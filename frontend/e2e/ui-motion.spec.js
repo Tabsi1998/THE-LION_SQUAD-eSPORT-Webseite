@@ -53,6 +53,8 @@ test.describe("Oberfläche, Welle 1: Kopfleiste, Menü, Seitenwechsel, Social-Lo
     await page.goto("/");
     const header = page.getByTestId("site-header");
     await expect(header).toHaveAttribute("data-compact", "0");
+    // Erst messen, wenn die Startseite geladen ist - sonst vergleicht der Test die Platzhalter mit dem Inhalt.
+    await expect(page.getByTestId("skeleton")).toHaveCount(0);
     const before = await headerState(page);
     expect(before.barHeight).toBe(before.headerHeight);
     if (SHOTS) await page.screenshot({ path: `${SHOTS}/kopf-voll-1440.png`, clip: { x: 0, y: 0, width: 1440, height: 130 } });

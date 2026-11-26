@@ -237,7 +237,9 @@ function PlayerRow({ match, slot, regMap, findMatch, result, played, isWinner, i
     >
       <span className="w-4 shrink-0 text-right tls-type-small tls-type-num text-quiet">{seed || ""}</span>
       <SlotAvatar avatar={reg?.user?.avatar_url || reg?.avatar_url} label={label} empty={!reg} />
-      <span className={`tls-type-small min-w-0 flex-1 leading-tight ${(!label && pending) || singleWord ? "truncate" : "break-words"} ${nameTone}`} data-pending={!label && pending ? "1" : undefined} title={!label && pending ? pending : singleWord ? label : undefined}>
+      {/* Feste Kartenbreite im Baum: lange Namen und Platzhalter („Verlierer aus Winner Runde 1“) stehen mit 12 px in einer
+          Zeile statt abgeschnitten - die begründete Ausnahme zur Stufe „Klein“ (14 px), wie vor der Schrift-Treppe. */}
+      <span className={`${String(label || pending).length > (heat ? 14 : 22) ? "text-xs" : "tls-type-small"} min-w-0 flex-1 leading-tight ${(!label && pending) || singleWord ? "truncate" : "break-words"} ${nameTone}`} data-pending={!label && pending ? "1" : undefined} title={!label && pending ? pending : singleWord ? label : undefined}>
         {bye ? "Freilos" : label || pending || "—"}
       </span>
       {isMine ? <span className="tls-you-tag">{youLabel(reg)}</span> : null}

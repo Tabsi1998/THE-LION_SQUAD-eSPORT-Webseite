@@ -1,6 +1,7 @@
 import { CountUp } from "@/components/tls/motion/CountUp";
 import { formatCount } from "@/lib/countUp";
 import { MedalMark, medalTone } from "@/components/tls/references/overviewParts";
+import { ShortCaps } from "@/components/tls/ShortCaps";
 
 // Kopf der Referenzen-Übersicht (#1878): Überschrift mit Einleitung und Sprungmarken, rechts die Ehrentafel - Siege,
 // Zweite und Dritte als große Zahlen mit Medaillen-Ring, darunter Teilnahmen, Spiele, laufende Saisons, Aufstiege und
@@ -14,7 +15,7 @@ export function HonorHeader({ stats, links }) {
       <div className="tls-ref-hero max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-9 pb-7 md:pt-20 md:pb-16">
         <div className="tls-ref-hero__intro tls-ref-rise flex flex-col gap-4 md:gap-[22px] min-w-0" style={{ "--tls-ref-i": 0 }}>
           <div className="tls-type-label text-honor">Verein · Erfolgswand</div>
-          <h1 className="m-0 tls-type-hero leading-[0.95] break-words [text-wrap:balance]">Erfolge &amp; Referenzen</h1>
+          <h1 className="m-0 tls-type-title leading-[0.95] break-words [text-wrap:balance]"><ShortCaps>Erfolge &amp; Referenzen</ShortCaps></h1>
           <p className="m-0 max-w-[52ch] text-muted-text tls-type-body">
             Wo THE LION SQUAD im Namen des Vereins angetreten ist – in Turnieren, Rennligen und Team-Ligen. Mit allem, was dabei herausgekommen ist.
           </p>

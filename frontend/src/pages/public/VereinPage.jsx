@@ -11,6 +11,7 @@ import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 import { memberNews, tileNote } from "@/lib/memberArea";
 import { viennaDate } from "@/lib/vienna";
 import { referenceHref } from "@/lib/seasonClose";
+import { ShortCaps } from "@/components/tls/ShortCaps";
 
 // /verein (#1147): das Ziel des Eintrags „Verein“ in der Handy-Leiste - derselbe Aufbau wie der Tab in der App.
 // Mitglieder sehen oben kurz ihren Bereich „Verein“ (mit dem Weg nach /mein-bereich/verein, #2059), alle anderen „Mitglied werden“ mit
@@ -88,7 +89,7 @@ export default function VereinPage() {
       <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10 md:py-12 space-y-10" data-testid="verein-page">
         <header>
           <span className="tls-type-label text-[#29B6E8]">THE LION SQUAD</span>
-          <h1 className="mt-2 tls-type-hero">Verein</h1>
+          <h1 className="mt-2 tls-type-title"><ShortCaps>Verein</ShortCaps></h1>
         </header>
 
         {member ? (

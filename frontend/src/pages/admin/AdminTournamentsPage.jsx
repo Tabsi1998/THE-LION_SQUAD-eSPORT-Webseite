@@ -266,32 +266,32 @@ function TournamentList() {
         <table className="w-full tls-type-small xl:min-w-[860px]">
           <thead className="bg-[#0A0A0A] tls-type-label text-white/50">
             <tr>
-              <th className="text-left px-4 py-3">Titel</th>
-              <th className="text-left px-4 py-3">Spiel</th>
-              <th className="text-left px-4 py-3">Format</th>
-              <th className="hidden text-left px-4 py-3 xl:table-cell">Regeln</th>
-              <th className="text-left px-4 py-3">Status</th>
-              <th className="text-right px-4 py-3">Teilnehmer</th>
-              <th className="text-right px-4 py-3">Aktion</th>
+              <th className="text-left px-3 py-3">Titel</th>
+              <th className="text-left px-3 py-3">Spiel</th>
+              <th className="text-left px-3 py-3">Format</th>
+              <th className="hidden text-left px-3 py-3 xl:table-cell">Regeln</th>
+              <th className="text-left px-3 py-3">Status</th>
+              <th className="text-right px-3 py-3">Teilnehmer</th>
+              <th className="text-right px-3 py-3">Aktion</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-white/5">
             {filteredList.map((t) => (
               <tr key={t.id} data-testid={`admin-tr-${t.slug}`}>
-                <td className="px-4 py-3">
+                <td className="px-3 py-3">
                   <Link to={`/admin/tournaments/${t.id}`} className="font-semibold [overflow-wrap:anywhere] hover:text-[#29B6E8]">{t.title}</Link>
                   <div className="mt-1 xl:hidden"><RulePills tournament={t} compact /></div>
                 </td>
-                <td className="px-4 py-3 text-white/70">{gameLabel(t.game) || "—"}</td>
-                <td className="px-4 py-3 text-white/70">{formatTournamentDisplay(t)}</td>
-                <td className="hidden px-4 py-3 xl:table-cell">
+                <td className="px-3 py-3 text-white/70">{gameLabel(t.game) || "—"}</td>
+                <td className="px-3 py-3 text-white/70">{formatTournamentDisplay(t)}</td>
+                <td className="hidden px-3 py-3 xl:table-cell">
                   <RulePills tournament={t} />
                 </td>
-                <td className="px-4 py-3">
+                <td className="px-3 py-3">
                   <StatusCell tournament={t} leads={isTournamentLead} endedClassName="mt-1 block max-w-[14rem]" />
                 </td>
-                <td className="px-4 py-3 text-right">{t.participant_count}/{t.max_participants}</td>
-                <td className="px-4 py-3 text-right">
+                <td className="px-3 py-3 text-right">{t.participant_count}/{t.max_participants}</td>
+                <td className="px-3 py-3 text-right">
                   <div className="flex items-center justify-end gap-1">
                     <RowActions tournament={t} isTournamentLead={isTournamentLead} onStatus={setStatus} onDelete={del} />
                   </div>

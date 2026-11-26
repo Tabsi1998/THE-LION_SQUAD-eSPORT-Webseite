@@ -54,7 +54,7 @@ function PasteErrors({ errors, testId }) {
 function PersonToggle({ person, on, onToggle, testId = "result-lineup-person", size = "md" }) {
   return (
     <button type="button" aria-pressed={on} onClick={onToggle} data-testid={testId}
-      className={`tls-type-small inline-flex items-center gap-1.5 rounded-sm border transition-colors active:scale-[0.97] ${size === "sm" ? "min-h-[30px] px-2" : "min-h-[34px] px-2.5"} ${on ? "border-[#29B6E8] bg-[#29B6E8]/15 text-white" : "border-white/10 text-white/60 hover:text-white hover:border-white/25"}`}>
+      className={`inline-flex items-center gap-1.5 rounded-sm border transition-colors active:scale-[0.97] ${size === "sm" ? "min-h-[30px] px-2 tls-type-small" : "min-h-[34px] px-2.5 tls-type-small"} ${on ? "border-[#29B6E8] bg-[#29B6E8]/15 text-white" : "border-white/10 text-white/60 hover:text-white hover:border-white/25"}`}>
       <span className={`inline-flex h-3.5 w-3.5 items-center justify-center rounded-[3px] ${on ? "bg-[#29B6E8] text-[#04121a]" : "ring-1 ring-inset ring-white/25"}`} aria-hidden="true">
         {on && <Check className="h-3 w-3" strokeWidth={3.5} />}
       </span>

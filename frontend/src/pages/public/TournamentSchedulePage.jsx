@@ -28,6 +28,7 @@ import { formatWhen } from "@/lib/datetime";
 import { seoTextPreview } from "@/lib/textPreview";
 import { viennaDate } from "@/lib/vienna";
 import { groupByRound, groupByStation, hasStations, onlyMine, scheduleEntries } from "@/lib/scheduleView";
+import { ShortCaps } from "@/components/tls/ShortCaps";
 
 // Öffentlicher Spielplan (#1562) im Bild des neuen Turnierbaums (#1561): ruhige Karten, Sieger mit Cyan-Strich, laufende
 // Spiele atmen in der Live-Farbe. Zwei Sichten - nach Runden und, vor Ort, je Station als einfache Liste nach Zeit -
@@ -218,7 +219,7 @@ export default function TournamentSchedulePage() {
         <Breadcrumbs items={tournamentCrumbs(tournament, trail, { tournamentUrl, current: { label: "Spielplan" } })} className="mb-3" />
         <div className="mt-3 flex flex-wrap items-end justify-between gap-3">
           <div>
-            <h1 className="tls-type-hero">Spielplan</h1>
+            <h1 className="tls-type-title"><ShortCaps>Spielplan</ShortCaps></h1>
             <p className="mt-3 text-white/60 max-w-2xl">Alle Runden, Zeiten und Stationen. Ein Spiel antippen öffnet seine Spielseite mit Chat und Ergebnis.</p>
           </div>
           {/* Druckansicht (#1283): mit leeren Feldern für das Ergebnis zum Handschreiben. */}

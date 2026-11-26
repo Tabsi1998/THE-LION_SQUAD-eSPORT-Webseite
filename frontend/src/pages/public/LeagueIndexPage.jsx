@@ -14,6 +14,7 @@ import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 import { seasonPath } from "@/lib/leaguePage";
 import { viennaDate } from "@/lib/vienna";
 import "@/components/tls/league/public/league.css";
+import { ShortCaps } from "@/components/tls/ShortCaps";
 
 const STATUS = { draft: "Startet bald", active: "Läuft", completed: "Beendet" };
 
@@ -34,7 +35,7 @@ export default function LeagueIndexPage() {
     <PublicLayout>
       <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
         <Breadcrumbs items={[{ label: "Start", to: "/" }, { label: "Liga" }]} className="mb-3" />
-        <h1 className="tls-type-hero">Liga</h1>
+        <h1 className="tls-type-title"><ShortCaps>Liga</ShortCaps></h1>
         <p className="mt-3 max-w-2xl text-white/65">Wochen statt Turniertag: Jede Woche ein Spieltag, Termin unter den Teams ausgemacht, Tabelle nach jeder Runde.</p>
         {leagues === null ? <div className="tls-league-skeleton mt-10" aria-busy="true" aria-label="Lade Ligen" /> : null}
         {leagues && !leagues.length ? (

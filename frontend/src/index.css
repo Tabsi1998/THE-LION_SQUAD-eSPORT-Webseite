@@ -3035,6 +3035,13 @@ html[data-season-still-cards] .tls-card[data-season-perch="card"]:focus-visible 
 }
 .tls-steps[data-compact] .tls-steps__item[data-state="current"] .tls-steps__count { display: inline; }
 
+/* Verwaltung am Handy und Tablet: Die Kopfleiste klebt oben. Was per Tastatur oder Sprung ins Bild kommt (eine wischbare
+   Tabelle, ein Knopf darin), landet darunter statt verdeckt (#1302: mit 12-px-Etiketten rückten die ersten Knöpfe der
+   Finanz-Tabellen unter die Leiste). */
+@media (max-width: 1023px) {
+  html:has([data-admin-topbar]) { scroll-padding-top: 4.5rem; }
+}
+
 /* Tippfläche (#1155): mindestens 44 × 44 px am Handy, ohne das Aussehen zu ändern - eine unsichtbare Fläche um die
    Mitte. Für kleine Symbol-Knöpfe, Schalter und Textlinks außerhalb von Fließtext. In der Komponenten-Ebene, damit
    `absolute` oder `fixed` am selben Element weiter gelten. */

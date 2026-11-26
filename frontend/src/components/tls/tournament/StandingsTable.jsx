@@ -125,7 +125,9 @@ export function StandingsTable({ rows, kind = "league", changed, registerRow, ce
   // Ecken-Klammern (#1316) nur für „du“ und dein Team - die Marke „Verein“ (Rennserien, TeamLeague) ist kein „du“.
   const markYou = mineLabel !== "Verein";
   return (
-    // Bei großer Schrift (200 %) am Handy schiebt sich die Tabelle seitlich, statt die Punkte abzuschneiden.
+    // Bei großer Schrift (200 %) am Handy schiebt sich die Tabelle seitlich, statt die Punkte abzuschneiden. Die Etiketten
+    // im Kopf haben seit der Schrift-Treppe (#1302) 12 px: die Punkte-Spalte rückt am Handy 4 px näher an den Rand, damit
+    // ein Name wie „Grenzlandfalken“ bei 320 px weiter in eine Zeile passt (#2498).
     // eslint-disable-next-line jsx-a11y/no-noninteractive-tabindex -- eine scrollbare Fläche muss per Tastatur erreichbar sein (axe: scrollable-region-focusable)
     <div role="region" aria-label={label} tabIndex={0} className="tls-standings border border-white/10 rounded-md bg-[var(--tls-surface-1)] tls-swipe pb-0 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#29B6E8]">
       <table className="w-full tls-type-small tabular-nums" aria-label={label}>
@@ -134,7 +136,7 @@ export function StandingsTable({ rows, kind = "league", changed, registerRow, ce
             <th scope="col" className="text-left pl-3 sm:pl-4 pr-1 py-2.5 w-12 sm:w-16 font-semibold">#</th>
             <th scope="col" className="text-left px-2 py-2.5 font-semibold">{nameLabel}</th>
             {columns.map((column) => (
-              <th key={column.key} scope="col" title={column.title} data-col={column.key} className={`px-1.5 sm:px-2.5 py-2.5 font-semibold ${column.key === "form" ? "text-left" : "text-right"} ${column.wide ? "hidden sm:table-cell" : ""} ${column.strong ? "pr-3 sm:pr-4" : ""}`}>
+              <th key={column.key} scope="col" title={column.title} data-col={column.key} className={`px-1.5 sm:px-2.5 py-2.5 font-semibold ${column.key === "form" ? "text-left" : "text-right"} ${column.wide ? "hidden sm:table-cell" : ""} ${column.strong ? "pr-2 sm:pr-4" : ""}`}>
                 {column.label}
               </th>
             ))}
@@ -158,7 +160,7 @@ export function StandingsTable({ rows, kind = "league", changed, registerRow, ce
               >
                 <td className="tls-standing-rank pl-3 sm:pl-4 pr-1 py-2.5 align-middle">
                   <span className="flex items-center gap-1.5">
-                    <span className="tls-type-card tls-type-num text-white w-5 text-right">{row.rank}</span>
+                    <span className="tls-type-body tls-type-num text-white w-5 text-right">{row.rank}</span>
                     {/* Zone für Auf- und Abstieg (F.2): der Strich links trägt die Farbe, für Screenreader das Wort. */}
                     {ZONE_LABELS[row.zone] ? <span className="sr-only">{ZONE_LABELS[row.zone]}</span> : null}
                     <ZoneMark zone={row.zone} testId={`standing-zone-${row.registration_id}`} />
@@ -175,7 +177,7 @@ export function StandingsTable({ rows, kind = "league", changed, registerRow, ce
                   <Notes row={row} labels={tiebreakLabels} />
                 </td>
                 {columns.map((column) => (
-                  <td key={column.key} data-col={column.key} className={`tls-type-body px-1.5 sm:px-2.5 py-2.5 align-middle ${column.key === "form" ? "text-left" : "text-right"} ${column.wide ? "hidden sm:table-cell" : ""} ${column.strong ? "pr-3 sm:pr-4 font-bold text-white" : "text-white/70"}`}>
+                  <td key={column.key} data-col={column.key} className={`px-1.5 sm:px-2.5 py-2.5 align-middle ${column.key === "form" ? "text-left" : "text-right"} ${column.wide ? "hidden sm:table-cell" : ""} ${column.strong ? "pr-2 sm:pr-4 tls-type-body tls-type-num text-white" : "text-white/70"}`}>
                     {/* Punkte zählen beim ersten Sichtbarwerden hoch (#1969); beim Nachladen steht der neue Wert sofort da -
                         die Zeile selbst leuchtet schon auf (tls-changed-row), ein zweites Aufleuchten wäre zu viel. */}
                     {column.key === "form" ? <Form form={row.form} /> : column.strong ? <CountUp value={standingCell(column, row)} flash={false} /> : standingCell(column, row)}

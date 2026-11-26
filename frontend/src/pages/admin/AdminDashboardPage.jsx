@@ -563,7 +563,7 @@ export default function AdminDashboardPage() {
               <div className="tls-type-section tls-type-num text-[#FFD700]" data-testid="growth-total-accounts">{growthData.length ? growthData[growthData.length - 1].total_users : "—"}</div>
             </div>
             <div>
-              <div className="tls-type-label text-white/45">Neue Vereinsmitglieder</div>
+              <div className="tls-type-label text-white/45 hyphens-auto [overflow-wrap:anywhere]">Neue Vereinsmitglieder</div>
               <div className="tls-type-section tls-type-num text-white" data-testid="growth-new-club-members">{newClubMembers30d ?? "—"}</div>
             </div>
           </div>
@@ -620,7 +620,7 @@ export default function AdminDashboardPage() {
                 <s.icon className="w-4 h-4 text-[#29B6E8]" />
                 {s.ok !== undefined ? <StatusDot ok={s.ok} /> : <span className="text-[#29B6E8] opacity-0 group-hover:opacity-100 transition">→</span>}
               </div>
-              <div className="mt-3 tls-type-label text-white">{s.label}</div>
+              <div className="mt-3 tls-type-label text-white hyphens-auto [overflow-wrap:anywhere]">{s.label}</div>
               <div className="mt-1 tls-type-small text-white/45 leading-relaxed tls-wrap">{s.detail}</div>
             </Link>
           ))}

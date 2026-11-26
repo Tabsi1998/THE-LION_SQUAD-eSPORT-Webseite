@@ -49,9 +49,9 @@ test("Seitentitel aus einer Eigenschaft `title` bekommt ShortCaps", () => {
   assert.match(code, /<h1 className="tls-type-title"><ShortCaps>\{title\}<\/ShortCaps><\/h1>/);
 });
 
-test("Bühne: sehr groß, wenige feste Wörter - tls-type-hero", () => {
-  const { code } = run('<h1 className="font-heading text-4xl sm:text-5xl lg:text-7xl font-black uppercase tracking-tighter leading-[0.95] text-white">Wir sind das Rudel</h1>');
-  assert.equal(code, '<h1 className="tls-type-hero leading-[0.95] text-white">Wir sind das Rudel</h1>');
+test("auch eine sehr große h1 ist Seitentitel - die Bühne setzt man von Hand", () => {
+  const { code } = run('<h1 className="font-heading text-4xl sm:text-5xl lg:text-7xl font-black uppercase tracking-tighter leading-[0.95] text-white">Galerie</h1>');
+  assert.match(code, /<h1 className="tls-type-title leading-\[0\.95\] text-white"><ShortCaps>Galerie<\/ShortCaps><\/h1>/);
 });
 
 test("h2 wird Abschnitt (Outfit, normal geschrieben), h3 und Kartentitel werden Kartentitel", () => {
@@ -232,4 +232,14 @@ test("Kleintext lesbar (#1232): Klein und Etikett in Weiß 25-42 % werden ruhige
 test("der Titel eines Moments bleibt in der Vereinsschrift", () => {
   const moment = '<h2 key="title" className="tls-placement__title font-heading">{title}</h2>';
   assert.equal(run(moment).code, moment);
+});
+
+test("Größe nur in einem Zweig: die Stufe kommt nur in diesen Zweig, die anderen erben weiter", () => {
+  assert.equal(run('<td className={`px-2 ${strong ? "font-display text-base font-bold text-white" : "text-white/70"}`}>{value}</td>').code,
+    '<td className={`px-2 ${strong ? "tls-type-card tls-type-num text-white" : "text-white/70"}`}>{value}</td>');
+});
+
+test("Zahl am Handy klein gedacht (Kachel-Reihe): höchstens Abschnitt", () => {
+  assert.equal(run('<div className="font-display text-lg sm:text-2xl md:text-3xl font-black tabular-nums truncate">{value}</div>').code,
+    '<div className="tls-type-section tls-type-num truncate">{value}</div>');
 });

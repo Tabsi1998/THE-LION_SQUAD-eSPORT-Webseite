@@ -12,6 +12,7 @@ import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 import { asInstant, viennaDateTime } from "@/lib/vienna";
 import { formatDuration } from "@/lib/datetime";
+import { ShortCaps } from "@/components/tls/ShortCaps";
 
 const statusLabels = { online: "Online", offline: "Offline", maintenance: "Wartung", planned: "Geplant" };
 const visibilityLabels = { public: "Öffentlich", community: "Community", members: "Vereinsmitglieder", internal: "Intern" };
@@ -97,7 +98,7 @@ export default function ServersPage() {
     <PublicLayout>
       <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-14">
         <span className="tls-type-label text-[#29B6E8]">Community</span>
-        <h1 className="mt-3 pb-2 tls-type-hero leading-[0.95]">Server</h1>
+        <h1 className="mt-3 pb-2 tls-type-title leading-[0.95]"><ShortCaps>Server</ShortCaps></h1>
         <p className="mt-4 max-w-3xl text-white/65">
           Unsere Community- und Vereinsserver. Öffentliche Server sind direkt sichtbar, Community-Server nach dem Anmelden und Vereinsserver nur für aktive Vereinsmitglieder.
         </p>

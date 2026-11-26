@@ -18,6 +18,7 @@ import { formatWhen } from "@/lib/datetime";
 import { KIND_COLORS } from "@/lib/categoryColors";
 import { scheduleLine } from "@/lib/eventDays";
 import { splitTournamentTitle } from "@/lib/tournamentTitle";
+import { ShortCaps } from "@/components/tls/ShortCaps";
 
 // Events (#1182): das Event als Klammer um seine Turniere und Fast Laps - eine Karte für die Herbst-LAN, darin jedes
 // Turnier mit Tag, Uhrzeit, Spielart und dem eigenen Stand (aufklappbar). Turniere und Fast Laps ohne Event stehen für
@@ -138,7 +139,7 @@ export default function EventsPage() {
     <PublicLayout>
       <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
         <span className="tls-type-label text-[#9F7AEA]">VEREINSEVENTS</span>
-        <h1 className="mt-2 tls-type-hero break-words">Events</h1>
+        <h1 className="mt-2 tls-type-title break-words"><ShortCaps>Events</ShortCaps></h1>
         <p className="mt-3 text-white/60 max-w-2xl">
           LAN-Partys, Vereinsabende, Messen, Turniere und Fast Laps. Was zu einem Event gehört, steht in seiner Karte.
         </p>

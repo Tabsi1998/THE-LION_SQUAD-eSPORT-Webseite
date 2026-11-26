@@ -10,6 +10,7 @@ import { useLiveRefresh } from "@/hooks/useLiveRefresh";
 import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 import { useOptionalAuth } from "@/context/AuthContext";
 import { sortByNearestDate } from "@/lib/contentSort";
+import { ShortCaps } from "@/components/tls/ShortCaps";
 
 const PAGE_SIZE = 24;
 // Der Server gibt höchstens 200 je Abruf zurück (_page_items) - so weit lädt „Mehr laden“ nach.
@@ -171,7 +172,7 @@ export default function TournamentsPage() {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12 md:py-16">
         <div className="mb-10">
           <span className="tls-type-label text-[#29B6E8]">Turniere</span>
-          <h1 className="mt-2 tls-type-hero">Alle Turniere</h1>
+          <h1 className="mt-2 tls-type-title"><ShortCaps>Alle Turniere</ShortCaps></h1>
           <p className="mt-3 text-white/60 max-w-xl">Online und vor Ort. Einzelspieler, Teams und Mehrspieler. Vom kleinen Pokal bis zur Saison-Liga.</p>
         </div>
         {/* Handy: beide Zeilen einzeilig zum Wischen; ab Tablet brechen sie um (#1276). */}

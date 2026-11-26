@@ -14,6 +14,7 @@ import { formatWhen } from "@/lib/datetime";
 import { compareByNearestDate, sortByNearestDate } from "@/lib/contentSort";
 import { ArrowRight, CalendarDays, Flag, Medal, Radio, Shield, Trophy, Users } from "lucide-react";
 import { viennaDate } from "@/lib/vienna";
+import { ShortCaps } from "@/components/tls/ShortCaps";
 
 const ACTIVE_PHASES = new Set(["registration", "check_in", "live", "upcoming"]);
 const ACTIVE_STATUSES = new Set(["scheduled", "registration_open", "registration_closed", "check_in", "live"]);
@@ -84,7 +85,7 @@ export default function EsportsOverviewPage() {
         <div className="relative mx-auto grid max-w-7xl gap-8 px-4 py-16 sm:px-6 md:grid-cols-[minmax(0,1fr)_360px] md:py-20 lg:px-8">
           <div className="max-w-3xl self-end">
             <span className="tls-type-label text-[#29B6E8]">THE LION SQUAD</span>
-            <h1 className="mt-3 tls-type-hero leading-none">eSports</h1>
+            <h1 className="mt-3 tls-type-title leading-none"><ShortCaps>eSports</ShortCaps></h1>
             <p className="mt-5 max-w-2xl tls-type-body leading-relaxed text-white/70">
               {league ? "Turniere, Liga, Fast-Lap-Challenges und Jahreswertung an einem Ort." : "Turniere, Fast-Lap-Challenges und Jahreswertung an einem Ort."} Alles, was aktiv ist oder als Nächstes kommt, findest du hier.
             </p>

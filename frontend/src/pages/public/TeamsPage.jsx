@@ -50,6 +50,7 @@ import { LeagueSeasonHistory } from "@/components/tls/league/LeagueSeasonHistory
 import { LeagueOverallStanding } from "@/components/tls/league/LeagueOverallStanding";
 import { LeagueSeasonLine } from "@/components/tls/league/LeagueSeasonLine";
 import { LeagueMomentHint } from "@/components/tls/league/LeagueMomentHint";
+import { ShortCaps } from "@/components/tls/ShortCaps";
 
 const TEAM_TAB_ALIASES = { awards: "trophies", trophies: "trophies", trophaeen: "trophies", overview: "overview" };
 
@@ -101,7 +102,7 @@ function TeamList() {
         <div className="flex items-end justify-between gap-4 flex-wrap">
           <div>
             <span className="tls-type-label text-[#29B6E8]">Teams</span>
-            <h1 className="mt-2 tls-type-hero">Teams & Clans</h1>
+            <h1 className="mt-2 tls-type-title"><ShortCaps>Teams & Clans</ShortCaps></h1>
             <p className="mt-3 text-white/60 max-w-xl">Erstelle dein Team, teile den Beitrittscode und verwalte Logo, Banner, Beschreibung und Discord-Link.</p>
           </div>
           {user ? (
@@ -832,7 +833,7 @@ function TeamColorPicker({ value, onChange }) {
 function TeamLogo({ team, size = "md", bare = false }) {
   const cls = bare ? "w-full h-full" : `${size === "lg" ? "w-28 h-28 tls-type-section" : "w-16 h-16 tls-type-card"} bg-[#0A0A0A] border border-white/10 rounded-sm`;
   return (
-    <div className={`${cls} tls-type-card flex items-center justify-center shrink-0 overflow-hidden ${bare ? "bg-[#0A0A0A]" : ""}`}>
+    <div className={`${cls} flex items-center justify-center shrink-0 overflow-hidden ${bare ? "tls-type-card bg-[#0A0A0A]" : ""}`}>
       {team.logo_url ? <img src={resolveMediaUrl(team.logo_url)} alt={team.name} className="w-full h-full object-cover" /> : <span className="font-black text-[#29B6E8]">{team.tag}</span>}
     </div>
   );

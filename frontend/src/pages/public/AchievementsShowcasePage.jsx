@@ -189,7 +189,7 @@ export default function AchievementsShowcasePage() {
               <div className="flex items-center gap-2 tls-type-label text-[#29B6E8]">
                 <Sparkles className="w-4 h-4" /> Ruhmeshalle
               </div>
-              <h1 className="tls-type-hero mt-2 sm:mt-3 leading-none">
+              <h1 className="tls-type-title mt-2 sm:mt-3 leading-none">
                 Achieve<span className="text-[#FFD700]">ments</span>
               </h1>
               <p className="mt-4 max-w-2xl tls-type-body text-white/60">
@@ -200,7 +200,7 @@ export default function AchievementsShowcasePage() {
             <WeekTile week={overview?.week} loading={loading} />
           </div>
 
-          <div className="mt-6 sm:mt-8 grid grid-cols-4 gap-2 sm:gap-3" data-testid="achievements-stats">
+          <div className="mt-6 sm:mt-8 grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-3" data-testid="achievements-stats">
             <StatCard icon={Trophy} label="Erfolge" value={stats.tierCount} accent="#FFD700" />
             <StatCard icon={Target} label="Punkte zu holen" value={stats.pointsTotal} accent="#29B6E8" />
             <StatCard icon={Flame} label="Kategorien" value={stats.categoryCount} accent="#00FF88" />
@@ -231,7 +231,7 @@ export default function AchievementsShowcasePage() {
             <Layers className="w-5 h-5 text-[#00FF88]" />
             <h2 className="tls-type-section">Kategorien</h2>
           </div>
-          <p className="mb-2 sm:mb-4 tls-type-label text-quiet" data-testid="categories-caption">
+          <p className="mb-2 sm:mb-4 tls-type-small text-quiet" data-testid="categories-caption">
             {mine ? "Dein Fortschritt je Kategorie · was du selbst erreichen kannst" : `Fortschritt der Community · ${overview?.rarity?.base ?? 0} Konten`}
             <span className="hidden sm:inline"> · antippen zeigt die Abzeichen</span>
           </p>
@@ -655,7 +655,7 @@ function StatCard({ icon: Icon, label, value, accent, testId }) {
       style={{ boxShadow: `inset 0 0 0 1px ${accent}12` }}
     >
       <Icon className="w-4 h-4 sm:w-5 sm:h-5 mb-1 sm:mb-2" style={{ color: accent }} />
-      <div className="tls-type-title tls-type-num truncate">{value}</div>
+      <div className="tls-type-section tls-type-num truncate">{value}</div>
       <div className="tls-type-label sm:tracking-widest text-white/45 mt-0.5 sm:mt-1 leading-tight">{label}</div>
     </div>
   );

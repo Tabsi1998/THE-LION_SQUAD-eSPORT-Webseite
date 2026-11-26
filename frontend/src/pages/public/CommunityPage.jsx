@@ -61,7 +61,7 @@ export default function CommunityPage() {
     <PublicLayout>
       <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
         <span className="tls-type-label text-[#29B6E8]">Community</span>
-        <h1 className="mt-2 tls-type-hero">Konten, Teams & Verein</h1>
+        <h1 className="mt-2 tls-type-title">Konten, Teams & Verein</h1>
         <p className="mt-4 text-white/60 max-w-3xl" data-testid="community-explainer">
           <span className="text-white">Community-Konten</span> hat jeder mit Website-Konto und öffentlichem Profil. <span className="text-white">Vereinsmitglieder</span> sind die eingetragenen Mitglieder laut Mitgliederverwaltung – im Verzeichnis stehen die, die das wollen.
         </p>

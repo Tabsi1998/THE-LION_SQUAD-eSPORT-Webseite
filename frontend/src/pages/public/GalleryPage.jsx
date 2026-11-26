@@ -12,6 +12,7 @@ import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 import { Image as ImageIcon, Crown, Film, Layers } from "lucide-react";
 import { viennaDate } from "@/lib/vienna";
 import { GALLERY_LIST_GRID_SIZES } from "@/lib/gallerySizes";
+import { ShortCaps } from "@/components/tls/ShortCaps";
 
 export default function GalleryPage() {
   useDocumentTitle(
@@ -39,7 +40,7 @@ export default function GalleryPage() {
     <PublicLayout>
       <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
         <span className="tls-type-label text-[#29B6E8]">RUDEL-IMPRESSIONEN</span>
-        <h1 className="mt-2 tls-type-hero">Galerie</h1>
+        <h1 className="mt-2 tls-type-title"><ShortCaps>Galerie</ShortCaps></h1>
         <p className="mt-3 text-white/60 max-w-2xl">
           Eindrücke aus Turnieren, LAN-Partys, Events und allem dazwischen.
         </p>

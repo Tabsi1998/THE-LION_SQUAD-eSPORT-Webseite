@@ -910,7 +910,7 @@ function ParticipantList({ title, rows, testId }) {
 function MiniStat({ label, value }) {
   return (
     <div className="border border-white/10 bg-[#0A0A0A] rounded-sm p-3">
-      <div className="tls-type-label text-quiet">{label}</div>
+      <div className="tls-type-label text-quiet hyphens-auto [overflow-wrap:anywhere]">{label}</div>
       <div className="mt-1 tls-type-card tls-type-num">{value}</div>
     </div>
   );

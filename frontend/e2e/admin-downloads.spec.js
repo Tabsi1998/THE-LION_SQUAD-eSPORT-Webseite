@@ -179,7 +179,7 @@ test("admin downloads keep working when optional source lists fail", async ({ pa
 
   await page.getByTestId("single-qr-type").selectOption("fastlap");
   await page.getByTestId("single-qr-source").selectOption("f1-1");
-  await expect(page.locator(".font-heading", { hasText: "Gamers Heaven • F1 25 • Fastest Lap Challenge | Samstag" })).toBeVisible();
+  await expect(page.locator(".tls-type-card", { hasText: "Gamers Heaven • F1 25 • Fastest Lap Challenge | Samstag" })).toBeVisible();
   await expect(page.getByTestId("branded-qr-code").first()).toBeVisible();
 
   await page.getByTestId("qr-event").selectOption("event-1");

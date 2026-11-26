@@ -28,7 +28,7 @@ const CLASS_TOKEN = /^[!-]?[[a-z0-9@][\w:./%#[\]()=,&>*+~'"-]*$/i;
 const TYPE_TOKEN = /^(?:(?:sm|md|lg|xl|2xl):)?text-(?:xs|sm|base|lg|[2-9]?xl|\[[\d.]+(?:px|rem)\]|\[clamp)|^font-(?:heading|display)$|^uppercase$|^tabular-nums$|^tls-card__title$/;
 const STEP_CLASS = /^tls-type-/;
 // Schalter für Vergleichsläufe: blockText = ein langer Text zählt je Block, nicht über alle Spalten zusammen.
-export const OPTIONS = { blockText: true };
+export const OPTIONS = { blockText: true, branchOnly: true, numCap: true };
 
 // Was ein Name ist (Personen, Teams, Spiele, Titel): nie GROSS. Was ein Etikett ist (Zustand, Art, Rolle): darf GROSS.
 // Titel sind keine Namen: ein Titel im Etikett darf GROSS bleiben (kurz, 1-3 Wörter).
@@ -127,7 +127,6 @@ export function classify(tokens, ctx = {}) {
   if (tokens.includes("absolute") && tokens.includes("rounded-full") && t.desktop !== null && t.desktop < 12) return null;
 
   const px = t.desktop;
-  const staticWords = words(children.text || "");
   // Lang ist ein Text, wenn ein Block für sich lang ist - eine Kopfzeile mit fünf kurzen Spalten („# Fahrer Zeit …“) nicht.
   const blockText = OPTIONS.blockText && children.longestText !== undefined ? children.longestText : (children.text || "");
   const longStatic = words(blockText).length > 4 || blockText.length > 32;
@@ -144,16 +143,18 @@ export function classify(tokens, ctx = {}) {
   if (num) {
     if (px === null) return { step: null, num: true };
     if (px <= 12 && (t.upper || t.wide)) return { step: "label", num: false, keepTabular: t.tabular || t.display };
-    const step = px <= 15 ? "small" : px <= 20 ? "card" : px <= 27 ? "section" : px <= 47 ? "title" : "hero";
+    let step = px <= 15 ? "small" : px <= 20 ? "card" : px <= 27 ? "section" : px <= 47 ? "title" : "hero";
+    // Am Handy viel kleiner gedacht (`text-lg sm:text-2xl md:text-3xl` in einer Kachel-Reihe): nicht größer als der
+    // Abschnitt, sonst wird die Zahl in schmalen Spalten abgeschnitten.
+    if (OPTIONS.numCap && t.mobile !== null && t.mobile <= 20 && (step === "title" || step === "hero")) step = "section";
     return { step, num: true };
   }
 
   if (level === 1) {
     if (px === null && t.heading) return { step: "title", shortCaps: true };
-    if (px !== null && (px >= 20 || t.heading)) {
-      const hero = px >= 60 && !children.dynamic && staticWords.length > 0 && staticWords.length <= 4;
-      return { step: hero ? "hero" : "title", shortCaps: !hero };
-    }
+    // Jede h1 ist ein Seitentitel, auch eine sehr große. Die Bühne (tls-type-hero) setzt man von Hand: die Startseite und
+    // die wenigen Schlagzeilen-Seiten („Werde Teil des Rudels“).
+    if (px !== null && (px >= 20 || t.heading)) return { step: "title", shortCaps: true };
   } else if (level === 2) {
     // Unbounded nur für Bühne und Seitentitel (h1): auch eine große h2 ist ein Abschnitt.
     if ((px !== null && px >= 16) || (px === null && t.heading)) return { step: "section" };
@@ -435,6 +436,17 @@ export function transformSource(code, { file = "datei.jsx" } = {}) {
         return true;
       }
       decision = options[0];
+      // Größe nur in einem Zweig (`${strong ? "text-base font-display" : "text-white/70"}`): Die Stufe gehört nur in diesen
+      // Zweig - die anderen Zweige erben weiter die Größe der Umgebung.
+      const unsizedBranch = branches.some((piece) => !analyze(tokensOf([piece])).sizes.length);
+      if (OPTIONS.branchOnly && unsized && unsizedBranch) {
+        if (fixedTokens.some((token) => /^(font-heading|font-display|uppercase|tracking-.+)$/.test(token))) {
+          manual.push(`${file}:${node.loc.start.line} <${tag}> Schrift fest, Größe nur in einem Zweig`);
+          return true;
+        }
+        sizedBranches.forEach((piece) => editPiece(piece, decision, true));
+        return true;
+      }
     } else if (!decision) {
       // Eine Rolle nur in einem Zweig (z. B. `${big ? "font-heading" : ""}`): von Hand.
       const branchDecisions = branches.map((piece) => classify([...fixedTokens, ...tokensOf([piece])], ctx)).filter(Boolean);

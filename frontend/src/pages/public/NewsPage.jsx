@@ -81,7 +81,7 @@ export default function NewsPage() {
     <PublicLayout>
       <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
         <span className="tls-type-label text-[#29B6E8]">VEREINS-NEWS</span>
-        <h1 className="mt-2 tls-type-hero">News & Ankündigungen</h1>
+        <h1 className="mt-2 tls-type-title">News & Ankündigungen</h1>
         <p className="mt-3 text-white/60 max-w-2xl">
           Alles was im Rudel passiert — von Turnier-Recaps über Eventankündigungen bis zu Vereinsthemen.
         </p>
