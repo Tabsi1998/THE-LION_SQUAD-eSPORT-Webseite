@@ -113,8 +113,20 @@ def compare(before_path: str, after_path: str) -> int:
         if not same:
             (problems if strict else notes).append(label)
 
+    # Indizes zählen streng - nur eine Sammlung der Betriebsdaten, die es auf einer Seite nicht gibt (``ops_maintenance`` entsteht
+    # erst mit der Schreibpause und kommt mit dem Dump zurück), ist ein Hinweis.
+    def kept(name: str) -> bool:
+        return not (name in VOLATILE and (name not in before["index_specs"] or name not in after["index_specs"]))
+
+    stable_before = {name: rows for name, rows in before["index_specs"].items() if kept(name)}
+    stable_after = {name: rows for name, rows in after["index_specs"].items() if kept(name)}
     print("Übersicht")
     for key in before["summary"]:
+        if key == "indizes":
+            row("indizes (ohne neue Betriebsdaten)", sum(len(rows) for rows in stable_before.values()),
+                sum(len(rows) for rows in stable_after.values()))
+            row("indizes (alle)", before["summary"][key], after["summary"].get(key), strict=False)
+            continue
         row(key, before["summary"][key], after["summary"].get(key))
     print("Sammlungen (Anzahl)")
     for name in sorted(set(before["counts"]) | set(after["counts"])):
@@ -128,11 +140,12 @@ def compare(before_path: str, after_path: str) -> int:
         old, new = before["league"][name], after["league"].get(name) or {}
         row(f"{name} ({old['count']})", old["digest"][:16], (new.get("digest") or "")[:16])
     row("Tabellen der Liga-Staffeln", before["tables"]["digest"][:16], after["tables"]["digest"][:16])
-    row("Indizes (alle Sammlungen)", before["indexes"]["digest"][:16], after["indexes"]["digest"][:16])
-    if before["indexes"]["digest"] != after["indexes"]["digest"]:
-        for name, rows in before["index_specs"].items():
-            if rows != after["index_specs"].get(name):
-                print(f"    Index-Abweichung in {name}: vorher {[r['name'] for r in rows]} nachher {[r['name'] for r in after['index_specs'].get(name) or []]}")
+    row("Indizes (je Sammlung)", _digest(stable_before)[:16], _digest(stable_after)[:16])
+    for name in sorted(set(before["index_specs"]) | set(after["index_specs"])):
+        old, new = before["index_specs"].get(name), after["index_specs"].get(name)
+        if old != new:
+            label = "ABWEICHUNG" if kept(name) else "Hinweis"
+            print(f"    Indizes {name} ({label}): vorher {[r['name'] for r in old or []]} nachher {[r['name'] for r in new or []]}")
     row("Uploads (Pfad, Größe, SHA-256)", before["uploads"]["digest"][:16], after["uploads"]["digest"][:16])
     print()
     if problems:

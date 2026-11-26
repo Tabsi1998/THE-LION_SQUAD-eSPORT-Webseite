@@ -79,7 +79,13 @@ case "$(uname -s)" in
 esac
 if ! python3 -c 'import sys' >/dev/null 2>&1; then
   mkdir -p "$DIR/bin"
-  printf '#!/bin/sh\nexec "%s" "$@"\n' "$PYTHON" >"$DIR/bin/python3"
+  # Windows-Python schreibt Zeilenenden als CRLF; backup.sh liest Namen aus seiner Ausgabe (DB_NAME, Volume) - ohne „\r“ entfernen
+  # endete der Dateiname auf „\r“ (openssl: „Invalid argument“).
+  {
+    echo '#!/bin/bash'
+    echo 'set -o pipefail'
+    echo "\"$PYTHON\" \"\$@\" | tr -d '\\015'"
+  } >"$DIR/bin/python3"
   chmod +x "$DIR/bin/python3"
   export PATH="$POSIX_ROOT/$DIR_REL/bin:$PATH"  # PATH trennt mit „:“ - hier nie C:/…
 fi
@@ -146,8 +152,17 @@ seed() {
   (
     export G1_MONGO_URL="$url" G1_DB_NAME="$PROBE_DB" G1_DIR="$DIR/g1" G1_STATE="$DIR/g1/state.json" G1_SPECS="$SPECS" G1_TRACE=off
     export BACKEND_PORT="$BACKEND_PORT_VALUE" FRONTEND_PORT="$VITE_PORT" PYTHON="$PYTHON"
-    bash scripts/run_liga_g1.sh seed >"$DIR/g1-seed.log" 2>&1 || { tail -n 20 "$DIR/g1-seed.log"; exit 1; }
-    bash scripts/run_liga_g1.sh run >"$DIR/g1-run.log" 2>&1 || { grep -E "✘|failed|Error" "$DIR/g1-run.log" | head -20; exit 1; }
+    # Ein zweiter Versuch mit frischer Testwelt (die Specs verbrauchen ihre Daten): Der Vite-Entwicklungsserver baut beim ersten
+    # Aufruf mitunter seine Pakete neu (504 „Outdated Optimize Dep“) - das ist kein Fehler der Daten.
+    for attempt in 1 2; do
+      bash scripts/run_liga_g1.sh seed >"$DIR/g1-seed.log" 2>&1 || { tail -n 20 "$DIR/g1-seed.log"; exit 1; }
+      if bash scripts/run_liga_g1.sh run >"$DIR/g1-run-${attempt}.log" 2>&1; then
+        cp "$DIR/g1-run-${attempt}.log" "$DIR/g1-run.log"
+        exit 0
+      fi
+      grep -E "✘|failed|Error|Outdated" "$DIR/g1-run-${attempt}.log" | grep -v WebServer | head -12
+    done
+    exit 1
   ) || die "Die Gesamtabnahme auf dem Probe-Stand ist rot - ohne vollständige Daten kein Probelauf."
   good "Liga-Daten angelegt ($(grep -Eo '[0-9]+ passed' "$DIR/g1-run.log" | tail -1))"
 }
@@ -156,19 +171,26 @@ backup() {
   say "Backup mit Schreibpause (scripts/backup.sh)"
   safe_remove_dir "$BACKUP_DIR"; mkdir -p "$BACKUP_DIR"
   [ -s "$BACKUP_ENCRYPTION_PASSWORD_FILE" ] || (umask 077; openssl rand -base64 48 >"$BACKUP_ENCRYPTION_PASSWORD_FILE")
+  docker stats --no-stream --format "{{.Name}} {{.MemUsage}} {{.CPUPerc}}" $(docker compose ps -q) >"$DIR/stats-before-backup.txt" 2>&1 || true
   BACKUP_WRITE_PAUSE_SETTLE_SECONDS=5 bash scripts/backup.sh >"$DIR/backup.log" 2>&1 &
   local pid=$! status code=""
   # In der Pause: Lesen geht, Schreiben bekommt 503 (auch ohne Anmeldung, vor jeder Rechteprüfung).
   for _ in $(seq 1 120); do
     if docker compose exec -T backend python -m services.maintenance status 2>/dev/null | grep -q '"active": true'; then
-      code="$(curl -s -o /dev/null -w '%{http_code}' -X POST -H 'Content-Type: application/json' -d '{}' "http://127.0.0.1:${BACKEND_PORT_VALUE}/api/games")"
+      code="$(curl -s -o "$DIR/pause-write.txt" -w '%{http_code}' -X POST -H 'Content-Type: application/json' -d '{}' "http://127.0.0.1:${BACKEND_PORT_VALUE}/api/games" || true)"
       break
     fi
     kill -0 "$pid" 2>/dev/null || break
     sleep 0.5
   done
   set +e; wait "$pid"; status=$?; set -e
-  [ "$status" -eq 0 ] || { tail -n 30 "$DIR/backup.log"; die "backup.sh endete mit ${status}."; }
+  if [ "$status" -ne 0 ]; then
+    tail -n 30 "$DIR/backup.log"
+    # Zur Ursache: Speicher, Neustarts und OOM des Backends (mem_limit 2g in docker-compose.yml).
+    docker stats --no-stream --format '{{.Name}} {{.MemUsage}} {{.CPUPerc}}' $(docker compose ps -q) 2>&1 | tee -a "$DIR/backup.log" || true
+    docker inspect -f '{{.Name}} restarts={{.RestartCount}} oom={{.State.OOMKilled}} started={{.State.StartedAt}}' $(docker compose ps -q) 2>&1 | tee -a "$DIR/backup.log" || true
+    die "backup.sh endete mit ${status}."
+  fi
   [ "$code" = "503" ] || die "Schreibversuch in der Pause bekam ${code:-keine Antwort} statt 503."
   MANIFEST="$(ls -1 "$BACKUP_DIR"/tls_backup_*.manifest.json | tail -1)"
   [ "$(python3 scripts/backup-manifest.py field --manifest "$MANIFEST" --name consistent)" = "True" ] || die "Manifest sagt consistent=false."
