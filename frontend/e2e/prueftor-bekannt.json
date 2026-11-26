@@ -5,97 +5,97 @@
       "seite": "*",
       "art": "kontrast",
       "ziel": "color-contrast: [Fuß] .md\\:flex-row > span",
-      "grund": "Bestand vor dem Prüftor (#1660): Rahmen der Seite (Fuß mit text-white/40, Beschriftung der Handy-Leiste in 9 px) unter WCAG AA. Anpassung ändert jede Seite sichtbar und braucht Fabians Freigabe; bis dahin bekannt."
+      "grund": "Bestand vor dem Prüftor (#1660): Rahmen der Seite (Fuß mit text-white/40) unter WCAG AA. Anpassung ändert jede Seite sichtbar und braucht Fabians Freigabe; bis dahin bekannt."
     },
     {
       "seite": "*",
       "art": "kontrast",
       "ziel": "color-contrast: [Fuß] .md\\:justify-end > .hover\\:text-\\[\\#29B6E8\\].transition[type=\"button\"]",
-      "grund": "Bestand vor dem Prüftor (#1660): Rahmen der Seite (Fuß mit text-white/40, Beschriftung der Handy-Leiste in 9 px) unter WCAG AA. Anpassung ändert jede Seite sichtbar und braucht Fabians Freigabe; bis dahin bekannt."
+      "grund": "Bestand vor dem Prüftor (#1660): Rahmen der Seite (Fuß mit text-white/40) unter WCAG AA. Anpassung ändert jede Seite sichtbar und braucht Fabians Freigabe; bis dahin bekannt."
     },
     {
       "seite": "*",
       "art": "kontrast",
       "ziel": "color-contrast: [Fuß] .md\\:justify-end > .transition[type=\"button\"]",
-      "grund": "Bestand vor dem Prüftor (#1660): Rahmen der Seite (Fuß mit text-white/40, Beschriftung der Handy-Leiste in 9 px) unter WCAG AA. Anpassung ändert jede Seite sichtbar und braucht Fabians Freigabe; bis dahin bekannt."
+      "grund": "Bestand vor dem Prüftor (#1660): Rahmen der Seite (Fuß mit text-white/40) unter WCAG AA. Anpassung ändert jede Seite sichtbar und braucht Fabians Freigabe; bis dahin bekannt."
     },
     {
       "seite": "*",
       "art": "kontrast",
       "ziel": "color-contrast: [Fuß] .md\\:justify-end > button[type=\"button\"]",
-      "grund": "Bestand vor dem Prüftor (#1660): Rahmen der Seite (Fuß mit text-white/40, Beschriftung der Handy-Leiste in 9 px) unter WCAG AA. Anpassung ändert jede Seite sichtbar und braucht Fabians Freigabe; bis dahin bekannt."
+      "grund": "Bestand vor dem Prüftor (#1660): Rahmen der Seite (Fuß mit text-white/40) unter WCAG AA. Anpassung ändert jede Seite sichtbar und braucht Fabians Freigabe; bis dahin bekannt."
     },
     {
       "seite": "*",
       "art": "kontrast",
       "ziel": "color-contrast: [Fuß] .py-5.md\\:flex-row.lg\\:px-8 > span",
-      "grund": "Bestand vor dem Prüftor (#1660): Rahmen der Seite (Fuß mit text-white/40, Beschriftung der Handy-Leiste in 9 px) unter WCAG AA. Anpassung ändert jede Seite sichtbar und braucht Fabians Freigabe; bis dahin bekannt."
+      "grund": "Bestand vor dem Prüftor (#1660): Rahmen der Seite (Fuß mit text-white/40) unter WCAG AA. Anpassung ändert jede Seite sichtbar und braucht Fabians Freigabe; bis dahin bekannt."
     },
     {
       "seite": "*",
       "art": "kontrast",
       "ziel": "color-contrast: [Fuß] .text-white\\/40 > span",
-      "grund": "Bestand vor dem Prüftor (#1660): Rahmen der Seite (Fuß mit text-white/40, Beschriftung der Handy-Leiste in 9 px) unter WCAG AA. Anpassung ändert jede Seite sichtbar und braucht Fabians Freigabe; bis dahin bekannt."
+      "grund": "Bestand vor dem Prüftor (#1660): Rahmen der Seite (Fuß mit text-white/40) unter WCAG AA. Anpassung ändert jede Seite sichtbar und braucht Fabians Freigabe; bis dahin bekannt."
     },
     {
       "seite": "*",
       "art": "kontrast",
       "ziel": "color-contrast: [Fuß] .whitespace-nowrap",
-      "grund": "Bestand vor dem Prüftor (#1660): Rahmen der Seite (Fuß mit text-white/40, Beschriftung der Handy-Leiste in 9 px) unter WCAG AA. Anpassung ändert jede Seite sichtbar und braucht Fabians Freigabe; bis dahin bekannt."
+      "grund": "Bestand vor dem Prüftor (#1660): Rahmen der Seite (Fuß mit text-white/40) unter WCAG AA. Anpassung ändert jede Seite sichtbar und braucht Fabians Freigabe; bis dahin bekannt."
     },
     {
       "seite": "*",
       "art": "kontrast",
       "ziel": "color-contrast: [Fuß] a[data-testid=\"footer-imprint\"]",
-      "grund": "Bestand vor dem Prüftor (#1660): Rahmen der Seite (Fuß mit text-white/40, Beschriftung der Handy-Leiste in 9 px) unter WCAG AA. Anpassung ändert jede Seite sichtbar und braucht Fabians Freigabe; bis dahin bekannt."
+      "grund": "Bestand vor dem Prüftor (#1660): Rahmen der Seite (Fuß mit text-white/40) unter WCAG AA. Anpassung ändert jede Seite sichtbar und braucht Fabians Freigabe; bis dahin bekannt."
     },
     {
       "seite": "*",
       "art": "kontrast",
       "ziel": "color-contrast: [Fuß] a[data-testid=\"footer-privacy\"]",
-      "grund": "Bestand vor dem Prüftor (#1660): Rahmen der Seite (Fuß mit text-white/40, Beschriftung der Handy-Leiste in 9 px) unter WCAG AA. Anpassung ändert jede Seite sichtbar und braucht Fabians Freigabe; bis dahin bekannt."
+      "grund": "Bestand vor dem Prüftor (#1660): Rahmen der Seite (Fuß mit text-white/40) unter WCAG AA. Anpassung ändert jede Seite sichtbar und braucht Fabians Freigabe; bis dahin bekannt."
     },
     {
       "seite": "*",
       "art": "kontrast",
       "ziel": "color-contrast: [Fuß] a[data-testid=\"footer-whatsnew\"]",
-      "grund": "Bestand vor dem Prüftor (#1660): Rahmen der Seite (Fuß mit text-white/40, Beschriftung der Handy-Leiste in 9 px) unter WCAG AA. Anpassung ändert jede Seite sichtbar und braucht Fabians Freigabe; bis dahin bekannt."
+      "grund": "Bestand vor dem Prüftor (#1660): Rahmen der Seite (Fuß mit text-white/40) unter WCAG AA. Anpassung ändert jede Seite sichtbar und braucht Fabians Freigabe; bis dahin bekannt."
     },
     {
       "seite": "*",
       "art": "kontrast",
       "ziel": "color-contrast: [Fuß] a[href$=\"terms\"]",
-      "grund": "Bestand vor dem Prüftor (#1660): Rahmen der Seite (Fuß mit text-white/40, Beschriftung der Handy-Leiste in 9 px) unter WCAG AA. Anpassung ändert jede Seite sichtbar und braucht Fabians Freigabe; bis dahin bekannt."
+      "grund": "Bestand vor dem Prüftor (#1660): Rahmen der Seite (Fuß mit text-white/40) unter WCAG AA. Anpassung ändert jede Seite sichtbar und braucht Fabians Freigabe; bis dahin bekannt."
     },
     {
       "seite": "*",
       "art": "kontrast",
       "ziel": "color-contrast: [Navigation] a[aria-label=\"Events\"] > .leading-none.tls-type-label",
-      "grund": "Bestand vor dem Prüftor (#1660): Rahmen der Seite (Fuß mit text-white/40, Beschriftung der Handy-Leiste in 9 px) unter WCAG AA. Anpassung ändert jede Seite sichtbar und braucht Fabians Freigabe; bis dahin bekannt."
+      "grund": "Bestand vor dem Prüftor (#1660): Beschriftung der Handy-Leiste - seit der Schrift-Treppe (#1302) 12 px im ruhigen Grau, auf der halbdurchsichtigen Leiste über hellen Flächen aber unter WCAG AA. Anpassung der Leiste ändert jede Seite sichtbar und braucht Fabians Freigabe; bis dahin bekannt."
     },
     {
       "seite": "*",
       "art": "kontrast",
       "ziel": "color-contrast: [Navigation] a[aria-label=\"Profil\"] > .leading-none.tls-type-label",
-      "grund": "Bestand vor dem Prüftor (#1660): Rahmen der Seite (Fuß mit text-white/40, Beschriftung der Handy-Leiste in 9 px) unter WCAG AA. Anpassung ändert jede Seite sichtbar und braucht Fabians Freigabe; bis dahin bekannt."
+      "grund": "Bestand vor dem Prüftor (#1660): Beschriftung der Handy-Leiste - seit der Schrift-Treppe (#1302) 12 px im ruhigen Grau, auf der halbdurchsichtigen Leiste über hellen Flächen aber unter WCAG AA. Anpassung der Leiste ändert jede Seite sichtbar und braucht Fabians Freigabe; bis dahin bekannt."
     },
     {
       "seite": "*",
       "art": "kontrast",
       "ziel": "color-contrast: [Navigation] a[aria-label=\"Start\"] > .leading-none.tls-type-label",
-      "grund": "Bestand vor dem Prüftor (#1660): Rahmen der Seite (Fuß mit text-white/40, Beschriftung der Handy-Leiste in 9 px) unter WCAG AA. Anpassung ändert jede Seite sichtbar und braucht Fabians Freigabe; bis dahin bekannt."
+      "grund": "Bestand vor dem Prüftor (#1660): Beschriftung der Handy-Leiste - seit der Schrift-Treppe (#1302) 12 px im ruhigen Grau, auf der halbdurchsichtigen Leiste über hellen Flächen aber unter WCAG AA. Anpassung der Leiste ändert jede Seite sichtbar und braucht Fabians Freigabe; bis dahin bekannt."
     },
     {
       "seite": "*",
       "art": "kontrast",
       "ziel": "color-contrast: [Navigation] a[data-testid=\"bottom-nav-community\"] > .leading-none.tls-type-label",
-      "grund": "Bestand vor dem Prüftor (#1660): Rahmen der Seite (Fuß mit text-white/40, Beschriftung der Handy-Leiste in 9 px) unter WCAG AA. Anpassung ändert jede Seite sichtbar und braucht Fabians Freigabe; bis dahin bekannt."
+      "grund": "Bestand vor dem Prüftor (#1660): Beschriftung der Handy-Leiste - seit der Schrift-Treppe (#1302) 12 px im ruhigen Grau, auf der halbdurchsichtigen Leiste über hellen Flächen aber unter WCAG AA. Anpassung der Leiste ändert jede Seite sichtbar und braucht Fabians Freigabe; bis dahin bekannt."
     },
     {
       "seite": "*",
       "art": "kontrast",
       "ziel": "color-contrast: [Navigation] a[data-testid=\"bottom-nav-verein\"] > .leading-none.tls-type-label",
-      "grund": "Bestand vor dem Prüftor (#1660): Rahmen der Seite (Fuß mit text-white/40, Beschriftung der Handy-Leiste in 9 px) unter WCAG AA. Anpassung ändert jede Seite sichtbar und braucht Fabians Freigabe; bis dahin bekannt."
+      "grund": "Bestand vor dem Prüftor (#1660): Beschriftung der Handy-Leiste - seit der Schrift-Treppe (#1302) 12 px im ruhigen Grau, auf der halbdurchsichtigen Leiste über hellen Flächen aber unter WCAG AA. Anpassung der Leiste ändert jede Seite sichtbar und braucht Fabians Freigabe; bis dahin bekannt."
     },
     {
       "seite": "Benachrichtigungen einstellen",

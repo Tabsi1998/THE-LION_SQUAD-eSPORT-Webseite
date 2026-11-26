@@ -703,7 +703,7 @@ export function AdminLayout({ children }) {
 
       {/* Main */}
       <div className="flex-1 min-w-0">
-        <div data-admin-topbar="" className="lg:hidden sticky top-0 z-30 bg-[#0A0A0A] border-b border-white/10 p-3 flex items-center justify-between">
+        <div className="lg:hidden sticky top-0 z-30 bg-[#0A0A0A] border-b border-white/10 p-3 flex items-center justify-between">
           <button ref={menuButtonRef} onClick={() => setOpenMobile(true)} className="p-2" data-testid="admin-menu-open" aria-label="Admin-Menü öffnen" aria-expanded={openMobile}>
             <Menu className="w-5 h-5" />
           </button>

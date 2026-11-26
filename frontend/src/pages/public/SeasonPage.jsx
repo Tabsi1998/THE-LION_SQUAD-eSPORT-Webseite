@@ -259,10 +259,10 @@ function PlayerIdentity({ row, mine = false }) {
       </div>
       <div className="min-w-0">
         <div className="flex items-center gap-2 min-w-0">
-          <span className="font-bold truncate">{row.display_name}</span>
+          <span className="font-bold tls-wrap tls-wrap--name">{row.display_name}</span>
           {mine ? <span className="tls-you-tag">Du</span> : null}
         </div>
-        {row.username && <div className="tls-type-small text-quiet truncate">@{row.username}</div>}
+        {row.username && <div className="tls-type-small text-quiet [overflow-wrap:anywhere]">@{row.username}</div>}
       </div>
     </div>
   );

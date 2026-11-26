@@ -15,7 +15,7 @@ const root = path.join(process.cwd(), "src");
 const PUBLIC_PAGES = [
   "HomePage", "NewsPage", "NewsDetailPage", "EventsPage", "EventDetailPage", "EventLivePage", "EventLeadPage",
   "CalendarPage", "VereinPage", "AboutPage", "ClubPages", "ContactPage", "GalleryPage", "GalleryAlbumPage", "FaqPage",
-  "HelpTopicPage",
+  "HelpTopicPage", "SeasonPage",
 ].map((name) => `pages/public/${name}.jsx`);
 
 const COMPONENTS = [

@@ -518,7 +518,7 @@ button.tls-bracket-row:active, .tls-bracket-head:active { transform: scale(calc(
 /* Ein einzelnes Wort („KartKönigin“) bleibt ganz oder endet mit „…“ - nie „KartK|önigin“. */
 .tls-podium__name--word { display: block; white-space: nowrap; text-overflow: ellipsis; }
 .tls-podium__entry[data-mine="true"] .tls-podium__name { color: var(--tls-brand); }
-.tls-podium__value { font-family: 'Rajdhani', 'Bahnschrift Condensed', sans-serif; font-size: var(--tls-type-label-size); font-weight: 700; font-variant-numeric: tabular-nums; color: var(--tls-text-muted); }
+.tls-podium__value { font-family: 'Rajdhani', 'Bahnschrift Condensed', sans-serif; font-size: var(--tls-type-small-size); font-weight: 700; font-variant-numeric: tabular-nums; color: var(--tls-text-muted); }
 /* Im Baum (#2336): der Weg zum Platz darf zwei Zeilen nehmen (nie abgeschnitten), die gewonnenen Spiele stehen klein
    darunter; der Satz unter dem Podest erklärt, warum Siege und Platz nicht zusammenpassen müssen. */
 .tls-podium__path { display: flex; max-width: 100%; flex-direction: column; align-items: center; gap: 1px; }
@@ -3034,13 +3034,6 @@ html[data-season-still-cards] .tls-card[data-season-perch="card"]:focus-visible 
   bottom: 0;
 }
 .tls-steps[data-compact] .tls-steps__item[data-state="current"] .tls-steps__count { display: inline; }
-
-/* Verwaltung am Handy und Tablet: Die Kopfleiste klebt oben. Was per Tastatur oder Sprung ins Bild kommt (eine wischbare
-   Tabelle, ein Knopf darin), landet darunter statt verdeckt (#1302: mit 12-px-Etiketten rückten die ersten Knöpfe der
-   Finanz-Tabellen unter die Leiste). */
-@media (max-width: 1023px) {
-  html:has([data-admin-topbar]) { scroll-padding-top: 4.5rem; }
-}
 
 /* Tippfläche (#1155): mindestens 44 × 44 px am Handy, ohne das Aussehen zu ändern - eine unsichtbare Fläche um die
    Mitte. Für kleine Symbol-Knöpfe, Schalter und Textlinks außerhalb von Fließtext. In der Komponenten-Ebene, damit

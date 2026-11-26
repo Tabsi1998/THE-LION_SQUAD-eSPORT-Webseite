@@ -110,7 +110,7 @@ export default function MeinBereichLayout() {
       const warten = warteAufElement(() => document.getElementById(anker), (ziel) => {
         ziel.scrollIntoView({ block: "start", inline: "nearest", behavior: motionAllowed() ? "smooth" : "auto" });
         // Karten darüber laden nach und werden höher - das Ziel bleibt trotzdem oben.
-        halten = bleibAmZiel(ziel);
+        halten = bleibAmZiel(ziel, { motion: motionAllowed() });
       });
       return () => {
         warten();

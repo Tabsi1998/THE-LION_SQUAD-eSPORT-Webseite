@@ -32,20 +32,26 @@ const STOP_EVENTS = ["wheel", "touchstart", "keydown", "pointerdown"];
 
 /**
  * Nach dem Sprung zu einem Anker das Ziel kurz im Blick halten: Laden Karten darüber nach und werden höher (seit der
- * Schrift-Treppe, #1302, mit größerem Kleintext etwa die Wunschnummer über „Meine Daten“), springt die Seite noch einmal
- * hin. Höchstens `ms` lang und nur, solange die Person nicht selbst scrollt, wischt, tippt oder eine Taste drückt.
+ * Schrift-Treppe, #1302, mit größerem Kleintext etwa die Wunschnummer über „Meine Daten“), rückt die Seite nach -
+ * gleitend, wenn Bewegung erlaubt ist (`motion`). Gemessen wird die Lage des Ziels im Dokument, nicht im Bild: Der
+ * erste Sprung gleitet ungestört, nachgerückt wird nur, wenn sich das Ziel danach im Dokument verschiebt.
+ * Höchstens `ms` lang und nur, solange die Person nicht selbst scrollt, wischt, tippt oder eine Taste drückt.
  * Gibt `abbrechen` zurück.
  */
-export function bleibAmZiel(ziel, { ms = 1500, ResizeObserver = globalThis.ResizeObserver, root = typeof document === "undefined" ? null : document.body } = {}) {
+export function bleibAmZiel(ziel, {
+  ms = 1500, motion = false, ResizeObserver = globalThis.ResizeObserver, root = typeof document === "undefined" ? null : document.body,
+  scrollY = () => globalThis.scrollY || 0,
+} = {}) {
   if (!ziel || typeof ResizeObserver !== "function") return () => {};
-  // Wo das Ziel nach dem Sprung steht: oben, mit seinem Abstand (scroll-mt-…) - auch wenn der Sprung noch gleitet.
-  const start = typeof globalThis.Element === "function" && ziel instanceof globalThis.Element
-    ? Number.parseFloat(getComputedStyle(ziel).scrollMarginTop) || 0
-    : ziel.getBoundingClientRect().top;
+  const imDokument = () => ziel.getBoundingClientRect().top + scrollY();
+  let lage = imDokument();
   let fertig = false;
   const observer = new ResizeObserver(() => {
     if (fertig) return;
-    if (Math.abs(ziel.getBoundingClientRect().top - start) > 4) ziel.scrollIntoView({ block: "start", inline: "nearest", behavior: "auto" });
+    const jetzt = imDokument();
+    if (Math.abs(jetzt - lage) <= 4) return;
+    lage = jetzt;
+    ziel.scrollIntoView({ block: "start", inline: "nearest", behavior: motion ? "smooth" : "auto" });
   });
   const ende = () => {
     if (fertig) return;
