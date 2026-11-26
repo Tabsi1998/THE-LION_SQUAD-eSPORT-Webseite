@@ -22,7 +22,7 @@ const TOPIC_ICONS = {
   helper_shifts: HeartHandshake,
   account: ShieldCheck,
 };
-const IMPORTANCE_TONE = { urgent: "text-[#FF3B30]", important: "text-[#29B6E8]", normal: "text-white/45" };
+const IMPORTANCE_TONE = { urgent: "text-live", important: "text-[#29B6E8]", normal: "text-white/45" };
 const FRESH_MS = 700;
 
 export function TopicIcon({ bundle, compact = false }) {

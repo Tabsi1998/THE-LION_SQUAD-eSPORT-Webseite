@@ -57,7 +57,7 @@ export function DigestSection() {
           <div className="font-heading font-bold uppercase text-[#29B6E8] mb-1">Sammel-Mail</div>
           <p>Jede Person wählt in ihren Einstellungen, ob optionale Mails sofort, täglich oder wöchentlich kommen. Hier steht, was gilt, solange sie nichts wählt, und wann die Sammel-Mail hinausgeht. Pflicht-Mails und Dringendes (Spiel in 10 Minuten, Check-in schließt, Ergebnis bestätigen) kommen immer sofort.</p>
         </div>
-        {error ? <div className="border border-[#FF3B30]/40 bg-[#FF3B30]/10 rounded-sm p-4 text-sm" role="alert" data-testid="digest-settings-error">{error}</div> : null}
+        {error ? <div className="border border-warn/40 bg-warn/10 text-warn rounded-sm p-4 text-sm" role="alert" data-testid="digest-settings-error">{error}</div> : null}
         {!draft && !error ? <div className="text-sm text-white/45" role="status">Lade Vorgaben …</div> : null}
         {draft ? (
           <div className="border border-white/10 bg-[#121212] rounded-sm p-5 space-y-5">
@@ -90,7 +90,7 @@ export function DigestSection() {
               </label>
             </div>
             <p className="text-xs text-white/45">Wiener Zeit. Was nach dem Termin dazukommt, wartet auf den nächsten. Der Versand-Job sieht alle 10 Minuten nach.</p>
-            {!timesValid ? <p className="text-xs text-[#FF3B30]" role="alert" data-testid="digest-time-error">Bitte eine Uhrzeit wie 07:00 angeben.</p> : null}
+            {!timesValid ? <p className="text-xs text-warn" role="alert" data-testid="digest-time-error">Bitte eine Uhrzeit wie 07:00 angeben.</p> : null}
             <button type="button" onClick={save} disabled={!changed || !timesValid || saving} className="tls-btn tls-btn--primary min-h-11 px-4 rounded-sm text-xs uppercase tracking-wider font-bold disabled:opacity-50" data-testid="digest-save">
               {saving ? "Speichert …" : "Speichern"}
             </button>
@@ -111,7 +111,7 @@ export function DigestSection() {
           // Ohne Skripte und ohne Formulare - nur ansehen. Die Links zeigen auf die echte Website.
           <iframe title="Vorschau der Sammel-Mail" sandbox="" srcDoc={preview.html} className="w-full h-[42rem] bg-white" data-testid="digest-preview-frame" />
         ) : (
-          <div className="h-64 animate-pulse bg-white/[0.03]" aria-hidden="true" />
+          <div className="h-64 motion-safe:animate-pulse bg-white/[0.03]" aria-hidden="true" />
         )}
       </div>
     </div>
