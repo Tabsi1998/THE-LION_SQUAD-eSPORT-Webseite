@@ -1368,14 +1368,31 @@ async def preview_notification_digest(me: dict = Depends(require_club_admin())):
     return await mail_digest.preview(get_db(), me.get("display_name") or me.get("username") or "")
 
 
+async def _link_token(request: Request, token: str) -> str:
+    """Der Schlüssel eines Links ohne Login: aus der Query (Mail-Programme posten mit RFC 8058 ein Formular an die Adresse
+    aus der Kopfzeile) oder aus einem JSON-Body ``{"token": …}`` - so schickt ihn die Seite, nachdem sie ihn aus der Adresse
+    genommen hat (#1662). Ein Formular-Body wird nie als JSON gelesen."""
+    if token:
+        return token
+    if "application/json" not in (request.headers.get("content-type") or "").lower():
+        return ""
+    try:
+        data = await request.json()
+    except Exception:  # noqa: BLE001 - kaputter Body heißt: kein Schlüssel
+        return ""
+    value = data.get("token") if isinstance(data, dict) else None
+    return value[:200] if isinstance(value, str) else ""
+
+
 @settings_router.post("/notification-digest/instant")
 async def notification_digest_instant(request: Request, token: str = Query("", max_length=200)):
     """Zurück auf Einzelmails mit einem Klick aus der Sammel-Mail (#1662) - ohne Login, nur mit dem signierten Schlüssel;
-    ändert nur den Rhythmus. Gezählt werden wie bei der Newsletter-Abmeldung nur ungültige Versuche je Adresse."""
+    ändert nur den Rhythmus. Der Schlüssel kommt im Body (die Seite) oder als Query. Gezählt werden wie bei der
+    Newsletter-Abmeldung nur ungültige Versuche je Adresse."""
     from services.mail_digest_link import switch_to_instant
     from services.rate_limit import enforce_rate_limit
 
-    result = await switch_to_instant(get_db(), token)
+    result = await switch_to_instant(get_db(), await _link_token(request, token))
     if result is None:
         await enforce_rate_limit(request, "mail_digest:instant:ip", limit=30, window_seconds=3600,
                                  message="Zu viele ungültige Links. Bitte warte noch {wait}.")
@@ -1493,7 +1510,7 @@ async def newsletter_unsubscribe(request: Request, token: str = Query("", max_le
     from services.newsletter_unsubscribe import unsubscribe
     from services.rate_limit import enforce_rate_limit
 
-    result = await unsubscribe(get_db(), token)
+    result = await unsubscribe(get_db(), await _link_token(request, token))
     if result is None:
         await enforce_rate_limit(request, "newsletter:unsubscribe:ip", limit=30, window_seconds=3600,
                                  message="Zu viele ungültige Abmeldelinks. Bitte warte noch {wait}.")

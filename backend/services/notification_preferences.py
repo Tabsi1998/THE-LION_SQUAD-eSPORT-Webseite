@@ -286,12 +286,15 @@ TOPIC_LABELS: dict[str, str] = {
     ACCOUNT_TOPIC: "Konto & System",
 }
 
-# Wichtigkeit je Art (#1662): ``urgent`` kommt auch in der Ruhezeit sofort und nie in die Sammel-Mail (die Ausnahmen der
-# Ruhezeit, quiet_hours_rules.EXEMPT_KINDS, und Absagen); ``important`` verlangt meist etwas von dir; ``normal`` ist zur
-# Kenntnis. Eine einzelne Meldung kann ihre Stufe in ``meta.importance`` nennen.
+# Wichtigkeit je Art (#1662): ``urgent`` bricht die Ruhezeit und kommt nie in die Sammel-Mail (genau die Ausnahmen der Ruhezeit,
+# quiet_hours_rules.EXEMPT_KINDS); ``important`` verlangt meist etwas von dir; ``normal`` ist zur Kenntnis. Eine einzelne Meldung
+# kann ihre Stufe in ``meta.importance`` nennen. „Nie sammeln“ ohne die Ruhezeit zu brechen ist ``TIMELY_KINDS``.
 IMPORTANCE_LEVELS: tuple[str, ...] = ("urgent", "important", "normal")
-# Absagen sind dringend (Fabian 26.11., A) - Terminänderungen eines Events tragen ``meta.importance`` (event_changes).
-_URGENT = {"match_call", "match_station", "admin_push_test", "tournament_cancelled"}
+_URGENT = {"match_call", "match_station", "admin_push_test"}
+# Zeitkritisch (Fabian 26.11., E und F): Absage, neuer Termin, Nachrücken. Die Mail wird nie gesammelt; der Push wartet in der
+# Ruhezeit, außer der Termin (``meta.starts_at``) liegt vor 9 Uhr am Morgen, an dem sie endet (services/quiet_hours.py). Weitere
+# Meldungen tragen das Merkmal ``meta.timely`` (Event-Änderung, Nachgerückt).
+TIMELY_KINDS: frozenset[str] = frozenset({"tournament_cancelled"})
 _IMPORTANT = {
     "match_reminder", "match_report", "match_attention", "schedule_escalation", "match_schedule", "match_dispute",
     "team_presence_nudge", "tournament_checkin", "tournament_registration", "tournament_cancelled", "tournament_notice",
@@ -325,6 +328,11 @@ def notification_importance(kind: str, meta: dict | None = None) -> str:
     if kind == "match_schedule" and meta.get("reason") == "checkin_started":
         return "urgent"
     return NOTIFICATION_KIND_IMPORTANCE.get(str(kind or ""), "normal")
+
+
+def notification_timely(kind: str, meta: dict | None = None) -> bool:
+    """Zeitkritisch (Absage, neuer Termin, Nachrücken) - siehe ``TIMELY_KINDS``."""
+    return str(kind or "") in TIMELY_KINDS or bool((meta or {}).get("timely"))
 
 
 # Rechte und Entscheidungen über die Mitgliedschaft (#2125): die Person muss es erfahren - kein Thema zum Abbestellen.
@@ -522,11 +530,12 @@ def notification_level(user: dict | None, prefs: dict[str, bool] | None = None) 
 
 
 async def send_user_template(user: dict | None, template_key: str, category: str | None = None, *,
-                             importance: str | None = None, **kwargs) -> dict:
+                             importance: str | None = None, never_collect: bool = False, **kwargs) -> dict:
     """Send a named template to a user if their preferences allow it.
 
     Sammel-Mail (#1662): Wer „täglich“ oder „wöchentlich“ eingestellt hat, bekommt optionale Mails gesammelt
-    (services/mail_digest.py) - Pflicht und Dringendes (``importance="urgent"`` oder eine dringende Vorlage) nie. Ein
+    (services/mail_digest.py) - Pflicht, Dringendes (``importance="urgent"``), Zeitkritisches (``never_collect=True``: neuer
+    Termin, Nachrücken) und die Vorlagen aus ``mail_digest_rules.NEVER_COLLECT_TEMPLATES`` nie. Ein
     gesammelte Mail meldet ``{"ok": True, "digest": True}``."""
     if not user or not user.get("email"):
         return {"ok": False, "skipped": True, "reason": "missing_email"}
@@ -535,7 +544,7 @@ async def send_user_template(user: dict | None, template_key: str, category: str
         return {"ok": True, "skipped": True, "reason": "preference_disabled", "category": category}
     from services import mail_digest_rules
 
-    if user.get("id") and mail_digest_rules.collectable(template_key, importance, template_key in REQUIRED_EMAIL_TEMPLATES):
+    if not never_collect and user.get("id") and mail_digest_rules.collectable(template_key, importance, template_key in REQUIRED_EMAIL_TEMPLATES):
         held = await mail_digest_rules.hold(user, template_key, category, kwargs)
         if held:
             return held

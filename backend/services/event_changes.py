@@ -93,9 +93,10 @@ async def _inform(db, event: dict, users: list[dict], *, title: str, message: st
         try:
             doc = await create_user_notification(
                 user["id"], f"{name}: {title}", message, path, kind=MESSAGE_KIND,
-                # Absage und neuer Termin sind dringend (Fabian 26.11., A): auch in der Ruhezeit, nie in der Sammel-Mail.
+                # Absage und neuer Termin sind zeitkritisch (Fabian 26.11., A/E): nie gesammelt; der Push wartet in der Ruhezeit,
+                # außer das Event beginnt vor 9 Uhr am Morgen.
                 meta={"category": MESSAGE_CATEGORY, "event_id": event["id"], "dedupe_key": f"{dedupe}:{user['id']}",
-                      "importance": "urgent"},
+                      "timely": True, "starts_at": event.get("start_date"), "importance": "important"},
             )
             notified += 1 if doc else 0
         except Exception:
@@ -106,7 +107,7 @@ async def _inform(db, event: dict, users: list[dict], *, title: str, message: st
             if template == MESSAGE_TEMPLATE:
                 values["message"] = message
             result = await send_user_template(
-                user, template, MESSAGE_CATEGORY, importance="urgent", dedupe_key=f"{dedupe}:{user['id']}", **values,
+                user, template, MESSAGE_CATEGORY, never_collect=True, dedupe_key=f"{dedupe}:{user['id']}", **values,
             )
             mails += 1 if result.get("ok") and not result.get("skipped") else 0
         except Exception:

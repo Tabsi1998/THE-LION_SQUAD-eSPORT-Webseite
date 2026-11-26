@@ -20,12 +20,13 @@ RHYTHMS: tuple[str, ...] = ("instant", "daily", "weekly")
 RHYTHM_LABELS = {"instant": "Sofort", "daily": "Täglich", "weekly": "Wöchentlich"}
 WEEKDAYS = ("Montags", "Dienstags", "Mittwochs", "Donnerstags", "Freitags", "Samstags", "Sonntags")
 DEFAULTS: dict[str, Any] = {"default_rhythm": "instant", "daily_time": "07:00", "weekly_weekday": 0, "weekly_time": "07:00"}
-# Kann nicht warten: Spiel in 10 Minuten, Erinnerung vor dem Spiel, Check-in schließt, Ergebnis bestätigen, Dispute offen -
-# und Absagen von Turnier und Event (Fabian 26.11., A). Die Terminänderung eines Events ruft mit ``importance="urgent"``.
+# Kann nicht warten: Spiel in 10 Minuten, Erinnerung vor dem Spiel, Check-in schließt, Ergebnis bestätigen, Dispute offen.
 URGENT_TEMPLATES = frozenset({
     "match_lead_10m", "match_reminder", "checkin_closes_soon", "checkin_closes_soon_on_site", "score_reported", "dispute_opened",
-    "tournament_cancelled", "event_cancelled",
 })
+# Nie gesammelt (Fabian 26.11., A/E): dazu die Absagen von Turnier und Event. Neuer Termin und Nachrücken rufen mit
+# ``never_collect=True`` (gleiche Vorlage wie andere Hinweise).
+NEVER_COLLECT_TEMPLATES = URGENT_TEMPLATES | frozenset({"tournament_cancelled", "event_cancelled"})
 # Schon selbst ein Gruß bzw. eine Zusammenfassung - und die Newsletter mit eigenem Abmeldeweg.
 OWN_FORMAT_TEMPLATES = frozenset({"birthday_greeting", "achievement_recap", "newsletter_news", "newsletter_event", DIGEST_TEMPLATE})
 PREVIEW_FIELDS = ("text", "detail", "summary", "message", "preview", "decision", "reason", "when")
@@ -60,7 +61,7 @@ def collectable(template_key: str, importance: str | None = None, required: bool
     """Darf diese Mail in die Sammlung? Nie: Pflicht (``required``), Dringendes, eigene Formate."""
     if required or importance == "urgent":
         return False
-    return template_key not in URGENT_TEMPLATES and template_key not in OWN_FORMAT_TEMPLATES
+    return template_key not in NEVER_COLLECT_TEMPLATES and template_key not in OWN_FORMAT_TEMPLATES
 
 
 def _at(day, clock: str) -> datetime:

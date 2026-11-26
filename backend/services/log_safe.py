@@ -61,7 +61,9 @@ def mask_addresses_deep(value: Any) -> Any:
 _SECRET_PATHS = (re.compile(r"(/api/calendar/personal/)[^/?#\s]{1,256}"),
                  re.compile(r"(/api/shop/print-files/)[^/?#\s]{1,256}"),
                  # Newsletter abbestellen (#2119): der Schlüssel steht als ``?token=`` in der Adresse.
-                 re.compile(r"((?:/api/settings/newsletter/unsubscribe|/newsletter/abbestellen)\?(?:[^#\s&]{0,256}&){0,8}token=)[^&#\s]{1,256}"))
+                 re.compile(r"((?:/api/settings/newsletter/unsubscribe|/newsletter/abbestellen)\?(?:[^#\s&]{0,256}&){0,8}token=)[^&#\s]{1,256}"),
+                 # Zurück auf Einzelmails (#1662): derselbe Schlüssel-Aufbau wie beim Newsletter.
+                 re.compile(r"((?:/api/settings/notification-digest/instant|/sammel-mail/einzeln)\?(?:[^#\s&]{0,256}&){0,8}token=)[^&#\s]{1,256}"))
 
 
 def redact_secret_paths(value: Any) -> str:

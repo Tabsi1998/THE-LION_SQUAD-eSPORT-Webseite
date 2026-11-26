@@ -873,3 +873,32 @@ async def test_every_new_notification_carries_topic_and_importance(monkeypatch, 
     rows = {row["kind"]: row for row in db.notifications.rows}
     assert (rows["match_call"]["topic"], rows["match_call"]["importance"]) == ("match_reminders", "urgent")
     assert (rows["rights_change"]["topic"], rows["rights_change"]["importance"]) == ("account", "important")
+
+
+# ---------------------------------------------------------------- Zeitkritisch (Fabian 26.11., E und F)
+
+@pytest.mark.anyio
+@pytest.mark.parametrize("starts_at,through", [
+    ("2026-11-17T09:30:00+00:00", False),  # 10:30 in Wien: der Push wartet bis 7:00
+    ("2026-11-17T07:30:00+00:00", True),   # 08:30 in Wien, vor 9 Uhr am selben Morgen: sofort
+])
+async def test_a_cancellation_waits_unless_it_concerns_the_early_morning(monkeypatch, wires, starts_at, through):
+    db = _Db([{"id": "u1", "quiet_hours": NIGHT, "notification_preferences": {}}])
+    _at(monkeypatch, db, "2026-11-16T23:00:00")
+    await create_user_notification("u1", "Turnier abgesagt", kind="tournament_cancelled",
+                                   meta={"dedupe_key": "c-1", "starts_at": starts_at})
+    row = db.notifications.rows[0]
+    assert (("push", "tournament_cancelled", "u1") in wires) is through
+    assert ("quiet_hold_until" not in row) is through
+
+
+@pytest.mark.anyio
+async def test_a_new_date_or_moving_up_marked_timely_follows_the_same_rule(monkeypatch, wires):
+    db = _Db([{"id": "u1", "quiet_hours": NIGHT, "notification_preferences": {}}])
+    _at(monkeypatch, db, "2026-11-16T23:00:00")
+    await create_user_notification("u1", "Nachgerückt", kind="event_registration",
+                                   meta={"dedupe_key": "n-1", "timely": True, "starts_at": "2026-11-17T07:00:00+00:00"})
+    await create_user_notification("u1", "Termin geändert", kind="event_message",
+                                   meta={"dedupe_key": "n-2", "timely": True, "starts_at": "2026-11-18T07:00:00+00:00"})
+    assert [kind for _channel, kind, _user in wires] == ["event_registration", "event_registration"]
+    assert [bool(row.get("quiet_hold_until")) for row in db.notifications.rows] == [False, True]

@@ -118,12 +118,16 @@ async def _send(db, event: dict, registration: dict, status: str, previous: str 
     stamp = registration.get("updated_at") or registration.get("created_at") or ""
     dedupe = f"event-registration:{registration.get('id')}:{status}:{stamp}"
     meta = {"category": "tournament_updates", "dedupe_key": dedupe, "event_id": event.get("id"), "registration_id": registration.get("id"), "status": status}
+    promoted = status in ACTIVE and previous == "waitlist"
+    if promoted:
+        # Nachgerückt (Fabian 26.11., F): zeitkritisch wie eine Absage - nie gesammelt, Ruhezeit nur vor 9 Uhr gebrochen.
+        meta.update(timely=True, starts_at=event.get("start_date"))
     if user["id"] == actor_id:
         meta["in_app_only"] = True  # wer es gerade selbst getan hat, sieht es schon auf dem Bildschirm
     sent = await create_user_notification(user["id"], f"{message['headline']}: {name}", message["detail"], url=path, kind=KIND, meta=meta)
     url = await build_public_url(path)
     await send_user_template(
-        user, TEMPLATE, "tournament_updates", dedupe_key=f"{dedupe}:mail",
+        user, TEMPLATE, "tournament_updates", never_collect=promoted, dedupe_key=f"{dedupe}:mail",
         display_name=user.get("display_name") or user.get("username") or "", event_name=name,
         headline=message["headline"], detail=message["detail"], url=url,
     )

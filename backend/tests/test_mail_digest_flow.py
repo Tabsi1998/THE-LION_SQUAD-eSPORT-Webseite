@@ -339,7 +339,7 @@ async def test_more_than_500_rows_all_go_out_and_none_hang(flow, monkeypatch):
 
 @pytest.mark.asyncio
 async def test_cancellations_and_new_dates_never_wait(flow, monkeypatch):
-    """Fabian 26.11. (A): Absagen und Terminänderungen sind dringend - sofort, nie gesammelt."""
+    """Fabian 26.11. (A, E): Absagen und Terminänderungen werden nie gesammelt - die Mail geht sofort."""
     _clock(monkeypatch, "2026-11-26T10:00:00")
     paula = await _person(flow, "weekly")
     await send_user_template(paula, "tournament_cancelled", display_name="Paula", tournament_title="Winter Cup", url=URL,
@@ -353,7 +353,8 @@ async def test_cancellations_and_new_dates_never_wait(flow, monkeypatch):
     assert sorted(job["template_key"] for job in await _jobs(flow)) == ["event_cancelled", "event_message", "tournament_cancelled"]
     assert await flow.db.mail_digest_items.count_documents({}) == 0
     note = await flow.db.notifications.find_one({"user_id": paula["id"], "kind": "event_message"}, {"_id": 0})
-    assert note["importance"] == "urgent"
+    # Zeitkritisch, nicht dringend (Fabian 26.11., E): der Push wartet in der Ruhezeit, außer der Termin liegt vor 9 Uhr.
+    assert note["meta"]["timely"] is True and note["importance"] == "important"
 
 
 @pytest.mark.asyncio
@@ -416,3 +417,52 @@ async def test_back_to_the_club_default(flow):
     assert res.status_code == 200, res.text
     payload = (await flow.get("/api/users/me/notification-preferences")).json()["mail_digest"]
     assert payload["own"] is None and payload["rhythm"] == "instant"
+
+
+# ---------------------------------------------------------------- Zweite Nachprüfung (26.11.)
+
+def test_the_token_of_the_one_click_link_never_reaches_the_access_log():
+    from services import log_safe
+
+    assert log_safe.redact_secret_paths("POST /api/settings/notification-digest/instant?token=u1.SIG HTTP/1.1") == \
+        "POST /api/settings/notification-digest/instant?token=*** HTTP/1.1"
+    assert log_safe.redact_secret_paths("GET /sammel-mail/einzeln?x=1&token=u1.SIG&y=2") == "GET /sammel-mail/einzeln?x=1&token=***&y=2"
+
+
+@pytest.mark.asyncio
+async def test_moving_up_from_the_waitlist_is_never_collected(flow, monkeypatch):
+    """Fabian 26.11. (F): Nachgerückt - Turnier und Event - geht sofort per Mail, auch bei Sammel-Mail."""
+    from services import event_notifications, registration_notifications
+
+    _clock(monkeypatch, "2026-11-26T10:00:00")
+    paula = await _person(flow, "weekly")
+    tournament = {"id": "t-1", "slug": "winter-cup", "title": "Winter Cup", "start_date": "2026-11-28T09:00:00+00:00"}
+    registration = {"id": "r-1", "tournament_id": "t-1", "user_id": paula["id"], "status": "approved", "updated_at": "x1"}
+    await flow.db.tournament_registrations.insert_one(dict(registration))
+    await registration_notifications.notify_registration_status(flow.db, tournament, registration, "approved", previous="waitlist")
+    event = {"id": "ev-1", "slug": "herbst-lan", "name": "Herbst-LAN", "start_date": "2026-11-29T09:00:00+00:00"}
+    await event_notifications.notify_registration_status(
+        flow.db, event, {"id": "er-1", "user_id": paula["id"], "updated_at": "x2"}, "registered", previous="waitlist")
+    assert sorted(job["template_key"] for job in await _jobs(flow)) == ["event_registration", "registration_approved"]
+    assert await flow.db.mail_digest_items.count_documents({}) == 0
+    notes = await flow.db.notifications.find({"user_id": paula["id"]}, {"_id": 0}).to_list(10)
+    assert {note["kind"]: (note["meta"].get("timely"), note["meta"].get("starts_at")) for note in notes} == {
+        "tournament_registration": (True, "2026-11-28T09:00:00+00:00"),
+        "event_registration": (True, "2026-11-29T09:00:00+00:00"),
+    }
+    # Gegenprobe: eine gewöhnliche Bestätigung wartet weiter auf die Sammel-Mail.
+    await registration_notifications.notify_registration_status(
+        flow.db, tournament, {**registration, "id": "r-2", "updated_at": "x3"}, "approved", previous="pending")
+    assert await flow.db.mail_digest_items.count_documents({"template_key": "registration_approved"}) == 1
+
+
+@pytest.mark.asyncio
+async def test_the_link_page_may_send_the_token_in_the_body(flow, monkeypatch):
+    """Prüfung 26.11.: Die Seite nimmt den Schlüssel aus der Adresse und schickt ihn im Body - nicht als Query."""
+    from services import mail_digest_link
+
+    paula = await _person(flow, "weekly")
+    done = await flow.client.post(mail_digest_link.API_PATH, json={"token": mail_digest_link.token_for(paula["id"])})
+    assert done.status_code == 200 and done.json()["rhythm"] == "instant"
+    assert (await flow.client.post(mail_digest_link.API_PATH, json={"token": "kaputt"})).status_code == 400
+    assert (await flow.client.post(mail_digest_link.API_PATH, json={})).status_code == 400

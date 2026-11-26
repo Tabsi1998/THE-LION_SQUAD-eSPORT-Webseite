@@ -57,17 +57,6 @@ def test_every_topic_and_importance_is_known():
     assert set(TOPIC_LABELS) == set(LEVEL_TOPICS) | {ACCOUNT_TOPIC}
 
 
-def test_every_quiet_hour_exception_is_urgent_and_every_urgent_kind_comes_through():
-    """Dringend heißt: kommt auch in der Ruhezeit. Seit Fabians Entscheidung (26.11., A) gehören Absagen dazu."""
-    import asyncio
-
-    from services.quiet_hours import is_exempt
-
-    urgent = {kind for kind, level in NOTIFICATION_KIND_IMPORTANCE.items() if level == "urgent"}
-    assert set(EXEMPT_KINDS) <= urgent
-    assert all(asyncio.run(is_exempt(None, kind, {})) for kind in urgent)
-
-
 def test_required_kinds_sit_under_account():
     assert set(REQUIRED_NOTIFICATION_KINDS) <= set(ACCOUNT_KINDS)
     assert all(notification_topic(kind) == ACCOUNT_TOPIC for kind in ACCOUNT_KINDS)
@@ -88,7 +77,28 @@ def test_topic_and_importance_of_a_single_notification():
     assert notification_importance("unbekannt") == "normal"
 
 
-def test_cancellations_are_urgent():
-    """Fabian 26.11. (A): Absagen und Terminänderungen sind dringend - auch in der Ruhezeit."""
-    assert notification_importance("tournament_cancelled") == "urgent"
-    assert notification_importance("event_message", {"importance": "urgent"}) == "urgent"
+
+# Prüfung 26.11. (Kann): Die Mengen stehen ausdrücklich hier - eine neue Art, die die Ruhezeit bricht oder nie gesammelt wird,
+# muss hier eingetragen werden, sonst ist der Test rot.
+EXPECTED_QUIET_BREAKERS = {"match_call", "match_station", "admin_push_test"}
+EXPECTED_TIMELY_KINDS = {"tournament_cancelled"}
+EXPECTED_NEVER_COLLECTED_TEMPLATES = {
+    "match_lead_10m", "match_reminder", "checkin_closes_soon", "checkin_closes_soon_on_site", "score_reported", "dispute_opened",
+    "tournament_cancelled", "event_cancelled",
+}
+
+
+def test_the_kinds_that_break_the_quiet_hours_are_exactly_these():
+    urgent = {kind for kind, level in NOTIFICATION_KIND_IMPORTANCE.items() if level == "urgent"}
+    assert urgent == EXPECTED_QUIET_BREAKERS
+    assert set(EXEMPT_KINDS) == EXPECTED_QUIET_BREAKERS
+
+
+def test_the_timely_kinds_and_never_collected_mails_are_exactly_these():
+    from services.mail_digest_rules import NEVER_COLLECT_TEMPLATES
+    from services.notification_preferences import TIMELY_KINDS
+
+    assert set(TIMELY_KINDS) == EXPECTED_TIMELY_KINDS
+    assert set(NEVER_COLLECT_TEMPLATES) == EXPECTED_NEVER_COLLECTED_TEMPLATES
+    # Absagen brechen die Ruhezeit nicht von selbst (Fabian 26.11., E).
+    assert notification_importance("tournament_cancelled") == "important"
