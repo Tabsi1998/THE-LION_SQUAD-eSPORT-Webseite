@@ -14,6 +14,7 @@ import {
 import { SeriesLogo } from "@/components/tls/references/SeriesLogo";
 import { seriesLogo } from "@/lib/seriesLogo";
 import "./roundResults.css";
+import { ShortCaps } from "@/components/tls/ShortCaps";
 
 // Bausteine der Ergebnisseite einer Runde (#1950): Kopf mit Flagge und Pfeilen, Zusammenfassung, Reiter je Lauf, die
 // Tabelle am PC und die Liste am Handy. Zeiten und Abstände zählen beim Öffnen und bei jedem Reiterwechsel hoch
@@ -68,11 +69,11 @@ export function RoundHead({ page, lineageSlug, seasonSlug }) {
         <SeriesLogo src={seriesLogo(page.lineage, page.series)} size="sm" testId="round-logo" />
         {round.country_code && <span className="tls-round-flag flex shrink-0"><CountryFlag code={round.country_code} size="xl" /></span>}
         <div className="flex flex-col min-w-0">
-          <span className="hidden sm:block text-xs font-bold uppercase tracking-[0.22em] text-[#29B6E8] tabular-nums" data-testid="round-eyebrow">{roundEyebrow(round)}</span>
-          <h1 className="font-heading font-black uppercase leading-none text-[20px] sm:text-[clamp(28px,4vw,44px)] sm:mt-1 [overflow-wrap:anywhere]">{heading}</h1>
-          {sub && <span className="hidden sm:block mt-1 text-[15px] text-white/65">{sub}</span>}
+          <span className="hidden sm:block tls-type-label text-[#29B6E8] tabular-nums" data-testid="round-eyebrow">{roundEyebrow(round)}</span>
+          <h1 className="tls-type-title leading-none sm:mt-1 [overflow-wrap:anywhere]"><ShortCaps>{heading}</ShortCaps></h1>
+          {sub && <span className="hidden sm:block mt-1 tls-type-small text-white/65">{sub}</span>}
           {/* Am Handy eine Zeile unter dem Namen: Kürzel, Tag und Strecke. */}
-          <span className="sm:hidden mt-1 text-[13px] text-white/65 tabular-nums" data-testid="round-subline">{roundSubline(round, sub)}</span>
+          <span className="sm:hidden mt-1 tls-type-small text-white/65 tabular-nums" data-testid="round-subline">{roundSubline(round, sub)}</span>
         </div>
       </div>
       <nav aria-label="Runden" className="flex shrink-0 gap-2">
@@ -204,7 +205,7 @@ export function ResultTable({ session, playKey }) {
   return (
     // eslint-disable-next-line jsx-a11y/no-noninteractive-tabindex -- eine scrollbare Fläche muss per Tastatur erreichbar sein (axe: scrollable-region-focusable)
     <div className="tls-round-table tls-swipe hidden md:block focus:outline-none focus-visible:ring-2 focus-visible:ring-[#29B6E8]" role="region" aria-label={`Ergebnis ${session.label}`} tabIndex={0} data-testid="round-table">
-      <table className="text-[15px]">
+      <table className="tls-type-small">
         <thead>
           <tr>
             {columns.map((key) => (
@@ -265,11 +266,11 @@ export function ResultList({ session, playKey }) {
             <Pos row={row} />
             {columns.has("number") && <span className="tls-round-number" style={teamStyle(row)}>{row.start_number || ""}</span>}
             <span className="flex-1 min-w-0 flex flex-col">
-              <span className="font-bold text-[14px] flex flex-wrap items-center gap-x-1.5 gap-y-1 [overflow-wrap:anywhere]">
+              <span className="font-bold tls-type-small flex flex-wrap items-center gap-x-1.5 gap-y-1 [overflow-wrap:anywhere]">
                 <DriverName row={row} />
                 {rowBadges(row).map((badge) => <Badge key={badge.key} badge={badge} short glow index={index} />)}
               </span>
-              {row.team && <span className="tls-round-team text-[12px]" style={teamStyle(row)}>{row.team}</span>}
+              {row.team && <span className="tls-round-team tls-type-small" style={teamStyle(row)}>{row.team}</span>}
             </span>
             <span className="flex flex-col items-end shrink-0 tabular-nums">
               {timed ? (

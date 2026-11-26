@@ -112,11 +112,11 @@ function NoticeCard({ item, index, now, showTournament, leaving = false }) {
         <Megaphone className="h-4 w-4" />
       </div>
       <div className="min-w-0 flex-1">
-        <div className="text-[10px] font-bold uppercase tracking-[0.22em] text-honor">
+        <div className="tls-type-label text-honor">
           Hinweis der Turnierleitung{where ? <span className="text-white/45 tracking-[0.12em]"> · {where}</span> : null}
         </div>
-        <p className="mt-0.5 text-base sm:text-lg font-bold leading-snug text-white [overflow-wrap:anywhere]" data-testid="notice-text">{item.text}</p>
-        <div className="mt-1 text-[11px] text-white/50 tabular-nums" data-testid="notice-meta">
+        <p className="mt-0.5 tls-type-body font-bold leading-snug text-white [overflow-wrap:anywhere]" data-testid="notice-text">{item.text}</p>
+        <div className="mt-1 tls-type-small text-white/50 tabular-nums" data-testid="notice-meta">
           {noticeClock(item)} Uhr · {remainingText(item.expires_at, now)}
         </div>
       </div>

@@ -12,7 +12,7 @@ import "./referenceSeries.css";
 // Am Handy Karten statt der breiten Tabelle. Fremde Namen sind reiner Text, nur Vereinsmitglieder verlinken im Detail
 // auf ihr Profil.
 
-const CHIP = "min-h-[36px] px-3 rounded-md border text-[12px] font-bold uppercase tracking-[0.12em] transition-colors whitespace-nowrap active:scale-[0.97]";
+const CHIP = "min-h-[36px] px-3 rounded-md border tls-type-label transition-colors whitespace-nowrap active:scale-[0.97]";
 const CHIP_ON = "border-[#29B6E8]/70 bg-[#29B6E8]/10 text-[#29B6E8]";
 const CHIP_OFF = "border-white/15 text-white/65 hover:text-white hover:border-white/30";
 
@@ -53,7 +53,7 @@ function PersonName({ item, onOpen }) {
         )}
         {item.club_member && <span className="tls-standing-me">Verein</span>}
       </span>
-      {item.partner && <span className="text-[11px] text-white/50" data-testid="series-day-partner">mit {nameOf(item.partner)}</span>}
+      {item.partner && <span className="tls-type-small text-white/50" data-testid="series-day-partner">mit {nameOf(item.partner)}</span>}
     </span>
   );
 }
@@ -73,8 +73,8 @@ function DayTableView({ table, count, scheme, bonuses, onOpen }) {
     <>
       {/* eslint-disable-next-line jsx-a11y/no-noninteractive-tabindex -- eine scrollbare Fläche muss per Tastatur erreichbar sein (axe: scrollable-region-focusable) */}
       <div role="region" aria-label="Tagesansicht" tabIndex={0} className="tls-standings hidden md:block mt-4 border border-white/10 rounded-md bg-[var(--tls-surface-1)] tls-swipe pb-0 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#29B6E8]" data-testid="series-day-table">
-        <table className="w-full text-sm tabular-nums">
-          <thead className="text-[11px] uppercase tracking-[0.12em] text-white/50">
+        <table className="w-full tls-type-small tabular-nums">
+          <thead className="tls-type-label text-white/50">
             <tr className="border-b border-white/10">
               <th scope="col" className="text-left pl-4 pr-1 py-2.5 w-12 font-semibold">#</th>
               <th scope="col" className="text-left px-2 py-2.5 font-semibold">Name</th>
@@ -86,7 +86,7 @@ function DayTableView({ table, count, scheme, bonuses, onOpen }) {
           <tbody>
             {table.map((item, position) => (
               <tr key={item.key} className="tls-standing-row tls-series-row" style={{ "--i": Math.min(position, 12) }} data-testid="series-day-row" data-mine={item.club_member ? "true" : undefined}>
-                <td className="pl-4 pr-1 py-2 align-middle font-display text-base font-bold text-white">{item.place ?? "–"}</td>
+                <td className="pl-4 pr-1 py-2 align-middle tls-type-card tls-type-num text-white">{item.place ?? "–"}</td>
                 <th scope="row" className="px-2 py-2 align-middle min-w-[11rem] text-left font-normal">
                   <PersonName item={item} onOpen={onOpen} />
                   <Badges item={item} bonuses={bonuses} />
@@ -94,7 +94,7 @@ function DayTableView({ table, count, scheme, bonuses, onOpen }) {
                 {columns.map((index) => (
                   <td key={index} className="px-1.5 py-2 text-center align-middle text-white/80"><RoundCell entry={item.day_rounds?.[index]} index={index} scheme={scheme} infer={!item.partner} /></td>
                 ))}
-                <td className="px-2 py-2 text-right align-middle font-display text-base font-bold text-white" data-testid="series-day-total">{item.day_points ?? "–"}</td>
+                <td className="px-2 py-2 text-right align-middle tls-type-card tls-type-num text-white" data-testid="series-day-total">{item.day_points ?? "–"}</td>
                 <td className="pr-4 pl-2 py-2 text-right align-middle text-white/80"><SeasonPoints item={item} /></td>
               </tr>
             ))}
@@ -105,18 +105,18 @@ function DayTableView({ table, count, scheme, bonuses, onOpen }) {
         {table.map((item, position) => (
           <li key={item.key} className="tls-standing-row tls-series-row border border-white/10 rounded-md bg-[var(--tls-surface-1)] px-3 py-2.5" style={{ "--i": Math.min(position, 12) }} data-testid="series-day-card" data-mine={item.club_member ? "true" : undefined}>
             <div className="flex items-start gap-3">
-              <span className="w-7 shrink-0 font-display text-lg font-bold text-white tabular-nums">{item.place ?? "–"}</span>
+              <span className="w-7 shrink-0 tls-type-card tls-type-num text-white">{item.place ?? "–"}</span>
               <span className="min-w-0 flex-1 space-y-1">
                 <PersonName item={item} onOpen={onOpen} />
                 <Badges item={item} bonuses={bonuses} />
               </span>
               <span className="flex flex-col items-end shrink-0 tabular-nums">
-                <span className="font-display text-lg font-bold text-white">{item.day_points ?? "–"}</span>
-                <span className="text-[11px] text-white/50"><SeasonPoints item={item} /> Pkt</span>
+                <span className="tls-type-card tls-type-num text-white">{item.day_points ?? "–"}</span>
+                <span className="tls-type-small text-white/50"><SeasonPoints item={item} /> Pkt</span>
               </span>
             </div>
             {columns.length > 0 && (
-              <div className="mt-1.5 pl-10 flex flex-wrap gap-1 text-[12px]">
+              <div className="mt-1.5 pl-10 flex flex-wrap gap-1 tls-type-small">
                 {columns.map((index) => <RoundCell key={index} entry={item.day_rounds?.[index]} index={index} scheme={scheme} infer={!item.partner} />)}
               </div>
             )}
@@ -139,15 +139,15 @@ function LobbyView({ table, count, scheme, onOpen }) {
         ))}
       </div>
       {groups.length === 0 ? (
-        <p className="mt-3 text-sm text-white/55">Für diese Runde sind keine Lobbys eingetragen.</p>
+        <p className="mt-3 tls-type-small text-white/55">Für diese Runde sind keine Lobbys eingetragen.</p>
       ) : (
         <div className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
           {groups.map((group) => (
             <section key={group.lobby} className="border border-white/10 rounded-md bg-[var(--tls-surface-1)] p-3" aria-label={`Lobby ${group.lobby}`} data-testid="series-lobby">
-              <h3 className="text-[11px] font-bold uppercase tracking-[0.16em] text-white/55">Lobby {group.lobby}</h3>
+              <h3 className="tls-type-label text-white/55">Lobby {group.lobby}</h3>
               <ol className="mt-2 space-y-1">
                 {group.members.map(({ item, entry, place }) => (
-                  <li key={item.key} className="flex items-center gap-2 text-sm tabular-nums">
+                  <li key={item.key} className="flex items-center gap-2 tls-type-small tabular-nums">
                     <span className="tls-day-cell w-7" data-tone={placeTone(place) || undefined}>{place ?? "–"}</span>
                     <span className="min-w-0 flex-1 truncate">
                       {item.name_hidden ? <span className="text-white/40 italic">{nameOf(item)}</span>
@@ -174,24 +174,24 @@ function PlayerDetail({ rows, row, days, scheme, bonuses, topN, onPick, detailRe
   return (
     <section ref={detailRef} className="tls-day-detail mt-6 border border-white/10 rounded-md bg-[var(--tls-surface-1)] p-4" aria-labelledby={`${selectId}-title`} data-testid="series-player-detail">
       <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3">
-        <h3 id={`${selectId}-title`} className="font-heading text-lg font-black uppercase">Spieler-Detail</h3>
+        <h3 id={`${selectId}-title`} className="tls-type-card">Spieler-Detail</h3>
         <label htmlFor={selectId} className="sr-only">Spieler</label>
         <select id={selectId} value={row.key} onChange={(event) => onPick(event.target.value)} className="min-h-[40px] sm:ml-auto bg-black/40 border border-white/15 rounded-md px-3 text-sm text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-[#29B6E8]" data-testid="series-player-select">
           {named.map((item) => <option key={item.key} value={item.key}>{`${item.rank}. ${nameOf(item)}`}</option>)}
         </select>
       </div>
       <div className="tls-day-detail__head mt-3 flex flex-wrap items-baseline gap-x-5 gap-y-1" key={row.key}>
-        <span className="text-white font-semibold text-base">
+        <span className="text-white font-semibold tls-type-body">
           {row.club_member && row.profile_slug ? <Link to={`/members/${row.profile_slug}`} className="hover:text-[#29B6E8]">{nameOf(row)}</Link> : nameOf(row)}
         </span>
-        <span className="text-sm text-white/70 tabular-nums" data-testid="series-player-summary">
+        <span className="tls-type-small text-white/70 tabular-nums" data-testid="series-player-summary">
           Platz {row.rank} · {formatNumber(row.points)} Saisonpunkte{row.bonus_points ? ` (davon ${formatNumber(row.bonus_points)} Sonderbonus)` : ""} · {summary.played} {summary.played === 1 ? "Turniertag" : "Turniertage"} · {summary.wins} {summary.wins === 1 ? "Sieg" : "Siege"} · {`${summary.topN(topN)}×\u00a0Top\u00a0${topN}`}
         </span>
       </div>
       {/* eslint-disable-next-line jsx-a11y/no-noninteractive-tabindex -- eine scrollbare Fläche muss per Tastatur erreichbar sein (axe: scrollable-region-focusable) */}
       <div role="region" aria-label={`Turniertage von ${nameOf(row)}`} tabIndex={0} className="relative mt-3 tls-swipe pb-0 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#29B6E8] rounded-sm">
-        <table className="w-full text-sm tabular-nums">
-          <thead className="text-[11px] uppercase tracking-[0.12em] text-white/50">
+        <table className="w-full tls-type-small tabular-nums">
+          <thead className="tls-type-label text-white/50">
             <tr className="border-b border-white/10">
               <th scope="col" className="text-left pr-2 py-2 font-semibold">Termin</th>
               <th scope="col" className="px-2 py-2 text-right font-semibold">Platz</th>
@@ -205,23 +205,23 @@ function PlayerDetail({ rows, row, days, scheme, bonuses, topN, onPick, detailRe
               <tr key={round.id} className="border-b border-white/5 last:border-0" data-testid="series-player-day">
                 <th scope="row" className="text-left pr-2 py-2 font-normal whitespace-nowrap">
                   <span className="font-semibold text-white">{roundLabel(round)}</span>
-                  {result?.partner && <span className="block text-[11px] text-white/50">Double Up mit {nameOf(result.partner)}</span>}
+                  {result?.partner && <span className="block tls-type-small text-white/50">Double Up mit {nameOf(result.partner)}</span>}
                   {result && <Badges item={result} bonuses={bonuses} />}
                   {/* Am Handy stehen die Runden unter dem Termin statt in eigenen Spalten. */}
                   {result && count > 0 && (
-                    <span className="sm:hidden mt-1 flex flex-wrap gap-1 text-[12px]" aria-hidden="true">
+                    <span className="sm:hidden mt-1 flex flex-wrap gap-1 tls-type-small" aria-hidden="true">
                       {Array.from({ length: count }, (_, index) => <RoundCell key={index} entry={result.day_rounds?.[index]} index={index} scheme={scheme} infer={!result.partner} />)}
                     </span>
                   )}
                 </th>
                 {result ? (
                   <>
-                    <td className="px-2 py-2 text-right font-display font-bold text-white">{result.place ?? "–"}</td>
+                    <td className="px-2 py-2 text-right tls-type-num text-white">{result.place ?? "–"}</td>
                     {Array.from({ length: count }, (_, index) => (
                       <td key={index} className="hidden sm:table-cell px-1 py-2 text-center"><RoundCell entry={result.day_rounds?.[index]} index={index} scheme={scheme} infer={!result.partner} /></td>
                     ))}
                     <td className="px-2 py-2 text-right font-bold text-white">{result.day_points ?? "–"}</td>
-                    <td className="px-2 py-2 text-right text-white/80"><SeasonPoints item={result} />{result.bonus ? <span className="text-[11px] text-[var(--tls-honor)]"> +{formatNumber(result.bonus)}</span> : null}</td>
+                    <td className="px-2 py-2 text-right text-white/80"><SeasonPoints item={result} />{result.bonus ? <span className="tls-type-small text-[var(--tls-honor)]"> +{formatNumber(result.bonus)}</span> : null}</td>
                   </>
                 ) : (
                   <>
@@ -268,7 +268,7 @@ export function TournamentDays({ standings, rounds, rules }) {
   return (
     <section className="mt-12" aria-labelledby="series-days" data-testid="series-days">
       <div className="flex items-baseline justify-between gap-3 flex-wrap">
-        <h2 id="series-days" className="font-heading text-2xl font-black uppercase">Turniertage</h2>
+        <h2 id="series-days" className="tls-type-section">Turniertage</h2>
         {lobbyData && (
           <div className="flex gap-1.5" role="group" aria-label="Ansicht">
             <button type="button" aria-pressed={!showLobbies} onClick={() => setView("table")} className={`${CHIP} ${!showLobbies ? CHIP_ON : CHIP_OFF}`} data-testid="series-day-view-table">Tabelle</button>
@@ -282,7 +282,7 @@ export function TournamentDays({ standings, rounds, rules }) {
             className={`${CHIP} ${round.id === current.id ? CHIP_ON : CHIP_OFF}`} data-testid="series-day-pick">{roundLabel(round)}</button>
         ))}
       </div>
-      <p className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-white/60" data-testid="series-day-head">
+      <p className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1 tls-type-small text-white/60" data-testid="series-day-head">
         <span className="tabular-nums">{roundWhen(current)}</span>
         {isDoubleUp(table) && <span className="tls-series-badge tls-day-badge--duo" data-testid="series-day-double-up">Double Up</span>}
         {isDoubleUp(table) && <span data-testid="series-day-double-up-rule">{doubleUpDayText(rules)}</span>}

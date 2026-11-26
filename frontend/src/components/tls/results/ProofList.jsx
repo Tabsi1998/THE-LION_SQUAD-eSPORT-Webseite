@@ -10,7 +10,7 @@ import { chatAttachmentSrc } from "@/lib/chatAttachments";
 // `sideLabels`: Namen der Seiten je Anmeldung, etwa { "reg-1": "Rudel A" }; ohne sie steht „Eigene Seite“ / „Gegenseite“.
 
 const ACCEPT = "image/png,image/jpeg,image/webp";
-const BUTTON = "tls-btn tls-btn--secondary inline-flex min-h-[44px] items-center gap-2 px-3 py-2 rounded-sm text-xs uppercase tracking-wider font-bold disabled:opacity-50";
+const BUTTON = "tls-btn tls-btn--secondary inline-flex min-h-[44px] items-center gap-2 px-3 py-2 rounded-sm tls-type-label disabled:opacity-50";
 
 function errorText(error, fallback) {
   const detail = error?.response?.data?.detail;
@@ -56,7 +56,7 @@ function ProofItem({ item, sideLabels, testId, confirming, busy, onRemove }) {
           <img src={chatAttachmentSrc(item.url, 400)} alt="Nachweis als Bild" className="h-full w-full object-cover" loading="lazy" />
         </a>
       )}
-      <div className="min-w-0 flex-1 text-xs">
+      <div className="min-w-0 flex-1 tls-type-small">
         {item.type === "link" ? (
           <a href={item.link} target="_blank" rel="noopener noreferrer nofollow" className="inline-flex max-w-full items-center gap-1 text-[#29B6E8] hover:underline" data-testid={`${testId}-link-${item.id}`}>
             <span className="truncate">{linkLabel(item.link)}</span>
@@ -69,12 +69,12 @@ function ProofItem({ item, sideLabels, testId, confirming, busy, onRemove }) {
             <span className="truncate">MOSS-Datei (ZIP, {sizeText(item.size)}) herunterladen</span>
           </a>
         ) : <span className="text-white/70">Bild</span>}
-        {item.type === "file" && item.sha256 ? <div className="truncate font-mono text-[10px] text-white/40" title={item.sha256}>SHA-256 {item.sha256}</div> : null}
+        {item.type === "file" && item.sha256 ? <div className="truncate font-mono tls-type-small text-white/40" title={item.sha256}>SHA-256 {item.sha256}</div> : null}
         <div className="text-white/50">{sideName(item, sideLabels)}{item.removed ? " · von der Seite entfernt, nur noch für die Leitung sichtbar" : ""}{waiting ? " · wird noch geprüft, bis dahin nur für dich sichtbar" : ""}</div>
       </div>
       {item.can_remove ? (
         <button type="button" disabled={busy} onClick={() => onRemove(item)} aria-label={confirming ? "Wirklich entfernen" : "Nachweis entfernen"}
-          className={`shrink-0 min-h-[44px] px-2 text-xs font-bold uppercase tracking-wider disabled:opacity-50 ${confirming ? "text-[#FF6B60]" : "text-white/50 hover:text-white"}`}
+          className={`shrink-0 min-h-[44px] px-2 tls-type-label disabled:opacity-50 ${confirming ? "text-[#FF6B60]" : "text-white/50 hover:text-white"}`}
           data-testid={`${testId}-remove-${item.id}`}>
           {confirming ? (item.kind === "moss" ? "Wirklich entfernen? Die Leitung sieht ihn weiter." : "Wirklich entfernen?") : <Trash2 className="w-4 h-4" />}
         </button>
@@ -181,10 +181,10 @@ export function ProofList({ matchId, kind, refId = "", title = "Nachweise", side
 
   return (
     <section className="space-y-2" data-testid={testId} aria-busy={state.status === "loading" || busy}>
-      <div className="text-[11px] font-bold uppercase tracking-widest text-white/60">{title}</div>
-      {state.status === "loading" ? <p className="flex items-center gap-2 text-xs text-white/50"><Loader2 className="w-4 h-4 animate-spin" /> Nachweise werden geladen …</p> : null}
+      <div className="tls-type-label text-white/60">{title}</div>
+      {state.status === "loading" ? <p className="flex items-center gap-2 tls-type-small text-white/50"><Loader2 className="w-4 h-4 animate-spin" /> Nachweise werden geladen …</p> : null}
       {state.status === "error" ? (
-        <p className="text-xs text-white/60" role="alert" data-testid={`${testId}-load-error`}>
+        <p className="tls-type-small text-white/60" role="alert" data-testid={`${testId}-load-error`}>
           Die Nachweise ließen sich nicht laden. <button type="button" onClick={load} className="underline hover:text-white">Noch einmal versuchen</button>
         </p>
       ) : null}
@@ -196,7 +196,7 @@ export function ProofList({ matchId, kind, refId = "", title = "Nachweise", side
                 <ProofItem key={item.id} item={item} sideLabels={sideLabels} testId={testId} confirming={confirmId === item.id} busy={busy} onRemove={remove} />
               ))}
             </ul>
-          ) : <p className="text-xs text-white/50" data-testid={`${testId}-empty`}>Noch keine Nachweise.</p>}
+          ) : <p className="tls-type-small text-white/50" data-testid={`${testId}-empty`}>Noch keine Nachweise.</p>}
           {data.can_add ? (
             <div className="space-y-2" data-testid={`${testId}-add`}>
               <div className="flex flex-wrap gap-2">
@@ -223,17 +223,17 @@ export function ProofList({ matchId, kind, refId = "", title = "Nachweise", side
               </form>
               <input ref={cameraRef} type="file" accept={ACCEPT} capture="environment" className="hidden" onChange={(event) => { addFile(event.target.files); event.target.value = ""; }} data-testid={`${testId}-camera-input`} />
               <input ref={galleryRef} type="file" accept={ACCEPT} className="hidden" onChange={(event) => { addFile(event.target.files); event.target.value = ""; }} data-testid={`${testId}-input`} />
-              {hint ? <p className="text-xs text-white/50" data-testid={`${testId}-hint`}>{proofHintText(data.limit)}</p> : null}
+              {hint ? <p className="tls-type-small text-white/50" data-testid={`${testId}-hint`}>{proofHintText(data.limit)}</p> : null}
             </div>
           ) : (
-            <p className="text-xs text-white/50" data-testid={`${testId}-closed`}>
+            <p className="tls-type-small text-white/50" data-testid={`${testId}-closed`}>
               {data.open ? "Hier kannst du keine Nachweise hinzufügen." : "Abgeschlossen – die Nachweise lassen sich nicht mehr ändern."}
             </p>
           )}
-          {hint ? <p className="text-xs text-white/50" data-testid={`${testId}-audience`}>{proofAudienceText(kind)}</p> : null}
+          {hint ? <p className="tls-type-small text-white/50" data-testid={`${testId}-audience`}>{proofAudienceText(kind)}</p> : null}
         </>
       ) : null}
-      {error ? <p className="text-sm text-[#FF6B60]" role="alert" data-testid={`${testId}-error`}>{error}</p> : null}
+      {error ? <p className="tls-type-small text-[#FF6B60]" role="alert" data-testid={`${testId}-error`}>{error}</p> : null}
     </section>
   );
 }

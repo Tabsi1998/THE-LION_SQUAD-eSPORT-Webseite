@@ -31,7 +31,7 @@
 .tls-series-cutline__label {
   display: inline-block; transform: translateY(-50%); margin-left: 0.75rem; padding: 0 0.5rem;
   background: var(--tls-surface-1); color: var(--tls-honor);
-  font-size: 10px; font-weight: 800; letter-spacing: 0.16em; text-transform: uppercase; line-height: 1.4;
+  font-size: var(--tls-type-label-size); font-weight: 800; letter-spacing: 0.16em; text-transform: uppercase; line-height: 1.4;
 }
 /* Am Handy zwischen den Karten: Beschriftung links, die Linie läuft daneben weiter (nichts überdeckt sie). */
 .tls-series-cutline--card { list-style: none; display: flex; align-items: center; gap: 0.5rem; padding: 0.25rem 0; }
@@ -51,7 +51,7 @@
 
 .tls-series-badge {
   display: inline-flex; align-items: center; padding: 1px 6px; border-radius: 3px;
-  font-size: 10px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase;
+  font-size: var(--tls-type-label-size); font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase;
 }
 .tls-series-badge--guess { color: var(--tls-honor); box-shadow: inset 0 0 0 1px rgb(var(--tls-honor-rgb) / 0.5); }
 

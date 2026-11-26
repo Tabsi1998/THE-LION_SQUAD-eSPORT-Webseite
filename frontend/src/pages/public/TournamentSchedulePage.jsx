@@ -218,7 +218,7 @@ export default function TournamentSchedulePage() {
         <Breadcrumbs items={tournamentCrumbs(tournament, trail, { tournamentUrl, current: { label: "Spielplan" } })} className="mb-3" />
         <div className="mt-3 flex flex-wrap items-end justify-between gap-3">
           <div>
-            <h1 className="font-heading text-4xl md:text-6xl font-black uppercase">Spielplan</h1>
+            <h1 className="tls-type-hero">Spielplan</h1>
             <p className="mt-3 text-white/60 max-w-2xl">Alle Runden, Zeiten und Stationen. Ein Spiel antippen öffnet seine Spielseite mit Chat und Ergebnis.</p>
           </div>
           {/* Druckansicht (#1283): mit leeren Feldern für das Ergebnis zum Handschreiben. */}
@@ -234,14 +234,14 @@ export default function TournamentSchedulePage() {
             {showViews && (
               <div role="group" aria-label="Ansicht" className="flex flex-wrap gap-1" data-testid="schedule-view">
                 {VIEWS.map((option) => (
-                  <button key={option.key} type="button" onClick={() => setView(option.key)} aria-pressed={activeView === option.key} data-testid={`schedule-view-${option.key}`} className={`tls-btn ${activeView === option.key ? "tls-btn--secondary" : "tls-btn--quiet"} px-3 py-1.5 rounded-sm text-xs font-bold uppercase tracking-wider`}>
+                  <button key={option.key} type="button" onClick={() => setView(option.key)} aria-pressed={activeView === option.key} data-testid={`schedule-view-${option.key}`} className={`tls-type-label tls-btn ${activeView === option.key ? "tls-btn--secondary" : "tls-btn--quiet"} px-3 py-1.5 rounded-sm`}>
                     {option.label}
                   </button>
                 ))}
               </div>
             )}
             {hasMine && (
-              <button type="button" onClick={() => setMineOnly((value) => !value)} aria-pressed={mineOnly} data-testid="schedule-only-mine" className={`tls-btn ${mineOnly ? "tls-btn--secondary" : "tls-btn--quiet"} px-3 py-1.5 rounded-sm text-xs font-bold uppercase tracking-wider sm:ml-auto`}>
+              <button type="button" onClick={() => setMineOnly((value) => !value)} aria-pressed={mineOnly} data-testid="schedule-only-mine" className={`tls-type-label tls-btn ${mineOnly ? "tls-btn--secondary" : "tls-btn--quiet"} px-3 py-1.5 rounded-sm sm:ml-auto`}>
                 Nur meine Spiele
               </button>
             )}
@@ -262,13 +262,13 @@ export default function TournamentSchedulePage() {
                 <ChevronLeft className="w-5 h-5" />
               </button>
               <div className="text-center min-w-0">
-                <div className="font-heading text-xl md:text-2xl font-black uppercase truncate" data-testid="matchday-title">
+                <div className="tls-type-section truncate" data-testid="matchday-title">
                   Spieltag {currentWeek.number}
                 </div>
-                <div className="mt-0.5 text-xs text-white/55 tabular-nums" data-testid="matchday-range">
+                <div className="mt-0.5 tls-type-small text-white/55 tabular-nums" data-testid="matchday-range">
                   {formatWeekRange(currentWeek.starts_at, currentWeek.ends_at)}
                 </div>
-                <div className="mt-0.5 text-[10px] uppercase tracking-widest text-white/30">
+                <div className="mt-0.5 tls-type-label text-white/30">
                   {weekIndex + 1} von {weeks.length}
                 </div>
               </div>
@@ -301,7 +301,7 @@ export default function TournamentSchedulePage() {
           <div className="mt-8 space-y-10">
             {groupByRound(filtered).map((group) => (
               <section key={group.key} aria-labelledby={`runde-${group.key}`}>
-                <h2 id={`runde-${group.key}`} className="font-heading text-xl md:text-2xl font-black uppercase">{group.label}</h2>
+                <h2 id={`runde-${group.key}`} className="tls-type-section">{group.label}</h2>
                 <div className="mt-4 grid md:grid-cols-2 xl:grid-cols-3 gap-3">
                   {group.entries.map((entry) => (
                     <ScheduleCard key={entry.id} entry={entry} resolved={resolvedByMatch[entry.id]} changed={changedMatches.has(entry.id)} />
@@ -341,10 +341,10 @@ function When({ entry, resolved }) {
   const source = SCHEDULE_SOURCE_LABELS[match.schedule_source === "manual" ? "manual" : resolved?.schedule_source || match.schedule_source];
   return (
     <span className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5 min-w-0">
-      <span className="text-[13px] text-white/70 tabular-nums" data-testid={`schedule-when-${match.id}`}>{formatWhen(scheduledAt, { fallback: "Termin offen" })}</span>
-      {entry.forecast && scheduledAt && <span className="text-[11px] text-white/45" data-testid={`schedule-forecast-${match.id}`}>voraussichtlich</span>}
+      <span className="tls-type-small text-white/70 tabular-nums" data-testid={`schedule-when-${match.id}`}>{formatWhen(scheduledAt, { fallback: "Termin offen" })}</span>
+      {entry.forecast && scheduledAt && <span className="tls-type-small text-white/45" data-testid={`schedule-forecast-${match.id}`}>voraussichtlich</span>}
       {source && !entry.forecast && (
-        <span className="text-[10px] uppercase tracking-widest text-white/35" data-testid={`schedule-source-${match.id}`}>{source}</span>
+        <span className="tls-type-label text-white/35" data-testid={`schedule-source-${match.id}`}>{source}</span>
       )}
     </span>
   );
@@ -364,7 +364,7 @@ function ScheduleCard({ entry, resolved, changed = false }) {
       className={`tls-bracket-node tls-sched-card block rounded-md border border-white/10 ${tone === "live" ? "tls-bracket-live" : ""} ${entry.mine ? "is-mine tls-you" : ""} ${changed ? "tls-changed" : ""}`}
     >
       <div className="tls-bracket-head">
-        <span className="min-w-0 truncate text-[11px] font-semibold uppercase tracking-[0.08em] text-white/50">{head}</span>
+        <span className="min-w-0 truncate tls-type-label text-white/50">{head}</span>
         <span className="flex shrink-0 items-center gap-2">
           {changed && <span className="tls-new-chip" data-testid={`schedule-fresh-${match.id}`}>gerade eingetragen</span>}
           <StatusLabel entry={entry} />
@@ -380,7 +380,7 @@ function ScheduleCard({ entry, resolved, changed = false }) {
           >
             <span className={`tls-sched-name min-w-0 flex-1 ${side.known ? "text-white" : "text-white/45 italic"} ${side.winner ? "font-semibold" : ""}`}>{side.label}</span>
             {side.mine && <span className="tls-standing-me">{side.mineLabel || "Du"}</span>}
-            {side.score != null && <span className={`font-display text-base font-bold tabular-nums ${side.winner ? "text-white" : "text-white/55"}`}>{side.score}</span>}
+            {side.score != null && <span className={`tls-type-card tls-type-num ${side.winner ? "text-white" : "text-white/55"}`}>{side.score}</span>}
             {index < sides.length - 1 && <span className="sr-only">{entry.heat ? ", " : " gegen "}</span>}
           </div>
         ))}
@@ -388,7 +388,7 @@ function ScheduleCard({ entry, resolved, changed = false }) {
       <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1 border-t border-white/5 px-2.5 py-2">
         <When entry={entry} resolved={resolved} />
         {entry.stationLabel && (
-          <span className="inline-flex items-center gap-1 text-[11px] font-bold uppercase tracking-wider text-[var(--tls-brand)]" data-testid={`schedule-station-${match.id}`}>
+          <span className="inline-flex items-center gap-1 tls-type-label text-[var(--tls-brand)]" data-testid={`schedule-station-${match.id}`}>
             <MapPin className="h-3 w-3" aria-hidden="true" />{entry.stationLabel}
           </span>
         )}
@@ -404,17 +404,17 @@ function StationView({ entries, changedMatches, queue = null, staleSince = 0 }) 
   const summary = queueSummaryLine(queue?.summary);
   return (
     <>
-    {summary ? <p className="mt-8 text-sm font-bold text-white" data-testid="schedule-live-summary">{summary}</p> : null}
+    {summary ? <p className="mt-8 tls-type-body font-bold text-white" data-testid="schedule-live-summary">{summary}</p> : null}
     <LiveStaleNote since={staleSince} className="mt-3" testId="schedule-live-stale" />
     <div className="mt-8 grid gap-8 lg:grid-cols-2" data-testid="schedule-stations">
       {stations.map((station) => (
         <section key={station.key} className="min-w-0" aria-labelledby={`station-${station.key}`} data-testid={`schedule-station-group-${station.key}`}>
-          <h2 id={`station-${station.key}`} className="flex items-baseline justify-between gap-3 font-heading text-lg md:text-xl font-black uppercase">
+          <h2 id={`station-${station.key}`} className="flex items-baseline justify-between gap-3 tls-type-section">
             <span className="flex min-w-0 items-baseline gap-2">
               <span className="min-w-0 truncate">{station.name}</span>
-              {station.device && <span className="shrink-0 font-body text-[11px] font-semibold normal-case tracking-normal text-white/50" data-testid={`schedule-station-device-${station.name}`}>{station.device}</span>}
+              {station.device && <span className="shrink-0 tls-type-small font-semibold text-white/50" data-testid={`schedule-station-device-${station.name}`}>{station.device}</span>}
             </span>
-            <span className="shrink-0 font-body text-xs font-semibold normal-case tracking-normal text-white/45">{station.entries.length} {station.entries.length === 1 ? "Spiel" : "Spiele"}</span>
+            <span className="shrink-0 tls-type-small font-semibold text-white/45">{station.entries.length} {station.entries.length === 1 ? "Spiel" : "Spiele"}</span>
           </h2>
           {/* Live-Warteschlange je Station (#1556): „Jetzt“ und „Als Nächstes“ aus dem Server. Die Liste darunter bleibt der Plan. */}
           <StationNowNext station={live[station.key]} stationKey={station.key} />
@@ -430,20 +430,20 @@ function StationView({ entries, changedMatches, queue = null, staleSince = 0 }) 
                 >
                   <span className="tls-sched-line__time tabular-nums">
                     {entry.scheduledAt ? formatWhen(entry.scheduledAt) : "offen"}
-                    {entry.forecast && <span className="block text-[10px] font-normal text-white/40">voraussichtlich</span>}
+                    {entry.forecast && <span className="block tls-type-small font-normal text-white/40">voraussichtlich</span>}
                   </span>
                   <span className="min-w-0">
                     {entry.heat ? (
                       <>
-                        <span className="block text-sm font-semibold text-white">{entry.heat.name} · {entry.heat.count}</span>
-                        <span className="tls-sched-name block text-[12px] text-white/70">{entry.sides.map((side) => side.label).join(", ")}</span>
+                        <span className="block tls-type-small font-semibold text-white">{entry.heat.name} · {entry.heat.count}</span>
+                        <span className="tls-sched-name block tls-type-small text-white/70">{entry.sides.map((side) => side.label).join(", ")}</span>
                       </>
                     ) : (
-                      <span className="tls-sched-name block text-sm text-white">
+                      <span className="tls-sched-name block tls-type-small text-white">
                         {entry.sides.map((side) => side.label).join(" gegen ")}
                       </span>
                     )}
-                    <span className="flex min-w-0 items-center gap-2 text-[11px] text-white/45">
+                    <span className="flex min-w-0 items-center gap-2 tls-type-small text-white/45">
                       {entry.mine ? <span className="tls-you-tag" data-testid={`schedule-you-${entry.match.id}`}>{entry.mineLabel || "Du"}</span> : null}
                       <span className="truncate">{[entry.groupLabel, entry.roundLabel].filter(Boolean).join(" · ")}</span>
                     </span>

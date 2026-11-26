@@ -114,13 +114,13 @@ function MatchSheet({ match, id }) {
   const duration = useContext(DurationContext)(match);
   return (
     <div id={id} className="tls-bracket-sheet" role="group" aria-label={`Spiel ${match.match_key || ""}`.trim()}>
-      <div className="flex flex-wrap gap-x-3 gap-y-1 text-xs text-muted-text">
+      <div className="flex flex-wrap gap-x-3 gap-y-1 tls-type-small text-muted-text">
         {time ? <span>{time}{match?.schedule_forecast || match?.is_preview ? " · voraussichtlich" : ""}</span> : null}
         {duration ? <span>{duration} Min.</span> : null}
         {station ? <span className="text-brand">{station}</span> : null}
         {!time && !station && !duration ? <span>Zeit und Station folgen</span> : null}
       </div>
-      <MatchLink match={match} className="mt-1.5 inline-block text-xs font-bold uppercase tracking-wider text-brand hover:text-white">Zum Spiel</MatchLink>
+      <MatchLink match={match} className="mt-1.5 inline-block tls-type-label text-brand hover:text-white">Zum Spiel</MatchLink>
     </div>
   );
 }
@@ -171,7 +171,7 @@ function SlotAvatar({ avatar, label, empty }) {
   const short = empty ? "" : initials(label);
   if (!short) return <span className="w-5 h-5 rounded-sm border border-dashed border-white/15 shrink-0" aria-hidden="true" />;
   return (
-    <span className="w-5 h-5 rounded-sm border border-white/10 bg-white/[0.05] text-[9px] font-bold text-white/65 flex items-center justify-center shrink-0" aria-hidden="true" data-testid="bracket-initials">
+    <span className="w-5 h-5 rounded-sm border border-white/10 bg-white/[0.05] tls-type-small font-bold text-white/65 flex items-center justify-center shrink-0" aria-hidden="true" data-testid="bracket-initials">
       {short}
     </span>
   );
@@ -235,23 +235,23 @@ function PlayerRow({ match, slot, regMap, findMatch, result, played, isWinner, i
       style={style}
       className={`tls-bracket-row ${isWinner || qualified ? "is-winner" : ""} ${sweep ? "tls-winner-sweep" : ""} ${podium ? "is-podium" : ""}`}
     >
-      <span className="w-4 shrink-0 text-right font-display text-[11px] tabular-nums text-quiet">{seed || ""}</span>
+      <span className="w-4 shrink-0 text-right tls-type-small tls-type-num text-quiet">{seed || ""}</span>
       <SlotAvatar avatar={reg?.user?.avatar_url || reg?.avatar_url} label={label} empty={!reg} />
-      <span className={`min-w-0 flex-1 leading-tight ${(!label && pending) || singleWord ? "truncate" : "break-words"} ${String(label || pending).length > (heat ? 14 : 22) ? "text-xs" : "text-sm"} ${nameTone}`} data-pending={!label && pending ? "1" : undefined} title={!label && pending ? pending : singleWord ? label : undefined}>
+      <span className={`tls-type-small min-w-0 flex-1 leading-tight ${(!label && pending) || singleWord ? "truncate" : "break-words"} ${nameTone}`} data-pending={!label && pending ? "1" : undefined} title={!label && pending ? pending : singleWord ? label : undefined}>
         {bye ? "Freilos" : label || pending || "—"}
       </span>
       {isMine ? <span className="tls-you-tag">{youLabel(reg)}</span> : null}
       {walkover && isWinner ? <span className="tls-bracket-tag shrink-0">kampflos</span> : null}
-      {podium ? <span className={`shrink-0 px-1 py-0.5 rounded-sm border text-[10px] font-display font-bold ${podium.badge}`}>{podium.label}</span> : null}
+      {podium ? <span className={`shrink-0 px-1 py-0.5 rounded-sm border tls-type-small tls-type-num ${podium.badge}`}>{podium.label}</span> : null}
       {heat ? (
         <span className="flex shrink-0 items-center gap-1.5">
-          {played && score != null ? <span className="font-display text-xs tabular-nums text-quiet"><CountUp value={score} run={pop} delay={(rank ? rank - 1 : 0) * 60} /> P</span> : null}
+          {played && score != null ? <span className="tls-type-small tls-type-num text-quiet"><CountUp value={score} run={pop} delay={(rank ? rank - 1 : 0) * 60} /> P</span> : null}
           <span className={`tls-bracket-rank ${qualified ? "is-qualified" : ""}`} data-rank={rank || undefined} data-motion={pop && rank ? "pop" : undefined} style={rank ? { "--tls-i": rank - 1 } : undefined}>
             {played && rank ? rank : ""}
           </span>
         </span>
       ) : score != null ? (
-        <span key={score} className={`tls-score-tick shrink-0 font-display text-base font-bold tabular-nums ${podium?.text || (isWinner ? "text-brand" : "text-quiet")}`} data-motion={pop ? "pop" : undefined} style={pop ? { "--tls-i": isWinner ? 0 : 1 } : undefined}>
+        <span key={score} className={`tls-score-tick shrink-0 tls-type-card tls-type-num ${podium?.text || (isWinner ? "text-brand" : "text-quiet")}`} data-motion={pop ? "pop" : undefined} style={pop ? { "--tls-i": isWinner ? 0 : 1 } : undefined}>
           <CountUp value={score} run={pop} delay={isWinner ? 0 : 60} />
         </span>
       ) : null}
@@ -278,10 +278,10 @@ function CardHead({ match, title, meta, sheetId, open, onToggle }) {
       <span className="min-w-0 flex-1">
         {title}
         {meta}
-        {live ? <span className="mt-0.5 block text-[11px]"><LiveStatus match={match} /></span> : null}
+        {live ? <span className="mt-0.5 block tls-type-small"><LiveStatus match={match} /></span> : null}
       </span>
       {live ? null : (
-        <span className="shrink-0 text-[11px] text-muted-text">
+        <span className="shrink-0 tls-type-small text-muted-text">
           <LiveStatus match={match} />
         </span>
       )}
@@ -320,7 +320,7 @@ function DuelCard({ match, regMap, podiumMap, decisive }) {
         sheetId={sheetId}
         open={sheet.open}
         onToggle={() => sheet.setOpen((value) => !value)}
-        title={<span className="text-[11px] font-bold tracking-wider text-muted-text">{match.match_key || "Spiel"}</span>}
+        title={<span className="tls-type-label text-muted-text">{match.match_key || "Spiel"}</span>}
       />
       {slots.map((slot, index) => {
         const result = resultMap.get(slot.registration_id);
@@ -401,11 +401,11 @@ function HeatCard({ match, regMap, podiumMap, decisive }) {
         sheetId={sheetId}
         open={sheet.open}
         onToggle={() => sheet.setOpen((value) => !value)}
-        title={<span className="block text-xs font-bold text-white/85" data-testid={`bracket-heat-title-${match.id}`}>{name}{isMine ? <span className="ml-2 text-[10px] uppercase tracking-widest text-brand">Du bist dabei</span> : null}</span>}
-        meta={<span className="block text-[11px] leading-snug text-muted-text" data-testid={`bracket-heat-meta-${match.id}`}>{meta}</span>}
+        title={<span className="block tls-type-small font-bold text-white/85" data-testid={`bracket-heat-title-${match.id}`}>{name}{isMine ? <span className="ml-2 tls-type-label text-brand">Du bist dabei</span> : null}</span>}
+        meta={<span className="block tls-type-small leading-snug text-muted-text" data-testid={`bracket-heat-meta-${match.id}`}>{meta}</span>}
       />
       {empty ? (
-        <div className="px-3 py-2 text-xs italic text-quiet">noch leer</div>
+        <div className="px-3 py-2 tls-type-small italic text-quiet">noch leer</div>
       ) : rows.map((slot, index) => {
         const result = resultMap.get(slot.registration_id);
         const rank = result?.rank || 0;
@@ -437,10 +437,10 @@ function HeatCard({ match, regMap, podiumMap, decisive }) {
           sagt mit „2 Spieler“ schon, wie viele gefahren sind. Sonst stand in Lauf G und im Grand Final nach dem Ende
           „2 Plätze frei“, als wäre noch etwas offen. */}
       {freeCount && !empty && !played && !finished ? (
-        <div className="px-3 py-1.5 text-xs italic text-quiet" data-testid={`bracket-heat-free-${match.id}`}>{stayEmpty ? `${freeCount} ${freeCount === 1 ? "Platz bleibt" : "Plätze bleiben"} leer` : text.free}</div>
+        <div className="px-3 py-1.5 tls-type-small italic text-quiet" data-testid={`bracket-heat-free-${match.id}`}>{stayEmpty ? `${freeCount} ${freeCount === 1 ? "Platz bleibt" : "Plätze bleiben"} leer` : text.free}</div>
       ) : null}
       {dropText && !empty ? (
-        <div className="px-3 pb-2 pt-1 text-[11px] text-muted-text" data-testid={dropText.startsWith("Die anderen →") ? `bracket-heat-drop-${match.id}` : `bracket-heat-out-${match.id}`} data-exit-anchor={dropText.startsWith("Die anderen →") ? `${match.id}:L` : undefined}>{dropText}</div>
+        <div className="px-3 pb-2 pt-1 tls-type-small text-muted-text" data-testid={dropText.startsWith("Die anderen →") ? `bracket-heat-drop-${match.id}` : `bracket-heat-out-${match.id}`} data-exit-anchor={dropText.startsWith("Die anderen →") ? `${match.id}:L` : undefined}>{dropText}</div>
       ) : null}
       <MatchSheet match={match} id={sheetId} />
     </div>
@@ -457,8 +457,8 @@ function ByeLine({ match, regMap, advance }) {
   const path = useContext(PathContext);
   return (
     <div data-node={match.id} data-testid={`bracket-match-v2-${match.id}`} data-path={nodePathState(active, match.id) || undefined} className="tls-bracket-node tls-bracket-node--line">
-      <div data-testid={`bracket-bye-${match.id}`} className="flex items-baseline gap-1.5 px-3 py-1.5 text-xs text-muted-text" data-slot-anchor={`${match.id}:${slot.slot}`}>
-        <span className="uppercase tracking-wider text-[10px] font-bold text-quiet">Freilos:</span>{" "}
+      <div data-testid={`bracket-bye-${match.id}`} className="flex items-baseline gap-1.5 px-3 py-1.5 tls-type-small text-muted-text" data-slot-anchor={`${match.id}:${slot.slot}`}>
+        <span className="tls-type-label text-quiet">Freilos:</span>{" "}
         {regId ? (
           <button type="button" data-path-trigger="1" data-row={`${match.id}:${regId}`} aria-pressed={path.selected === regId} onClick={() => path.toggle(regId)} className="min-w-0 break-words text-left font-semibold text-white/85 hover:text-white">{label}</button>
         ) : <span className="min-w-0 break-words italic">{label}</span>}{" "}
@@ -474,7 +474,7 @@ function FateLine({ match, fate, heat }) {
   const title = heat ? `Lauf ${match.match_key || ""}`.trim() : (match.round_label || match.match_key || "Spiel");
   return (
     <div data-node={match.id} data-testid={heat ? `bracket-heat-${match.id}` : `bracket-match-v2-${match.id}`} data-fate={fate.kind} data-motion={state.fade.has(match.id) ? "fade" : undefined} className="tls-bracket-node tls-bracket-node--line tls-bracket-node--fate">
-      <div data-testid={`bracket-fate-${match.id}`} className="px-3 py-1.5 text-xs text-quiet">
+      <div data-testid={`bracket-fate-${match.id}`} className="px-3 py-1.5 tls-type-small text-quiet">
         <span className="font-bold text-white/55">{title}</span>{" · "}
         {fate.kind === "reset" ? <span data-testid="bracket-reset-not-needed">{fate.label}</span> : <span>{fate.label}</span>}
       </div>

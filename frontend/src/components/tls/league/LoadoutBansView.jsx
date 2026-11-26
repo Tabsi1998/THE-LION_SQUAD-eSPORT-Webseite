@@ -34,7 +34,7 @@ export function SubcategoryIcon({ src, className = "h-5 w-5" }) {
 function ModeNote({ entry }) {
   const all = !(entry.mode_labels || []).length;
   return (
-    <span className={`text-[11px] ${all ? "text-white/50" : "font-semibold text-warn"}`} data-testid="loadout-ban-modes">
+    <span className={`tls-type-small ${all ? "text-white/50" : "font-semibold text-warn"}`} data-testid="loadout-ban-modes">
       {all ? "in allen Modi" : `nur ${modesText(entry)}`}
     </span>
   );
@@ -44,12 +44,12 @@ function SectionHead({ section }) {
   if (!section.label) return null;
   return (
     <div className="mb-2.5 flex flex-wrap items-center gap-x-2.5 gap-y-1" data-testid="loadout-ban-section-head">
-      <h4 className="flex min-w-0 items-center gap-2 text-[11px] font-bold uppercase tracking-widest text-[#29B6E8]">
+      <h4 className="flex min-w-0 items-center gap-2 tls-type-label text-[#29B6E8]">
         <SubcategoryIcon src={section.icon_url} />
         <span className="break-words">{section.label}</span>
       </h4>
       {section.all ? (
-        <span className="inline-flex items-center gap-1.5 rounded-sm border border-warn/40 bg-warn/10 px-2 py-0.5 text-[11px] font-semibold text-warn"
+        <span className="inline-flex items-center gap-1.5 rounded-sm border border-warn/40 bg-warn/10 px-2 py-0.5 tls-type-small font-semibold text-warn"
           data-testid="loadout-ban-class">
           <Ban className="h-3 w-3" aria-hidden="true" />
           Ganze Klasse gesperrt · {section.mode_labels.length ? `nur ${section.mode_labels.join(", ")}` : "in allen Modi"}
@@ -65,7 +65,7 @@ function EntryTile({ entry, section }) {
   return (
     <li className="min-w-0" data-testid="loadout-ban-entry">
       <EquipmentThumb src={entry.image_url} />
-      <p className="mt-1.5 text-sm font-semibold leading-snug text-white break-words">{entry.name}</p>
+      <p className="mt-1.5 tls-type-small font-semibold leading-snug text-white break-words">{entry.name}</p>
       {note ? <ModeNote entry={entry} /> : null}
     </li>
   );
@@ -79,17 +79,17 @@ export function LoadoutBansView({ list, title = "Sperrliste", className = "mt-14
   return (
     <section className={className} {...(hideTitle ? { "aria-label": title } : { "aria-labelledby": headingId })} data-testid={testId}>
       {hideTitle ? null : (
-        <h2 id={headingId} className="flex items-center gap-2 font-heading text-2xl font-black uppercase">
+        <h2 id={headingId} className="flex items-center gap-2 tls-type-section">
           <Ban className="h-4 w-4 text-[#29B6E8]" aria-hidden="true" />{title}
         </h2>
       )}
-      <p className={`${hideTitle ? "" : "mt-1 "}text-sm text-white/60`}>Gesperrt ist nur, was hier steht – alles andere ist erlaubt.</p>
+      <p className={`${hideTitle ? "" : "mt-1 "}tls-type-small text-white/60`}>Gesperrt ist nur, was hier steht – alles andere ist erlaubt.</p>
       <div className="mt-6 space-y-9">
         {categories.map((category) => (
           <div key={category.label} data-testid="loadout-ban-group">
-            <h3 className="flex flex-wrap items-baseline gap-x-2 border-b border-white/10 pb-2 font-heading text-lg font-bold uppercase leading-tight text-white">
+            <h3 className="flex flex-wrap items-baseline gap-x-2 border-b border-white/10 pb-2 tls-type-card leading-tight text-white">
               <span className="break-words">{category.label}</span>
-              <span className="font-sans text-[11px] font-semibold normal-case tracking-normal text-white/45 tabular-nums">{countText(category.count, "Eintrag", "Einträge")}</span>
+              <span className="font-sans tls-type-small font-semibold text-white/45 tabular-nums">{countText(category.count, "Eintrag", "Einträge")}</span>
             </h3>
             <div className="mt-4 space-y-6">
               {category.sections.map((section) => (
@@ -105,17 +105,17 @@ export function LoadoutBansView({ list, title = "Sperrliste", className = "mt-14
         ))}
         {weapons.length ? (
           <div data-testid="loadout-ban-weapons">
-            <h3 className="border-b border-white/10 pb-2 font-heading text-lg font-bold uppercase leading-tight text-white">Aufsätze an erlaubten Waffen</h3>
+            <h3 className="border-b border-white/10 pb-2 tls-type-card leading-tight text-white">Aufsätze an erlaubten Waffen</h3>
             <ul className="divide-y divide-white/10 border-b border-white/10">
               {weapons.map((entry) => (
                 <li key={entry.item_id || entry.name} className="flex items-start gap-3 py-3" data-testid="loadout-ban-weapon">
                   <EquipmentThumb src={entry.image_url} sizes="96px" className="w-24 shrink-0" />
                   <div className="min-w-0 flex-1">
-                    <p className="text-sm font-semibold text-white break-words">{entry.name} <ModeNote entry={entry} /></p>
-                    <p className="mt-1 text-[11px] font-bold uppercase tracking-wider text-white/45">Gesperrte Aufsätze</p>
+                    <p className="tls-type-small font-semibold text-white break-words">{entry.name} <ModeNote entry={entry} /></p>
+                    <p className="mt-1 tls-type-label text-white/45">Gesperrte Aufsätze</p>
                     <ul className="mt-1 flex flex-wrap gap-1.5">
                       {(entry.attachments || []).map((item) => (
-                        <li key={item.item_id || item.name} className="max-w-full rounded-sm border border-white/10 bg-white/5 px-2 py-0.5 text-xs text-white/85 break-words">
+                        <li key={item.item_id || item.name} className="max-w-full rounded-sm border border-white/10 bg-white/5 px-2 py-0.5 tls-type-small text-white/85 break-words">
                           {item.name}
                           {/* Eigene Modi je Aufsatz (#2299). */}
                           {item.mode_labels?.length ? <span className="text-warn"> · nur {item.mode_labels.join(", ")}</span> : null}

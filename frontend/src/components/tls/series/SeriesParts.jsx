@@ -44,9 +44,9 @@ export function SeriesProgress({ progress, rounds, words: given, profile = null,
   return (
     <section className="mt-8" aria-labelledby="series-progress" data-testid="series-progress">
       <div className="flex items-baseline justify-between gap-3 flex-wrap">
-        <h2 id="series-progress" className="text-[11px] font-bold uppercase tracking-[0.3em] text-white/55">Fortschritt</h2>
-        <p className="text-sm text-white/80 tabular-nums">
-          <span className="font-display text-xl font-bold text-white">{progress?.scored || 0}</span>
+        <h2 id="series-progress" className="tls-type-label text-white/55">Fortschritt</h2>
+        <p className="tls-type-small text-white/80 tabular-nums">
+          <span className="tls-type-card tls-type-num text-white">{progress?.scored || 0}</span>
           <span className="text-white/50"> von {progress?.total || 0} {words.rounds} gewertet</span>
           {progress?.cancelled > 0 && <span className="text-white/40"> · {progress.cancelled} abgesagt</span>}
         </p>
@@ -59,7 +59,7 @@ export function SeriesProgress({ progress, rounds, words: given, profile = null,
         </div>
       )}
       {next && (
-        <p className="mt-3 text-sm text-white/70" data-testid="series-next">
+        <p className="mt-3 tls-type-small text-white/70" data-testid="series-next">
           <span className="text-white/45">{next.kind === "final" ? "Als Nächstes das Finale: " : words.next}</span>
           <span className="text-white font-semibold">{sessionLabel(next)}</span>
           <span className="tabular-nums"> · {roundWhen(next, { open: OPEN_ROUND })}</span>
@@ -84,10 +84,10 @@ export function SeriesRules({ rules }) {
   if (bonusRulesLabel(rules)) items.push(["Boni", bonusRulesLabel(rules)]);
   if (rules?.final_top_n) items.push(["Finale", `Die besten ${rules.final_top_n} der Gesamtwertung`]);
   return (
-    <dl className="mt-6 grid gap-x-6 gap-y-2 sm:grid-cols-2 text-sm" data-testid="series-rules">
+    <dl className="mt-6 grid gap-x-6 gap-y-2 sm:grid-cols-2 tls-type-small" data-testid="series-rules">
       {items.map(([term, value]) => (
         <div key={term} className="flex gap-3 min-w-0">
-          <dt className="w-24 shrink-0 text-[11px] font-bold uppercase tracking-[0.16em] text-white/45 pt-0.5">{term}</dt>
+          <dt className="w-24 shrink-0 tls-type-label text-white/45 pt-0.5">{term}</dt>
           <dd className="text-white/80 min-w-0">{value}</dd>
         </div>
       ))}
@@ -122,17 +122,17 @@ export function FinalCalculator({ standings, rules, progress }) {
   return (
     <section className="mt-6 border border-white/10 rounded-md bg-[var(--tls-surface-1)] p-4" aria-labelledby={`${selectId}-title`} data-testid="series-final-calc">
       <div className="flex items-center gap-2 flex-wrap">
-        <h3 id={`${selectId}-title`} className="font-heading text-lg font-black uppercase">Was braucht es fürs Finale?</h3>
+        <h3 id={`${selectId}-title`} className="tls-type-card">Was braucht es fürs Finale?</h3>
         <span className="tls-series-badge tls-series-badge--guess">Richtwert</span>
       </div>
       <div className="mt-3 flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3">
-        <label htmlFor={selectId} className="text-sm text-white/60">Spieler</label>
+        <label htmlFor={selectId} className="tls-type-small text-white/60">Spieler</label>
         <select id={selectId} value={row.key} onChange={(event) => setKey(event.target.value)} className="min-h-[40px] bg-black/40 border border-white/15 rounded-md px-3 text-sm text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-[#29B6E8]" data-testid="series-final-calc-select">
           {rows.map((item) => <option key={item.key} value={item.key}>{`${item.rank}. ${nameOf(item)}`}</option>)}
         </select>
       </div>
-      <p className="mt-3 text-sm text-white" aria-live="polite" data-testid="series-final-calc-result">{needsText(result, topN)}</p>
-      <p className="mt-2 text-[12px] text-white/45">Richtwert aus dem aktuellen Stand – ohne Streichergebnisse und ohne die Punkte, die die anderen noch holen.</p>
+      <p className="mt-3 tls-type-small text-white" aria-live="polite" data-testid="series-final-calc-result">{needsText(result, topN)}</p>
+      <p className="mt-2 tls-type-small text-white/45">Richtwert aus dem aktuellen Stand – ohne Streichergebnisse und ohne die Punkte, die die anderen noch holen.</p>
     </section>
   );
 }
@@ -146,18 +146,18 @@ export function SeriesFinal({ final }) {
   return (
     <section className="mt-12" aria-labelledby="series-final" data-testid="series-final">
       <div className="flex items-baseline justify-between gap-3 flex-wrap">
-        <h2 id="series-final" className="font-heading text-2xl font-black uppercase text-[var(--tls-honor)]">Finale</h2>
-        <p className="text-sm text-white/60 tabular-nums">{[roundWhen(round, { open: OPEN_ROUND }), round.venue].filter(Boolean).join(" · ")}</p>
+        <h2 id="series-final" className="tls-type-section text-[var(--tls-honor)]">Finale</h2>
+        <p className="tls-type-small text-white/60 tabular-nums">{[roundWhen(round, { open: OPEN_ROUND }), round.venue].filter(Boolean).join(" · ")}</p>
       </div>
       {rows.length === 0 ? (
-        <p className="mt-3 text-sm text-white/55">Die Endplatzierung steht hier nach dem Finale.</p>
+        <p className="mt-3 tls-type-small text-white/55">Die Endplatzierung steht hier nach dem Finale.</p>
       ) : (
         <ol className="mt-4 divide-y divide-white/5 border-y border-white/10">
           {rows.map((row) => {
             const metal = PODIUM[row.place];
             return (
               <li key={row.key} className="py-2.5 flex items-center gap-3" data-testid="series-final-row" data-club={row.club_member ? "true" : undefined}>
-                <span className={`w-10 shrink-0 font-display text-lg font-bold tabular-nums ${metal ? metal.text : "text-white/70"}`}>
+                <span className={`w-10 shrink-0 tls-type-card tabular-nums ${metal ? metal.text : "text-white/70"}`}>
                   {row.place ? `${row.place}.` : "–"}
                   {metal && <span className="sr-only"> ({metal.label})</span>}
                 </span>

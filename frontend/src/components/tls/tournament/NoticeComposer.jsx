@@ -165,16 +165,16 @@ export function NoticeComposer({ slug, tournament, stations = [] }) {
   return (
     <div className="mt-5 space-y-6" data-testid="lead-notice">
       <form onSubmit={submit} className="rounded-sm border border-white/10 bg-[#121212] p-4" data-testid="notice-form">
-        <div className="text-[11px] font-bold uppercase tracking-widest text-white/50">Vorlagen</div>
+        <div className="tls-type-label text-white/50">Vorlagen</div>
         <div className="mt-2 flex flex-wrap gap-2">
           {templates.map((template) => (
-            <button key={template.key} type="button" onClick={() => pickTemplate(template)} className="tls-btn tls-btn--quiet min-h-[40px] max-w-full rounded-sm px-3 py-2 text-xs font-bold [overflow-wrap:anywhere]" data-testid={`notice-template-${template.key}`}>
+            <button key={template.key} type="button" onClick={() => pickTemplate(template)} className="tls-btn tls-btn--quiet min-h-[40px] max-w-full rounded-sm px-3 py-2 tls-type-small font-bold [overflow-wrap:anywhere]" data-testid={`notice-template-${template.key}`}>
               {template.label}
             </button>
           ))}
         </div>
 
-        <label htmlFor="notice-text" className="mt-4 block text-[11px] font-bold uppercase tracking-widest text-white/50">Hinweis</label>
+        <label htmlFor="notice-text" className="mt-4 block tls-type-label text-white/50">Hinweis</label>
         <textarea
           id="notice-text"
           value={text}
@@ -185,83 +185,83 @@ export function NoticeComposer({ slug, tournament, stations = [] }) {
           className="mt-2 w-full resize-none rounded-sm border border-white/15 bg-black/40 px-3 py-2 text-base text-white placeholder:text-white/30 focus:border-[#29B6E8] focus:outline-none"
           data-testid="notice-text-input"
         />
-        <div className={`mt-1 text-right text-[11px] tabular-nums ${length > NOTICE_MAX - 20 ? "text-honor" : "text-white/40"}`} data-testid="notice-count">{length}/{NOTICE_MAX}</div>
+        <div className={`mt-1 text-right tls-type-small tabular-nums ${length > NOTICE_MAX - 20 ? "text-honor" : "text-white/40"}`} data-testid="notice-count">{length}/{NOTICE_MAX}</div>
 
         <fieldset className="mt-3">
-          <legend className="text-[11px] font-bold uppercase tracking-widest text-white/50">An wen</legend>
+          <legend className="tls-type-label text-white/50">An wen</legend>
           <div className="mt-2 grid grid-cols-2 gap-1 rounded-sm border border-white/10 bg-white/5 p-1" role="group">
             {[["tournament", "Dieses Turnier"], ["event", "Ganzes Event"]].map(([key, label]) => {
               const disabled = key === "event" && (!hasEvent || !canEvent);
               return (
-                <button key={key} type="button" disabled={disabled} aria-pressed={target === key} onClick={() => setTarget(key)} className={`min-h-[40px] rounded-sm text-xs font-bold uppercase tracking-wider disabled:opacity-40 ${target === key ? "bg-[#29B6E8] text-black" : "text-white/60"}`} data-testid={`notice-target-${key}`}>
+                <button key={key} type="button" disabled={disabled} aria-pressed={target === key} onClick={() => setTarget(key)} className={`min-h-[40px] rounded-sm tls-type-label disabled:opacity-40 ${target === key ? "bg-[#29B6E8] text-black" : "text-white/60"}`} data-testid={`notice-target-${key}`}>
                   {label}
                 </button>
               );
             })}
           </div>
-          <p className="mt-2 text-xs text-white/50" data-testid="notice-recipients">
+          <p className="mt-2 tls-type-small text-white/50" data-testid="notice-recipients">
             {count == null ? "Empfänger werden gezählt …" : count === 0 ? "Gerade ist niemand angemeldet – der Hinweis steht nur als Banner." : `Geht an ${count === 1 ? "1 Person" : `${count} Personen`}: alle Angemeldeten, bei Teams alle Mitglieder.`}
             {!hasEvent ? " Dieses Turnier gehört zu keinem Event." : !canEvent && list ? " An das ganze Event schreibt, wer alle Turniere des Events leitet." : ""}
           </p>
           {/* Vor-Ort-Zugang (#2546, Fabian 24.11.): Gäste mit dem QR-Code sehen das Banner auf ihrer schlanken Turnierseite. */}
           {list?.onsite_access ? (
-            <p className="mt-1 text-xs text-white/50" data-testid="notice-onsite">Auch Gäste mit Vor-Ort-QR-Code sehen diesen Hinweis.</p>
+            <p className="mt-1 tls-type-small text-white/50" data-testid="notice-onsite">Auch Gäste mit Vor-Ort-QR-Code sehen diesen Hinweis.</p>
           ) : null}
         </fieldset>
 
         <fieldset className="mt-4">
-          <legend className="text-[11px] font-bold uppercase tracking-widest text-white/50">Steht für</legend>
+          <legend className="tls-type-label text-white/50">Steht für</legend>
           <div className="mt-2 grid grid-cols-5 gap-1 rounded-sm border border-white/10 bg-white/5 p-1" role="group">
             {NOTICE_DURATIONS.map(([minutes, label]) => (
-              <button key={minutes} type="button" aria-pressed={duration === minutes} onClick={() => setDuration(minutes)} className={`min-h-[40px] rounded-sm text-[11px] sm:text-xs font-bold tabular-nums ${duration === minutes ? "bg-[#29B6E8] text-black" : "text-white/60"}`} data-testid={`notice-duration-${minutes}`}>
+              <button key={minutes} type="button" aria-pressed={duration === minutes} onClick={() => setDuration(minutes)} className={`min-h-[40px] rounded-sm tls-type-small font-bold tabular-nums ${duration === minutes ? "bg-[#29B6E8] text-black" : "text-white/60"}`} data-testid={`notice-duration-${minutes}`}>
                 {label}
               </button>
             ))}
           </div>
         </fieldset>
 
-        <label className="mt-4 flex min-h-[44px] cursor-pointer items-center gap-3 text-sm text-white/85">
+        <label className="mt-4 flex min-h-[44px] cursor-pointer items-center gap-3 tls-type-small text-white/85">
           <input type="checkbox" checked={tv} onChange={(event) => setTv(event.target.checked)} className="h-5 w-5 accent-[#29B6E8]" data-testid="notice-tv" />
           <MonitorPlay className="h-4 w-4 text-[#29B6E8]" aria-hidden="true" /> Auch am TV zeigen
         </label>
         {canPause ? (
-          <label className="flex min-h-[44px] cursor-pointer items-center gap-3 text-sm text-white/85" data-testid="notice-pause-row">
+          <label className="flex min-h-[44px] cursor-pointer items-center gap-3 tls-type-small text-white/85" data-testid="notice-pause-row">
             <input type="checkbox" checked={setPause} onChange={(event) => setSetPause(event.target.checked)} className="h-5 w-5 accent-honor" data-testid="notice-pause" />
             <span>Turnier gleich pausieren bis {pauseClock} <span className="text-white/45">(Pause-Bildschirm am TV)</span></span>
           </label>
         ) : null}
 
-        <button type="submit" disabled={busy || tooShort} className="tls-btn tls-btn--primary mt-4 inline-flex min-h-[48px] w-full items-center justify-center gap-2 rounded-sm px-4 py-2 text-sm font-bold uppercase tracking-wider sm:w-auto" data-testid="notice-send">
+        <button type="submit" disabled={busy || tooShort} className="tls-btn tls-btn--primary mt-4 inline-flex min-h-[48px] w-full items-center justify-center gap-2 rounded-sm px-4 py-2 tls-type-small font-bold uppercase tracking-wider sm:w-auto" data-testid="notice-send">
           <Send className="h-4 w-4" aria-hidden="true" /> {busy ? "Wird gesendet …" : "Hinweis senden"}
         </button>
       </form>
 
       <section aria-labelledby="notice-log-title">
-        <div id="notice-log-title" className="text-[11px] font-bold uppercase tracking-widest text-white/40">Gesendet · wer, wann, an wen</div>
-        {list?.error ? <p className="mt-2 text-sm text-warn">{list.error}</p> : null}
-        {list && !items.length && !list.error ? <div className="mt-2 rounded-sm border border-white/10 bg-[#121212] p-5 text-center text-sm text-white/50" data-testid="notice-log-empty">Noch kein Hinweis gesendet.</div> : null}
+        <div id="notice-log-title" className="tls-type-small font-bold text-white/40">Gesendet · wer, wann, an wen</div>
+        {list?.error ? <p className="mt-2 tls-type-small text-warn">{list.error}</p> : null}
+        {list && !items.length && !list.error ? <div className="mt-2 rounded-sm border border-white/10 bg-[#121212] p-5 text-center tls-type-small text-white/50" data-testid="notice-log-empty">Noch kein Hinweis gesendet.</div> : null}
         <ul className="mt-2 space-y-2" data-testid="notice-log">
           {items.map((item) => (
             <li key={item.id} className={`rounded-sm border p-3 ${item.active ? "border-honor/40 bg-honor/[0.04]" : "border-white/10 bg-[#121212]"}`} data-testid={`notice-log-${item.id}`}>
               <div className="flex items-start gap-3">
                 <div className="min-w-0 flex-1">
-                  <p className="text-sm font-bold text-white [overflow-wrap:anywhere]">{item.text}</p>
-                  <div className="mt-1 text-[11px] text-white/50 [overflow-wrap:anywhere]">
+                  <p className="tls-type-body font-bold text-white [overflow-wrap:anywhere]">{item.text}</p>
+                  <div className="mt-1 tls-type-small text-white/50 [overflow-wrap:anywhere]">
                     {noticeClock(item)} · {item.author || "Turnierleitung"} · {item.target_label}{item.tv ? " · am TV" : ""}
                   </div>
-                  <div className="mt-0.5 text-[11px] text-white/60" data-testid={`notice-delivery-${item.id}`}>{deliveryText(item)}</div>
-                  <div className={`mt-0.5 text-[11px] font-bold ${item.active ? "text-honor" : "text-white/35"}`}>
+                  <div className="mt-0.5 tls-type-small text-white/60" data-testid={`notice-delivery-${item.id}`}>{deliveryText(item)}</div>
+                  <div className={`mt-0.5 tls-type-small font-bold ${item.active ? "text-honor" : "text-white/35"}`}>
                     {item.removed_at ? `entfernt${item.removed_by ? ` von ${item.removed_by}` : ""}` : item.active ? `steht · ${remainingText(item.expires_at, now)}` : "abgelaufen"}
                   </div>
                 </div>
                 {item.active && item.can_remove ? (
                   <div className="flex shrink-0 flex-col items-stretch gap-2">
                     {item.stale || item.state === "interrupted" ? (
-                      <button type="button" disabled={removing === item.id} onClick={() => resume(item)} className="tls-btn tls-btn--primary inline-flex min-h-[44px] items-center justify-center gap-1.5 rounded-sm px-3 py-2 text-[11px] font-bold uppercase tracking-wider" data-testid={`notice-resume-${item.id}`}>
+                      <button type="button" disabled={removing === item.id} onClick={() => resume(item)} className="tls-btn tls-btn--primary inline-flex min-h-[44px] items-center justify-center gap-1.5 rounded-sm px-3 py-2 tls-type-label" data-testid={`notice-resume-${item.id}`}>
                         <RotateCw className="h-3.5 w-3.5" aria-hidden="true" /> Fortsetzen
                       </button>
                     ) : null}
-                    <button type="button" disabled={removing === item.id} onClick={() => remove(item)} className="tls-btn tls-btn--quiet inline-flex min-h-[44px] items-center justify-center gap-1.5 rounded-sm px-3 py-2 text-[11px] font-bold uppercase tracking-wider" data-testid={`notice-remove-${item.id}`}>
+                    <button type="button" disabled={removing === item.id} onClick={() => remove(item)} className="tls-btn tls-btn--quiet inline-flex min-h-[44px] items-center justify-center gap-1.5 rounded-sm px-3 py-2 tls-type-label" data-testid={`notice-remove-${item.id}`}>
                       <Trash2 className="h-3.5 w-3.5" aria-hidden="true" /> Entfernen
                     </button>
                   </div>
@@ -270,7 +270,7 @@ export function NoticeComposer({ slug, tournament, stations = [] }) {
             </li>
           ))}
         </ul>
-        <p className="mt-3 text-xs text-white/40">Die Benachrichtigung kommt nach den Einstellungen jeder Person (Thema „Turnier-Updates“). Banner und TV zeigen nur Text und Zeit, nie, wer geschrieben hat.</p>
+        <p className="mt-3 tls-type-small text-white/40">Die Benachrichtigung kommt nach den Einstellungen jeder Person (Thema „Turnier-Updates“). Banner und TV zeigen nur Text und Zeit, nie, wer geschrieben hat.</p>
       </section>
     </div>
   );

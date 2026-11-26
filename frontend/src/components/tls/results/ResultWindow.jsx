@@ -176,8 +176,8 @@ export function ResultWindow({ entry, league = null, onClose, onSaved, testId = 
       >
         <div className="sticky top-0 z-10 flex items-start justify-between gap-3 border-b border-white/10 bg-[#0F0F10] px-4 py-3">
           <div className="min-w-0">
-            <div className="text-[11px] font-bold uppercase tracking-[0.25em] text-[#29B6E8] truncate">{meta}</div>
-            <h2 className="font-heading text-xl font-black uppercase">{correcting ? "Ergebnis korrigieren" : "Ergebnis eintragen"}</h2>
+            <div className="tls-type-label text-[#29B6E8] truncate">{meta}</div>
+            <h2 className="tls-type-section">{correcting ? "Ergebnis korrigieren" : "Ergebnis eintragen"}</h2>
           </div>
           <button type="button" onClick={onClose} aria-label="Schließen" className="shrink-0 p-2 text-white/50 hover:text-white" data-testid={`${testId}-close`}>
             <X className="w-5 h-5" />
@@ -188,7 +188,7 @@ export function ResultWindow({ entry, league = null, onClose, onSaved, testId = 
           {entry.kind !== "duel" && entry.ranking_mode !== "time" ? (
             <div className="grid grid-cols-2 gap-1 rounded-sm border border-white/10 bg-white/5 p-1" role="group" aria-label="Eingabe bei Läufen" data-testid="result-heat-mode">
               {HEAT_MODES.map(([mode, label]) => (
-                <button key={mode} type="button" aria-pressed={heatMode === mode} onClick={() => chooseHeatMode(mode)} className={`min-h-[40px] rounded-sm text-xs font-bold uppercase tracking-wider ${heatMode === mode ? "bg-[#29B6E8] text-black" : "text-white/60"}`} data-testid={`result-heat-mode-${mode}`}>
+                <button key={mode} type="button" aria-pressed={heatMode === mode} onClick={() => chooseHeatMode(mode)} className={`min-h-[40px] rounded-sm tls-type-label ${heatMode === mode ? "bg-[#29B6E8] text-black" : "text-white/60"}`} data-testid={`result-heat-mode-${mode}`}>
                   {mode === "order" ? "Reihenfolge antippen" : `${label} eintragen`}
                 </button>
               ))}
@@ -199,7 +199,7 @@ export function ResultWindow({ entry, league = null, onClose, onSaved, testId = 
             <div className="grid grid-cols-2 gap-1 rounded-sm border border-white/10 bg-white/5 p-1" role="group" aria-label="Eingabe bei Liga-Spielen" data-testid="result-maps-mode">
               {[[false, "Mit Maps"], [true, "Ohne Maps"]].map(([skip, label]) => (
                 <button key={label} type="button" aria-pressed={skipMaps === skip} onClick={() => { setSkipMaps(skip); setError(""); }}
-                  className={`min-h-[40px] rounded-sm text-xs font-bold uppercase tracking-wider ${skipMaps === skip ? "bg-[#29B6E8] text-black" : "text-white/60"}`}
+                  className={`min-h-[40px] rounded-sm tls-type-label ${skipMaps === skip ? "bg-[#29B6E8] text-black" : "text-white/60"}`}
                   data-testid={`result-maps-${skip ? "off" : "on"}`}>
                   {label}
                 </button>
@@ -207,7 +207,7 @@ export function ResultWindow({ entry, league = null, onClose, onSaved, testId = 
             </div>
           ) : null}
           {mapsPossible && skipMaps ? (
-            <p className="text-xs text-white/55" data-testid="result-maps-off-hint">Für „Nicht erschienen“, „Aufgegeben“ oder einen Stand ohne gespielte Maps. Vorhandene Maps fallen weg, wenn der Stand nicht mehr zu ihnen passt.</p>
+            <p className="tls-type-small text-white/55" data-testid="result-maps-off-hint">Für „Nicht erschienen“, „Aufgegeben“ oder einen Stand ohne gespielte Maps. Vorhandene Maps fallen weg, wenn der Stand nicht mehr zu ihnen passt.</p>
           ) : null}
           {withMaps && mapGames.map((game, index) => (
             <GameEditor key={game.position} staff index={index} game={game} games={mapGames} league={league}
@@ -233,47 +233,47 @@ export function ResultWindow({ entry, league = null, onClose, onSaved, testId = 
 
           {correcting || deciding ? (
             <label className="block">
-              <span className="block text-[11px] font-bold uppercase tracking-widest text-white/60 mb-1.5">{deciding ? "Begründung der Entscheidung (geht an beide Seiten)" : "Grund der Korrektur (steht im Protokoll)"}</span>
+              <span className="block tls-type-label text-white/60 mb-1.5">{deciding ? "Begründung der Entscheidung (geht an beide Seiten)" : "Grund der Korrektur (steht im Protokoll)"}</span>
               <input value={reason} onChange={(event) => setReason(event.target.value)} maxLength={deciding ? 2000 : 500} className="input" placeholder="z. B. Stand falsch abgelesen" data-testid="result-reason" />
             </label>
           ) : null}
 
           {withMaps && league?.can_override_rules ? (
             <label className="block rounded-sm border border-white/10 bg-white/5 px-3 py-2" data-testid="result-rule-override">
-              <span className="block text-sm font-bold text-white">Ergebnisregel übergehen (Liga-Leitung, mit Grund)</span>
-              <span className="mt-0.5 mb-2 block text-xs text-white/70">Nur wenn ein Endstand wirklich so war und nicht zur Regel passt. Best of, Pool und Aufstellung gelten trotzdem; der Grund steht im Protokoll.</span>
+              <span className="block tls-type-small font-bold text-white">Ergebnisregel übergehen (Liga-Leitung, mit Grund)</span>
+              <span className="mt-0.5 mb-2 block tls-type-small text-white/70">Nur wenn ein Endstand wirklich so war und nicht zur Regel passt. Best of, Pool und Aufstellung gelten trotzdem; der Grund steht im Protokoll.</span>
               <input value={ruleOverride} onChange={(event) => setRuleOverride(event.target.value)} maxLength={500} className="input" placeholder="Grund, mindestens 5 Zeichen" aria-label="Grund für das Übergehen der Ergebnisregel" data-testid="result-rule-override-reason" />
             </label>
           ) : null}
 
           {entry.conflict_override ? (
             <label className="block rounded-sm border border-warn/40 bg-warn/10 px-3 py-2" data-testid="result-conflict">
-              <span className="block text-sm font-bold text-white">Du bist an diesem Spiel selbst beteiligt.</span>
-              <span className="mt-0.5 mb-2 block text-xs text-white/70">Das entscheidet sonst eine zweite Person. Als Superadmin geht es nur als Notausnahme, der Grund steht im Protokoll.</span>
+              <span className="block tls-type-small font-bold text-white">Du bist an diesem Spiel selbst beteiligt.</span>
+              <span className="mt-0.5 mb-2 block tls-type-small text-white/70">Das entscheidet sonst eine zweite Person. Als Superadmin geht es nur als Notausnahme, der Grund steht im Protokoll.</span>
               <input value={conflictReason} onChange={(event) => setConflictReason(event.target.value)} maxLength={500} className="input" placeholder="Grund der Notausnahme" aria-label="Grund der Notausnahme" data-testid="result-conflict-reason" />
             </label>
           ) : null}
 
-          <p className={`rounded-sm border px-3 py-2 text-sm font-bold ${sentence ? "border-[#29B6E8]/35 bg-[#29B6E8]/10 text-[#BFE9F8]" : "border-white/10 bg-white/5 text-white/45"}`} data-testid="result-sentence" aria-live="polite">
+          <p className={`rounded-sm border px-3 py-2 tls-type-small font-bold ${sentence ? "border-[#29B6E8]/35 bg-[#29B6E8]/10 text-[#BFE9F8]" : "border-white/10 bg-white/5 text-white/45"}`} data-testid="result-sentence" aria-live="polite">
             {sentence ? `${correcting ? "Neu: " : ""}${sentence}` : outcome.error || "Noch kein Ergebnis gewählt."}
           </p>
           {offerCorrection ? (
-            <div className="rounded-sm border border-warn/40 bg-warn/10 px-3 py-2 text-sm text-white" role="alert" data-testid="result-correction-offer">
+            <div className="rounded-sm border border-warn/40 bg-warn/10 px-3 py-2 tls-type-small text-white" role="alert" data-testid="result-correction-offer">
               <p className="font-bold">Inzwischen ist ein Ergebnis eingetragen – als Korrektur speichern?</p>
-              <button type="button" onClick={() => { setForceCorrection(true); setOfferCorrection(false); }} className="tls-btn tls-btn--secondary mt-2 min-h-[44px] px-3 py-2 rounded-sm text-xs uppercase tracking-wider font-bold" data-testid="result-correction-accept">
+              <button type="button" onClick={() => { setForceCorrection(true); setOfferCorrection(false); }} className="tls-btn tls-btn--secondary mt-2 min-h-[44px] px-3 py-2 rounded-sm tls-type-label" data-testid="result-correction-accept">
                 Als Korrektur speichern
               </button>
             </div>
           ) : null}
-          {error ? <p className="text-sm text-[#FF6B60]" role="alert" data-testid="result-error">{error}</p> : null}
+          {error ? <p className="tls-type-small text-[#FF6B60]" role="alert" data-testid="result-error">{error}</p> : null}
         </div>
 
         <div className="sticky bottom-0 flex flex-wrap items-center gap-3 border-t border-white/10 bg-[#0F0F10] px-4 py-3">
-          <button type="button" onClick={save} disabled={busy} className="tls-btn tls-btn--primary flex-1 min-h-[48px] px-4 py-3 rounded-sm text-sm uppercase tracking-wider font-bold disabled:opacity-50" data-testid="result-save">
+          <button type="button" onClick={save} disabled={busy} className="tls-btn tls-btn--primary flex-1 min-h-[48px] px-4 py-3 rounded-sm tls-type-small uppercase tracking-wider font-bold disabled:opacity-50" data-testid="result-save">
             {busy ? "Speichert …" : correcting ? "Korrektur speichern" : "Ergebnis speichern"}
           </button>
           {/* Liga-Wörter (Paket D, #2262): Ein Liga-Spiel hat keinen Baum - es zählt in der Tabelle, Bescheid bekommen die Teams. */}
-          <p className="w-full text-xs text-white/45" data-testid="result-undo-note">{league
+          <p className="w-full tls-type-small text-white/45" data-testid="result-undo-note">{league
             ? "Danach 10 Sekunden „Rückgängig“ – erst dann zählt das Ergebnis in der Tabelle und die Teams bekommen Bescheid."
             : "Danach 10 Sekunden „Rückgängig“ – erst dann rückt der Baum weiter und die Spieler bekommen Bescheid."}</p>
         </div>
@@ -320,9 +320,9 @@ export function ResultWindowLoader({ matchId, onClose, onSaved, testId = "result
   if (entry) return <ResultWindow entry={entry} league={league} onClose={onClose} onSaved={onSaved} testId={testId} />;
   return (
     <div role="presentation" className="fixed inset-0 z-50 flex items-end xl:items-center justify-center bg-black/70" onMouseDown={(event) => { if (event.target === event.currentTarget) onClose?.(); }} data-testid={`${testId}-loading`}>
-      <div className="w-full xl:max-w-xl rounded-t-xl xl:rounded-xl border border-white/10 bg-[#0F0F10] p-6 text-center text-sm text-white/60">
+      <div className="w-full xl:max-w-xl rounded-t-xl xl:rounded-xl border border-white/10 bg-[#0F0F10] p-6 text-center tls-type-small text-white/60">
         {error ? <span className="text-[#FF6B60]" role="alert">{error}</span> : "Wird geladen …"}
-        <div className="mt-4"><button type="button" onClick={onClose} className="tls-btn tls-btn--quiet px-4 py-2 rounded-sm text-xs uppercase tracking-wider font-bold">Schließen</button></div>
+        <div className="mt-4"><button type="button" onClick={onClose} className="tls-btn tls-btn--quiet px-4 py-2 rounded-sm tls-type-label">Schließen</button></div>
       </div>
     </div>
   );

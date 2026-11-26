@@ -78,16 +78,16 @@ export function FastLapGuestsPanel({ guests, locked, onChanged }) {
 
   return (
     <section className="border border-white/10 rounded-sm bg-[#121212] p-5 mt-6" data-testid="f1-guests-panel" aria-labelledby="f1-guests-title">
-      <h2 id="f1-guests-title" className="font-heading font-bold uppercase mb-1 text-lg">Gäste</h2>
-      <p className="text-xs text-white/50 mb-3">Fahrer ohne Konto. Löschen geht nur, solange ein Gast keine Zeiten hat.</p>
+      <h2 id="f1-guests-title" className="tls-type-section mb-1">Gäste</h2>
+      <p className="tls-type-small text-white/50 mb-3">Fahrer ohne Konto. Löschen geht nur, solange ein Gast keine Zeiten hat.</p>
       <ul className="space-y-1">
         {guests.map((guest) => (
           <li key={guest.id} data-testid={`f1-guest-${guest.id}`} className="flex items-center justify-between gap-3 border border-white/5 rounded-sm px-3 py-2">
             <div className="flex items-center gap-2 min-w-0">
               <UserRound className="w-4 h-4 shrink-0 text-white/40" aria-hidden="true" />
-              <span className="text-sm text-white truncate">{guest.display_name}</span>
-              {guest.linked_user_id && <span className="text-[9px] font-bold uppercase tracking-widest text-[#29B6E8] border border-[#29B6E8]/40 rounded-sm px-1">Verknüpft</span>}
-              {!guest.has_times && <span className="text-[10px] text-white/40">ohne Zeiten</span>}
+              <span className="tls-type-small text-white truncate">{guest.display_name}</span>
+              {guest.linked_user_id && <span className="tls-type-label text-[#29B6E8] border border-[#29B6E8]/40 rounded-sm px-1">Verknüpft</span>}
+              {!guest.has_times && <span className="tls-type-small text-white/40">ohne Zeiten</span>}
             </div>
             <div className="flex items-center gap-1 shrink-0">
               <button type="button" onClick={() => rename(guest)} data-testid={`f1-guest-rename-${guest.id}`} aria-label={`${guest.display_name} umbenennen`} title="Umbenennen" className="p-2 text-white/40 hover:text-[#29B6E8]">

@@ -27,7 +27,7 @@ export function TournamentMapPools({ tournamentId }) {
     <div className="space-y-8" data-testid="tournament-map-pools">
       {sections.map((section) => (
         <MapPoolView key={section.key} pool={section.pool} title={section.title} className="" headingId={`map-pool-${section.key}`}
-          headingClass="font-heading text-2xl font-bold uppercase mb-3 flex items-center gap-2" icon={MapIcon} />
+          headingClass="tls-type-section mb-3 flex items-center gap-2" icon={MapIcon} />
       ))}
     </div>
   );

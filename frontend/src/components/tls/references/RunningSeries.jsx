@@ -33,7 +33,7 @@ export function RunningSeries({ items, index = 2 }) {
       <div className="tls-ref-scroll tls-ref-snap -mx-4 px-4 pb-1 flex gap-3 tls-swipe tls-swipe--room sm:-mx-6 sm:px-6 md:mx-0 md:px-0 md:pb-0 md:overflow-visible md:grid md:gap-5 md:grid-cols-[repeat(auto-fit,minmax(min(100%,330px),1fr))] md:[mask-image:none] md:[-webkit-mask-image:none]" data-testid="references-running-list">
         {items.map((item) => <RunningCard key={`${item.lineage.slug}/${item.series.season_slug}`} item={item} />)}
       </div>
-      {items.length > 1 && <div className="md:hidden mt-2.5 text-[13px] text-quiet">Wischen für weitere Saisons →</div>}
+      {items.length > 1 && <div className="md:hidden mt-2.5 tls-type-small text-quiet">Wischen für weitere Saisons →</div>}
     </section>
   );
 }
@@ -52,44 +52,44 @@ function RunningCard({ item }) {
     >
       <div className="flex items-start gap-3 md:gap-3.5">
         {/* #2014: das Logo der Saison bzw. Spur steht vor dem Spiel-Logo. */}
-        <GameMark game={markWithLogo(item.game || (lineage.game_name ? { name: lineage.game_name } : null), seriesLogo(lineage, series))} code className="w-10 h-10 md:w-11 md:h-11 !rounded-lg !bg-surface-3 border border-white/10" codeClass="font-display text-[15px] md:text-base !text-brand" iconClass="w-5 h-5" padded />
+        <GameMark game={markWithLogo(item.game || (lineage.game_name ? { name: lineage.game_name } : null), seriesLogo(lineage, series))} code className="w-10 h-10 md:w-11 md:h-11 !rounded-lg !bg-surface-3 border border-white/10" codeClass="tls-type-card tls-type-num !text-brand" iconClass="w-5 h-5" padded />
         <div className="flex-1 min-w-0 flex flex-col gap-0.5">
-          <div className="text-[11px] md:text-xs font-bold uppercase tracking-[0.14em] md:tracking-[0.16em] text-quiet">{KIND_LABELS[kind] || "Serie"}</div>
-          <div className="font-semibold text-[15px] md:text-base text-zinc-200 break-words [overflow-wrap:anywhere]" data-testid="running-title">{lineage.title}</div>
+          <div className="tls-type-label md:tracking-[0.16em] text-quiet">{KIND_LABELS[kind] || "Serie"}</div>
+          <div className="font-semibold tls-type-body text-zinc-200 break-words [overflow-wrap:anywhere]" data-testid="running-title">{lineage.title}</div>
           {/* #1934: veranstaltender Partner des Vereins */}
           <PartnerHostBadge partner={item.organizers?.[0]} className="mt-1" />
         </div>
         {item.today && (
-          <span className="shrink-0 inline-flex items-center gap-1.5 md:gap-[7px] px-2 md:px-2.5 py-1 rounded-full bg-honor/[0.12] border border-honor/45 text-honor text-[11px] md:text-xs font-bold uppercase tracking-[0.1em] md:tracking-[0.12em]" data-testid="running-today-badge">
+          <span className="shrink-0 inline-flex items-center gap-1.5 md:gap-[7px] px-2 md:px-2.5 py-1 rounded-full bg-honor/[0.12] border border-honor/45 text-honor tls-type-label md:tracking-[0.12em]" data-testid="running-today-badge">
             <span className="tls-run-pulse" aria-hidden="true" /> Heute
           </span>
         )}
       </div>
-      <div className="font-heading font-extrabold uppercase leading-[1.15] text-[19px] md:text-[22px] break-words [overflow-wrap:anywhere]" data-testid="running-season">{seasonLabel(item)}</div>
+      <div className="tls-type-card leading-[1.15] break-words [overflow-wrap:anywhere]" data-testid="running-season">{seasonLabel(item)}</div>
       {total > 0 && (
         <div className="flex flex-col gap-1.5 md:gap-2">
           <Segments scored={scored} total={total} />
-          <div className="text-[13px] md:text-sm text-zinc-400" data-testid="running-progress-text">{progressText(kind, scored, total, profile)}</div>
+          <div className="tls-type-small text-zinc-400" data-testid="running-progress-text">{progressText(kind, scored, total, profile)}</div>
         </div>
       )}
       <div className="mt-auto grid grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)] gap-3 md:gap-4 pt-3 md:pt-4 border-t border-white/[0.08]">
         <div className="min-w-0 flex flex-col gap-1">
-          <div className="text-[11px] md:text-xs font-bold uppercase tracking-[0.14em] md:tracking-[0.16em] text-quiet">{nextTitle(kind, next, profile)}</div>
-          <div className="font-semibold text-sm md:text-base text-white break-words [overflow-wrap:anywhere]" data-testid="running-next">
+          <div className="tls-type-label md:tracking-[0.16em] text-quiet">{nextTitle(kind, next, profile)}</div>
+          <div className="font-semibold tls-type-body text-white break-words [overflow-wrap:anywhere]" data-testid="running-next">
             {kindShows(profile, "country") && <CountryFlag code={next?.country_code} size="sm" className="mr-1.5" />}
             {nextValue(next)}
           </div>
           {next?.sessions?.length > 1 && <SessionChips rounds={next.sessions.map((entry, position) => ({ ...entry, id: `${position}` }))} showTime className="mt-1.5" testId="running-sessions" />}
         </div>
         <div className="min-w-0 flex flex-col items-end gap-0.5 text-right" data-testid="running-place">
-          <div className="text-[11px] md:text-xs font-bold uppercase tracking-[0.14em] md:tracking-[0.16em] text-quiet">{placeTitle(kind, profile)}</div>
+          <div className="tls-type-label md:tracking-[0.16em] text-quiet">{placeTitle(kind, profile)}</div>
           {club ? (
             <div className="flex items-baseline gap-1.5">
-              <span className="font-display font-bold leading-[0.9] tabular-nums text-[34px] md:text-[40px] text-brand">{club.rank}.</span>
-              {club.of ? <span className="text-[13px] md:text-sm text-zinc-400">von {club.of}</span> : null}
+              <span className="tls-type-title tls-type-num leading-[0.9] text-brand">{club.rank}.</span>
+              {club.of ? <span className="tls-type-small text-zinc-400">von {club.of}</span> : null}
             </div>
           ) : (
-            <div className="text-sm text-zinc-400 pt-1">Noch offen</div>
+            <div className="tls-type-small text-zinc-400 pt-1">Noch offen</div>
           )}
         </div>
       </div>

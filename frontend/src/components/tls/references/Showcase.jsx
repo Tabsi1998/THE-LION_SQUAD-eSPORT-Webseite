@@ -65,23 +65,23 @@ function MainCard({ item, link, pinned }) {
     >
       <div className="flex justify-between items-start gap-3 md:gap-4">
         <div className="flex flex-col gap-1.5 min-w-0">
-          <div className={`text-[11px] md:text-xs font-bold uppercase tracking-[0.2em] md:tracking-[0.22em] ${tone.text}`}>{placement}. Platz{entries[0]?.placement_label ? ` · ${entries[0].placement_label}` : ""}</div>
-          <div className="text-sm text-zinc-400">{pinned ? "Ausgewählt vom Verein" : "Größter Erfolg bisher"}</div>
+          <div className={`tls-type-label md:tracking-[0.22em] ${tone.text}`}>{placement}. Platz{entries[0]?.placement_label ? ` · ${entries[0].placement_label}` : ""}</div>
+          <div className="tls-type-small text-zinc-400">{pinned ? "Ausgewählt vom Verein" : "Größter Erfolg bisher"}</div>
         </div>
         <TrophyMark className={`shrink-0 w-14 h-14 md:w-[84px] md:h-[84px] ${tone.text}`} label={`Pokal, ${tone.label}`} />
       </div>
-      <div className="font-heading font-extrabold uppercase leading-[1.05] text-2xl md:text-[clamp(26px,2.8vw,36px)] break-words [overflow-wrap:anywhere] [text-wrap:balance]" data-testid="references-showcase-title">{displayTitle(item)}</div>
-      <div className="md:hidden text-sm text-zinc-400 break-words">{marks.join(" · ")}</div>
+      <div className="tls-type-section leading-[1.05] break-words [overflow-wrap:anywhere] [text-wrap:balance]" data-testid="references-showcase-title">{displayTitle(item)}</div>
+      <div className="md:hidden tls-type-small text-zinc-400 break-words">{marks.join(" · ")}</div>
       <div className="hidden md:flex flex-wrap gap-2">{marks.map((mark, position) => <Mark key={`${position}-${mark}`}>{mark}</Mark>)}</div>
       <div className={`hidden md:grid gap-3 py-4 border-y border-white/[0.08] ${figures.length === 3 ? "grid-cols-3" : figures.length === 2 ? "grid-cols-2" : "grid-cols-1"}`}>
         {figures.map((figure) => (
           <div key={figure.label} className="min-w-0">
-            <div className={`font-display font-bold text-[32px] leading-none tabular-nums ${figure.tone || "text-white"}`}><CountUp value={figure.value} /></div>
-            <div className="text-[13px] text-zinc-400">{figure.label}</div>
+            <div className={`tls-type-title tls-type-num leading-none ${figure.tone || "text-white"}`}><CountUp value={figure.value} /></div>
+            <div className="tls-type-small text-zinc-400">{figure.label}</div>
           </div>
         ))}
       </div>
-      <div className="mt-auto flex flex-wrap justify-between items-center gap-2.5 pt-3 md:pt-0 border-t border-white/[0.08] md:border-t-0 text-sm">
+      <div className="mt-auto flex flex-wrap justify-between items-center gap-2.5 pt-3 md:pt-0 border-t border-white/[0.08] md:border-t-0 tls-type-small">
         {starters.length > 0 && (
           <span className="text-zinc-400 min-w-0 break-words [overflow-wrap:anywhere]" data-testid="references-showcase-starters">
             <span className="hidden md:inline">Für uns am Start: </span><span className="text-white font-semibold">{starters.join(", ")}</span>
@@ -100,10 +100,10 @@ function TrophyTile({ item, link }) {
     <Link to={referenceHref(item, link)} data-testid={`reference-trophy-${item.id}`} data-medal={tone.key} className="tls-ref-lift min-w-0 flex flex-col gap-2 md:gap-2.5 p-3.5 md:p-4 bg-surface-1 border border-white/[0.08] rounded-[10px] text-white no-underline">
       <div className="flex items-center gap-2.5">
         <PlaceRing placement={placement} size="sm" />
-        <span className={`hidden md:inline text-xs font-bold uppercase tracking-[0.14em] ${tone.text}`}>{placement}. Platz</span>
+        <span className={`hidden md:inline tls-type-label ${tone.text}`}>{placement}. Platz</span>
       </div>
-      <div className="font-bold text-[15px] md:text-base leading-tight break-words [overflow-wrap:anywhere]">{displayTitle(item)}</div>
-      <div className="text-xs md:text-[13px] text-zinc-400 break-words">{[gameTitle(item), yearOf(item)].filter(Boolean).join(" · ")}</div>
+      <div className="font-bold tls-type-body leading-tight break-words [overflow-wrap:anywhere]">{displayTitle(item)}</div>
+      <div className="tls-type-small text-zinc-400 break-words">{[gameTitle(item), yearOf(item)].filter(Boolean).join(" · ")}</div>
     </Link>
   );
 }

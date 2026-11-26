@@ -16,7 +16,7 @@ import { ConflictReasonField, CONFLICT_REASON_MIN, OwnTeamNote, overrideMissing,
 // Mal scheiden beide aus. Das Spiel trägt die Art (`postseason`) und ob schon einmal neu angesetzt wurde (`no_show_retry`).
 
 const MIN_TEXT = 5;
-const BUTTON = "tls-btn tls-btn--quiet inline-flex min-h-[44px] items-center gap-1.5 rounded-sm px-3 py-2 text-[11px] font-bold uppercase tracking-wider";
+const BUTTON = "tls-btn tls-btn--quiet inline-flex min-h-[44px] items-center gap-1.5 rounded-sm px-3 py-2 tls-type-label";
 
 const TEXT = {
   undo: "Die Wertung fällt weg, das Spiel ist wieder offen. Den neuen Termin setzt du danach wie gewohnt.",
@@ -89,7 +89,7 @@ export function DoubleNoShowAction({ match, conflict = null, onDone }) {
       {mode ? (
         <AdminSheet title={title} onClose={close} onSubmit={submit} saving={saving} submitLabel={submitLabel}
           submitTestId="match-double-no-show-save" testId="match-double-no-show-sheet">
-          <p className="text-sm text-white/65">
+          <p className="tls-type-small text-white/65">
             {back ? TEXT.back : scored ? TEXT.undo : knockout ? (retried ? TEXT.second : TEXT.first) : TEXT.regular}
           </p>
           <div className="mt-4">

@@ -20,7 +20,7 @@ export function LeagueRulesNote({ rules, testId = "league-rules-note", className
   const state = rulesConsentState(rules);
   const pdfHref = rules.pdf_url ? `${API}${String(rules.pdf_url).replace(/^\/api/, "")}` : null;
   return (
-    <div className={`rounded-sm border px-4 py-3 text-sm ${state === "open" ? "border-warn/40 bg-warn/5" : "border-white/10 bg-[#121212]"} ${className}`}
+    <div className={`rounded-sm border px-4 py-3 tls-type-small ${state === "open" ? "border-warn/40 bg-warn/5" : "border-white/10 bg-[#121212]"} ${className}`}
       data-testid={testId} data-consent={state || "none"}>
       <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
         <Link to={rules.url} className="inline-flex items-center gap-1.5 font-bold text-white hover:text-[#29B6E8]" data-testid={`${testId}-link`}>
@@ -28,7 +28,7 @@ export function LeagueRulesNote({ rules, testId = "league-rules-note", className
         </Link>
         <span className="text-white/65" data-testid={`${testId}-version`}>{rules.label}{rules.valid_from ? ` · gültig ab ${dayLabel(rules.valid_from)}` : ""}</span>
         {pdfHref ? (
-          <a href={pdfHref} target="_blank" rel="noopener noreferrer" className="tls-hit inline-flex items-center gap-1 text-xs font-bold uppercase tracking-wider text-white/60 hover:text-[#29B6E8]" data-testid={`${testId}-pdf`}>
+          <a href={pdfHref} target="_blank" rel="noopener noreferrer" className="tls-hit inline-flex items-center gap-1 tls-type-label text-white/60 hover:text-[#29B6E8]" data-testid={`${testId}-pdf`}>
             <FileText className="h-3.5 w-3.5" aria-hidden="true" /> PDF
           </a>
         ) : null}
@@ -43,7 +43,7 @@ export function LeagueRulesNote({ rules, testId = "league-rules-note", className
         </p>
       ) : null}
       {state === "agreed" ? (
-        <p className="mt-1.5 flex items-center gap-1.5 text-xs text-white/60" data-testid={`${testId}-consent`}>
+        <p className="mt-1.5 flex items-center gap-1.5 tls-type-small text-white/60" data-testid={`${testId}-consent`}>
           <Check className="h-3.5 w-3.5 text-ok" aria-hidden="true" /> Dein Co-Team hat zugestimmt{rules.consent?.agreed_at ? ` (${viennaDate(rules.consent.agreed_at, LONG_DAY)})` : ""}.
         </p>
       ) : null}

@@ -25,7 +25,7 @@ export function LeagueGamesView({ league }) {
   const series = isSeries(league);
   return (
     <div className="mt-5 space-y-3" data-testid="league-games">
-      <h3 className="text-xs font-bold uppercase tracking-wider text-[#29B6E8]">Maps</h3>
+      <h3 className="tls-type-label text-[#29B6E8]">Maps</h3>
       <ol className="grid gap-3 md:grid-cols-2">
         {games.map((game) => (
           <li key={game.position} className="min-w-0 overflow-hidden rounded-sm border border-white/10 bg-[#0A0A0A]" data-testid={`league-games-${game.position}`}>
@@ -34,12 +34,12 @@ export function LeagueGamesView({ league }) {
                 <LazyImg src={game.map_image_url} alt="" sizes="(min-width: 768px) 360px, 92vw" className="h-full w-full object-cover opacity-60" />
               ) : <span className="block h-full bg-white/5" />}
               <div className="absolute inset-0 flex flex-col justify-end bg-gradient-to-t from-black/85 to-transparent px-3 py-2">
-                <span className="flex min-w-0 items-center gap-1.5 text-[10px] font-bold uppercase tracking-widest text-white/65">
+                <span className="flex min-w-0 items-center gap-1.5 tls-type-label text-white/65">
                   {/* Modus-Symbol (#2266): Schnappschuss am Spiel, ohne Bild das neutrale Symbol. */}
                   {game.mode ? <ModeIcon src={game.mode_icon_url} size="xs" testId={`league-games-${game.position}-mode`} /> : null}
                   <span className="truncate">Map {game.position}{game.mode_label ? ` · ${game.mode_label}` : ""}</span>
                 </span>
-                <span className="truncate font-heading text-lg font-black text-white">{game.map_name || "Map"}</span>
+                <span className="truncate tls-type-card text-white">{game.map_name || "Map"}</span>
               </div>
             </div>
             <div className="space-y-2 p-3">
@@ -49,14 +49,14 @@ export function LeagueGamesView({ league }) {
                 const lineup = game.lineups?.[side.registration_id] || [];
                 return (
                   <div key={side.registration_id} className="min-w-0">
-                    <div className="flex min-w-0 items-center justify-between gap-2 text-sm">
+                    <div className="flex min-w-0 items-center justify-between gap-2 tls-type-small">
                       <span className={`inline-flex min-w-0 items-center gap-1.5 truncate font-bold ${won ? "text-honor" : "text-white/70"}`}>
                         {won && <Trophy className="h-3.5 w-3.5 shrink-0" aria-label="Sieger" />}<span className="truncate">{side.name}</span>
                       </span>
-                      {score !== undefined && score !== null && <span className="shrink-0 font-display text-white/80">{score}</span>}
+                      {score !== undefined && score !== null && <span className="shrink-0 tls-type-num text-white/80">{score}</span>}
                     </div>
                     {series && !lineup.length ? null : (
-                      <p className="text-xs text-white/50 [overflow-wrap:anywhere]">
+                      <p className="tls-type-small text-white/50 [overflow-wrap:anywhere]">
                         {lineup.length ? lineup.map((person) => person.name).join(", ")
                           : missing.has(side.registration_id) ? <span className="text-warn">Aufstellung fehlt noch</span> : "–"}
                       </p>
@@ -66,17 +66,17 @@ export function LeagueGamesView({ league }) {
               })}
               {/* Zusatzfelder (C.3, #1617): wiederholt - den Grund bekommen nur die beiden Teams und die Leitung (#2268) -, zugesprochen. */}
               {game.status === "replayed" ? (
-                <p className="text-xs text-white/60 [overflow-wrap:anywhere]" data-testid={`league-games-${game.position}-replayed`}>{game.replay_reason ? `Wiederholt: ${game.replay_reason}` : "Map wiederholt"}</p>
+                <p className="tls-type-small text-white/60 [overflow-wrap:anywhere]" data-testid={`league-games-${game.position}-replayed`}>{game.replay_reason ? `Wiederholt: ${game.replay_reason}` : "Map wiederholt"}</p>
               ) : null}
               {game.decision === "awarded" ? (
-                <p className="text-xs text-warn" data-testid={`league-games-${game.position}-awarded`}>Zugesprochen von der Liga-Leitung</p>
+                <p className="tls-type-small text-warn" data-testid={`league-games-${game.position}-awarded`}>Zugesprochen von der Liga-Leitung</p>
               ) : null}
             </div>
           </li>
         ))}
       </ol>
       {(league.not_played || []).length ? (
-        <p className="text-xs text-white/50" data-testid="league-games-not-played">{notPlayedText(league.not_played)}</p>
+        <p className="tls-type-small text-white/50" data-testid="league-games-not-played">{notPlayedText(league.not_played)}</p>
       ) : null}
       {series ? <ParticipantsView league={league} missing={missing} /> : null}
     </div>
@@ -89,14 +89,14 @@ function ParticipantsView({ league, missing }) {
   if (!league.own_registration_id && !Object.keys(lists).length) return null;
   return (
     <div className="rounded-sm border border-white/10 bg-[#0A0A0A] p-3" data-testid="league-participants-view">
-      <h4 className="text-xs font-bold uppercase tracking-wider text-white/60">Wer hat gespielt?</h4>
+      <h4 className="tls-type-label text-white/60">Wer hat gespielt?</h4>
       <div className="mt-2 grid gap-3 sm:grid-cols-2">
         {league.sides.map((side) => {
           const people = lists[side.registration_id] || [];
           return (
             <div key={side.registration_id} className="min-w-0" data-testid={`league-participants-${side.registration_id}`}>
-              <p className="truncate text-sm font-bold text-white">{side.name}</p>
-              <p className="text-xs text-white/60 [overflow-wrap:anywhere]">
+              <p className="truncate tls-type-small font-bold text-white">{side.name}</p>
+              <p className="tls-type-small text-white/60 [overflow-wrap:anywhere]">
                 {people.length ? people.map((person) => person.name).join(", ")
                   : missing.has(side.registration_id) ? <span className="text-warn">Teilnehmerliste fehlt noch</span> : "–"}
               </p>
@@ -116,7 +116,7 @@ export function LeagueLobbyIds({ league }) {
   const label = league.id_label || "Spiel-ID";
   return (
     <details className="group mt-5 rounded-sm border border-white/10 bg-[#0A0A0A]" data-testid="league-lobby-ids">
-      <summary className="tls-hit flex min-h-[44px] cursor-pointer list-none items-center gap-2 px-4 py-2 text-xs font-bold uppercase tracking-wider text-[#29B6E8] [&::-webkit-details-marker]:hidden">
+      <summary className="tls-hit flex min-h-[44px] cursor-pointer list-none items-center gap-2 px-4 py-2 tls-type-label text-[#29B6E8] [&::-webkit-details-marker]:hidden">
         <IdCard className="h-4 w-4 shrink-0" aria-hidden="true" />
         <span className="min-w-0 flex-1">{label} für die Lobby</span>
         <ChevronDown className="h-4 w-4 shrink-0 transition-transform duration-fast ease-tls group-open:rotate-180" aria-hidden="true" />
@@ -124,15 +124,15 @@ export function LeagueLobbyIds({ league }) {
       <div className="grid gap-4 border-t border-white/10 px-4 py-3 sm:grid-cols-2">
         {sides.map((side) => (
           <div key={side.registration_id} className="min-w-0" data-testid={`league-lobby-ids-${side.registration_id}`}>
-            <p className="truncate text-sm font-bold text-white">{side.name}</p>
+            <p className="truncate tls-type-small font-bold text-white">{side.name}</p>
             <ul className="mt-1 space-y-1">
               {side.players.map((player) => (
-                <li key={player.id} className="flex min-w-0 flex-wrap items-baseline justify-between gap-x-3 text-sm">
+                <li key={player.id} className="flex min-w-0 flex-wrap items-baseline justify-between gap-x-3 tls-type-small">
                   <span className="min-w-0 truncate text-white/70">{player.name}</span>
                   {player.text ? (
                     <span className="min-w-0 select-all font-mono text-white [overflow-wrap:anywhere]">{player.text}</span>
                   ) : (
-                    <span className="text-xs text-warn">{player.reason || `${label} fehlt`}</span>
+                    <span className="tls-type-small text-warn">{player.reason || `${label} fehlt`}</span>
                   )}
                 </li>
               ))}
@@ -140,7 +140,7 @@ export function LeagueLobbyIds({ league }) {
           </div>
         ))}
       </div>
-      <p className="border-t border-white/10 px-4 py-2 text-[11px] text-white/45">Es gilt die für die Season gemeldete ID – nur ihr, euer Gegner und die Turnierleitung seht sie.</p>
+      <p className="border-t border-white/10 px-4 py-2 tls-type-small text-white/45">Es gilt die für die Season gemeldete ID – nur ihr, euer Gegner und die Turnierleitung seht sie.</p>
     </details>
   );
 }
@@ -153,13 +153,13 @@ export function LineupAmendClosed({ league, onAskStaff = null }) {
       <div className="mt-5 flex items-start gap-3 rounded-sm border border-warn/40 bg-warn/5 px-4 py-3" role="status" data-testid="league-lineup-closed">
         <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-warn" aria-hidden="true" />
         <div className="min-w-0">
-          <p className="text-sm font-bold text-white">Eure Teilnehmerliste fehlt noch – die Frist zum Nachtragen ist vorbei.</p>
-          <p className="mt-0.5 text-xs text-white/60">
+          <p className="tls-type-small font-bold text-white">Eure Teilnehmerliste fehlt noch – die Frist zum Nachtragen ist vorbei.</p>
+          <p className="mt-0.5 tls-type-small text-white/60">
             {league.amend_until ? `Nachtragen ging bis ${until(league.amend_until)}. ` : ""}
             Das Ergebnis bleibt gültig. Der Fall liegt jetzt bei der Liga-Leitung{onAskStaff ? " – schreib ihr im Matchchat mit @leitung, wer gespielt hat." : "."}
           </p>
           {onAskStaff ? (
-            <button type="button" onClick={onAskStaff} className="tls-btn tls-btn--secondary mt-2 min-h-[44px] px-3 py-2 rounded-sm text-[10px] uppercase tracking-wider font-bold" data-testid="league-lineup-closed-ask">
+            <button type="button" onClick={onAskStaff} className="tls-btn tls-btn--secondary mt-2 min-h-[44px] px-3 py-2 rounded-sm tls-type-label" data-testid="league-lineup-closed-ask">
               @leitung im Matchchat
             </button>
           ) : null}
@@ -171,8 +171,8 @@ export function LineupAmendClosed({ league, onAskStaff = null }) {
     <div className="mt-5 flex items-start gap-3 rounded-sm border border-warn/40 bg-warn/5 px-4 py-3" role="status" data-testid="league-lineup-closed">
       <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-warn" aria-hidden="true" />
       <div className="min-w-0">
-        <p className="text-sm font-bold text-white">Eure Aufstellung fehlt noch – die Frist zum Nachtragen ist vorbei.</p>
-        <p className="mt-0.5 text-xs text-white/60">
+        <p className="tls-type-small font-bold text-white">Eure Aufstellung fehlt noch – die Frist zum Nachtragen ist vorbei.</p>
+        <p className="mt-0.5 tls-type-small text-white/60">
           {league.amend_until ? `Nachtragen ging bis ${until(league.amend_until)}. ` : ""}
           {/* Den Matchchat schreiben Captain, Vertreter und Teamleitung - der übrige Kader bekommt keinen Verweis darauf. */}
           {onAskStaff
@@ -180,7 +180,7 @@ export function LineupAmendClosed({ league, onAskStaff = null }) {
             : "Jetzt trägt sie nur noch die Turnierleitung nach – das klären Captain oder Vertreter eures Teams mit ihr."}
         </p>
         {onAskStaff ? (
-          <button type="button" onClick={onAskStaff} className="tls-btn tls-btn--secondary mt-2 min-h-[44px] px-3 py-2 rounded-sm text-[10px] uppercase tracking-wider font-bold" data-testid="league-lineup-closed-ask">
+          <button type="button" onClick={onAskStaff} className="tls-btn tls-btn--secondary mt-2 min-h-[44px] px-3 py-2 rounded-sm tls-type-label" data-testid="league-lineup-closed-ask">
             @leitung im Matchchat
           </button>
         ) : null}
@@ -209,14 +209,14 @@ function ParticipantsAmendForm({ league, busy = false, onSave, onAskStaff = null
   };
   return (
     <form onSubmit={save} className={`mt-5 space-y-3 rounded-sm border px-4 py-3 ${missing ? "border-warn/40 bg-warn/5" : "border-white/10 bg-white/[0.02]"}`} data-testid="league-lineup-amend" noValidate>
-      <p className="flex items-start gap-2 text-sm font-bold text-white">
+      <p className="flex items-start gap-2 tls-type-small font-bold text-white">
         {missing && <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-warn" />}
         {missing ? "Das Ergebnis gilt. Bitte noch eintragen, wer bei euch gespielt hat." : "Teilnehmerliste ändern"}
       </p>
-      {league.amend_until && <p className="text-xs text-white/50">Möglich bis {until(league.amend_until)}, danach entscheidet die Liga-Leitung.</p>}
+      {league.amend_until && <p className="tls-type-small text-white/50">Möglich bis {until(league.amend_until)}, danach entscheidet die Liga-Leitung.</p>}
       <ParticipantsPicker roster={league.roster} value={list} league={league} onChange={setList} testId="league-amend-participants" />
-      {error && <p className="text-sm text-warn" role="alert" data-testid="league-amend-error">{error}</p>}
-      <button disabled={busy} className="tls-btn tls-btn--primary min-h-[44px] px-4 py-2 rounded-sm text-xs uppercase tracking-wider font-bold disabled:opacity-50" data-testid="league-amend-save">
+      {error && <p className="tls-type-small text-warn" role="alert" data-testid="league-amend-error">{error}</p>}
+      <button disabled={busy} className="tls-btn tls-btn--primary min-h-[44px] px-4 py-2 rounded-sm tls-type-label disabled:opacity-50" data-testid="league-amend-save">
         Liste speichern
       </button>
     </form>
@@ -244,18 +244,18 @@ function MapLineupAmendForm({ league, busy = false, onSave, onAskStaff = null })
   };
   return (
     <form onSubmit={save} className={`mt-5 space-y-3 rounded-sm border px-4 py-3 ${missing ? "border-warn/40 bg-warn/5" : "border-white/10 bg-white/[0.02]"}`} data-testid="league-lineup-amend" noValidate>
-      <p className="flex items-start gap-2 text-sm font-bold text-white">
+      <p className="flex items-start gap-2 tls-type-small font-bold text-white">
         {missing && <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-warn" />}
         {missing ? "Eure Aufstellung fehlt noch – bitte je Map nachtragen." : "Aufstellung ändern"}
       </p>
-      {league.amend_until && <p className="text-xs text-white/50">Möglich bis {until(league.amend_until)}, danach nur über die Turnierleitung.</p>}
+      {league.amend_until && <p className="tls-type-small text-white/50">Möglich bis {until(league.amend_until)}, danach nur über die Turnierleitung.</p>}
       {games.map((game) => (
         <LineupPicker key={game.position} roster={league.roster} value={lineups[game.position] || []} size={league.team_size}
           label={`Map ${game.position} · ${game.map_name || "Map"}`} testId={`league-amend-lineup-${game.position}`}
           onChange={(lineup) => setLineups((current) => followLineups(current, game.position, lineup))} />
       ))}
-      {error && <p className="text-sm text-warn" role="alert" data-testid="league-amend-error">{error}</p>}
-      <button disabled={busy} className="tls-btn tls-btn--primary min-h-[44px] px-4 py-2 rounded-sm text-xs uppercase tracking-wider font-bold disabled:opacity-50" data-testid="league-amend-save">
+      {error && <p className="tls-type-small text-warn" role="alert" data-testid="league-amend-error">{error}</p>}
+      <button disabled={busy} className="tls-btn tls-btn--primary min-h-[44px] px-4 py-2 rounded-sm tls-type-label disabled:opacity-50" data-testid="league-amend-save">
         Aufstellung speichern
       </button>
     </form>
@@ -296,19 +296,19 @@ function StaffParticipantsAmend({ league, busy = false, onSave }) {
   };
   if (!open) {
     return (
-      <button type="button" onClick={() => setOpen(true)} className="mt-4 text-xs font-bold text-white/60 underline underline-offset-2 hover:text-white" data-testid="league-staff-amend-open">
+      <button type="button" onClick={() => setOpen(true)} className="mt-4 tls-type-small font-bold text-white/60 underline underline-offset-2 hover:text-white" data-testid="league-staff-amend-open">
         {firstMissing ? "Fehlende Teilnehmerliste nachtragen (Liga-Leitung)" : "Teilnehmerliste ändern (Liga-Leitung)"}
       </button>
     );
   }
   return (
     <form onSubmit={save} className="mt-5 space-y-3 rounded-sm border border-white/10 bg-white/[0.02] px-4 py-3" data-testid="league-staff-amend" noValidate>
-      <p className="text-sm font-bold text-white">Teilnehmerliste nachtragen (Liga-Leitung)</p>
-      {league.lineup_overdue ? <p className="text-xs text-warn" data-testid="league-staff-amend-overdue">Die Frist ist vorbei, die Seite hat nicht nachgetragen. Das Ergebnis bleibt gültig.</p> : null}
+      <p className="tls-type-small font-bold text-white">Teilnehmerliste nachtragen (Liga-Leitung)</p>
+      {league.lineup_overdue ? <p className="tls-type-small text-warn" data-testid="league-staff-amend-overdue">Die Frist ist vorbei, die Seite hat nicht nachgetragen. Das Ergebnis bleibt gültig.</p> : null}
       <div role="group" aria-label="Seite" className="grid grid-cols-2 gap-2">
         {sides.map((row) => (
           <button key={row.registration_id} type="button" aria-pressed={side === row.registration_id} onClick={() => pick(row.registration_id)}
-            className={`min-h-[44px] min-w-0 rounded-sm border px-3 py-2 text-sm font-bold ${side === row.registration_id ? "border-[#29B6E8] bg-[#29B6E8]/15 text-white" : "border-white/15 text-white/70"}`}
+            className={`min-h-[44px] min-w-0 rounded-sm border px-3 py-2 tls-type-small font-bold ${side === row.registration_id ? "border-[#29B6E8] bg-[#29B6E8]/15 text-white" : "border-white/15 text-white/70"}`}
             data-testid={`league-staff-amend-side-${row.registration_id}`}>
             <span className="block truncate">{row.name}{(league.lineups_missing || []).includes(row.registration_id) ? " · fehlt" : ""}</span>
           </button>
@@ -316,15 +316,15 @@ function StaffParticipantsAmend({ league, busy = false, onSave }) {
       </div>
       <ParticipantsPicker key={side} roster={league.rosters[side] || []} value={list} league={league} onChange={setList} testId="league-staff-amend-participants" />
       <label className="block">
-        <span className="mb-1.5 block text-[11px] font-bold uppercase tracking-widest text-white/60">Grund (steht im Protokoll)</span>
+        <span className="mb-1.5 block tls-type-label text-white/60">Grund (steht im Protokoll)</span>
         <input value={reason} onChange={(event) => setReason(event.target.value)} maxLength={500} className="input" placeholder="z. B. Screenshot aus dem Matchchat" data-testid="league-staff-amend-reason" />
       </label>
-      {error && <p className="text-sm text-warn" role="alert" data-testid="league-staff-amend-error">{error}</p>}
+      {error && <p className="tls-type-small text-warn" role="alert" data-testid="league-staff-amend-error">{error}</p>}
       <div className="flex flex-wrap gap-2">
-        <button disabled={busy} className="tls-btn tls-btn--primary min-h-[44px] px-4 py-2 rounded-sm text-xs uppercase tracking-wider font-bold disabled:opacity-50" data-testid="league-staff-amend-save">
+        <button disabled={busy} className="tls-btn tls-btn--primary min-h-[44px] px-4 py-2 rounded-sm tls-type-label disabled:opacity-50" data-testid="league-staff-amend-save">
           Liste speichern
         </button>
-        <button type="button" onClick={() => setOpen(false)} className="tls-btn tls-btn--quiet min-h-[44px] px-4 py-2 rounded-sm text-xs uppercase tracking-wider font-bold">
+        <button type="button" onClick={() => setOpen(false)} className="tls-btn tls-btn--quiet min-h-[44px] px-4 py-2 rounded-sm tls-type-label">
           Abbrechen
         </button>
       </div>
@@ -366,18 +366,18 @@ function MapStaffLineupAmend({ league, busy = false, onSave }) {
   };
   if (!open) {
     return (
-      <button type="button" onClick={() => setOpen(true)} className="mt-4 text-xs font-bold text-white/60 underline underline-offset-2 hover:text-white" data-testid="league-staff-amend-open">
+      <button type="button" onClick={() => setOpen(true)} className="mt-4 tls-type-small font-bold text-white/60 underline underline-offset-2 hover:text-white" data-testid="league-staff-amend-open">
         {firstMissing ? "Fehlende Aufstellung nachtragen (Turnierleitung)" : "Aufstellung ändern (Turnierleitung)"}
       </button>
     );
   }
   return (
     <form onSubmit={save} className="mt-5 space-y-3 rounded-sm border border-white/10 bg-white/[0.02] px-4 py-3" data-testid="league-staff-amend" noValidate>
-      <p className="text-sm font-bold text-white">Aufstellung nachtragen (Turnierleitung)</p>
+      <p className="tls-type-small font-bold text-white">Aufstellung nachtragen (Turnierleitung)</p>
       <div role="group" aria-label="Seite" className="grid grid-cols-2 gap-2">
         {sides.map((row) => (
           <button key={row.registration_id} type="button" aria-pressed={side === row.registration_id} onClick={() => pick(row.registration_id)}
-            className={`min-h-[44px] min-w-0 rounded-sm border px-3 py-2 text-sm font-bold ${side === row.registration_id ? "border-[#29B6E8] bg-[#29B6E8]/15 text-white" : "border-white/15 text-white/70"}`}
+            className={`min-h-[44px] min-w-0 rounded-sm border px-3 py-2 tls-type-small font-bold ${side === row.registration_id ? "border-[#29B6E8] bg-[#29B6E8]/15 text-white" : "border-white/15 text-white/70"}`}
             data-testid={`league-staff-amend-side-${row.registration_id}`}>
             <span className="block truncate">{row.name}{(league.lineups_missing || []).includes(row.registration_id) ? " · fehlt" : ""}</span>
           </button>
@@ -389,15 +389,15 @@ function MapStaffLineupAmend({ league, busy = false, onSave }) {
           onChange={(lineup) => setLineups((current) => followLineups(current, game.position, lineup))} />
       ))}
       <label className="block">
-        <span className="mb-1.5 block text-[11px] font-bold uppercase tracking-widest text-white/60">Grund (steht im Protokoll)</span>
+        <span className="mb-1.5 block tls-type-label text-white/60">Grund (steht im Protokoll)</span>
         <input value={reason} onChange={(event) => setReason(event.target.value)} maxLength={500} className="input" placeholder="z. B. per Discord nachgereicht" data-testid="league-staff-amend-reason" />
       </label>
-      {error && <p className="text-sm text-warn" role="alert" data-testid="league-staff-amend-error">{error}</p>}
+      {error && <p className="tls-type-small text-warn" role="alert" data-testid="league-staff-amend-error">{error}</p>}
       <div className="flex flex-wrap gap-2">
-        <button disabled={busy} className="tls-btn tls-btn--primary min-h-[44px] px-4 py-2 rounded-sm text-xs uppercase tracking-wider font-bold disabled:opacity-50" data-testid="league-staff-amend-save">
+        <button disabled={busy} className="tls-btn tls-btn--primary min-h-[44px] px-4 py-2 rounded-sm tls-type-label disabled:opacity-50" data-testid="league-staff-amend-save">
           Aufstellung speichern
         </button>
-        <button type="button" onClick={() => setOpen(false)} className="tls-btn tls-btn--quiet min-h-[44px] px-4 py-2 rounded-sm text-xs uppercase tracking-wider font-bold">
+        <button type="button" onClick={() => setOpen(false)} className="tls-btn tls-btn--quiet min-h-[44px] px-4 py-2 rounded-sm tls-type-label">
           Abbrechen
         </button>
       </div>

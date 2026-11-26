@@ -131,7 +131,7 @@ export function CheckinBoard({ slug, tournamentId, eventId }) {
         {FILTERS.map(([key, label]) => {
           const number = key === "missing" ? counts.missing : key === "present" ? counts.present : counts.total;
           return (
-            <button key={key} type="button" aria-pressed={filter === key} onClick={() => setFilter(key)} className={`tls-lead-tap min-h-[44px] rounded-sm text-[11px] sm:text-xs font-bold uppercase tracking-wider ${filter === key ? "bg-brand text-black" : "text-white/60"}`} data-testid={`lead-checkin-filter-${key}`}>
+            <button key={key} type="button" aria-pressed={filter === key} onClick={() => setFilter(key)} className={`tls-lead-tap min-h-[44px] rounded-sm tls-type-label ${filter === key ? "bg-brand text-black" : "text-white/60"}`} data-testid={`lead-checkin-filter-${key}`}>
               {label} ({number})
             </button>
           );
@@ -151,7 +151,7 @@ export function CheckinBoard({ slug, tournamentId, eventId }) {
         </div>
       ) : null}
 
-      <p className="mt-4 text-xs text-white/40">
+      <p className="mt-4 tls-type-small text-white/40">
         {board.tournament?.self_checkin
           ? "Spieler können auch selbst einchecken – was hier steht, gilt für beide Wege. "
           : "Vor Ort checkt nur die Turnierleitung ein. "}
@@ -172,15 +172,15 @@ function CheckinCounter({ counts }) {
     <div className="rounded-sm border border-white/10 bg-surface-1 p-4" data-testid="lead-checkin-counter">
       <div className="flex items-baseline gap-2" aria-live="polite" aria-atomic="true">
         <span className="sr-only">{checkinCounterText(counts)}</span>
-        <span aria-hidden="true" className="font-heading text-4xl font-black leading-none text-white">
+        <span aria-hidden="true" className="tls-type-title tls-type-num leading-none text-white">
           <CountUp value={counts.present} from={from} playKey={String(counts.present)} duration={360} whenVisible={false} flash={false} data-testid="lead-checkin-present" />
         </span>
-        <span aria-hidden="true" className="text-sm font-bold uppercase tracking-wider text-white/55">von <span className="tabular-nums" data-testid="lead-checkin-total">{counts.total}</span> da</span>
+        <span aria-hidden="true" className="tls-type-label text-white/55">von <span className="tabular-nums" data-testid="lead-checkin-total">{counts.total}</span> da</span>
       </div>
       <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-white/10" aria-hidden="true">
         <div className="tls-lead-checkin-bar h-full w-full origin-left rounded-full bg-ok" style={{ transform: `scaleX(${share})` }} />
       </div>
-      {summary ? <div className="mt-2 text-xs text-white/55" data-testid="lead-checkin-summary">{summary}</div> : null}
+      {summary ? <div className="mt-2 tls-type-small text-white/55" data-testid="lead-checkin-summary">{summary}</div> : null}
     </div>
   );
 }
@@ -198,13 +198,13 @@ function StatusChips({ row, status }) {
   return (
     <div className="mt-1 flex flex-wrap gap-1.5">
       {row.fee === "open" ? (
-        <span className="rounded-sm border border-warn/50 bg-warn/10 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wider text-warn" data-testid={`lead-checkin-fee-${row.id}`}>
+        <span className="rounded-sm border border-warn/50 bg-warn/10 px-1.5 py-0.5 tls-type-label text-warn" data-testid={`lead-checkin-fee-${row.id}`}>
           Startgeld offen{amount ? ` · ${amount}` : ""}
         </span>
       ) : null}
-      {status === "pending" ? <span className="rounded-sm border border-white/20 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wider text-white/60">Freigabe offen</span> : null}
-      {row.onsite ? <span className="rounded-sm border border-brand/40 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wider text-brand">Vor Ort angemeldet</span> : null}
-      {status === "no_show" ? <span className="rounded-sm border border-warn/50 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wider text-warn">Nicht erschienen</span> : null}
+      {status === "pending" ? <span className="rounded-sm border border-white/20 px-1.5 py-0.5 tls-type-label text-white/60">Freigabe offen</span> : null}
+      {row.onsite ? <span className="rounded-sm border border-brand/40 px-1.5 py-0.5 tls-type-label text-brand">Vor Ort angemeldet</span> : null}
+      {status === "no_show" ? <span className="rounded-sm border border-warn/50 px-1.5 py-0.5 tls-type-label text-warn">Nicht erschienen</span> : null}
     </div>
   );
 }
@@ -214,15 +214,15 @@ function TeamMembers({ row }) {
   if (!(row.members || []).length) return null;
   return (
     <div className="mt-2 border-t border-white/10 pt-2" data-testid={`lead-checkin-members-${row.id}`}>
-      <div className="flex items-center gap-1.5 text-[11px] text-white/50">
+      <div className="flex items-center gap-1.5 tls-type-small text-white/50">
         <Users className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
         <span>{row.lineup_set ? "Aufstellung" : "Keine Aufstellung – ganzes Team"} · {row.members_present} von {row.members.length} sagen „Ich bin da“</span>
       </div>
       {groups.map((group) => (
         <div key={group.key} className="mt-1.5 flex flex-wrap items-center gap-1">
-          {group.label ? <span className="mr-0.5 text-[10px] font-bold uppercase tracking-wider text-white/40">{group.label}</span> : null}
+          {group.label ? <span className="mr-0.5 tls-type-label text-white/40">{group.label}</span> : null}
           {group.members.map((member) => (
-            <span key={member.id} className={`max-w-full rounded-sm border px-1.5 py-0.5 text-[11px] [overflow-wrap:anywhere] ${member.present ? "border-ok/40 text-white/85" : "border-white/10 text-white/50"}`}>
+            <span key={member.id} className={`max-w-full rounded-sm border px-1.5 py-0.5 tls-type-small [overflow-wrap:anywhere] ${member.present ? "border-ok/40 text-white/85" : "border-white/10 text-white/50"}`}>
               {member.present ? <span className="sr-only">da: </span> : null}{member.name}{member.leader ? " (Leitung)" : ""}
             </span>
           ))}
@@ -250,12 +250,12 @@ function NoShowQuestion({ row, onConfirm, onCancel }) {
       className="tls-lead-ask mt-3 rounded-sm border border-warn/40 bg-warn/[0.07] p-3"
       data-testid={`lead-checkin-ask-${row.id}`}
     >
-      <p id={`lead-checkin-ask-text-${row.id}`} className="text-sm text-white/85">
+      <p id={`lead-checkin-ask-text-${row.id}`} className="tls-type-body text-white/85">
         <span className="font-bold text-white">{row.name} nicht erschienen?</span> Dann rückt jemand von der Warteliste nach – das lässt sich nicht einfach rückgängig machen.
       </p>
       <div className="mt-3 flex flex-wrap justify-end gap-2">
-        <button ref={cancel} type="button" onClick={onCancel} className="tls-btn tls-btn--quiet tls-lead-tap min-h-[44px] rounded-sm px-4 text-xs font-bold uppercase tracking-wider" data-testid={`lead-checkin-ask-cancel-${row.id}`}>Abbrechen</button>
-        <button type="button" onClick={onConfirm} className="tls-btn tls-btn--danger tls-lead-tap min-h-[44px] rounded-sm px-4 text-xs font-bold uppercase tracking-wider" data-testid={`lead-checkin-ask-confirm-${row.id}`}>Ja, nicht erschienen</button>
+        <button ref={cancel} type="button" onClick={onCancel} className="tls-btn tls-btn--quiet tls-lead-tap min-h-[44px] rounded-sm px-4 tls-type-label" data-testid={`lead-checkin-ask-cancel-${row.id}`}>Abbrechen</button>
+        <button type="button" onClick={onConfirm} className="tls-btn tls-btn--danger tls-lead-tap min-h-[44px] rounded-sm px-4 tls-type-label" data-testid={`lead-checkin-ask-confirm-${row.id}`}>Ja, nicht erschienen</button>
       </div>
     </div>
   );
@@ -280,21 +280,21 @@ export function CheckinRow({ row, status, saving, fresh, asking = false, adminUr
           <div className="font-bold text-white [overflow-wrap:anywhere]">
             {row.team_tag ? <span className="mr-1 text-brand">[{row.team_tag}]</span> : null}{row.name}
           </div>
-          {row.ingame_name ? <div className="text-xs text-white/50 [overflow-wrap:anywhere]">{row.ingame_name}</div> : null}
-          {here ? <div className="text-[11px] font-bold uppercase tracking-wider text-ok">Da{at ? ` · ${at}` : ""}</div> : null}
+          {row.ingame_name ? <div className="tls-type-small text-white/50 [overflow-wrap:anywhere]">{row.ingame_name}</div> : null}
+          {here ? <div className="tls-type-label text-ok">Da{at ? ` · ${at}` : ""}</div> : null}
           <StatusChips row={row} status={status} />
         </div>
         {here || gone ? (
-          <button type="button" disabled={saving} onClick={() => onStatus("approved")} className="tls-btn tls-btn--quiet tls-lead-tap inline-flex min-h-[48px] shrink-0 items-center gap-1.5 rounded-sm px-3 text-xs font-bold uppercase tracking-wider" data-testid={`lead-checkin-undo-${row.id}`}>
+          <button type="button" disabled={saving} onClick={() => onStatus("approved")} className="tls-btn tls-btn--quiet tls-lead-tap inline-flex min-h-[48px] shrink-0 items-center gap-1.5 rounded-sm px-3 tls-type-label" data-testid={`lead-checkin-undo-${row.id}`}>
             <Undo2 className="h-4 w-4" aria-hidden="true" /> Rückgängig
           </button>
         ) : status === "pending" ? (
           // Freigabe offen (Review M3): erst freigeben - die Freigabe prüft Platz und Startgeld. Abhaken geht danach.
-          <a href={adminUrl} className="tls-btn tls-btn--secondary tls-lead-tap inline-flex min-h-[48px] max-w-[9rem] shrink-0 items-center rounded-sm px-3 text-center text-[11px] font-bold uppercase leading-tight tracking-wider" data-testid={`lead-checkin-approve-${row.id}`}>
+          <a href={adminUrl} className="tls-btn tls-btn--secondary tls-lead-tap inline-flex min-h-[48px] max-w-[9rem] shrink-0 items-center rounded-sm px-3 text-center tls-type-label leading-tight" data-testid={`lead-checkin-approve-${row.id}`}>
             Erst freigeben
           </a>
         ) : (
-          <button type="button" disabled={saving} onClick={() => onStatus("checked_in")} className="tls-btn tls-btn--primary tls-lead-tap min-h-[48px] min-w-[5.5rem] shrink-0 rounded-sm px-4 text-sm font-black uppercase tracking-wider" data-testid={`lead-checkin-here-${row.id}`} aria-label={`${row.name} ist da`}>
+          <button type="button" disabled={saving} onClick={() => onStatus("checked_in")} className="tls-btn tls-btn--primary tls-lead-tap min-h-[48px] min-w-[5.5rem] shrink-0 rounded-sm px-4 tls-type-small font-black uppercase tracking-wider" data-testid={`lead-checkin-here-${row.id}`} aria-label={`${row.name} ist da`}>
             Da
           </button>
         )}
@@ -302,7 +302,7 @@ export function CheckinRow({ row, status, saving, fresh, asking = false, adminUr
       {asking ? <NoShowQuestion row={row} onConfirm={onConfirm} onCancel={onCancel} /> : null}
       {!here && !gone && !asking ? (
         <div className="mt-2 flex justify-end">
-          <button type="button" disabled={saving} onClick={() => onStatus("no_show")} className="tls-lead-tap inline-flex min-h-[44px] items-center gap-1.5 rounded-sm px-2 text-[11px] font-bold uppercase tracking-wider text-white/50 hover:text-warn" data-testid={`lead-checkin-noshow-${row.id}`} aria-label={`${row.name} nicht erschienen`}>
+          <button type="button" disabled={saving} onClick={() => onStatus("no_show")} className="tls-lead-tap inline-flex min-h-[44px] items-center gap-1.5 rounded-sm px-2 tls-type-label text-white/50 hover:text-warn" data-testid={`lead-checkin-noshow-${row.id}`} aria-label={`${row.name} nicht erschienen`}>
             <UserX className="h-4 w-4" aria-hidden="true" /> Nicht erschienen
           </button>
         </div>

@@ -56,10 +56,10 @@ export function ResultUndoBar({ undo }) {
     <div className="fixed inset-x-0 bottom-0 z-40 px-4 pb-4 pointer-events-none" data-modal-exempt="" data-testid="result-undo-bar">
       <div className="pointer-events-auto mx-auto flex max-w-xl items-center gap-3 rounded-lg border border-[#29B6E8]/40 bg-[#0F1D23] px-4 py-3 shadow-2xl shadow-black/60" role="status" aria-live="polite">
         <div className="min-w-0 flex-1">
-          <div className="text-[11px] font-bold uppercase tracking-widest text-[#29B6E8]">Gespeichert</div>
-          <div className="text-sm text-white/80 truncate" data-testid="result-undo-sentence">{undo.pending.sentence}</div>
+          <div className="tls-type-label text-[#29B6E8]">Gespeichert</div>
+          <div className="tls-type-small text-white/80 truncate" data-testid="result-undo-sentence">{undo.pending.sentence}</div>
         </div>
-        <button type="button" onClick={undo.undo} className="tls-btn tls-btn--secondary shrink-0 inline-flex items-center gap-2 min-h-[44px] px-3 py-2 rounded-sm text-xs uppercase tracking-wider font-bold" data-testid="result-undo">
+        <button type="button" onClick={undo.undo} className="tls-btn tls-btn--secondary shrink-0 inline-flex items-center gap-2 min-h-[44px] px-3 py-2 rounded-sm tls-type-label" data-testid="result-undo">
           <Undo2 className="w-4 h-4" /> Rückgängig ({undo.secondsLeft})
         </button>
       </div>

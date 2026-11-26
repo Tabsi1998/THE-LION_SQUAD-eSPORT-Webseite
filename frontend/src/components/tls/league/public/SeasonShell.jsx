@@ -13,6 +13,7 @@ import { accentStyle } from "@/lib/leagueLook";
 import { SEASON_SECTIONS, sectionPath } from "@/lib/leagueSeasonPage";
 import "./league.css";
 import "./season.css";
+import { ShortCaps } from "@/components/tls/ShortCaps";
 
 /** Die Season laden - `missing`, wenn die API sie der Person nicht zeigt (404); `failed` bei Netz- oder Serverfehlern (#2268) - dann
  *  ist die Season nicht „nicht gefunden“, sondern gerade nicht erreichbar. */
@@ -82,7 +83,7 @@ function CompactHead({ look, league, season, title }) {
         <p className="tls-league-head__eyebrow">
           <Link to={sectionPath(league.slug, season.slug)} className="hover:text-white">{league.name} {season.name}</Link>
         </p>
-        <h1 className="font-heading text-3xl font-black uppercase leading-none md:text-5xl">{title}</h1>
+        <h1 className="tls-type-title leading-none"><ShortCaps>{title}</ShortCaps></h1>
       </div>
     </header>
   );
@@ -114,9 +115,9 @@ export function SeasonShell({ section = "", head, children }) {
     return (
       <PublicLayout>
         <div className="max-w-3xl mx-auto px-4 sm:px-6 py-20 text-center" data-testid="league-missing">
-          <h1 className="font-heading text-3xl font-black uppercase">Liga nicht gefunden</h1>
+          <h1 className="tls-type-title"><ShortCaps>Liga nicht gefunden</ShortCaps></h1>
           <p className="mt-3 text-white/60">Diese Season gibt es nicht oder sie ist (noch) nicht sichtbar.</p>
-          <Link to="/liga" className="tls-btn tls-btn--secondary mt-6 inline-flex rounded-sm px-4 py-2 text-xs font-bold uppercase tracking-wider">Zur Liga-Übersicht</Link>
+          <Link to="/liga" className="tls-btn tls-btn--secondary mt-6 inline-flex rounded-sm px-4 py-2 tls-type-label">Zur Liga-Übersicht</Link>
         </div>
       </PublicLayout>
     );
@@ -125,10 +126,10 @@ export function SeasonShell({ section = "", head, children }) {
     return (
       <PublicLayout>
         <div className="max-w-3xl mx-auto px-4 sm:px-6 py-20 text-center" role="alert" data-testid="league-load-failed">
-          <h1 className="font-heading text-3xl font-black uppercase">Liga gerade nicht erreichbar</h1>
+          <h1 className="tls-type-title"><ShortCaps>Liga gerade nicht erreichbar</ShortCaps></h1>
           <p className="mt-3 text-white/60">Die Seite konnte nicht geladen werden – meist hilft es, es gleich noch einmal zu versuchen.</p>
           <button type="button" onClick={reload} data-testid="league-load-retry"
-            className="tls-btn tls-btn--secondary mt-6 inline-flex min-h-[44px] items-center rounded-sm px-4 py-2 text-xs font-bold uppercase tracking-wider">
+            className="tls-btn tls-btn--secondary mt-6 inline-flex min-h-[44px] items-center rounded-sm px-4 py-2 tls-type-label">
             Nochmal laden
           </button>
         </div>

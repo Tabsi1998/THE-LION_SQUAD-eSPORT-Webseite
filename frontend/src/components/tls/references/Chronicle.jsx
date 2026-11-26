@@ -19,7 +19,7 @@ import { StaggerIn } from "@/components/tls/motion/StaggerIn";
 // Eine Teilnahme aus einer Saison (#1750) führt zur Saison-Seite statt zur Detailseite.
 
 // Filter-Chips geben beim Drücken leicht nach (Baustein Press als Klasse, flach - ohne Anheben in der Leiste, #1969).
-const chipBase = "tls-press tls-press--flat shrink-0 inline-flex items-center gap-2 min-h-[44px] px-4 rounded-full border text-sm font-semibold whitespace-nowrap";
+const chipBase = "tls-press tls-press--flat shrink-0 inline-flex items-center gap-2 min-h-[44px] px-4 rounded-full border tls-type-small font-semibold whitespace-nowrap";
 const chipIdle = "border-white/[0.14] bg-transparent text-zinc-300 hover:border-white/40 hover:text-white";
 
 export const Chronicle = forwardRef(function Chronicle({ items, linked, memberId = "", memberLabel = "", onClearMember, index = 5 }, ref) {
@@ -58,8 +58,8 @@ export const Chronicle = forwardRef(function Chronicle({ items, linked, memberId
 
       {items.length === 0 ? (
         <div className="mt-8 border border-dashed border-white/15 rounded-[10px] p-10 md:p-12 text-center text-zinc-400">
-          <div className="font-heading font-bold text-lg text-white">Referenzen werden bald ergänzt.</div>
-          <div className="text-sm mt-2">Sobald externe Turniere gepflegt sind, erscheinen sie hier.</div>
+          <div className="tls-type-card text-white">Referenzen werden bald ergänzt.</div>
+          <div className="tls-type-small mt-2">Sobald externe Turniere gepflegt sind, erscheinen sie hier.</div>
         </div>
       ) : shown.length === 0 ? (
         <div className="py-10 md:py-12 text-center text-zinc-400" data-testid="references-empty-filter">Keine Teilnahmen für diese Auswahl.</div>
@@ -77,10 +77,10 @@ function YearGroup({ group, linked, memberId }) {
     <div className="pt-6 md:pt-9" data-testid={`references-timeline-${group.key || "none"}`}>
       <div className="flex items-baseline justify-between gap-2.5 md:gap-4 pb-2 md:pb-3 border-b border-white/10">
         <div className="flex items-baseline gap-3.5 min-w-0">
-          <span className="font-display font-bold leading-none tabular-nums text-[34px] md:text-[44px] text-white">{group.label}</span>
-          <span className="hidden md:inline text-sm text-quiet">{count}</span>
+          <span className="tls-type-title tls-type-num leading-none text-white">{group.label}</span>
+          <span className="hidden md:inline tls-type-small text-quiet">{count}</span>
         </div>
-        <span className="text-[13px] md:text-sm text-zinc-400 text-right" data-testid="references-year-medals">{medals || <span className="md:hidden">{count}</span>}</span>
+        <span className="tls-type-small text-zinc-400 text-right" data-testid="references-year-medals">{medals || <span className="md:hidden">{count}</span>}</span>
       </div>
       {/* Die Zeilen eines Jahres steigen beim ersten Sichtbarwerden gestaffelt auf (#1969). */}
       <StaggerIn as="ul" className="list-none m-0 p-0">
@@ -111,18 +111,18 @@ function ChronicleRow({ item, link, memberId }) {
       <Link to={referenceHref(item, link)} data-testid={`reference-card-${item.id}`} className="tls-ref-row flex items-start sm:items-center sm:flex-wrap gap-3 sm:gap-x-5 sm:gap-y-2.5 py-3.5 sm:py-4 sm:px-2 text-white no-underline">
         <PlaceRing placement={placement} />
         <span className="flex-1 sm:flex-[1_1_280px] min-w-0 flex flex-col gap-1 sm:gap-0.5">
-          <span className="font-bold text-base sm:text-[17px] leading-[1.3] break-words [overflow-wrap:anywhere]" title={composed ? full : undefined} data-testid="reference-row-title">{title}</span>
+          <span className="tls-type-card leading-[1.3] break-words [overflow-wrap:anywhere]" title={composed ? full : undefined} data-testid="reference-row-title">{title}</span>
           {/* #2014: Logo der Saison bzw. Spur vor dem Veranstalter - ohne Logo wie bisher. */}
           {logo ? (
             <span className="flex items-center flex-wrap gap-x-2.5 gap-y-1 mt-0.5 min-w-0">
               <SeriesLogo src={logo} size="xs" testId="reference-row-logo" />
               {host ? <PartnerHostBadge partner={host} />
-                : item.organizer && !composed && <span className="hidden sm:block text-sm text-zinc-400 break-words" data-testid="reference-row-organizer">{item.organizer}</span>}
+                : item.organizer && !composed && <span className="hidden sm:block tls-type-small text-zinc-400 break-words" data-testid="reference-row-organizer">{item.organizer}</span>}
             </span>
           ) : host ? <PartnerHostBadge partner={host} className="mt-0.5" />
-            : item.organizer && !composed && <span className="hidden sm:block text-sm text-zinc-400 break-words" data-testid="reference-row-organizer">{item.organizer}</span>}
-          <span className="sm:hidden text-[13px] text-zinc-400 break-words">{[game, format, cancelled ? "abgebrochen" : "", shortDate].filter(Boolean).join(" · ")}</span>
-          {starters && <span className="sm:hidden text-[13px] text-zinc-300 break-words [overflow-wrap:anywhere]" data-testid="reference-row-starters-phone">{starters}</span>}
+            : item.organizer && !composed && <span className="hidden sm:block tls-type-small text-zinc-400 break-words" data-testid="reference-row-organizer">{item.organizer}</span>}
+          <span className="sm:hidden tls-type-small text-zinc-400 break-words">{[game, format, cancelled ? "abgebrochen" : "", shortDate].filter(Boolean).join(" · ")}</span>
+          {starters && <span className="sm:hidden tls-type-small text-zinc-300 break-words [overflow-wrap:anywhere]" data-testid="reference-row-starters-phone">{starters}</span>}
         </span>
         <span className="hidden sm:flex sm:flex-[1_1_220px] min-w-0 flex-wrap gap-1.5">
           <Mark>{game}</Mark>
@@ -130,8 +130,8 @@ function ChronicleRow({ item, link, memberId }) {
           {/* Saison abgebrochen (#1960): ohne Platz, aber als Teilnahme in der Chronik. */}
           {cancelled && <Mark>abgebrochen</Mark>}
         </span>
-        <span className="hidden sm:block sm:flex-[1_1_180px] min-w-0 text-sm text-zinc-300 break-words [overflow-wrap:anywhere]" data-testid="reference-row-starters">{starters}</span>
-        <span className="hidden sm:block sm:flex-[0_0_110px] text-sm text-quiet tabular-nums">{formatDate(item.start_date) || formatDate(item.end_date)}</span>
+        <span className="hidden sm:block sm:flex-[1_1_180px] min-w-0 tls-type-small text-zinc-300 break-words [overflow-wrap:anywhere]" data-testid="reference-row-starters">{starters}</span>
+        <span className="hidden sm:block sm:flex-[0_0_110px] tls-type-small text-quiet tabular-nums">{formatDate(item.start_date) || formatDate(item.end_date)}</span>
         <Chevron className="mt-[11px] sm:mt-0" />
       </Link>
     </li>

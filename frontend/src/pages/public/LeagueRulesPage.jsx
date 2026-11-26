@@ -16,9 +16,10 @@ import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 import { accentStyle } from "@/lib/leagueLook";
 import { clearHits, dayLabel, findRanges, paintHits, renderRulesMarkdown, rulesApiPath, rulesPagePath, tocOf } from "@/lib/leagueRules";
 import { viennaDate } from "@/lib/vienna";
+import { ShortCaps } from "@/components/tls/ShortCaps";
 
 const LONG_DAY = { day: "2-digit", month: "2-digit", year: "numeric" };
-const QUIET_BUTTON = "tls-btn tls-btn--quiet rounded-sm px-3 py-2 text-xs font-bold uppercase tracking-wider";
+const QUIET_BUTTON = "tls-btn tls-btn--quiet rounded-sm px-3 py-2 tls-type-label";
 
 function Toc({ sections, active }) {
   const [open, setOpen] = useState(false);
@@ -127,13 +128,13 @@ function ConsentHint({ consent, seasonId, onDone }) {
       {open.length ? (
         <>
           <h2 className="font-bold text-white">Bitte {consent.label} zustimmen</h2>
-          <p className="mt-1 text-sm text-white/75">Du bist für dein Co-Team verantwortlich. Spiele laufen auch ohne Zustimmung weiter.</p>
+          <p className="mt-1 tls-type-body text-white/75">Du bist für dein Co-Team verantwortlich. Spiele laufen auch ohne Zustimmung weiter.</p>
           <ul className="mt-3 space-y-2">
             {open.map((row) => (
               <li key={row.squad_id} className="flex flex-wrap items-center justify-between gap-2">
                 <span className="min-w-0 break-words text-white">{row.squad_name}</span>
                 <button type="button" disabled={busy === row.squad_id} onClick={() => agree(row.squad_id)} data-testid={`rules-consent-agree-${row.squad_id}`}
-                  className="tls-btn tls-btn--primary rounded-sm px-3 py-2 text-xs font-black uppercase tracking-wider disabled:opacity-50">
+                  className="tls-btn tls-btn--primary rounded-sm px-3 py-2 tls-type-label disabled:opacity-50">
                   {busy === row.squad_id ? "Speichere …" : "Zustimmen"}
                 </button>
               </li>
@@ -142,7 +143,7 @@ function ConsentHint({ consent, seasonId, onDone }) {
         </>
       ) : null}
       {done.length ? (
-        <ul className={`text-sm text-white/70 ${open.length ? "mt-3" : ""}`}>
+        <ul className={`tls-type-small text-white/70 ${open.length ? "mt-3" : ""}`}>
           {done.map((row) => (
             <li key={row.squad_id} data-testid={`rules-consent-done-${row.squad_id}`}>
               {row.squad_name} hat zugestimmt am {viennaDate(row.agreed_at, LONG_DAY)}.
@@ -246,9 +247,9 @@ export default function LeagueRulesPage() {
     return (
       <PublicLayout>
         <div className="mx-auto max-w-3xl px-4 py-20 text-center sm:px-6" data-testid="rules-missing">
-          <h1 className="font-heading text-3xl font-black uppercase">Regeln nicht gefunden</h1>
+          <h1 className="tls-type-title"><ShortCaps>Regeln nicht gefunden</ShortCaps></h1>
           <p className="mt-3 text-white/60">Diese Liga gibt es nicht oder sie ist (noch) nicht sichtbar.</p>
-          <Link to="/liga" className="tls-btn tls-btn--secondary mt-6 inline-flex rounded-sm px-4 py-2 text-xs font-bold uppercase tracking-wider">Zur Liga-Übersicht</Link>
+          <Link to="/liga" className="tls-btn tls-btn--secondary mt-6 inline-flex rounded-sm px-4 py-2 tls-type-label">Zur Liga-Übersicht</Link>
         </div>
       </PublicLayout>
     );
@@ -278,18 +279,18 @@ export default function LeagueRulesPage() {
         {/* Navigation der Season (#2268): Übersicht · Spieltage · Teams · Regelwerk. */}
         {season ? <SeasonNav leagueSlug={league.slug} seasonSlug={season.slug} className="mb-8" /> : null}
         <header className="mb-8 max-w-[72ch]">
-          <h1 className="font-heading text-2xl font-black uppercase leading-tight [overflow-wrap:anywhere] [text-wrap:balance] md:text-4xl">{version?.title || "Regeln"}</h1>
+          <h1 className="tls-type-title leading-tight [overflow-wrap:anywhere] [text-wrap:balance]">{version?.title || "Regeln"}</h1>
           <p className="mt-2 text-white/75">{name}</p>
           {version ? (
-            <p className="mt-3 text-sm text-white/75" data-testid="rules-meta">
+            <p className="mt-3 tls-type-small text-white/75" data-testid="rules-meta">
               {version.label} · gültig ab {dayLabel(version.valid_from)}
               {version.published_at ? ` · Stand ${viennaDate(version.published_at, LONG_DAY)}` : ""}
             </p>
           ) : null}
-          {version?.change_reason ? <p className="mt-1 text-sm text-white/60">Änderungsgrund: {version.change_reason}</p> : null}
+          {version?.change_reason ? <p className="mt-1 tls-type-small text-white/60">Änderungsgrund: {version.change_reason}</p> : null}
           <div className="mt-4 flex flex-wrap items-center gap-2">
             {pdfHref ? (
-              <a href={pdfHref} target="_blank" rel="noopener noreferrer" className="tls-btn tls-btn--secondary inline-flex items-center gap-2 rounded-sm px-3 py-2 text-xs font-bold uppercase tracking-wider" data-testid="rules-pdf">
+              <a href={pdfHref} target="_blank" rel="noopener noreferrer" className="tls-btn tls-btn--secondary inline-flex items-center gap-2 rounded-sm px-3 py-2 tls-type-label" data-testid="rules-pdf">
                 <FileText className="h-4 w-4" aria-hidden="true" /> PDF
               </a>
             ) : null}
@@ -305,12 +306,12 @@ export default function LeagueRulesPage() {
         </header>
 
         {isOld ? (
-          <p role="status" className="mb-6 rounded-sm border border-white/15 bg-white/5 px-4 py-3 text-sm text-white/85" data-testid="rules-old-version">
+          <p role="status" className="mb-6 rounded-sm border border-white/15 bg-white/5 px-4 py-3 tls-type-small text-white/85" data-testid="rules-old-version">
             Du liest {version.label}. Das ist nicht die gültige Fassung. <Link to={pagePath} className="underline underline-offset-2">Zur gültigen Fassung</Link>
           </p>
         ) : null}
         {upcoming ? (
-          <p className="mb-6 rounded-sm border border-white/15 bg-white/5 px-4 py-3 text-sm text-white/85" data-testid="rules-upcoming">
+          <p className="mb-6 rounded-sm border border-white/15 bg-white/5 px-4 py-3 tls-type-small text-white/85" data-testid="rules-upcoming">
             {upcoming.label} gilt ab {dayLabel(upcoming.valid_from)}. <Link to={`${pagePath}?version=${upcoming.id}`} className="underline underline-offset-2">Jetzt lesen</Link>
           </p>
         ) : null}
@@ -318,7 +319,7 @@ export default function LeagueRulesPage() {
 
         {seasons.length ? (
           <section className="mb-8" data-testid="rules-seasons" aria-label="Regeln je Season">
-            <p className="mb-2 text-sm text-white/75">Die Listen stehen auf den Regeln der jeweiligen Season:</p>
+            <p className="mb-2 tls-type-small text-white/75">Die Listen stehen auf den Regeln der jeweiligen Season:</p>
             <ul className="flex flex-wrap gap-2">
               {seasons.map((row) => <li key={row.slug}><Link to={row.url} className={QUIET_BUTTON + " inline-flex"}>{row.name}</Link></li>)}
             </ul>
@@ -341,7 +342,7 @@ export default function LeagueRulesPage() {
               {comparison && compareParam ? (
                 <RulesComparison sections={comparison.sections}>
                   <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
-                    <h2 ref={compareTitleRef} tabIndex={-1} data-testid="rules-compare-title" className="font-heading text-xl font-black uppercase outline-none scroll-mt-24">{comparison.base.label} und {comparison.target.label}</h2>
+                    <h2 ref={compareTitleRef} tabIndex={-1} data-testid="rules-compare-title" className="tls-type-section outline-none scroll-mt-24">{comparison.base.label} und {comparison.target.label}</h2>
                     <button type="button" className={QUIET_BUTTON} onClick={() => setParam("vergleich", null)}>Zurück zum Text</button>
                   </div>
                 </RulesComparison>

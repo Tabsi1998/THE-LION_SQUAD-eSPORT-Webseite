@@ -20,7 +20,7 @@ import { LeagueBadge } from "@/components/tls/league/LeagueBadge";
 function SectionTitle({ id, icon: Icon, children, aside }) {
   return (
     <div className="tls-season-title">
-      <h2 id={id} className="flex items-center gap-2 font-heading text-2xl font-black uppercase md:text-3xl">
+      <h2 id={id} className="flex items-center gap-2 tls-type-section">
         <Icon className="h-5 w-5 tls-league-accent" aria-hidden="true" /> {children}
       </h2>
       {aside}
@@ -49,11 +49,11 @@ export function SeasonPlay({ league, season, pool, platform }) {
             <li key={mode.mode} className="tls-season-mode" data-testid={`season-mode-${mode.mode}`}>
               <span className="tls-season-mode__icon"><ModeIcon src={mode.icon_url} label={mode.label} size="lg" /></span>
               <span className="min-w-0">
-                <span className="block font-heading text-lg font-bold uppercase leading-tight [overflow-wrap:anywhere]">{mode.label}</span>
-                <span className="mt-0.5 block text-sm text-white/70" data-testid={`season-mode-${mode.mode}-rule`}>
+                <span className="block tls-type-card leading-tight [overflow-wrap:anywhere]">{mode.label}</span>
+                <span className="mt-0.5 block tls-type-small text-white/70" data-testid={`season-mode-${mode.mode}-rule`}>
                   {mode.rule || "Regel steht im Regelwerk"}
                 </span>
-                {mode.maps ? <span className="mt-1 block text-[11px] font-semibold uppercase tracking-wider text-white/40">{mode.maps} {mode.maps === 1 ? "Map" : "Maps"} im Pool</span> : null}
+                {mode.maps ? <span className="mt-1 block tls-type-label text-white/40">{mode.maps} {mode.maps === 1 ? "Map" : "Maps"} im Pool</span> : null}
               </span>
             </li>
           ))}
@@ -77,7 +77,7 @@ export function SeasonPlay({ league, season, pool, platform }) {
         </div>
       ) : null}
       {platforms.length ? (
-        <ul className="mt-5 flex flex-wrap gap-x-5 gap-y-1 text-sm text-white/70" data-testid="season-platform">
+        <ul className="mt-5 flex flex-wrap gap-x-5 gap-y-1 tls-type-small text-white/70" data-testid="season-platform">
           {platforms.map((line) => <li key={line} className="flex items-center gap-1.5 [overflow-wrap:anywhere]"><Gamepad2 className="h-4 w-4 shrink-0 text-white/40" aria-hidden="true" /> {line}</li>)}
         </ul>
       ) : null}
@@ -88,10 +88,10 @@ export function SeasonPlay({ league, season, pool, platform }) {
 function Fact({ icon: Icon, label, children, testId }) {
   return (
     <div className="min-w-0" data-testid={testId}>
-      <dt className="flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-[0.18em] text-white/45">
+      <dt className="flex items-center gap-1.5 tls-type-label text-white/45">
         <Icon className="h-3.5 w-3.5 tls-league-accent" aria-hidden="true" /> {label}
       </dt>
-      <dd className="mt-1 text-sm text-white/85">{children}</dd>
+      <dd className="mt-1 tls-type-small text-white/85">{children}</dd>
     </div>
   );
 }
@@ -125,13 +125,13 @@ export function SeasonFlow({ season }) {
           {lines.map((line) => (
             <li key={line.key} className="tls-season-rule" data-testid={`season-flow-${line.key}`}>
               <span className="tls-season-rule__title">{line.title}</span>
-              <span className="text-sm text-white/80">{line.text}</span>
+              <span className="tls-type-small text-white/80">{line.text}</span>
             </li>
           ))}
         </ol>
         <div className="tls-season-points" data-testid="season-points">
           <p className="tls-season-rule__title">Punkte und Gleichstand</p>
-          {points.map((line) => <p key={line} className="mt-1 text-sm text-white/80">{line}</p>)}
+          {points.map((line) => <p key={line} className="mt-1 tls-type-small text-white/80">{line}</p>)}
         </div>
       </div>
     </section>
@@ -152,10 +152,10 @@ export function SeasonBans({ list, rulesUrl }) {
       <details className="tls-season-bans" open={open} onToggle={(event) => setOpen(event.currentTarget.open)}>
         <summary className="tls-season-bans__summary" data-testid="season-bans-toggle">
           <span className="min-w-0">
-            <span id="season-bans-title" className="flex items-center gap-2 font-heading text-2xl font-black uppercase md:text-3xl">
+            <span id="season-bans-title" className="flex items-center gap-2 tls-type-section">
               <Ban className="h-5 w-5 text-warn" aria-hidden="true" /> Sperrliste
             </span>
-            <span className="mt-1 block text-sm text-white/60">
+            <span className="mt-1 block tls-type-small text-white/60">
               {count} {count === 1 ? "Sperre" : "Sperren"} – alles andere ist erlaubt.
             </span>
           </span>
@@ -170,7 +170,7 @@ export function SeasonBans({ list, rulesUrl }) {
           <div className="tls-season-bans__body">
             <LoadoutBansView list={list} title="Sperrliste" hideTitle className="" testId="league-loadout-bans" />
             {rulesUrl ? (
-              <p className="mt-6 text-sm text-white/60">Verbindlich ist das <Link to={rulesUrl} className="text-brand hover:text-white">Regelwerk</Link> – dort steht die Liste mit Version.</p>
+              <p className="mt-6 tls-type-small text-white/60">Verbindlich ist das <Link to={rulesUrl} className="text-brand hover:text-white">Regelwerk</Link> – dort steht die Liste mit Version.</p>
             ) : null}
           </div>
         ) : null}
@@ -184,18 +184,18 @@ export function SeasonRulesCard({ rules }) {
   return (
     <section className="tls-league-rules tls-season-rulescard" data-testid="league-rules-link">
       <div className="min-w-0">
-        <Link to={rules.url} className="inline-flex items-center gap-2 font-heading text-xl font-bold uppercase hover:underline">
+        <Link to={rules.url} className="inline-flex items-center gap-2 tls-type-card hover:underline">
           <ScrollText className="h-5 w-5 tls-league-accent" aria-hidden="true" /> Regelwerk
         </Link>
-        <p className="mt-1 text-sm text-white/70" data-testid="league-rules-version">{rules.label} · gültig ab {viennaDate(dayNoon(rules.valid_from), { day: "2-digit", month: "2-digit", year: "numeric" })}</p>
-        {rules.consent_open ? <p className="mt-1 text-sm font-semibold text-warn" data-testid="league-rules-consent">Dein Co-Team hat noch nicht zugestimmt. Ohne Zustimmung geht vor dem Spiel kein Check-in.</p> : null}
+        <p className="mt-1 tls-type-small text-white/70" data-testid="league-rules-version">{rules.label} · gültig ab {viennaDate(dayNoon(rules.valid_from), { day: "2-digit", month: "2-digit", year: "numeric" })}</p>
+        {rules.consent_open ? <p className="mt-1 tls-type-body font-semibold text-warn" data-testid="league-rules-consent">Dein Co-Team hat noch nicht zugestimmt. Ohne Zustimmung geht vor dem Spiel kein Check-in.</p> : null}
       </div>
       <div className="flex flex-wrap gap-2">
-        <Link to={rules.url} className="tls-btn tls-btn--secondary inline-flex min-h-[44px] items-center gap-2 rounded-sm px-3 py-2 text-xs font-bold uppercase tracking-wider">
+        <Link to={rules.url} className="tls-btn tls-btn--secondary inline-flex min-h-[44px] items-center gap-2 rounded-sm px-3 py-2 tls-type-label">
           <ScrollText className="h-4 w-4" aria-hidden="true" /> Lesen
         </Link>
         <a href={`${API}${rules.pdf_url.replace(/^\/api/, "")}`} target="_blank" rel="noopener noreferrer" data-testid="league-rules-pdf"
-          className="tls-btn tls-btn--secondary inline-flex min-h-[44px] items-center gap-2 rounded-sm px-3 py-2 text-xs font-bold uppercase tracking-wider">
+          className="tls-btn tls-btn--secondary inline-flex min-h-[44px] items-center gap-2 rounded-sm px-3 py-2 tls-type-label">
           <FileText className="h-4 w-4" aria-hidden="true" /> PDF
         </a>
       </div>
@@ -208,8 +208,8 @@ export function SeasonPlaceholder({ season, application }) {
   const steps = nextSteps(season, application);
   return (
     <section className="tls-season-placeholder" aria-labelledby="season-placeholder-title" data-testid="league-no-divisions">
-      <h2 id="season-placeholder-title" className="font-heading text-2xl font-black uppercase md:text-3xl">Die Ligen werden eingeteilt</h2>
-      <p className="mt-2 max-w-2xl text-sm text-white/70">
+      <h2 id="season-placeholder-title" className="tls-type-section">Die Ligen werden eingeteilt</h2>
+      <p className="mt-2 max-w-2xl tls-type-body text-white/70">
         Sobald die Liga-Leitung die Teams eingeteilt hat, stehen hier die Tabellen jeder Liga und Staffel – mit dem aktuellen Spieltag.
       </p>
       <StaggerIn as="ol" className="tls-apply-steps mt-6" aria-label="So geht es weiter">
@@ -217,7 +217,7 @@ export function SeasonPlaceholder({ season, application }) {
           <li key={step.key} className="tls-apply-steps__item" data-state={step.state} data-testid={`season-step-${step.key}`}>
             <span className="tls-apply-steps__mark" aria-hidden="true">{index + 1}</span>
             <span className="tls-apply-steps__label">{step.title}</span>
-            <span className="mt-1 block text-center text-xs text-white/60">{step.text}</span>
+            <span className="mt-1 block text-center tls-type-small text-white/60">{step.text}</span>
           </li>
         ))}
       </StaggerIn>
@@ -250,7 +250,7 @@ export function Division({ division, leagueSlug, seasonSlug, hash, topLevel, ord
         <div className="flex min-w-0 items-center gap-3">
           {/* Liga-Abzeichen (#1638) vor dem Namen - der Name steht daneben als Überschrift, das Wappen bleibt ohne eigenen Text. */}
           <LeagueBadge badge={{ level: division.level, nickname: division.nickname }} size="card" label={false} decorative testId={`league-division-badge-${division.level}`} />
-          <h2 id={`liga-${division.level}`} className="font-heading text-2xl md:text-3xl font-black uppercase [overflow-wrap:anywhere]">{division.label}</h2>
+          <h2 id={`liga-${division.level}`} className="tls-type-section [overflow-wrap:anywhere]">{division.label}</h2>
         </div>
         {tabbed ? (
           <div className="tls-season-tabs tls-swipe" role="tablist" aria-label={`Staffeln in ${division.label}`}>
@@ -261,13 +261,13 @@ export function Division({ division, leagueSlug, seasonSlug, hash, topLevel, ord
                   id={tabId(row)} aria-selected={selected} aria-controls={panelId} tabIndex={selected ? 0 : -1}
                   onClick={() => setActive(row.tournament_id)} onKeyDown={(event) => onTabKey(event, index)}
                   data-testid={`league-staffel-tab-${row.staffel}`}
-                  className={`tls-btn tls-league-tab ${selected ? "tls-btn--secondary" : "tls-btn--quiet"} shrink-0 rounded-sm px-3 py-1.5 text-xs font-bold uppercase tracking-wider`}>
+                  className={`tls-type-label tls-btn tls-league-tab ${selected ? "tls-btn--secondary" : "tls-btn--quiet"} shrink-0 rounded-sm px-3 py-1.5`}>
                   Staffel {row.staffel}
                 </button>
               );
             })}
           </div>
-        ) : current ? <span className="text-xs font-bold uppercase tracking-wider text-white/45">Staffel {current.staffel}</span> : null}
+        ) : current ? <span className="tls-type-label text-white/45">Staffel {current.staffel}</span> : null}
       </div>
       {/* Eigene Gewinne dieser Liga N (#2107) - sonst gilt, was oben für die Season steht. */}
       <LeaguePrizes prizes={division.prizes} title={`Um was ${division.label} spielt`} compact testId={`league-prizes-${division.level}`} />
@@ -277,7 +277,7 @@ export function Division({ division, leagueSlug, seasonSlug, hash, topLevel, ord
         {tabbed ? staffeln.map((row) => <span key={row.tournament_id} id={`staffel-${row.slug || row.tournament_id}`} className="block scroll-mt-24" />) : null}
         {current
           ? <StaffelPanel key={current.tournament_id} leagueSlug={leagueSlug} seasonSlug={seasonSlug} staffel={current} topLevel={topLevel} order={order} />
-          : <p className="text-sm text-white/55">Die Staffeln dieser Liga werden gerade eingeteilt.</p>}
+          : <p className="tls-type-small text-white/55">Die Staffeln dieser Liga werden gerade eingeteilt.</p>}
       </div>
       {/* Playoffs und Relegation dieser Liga (#2404, F.6): eigene K.-o.-Staffeln unter den Tabellen - nur wenn es sie gibt. */}
       <DivisionPostseason division={division} />

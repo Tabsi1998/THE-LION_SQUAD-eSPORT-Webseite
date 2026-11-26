@@ -16,6 +16,7 @@ import {
   LEAD_FILTERS, MESSAGE_MAX, MESSAGE_TEMPLATES, STATUS_LABELS,
   changeText, companionsText, counterText, filterRows, leadCounts, messagePreview, normalizeName, seatsText, statusQuestion, waitlistHint,
 } from "@/lib/eventLead";
+import { ShortCaps } from "@/components/tls/ShortCaps";
 
 // Anmeldungen & Einlass (#1372): /events/<slug>/leitung - nur für die Turnierleitung. An der Tür (Handy): Suchfeld und
 // Zähler fest oben, große „Da“-Knöpfe, danach 10 Sekunden „Rückgängig“. Tablet quer und PC: Liste links, Details der
@@ -170,9 +171,9 @@ export default function EventLeadPage() {
     return (
       <PublicLayout>
         <section className="max-w-3xl mx-auto px-4 py-16 text-center" data-testid="event-lead-denied">
-          <h1 className="font-heading text-2xl font-black uppercase">Anmeldungen & Einlass</h1>
+          <h1 className="tls-type-title"><ShortCaps>Anmeldungen & Einlass</ShortCaps></h1>
           <p className="mt-3 text-white/60">{error.status === 401 || !user ? "Bitte melde dich an – diese Ansicht ist für die Turnierleitung." : error.detail || "Diese Ansicht ist nur für die Turnierleitung."}</p>
-          {!user ? <Link to={`/login?next=/events/${slug}/leitung`} className="tls-btn tls-btn--primary mt-6 inline-flex px-4 py-2 rounded-sm text-xs uppercase tracking-wider font-bold">Anmelden</Link> : <Link to={eventUrl} className="tls-btn tls-btn--secondary mt-6 inline-flex px-4 py-2 rounded-sm text-xs uppercase tracking-wider font-bold">Zum Event</Link>}
+          {!user ? <Link to={`/login?next=/events/${slug}/leitung`} className="tls-btn tls-btn--primary mt-6 inline-flex px-4 py-2 rounded-sm tls-type-label">Anmelden</Link> : <Link to={eventUrl} className="tls-btn tls-btn--secondary mt-6 inline-flex px-4 py-2 rounded-sm tls-type-label">Zum Event</Link>}
         </section>
       </PublicLayout>
     );
@@ -184,25 +185,25 @@ export default function EventLeadPage() {
         <Breadcrumbs items={[{ label: "Events", to: "/events" }, { label: event.name || "Event", to: `/events/${event.slug || slug}` }, { label: "Anmeldungen & Einlass" }]} className="mb-4" />
         <div className="flex flex-wrap items-end justify-between gap-3">
           <div className="min-w-0">
-            <div className="text-[11px] uppercase tracking-[0.3em] text-[#29B6E8] font-bold">Anmeldungen & Einlass</div>
-            <h1 className="mt-1 font-heading text-2xl md:text-4xl font-black uppercase [overflow-wrap:anywhere]">{event.name || "…"}</h1>
-            {event.start_date ? <div className="mt-1 text-sm text-white/50">{viennaDateTime(event.start_date, { weekday: "short", day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" })}</div> : null}
+            <div className="tls-type-label text-[#29B6E8]">Anmeldungen & Einlass</div>
+            <h1 className="mt-1 tls-type-title [overflow-wrap:anywhere]">{event.name || "…"}</h1>
+            {event.start_date ? <div className="mt-1 tls-type-small text-white/50">{viennaDateTime(event.start_date, { weekday: "short", day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" })}</div> : null}
           </div>
           <div className="flex flex-wrap gap-2">
             {data?.can_add_walk_in ? (
-              <button type="button" onClick={() => setWalkInOpen(true)} className="tls-btn tls-btn--primary inline-flex min-h-[44px] items-center gap-2 px-4 py-2 rounded-sm text-xs uppercase tracking-wider font-bold" data-testid="event-lead-walkin-open">
+              <button type="button" onClick={() => setWalkInOpen(true)} className="tls-btn tls-btn--primary inline-flex min-h-[44px] items-center gap-2 px-4 py-2 rounded-sm tls-type-label" data-testid="event-lead-walkin-open">
                 <UserPlus className="w-4 h-4" /> Person an der Tür
               </button>
             ) : null}
             {data?.can_message ? (
-              <button type="button" onClick={() => setMessageOpen(true)} className="tls-btn tls-btn--secondary inline-flex min-h-[44px] items-center gap-2 px-4 py-2 rounded-sm text-xs uppercase tracking-wider font-bold" data-testid="event-lead-message-open">
+              <button type="button" onClick={() => setMessageOpen(true)} className="tls-btn tls-btn--secondary inline-flex min-h-[44px] items-center gap-2 px-4 py-2 rounded-sm tls-type-label" data-testid="event-lead-message-open">
                 <Megaphone className="w-4 h-4" /> Nachricht an alle
               </button>
             ) : null}
             {/* Druckansicht (#1283): Liste mit Kästchen, Begleitpersonen, Warteliste, Druckzeit und QR-Code. */}
             <PrintLink scope="event" slug={event.slug || slug} parts="liste" testId="event-lead-print" className="!text-xs !py-2" />
             {/* CSV (#2127, EV16): die Liste des gewählten Filters - nur Name, Status und Plätze. */}
-            <button type="button" disabled={exporting} onClick={exportCsv} className="tls-btn tls-btn--secondary inline-flex min-h-[44px] items-center gap-2 px-4 py-2 rounded-sm text-xs uppercase tracking-wider font-bold" data-testid="event-lead-csv">
+            <button type="button" disabled={exporting} onClick={exportCsv} className="tls-btn tls-btn--secondary inline-flex min-h-[44px] items-center gap-2 px-4 py-2 rounded-sm tls-type-label" data-testid="event-lead-csv">
               <Download className="w-4 h-4" /> CSV
             </button>
           </div>
@@ -211,8 +212,8 @@ export default function EventLeadPage() {
         {/* Fest oben (Handy an der Tür): Zähler, Suche, Filter. */}
         <div className="sticky top-16 md:top-20 z-30 -mx-4 sm:-mx-6 mt-4 border-b border-white/10 bg-[#0A0A0A]/95 px-4 sm:px-6 py-3 backdrop-blur-sm" data-testid="event-lead-bar">
           <div className="flex items-baseline justify-between gap-3">
-            <div className="font-heading text-2xl md:text-3xl font-black" data-testid="event-lead-counter" aria-live="polite">{counterText(counts)}</div>
-            <div className="text-right text-xs text-white/50">
+            <div className="tls-type-section" data-testid="event-lead-counter" aria-live="polite">{counterText(counts)}</div>
+            <div className="text-right tls-type-small text-white/50">
               {seatsText(counts) ? <div data-testid="event-lead-seats">{seatsText(counts)}</div> : null}
               {event.max_participants ? <div>{counts.expected_seats} von {event.max_participants} Plätzen vergeben</div> : null}
             </div>
@@ -224,7 +225,7 @@ export default function EventLeadPage() {
           </label>
           <div className="mt-3 grid grid-cols-4 gap-1 rounded-sm border border-white/10 bg-white/5 p-1" role="group" aria-label="Filter" data-testid="event-lead-filters">
             {LEAD_FILTERS.map(([key, label]) => (
-              <button key={key} type="button" aria-pressed={filter === key} onClick={() => setFilter(key)} className={`min-h-[40px] rounded-sm px-1 text-[11px] sm:text-xs font-bold uppercase tracking-wider ${filter === key ? "bg-[#29B6E8] text-black" : "text-white/60"}`} data-testid={`event-lead-filter-${key}`}>
+              <button key={key} type="button" aria-pressed={filter === key} onClick={() => setFilter(key)} className={`min-h-[40px] rounded-sm px-1 tls-type-label ${filter === key ? "bg-[#29B6E8] text-black" : "text-white/60"}`} data-testid={`event-lead-filter-${key}`}>
                 {label} ({counts[key] ?? 0})
               </button>
             ))}
@@ -237,11 +238,11 @@ export default function EventLeadPage() {
             {freeHint ? (
               <div className="mb-3 flex flex-wrap items-center justify-between gap-3 rounded-sm border border-honor/35 bg-honor/5 px-4 py-3" role="status" data-testid="event-lead-free-hint">
                 <div className="min-w-0">
-                  <div className="text-sm font-bold text-honor">{freeHint.text}</div>
-                  <div className="text-xs text-white/60 [overflow-wrap:anywhere]">{freeHint.next}</div>
+                  <div className="tls-type-small font-bold text-honor">{freeHint.text}</div>
+                  <div className="tls-type-small text-white/60 [overflow-wrap:anywhere]">{freeHint.next}</div>
                 </div>
                 {filter !== "waitlist" ? (
-                  <button type="button" onClick={() => setFilter("waitlist")} className="tls-btn tls-btn--secondary min-h-[44px] shrink-0 px-3 py-2 rounded-sm text-xs uppercase tracking-wider font-bold" data-testid="event-lead-free-open">Zur Warteliste</button>
+                  <button type="button" onClick={() => setFilter("waitlist")} className="tls-btn tls-btn--secondary min-h-[44px] shrink-0 px-3 py-2 rounded-sm tls-type-label" data-testid="event-lead-free-open">Zur Warteliste</button>
                 ) : null}
               </div>
             ) : null}
@@ -269,12 +270,12 @@ export default function EventLeadPage() {
           <aside className="hidden lg:block" data-testid="event-lead-aside">
             <div className="sticky top-[19rem]">
               {selected ? <Details row={selected} event={event} busy={busyId === selected.id} onChange={(payload) => change(selected, payload)} onStatus={(status) => changeStatus(selected, status)} onRename={(name) => renameWalkIn(selected, name)} onDelete={() => deleteWalkIn(selected)} onClose={() => setSelectedId("")} /> : (
-                <div className="rounded-sm border border-dashed border-white/10 p-6 text-sm text-white/45">Tippe auf einen Namen für Details: Begleitpersonen, Notiz und Status.</div>
+                <div className="rounded-sm border border-dashed border-white/10 p-6 tls-type-small text-white/45">Tippe auf einen Namen für Details: Begleitpersonen, Notiz und Status.</div>
               )}
             </div>
           </aside>
         </div>
-        <p className="mt-6 text-xs text-white/40">Jede Änderung steht im Protokoll (wer, wann, was). Mail-Adressen stehen hier nur gekürzt.</p>
+        <p className="mt-6 tls-type-small text-white/40">Jede Änderung steht im Protokoll (wer, wann, was). Mail-Adressen stehen hier nur gekürzt.</p>
       </section>
 
       {undo ? <UndoBar undo={undo} onUndo={undoLast} /> : null}
@@ -294,18 +295,18 @@ function RegistrationRow({ row, busy, selected, showStatus, undoable, onSelect, 
       <button type="button" onClick={onSelect} aria-expanded={selected} className="min-w-0 flex-1 text-left" data-testid={`event-lead-name-${row.id}`}>
         <span className="flex items-center gap-2">
           {here ? <Check className="w-4 h-4 shrink-0 text-[color:var(--tls-success)]" aria-label="da" /> : null}
-          <span className="tls-wrap block text-base font-bold text-white">{row.display_name}</span>
+          <span className="tls-wrap block tls-type-body font-bold text-white">{row.display_name}</span>
         </span>
-        {sub ? <span className="tls-wrap mt-0.5 block text-xs text-white/55">{sub}</span> : null}
+        {sub ? <span className="tls-wrap mt-0.5 block tls-type-small text-white/55">{sub}</span> : null}
       </button>
       {row.status === "registered" ? (
-        <button type="button" disabled={busy} onClick={onCheckIn} className="tls-btn tls-btn--primary shrink-0 min-h-[48px] min-w-[84px] px-5 py-2 rounded-sm text-sm uppercase tracking-wider font-black" data-testid={`event-lead-checkin-${row.id}`}>Da</button>
+        <button type="button" disabled={busy} onClick={onCheckIn} className="tls-btn tls-btn--primary shrink-0 min-h-[48px] min-w-[84px] px-5 py-2 rounded-sm tls-type-small uppercase tracking-wider font-black" data-testid={`event-lead-checkin-${row.id}`}>Da</button>
       ) : here && undoable ? (
-        <button type="button" disabled={busy} onClick={onUndo} className="tls-btn tls-btn--quiet shrink-0 min-h-[44px] px-3 py-2 rounded-sm text-[11px] uppercase tracking-wider font-bold" data-testid={`event-lead-undo-${row.id}`}>Rückgängig</button>
+        <button type="button" disabled={busy} onClick={onUndo} className="tls-btn tls-btn--quiet shrink-0 min-h-[44px] px-3 py-2 rounded-sm tls-type-label" data-testid={`event-lead-undo-${row.id}`}>Rückgängig</button>
       ) : row.status === "waitlist" ? (
-        <button type="button" disabled={busy} onClick={onMoveUp} className="tls-btn tls-btn--secondary shrink-0 min-h-[44px] px-3 py-2 rounded-sm text-[11px] uppercase tracking-wider font-bold" data-testid={`event-lead-moveup-${row.id}`}>Nachrücken</button>
+        <button type="button" disabled={busy} onClick={onMoveUp} className="tls-btn tls-btn--secondary shrink-0 min-h-[44px] px-3 py-2 rounded-sm tls-type-label" data-testid={`event-lead-moveup-${row.id}`}>Nachrücken</button>
       ) : (
-        <span className="shrink-0 text-[11px] font-bold uppercase tracking-wider text-white/40">{STATUS_LABELS[row.status] || row.status}</span>
+        <span className="shrink-0 tls-type-label text-white/40">{STATUS_LABELS[row.status] || row.status}</span>
       )}
     </div>
   );
@@ -317,15 +318,15 @@ function WalkInEdit({ row, busy, onRename, onDelete }) {
   const trimmed = name.trim();
   return (
     <div className="mt-4" data-testid="event-lead-walkin-edit">
-      <label className="block text-[11px] font-bold uppercase tracking-widest text-white/50">
+      <label className="block tls-type-label text-white/50">
         Name
         <input value={name} disabled={busy} onChange={(e) => setName(e.target.value)} maxLength={80} autoComplete="off" className="mt-1 block w-full min-h-[44px] rounded-sm border border-white/10 bg-[#0A0A0A] px-3 text-sm normal-case tracking-normal text-white" data-testid="event-lead-walkin-edit-name" />
       </label>
       <div className="mt-2 flex flex-wrap gap-2">
         {trimmed && trimmed !== row.display_name ? (
-          <button type="button" disabled={busy} onClick={() => onRename(trimmed)} className="tls-btn tls-btn--secondary min-h-[44px] px-3 py-2 rounded-sm text-xs uppercase tracking-wider font-bold" data-testid="event-lead-walkin-edit-save">Name speichern</button>
+          <button type="button" disabled={busy} onClick={() => onRename(trimmed)} className="tls-btn tls-btn--secondary min-h-[44px] px-3 py-2 rounded-sm tls-type-label" data-testid="event-lead-walkin-edit-save">Name speichern</button>
         ) : null}
-        <button type="button" disabled={busy} onClick={onDelete} className="tls-btn tls-btn--quiet min-h-[44px] px-3 py-2 rounded-sm text-xs uppercase tracking-wider font-bold" data-testid="event-lead-walkin-delete">Eintrag löschen</button>
+        <button type="button" disabled={busy} onClick={onDelete} className="tls-btn tls-btn--quiet min-h-[44px] px-3 py-2 rounded-sm tls-type-label" data-testid="event-lead-walkin-delete">Eintrag löschen</button>
       </div>
     </div>
   );
@@ -361,16 +362,16 @@ function Details({ row, event, busy, onChange, onStatus, onRename, onDelete, onC
     <div className="rounded-sm border border-white/10 bg-[#121212] p-4" data-testid="event-lead-details">
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
-          <div className="text-lg font-bold text-white [overflow-wrap:anywhere]">{row.display_name}</div>
-          {row.email_masked ? <div className="text-xs text-white/45" data-testid="event-lead-mail">{row.email_masked}</div> : null}
-          {row.walk_in ? <div className="text-xs text-white/45" data-testid="event-lead-walkin-note">An der Tür eingetragen, ohne Konto und ohne Preis.</div> : null}
+          <div className="tls-type-card text-white [overflow-wrap:anywhere]">{row.display_name}</div>
+          {row.email_masked ? <div className="tls-type-small text-white/45" data-testid="event-lead-mail">{row.email_masked}</div> : null}
+          {row.walk_in ? <div className="tls-type-small text-white/45" data-testid="event-lead-walkin-note">An der Tür eingetragen, ohne Konto und ohne Preis.</div> : null}
         </div>
         {onClose ? (
           <button type="button" onClick={onClose} aria-label="Details schließen" className="tls-btn tls-btn--quiet shrink-0 p-2 rounded-sm"><X className="w-4 h-4" /></button>
         ) : null}
       </div>
       {row.walk_in ? <WalkInEdit row={row} busy={busy} onRename={onRename} onDelete={onDelete} /> : null}
-      <dl className="mt-3 space-y-2 text-sm">
+      <dl className="mt-3 space-y-2 tls-type-small">
         <div className="flex items-center justify-between gap-3">
           <dt className="text-white/50">Plätze</dt>
           <dd className="font-bold text-white">{row.seat_count}</dd>
@@ -387,8 +388,8 @@ function Details({ row, event, busy, onChange, onStatus, onRename, onDelete, onC
             ) : null}
           </dd>
         </div>
-        {row.has_note && !notes ? <div className="text-xs text-white/40">Notiz wird geladen …</div> : null}
-        {notes?.error ? <div className="text-xs text-white/40">Notiz konnte nicht geladen werden.</div> : null}
+        {row.has_note && !notes ? <div className="tls-type-small text-white/40">Notiz wird geladen …</div> : null}
+        {notes?.error ? <div className="tls-type-small text-white/40">Notiz konnte nicht geladen werden.</div> : null}
         {notes?.note ? (
           <div>
             <dt className="text-white/50">Notiz der Person</dt>
@@ -396,22 +397,22 @@ function Details({ row, event, busy, onChange, onStatus, onRename, onDelete, onC
           </div>
         ) : null}
       </dl>
-      <label className="mt-4 block text-[11px] font-bold uppercase tracking-widest text-white/50">
+      <label className="mt-4 block tls-type-label text-white/50">
         Interne Notiz
         <textarea value={noteDraft} disabled={busy || notes?.error} onChange={(e) => setNoteDraft(e.target.value.slice(0, INTERNAL_NOTE_MAX))} rows={2} className="mt-1 block w-full rounded-sm border border-white/10 bg-[#0A0A0A] p-2 text-sm normal-case tracking-normal text-white" data-testid="event-lead-internal-note" />
       </label>
       {/* Ein Personendatum (Art. 15 DSGVO): nichts versprechen, was die Datenauskunft nicht hält. */}
-      <p className="mt-1 text-xs text-white/45" data-testid="event-lead-internal-note-hint">Für die Turnierleitung. Die Person sieht sie nicht in der Anmeldung; bei einer Datenauskunft wird sie mitgeliefert.</p>
+      <p className="mt-1 tls-type-small text-white/45" data-testid="event-lead-internal-note-hint">Für die Turnierleitung. Die Person sieht sie nicht in der Anmeldung; bei einer Datenauskunft wird sie mitgeliefert.</p>
       {noteChanged ? (
-        <button type="button" disabled={busy} onClick={saveNote} className="tls-btn tls-btn--secondary mt-2 min-h-[44px] px-3 py-2 rounded-sm text-xs uppercase tracking-wider font-bold" data-testid="event-lead-internal-note-save">Notiz speichern</button>
+        <button type="button" disabled={busy} onClick={saveNote} className="tls-btn tls-btn--secondary mt-2 min-h-[44px] px-3 py-2 rounded-sm tls-type-label" data-testid="event-lead-internal-note-save">Notiz speichern</button>
       ) : null}
-      <label className="mt-4 block text-[11px] font-bold uppercase tracking-widest text-white/50">
+      <label className="mt-4 block tls-type-label text-white/50">
         Status
         <select value={row.status || "registered"} disabled={busy} onChange={(e) => onStatus(e.target.value)} className="mt-1 block w-full min-h-[44px] rounded-sm border border-white/10 bg-[#0A0A0A] px-2 text-sm normal-case tracking-normal text-white" data-testid="event-lead-status">
           {STATUS_ORDER.map((status) => <option key={status} value={status}>{STATUS_LABELS[status]}</option>)}
         </select>
       </label>
-      {row.created_at ? <div className="mt-3 text-xs text-white/40">Angemeldet am {viennaDateTime(row.created_at, { dateStyle: "medium", timeStyle: "short" })}</div> : null}
+      {row.created_at ? <div className="mt-3 tls-type-small text-white/40">Angemeldet am {viennaDateTime(row.created_at, { dateStyle: "medium", timeStyle: "short" })}</div> : null}
     </div>
   );
 }
@@ -420,8 +421,8 @@ function UndoBar({ undo, onUndo }) {
   return (
     <div className="fixed inset-x-0 bottom-0 z-40 px-4 pb-4 pointer-events-none print:hidden" data-testid="event-lead-undo-bar">
       <div className="pointer-events-auto mx-auto flex max-w-xl items-center gap-3 rounded-lg border border-[#29B6E8]/40 bg-[#0F1D23] px-4 py-3 shadow-2xl shadow-black/60" role="status" aria-live="polite">
-        <div className="tls-wrap flex-1 text-sm text-white/85">{undo.sentence}</div>
-        <button type="button" onClick={onUndo} className="tls-btn tls-btn--secondary shrink-0 inline-flex min-h-[44px] items-center gap-2 px-3 py-2 rounded-sm text-xs uppercase tracking-wider font-bold" data-testid="event-lead-undo-last">
+        <div className="tls-wrap flex-1 tls-type-small text-white/85">{undo.sentence}</div>
+        <button type="button" onClick={onUndo} className="tls-btn tls-btn--secondary shrink-0 inline-flex min-h-[44px] items-center gap-2 px-3 py-2 rounded-sm tls-type-label" data-testid="event-lead-undo-last">
           <Undo2 className="w-4 h-4" /> Rückgängig
         </button>
       </div>
@@ -461,8 +462,8 @@ function MessageDialog({ event, recipients, onClose, onSent }) {
       <div className="w-full max-w-lg rounded-t-lg sm:rounded-sm border border-white/10 bg-[#121212] p-5">
         <div className="flex items-start justify-between gap-3">
           <div>
-            <div className="text-[11px] font-bold uppercase tracking-widest text-[#29B6E8]">Nachricht an alle Angemeldeten</div>
-            <h2 id="event-lead-message-title" className="mt-1 font-heading text-lg font-black uppercase [overflow-wrap:anywhere]">{event.name}</h2>
+            <div className="tls-type-label text-[#29B6E8]">Nachricht an alle Angemeldeten</div>
+            <h2 id="event-lead-message-title" className="mt-1 tls-type-section [overflow-wrap:anywhere]">{event.name}</h2>
           </div>
           <button type="button" onClick={onClose} aria-label="Schließen" className="tls-btn tls-btn--quiet shrink-0 p-2 rounded-sm"><X className="w-4 h-4" /></button>
         </div>
@@ -470,27 +471,27 @@ function MessageDialog({ event, recipients, onClose, onSent }) {
           <>
             <div className="mt-4 flex flex-wrap gap-2" data-testid="event-lead-templates">
               {MESSAGE_TEMPLATES.map((template) => (
-                <button key={template} type="button" onClick={() => setText(template)} className="tls-btn tls-btn--quiet px-2 py-1 rounded-sm text-xs text-left">{template}</button>
+                <button key={template} type="button" onClick={() => setText(template)} className="tls-btn tls-btn--quiet px-2 py-1 rounded-sm tls-type-small text-left">{template}</button>
               ))}
             </div>
-            <label className="mt-4 block text-[11px] font-bold uppercase tracking-widest text-white/50">
+            <label className="mt-4 block tls-type-label text-white/50">
               Text
               <textarea value={text} onChange={(e) => setText(e.target.value.slice(0, MESSAGE_MAX))} rows={4} className="mt-1 block w-full rounded-sm border border-white/10 bg-[#0A0A0A] p-3 text-sm normal-case tracking-normal text-white" data-testid="event-lead-message-text" />
             </label>
-            <div className="mt-1 text-right text-[11px] text-white/40">{text.length} / {MESSAGE_MAX}</div>
-            <p className="mt-2 flex items-start gap-2 text-sm text-white/70" data-testid="event-lead-message-preview"><Users className="mt-0.5 w-4 h-4 shrink-0 text-[#29B6E8]" /> {messagePreview(recipients)}</p>
+            <div className="mt-1 text-right tls-type-small text-white/40">{text.length} / {MESSAGE_MAX}</div>
+            <p className="mt-2 flex items-start gap-2 tls-type-small text-white/70" data-testid="event-lead-message-preview"><Users className="mt-0.5 w-4 h-4 shrink-0 text-[#29B6E8]" /> {messagePreview(recipients)}</p>
             <div className="mt-5 flex justify-end gap-2">
-              <button type="button" onClick={onClose} className="tls-btn tls-btn--quiet min-h-[44px] px-4 py-2 rounded-sm text-xs uppercase tracking-wider font-bold">Abbrechen</button>
-              <button type="button" disabled={!trimmed || !recipients} onClick={() => setStep("confirm")} className="tls-btn tls-btn--primary min-h-[44px] px-4 py-2 rounded-sm text-xs uppercase tracking-wider font-bold" data-testid="event-lead-message-next">Weiter</button>
+              <button type="button" onClick={onClose} className="tls-btn tls-btn--quiet min-h-[44px] px-4 py-2 rounded-sm tls-type-label">Abbrechen</button>
+              <button type="button" disabled={!trimmed || !recipients} onClick={() => setStep("confirm")} className="tls-btn tls-btn--primary min-h-[44px] px-4 py-2 rounded-sm tls-type-label" data-testid="event-lead-message-next">Weiter</button>
             </div>
           </>
         ) : (
           <>
-            <p className="mt-4 text-sm text-white/80" data-testid="event-lead-message-confirm">Wirklich an <strong>{recipients} {recipients === 1 ? "Person" : "Personen"}</strong> senden? Das lässt sich nicht zurückholen.</p>
-            <blockquote className="mt-3 whitespace-pre-line border-l-2 border-[#29B6E8] pl-3 text-sm text-white/70 [overflow-wrap:anywhere]">{trimmed}</blockquote>
+            <p className="mt-4 tls-type-small text-white/80" data-testid="event-lead-message-confirm">Wirklich an <strong>{recipients} {recipients === 1 ? "Person" : "Personen"}</strong> senden? Das lässt sich nicht zurückholen.</p>
+            <blockquote className="mt-3 whitespace-pre-line border-l-2 border-[#29B6E8] pl-3 tls-type-small text-white/70 [overflow-wrap:anywhere]">{trimmed}</blockquote>
             <div className="mt-5 flex justify-end gap-2">
-              <button type="button" disabled={sending} onClick={() => setStep("write")} className="tls-btn tls-btn--quiet min-h-[44px] px-4 py-2 rounded-sm text-xs uppercase tracking-wider font-bold">Zurück</button>
-              <button type="button" disabled={sending} onClick={send} className="tls-btn tls-btn--primary min-h-[44px] px-4 py-2 rounded-sm text-xs uppercase tracking-wider font-bold" data-testid="event-lead-message-send">{sending ? "Wird gesendet …" : `An ${recipients} senden`}</button>
+              <button type="button" disabled={sending} onClick={() => setStep("write")} className="tls-btn tls-btn--quiet min-h-[44px] px-4 py-2 rounded-sm tls-type-label">Zurück</button>
+              <button type="button" disabled={sending} onClick={send} className="tls-btn tls-btn--primary min-h-[44px] px-4 py-2 rounded-sm tls-type-label" data-testid="event-lead-message-send">{sending ? "Wird gesendet …" : `An ${recipients} senden`}</button>
             </div>
           </>
         )}
@@ -537,26 +538,26 @@ function WalkInDialog({ event, rows, onClose, onAdded }) {
       <form onSubmit={submit} className="w-full max-w-lg rounded-t-lg sm:rounded-sm border border-white/10 bg-[#121212] p-5">
         <div className="flex items-start justify-between gap-3">
           <div>
-            <div className="text-[11px] font-bold uppercase tracking-widest text-[#29B6E8]">Person an der Tür hinzufügen</div>
-            <h2 id="event-lead-walkin-title" className="mt-1 font-heading text-lg font-black uppercase [overflow-wrap:anywhere]">{event.name}</h2>
+            <div className="tls-type-small font-bold text-[#29B6E8]">Person an der Tür hinzufügen</div>
+            <h2 id="event-lead-walkin-title" className="mt-1 tls-type-section [overflow-wrap:anywhere]">{event.name}</h2>
           </div>
           <button type="button" onClick={onClose} aria-label="Schließen" className="tls-btn tls-btn--quiet shrink-0 p-2 rounded-sm"><X className="w-4 h-4" /></button>
         </div>
-        <p className="mt-3 text-sm text-white/65">Ohne Konto und ohne Preis. Die Person ist danach gleich „Da“, belegt einen Platz und steht im Protokoll. Öffentlich steht ihr Name nicht.</p>
-        <label className="mt-4 block text-[11px] font-bold uppercase tracking-widest text-white/50">
+        <p className="mt-3 tls-type-body text-white/65">Ohne Konto und ohne Preis. Die Person ist danach gleich „Da“, belegt einen Platz und steht im Protokoll. Öffentlich steht ihr Name nicht.</p>
+        <label className="mt-4 block tls-type-label text-white/50">
           Name
           <input value={name} onChange={(e) => setName(e.target.value)} ref={nameRef} maxLength={80} autoComplete="off" className="mt-1 block w-full min-h-[48px] rounded-sm border border-white/10 bg-[#0A0A0A] px-3 text-base normal-case tracking-normal text-white" data-testid="event-lead-walkin-name" />
         </label>
-        {twin ? <p className="mt-2 text-xs text-honor" data-testid="event-lead-walkin-twin">„{twin.display_name}“ steht schon in der Liste ({STATUS_LABELS[twin.status] || twin.status}). Trotzdem eintragen, wenn es eine andere Person ist.</p> : null}
+        {twin ? <p className="mt-2 tls-type-small text-honor" data-testid="event-lead-walkin-twin">„{twin.display_name}“ steht schon in der Liste ({STATUS_LABELS[twin.status] || twin.status}). Trotzdem eintragen, wenn es eine andere Person ist.</p> : null}
         {maxCompanions ? (
-          <label className="mt-4 block text-[11px] font-bold uppercase tracking-widest text-white/50">
+          <label className="mt-4 block tls-type-label text-white/50">
             Begleitpersonen
             <input type="number" min="0" max={maxCompanions} value={companions} onChange={(e) => setCompanions(e.target.value)} className="mt-1 block w-28 min-h-[44px] rounded-sm border border-white/10 bg-[#0A0A0A] px-3 text-sm normal-case tracking-normal text-white" data-testid="event-lead-walkin-companions" />
           </label>
         ) : null}
         <div className="mt-5 flex justify-end gap-2">
-          <button type="button" onClick={onClose} className="tls-btn tls-btn--quiet min-h-[44px] px-4 py-2 rounded-sm text-xs uppercase tracking-wider font-bold">Abbrechen</button>
-          <button type="submit" disabled={!trimmed || saving} className="tls-btn tls-btn--primary min-h-[44px] px-4 py-2 rounded-sm text-xs uppercase tracking-wider font-bold" data-testid="event-lead-walkin-save">{saving ? "Wird eingetragen …" : "Eintragen"}</button>
+          <button type="button" onClick={onClose} className="tls-btn tls-btn--quiet min-h-[44px] px-4 py-2 rounded-sm tls-type-label">Abbrechen</button>
+          <button type="submit" disabled={!trimmed || saving} className="tls-btn tls-btn--primary min-h-[44px] px-4 py-2 rounded-sm tls-type-label" data-testid="event-lead-walkin-save">{saving ? "Wird eingetragen …" : "Eintragen"}</button>
         </div>
       </form>
     </div>
@@ -567,12 +568,12 @@ function MessageLog({ messages }) {
   if (!messages.length) return null;
   return (
     <div className="mt-8" data-testid="event-lead-log">
-      <div className="text-[11px] font-bold uppercase tracking-widest text-white/40">Nachrichten an alle</div>
+      <div className="tls-type-label text-white/40">Nachrichten an alle</div>
       <ul className="mt-2 space-y-2">
         {messages.map((message) => (
           <li key={message.id} className="rounded-sm border border-white/10 bg-[#121212] p-3">
-            <div className="text-xs text-white/45">{viennaDateTime(message.created_at, { dateStyle: "short", timeStyle: "short" })} · {message.actor_name || "Turnierleitung"} · an {message.recipient_count}</div>
-            <div className="mt-1 whitespace-pre-line text-sm text-white/80 [overflow-wrap:anywhere]">{message.text}</div>
+            <div className="tls-type-small text-white/45">{viennaDateTime(message.created_at, { dateStyle: "short", timeStyle: "short" })} · {message.actor_name || "Turnierleitung"} · an {message.recipient_count}</div>
+            <div className="mt-1 whitespace-pre-line tls-type-small text-white/80 [overflow-wrap:anywhere]">{message.text}</div>
           </li>
         ))}
       </ul>

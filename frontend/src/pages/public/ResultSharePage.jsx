@@ -25,7 +25,7 @@ export function PathList({ steps = [], title = "Weg", testId = "result-path" }) 
   if (!steps.length) return null;
   return (
     <div data-testid={testId}>
-      <div className="text-[10px] font-bold uppercase tracking-[0.3em] text-white/45">{title}</div>
+      <div className="tls-type-label text-white/45">{title}</div>
       <ol className="mt-2 space-y-1.5">
         {steps.map((step, index) => {
           const style = OUTCOME_STYLE[step.outcome] || OUTCOME_STYLE.placed;
@@ -34,11 +34,11 @@ export function PathList({ steps = [], title = "Weg", testId = "result-path" }) 
             <li key={`${step.label}-${index}`} className="flex items-center gap-3 border border-white/10 bg-white/[0.03] rounded-sm pl-2 pr-3 py-2" data-testid={`${testId}-step`}>
               <span className={`w-1 self-stretch rounded-full ${style.mark}`} aria-hidden="true" />
               <span className="min-w-0 flex-1 flex items-baseline gap-2">
-                <span className="min-w-0 truncate font-semibold text-sm">{step.label}</span>
-                {note ? <span className="shrink-0 text-xs font-semibold text-warn" data-testid={`${testId}-clarification`}>{note}</span> : null}
+                <span className="min-w-0 truncate font-semibold tls-type-small">{step.label}</span>
+                {note ? <span className="shrink-0 tls-type-small font-semibold text-warn" data-testid={`${testId}-clarification`}>{note}</span> : null}
               </span>
               {style.word ? <span className="sr-only">{style.word}</span> : null}
-              <span className={`shrink-0 font-heading font-bold tabular-nums text-sm ${style.value}`}>{step.result}</span>
+              <span className={`shrink-0 tls-type-small font-bold tabular-nums ${style.value}`}>{step.result}</span>
             </li>
           );
         })}
@@ -85,13 +85,13 @@ export default function ResultSharePage() {
         {(state === "private" || state === "error") && (
           <div className="mt-6 border border-dashed border-white/15 rounded-sm px-6 py-16 text-center" data-testid="result-share-private">
             <Lock className="w-8 h-8 mx-auto mb-3 text-white/25" />
-            <h1 className="font-heading text-2xl font-bold uppercase text-white/80">{state === "private" ? "Dieses Ergebnis ist nicht öffentlich" : "Ergebnis gerade nicht erreichbar"}</h1>
-            <p className="mt-2 text-sm text-white/45 max-w-md mx-auto">
+            <h1 className="tls-type-title text-white/80">{state === "private" ? "Dieses Ergebnis ist nicht öffentlich" : "Ergebnis gerade nicht erreichbar"}</h1>
+            <p className="mt-2 tls-type-small text-white/45 max-w-md mx-auto">
               {state === "private"
                 ? "Entweder gibt es das Ergebnis nicht, das Turnier ist nicht öffentlich oder die Person zeigt ihr Profil nicht öffentlich."
                 : "Bitte versuch es gleich noch einmal."}
             </p>
-            <Link to="/tournaments" className="tls-btn tls-btn--secondary mt-6 inline-flex items-center gap-2 px-4 py-2 text-xs font-bold uppercase tracking-widest rounded-sm">
+            <Link to="/tournaments" className="tls-btn tls-btn--secondary mt-6 inline-flex items-center gap-2 px-4 py-2 tls-type-label rounded-sm">
               <Trophy className="w-3.5 h-3.5" /> Zu den Turnieren
             </Link>
           </div>
@@ -108,25 +108,25 @@ export default function ResultSharePage() {
             <img src={story} alt={`${data.headline} – ${person}`} width={1080} height={1920}
               className="w-full max-w-[320px] mx-auto md:mx-0 h-auto block rounded-sm border border-[#29B6E8]/30 bg-[#0A0A0A] shadow-[0_0_48px_rgba(41,182,232,0.12)]" data-testid="result-share-image" />
             <div className="min-w-0">
-              <div className="text-[10px] font-bold uppercase tracking-[0.35em] text-[#29B6E8]">
+              <div className="tls-type-small font-bold text-[#29B6E8]">
                 {[data.event_name, data.date].filter(Boolean).join(" · ") || data.club_name}
               </div>
               <div className="mt-2 flex items-end gap-4">
-                <span className={`font-heading font-black leading-none text-6xl md:text-7xl tabular-nums ${rankColor}`} data-testid="result-share-rank">{data.rank ? `${data.rank}.` : "–"}</span>
-                {data.participant_count ? <span className="pb-1 text-xs font-bold uppercase tracking-widest text-white/45">von {data.participant_count} {data.participant_word}</span> : null}
+                <span className={`tls-type-hero tls-type-num leading-none ${rankColor}`} data-testid="result-share-rank">{data.rank ? `${data.rank}.` : "–"}</span>
+                {data.participant_count ? <span className="pb-1 tls-type-label text-white/45">von {data.participant_count} {data.participant_word}</span> : null}
               </div>
-              <h1 className="mt-3 font-heading text-2xl md:text-4xl font-black uppercase leading-tight break-words" data-testid="result-share-headline">{data.headline}</h1>
-              <Link to={`/u/${encodeURIComponent(data.user.username)}`} className="mt-3 inline-flex items-center gap-2 text-sm hover:text-[#29B6E8]" data-testid="result-share-person">
-                <span className="w-7 h-7 rounded-sm border border-white/15 bg-white/5 flex items-center justify-center font-bold text-white/60 text-xs">{person.trim().charAt(0).toUpperCase()}</span>
+              <h1 className="mt-3 tls-type-title leading-tight break-words" data-testid="result-share-headline">{data.headline}</h1>
+              <Link to={`/u/${encodeURIComponent(data.user.username)}`} className="mt-3 inline-flex items-center gap-2 tls-type-small hover:text-[#29B6E8]" data-testid="result-share-person">
+                <span className="w-7 h-7 rounded-sm border border-white/15 bg-white/5 flex items-center justify-center font-bold text-white/60 tls-type-small">{person.trim().charAt(0).toUpperCase()}</span>
                 <span className="font-semibold">{person}</span>
-                {data.team_name ? <span className="text-white/40 text-xs">geteilt von {data.user.display_name}</span> : null}
+                {data.team_name ? <span className="text-white/40 tls-type-small">geteilt von {data.user.display_name}</span> : null}
               </Link>
               <div className="mt-6">
                 <PathList steps={data.steps} title={data.team_name ? "Weg des Teams" : "Weg durchs Turnier"} />
               </div>
               <div className="mt-6 space-y-3">
                 <ResultShareButton options={{ shareable: true, path: data.path, image_paths: data.image_paths, headline: data.headline, share_text: data.share_text }} showPage={false} testId="result-share-actions" />
-                <a href={wide} download={resultFileName(data.path, "wide")} className="inline-flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-widest text-white/55 hover:text-white" data-testid="result-share-wide">
+                <a href={wide} download={resultFileName(data.path, "wide")} className="inline-flex items-center gap-1.5 tls-type-label text-white/55 hover:text-white" data-testid="result-share-wide">
                   <Download className="w-3.5 h-3.5" /> Breites Bild (1200 × 630)
                 </a>
               </div>

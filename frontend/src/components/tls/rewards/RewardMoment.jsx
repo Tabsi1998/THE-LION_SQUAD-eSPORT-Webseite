@@ -26,7 +26,7 @@ export function RewardMoment({ plan, onClose, reduced = false, profileHref = "/u
   const title = many ? awards.map((award) => award.reward.name).join(" · ") : first.reward.name;
   const lines = [
     <p key="label" className="tls-placement__label">{heading}</p>,
-    <h2 key="title" className="tls-placement__title font-heading">{title}</h2>,
+    <h2 key="title" className="tls-placement__title tls-type-section">{title}</h2>,
     <p key="where" className="tls-placement__name">{artLines(first.reward.art).join(" · ")}</p>,
     first.team?.name ? <p key="team" className="tls-placement__tournament">{first.team.name}</p> : null,
   ].filter(Boolean);
@@ -72,7 +72,7 @@ export function RewardMoment({ plan, onClose, reduced = false, profileHref = "/u
         <div className="tls-placement__actions tls-placement__line" style={{ "--tls-i": lines.length }}>
           {canShareReward(first) ? <RewardShareButton award={first} testId="reward-moment-share" /> : null}
           <Link to={profileHref} onClick={onClose} data-testid="reward-moment-collection"
-            className="tls-btn tls-btn--secondary inline-flex min-h-[44px] items-center gap-2 px-3 py-2 rounded-sm text-xs font-bold uppercase tracking-wider">
+            className="tls-btn tls-btn--secondary inline-flex min-h-[44px] items-center gap-2 px-3 py-2 rounded-sm tls-type-label">
             Zur Sammlung
           </Link>
         </div>

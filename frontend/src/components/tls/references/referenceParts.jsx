@@ -148,12 +148,12 @@ export function SectionTitle({ icon: Icon, accent, eyebrow, title, hint }) {
   return (
     <div className="flex items-end justify-between gap-4 flex-wrap">
       <div>
-        <div className="text-[11px] uppercase tracking-[0.3em] font-bold flex items-center gap-2" style={{ color: accent }}>
+        <div className="tls-type-label flex items-center gap-2" style={{ color: accent }}>
           {Icon && <Icon className="w-3.5 h-3.5" />} {eyebrow}
         </div>
-        <h2 className="mt-2 font-heading text-2xl md:text-3xl font-black uppercase">{title}</h2>
+        <h2 className="mt-2 tls-type-section">{title}</h2>
       </div>
-      {hint && <div className="text-xs uppercase tracking-widest font-bold text-white/40">{hint}</div>}
+      {hint && <div className="tls-type-label text-white/40">{hint}</div>}
     </div>
   );
 }
@@ -162,19 +162,19 @@ export function SectionTitle({ icon: Icon, accent, eyebrow, title, hint }) {
 export function PlacementBadge({ placement, medal, size = "md" }) {
   const tone = medal ? MEDAL[medal] : null;
   const dims = size === "xl" ? "w-32 h-32 md:w-40 md:h-40" : size === "lg" ? "w-20 h-20" : "w-14 h-14";
-  const font = size === "xl" ? "text-5xl md:text-6xl" : size === "lg" ? "text-3xl" : "text-xl";
+  const font = size === "xl" ? "tls-type-title" : size === "lg" ? "tls-type-section" : "tls-type-card";
   return (
     <div className={`${dims} shrink-0 rounded-full p-[3px] bg-gradient-to-br ${tone ? `${tone.ring} ${tone.glow}` : "from-white/30 via-white/10 to-white/5"}`} data-testid="placement-badge" data-medal={medal || "none"}>
       <div className="w-full h-full rounded-full bg-[#0B0B0B] flex flex-col items-center justify-center">
         {placement ? (
           <>
-            <span className={`font-display font-black leading-none tabular-nums ${font} ${tone ? tone.text : "text-white"}`}>{placement}.</span>
-            {size !== "md" && <span className="mt-1 text-[10px] uppercase tracking-widest font-bold text-white/45">{tone ? tone.label : "Platz"}</span>}
+            <span className={`tls-type-num leading-none ${font} ${tone ? tone.text : "text-white"}`}>{placement}.</span>
+            {size !== "md" && <span className="mt-1 tls-type-label text-white/45">{tone ? tone.label : "Platz"}</span>}
           </>
         ) : (
           <>
             <Trophy className={`${size === "xl" ? "w-10 h-10" : "w-5 h-5"} text-white/60`} />
-            <span className="mt-1 text-[9px] uppercase tracking-widest font-black text-white/50">Dabei</span>
+            <span className="mt-1 tls-type-label text-white/50">Dabei</span>
           </>
         )}
       </div>
@@ -185,14 +185,14 @@ export function PlacementBadge({ placement, medal, size = "md" }) {
 // Das Zeichen eines Spiels (#1748): sein Logo. Ohne Logo zeigen nur große Zeichen (`code`, etwa die Spiel-Kachel)
 // das Kürzel wie im Spiele-Regal (gameCode); im kleinen Chip wäre es unlesbar und doppelt - der volle Name steht
 // daneben -, dort und ohne Spiel steht der Pokal. `className` setzt die Größe, `codeClass` die Schrift des Kürzels.
-export function GameMark({ game, code = false, className = "w-5 h-5", codeClass = "text-xs", iconClass = "w-3 h-3", padded = false }) {
+export function GameMark({ game, code = false, className = "w-5 h-5", codeClass = "tls-type-small", iconClass = "w-3 h-3", padded = false }) {
   const hasGame = code && Boolean(game?.short_name || game?.name);
   return (
     <span data-testid="reference-game-logo" className={`${className} shrink-0 rounded-sm bg-black overflow-hidden flex items-center justify-center`}>
       {game?.logo_url
         ? <img src={resolveMediaUrl(game.logo_url)} alt="" className={`w-full h-full object-contain ${padded ? "p-1" : ""}`} />
         : hasGame
-          ? <span aria-hidden="true" className={`font-heading font-black tracking-wide text-white leading-none ${codeClass}`}>{gameCode(game)}</span>
+          ? <span aria-hidden="true" className={`font-black text-white leading-none ${codeClass}`}>{gameCode(game)}</span>
           : <Trophy className={`${iconClass} text-[#29B6E8]`} />}
     </span>
   );
@@ -200,7 +200,7 @@ export function GameMark({ game, code = false, className = "w-5 h-5", codeClass 
 
 export function GameChip({ item }) {
   return (
-    <span className="inline-flex items-center gap-2 pl-1 pr-2.5 py-1 border border-white/10 bg-black/40 rounded-sm text-[10px] uppercase tracking-widest font-bold text-white/70">
+    <span className="inline-flex items-center gap-2 pl-1 pr-2.5 py-1 border border-white/10 bg-black/40 rounded-sm tls-type-label text-white/70">
       <GameMark game={item.game} />
       {gameTitle(item)}
     </span>
@@ -215,10 +215,10 @@ export function AvatarStack({ members, className = "", max = 6 }) {
     <div className={`flex items-center ${className}`}>
       {shown.map((member, index) => (
         <span key={member.profile_id || member.display_name || index} title={member.display_name} className={`w-8 h-8 rounded-full border-2 border-[#0F0F0F] bg-[#1A1A1A] overflow-hidden flex items-center justify-center ${index ? "-ml-2" : ""}`}>
-          {member.avatar_url ? <img src={resolveMediaUrl(member.avatar_url)} alt="" className="w-full h-full object-cover" /> : <span className="text-[10px] font-black text-white/60">{(member.display_name || "?").slice(0, 1).toUpperCase()}</span>}
+          {member.avatar_url ? <img src={resolveMediaUrl(member.avatar_url)} alt="" className="w-full h-full object-cover" /> : <span className="tls-type-small font-black text-white/60">{(member.display_name || "?").slice(0, 1).toUpperCase()}</span>}
         </span>
       ))}
-      {rest > 0 && <span className="-ml-2 w-8 h-8 rounded-full border-2 border-[#0F0F0F] bg-[#29B6E8]/20 text-[#29B6E8] text-[10px] font-black flex items-center justify-center">+{rest}</span>}
+      {rest > 0 && <span className="-ml-2 w-8 h-8 rounded-full border-2 border-[#0F0F0F] bg-[#29B6E8]/20 text-[#29B6E8] tls-type-small font-black flex items-center justify-center">+{rest}</span>}
     </div>
   );
 }
@@ -235,7 +235,7 @@ export function FieldChips({ item, className = "" }) {
   return (
     <div className={`${className} flex flex-wrap gap-1.5`} data-testid={`reference-chips-${item.id}`}>
       {chips.map((chip) => (
-        <span key={chip} className="px-2 py-1 border border-white/10 bg-white/[0.03] rounded-sm text-[10px] uppercase tracking-widest text-white/50 font-bold">{chip}</span>
+        <span key={chip} className="px-2 py-1 border border-white/10 bg-white/[0.03] rounded-sm tls-type-label text-white/50">{chip}</span>
       ))}
     </div>
   );
@@ -253,25 +253,25 @@ export function EntryRow({ entry, large = false }) {
       <div className={`${large ? "w-14 h-14" : "w-10 h-10"} shrink-0 rounded-full p-[2px] bg-gradient-to-br ${tone ? tone.ring : "from-white/25 to-white/5"}`}>
         <div className="w-full h-full rounded-full bg-[#0B0B0B] flex items-center justify-center">
           {entry.placement ? (
-            <span className={`${large ? "text-xl" : "text-sm"} font-display font-black leading-none tabular-nums ${tone ? tone.text : "text-white"}`}>{entry.placement}.</span>
+            <span className={`${large ? "tls-type-card" : "tls-type-small"} tls-type-num leading-none ${tone ? tone.text : "text-white"}`}>{entry.placement}.</span>
           ) : (
-            <span className="text-[8px] uppercase tracking-widest font-black text-white/60">Dabei</span>
+            <span className="tls-type-label text-white/60">Dabei</span>
           )}
         </div>
       </div>
       <div className="min-w-0 flex-1">
         <div className="flex items-center gap-2 flex-wrap">
-          <span className="inline-flex items-center gap-1 text-[10px] uppercase tracking-widest font-black text-white/45">
+          <span className="inline-flex items-center gap-1 tls-type-label text-white/45">
             {isSolo ? <User className="w-3 h-3" /> : <Users className="w-3 h-3" />} {isSolo ? "Einzel" : "Team"}
           </span>
-          <span className="font-bold text-sm text-white truncate">{entryTitle(entry)}</span>
-          {entry.placement_label && <span className="text-[10px] uppercase tracking-widest text-white/45">{entry.placement_label}</span>}
-          {counts && <span className="text-[10px] uppercase tracking-widest text-white/45">{counts}</span>}
+          <span className="font-bold tls-type-small text-white truncate">{entryTitle(entry)}</span>
+          {entry.placement_label && <span className="tls-type-label text-white/45">{entry.placement_label}</span>}
+          {counts && <span className="tls-type-label text-white/45">{counts}</span>}
         </div>
         {(!isSolo || members.length === 0) && (members.length > 0 || names.length > 0) && (
           <div className="mt-1.5 flex flex-wrap gap-1.5">
             {members.map((member) => <PlayerChip key={member.profile_id || member.display_name} member={member} />)}
-            {names.map((name) => <span key={name} className="px-2 py-0.5 border border-white/10 bg-black/20 text-xs text-white/55 rounded-sm">{name}</span>)}
+            {names.map((name) => <span key={name} className="px-2 py-0.5 border border-white/10 bg-black/20 tls-type-small text-white/55 rounded-sm">{name}</span>)}
           </div>
         )}
         {isSolo && members[0] && (
@@ -286,12 +286,12 @@ export function PlayerChip({ member }) {
   const content = (
     <>
       <span className="w-6 h-6 rounded-full bg-black border border-white/10 overflow-hidden flex items-center justify-center shrink-0">
-        {member.avatar_url ? <img src={resolveMediaUrl(member.avatar_url)} alt="" className="w-full h-full object-cover" /> : <span className="text-[9px] font-black text-white/50">{(member.display_name || "?").slice(0, 1).toUpperCase()}</span>}
+        {member.avatar_url ? <img src={resolveMediaUrl(member.avatar_url)} alt="" className="w-full h-full object-cover" /> : <span className="tls-type-small font-black text-white/50">{(member.display_name || "?").slice(0, 1).toUpperCase()}</span>}
       </span>
       <span className="truncate">{member.display_name}</span>
     </>
   );
-  const className = "inline-flex items-center gap-1.5 max-w-full border border-white/10 bg-black/30 text-white/80 rounded-full pl-0.5 pr-2.5 py-0.5 text-xs font-semibold";
+  const className = "inline-flex items-center gap-1.5 max-w-full border border-white/10 bg-black/30 text-white/80 rounded-full pl-0.5 pr-2.5 py-0.5 tls-type-small font-semibold";
   if (member.profile_url) return <Link to={member.profile_url} className={`${className} hover:border-[#29B6E8]/60 hover:text-[#29B6E8]`}>{content}</Link>;
   return <span className={className}>{content}</span>;
 }
@@ -299,7 +299,7 @@ export function PlayerChip({ member }) {
 export function RefButton({ href, label, compact = false }) {
   if (!href) return null;
   return (
-    <a href={href} target="_blank" rel="noreferrer" className={`inline-flex items-center justify-center gap-1.5 border border-white/10 hover:border-[#29B6E8]/50 rounded-sm uppercase tracking-wider font-bold text-white/70 hover:text-[#29B6E8] ${compact ? "px-2.5 py-1.5 text-[10px]" : "px-3 py-2 text-xs"}`}>
+    <a href={href} target="_blank" rel="noreferrer" className={`inline-flex items-center justify-center gap-1.5 border border-white/10 hover:border-[#29B6E8]/50 rounded-sm tls-type-label text-white/70 hover:text-[#29B6E8] ${compact ? "px-2.5 py-1.5" : "px-3 py-2"}`}>
       {label} <ExternalLink className="w-3 h-3" />
     </a>
   );

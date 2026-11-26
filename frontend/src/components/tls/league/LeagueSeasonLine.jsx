@@ -168,7 +168,7 @@ export function LeagueSeasonLine({ rows, byTeam = false, playing = [], testId = 
   const moreText = more > 0 ? `und ${more} ${more === 1 ? "weiteres Co-Team" : "weitere Co-Teams"}` : "";
   return (
     <section data-testid={testId} aria-labelledby={`${testId}-title`}>
-      <h2 id={`${testId}-title`} className="mb-4 flex items-center gap-2 font-heading text-2xl font-bold uppercase">
+      <h2 id={`${testId}-title`} className="mb-4 flex items-center gap-2 tls-type-section">
         <TrendingUp className="h-5 w-5 text-[#29B6E8]" aria-hidden="true" /> Saisonverlauf
       </h2>
       <div ref={ref} className="tls-season-line" data-play={state}>

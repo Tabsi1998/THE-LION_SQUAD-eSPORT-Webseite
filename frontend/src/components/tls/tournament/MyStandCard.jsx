@@ -42,32 +42,32 @@ export function MyStandCard({ tournament: t, registration: myReg, team = null, i
   return (
     <section className="border border-[#FFD700]/40 rounded-sm bg-[#FFD700]/5 p-4" data-testid="tournament-my-stand">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <div className="font-heading font-bold uppercase text-sm">Dein Stand</div>
+        <div className="tls-type-label">Dein Stand</div>
         <StatusBadge status={myReg.status} size="lg" />
       </div>
       {step >= 0 ? <StepBar steps={steps} current={step} className="tls-steps--gold mt-3" testId="tournament-my-steps" /> : null}
       {/* Abgelehnt (#2113, L-C3): sagen, was das heißt und was jetzt geht - der Grund steht in der Nachricht. */}
       {myReg.status === "rejected" ? (
-        <div className="mt-3 rounded-sm border border-warn/35 bg-warn/5 p-3 text-sm" data-testid="tournament-rejected-note">
+        <div className="mt-3 rounded-sm border border-warn/35 bg-warn/5 p-3 tls-type-small" data-testid="tournament-rejected-note">
           <p className="text-white/80">Die Turnierleitung hat {isTeamTournament ? "die Anmeldung deines Teams" : "deine Anmeldung"} abgelehnt. Den Grund findest du, falls angegeben, in deiner Benachrichtigung; Fragen klärt die Turnierleitung.</p>
           {canRemoveRejected ? (
-            <button type="button" onClick={onRemoveRejected} disabled={busy} data-testid="tournament-remove-rejected" className="tls-btn tls-btn--quiet mt-2 min-h-11 rounded-sm px-4 text-xs font-bold uppercase tracking-wider disabled:opacity-50">Anmeldung entfernen</button>
+            <button type="button" onClick={onRemoveRejected} disabled={busy} data-testid="tournament-remove-rejected" className="tls-btn tls-btn--quiet mt-2 min-h-11 rounded-sm px-4 tls-type-label disabled:opacity-50">Anmeldung entfernen</button>
           ) : null}
         </div>
       ) : null}
-      <dl className="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-2 text-sm">
+      <dl className="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-2 tls-type-small">
         {isTeamTournament ? (
-          <div className="flex items-start gap-2"><Users className="w-4 h-4 text-white/50 mt-0.5" /><div><dt className="text-[10px] font-bold uppercase tracking-widest text-white/50">Team</dt><dd data-testid="tournament-my-team">{team?.name ? `${team.name}${team.tag ? ` [${team.tag}]` : ""}` : "–"}</dd></div></div>
+          <div className="flex items-start gap-2"><Users className="w-4 h-4 text-white/50 mt-0.5" /><div><dt className="tls-type-label text-white/50">Team</dt><dd data-testid="tournament-my-team">{team?.name ? `${team.name}${team.tag ? ` [${team.tag}]` : ""}` : "–"}</dd></div></div>
         ) : null}
         {line ? (
-          <div className="flex items-start gap-2"><Wallet className="w-4 h-4 text-white/50 mt-0.5" /><div><dt className="text-[10px] font-bold uppercase tracking-widest text-white/50">Startgeld</dt><dd data-testid="tournament-own-price">{line}</dd></div></div>
+          <div className="flex items-start gap-2"><Wallet className="w-4 h-4 text-white/50 mt-0.5" /><div><dt className="tls-type-label text-white/50">Startgeld</dt><dd data-testid="tournament-own-price">{line}</dd></div></div>
         ) : null}
         {!line && t.offer && myReg.user_id && ["pending", "waitlist"].includes(myReg.status) ? (
-          <div className="flex items-start gap-2"><Wallet className="w-4 h-4 text-white/50 mt-0.5" /><div><dt className="text-[10px] font-bold uppercase tracking-widest text-white/50">Startgeld</dt><dd className="text-white/60" data-testid="tournament-price-pending">Bezahlt wird erst, wenn deine Teilnahme bestätigt ist.</dd></div></div>
+          <div className="flex items-start gap-2"><Wallet className="w-4 h-4 text-white/50 mt-0.5" /><div><dt className="tls-type-label text-white/50">Startgeld</dt><dd className="text-white/60" data-testid="tournament-price-pending">Bezahlt wird erst, wenn deine Teilnahme bestätigt ist.</dd></div></div>
         ) : null}
         {/* Die wirksamen Zeiten (#1938): nach einem Check-in von Hand nie „ab 10:56 bis 10:48“. */}
         {checkIn ? (
-          <div className="flex items-start gap-2"><CalendarClock className="w-4 h-4 text-white/50 mt-0.5" /><div><dt className="text-[10px] font-bold uppercase tracking-widest text-white/50">Check-in</dt><dd data-testid="tournament-my-checkin">{checkIn}{staffOnlyCheckIn ? " · vor Ort bei der Turnierleitung" : ""}</dd></div></div>
+          <div className="flex items-start gap-2"><CalendarClock className="w-4 h-4 text-white/50 mt-0.5" /><div><dt className="tls-type-label text-white/50">Check-in</dt><dd data-testid="tournament-my-checkin">{checkIn}{staffOnlyCheckIn ? " · vor Ort bei der Turnierleitung" : ""}</dd></div></div>
         ) : null}
       </dl>
       {/* Vor Ort im laufenden Turnier (#1556): wo und wann dein nächstes Spiel ist - aus der Warteschlange je Station. */}
@@ -78,17 +78,17 @@ export function MyStandCard({ tournament: t, registration: myReg, team = null, i
       {FINISHED.has(t.status) && ["approved", "checked_in"].includes(myReg.status) ? <div className="mt-3"><ResultShareButton tournamentId={t.id} /></div> : null}
       <div className="mt-3 flex flex-wrap items-center gap-3">
         {canCheckIn && myReg.status === "approved" && checkinOpen ? (
-          <button type="button" onClick={onCheckin} disabled={busy} data-testid="tournament-checkin-btn" className="tls-btn tls-btn--primary px-5 py-2.5 font-bold uppercase tracking-wider rounded-sm text-xs disabled:opacity-50">Jetzt einchecken</button>
+          <button type="button" onClick={onCheckin} disabled={busy} data-testid="tournament-checkin-btn" className="tls-btn tls-btn--primary px-5 py-2.5 tls-type-label rounded-sm disabled:opacity-50">Jetzt einchecken</button>
         ) : null}
-        {scheduleTo ? <Link to={scheduleTo} className="text-xs font-bold uppercase tracking-wider text-[#29B6E8] hover:text-white">Zum Spielplan</Link> : null}
+        {scheduleTo ? <Link to={scheduleTo} className="tls-type-label text-[#29B6E8] hover:text-white">Zum Spielplan</Link> : null}
         {detailsEdit}
         {canUnregister ? (
-          <button type="button" onClick={onUnregister} disabled={busy} data-testid="tournament-unregister-btn" className="ml-auto text-xs text-white/45 hover:text-[#FF3B30] underline underline-offset-2 disabled:opacity-50">Vom Turnier abmelden</button>
+          <button type="button" onClick={onUnregister} disabled={busy} data-testid="tournament-unregister-btn" className="ml-auto tls-type-small text-white/45 hover:text-[#FF3B30] underline underline-offset-2 disabled:opacity-50">Vom Turnier abmelden</button>
         ) : leagueSquad && !FINISHED.has(t.status) ? (
           // Liga-Staffel (#2110): ein Co-Team ist zugeteilt - abmelden kann es nur die Liga-Leitung (#2424).
-          <span className="ml-auto text-xs text-white/45" data-testid="tournament-unregister-league">Austritt nur über die Liga-Leitung</span>
+          <span className="ml-auto tls-type-small text-white/45" data-testid="tournament-unregister-league">Austritt nur über die Liga-Leitung</span>
         ) : note ? (
-          <span className="ml-auto text-xs text-white/45" data-testid="tournament-unregister-note">{note}</span>
+          <span className="ml-auto tls-type-small text-white/45" data-testid="tournament-unregister-note">{note}</span>
         ) : null}
       </div>
     </section>

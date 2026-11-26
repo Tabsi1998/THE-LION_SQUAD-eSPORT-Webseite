@@ -25,7 +25,7 @@ export function MapCard({ item, index = 0, position = null, sizes = CARD_SIZES, 
         )}
         <span className="tls-map-card__shade" aria-hidden="true" />
         {position ? <span className="tls-map-card__badge" aria-hidden="true" data-testid="map-card-position">{position}</span> : null}
-        <span className="tls-map-card__name font-heading">{item?.name}</span>
+        <span className="tls-map-card__name">{item?.name}</span>
       </div>
     </div>
   );
@@ -35,7 +35,7 @@ function countText(count) {
   return count === 1 ? "1 Map" : `${count} Maps`;
 }
 
-const HEADING = "font-heading text-2xl font-black uppercase";
+const HEADING = "tls-type-section";
 
 // `headingClass` und `icon`: die Überschrift im Stil der Seite (Turnierseite: fett mit Symbol wie „Regeln“, „Preise“).
 // `swipe`: am Handy je Modus eine wischbare Reihe statt des Rasters (Ligaseite, #2268).
@@ -47,12 +47,12 @@ export function MapPoolView({ pool, title = "Map-Pool", hint = "", headingId = "
   return (
     <section className={className} aria-labelledby={headingId} data-testid={testId}>
       <h2 id={headingId} className={headingClass}>{Icon ? <Icon className="w-4 h-4 text-[#29B6E8]" aria-hidden="true" /> : null}{title}</h2>
-      {hint ? <p className="mt-1 text-sm text-white/55">{hint}</p> : null}
+      {hint ? <p className="mt-1 tls-type-body text-white/55">{hint}</p> : null}
       <div className="mt-4 space-y-6">
         {groups.map((group) => (
           <div key={group.mode || "alle"} data-testid="map-pool-mode">
             {showModes ? (
-              <h3 className="mb-2 flex items-center gap-2 text-[11px] font-bold uppercase tracking-widest text-[#29B6E8]">
+              <h3 className="mb-2 flex items-center gap-2 tls-type-label text-[#29B6E8]">
                 {/* Modus-Symbol (#2266) aus dem Snapshot des Pools - ohne Bild das neutrale Symbol. */}
                 {group.mode ? <ModeIcon src={group.icon_url} size="sm" testId="map-pool-mode-icon" /> : null}
                 {group.label || group.mode}

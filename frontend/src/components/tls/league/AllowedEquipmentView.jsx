@@ -23,23 +23,23 @@ function SectionHead({ section }) {
   const note = modesNote(section);
   return (
     <div className="mb-2.5 flex flex-wrap items-center gap-x-2.5 gap-y-1" data-testid="allowed-section-head">
-      <h4 className="flex min-w-0 items-center gap-2 text-[11px] font-bold uppercase tracking-widest text-[#29B6E8]">
+      <h4 className="flex min-w-0 items-center gap-2 tls-type-label text-[#29B6E8]">
         <SubcategoryIcon src={section.icon_url} />
         <span className="break-words">{section.label}</span>
       </h4>
       {banned ? (
-        <span className="inline-flex items-center gap-1.5 rounded-sm border border-warn/40 bg-warn/10 px-2 py-0.5 text-[11px] font-semibold text-warn" data-testid="allowed-banned">
+        <span className="inline-flex items-center gap-1.5 rounded-sm border border-warn/40 bg-warn/10 px-2 py-0.5 tls-type-small font-semibold text-warn" data-testid="allowed-banned">
           <Ban className="h-3 w-3" aria-hidden="true" /> Nicht erlaubt
         </span>
       ) : section.state === "all" ? (
-        <span className="inline-flex items-center gap-1.5 rounded-sm border border-ok/30 bg-ok/10 px-2 py-0.5 text-[11px] font-semibold text-ok" data-testid="allowed-all">
+        <span className="inline-flex items-center gap-1.5 rounded-sm border border-ok/30 bg-ok/10 px-2 py-0.5 tls-type-small font-semibold text-ok" data-testid="allowed-all">
           <Check className="h-3 w-3" aria-hidden="true" /> Alle erlaubt
         </span>
       ) : note ? (
-        <span className="text-[11px] font-semibold text-warn" data-testid="allowed-section-note">{note}</span>
+        <span className="tls-type-small font-semibold text-warn" data-testid="allowed-section-note">{note}</span>
       ) : null}
       {banned && section.banned?.length ? (
-        <span className="min-w-0 basis-full text-xs text-white/55 break-words sm:basis-auto" data-testid="allowed-banned-names">{section.banned.join(", ")}</span>
+        <span className="min-w-0 basis-full tls-type-small text-white/55 break-words sm:basis-auto" data-testid="allowed-banned-names">{section.banned.join(", ")}</span>
       ) : null}
     </div>
   );
@@ -47,7 +47,7 @@ function SectionHead({ section }) {
 
 function Notes({ entry, section }) {
   return ownRestrictionParts(entry, section).map((note) => (
-    <p key={note} className="text-[11px] font-semibold leading-snug text-warn break-words" data-testid="allowed-note">{note}</p>
+    <p key={note} className="tls-type-small font-semibold leading-snug text-warn break-words" data-testid="allowed-note">{note}</p>
   ));
 }
 
@@ -55,7 +55,7 @@ function EntryTile({ entry, section }) {
   return (
     <li className="min-w-0" data-testid="allowed-entry">
       <EquipmentThumb src={entry.image_url} />
-      <p className="mt-1.5 text-sm font-semibold leading-snug text-white break-words">{entry.name}</p>
+      <p className="mt-1.5 tls-type-small font-semibold leading-snug text-white break-words">{entry.name}</p>
       <Notes entry={entry} section={section} />
     </li>
   );
@@ -68,9 +68,9 @@ function WeaponTile({ entry, section, open, panelId, onToggle }) {
       <button type="button" onClick={onToggle} aria-expanded={open} aria-controls={panelId} data-testid="allowed-weapon-toggle"
         className="group block w-full rounded-sm text-left focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#29B6E8]">
         <EquipmentThumb src={entry.image_url} className={`transition-shadow duration-fast ${open ? "ring-1 ring-[#29B6E8]/70" : "group-hover:ring-1 group-hover:ring-white/25"}`} />
-        <span className="mt-1.5 block text-sm font-semibold leading-snug text-white break-words">{entry.name}</span>
+        <span className="mt-1.5 block tls-type-small font-semibold leading-snug text-white break-words">{entry.name}</span>
         <Notes entry={entry} section={section} />
-        <span className={`mt-1 inline-flex items-center gap-1 text-[11px] font-semibold tabular-nums transition-colors duration-fast ${open ? "text-[#29B6E8]" : "text-white/60 group-hover:text-white"}`}
+        <span className={`mt-1 inline-flex items-center gap-1 tls-type-small font-semibold tabular-nums transition-colors duration-fast ${open ? "text-[#29B6E8]" : "text-white/60 group-hover:text-white"}`}
           data-testid="allowed-weapon-summary">
           {attachmentsSummary(entry.attachments)}
           <ChevronDown className={`h-3.5 w-3.5 transition-transform duration-fast ${open ? "rotate-180" : ""}`} aria-hidden="true" />
@@ -86,10 +86,10 @@ function AttachmentsPanel({ entry, id }) {
   return (
     <li id={id} className="col-span-full min-w-0 rounded-sm border border-[#29B6E8]/30 bg-[#0A0A0A] p-3 sm:p-4" data-testid="allowed-attachments"
       aria-label={`Aufsätze für ${entry.name}`}>
-      <p className="text-[11px] font-bold uppercase tracking-widest text-white/60">Erlaubte Aufsätze für <span className="text-white">{entry.name}</span></p>
+      <p className="tls-type-small font-bold text-white/60">Erlaubte Aufsätze für <span className="text-white">{entry.name}</span></p>
       {/* „Gesperrt: …“ ganz oben, vor den Slots (Fabian, 05.11., #2305) - das will man zuerst wissen. */}
       {banned.length || entry.attachments?.banned_everywhere ? (
-        <p className="mt-2.5 border-b border-white/10 pb-2.5 text-xs text-white/70 break-words" data-testid="allowed-attachments-banned">
+        <p className="mt-2.5 border-b border-white/10 pb-2.5 tls-type-small text-white/70 break-words" data-testid="allowed-attachments-banned">
           {banned.length ? <><span className="font-semibold text-warn">Gesperrt:</span> {banned.join(", ")}</> : null}
           {/* Die an keiner Waffe erlaubten stehen einmal unter den Waffen (Fabian, 04.11.) - hier nur die Zahl, damit „K gesperrt“ aufgeht. */}
           {entry.attachments?.banned_everywhere ? (
@@ -97,12 +97,12 @@ function AttachmentsPanel({ entry, id }) {
           ) : null}
         </p>
       ) : null}
-      {!groups.length ? <p className="mt-2 text-sm text-white/70">Keine Aufsätze erlaubt.</p> : null}
+      {!groups.length ? <p className="mt-2 tls-type-small text-white/70">Keine Aufsätze erlaubt.</p> : null}
       <div className="mt-3 space-y-4">
         {groups.map((group) => (
           <div key={group.label || "ohne"} data-testid="allowed-slot">
             {group.label ? (
-              <p className="mb-2 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[11px] font-bold uppercase tracking-widest text-[#29B6E8]">
+              <p className="mb-2 flex flex-wrap items-center gap-x-2 gap-y-0.5 tls-type-label text-[#29B6E8]">
                 <SubcategoryIcon src={group.icon_url} className="h-4 w-4" />
                 <span className="break-words">{group.label}</span>
                 {modesNote(group) ? <span className="font-semibold normal-case tracking-normal text-warn">{modesNote(group)}</span> : null}
@@ -112,7 +112,7 @@ function AttachmentsPanel({ entry, id }) {
               {group.entries.map((item) => (
                 <li key={item.name} className="min-w-0" data-testid="allowed-attachment">
                   <EquipmentThumb src={item.image_url} sizes={SMALL_TILE} />
-                  <p className="mt-1 text-xs font-semibold leading-snug text-white break-words">{item.name}</p>
+                  <p className="mt-1 tls-type-small font-semibold leading-snug text-white break-words">{item.name}</p>
                   <Notes entry={item} section={group} />
                 </li>
               ))}
@@ -158,20 +158,20 @@ export function AllowedEquipmentView({ data, title = "Erlaubte Ausrüstung", cla
   return (
     <section className={className} {...(hideTitle ? { "aria-label": title } : { "aria-labelledby": headingId })} data-testid={testId}>
       {hideTitle ? null : (
-        <h2 id={headingId} className="flex items-center gap-2 font-heading text-2xl font-black uppercase">
+        <h2 id={headingId} className="flex items-center gap-2 tls-type-section">
           <ShieldCheck className="h-5 w-5 text-[#29B6E8]" aria-hidden="true" />{title}
         </h2>
       )}
-      <p className={`${hideTitle ? "" : "mt-1 "}max-w-2xl text-sm text-white/60`} data-testid={`${testId}-intro`}>
+      <p className={`${hideTitle ? "" : "mt-1 "}max-w-2xl tls-type-small text-white/60`} data-testid={`${testId}-intro`}>
         {data.list ? "Erlaubt ist die Ausrüstung, die hier steht – Einschränkungen stehen beim Eintrag." : "Für diese Season ist nichts gesperrt – erlaubt ist die ganze Ausrüstung, die hier steht."}
       </p>
-      {!categories.length ? <p className="mt-4 text-sm text-white/60">Zurzeit ist keine Ausrüstung erlaubt.</p> : null}
+      {!categories.length ? <p className="mt-4 tls-type-small text-white/60">Zurzeit ist keine Ausrüstung erlaubt.</p> : null}
       <div className="mt-6 space-y-9">
         {categories.map((category, categoryIndex) => (
           <div key={category.label} data-testid="allowed-group">
-            <h3 className="flex flex-wrap items-baseline gap-x-2 border-b border-white/10 pb-2 font-heading text-lg font-bold uppercase leading-tight text-white">
+            <h3 className="flex flex-wrap items-baseline gap-x-2 border-b border-white/10 pb-2 tls-type-card leading-tight text-white">
               <span className="break-words">{category.label}</span>
-              <span className="font-sans text-[11px] font-semibold normal-case tracking-normal text-white/45 tabular-nums">{countText(allowedCount(category), "erlaubt", "erlaubt")}</span>
+              <span className="font-sans tls-type-small font-semibold text-white/45 tabular-nums">{countText(allowedCount(category), "erlaubt", "erlaubt")}</span>
             </h3>
             <div className="mt-4 space-y-6">
               {category.sections.map((section, sectionIndex) => (
@@ -182,9 +182,9 @@ export function AllowedEquipmentView({ data, title = "Erlaubte Ausrüstung", cla
               ))}
             </div>
             {nowhere && categoryIndex === lastWeapons ? (
-              <p className="mt-6 flex flex-wrap items-baseline gap-x-2 gap-y-1 rounded-sm border border-warn/30 bg-warn/5 px-3 py-2 text-sm text-white/80 break-words"
+              <p className="mt-6 flex flex-wrap items-baseline gap-x-2 gap-y-1 rounded-sm border border-warn/30 bg-warn/5 px-3 py-2 tls-type-small text-white/80 break-words"
                 data-testid="allowed-nowhere">
-                <span className="inline-flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-widest text-warn">
+                <span className="inline-flex items-center gap-1.5 tls-type-label text-warn">
                   <Ban className="h-3 w-3" aria-hidden="true" /> An keiner Waffe erlaubt
                 </span>
                 <span className="min-w-0">{nowhere}</span>

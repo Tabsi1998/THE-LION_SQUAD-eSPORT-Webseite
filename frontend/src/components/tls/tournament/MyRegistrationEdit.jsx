@@ -11,8 +11,8 @@ import { useSubmissionGuard } from "@/hooks/useSubmissionGuard";
 // `can_edit`, ob es noch geht, und nennt den Grund selbst; in Liga-Staffeln (`ids_locked`) sind Name und IDs gesperrt, und
 // das Blatt sagt warum. Bei Team-Anmeldungen ändert nur die Teamleitung - die Seite zeigt den Link dann gar nicht erst.
 
-const LABEL = "mb-1.5 text-[11px] font-bold uppercase tracking-widest text-white/60";
-const INPUT = "min-h-11 w-full rounded-sm border border-white/10 bg-[#0A0A0A] px-3 py-2 text-sm disabled:opacity-60 disabled:cursor-not-allowed";
+const LABEL = "mb-1.5 tls-type-label text-white/60";
+const INPUT = "min-h-11 w-full rounded-sm border border-white/10 bg-[#0A0A0A] px-3 py-2 tls-type-small disabled:opacity-60 disabled:cursor-not-allowed";
 
 function EditSheet({ tournament, details, onClose, onSaved }) {
   const fields = details.fields || [];
@@ -51,18 +51,18 @@ function EditSheet({ tournament, details, onClose, onSaved }) {
       testId="my-registration-sheet"
       footer={(
         <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
-          <button type="button" onClick={onClose} className="tls-btn tls-btn--quiet min-h-11 rounded-sm px-4 text-xs font-bold uppercase tracking-wider" data-testid="my-registration-cancel">Abbrechen</button>
-          <button type="submit" form="my-registration-form" disabled={submitting} className="tls-btn tls-btn--primary min-h-11 rounded-sm px-5 text-xs font-bold uppercase tracking-wider disabled:opacity-50" data-testid="my-registration-save">
+          <button type="button" onClick={onClose} className="tls-btn tls-btn--quiet min-h-11 rounded-sm px-4 tls-type-label" data-testid="my-registration-cancel">Abbrechen</button>
+          <button type="submit" form="my-registration-form" disabled={submitting} className="tls-btn tls-btn--primary min-h-11 rounded-sm px-5 tls-type-label disabled:opacity-50" data-testid="my-registration-save">
             {submitting ? "Speichere…" : "Speichern"}
           </button>
         </div>
       )}
     >
       <form id="my-registration-form" onSubmit={save} className="space-y-4">
-        <p className="text-sm text-white/60">
+        <p className="tls-type-small text-white/60">
           {details.is_team ? "Das gilt für die Anmeldung deines Teams." : "Das gilt nur für dieses Turnier."} Dein Profil bleibt, wie es ist.
         </p>
-        {locked && <p className="rounded-sm border border-warn/35 bg-warn/5 p-3 text-sm text-white/75" data-testid="my-registration-locked">{details.ids_locked_reason}</p>}
+        {locked && <p className="rounded-sm border border-warn/35 bg-warn/5 p-3 tls-type-small text-white/75" data-testid="my-registration-locked">{details.ids_locked_reason}</p>}
         <label className="block">
           <div className={LABEL}>Ingame-Name</div>
           <input value={name} onChange={(e) => { setName(e.target.value); setError(""); }} disabled={locked} required={!locked} maxLength={64} data-testid="my-registration-name" className={INPUT} />
@@ -104,7 +104,7 @@ export function MyRegistrationEdit({ tournament, registration, onSaved }) {
   if (!details?.can_edit) return null;
   return (
     <>
-      <button type="button" onClick={() => setOpen(true)} data-testid="my-registration-edit" className="tls-hit inline-flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider text-white/60 hover:text-[#29B6E8]">
+      <button type="button" onClick={() => setOpen(true)} data-testid="my-registration-edit" className="tls-hit inline-flex items-center gap-1.5 tls-type-label text-white/60 hover:text-[#29B6E8]">
         <Pencil className="w-3.5 h-3.5" /> Angaben ändern
       </button>
       {open && (

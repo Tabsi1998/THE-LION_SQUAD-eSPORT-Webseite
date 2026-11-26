@@ -39,8 +39,8 @@ export function TournamentLiveStreams({ tournament }) {
     <section className="border border-[#9146FF]/35 bg-[#0A0A0A] rounded-sm overflow-hidden" data-testid="tournament-live-streams">
       <div className="flex flex-wrap items-center gap-2 px-4 py-2 bg-[#9146FF]/10 border-b border-[#9146FF]/20">
         <Radio className="w-4 h-4 text-[#FF3B30] animate-pulse" />
-        <span className="text-sm font-display tracking-widest font-bold text-white">Live: {streams.length === 1 ? `${name} streamt das Turnier` : `${streams.length} Teilnehmer streamen das Turnier`}</span>
-        <a href={first.stream_url || `https://www.twitch.tv/${channel}`} target="_blank" rel="noopener noreferrer" data-testid="tournament-live-open" className="ml-auto text-[10px] uppercase tracking-widest text-white/70 hover:text-white inline-flex items-center gap-1">
+        <span className="tls-type-small font-bold text-white">Live: {streams.length === 1 ? `${name} streamt das Turnier` : `${streams.length} Teilnehmer streamen das Turnier`}</span>
+        <a href={first.stream_url || `https://www.twitch.tv/${channel}`} target="_blank" rel="noopener noreferrer" data-testid="tournament-live-open" className="ml-auto tls-type-label text-white/70 hover:text-white inline-flex items-center gap-1">
           <ExternalLink className="w-3 h-3" /> Zuschauen
         </a>
       </div>
@@ -63,10 +63,10 @@ export function TournamentLiveStreams({ tournament }) {
               ) : (
                 <span className="block font-bold text-white truncate">{stream.display_name || stream.username}</span>
               )}
-              <span className="block text-xs text-white/50 truncate">{[stream.title, stream.game_name].filter(Boolean).join(" · ")}</span>
+              <span className="block tls-type-small text-white/50 truncate">{[stream.title, stream.game_name].filter(Boolean).join(" · ")}</span>
             </span>
-            <span className="text-[11px] text-white/45 inline-flex items-center gap-1 shrink-0"><Users className="w-3 h-3" /> {(stream.viewer_count || 0).toLocaleString("de-DE")}</span>
-            <a href={stream.stream_url || `https://www.twitch.tv/${String(stream.twitch_login || "").toLowerCase()}`} target="_blank" rel="noopener noreferrer" className="text-[10px] font-bold uppercase tracking-widest text-[#9146FF] hover:text-white shrink-0">Zuschauen</a>
+            <span className="tls-type-small text-white/45 inline-flex items-center gap-1 shrink-0"><Users className="w-3 h-3" /> {(stream.viewer_count || 0).toLocaleString("de-DE")}</span>
+            <a href={stream.stream_url || `https://www.twitch.tv/${String(stream.twitch_login || "").toLowerCase()}`} target="_blank" rel="noopener noreferrer" className="tls-type-label text-[#9146FF] hover:text-white shrink-0">Zuschauen</a>
           </li>
         ))}
       </ul>

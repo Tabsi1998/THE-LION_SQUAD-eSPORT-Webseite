@@ -9,7 +9,7 @@ export function PartnerHostBadge({ partner, className = "" }) {
   if (!partner?.name) return null;
   return (
     <span
-      className={`inline-flex items-center gap-1.5 max-w-full min-w-0 self-start px-2 py-0.5 rounded-full border border-white/[0.12] bg-surface-2 text-[12px] leading-[1.4] text-zinc-300 ${className}`}
+      className={`inline-flex items-center gap-1.5 max-w-full min-w-0 self-start px-2 py-0.5 rounded-full border border-white/[0.12] bg-surface-2 tls-type-small leading-[1.4] text-zinc-300 ${className}`}
       title={`Veranstaltet von ${partner.name}, Partner des Vereins`}
       data-testid="partner-host-badge"
     >
