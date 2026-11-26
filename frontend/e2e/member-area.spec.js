@@ -161,20 +161,18 @@ for (const width of [390, 768, 1440, 2560]) {
       await expect(bar.getByTestId("member-area-jump-karte")).toHaveText("Karte");
       await expect(page.getByTestId("member-area-board")).toContainText("Mira Muster");
 
+      // Gemessen wird, wenn das Einblenden von „Mein Bereich“ (#2059) vorbei ist - sonst wandert die Leiste noch.
+      await page.waitForFunction(() => document.getAnimations().every((animation) => animation.playState !== "running"));
       const items = await bar.locator(".tls-area-jump__item").all();
       const rects = [];
       for (const item of items) rects.push(await box(item));
       const content = await box(page.getByTestId("member-area-meetings"));
       const barBox = await box(bar);
-      if (width >= 1280) {
-        // PC: die Leiste steht links fest neben den Abschnitten, Eintrag unter Eintrag.
-        expect(barBox.x + barBox.width).toBeLessThanOrEqual(content.x);
-        for (let i = 1; i < rects.length; i += 1) expect(rects[i].y).toBeGreaterThan(rects[i - 1].y);
-      } else {
-        // Handy und Tablet: eine Zeile zum Wischen über den Abschnitten.
-        for (const rect of rects) expect(Math.abs(rect.y - rects[0].y)).toBeLessThanOrEqual(1);
-        expect(barBox.y + barBox.height).toBeLessThanOrEqual(content.y);
-      }
+      // Seit „Mein Bereich“ (#2059) steht links die Seitenleiste - die Sprungleiste ist in jeder Breite eine Zeile über
+      // den Abschnitten (am Handy zum Wischen).
+      for (const rect of rects) expect(Math.abs(rect.y - rects[0].y)).toBeLessThanOrEqual(1);
+      expect(barBox.y + barBox.height).toBeLessThanOrEqual(content.y);
+      if (width >= 1024) await expect(page.getByTestId("mein-bereich-nav-verein")).toHaveAttribute("aria-current", "page");
 
       // Kein Verweis („Alle …“, „Vorstand“) überdeckt seine Überschrift - auch nicht in der schmalen Spalte rechts.
       for (const section of ["member-area-meetings", "member-area-helping", "member-area-news", "member-area-documents", "member-area-board"]) {
@@ -184,10 +182,10 @@ for (const width of [390, 768, 1440, 2560]) {
       }
 
       // Gold nur an Karte und Strich: Verweise sind Cyan, „Meine Mitgliedschaft“ ist ein cyaner Button (#2059).
-      const moreColor = await page.getByTestId("member-area-board-more").evaluate((element) => getComputedStyle(element).color);
-      expect(moreColor).toBe("rgb(41, 182, 232)");
-      const membershipFill = await page.getByTestId("member-area-my-membership").evaluate((element) => getComputedStyle(element).backgroundColor);
-      expect(membershipFill).toBe("rgb(41, 182, 232)");
+      await expect.poll(() => page.getByTestId("member-area-board-more").evaluate((element) => getComputedStyle(element).color)).toBe("rgb(41, 182, 232)");
+      // Die Maus steht nicht über dem Knopf (sonst zeigt er die Farbe beim Drüberfahren).
+      await page.mouse.move(0, 0);
+      await expect.poll(() => page.getByTestId("member-area-my-membership").evaluate((element) => getComputedStyle(element).backgroundColor)).toBe("rgb(41, 182, 232)");
 
       const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
       expect(overflow).toBeLessThanOrEqual(0);
@@ -211,7 +209,7 @@ test.describe("Handy (390 px)", () => {
     await expect(page.getByTestId("member-area-answer")).toHaveText("Deine Antwort: zugesagt");
     expect(answers).toEqual(["yes"]);
     await expect(page.getByTestId("member-area-jump-versammlung")).toHaveText("Versammlung");
-    await expect(page).toHaveURL(/^https?:\/\/[^/]+\/members\/area$/);
+    await expect(page).toHaveURL(/^https?:\/\/[^/]+\/mein-bereich\/verein$/);
   });
 
   test("die Leiste bleibt beim Scrollen unter dem Kopf stehen; ein Tipp springt zum Abschnitt", async ({ page }) => {
@@ -226,6 +224,6 @@ test.describe("Handy (390 px)", () => {
     const barBox = await box(bar);
     const header = await box(page.getByTestId("site-header"));
     expect(Math.abs(barBox.y - (header.y + header.height))).toBeLessThanOrEqual(1);
-    await expect(page).toHaveURL(/^https?:\/\/[^/]+\/members\/area#dokumente$/);
+    await expect(page).toHaveURL(/^https?:\/\/[^/]+\/mein-bereich\/verein#dokumente$/);
   });
 });

@@ -125,7 +125,7 @@ for (const size of SIZES) {
           { team_id: "team-1", team: "[RDL] Rudel", squad_id: "s-1", squad: "Erste", role: "captain", role_label: "Captain", way: "Gib die Rolle unter Teams → Deine Teams ab.", link: "/teams" },
         ],
       }));
-      await page.goto("/privacy-account");
+      await page.goto("/mein-bereich/datenschutz?tab=loeschung");
       await closeCookies(page);
       await expect(page.getByTestId("dsgvo-erasure-blockers")).toContainText("Erst deine Rollen in Teams abgeben");
       await expect(page.getByTestId("dsgvo-erasure-blocker-captain")).toContainText("im Co-Team Erste");

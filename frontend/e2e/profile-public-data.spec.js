@@ -70,7 +70,7 @@ for (const [width, height] of [[390, 844], [1440, 900]]) {
       await mockServer(page, { user: ME });
       await page.goto("/notifications");
       await page.getByTestId("notifications-settings-link").click();
-      await expect(page).toHaveURL(/\/profile\?tab=notifications$/);
+      await expect(page).toHaveURL(/\/mein-bereich\/benachrichtigungen$/);
       expect(await noSidewaysScroll(page)).toBe(true);
     });
 
