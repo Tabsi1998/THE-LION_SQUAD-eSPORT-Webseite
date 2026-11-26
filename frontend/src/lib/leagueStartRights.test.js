@@ -1,7 +1,7 @@
 // Startrechte für die nächste Season (#1627, docs/LIGA.md „F.2a“): Wörter und Sätze für Verwaltung und Team-Seite.
 import { describe, expect, it } from "vitest";
 import {
-  countsLine, outlookLine, placeLine, rightLine, settingsForm, settingsPayload, stateLabel, teamBadge,
+  countsLine, outlookLine, placeLine, rightLine, settingsForm, settingsPayload, stateLabel, teamBadge, teamBadgeTone,
 } from "./leagueStartRights";
 
 const UNTIL = "2026-12-15T17:00:00+00:00";
@@ -54,6 +54,11 @@ describe("Das eigene Team", () => {
     // Ohne Startrecht (Season ohne die Einstellung) bleibt alles, wie es war.
     expect(teamBadge({ status: "accepted", carry_over: {} })).toBe("");
     expect(teamBadge({ status: "accepted", staffel: "Staffel A", carry_over: { start_right: { state: "participating" } } })).toBe("");
+    // Offen ist noch nicht „grün“: eigene Farbe, sonst die des Antrags.
+    expect(teamBadgeTone({ carry_over: { start_right: { state: "offered" } } })).toBe("warn");
+    expect(teamBadgeTone({ carry_over: { start_right: { state: "expired" } } })).toBe("quiet");
+    expect(teamBadgeTone({ carry_over: { start_right: { state: "accepted" } } })).toBeUndefined();
+    expect(teamBadgeTone({ carry_over: {} })).toBeUndefined();
   });
 
   it("nennt eine Prognose Prognose und ein bestätigtes Startrecht bestätigt", () => {

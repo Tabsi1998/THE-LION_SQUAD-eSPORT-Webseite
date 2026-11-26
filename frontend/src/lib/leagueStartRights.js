@@ -60,6 +60,12 @@ export function teamBadge(row) {
   return "";
 }
 
+/** Die Farbe dazu: offen fällt auf, verfallen ist gedämpft - ``undefined`` heißt: die Farbe des Antrags. */
+export function teamBadgeTone(row) {
+  const state = row?.carry_over?.start_right?.state;
+  return state === "offered" ? "warn" : state === "expired" ? "quiet" : undefined;
+}
+
 /** Vor der Folge-Season: Prognose aus der laufenden Tabelle bzw. bestätigtes Startrecht aus dem Endstand. */
 export function outlookLine(item) {
   if (!item) return "";

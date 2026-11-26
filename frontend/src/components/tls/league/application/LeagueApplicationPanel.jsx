@@ -10,14 +10,15 @@ import { HelpLink } from "@/components/tls/HelpLink";
 import { useOptionalAuth } from "@/context/AuthContext";
 import { APPLICATION_STATES, STATE_CLASS, afterStartLine, canStartApplication, seatsLine, teamStateLabel, windowLine } from "@/lib/leagueApplications";
 import { carryLine } from "@/lib/leagueSuccessor";
-import { teamBadge } from "@/lib/leagueStartRights";
+import { teamBadge, teamBadgeTone } from "@/lib/leagueStartRights";
 import { StartRightBlock } from "./StartRightBlock";
 
 // ``label``: eigener Text bei gleicher Farbe - das eigene Team liest „Angemeldet“ statt „Angenommen“ (#2348, ``teamStateLabel``).
-export function ApplicationStateBadge({ state, testId, label }) {
+// ``tone`` (#1627, F.2a): eigene Farbe bei eigenem Text - ein Startrecht mit offener Zusage ist noch nicht „grün“.
+export function ApplicationStateBadge({ state, testId, label, tone }) {
   const info = APPLICATION_STATES[state] || APPLICATION_STATES.none;
   return (
-    <span data-testid={testId} className={`inline-flex shrink-0 rounded-sm border px-2 py-0.5 text-[11px] font-bold uppercase tracking-wider ${STATE_CLASS[info.tone]}`}>{label || info.label}</span>
+    <span data-testid={testId} className={`inline-flex shrink-0 rounded-sm border px-2 py-0.5 text-[11px] font-bold uppercase tracking-wider ${STATE_CLASS[tone] || STATE_CLASS[info.tone]}`}>{label || info.label}</span>
   );
 }
 
@@ -30,7 +31,8 @@ function OwnSquadRow({ row, onWithdraw, onChanged }) {
       <div className="min-w-0 flex-1 basis-64">
         <div className="flex flex-wrap items-center gap-2">
           <span className="min-w-0 font-semibold text-white [overflow-wrap:anywhere]">{row.display_name}</span>
-          <ApplicationStateBadge state={row.state} label={teamBadge(application) || teamStateLabel(row.state, application)} testId={`league-application-state-${row.squad_id}`} />
+          <ApplicationStateBadge state={row.state} label={teamBadge(application) || teamStateLabel(row.state, application)} tone={teamBadgeTone(application)}
+            testId={`league-application-state-${row.squad_id}`} />
         </div>
         {["submitted", "in_review"].includes(row.state) ? <p className="mt-1 text-sm text-white/75">Die Liga-Leitung prüft die Anmeldung und meldet sich.</p> : null}
         {/* Aus der Vorgänger-Season übernommen (F.2, #1627): woher, welche Liga, bis wann Abmelden geht. */}

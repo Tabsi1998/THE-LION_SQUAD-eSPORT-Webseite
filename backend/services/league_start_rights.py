@@ -143,7 +143,7 @@ async def _application(db, application_id: str, season_id: str | None = None) ->
 
 # ---------------------------------------------------------------- Zusage
 
-async def _accept(db, application_id: str, actor_id: str | None, via: str, *, reason: str | None = None, late_ok: bool = False) -> dict:
+async def _accept(db, application_id: str, actor_id: str | None, via: str, *, reason: str | None = None) -> dict:
     """Die Zusage unter der Season-Sperre, mit Bedingung auf den offenen Stand. Ein zweiter Aufruf antwortet mit ``replay``."""
     application = await _application(db, application_id)
     right = right_of(application)
@@ -154,7 +154,7 @@ async def _accept(db, application_id: str, actor_id: str | None, via: str, *, re
     season = await _season_of(db, application.get("season_id"))
     if application.get("status") != "accepted" or right.get("status") != OFFERED:
         raise StartRightProblem(NOT_OPEN, 409)
-    if not late_ok and overdue(application, season):
+    if overdue(application, season):
         raise StartRightProblem(LATE.format(day=day_text(accept_until(application, season))), 409)
     now = now_utc().isoformat()
     step = {"status": "accepted", "by": actor_id, "at": now, "start_right": ACCEPTED, "via": via, **({"reason": reason} if reason else {})}
@@ -204,7 +204,7 @@ async def accept_for(db, season: dict, application_id: str, actor: dict, reason:
     async with _Lock(db, season["id"]):
         override = await require_no_side_conflict(db, actor, side_of(await _application(db, application_id, season["id"])),
                                                   conflict_reason=conflict_reason)
-        done = await _accept(db, application_id, actor.get("id"), "lead", reason=reason, late_ok=True)
+        done = await _accept(db, application_id, actor.get("id"), "lead", reason=reason)
     if not done.get("replay"):
         if override:
             await record_override(db, actor, action="start_right_accept", target_id=season["id"], reason=override, application_id=application_id)

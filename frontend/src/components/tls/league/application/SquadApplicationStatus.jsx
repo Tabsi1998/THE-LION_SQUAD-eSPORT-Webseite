@@ -7,7 +7,7 @@ import { api, formatApiError } from "@/lib/api";
 import { useConfirm } from "@/components/tls/ConfirmDialog";
 import { teamStateLabel } from "@/lib/leagueApplications";
 import { carryLine } from "@/lib/leagueSuccessor";
-import { outlookLine, teamBadge } from "@/lib/leagueStartRights";
+import { outlookLine, teamBadge, teamBadgeTone } from "@/lib/leagueStartRights";
 import { ApplicationStateBadge } from "./LeagueApplicationPanel";
 import { StartRightBlock } from "./StartRightBlock";
 
@@ -41,7 +41,7 @@ export function SquadApplicationStatus({ items = [], outlook = [], onChanged }) 
           <div className="flex flex-wrap items-center gap-2">
             {row.url ? <Link to={row.url} className="min-w-0 text-sm font-semibold text-[#29B6E8] hover:underline [overflow-wrap:anywhere]">{row.title}</Link>
               : <span className="min-w-0 text-sm font-semibold text-white [overflow-wrap:anywhere]">{row.title}</span>}
-            <ApplicationStateBadge state={row.state === "confirmed" ? "accepted" : "none"} label={row.state === "confirmed" ? "Startrecht bestätigt" : "Prognose"} />
+            <ApplicationStateBadge state="none" tone={row.state === "confirmed" ? "ok" : "quiet"} label={row.state === "confirmed" ? "Startrecht bestätigt" : "Prognose"} />
           </div>
           <p className="mt-0.5 text-xs text-white/75 [overflow-wrap:anywhere]">{outlookLine(row)}</p>
         </li>
@@ -51,7 +51,7 @@ export function SquadApplicationStatus({ items = [], outlook = [], onChanged }) 
           <div className="flex flex-wrap items-center gap-2">
             {row.url ? <Link to={row.url} className="min-w-0 text-sm font-semibold text-[#29B6E8] hover:underline [overflow-wrap:anywhere]">{row.title}</Link>
               : <span className="min-w-0 text-sm font-semibold text-white [overflow-wrap:anywhere]">{row.title}</span>}
-            <ApplicationStateBadge state={row.status} label={teamBadge(row) || teamStateLabel(row.status, row)} />
+            <ApplicationStateBadge state={row.status} label={teamBadge(row) || teamStateLabel(row.status, row)} tone={teamBadgeTone(row)} />
           </div>
           {row.carry_over ? <p className="mt-0.5 text-xs text-white/75 [overflow-wrap:anywhere]" data-testid={`squad-application-carry-${row.id}`}>{carryLine(row.carry_over)}</p> : null}
           <StartRightBlock applicationId={row.id} carry={row.carry_over} onChanged={onChanged} testPrefix="squad-start-right" />

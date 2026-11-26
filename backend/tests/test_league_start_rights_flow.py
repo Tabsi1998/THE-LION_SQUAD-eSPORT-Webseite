@@ -602,6 +602,12 @@ async def test_the_lead_enters_an_acceptance_with_a_reason_but_never_for_the_own
     stored = (await carried(flow, season["id"]))[promoted["squad_id"]]["carry_over"]["start_right"]
     assert stored["accept_reason"] == "Zusage am Telefon" and stored["accepted_by"] == world["lead"]["id"]
     assert len(await notes(flow, "league_start_right_accepted", insider["id"])) == 1
+    # Die Frist gilt auch für die Leitung: Danach bleibt der Sonderweg „Co-Team zuteilen“ oder eine neue Anmeldung.
+    late = rows[squad_id(world, 2, 2)]
+    await overdue(flow, late["id"])
+    refused = await flow.post(f"{ADMIN}/seasons/{season['id']}/start-rights/{late['id']}/accept", json={"reason": "Zusage am Telefon"})
+    assert refused.status_code == 409 and "Frist" in refused.json()["detail"]
+    await flow.db.league_applications.update_one({"id": late["id"]}, {"$set": {"carry_over.start_right.offered_at": now_utc().isoformat()}})
     # Der Sonderweg „Co-Team zuteilen“ gilt als Zusage durch die Leitung.
     other = rows[squad_id(world, 1, 0)]
     division = await flow.db.league_divisions.find_one({"season_id": season["id"], "level": 1}, {"_id": 0})
