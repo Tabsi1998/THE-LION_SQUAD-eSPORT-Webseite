@@ -315,6 +315,12 @@ async function openNotifications(user) {
   await screen.findByTestId("notification-level-all");
 }
 
+// Reiter der Benachrichtigungen (#1662): Themen · E-Mail · Ruhezeit · Mehr.
+async function openSection(user, key) {
+  await user.click(screen.getByTestId(`notification-section-${key}`));
+  expect(screen.getByTestId(`notification-section-${key}`)).toHaveAttribute("aria-selected", "true");
+}
+
 test("Benachrichtigungen: eine Stufe setzt alle Themen in einem Speichern, eine eigene Stellung zeigt „Eigene Auswahl“", async () => {
   const user = setupUser();
   renderPage();
@@ -346,21 +352,21 @@ test("Benachrichtigungen: eine Stufe setzt alle Themen in einem Speichern, eine 
   expect([after["in_app:achievements"], after["push:achievements"], after["browser:achievements"]]).toEqual([false, false, false]);
 });
 
-test("Weitere Wege: eingeklappt, darin die Kanäle - Push ganz aus zeigt den Hinweis bei den Themen", async () => {
+test("Mehr: Kanäle ganz abschalten - Push ganz aus zeigt den Hinweis bei den Themen", async () => {
   const user = setupUser();
   renderPage();
   await waitForForm();
   await openNotifications(user);
-  const toggle = screen.getByTestId("notification-more-ways");
-  expect(toggle).toHaveAttribute("aria-expanded", "false");
-  expect(screen.getByTestId("notification-more-panel")).toHaveAttribute("data-open", "false");
-  await user.click(toggle);
-  expect(toggle).toHaveAttribute("aria-expanded", "true");
+  // Die Kanäle stehen nicht mehr auf der langen Seite, sondern im Reiter „Mehr“ (#1662).
+  expect(screen.queryByTestId("profile-notification-channel-push")).toBeNull();
+  await openSection(user, "mehr");
   const push = screen.getByTestId("profile-notification-channel-push");
   expect(push).toBeChecked();
   await user.click(push);
-  expect(screen.getByTestId("notification-push-off")).toBeInTheDocument();
+  await openSection(user, "mail");
   expect(screen.getByTestId("profile-newsletter")).not.toBeChecked();
+  await openSection(user, "themen");
+  expect(screen.getByTestId("notification-push-off")).toBeInTheDocument();
   await waitFor(() => expect(apiMock.patch).toHaveBeenCalledTimes(1), { timeout: 2500 });
   expect(apiMock.patch.mock.calls.at(-1)[1]).toEqual({ notification_preferences: { push: false } });
   await user.click(screen.getByTestId("notification-push-on"));
@@ -373,6 +379,7 @@ test("Ruhezeit: Standard aus, beim Einschalten 22:00 bis 7:00; ohne Lücke geht 
   renderPage();
   await waitForForm();
   await openNotifications(user);
+  await openSection(user, "ruhezeit");
   const toggle = screen.getByTestId("notification-quiet-toggle");
   expect(toggle).toHaveAttribute("aria-checked", "false");
   await user.click(toggle);
@@ -397,6 +404,7 @@ test("Ruhezeit: ein geleertes Zeitfeld bleibt Entwurf - andere Änderungen speic
   renderPage();
   await waitForForm();
   await openNotifications(user);
+  await openSection(user, "ruhezeit");
   await user.click(screen.getByTestId("notification-quiet-toggle"));
   await waitFor(() => expect(apiMock.patch).toHaveBeenCalledTimes(1), { timeout: 2500 });
 
@@ -408,7 +416,8 @@ test("Ruhezeit: ein geleertes Zeitfeld bleibt Entwurf - andere Änderungen speic
   await act(async () => { vi.advanceTimersByTime(AUTOSAVE_DELAY_MS + 200); });
   expect(apiMock.patch).toHaveBeenCalledTimes(1);
 
-  // Eine andere Änderung auf der Seite geht trotzdem - ohne die halbe Ruhezeit.
+  // Eine andere Änderung auf der Seite geht trotzdem - ohne die halbe Ruhezeit (auch über einen anderen Reiter, #1662).
+  await openSection(user, "themen");
   await user.click(screen.getByTestId("notification-topic-achievements-off"));
   await waitFor(() => expect(apiMock.patch).toHaveBeenCalledTimes(2), { timeout: 2500 });
   const sent = apiMock.patch.mock.calls.at(-1)[1];
@@ -884,6 +893,7 @@ test("Ruhezeit an, Zeitfeld geleert, während das Speichern noch läuft: kein zw
   renderPage();
   await waitForForm();
   await openNotifications(user);
+  await openSection(user, "ruhezeit");
   const first = deferredPatch();
   await user.click(screen.getByTestId("notification-quiet-toggle"));
   await waitFor(() => expect(apiMock.patch).toHaveBeenCalledTimes(1), { timeout: 2500 });

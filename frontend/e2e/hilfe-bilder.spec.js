@@ -71,7 +71,7 @@ async function konto(page, cam, state) {
   await cam.shot("spiel-ids", [page.getByTestId("profile-game-id-probe-hauptspiel-activision_id"), page.getByTestId("profile-game-id-probe-hauptspiel-platform")]);
   await cam.shot("liga-hinweis", page.getByTestId("profile-league-eligibility-s1"));
 
-  // Benachrichtigungen (#1204, #1206): Stufe, ein Thema selbst, Ruhezeit, Weitere Wege.
+  // Benachrichtigungen (#1204, #1206, #1662): Stufe, ein Thema selbst, Ruhezeit, E-Mail mit Sammel-Mail - in Reitern.
   state.routes["/users/me/notification-preferences"] = D.NOTIFICATION_SETTINGS;
   await shown(page, "profile-tab-notifications").click();
   await expect(page.getByTestId("notification-levels")).toBeVisible();
@@ -82,12 +82,13 @@ async function konto(page, cam, state) {
   await cam.clip("themen", page.getByTestId("notification-topic-achievements"), (act) => act.click(page.getByTestId("notification-topic-achievements-off")),
     { area: [page.getByTestId("notification-topic-prize_updates"), page.getByTestId("notification-topic-billing_updates")], start: page.getByTestId("notification-topic-achievements") });
   await expect(page.getByTestId("notification-level-custom")).toBeVisible();
+  await page.getByTestId("notification-section-ruhezeit").click();
   await cam.clip("ruhezeit", [page.getByTestId("notification-quiet-toggle"), page.getByTestId("notification-quiet-start"), page.getByTestId("notification-quiet-end")],
     (act) => act.click(page.getByTestId("notification-quiet-toggle")), { area: page.getByTestId("notification-quiet"), start: page.getByTestId("notification-quiet-toggle") });
   await expect(page.getByTestId("notification-quiet-start")).toBeVisible();
-  // Aufgeklappt reicht der Kasten weit nach unten - der Knopf steht deshalb vorher oben im Bild.
-  await cam.clip("weitere-wege", page.getByTestId("notification-more-ways"), (act) => act.click(page.getByTestId("notification-more-ways")),
-    { area: [page.getByTestId("notification-more-ways"), page.getByTestId("profile-notification-column-email")], block: "start" });
+  // Der Reiter „E-Mail“ (#1662): Sammel-Mail oben, darunter E-Mail je Thema.
+  await cam.clip("weitere-wege", page.getByTestId("notification-section-mail"), (act) => act.click(page.getByTestId("notification-section-mail")),
+    { area: [page.getByTestId("notification-sections"), page.getByTestId("notification-digest")], block: "start" });
   await expect(page.getByTestId("profile-notification-channel-email")).toBeVisible();
   await noSideScroll(page);
 }
