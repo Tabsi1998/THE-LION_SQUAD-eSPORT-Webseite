@@ -123,7 +123,7 @@
     "frage": "Wo finde ich meine Rechnungen?",
     "antwort": "Unter Meine Rechnungen stehen deine Belege, etwa für den Mitgliedsbeitrag oder ein Event. Offene stehen oben, bezahlte im Archiv.",
     "bereich": "verein-mitgliedschaft", "rollen": ["mitglied", "spieler"], "sichtbar_fuer": "alle",
-    "link": { "to": "/mein-bereich/rechnungen", "label": "Zu deinen Rechnungen" }
+    "link": { "to": "/account/invoices", "label": "Zu deinen Rechnungen" }
   },
   {
     "id": "event-begleitung",
@@ -193,7 +193,7 @@
     "frage": "Wer sieht meine vereinsinternen Turniere und Zeiten?",
     "antwort": "Du selbst und angemeldete Vereinsmitglieder, Gäste und angemeldete Nicht-Mitglieder nie, auch nicht bei Trophäen, Liga-Seasons und den Zahlen im Profil. Interne Einträge sind im Profil als Vereinsintern gekennzeichnet. Schaltest du unter Privatsphäre Vereinsinterne Erfolge zeigen aus, sehen Mitglieder nur Öffentliches.",
     "bereich": "gewinne", "rollen": ["spieler", "captain"], "sichtbar_fuer": "alle",
-    "link": { "to": "/mein-bereich/datenschutz", "label": "Sichtbarkeit öffnen" }
+    "link": { "to": "/profile?tab=privacy", "label": "Sichtbarkeit öffnen" }
   },
   {
     "id": "anonymisieren-was-passiert",

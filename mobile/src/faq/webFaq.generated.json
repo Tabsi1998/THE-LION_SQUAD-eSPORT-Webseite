@@ -413,7 +413,7 @@
       ],
       "sichtbar_fuer": "alle",
       "link": {
-        "to": "/mein-bereich/rechnungen",
+        "to": "/account/invoices",
         "label": "Zu deinen Rechnungen"
       }
     },
@@ -563,7 +563,7 @@
       ],
       "sichtbar_fuer": "alle",
       "link": {
-        "to": "/mein-bereich/datenschutz",
+        "to": "/profile?tab=privacy",
         "label": "Sichtbarkeit öffnen"
       }
     },
