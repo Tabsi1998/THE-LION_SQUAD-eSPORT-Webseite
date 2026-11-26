@@ -70,6 +70,9 @@ def outcomes(match: dict) -> dict[str, tuple[str, int]]:
         return {}
     if len(results) < 2:
         return {}  # Freilos: niemand hat gespielt
+    if is_grand_final_with_decider(match):
+        # Grand Final mit Entscheidungsspiel (#1549): beide Wege führen ins Reset-Spiel - ob es kommt, entscheidet das Zielspiel.
+        return {row["registration_id"]: ("decider_won" if int(row["rank"]) == 1 else "decider_lost", int(row["rank"])) for row in results}
     found: dict[str, tuple[str, int]] = {}
     for row in results:
         rank = int(row["rank"])
@@ -84,6 +87,13 @@ def outcomes(match: dict) -> dict[str, tuple[str, int]]:
 
 # Runden, vor denen „in“ steht („in Runde 1“, „in Gruppe B“) - sonst „im“ („im Viertelfinale“, „im Durchgang C“).
 IN_WORDS = frozenset({"Runde", "Gruppe", "Phase", "Vorrunde", "Zwischenrunde", "Hauptrunde", "Finalrunde", "Qualifikation", "Staffel"})
+
+
+def is_grand_final_with_decider(match: dict) -> bool:
+    """Beide Plätze gehen als Sieger-Weg in dasselbe Spiel (``W:X:1`` und ``W:X:2``) - das Reset-Spiel des Grand Finals."""
+    edges = [edge for edge in match.get("advancement") or [] if str(edge.get("flow") or "").upper() == "W"]
+    targets = {edge.get("to_match_id") or edge.get("to_match_key") for edge in edges}
+    return len(edges) >= 2 and len(targets) == 1 and len(match.get("advancement") or []) == len(edges)
 
 
 def _round(match: dict) -> str:
@@ -107,6 +117,10 @@ def message(tournament_title: str, match: dict, outcome: str, rank: int, size: i
         return "Du bist weiter!", f"{prefix}: gewonnen – du bist in der nächsten Runde."
     if outcome == "lower":
         return "Weiter im Loser Bracket", f"{prefix}: verloren – du spielst im Loser Bracket weiter."
+    if outcome == "decider_won":
+        return "Entscheidungsspiel", f"{prefix}: gewonnen – jetzt kommt das Entscheidungsspiel."
+    if outcome == "decider_lost":
+        return "Entscheidungsspiel", f"{prefix}: verloren – es gibt ein Entscheidungsspiel, du bist noch dabei."
     if heat:
         return f"Ausgeschieden: Platz {rank} von {size}", f"{prefix}: leider nicht weiter. Danke fürs Mitspielen!"
     return "Ausgeschieden", f"{prefix}: leider raus. Danke fürs Mitspielen!"
@@ -198,10 +212,19 @@ def checked_against_targets(found: dict[str, tuple[str, int]], targets: list[dic
     open_seat = any(not slot.get("registration_id") and slot.get("status") != "bye" for target in live for slot in target.get("slots") or [])
     checked: dict[str, tuple[str, int]] = {}
     for registration_id, (outcome, rank) in found.items():
-        if outcome in ("advanced", "lower") and registration_id not in seated and not open_seat:
+        if outcome in ("advanced", "lower", "decider_won", "decider_lost") and registration_id not in seated and not open_seat:
             outcome = "eliminated"
         checked[registration_id] = (outcome, rank)
     return checked
+
+
+async def _last_valid(db, match_id: str, registration_id: str) -> dict | None:
+    """Die letzte gültige (nicht überholte) Meldung zu diesem Spiel und dieser Anmeldung."""
+    rows = await db.notifications.find(
+        {"kind": KIND_PROGRESS, "meta.source_match_id": match_id, "meta.registration_id": registration_id,
+         "meta.superseded": {"$ne": True}}, {"_id": 0, "id": 1, "meta": 1, "created_at": 1},
+    ).sort([("created_at", -1), ("id", -1)]).to_list(1)
+    return rows[0] if rows else None
 
 
 async def _supersede(db, match_id: str, registration_id: str, token: str) -> None:
@@ -232,11 +255,16 @@ async def notify_match_progress(db, match: dict) -> int:
     sent = 0
     for registration in registrations:
         outcome, rank = found[registration["id"]]
+        # Nur ein geänderter Ausgang ist eine neue Meldung (Prüfung 26.11.): Eine reine Korrektur des Spielstands oder ein neues
+        # ``updated_at`` ohne report_id meldet nichts noch einmal.
+        last = await _last_valid(db, match.get("id"), registration["id"])
+        if last and (last.get("meta") or {}).get("reason") == outcome:
+            continue
         title, body = message(tournament.get("title") or "", match, outcome, rank, size)
         url = _tournament_url(tournament) if outcome == "eliminated" else await _next_match_url(db, tournament, registration["id"], match)
         meta = {"tournament_id": tournament["id"], "registration_id": registration["id"], "source_match_id": match.get("id"),
                 "reason": outcome, "rank": rank, "result_token": token,
-                "dedupe_key": f"progress:{match.get('id')}:{registration['id']}:{outcome}:{token}"}
+                "dedupe_key": f"progress:{match.get('id')}:{registration['id']}:{outcome}:after:{(last or {}).get('id') or 'none'}"}
         added = await _tell(await _people(db, registration), title, body, url, KIND_PROGRESS, meta)
         if added:
             await _supersede(db, match.get("id"), registration["id"], token)

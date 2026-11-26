@@ -272,3 +272,68 @@ async def test_only_a_pause_notice_for_this_tournament_replaces_the_pause_messag
     res = await flow.post(f"/api/tournaments/{tournament['id']}/status", json={"status": "paused"})
     assert res.status_code == 200, res.text
     assert await flow.db.notifications.count_documents({"kind": "tournament_pause"}) == len(player)
+
+
+# ---------------------------------------------------------------- Zweite Nachprüfung (26.11.)
+
+@pytest.mark.asyncio
+async def test_a_score_only_correction_says_nothing_new(flow):
+    """Sieger bleibt, nur der Spielstand ändert sich (neue report_id): keine zweite gleiche Meldung samt Push."""
+    staff, tournament, player = await _bracket(flow)
+    await flow.start(tournament)
+    semi = sorted(await flow.matches(tournament), key=lambda row: (row.get("round") or 0, row.get("match_key") or ""))[0]
+    a, b = [slot["registration_id"] for slot in semi["slots"]]
+    flow.act_as(staff)
+    assert (await flow.post(f"/api/matches/{semi['id']}/result", json=_staff_duel(a, b))).status_code == 200
+    score = {"results": [{"registration_id": a, "rank": 1, "score": 3}, {"registration_id": b, "rank": 2, "score": 0}], "reason": "Stand"}
+    assert (await flow.post(f"/api/matches/{semi['id']}/result?force=true", json=score)).status_code == 200
+    assert [row["title"] for row in await _latest(flow, player[a]["id"])] == ["Du bist weiter!"]
+    assert [row["title"] for row in await _latest(flow, player[b]["id"])] == ["Ausgeschieden"]
+    # Ohne report_id (alter Weg über tournament_events): jede Änderung von updated_at - trotzdem nichts Neues.
+    from services.tournament_progress import notify_match_progress
+    match = await flow.reload(semi)
+    match.pop("result_meta", None)
+    match["updated_at"] = now_utc().isoformat()
+    assert await notify_match_progress(flow.db, match) == 0
+    assert len(await _latest(flow, player[a]["id"])) == 1
+
+
+@pytest.mark.asyncio
+async def test_the_grand_final_loser_reads_about_the_decider_not_a_win(flow):
+    """Gewinnt im Grand Final die Seite aus dem Loser Bracket, gibt es ein Entscheidungsspiel - der Verlierer liest kein
+    „gewonnen“."""
+    staff = await flow.add_staff()
+    flow.act_as(staff)
+    tournament, users, registrations = await flow.with_participants(4, format="double_elim", title="Winter Cup")
+    assert (await flow.post(f"/api/tournaments/{tournament['id']}/bracket/from-format?preview=false")).status_code == 200
+    await flow.start(tournament)
+    player = {reg["id"]: users[index] for index, reg in enumerate(registrations)}
+    seeds = {reg["id"]: reg.get("seed") or 99 for reg in registrations}
+
+    def is_grand_final(row):
+        edges = [edge for edge in row.get("advancement") or [] if str(edge.get("flow") or "").upper() == "W"]
+        targets = {edge.get("to_match_id") or edge.get("to_match_key") for edge in edges}
+        return len(edges) >= 2 and len(targets) == 1
+
+    grand_final = None
+    for _round in range(20):
+        open_matches = [row for row in await flow.matches(tournament)
+                        if row.get("status") not in ("completed", "forfeit", "cancelled")
+                        and len([slot for slot in row.get("slots") or [] if slot.get("registration_id")]) == 2]
+        if not open_matches:
+            break
+        row = sorted(open_matches, key=lambda item: (item.get("round") or 0, item.get("match_key") or ""))[0]
+        first, second = sorted([slot["registration_id"] for slot in row["slots"]], key=lambda rid: seeds[rid])
+        if is_grand_final(row):
+            grand_final = row
+            first, second = second, first  # die Seite aus dem Loser Bracket gewinnt
+        assert (await flow.post(f"/api/matches/{row['id']}/result", json=_staff_duel(first, second))).status_code == 200
+        if grand_final:
+            break
+    assert grand_final, "Grand Final mit Entscheidungsspiel gefunden"
+    rows = await flow.db.notifications.find({"kind": "tournament_progress", "meta.source_match_id": grand_final["id"]}, {"_id": 0}).to_list(10)
+    by_reason = {row["meta"]["reason"]: row for row in rows}
+    assert set(by_reason) == {"decider_won", "decider_lost"}
+    lost = by_reason["decider_lost"]
+    assert lost["title"] == "Entscheidungsspiel" and "verloren" in lost["body"] and "gewonnen" not in lost["body"]
+    assert "gewonnen" in by_reason["decider_won"]["body"] and "Entscheidungsspiel" in by_reason["decider_won"]["body"]
