@@ -91,7 +91,8 @@ async def ready(db, doc: dict, cache: dict | None = None) -> bool:
 
 def reaches(doc: dict | None, season: dict | None, person: str, *, sees: bool, closed: bool) -> bool:
     """Erreicht der Moment diese Person? ``sees``: Die Person sieht die Season (``can_see_season``); ``closed``: alle Staffeln zu."""
-    return bool(doc and doc.get("squad_id") and doc.get("active", True) and not doc.get("suspended")
+    # Ein Moment gehört einem Co-Team oder in einer Einzel-Liga einer Person (Prüfung 4) - eine Team-Anmeldung ohne Co-Team hat keinen.
+    return bool(doc and (doc.get("squad_id") or doc.get("user_id")) and doc.get("active", True) and not doc.get("suspended")
                 and person in (doc.get("audience_ids") or []) and member_visible(season) and sees and closed)
 
 
@@ -125,11 +126,14 @@ async def champions(db, season_id: str) -> list[dict]:
 
 
 def entrant_of(registration: dict | None) -> str | None:
-    """Das Co-Team einer Anmeldung bzw. ``user:<person>`` in einer Einzel-Liga."""
+    """Wem der Moment einer Anmeldung gehört: dem Co-Team bzw. in einer Einzel-Liga der Person (``user:<person>``). Eine
+    Team-Anmeldung ohne Co-Team hat keinen Moment (M3) - ``None``. Die eine Stelle für Abgleich, Abrechnen und Zurückhalten."""
     registration = registration or {}
     if registration.get("squad_id"):
         return registration["squad_id"]
-    return f"user:{registration['user_id']}" if registration.get("user_id") else None
+    if not registration.get("team_id") and registration.get("user_id"):
+        return f"user:{registration['user_id']}"
+    return None
 
 
 async def held_reward_ids(db, user: dict, awards: list[dict], can_see) -> set[str]:
@@ -144,7 +148,7 @@ async def held_reward_ids(db, user: dict, awards: list[dict], can_see) -> set[st
     winners = {season_id: {entrant_of(champion["registration"]) for champion in await champions(db, season_id)} for season_id in season_ids}
     registration_ids = sorted({award["registration_id"] for award in awards})
     registrations = {row["id"]: row for row in await db.tournament_registrations.find(
-        {"id": {"$in": registration_ids}}, {"_id": 0, "id": 1, "squad_id": 1, "user_id": 1}).to_list(len(registration_ids) + 1)}
+        {"id": {"$in": registration_ids}}, {"_id": 0, "id": 1, "squad_id": 1, "user_id": 1, "team_id": 1}).to_list(len(registration_ids) + 1)}
     seasons = {row["id"]: row for row in await db.league_seasons.find({"id": {"$in": season_ids}}, {"_id": 0}).to_list(len(season_ids) + 1)}
     held: set[str] = set()
     moments: dict[str, dict | None] = {}

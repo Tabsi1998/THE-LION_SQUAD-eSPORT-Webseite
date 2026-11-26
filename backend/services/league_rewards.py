@@ -404,8 +404,9 @@ async def grant(db, tournament: dict, final: dict, frame: dict) -> dict:
     held_team = (registrations.get(champion) or {}).get("team_id") if champion else None
     if held or held_team:
         # Kam die Meister-Nachricht schon (Belohnung erst nach einem Wiederöffnen nachgetragen), meldet sich die Belohnung selbst.
-        squad = (registrations.get(champion) or {}).get("squad_id")
-        entrant = squad or (f"user:{(registrations.get(champion) or {}).get('user_id')}" if champion else None)
+        from services.league_moment_rules import entrant_of
+
+        entrant = entrant_of(registrations.get(champion)) if champion else None  # Co-Team bzw. Person der Einzel-Liga
         moment = await db.league_moments.find_one({"key": f"{season.get('id')}:{entrant}", "active": True},
                                                   {"_id": 0, "notified_ids": 1, "responsible_ids": 1}) if entrant else None
         told = set((moment or {}).get("notified_ids") or [])

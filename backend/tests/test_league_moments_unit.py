@@ -141,3 +141,15 @@ def test_announce_of_start_rights_covers_captains_only_for_moves():
     assert not moments._announce_covers(season, {"outcome": "champion"})
     assert not moments._announce_covers({"start_rights": {"announce": False}}, {"outcome": "up"})
     assert not moments._announce_covers({}, {"outcome": "up"})
+
+
+def test_the_moment_belongs_to_the_squad_or_in_a_single_league_to_the_person():
+    assert rules.entrant_of({"squad_id": "s-1", "team_id": "t-1", "user_id": "u-1"}) == "s-1"
+    assert rules.entrant_of({"user_id": "u-1"}) == "user:u-1"
+    assert rules.entrant_of({"team_id": "t-1", "user_id": "u-1"}) is None  # Team-Anmeldung ohne Co-Team: kein Moment
+    assert rules.entrant_of(None) is None
+    season = {"visibility": "public"}
+    solo = {"squad_id": None, "user_id": "u-1", "active": True, "audience_ids": ["u-1"]}
+    assert rules.reaches(solo, season, "u-1", sees=True, closed=True)
+    assert not rules.reaches({**solo, "user_id": None}, season, "u-1", sees=True, closed=True)
+    assert not rules.reaches({**solo, "suspended": True}, season, "u-1", sees=True, closed=True)

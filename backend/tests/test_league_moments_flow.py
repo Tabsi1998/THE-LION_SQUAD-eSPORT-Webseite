@@ -681,6 +681,58 @@ async def test_the_champion_comes_as_soon_as_league_one_is_done_with_one_message
         assert await league_titles(flow, person) == [f"Meister: {name}"]
 
 
+# ---------------------------------------------------------------- Einzel-Liga: der Meister ist eine Person (Prüfung 4)
+
+async def solo_world(flow) -> dict:
+    """Eine Einzel-Liga: eine Staffel aus vier Personen ohne Team. Die kleinere Nummer gewinnt - Solo 1 ist Meister."""
+    lead = await flow.add_staff()
+    flow.act_as(lead)
+    game = ok(await flow.post("/api/games", json=GAME))
+    league = ok(await flow.post(ADMIN, json={"name": "Einzel-Liga", "game_id": game["id"]}))
+    season = ok(await flow.post(f"{ADMIN}/{league['id']}/seasons", json=season_body(visibility="public")))
+    ok(await flow.put(f"{ADMIN}/seasons/{season['id']}/rewards", json={"items": [GOLD]}))
+    division = ok(await flow.post(f"{ADMIN}/seasons/{season['id']}/divisions", json={}))
+    tid = ok(await flow.post(f"{ADMIN}/divisions/{division['id']}/staffeln", json={}))["tournament_id"]
+    solos = [await flow.add_user(name=f"Solo {index}") for index in range(1, 5)]
+    for index, person in enumerate(solos, start=1):
+        await flow.db.tournament_registrations.insert_one({
+            "id": f"solo-reg-{index}", "tournament_id": tid, "user_id": person["id"], "status": "approved", "registration_type": "solo",
+            "display_name": f"Solo {index}", "identity_key": f"{tid}:solo:{person['id']}"})
+    flow.act_as(lead)
+    ok(await flow.post(f"/api/tournaments/{tid}/status", json={"status": "live"}))
+    for match in await flow.db.matches_v2.find({"tournament_id": tid, "is_preview": {"$ne": True}}, {"_id": 0}).to_list(None):
+        sides = sorted(slot["registration_id"] for slot in match.get("slots") or [] if slot.get("registration_id"))
+        if len(sides) != 2:
+            continue
+        await flow.db.matches_v2.update_one({"id": match["id"]}, {"$set": {
+            "status": "completed", "completed_at": LONG_AGO,
+            "results": [{"registration_id": sides[0], "rank": 1, "score": 2}, {"registration_id": sides[1], "rank": 2, "score": 0}]}})
+    return {"lead": lead, "season": season, "tids": [tid], "solos": solos}
+
+
+@pytest.mark.asyncio
+async def test_a_single_league_champion_gets_one_message_and_the_rewards_inside_the_moment(flow):
+    world = await solo_world(flow)
+    champion = world["solos"][0]
+    await close(flow, world)
+    docs = await flow.db.league_moments.find({"season_id": world["season"]["id"]}, {"_id": 0}).to_list(None)
+    assert [(doc["key"].split(":", 1)[1], doc["outcome"]) for doc in docs] == [(f"user:{champion['id']}", "champion")]
+    # Eine Nachricht: „Meister“ mit „Dazu: Goldmedaille“ - weder „Neue Belohnung“ noch „Staffel abgeschlossen“ daneben.
+    rows = await flow.db.notifications.find({"user_id": champion["id"], "meta.reason": {"$in": ["league_moment", "league_reward", "league_final"]}},
+                                            {"_id": 0}).to_list(None)
+    assert [(row["meta"]["reason"], row["title"]) for row in rows] == [("league_moment", "Meister: Solo 1")]
+    assert "Goldmedaille" in rows[0]["body"]
+    # Die Zeremonie wartet: Die Belohnung kommt als zweite Karte im Moment, nicht daneben.
+    moment = (await unseen(flow, champion))[0]
+    assert moment["outcome"] == "champion" and [row["reward"]["name"] for row in moment["rewards"]] == ["Goldmedaille"]
+    assert await rewards_unseen(flow, champion) == []
+    # Ein zweiter Abgleich (Job) schickt nichts nach.
+    from services import league_moments
+
+    await league_moments.sync(flow.db, world["season"]["id"])
+    assert len(await league_titles(flow, champion)) == 1
+
+
 @pytest.mark.asyncio
 async def test_two_last_closes_at_once_give_the_champion_one_message(flow):
     world = await build(flow, levels=2, rewards=[GOLD])

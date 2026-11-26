@@ -38,7 +38,7 @@ from pymongo.errors import DuplicateKeyError
 
 from models import new_id, now_utc
 from services.league_moment_rules import (
-    MEMBER_VISIBLE, champions, division_done, fresh, member_visible, moment_key, ready, season_closed,
+    MEMBER_VISIBLE, champions, division_done, entrant_of, fresh, member_visible, moment_key, ready, season_closed,
 )
 from services.log_safe import log_safe
 
@@ -192,12 +192,10 @@ async def confirmed_champions(db, season: dict) -> dict[str, dict]:
             continue
         level = (by_id.get(division_id) or {}).get("level")
         squad_id = registration.get("squad_id")
-        if squad_id:
-            entrant, user_id = squad_id, None
-        elif not registration.get("team_id") and registration.get("user_id"):
-            entrant, user_id = f"user:{registration['user_id']}", registration["user_id"]  # Einzel-Liga: die Person ist der Teilnehmer
-        else:
-            continue  # Team ohne Co-Team: kein Moment - Belohnung und Abschluss melden sich wie bisher (M3)
+        entrant = entrant_of(registration)  # Co-Team bzw. in einer Einzel-Liga die Person
+        if not entrant:
+            continue  # Team-Anmeldung ohne Co-Team: kein Moment - Belohnung und Abschluss melden sich wie bisher (M3)
+        user_id = None if squad_id else registration["user_id"]
         found[entrant] = {
             "outcome": "champion", "squad_id": squad_id, "team_id": registration.get("team_id"), "user_id": user_id,
             "registration_id": registration["id"], "display_name": champion["display_name"] or registration.get("display_name"),
@@ -393,10 +391,11 @@ async def settle(db, season_id: str) -> int:
         claimed = await db.tournament_awards.update_one({"id": award["id"], "moment_owed.at": owed.get("at")}, {"$unset": {"moment_owed": ""}})
         if not claimed.modified_count:
             continue
-        registration = await db.tournament_registrations.find_one({"id": award.get("registration_id")}, {"_id": 0, "squad_id": 1}) or {}
-        doc = None
-        if registration.get("squad_id"):
-            doc = await db.league_moments.find_one({"key": moment_key(season_id, registration["squad_id"])}, {"_id": 0})
+        registration = await db.tournament_registrations.find_one({"id": award.get("registration_id")},
+                                                                   {"_id": 0, "squad_id": 1, "user_id": 1, "team_id": 1})
+        # Co-Team oder - in einer Einzel-Liga - die Person selbst (Prüfung 4).
+        entrant = entrant_of(registration)
+        doc = await db.league_moments.find_one({"key": moment_key(season_id, entrant)}, {"_id": 0}) if entrant else None
         rewards = owed.get("rewards") or {}
         # Abgedeckt ist nur, wem die Nachricht zum Moment wirklich ging (``notified_ids``, ``notify`` lief davor) - wird die Season
         # danach wieder unsichtbar, bleibt trotzdem niemand ohne Nachricht.
