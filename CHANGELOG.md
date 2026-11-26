@@ -1,5 +1,35 @@
 # Changelog
 
+## [1.99.0](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/compare/v1.98.0...v1.99.0) (2026-11-26)
+
+
+### Neu
+
+* Alte Adressen (/profile, /members, /account, /my, /privacy-account) leiten mit Reiter und Anker nach Mein Bereich weiter ([#2059](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/2059)) ([56ea049](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/56ea049725dca9065602adc33d2b961e4e6d0bef))
+* Benutzermenü, Handy-Menü und Dashboard führen direkt in die Gruppen von Mein Bereich ([#2059](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/2059)) ([56ea049](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/56ea049725dca9065602adc33d2b961e4e6d0bef))
+* Einheitliche Begriffe „Konto löschen“ und „Daten herunterladen“, Knöpfe statt Textlinks ([#2059](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/2059)) ([56ea049](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/56ea049725dca9065602adc33d2b961e4e6d0bef))
+* Konto löschen fragt im roten Dialog mit beschriftetem Feld nach und führt danach zur Startseite mit Bestätigung ([#2059](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/2059)) ([56ea049](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/56ea049725dca9065602adc33d2b961e4e6d0bef))
+* Mein Bereich – Profil, Mitgliedschaft, Rechnungen & Unterlagen, Verein, Benachrichtigungen, Konto & Sicherheit und Datenschutz an einem Ort ([#2059](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/2059)) ([56ea049](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/56ea049725dca9065602adc33d2b961e4e6d0bef))
+* Mein Bereich – Übersicht „Zu tun“ mit offener Rechnung, geänderter Einwilligung, Wunschnummer, Versammlung und Gewinn, dazu „Häufig gebraucht“ ([#2059](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/2059)) ([56ea049](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/56ea049725dca9065602adc33d2b961e4e6d0bef))
+* Menü „Verein“ verlinkt für Mitglieder nach Mein Bereich ([#2059](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/2059)) ([56ea049](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/56ea049725dca9065602adc33d2b961e4e6d0bef))
+* Nach dem Login zurück an genau die Stelle, mit Reiter und Anker ([#2059](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/2059)) ([56ea049](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/56ea049725dca9065602adc33d2b961e4e6d0bef))
+
+
+### Fehlerbehebungen
+
+* Datenschutzerklärung nennt den Weg zu „Konto löschen“ in Mein Bereich ([#2059](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/2059)) ([56ea049](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/56ea049725dca9065602adc33d2b961e4e6d0bef))
+* Nach „Konto löschen“ ist das Gerät immer leer, auch wenn der Server nicht antwortet ([#2059](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/2059)) ([56ea049](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/56ea049725dca9065602adc33d2b961e4e6d0bef))
+
+
+### Schneller
+
+* Start-Bündel kleiner – Menü-Zeichen gebündelt, Texte nachgeladen ([#2059](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/2059)) ([56ea049](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/56ea049725dca9065602adc33d2b961e4e6d0bef))
+
+
+### Dokumentation
+
+* Handbuch, FAQ und Routen-Inventar zu Mein Bereich ([#2059](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/2059)) ([56ea049](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/56ea049725dca9065602adc33d2b961e4e6d0bef))
+
 ## 1.98.0 (26.11.2026)
 
 ### Neu
