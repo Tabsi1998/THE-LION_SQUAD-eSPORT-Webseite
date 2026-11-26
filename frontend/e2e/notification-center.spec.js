@@ -17,12 +17,15 @@ const OPTIONS = [
 ];
 
 const HOUR = 60 * 60 * 1000;
+// Feste Uhr (12:00 Wiener Zeit): „Heute“ und „Gestern“ hängen am Kalendertag in Wien. Mit der echten Uhr war der Test
+// kurz nach Mitternacht rot (CI-Lauf 23:13 UTC = 00:13 in Wien, #2593) - die Meldungen von „Heute“ lagen dann gestern.
+const NOW = Date.parse("2026-11-26T11:00:00.000Z");
 function ago(hours) {
-  return new Date(Date.now() - hours * HOUR).toISOString();
+  return new Date(NOW - hours * HOUR).toISOString();
 }
-// Jetzt minus Tage und Minuten - „Heute“ liegt höchstens eine halbe Stunde zurück (außer kurz nach Mitternacht).
+// Mittag minus Tage und Minuten - „Heute“ liegt höchstens eine halbe Stunde zurück.
 function noonDaysAgo(days, minutes = 0) {
-  return new Date(Date.now() - days * 24 * HOUR - (30 - minutes) * 60 * 1000).toISOString();
+  return new Date(NOW - days * 24 * HOUR - (30 - minutes) * 60 * 1000).toISOString();
 }
 
 function row(id, kind, topic, importance, title, body, created_at, extra = {}) {
@@ -63,6 +66,7 @@ const SETTINGS = {
 };
 
 async function mockServer(page) {
+  await page.clock.install({ time: new Date(NOW) });
   await page.addInitScript(() => {
     window.localStorage.setItem("tls_cookie_consent_v1", JSON.stringify({ essential: true, external_media: false, analytics: false, meta: false, tiktok: false, saved_at: Date.now(), expires_at: Date.now() + 30 * 24 * 60 * 60 * 1000 }));
   });
