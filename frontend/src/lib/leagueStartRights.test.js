@@ -1,7 +1,7 @@
 // Startrechte für die nächste Season (#1627, docs/LIGA.md „F.2a“): Wörter und Sätze für Verwaltung und Team-Seite.
 import { describe, expect, it } from "vitest";
 import {
-  countsLine, openRightsQuestion, outlookLine, placeLine, rightLine, settingsForm, settingsPayload, stateLabel, teamBadge, teamBadgeTone,
+  countsLine, declineText, openRightsQuestion, outlookLine, placeLine, rightLine, settingsForm, settingsPayload, stateLabel, teamBadge, teamBadgeTone,
 } from "./leagueStartRights";
 
 const UNTIL = "2026-12-15T17:00:00+00:00";
@@ -41,6 +41,21 @@ describe("Das eigene Team", () => {
     expect(line).toBe("Nachgerückt: In Liga 1 ist ein Platz frei geworden. Bitte bis 15.12.2026, 18:00 Uhr zusagen oder ablehnen – ohne Antwort bleibt ihr in Liga 2.");
     expect(rightLine({ ...carry, start_right: { state: "confirmed", fills: { from_label: "Liga 2" } } }))
       .toBe("Nachgerückt in Liga 1. Wer lieber in Liga 2 bleibt, lehnt bis zum Start ab.");
+  });
+
+  it("sagt dem Nachrücker mit offener eigener Zusage, was Ablehnen und Schweigen bedeuten", () => {
+    // Entscheidung 26.11.: Die eigene Frist ruht, Ablehnen gilt als Zusage für die eigene Liga, Schweigen lässt die Restfrist.
+    const line = rightLine({ ...carry, start_right: { state: "offered", accept_until: UNTIL, fills: { from_label: "Liga 2", own_open: true, rest_days: 3 } } });
+    expect(line).toBe("Nachgerückt: In Liga 1 ist ein Platz frei geworden. Bitte bis 15.12.2026, 18:00 Uhr zusagen oder ablehnen. Eure Frist für Liga 2 ruht so lange. Ablehnen gilt als Zusage für Liga 2. Ohne Antwort bleibt ihr in Liga 2 und habt dort noch die restliche Frist, mindestens 3 Tage.");
+    expect(rightLine({ ...carry, start_right: { state: "offered", accept_until: UNTIL, fills: { from_label: "Liga 2", own_open: true, rest_days: 1 } } }))
+      .toContain("mindestens 1 Tag.");
+    // Hat das Team für die eigene Liga schon zugesagt, bleibt der kurze Satz.
+    expect(rightLine({ ...carry, start_right: { state: "offered", accept_until: UNTIL, fills: { from_label: "Liga 2", own_open: false, rest_days: 3 } } }))
+      .toBe("Nachgerückt: In Liga 1 ist ein Platz frei geworden. Bitte bis 15.12.2026, 18:00 Uhr zusagen oder ablehnen – ohne Antwort bleibt ihr in Liga 2.");
+    expect(declineText({ ...carry, start_right: { state: "offered", fills: { from_label: "Liga 2", own_open: true } } }))
+      .toBe("Ihr bleibt in Liga 2 – das gilt zugleich als eure Zusage für Liga 2. Der Platz in Liga 1 geht an das nächste Team, zurück geht das nicht.");
+    expect(declineText({ ...carry, start_right: { state: "offered", fills: { from_label: "Liga 2", own_open: false } } }))
+      .toBe("Ihr bleibt in Liga 2. Der Platz in Liga 1 geht an das nächste Team, zurück geht das nicht.");
   });
 
   it("trennt Zusage, Verfall und Teilnahme", () => {
@@ -116,6 +131,9 @@ describe("Verwaltung", () => {
     expect(settingsPayload({ active: true, mode: "auto", accept_days: 14, successor: "next", remind_hours: 48, announce: true }, true))
       .toEqual({ active: true, mode: "auto", accept_days: 14, successor: "next", remind_hours: 48, announce: true, confirm_open: true });
     expect(settingsPayload({ active: false }, true)).toEqual({ active: false, confirm_open: true });
+    // Die Restfrist nach einem verstrichenen Nachrück-Angebot geht mit, wenn die Verwaltung sie kennt.
+    expect(settingsPayload({ active: true, mode: "accept", accept_days: 14, successor: "next", remind_hours: 48, announce: true, rest_days: "5" }))
+      .toEqual({ active: true, mode: "accept", accept_days: 14, successor: "next", remind_hours: 48, announce: true, rest_days: 5 });
   });
 
   it("baut das Formular aus Einstellung und Vorgabe und schickt ganze Zahlen", () => {

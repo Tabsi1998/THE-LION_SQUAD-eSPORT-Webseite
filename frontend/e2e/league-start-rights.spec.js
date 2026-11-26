@@ -36,7 +36,7 @@ const done = [{ tournament_id: "o1", staffel: "A", status: "completed", particip
 const OLD_PAGE = { ...PAGE, season: { ...SEASON, id: "s1", number: 1, name: "Season 1", slug: "season-1", status: "completed", visibility: "public",
   start_date: "2026-11-09T23:00:00+00:00", predecessor_id: null, predecessor: null }, divisions: [division(1, true, false, done), division(2, false, true, done)] };
 
-const DEFAULTS = { mode: "accept", accept_days: 14, successor: "next", remind_hours: 48, announce: true };
+const DEFAULTS = { mode: "accept", accept_days: 14, successor: "next", remind_hours: 48, announce: true, rest_days: 3 };
 const UNTIL = "2027-01-15T17:00:00+00:00";
 const right = (id, name, extra = {}) => ({ application_id: id, squad_id: `q${id.slice(1)}`, display_name: name, division_level: 1, division_label: "Liga 1",
   movement: "stay", from_label: "Liga 1", from_staffel: "A", rank: 1, via: null, state: "offered", accept_until: UNTIL, accepted_at: null, accepted_via: null,
@@ -183,6 +183,34 @@ test.describe("Liga: Startrechte für die nächste Season", () => {
       await expect(box).toHaveCount(0);
     });
 
+    test(`Nachrücker unter Teams bei ${width} px: Die eigene Frist ruht, Ablehnen gilt als Zusage für die eigene Liga`, async ({ page }) => {
+      await page.setViewportSize({ width, height });
+      await mockServer(page, CAPTAIN);
+      let answered = null;
+      const moved = { ...OFFER, carry_over: { ...OFFER.carry_over, from_label: "Liga 2", movement: "up", division_label: "Liga 1",
+        start_right: { ...OFFER.carry_over.start_right, can_decline: true, fills: { from_label: "Liga 2", own_open: true, rest_days: 3 } } } };
+      const back = { ...OFFER, carry_over: { ...OFFER.carry_over, movement: "stay", division_label: "Liga 2",
+        start_right: { state: "accepted", accept_until: null, accepted_at: "2027-01-10T18:00:00+00:00", fills: null, can_accept: false, can_decline: false } } };
+      await page.route("**/api/teams/my", json([MY_TEAM]));
+      await page.route("**/api/teams/team-1/squads", json(MY_SQUADS));
+      await page.route("**/api/me/league-applications", (route) => json({ items: [answered ? back : moved], start_rights: [] })(route));
+      await page.route("**/api/me/league-applications/a5/start-right", (route) => {
+        answered = route.request().postDataJSON();
+        return json({ ...back, replay: false })(route);
+      });
+      await page.goto("/teams");
+      const row = page.getByTestId("squad-application-a5");
+      await expect(row.getByTestId("squad-start-right-line-a5")).toHaveText(
+        "Nachgerückt: In Liga 1 ist ein Platz frei geworden. Bitte bis 15.01.2027, 18:00 Uhr zusagen oder ablehnen. Eure Frist für Liga 2 ruht so lange. Ablehnen gilt als Zusage für Liga 2. Ohne Antwort bleibt ihr in Liga 2 und habt dort noch die restliche Frist, mindestens 3 Tage.");
+      await noSideScroll(page);
+      await shot(row.locator("xpath=ancestor::div[contains(@class,'rounded-sm')][1]"), `startrechte-nachruecker-${width}`);
+      await row.getByTestId("squad-start-right-decline-a5").click();
+      await expect(page.getByText("das gilt zugleich als eure Zusage für Liga 2")).toBeVisible();
+      await page.getByRole("button", { name: "Ablehnen" }).last().click();
+      await expect.poll(() => answered).toEqual({ action: "decline" });
+      await expect(page.getByTestId("squad-application-a5")).toContainText("Zugesagt – Zuteilung folgt");
+    });
+
     test(`Pause und Startdatum bei ${width} px: Die Übersicht sagt, warum gerade nichts verfällt`, async ({ page }) => {
       await page.setViewportSize({ width, height });
       await mockServer(page, ADMIN);
@@ -224,7 +252,7 @@ test.describe("Liga: Startrechte für die nächste Season", () => {
       await noSideScroll(page);
       await shot(page, `startrechte-neue-season-${width}`);
       await sheet.getByTestId("successor-create").click();
-      await expect.poll(() => sent && sent.start_rights).toEqual({ mode: "accept", accept_days: 7, successor: "next", remind_hours: 48, announce: true });
+      await expect.poll(() => sent && sent.start_rights).toEqual({ mode: "accept", accept_days: 7, successor: "next", remind_hours: 48, announce: true, rest_days: 3 });
       await expect(page).toHaveURL(/\/admin\/leagues\/seasons\/s2/);
     });
 

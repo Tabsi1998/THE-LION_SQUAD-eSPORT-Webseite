@@ -49,6 +49,13 @@ export function rightLine(carry) {
     // Pause: Der Endstand der Vorgänger-Season wird geprüft, die Frist steht still und ist danach um diese Zeit länger.
     if (right.paused && right.fills) return `Nachgerückt: In ${label} ist ein Platz frei geworden. Die Frist ruht, solange der Endstand der Vorgänger-Season geprüft wird. Zusagen oder ablehnen geht trotzdem – ohne Antwort bleibt ihr in ${back}.`;
     if (right.paused) return `Startrecht für ${label}: Die Frist ruht, solange der Endstand der Vorgänger-Season geprüft wird – danach läuft sie um diese Zeit länger. Zusagen geht trotzdem.`;
+    // Die eigene Zusage ist noch offen (Entscheidung 26.11.): Ihre Frist ruht, solange das Angebot offen ist. Ablehnen gilt als
+    // Zusage für die eigene Liga; wer schweigt, hat dort die restliche Frist, mindestens `rest_days`.
+    if (right.fills?.own_open) {
+      const days = Number(right.fills.rest_days) || 0;
+      const rest = days ? `, mindestens ${days} ${days === 1 ? "Tag" : "Tage"}` : "";
+      return `Nachgerückt: In ${label} ist ein Platz frei geworden. Bitte bis ${untilText(right.accept_until)} zusagen oder ablehnen. Eure Frist für ${back} ruht so lange. Ablehnen gilt als Zusage für ${back}. Ohne Antwort bleibt ihr in ${back} und habt dort noch die restliche Frist${rest}.`;
+    }
     if (right.fills) return `Nachgerückt: In ${label} ist ein Platz frei geworden. Bitte bis ${untilText(right.accept_until)} zusagen oder ablehnen – ohne Antwort bleibt ihr in ${back}.`;
     return `Startrecht für ${label}: bitte bis ${untilText(right.accept_until)} zusagen. Ohne Zusage verfällt es.`;
   }
@@ -56,6 +63,13 @@ export function rightLine(carry) {
   if (right.state === "accepted") return `Zugesagt für ${label}. Die Staffel teilt die Liga-Leitung noch zu.`;
   if (right.state === "expired") return "Das Startrecht ist verfallen: Die Frist für die Zusage ist vorbei.";
   return "";
+}
+
+/** Die Rückfrage vor „Nachrücken ablehnen“: Mit offener eigener Zusage gilt das Ablehnen zugleich als Zusage für die eigene Liga. */
+export function declineText(carry) {
+  const back = carry?.start_right?.fills?.from_label || "eurer Liga";
+  const own = carry?.start_right?.fills?.own_open ? ` – das gilt zugleich als eure Zusage für ${back}` : "";
+  return `Ihr bleibt in ${back}${own}. Der Platz in ${carry?.division_label} geht an das nächste Team, zurück geht das nicht.`;
 }
 
 /** Das Abzeichen am Antrag des eigenen Teams - leer heißt: wie bisher (`teamStateLabel`). */
@@ -110,7 +124,7 @@ export function settingsPayload(form, confirmOpen = false) {
   if (!form.active) return { active: false, ...confirmed };
   const number = (value) => (value === "" || value == null ? null : Number.parseInt(String(value), 10));
   return { active: true, mode: form.mode, accept_days: number(form.accept_days), successor: form.successor, remind_hours: number(form.remind_hours),
-    announce: Boolean(form.announce), ...confirmed };
+    announce: Boolean(form.announce), ...(form.rest_days === undefined ? {} : { rest_days: number(form.rest_days) }), ...confirmed };
 }
 
 /** Die Rückfrage vor dem Ausschalten bzw. Umschalten auf „automatisch“: Offene Startrechte gelten dann als zugesagt. Leer, wenn

@@ -243,6 +243,11 @@ export function SeasonStartRightsPanel({ seasonId, canSeason = false, canApplica
                 hint="Die Regel: nach einem abgelehnten Aufstieg der beste Nicht-Aufsteiger, sonst der beste Absteiger (er bleibt). Bei Gleichstand wählst immer du." />
               <TextField label="Erinnerung vor Fristende (Stunden)" type="number" min={0} max={336} value={form.remind_hours ?? ""} onChange={(value) => set("remind_hours", value)}
                 disabled={!canSeason || !accept} testId="start-rights-remind" hint={`Vorgabe ${data.defaults.remind_hours} · 0 = keine Erinnerung`} />
+              {form.rest_days !== undefined ? (
+                <TextField label="Restfrist nach einem Nachrück-Angebot (Tage)" type="number" min={0} max={30} value={form.rest_days ?? ""} onChange={(value) => set("rest_days", value)}
+                  disabled={!canSeason || !accept} testId="start-rights-rest"
+                  hint={`Vorgabe ${data.defaults.rest_days ?? 3}. Solange ein Nachrück-Angebot offen ist, ruht die eigene Frist. Wer es verstreichen lässt, hat danach in der eigenen Liga mindestens so viele Tage für die Zusage.`} />
+              ) : null}
             </FormGrid>
             <CheckField label="Nachricht „Aufstieg bestätigt“ bzw. „Abstieg bestätigt“" checked={form.announce} onChange={(value) => set("announce", value)}
               disabled={!canSeason} testId="start-rights-announce" className="min-h-[44px]"
@@ -283,7 +288,7 @@ export function SeasonStartRightsPanel({ seasonId, canSeason = false, canApplica
                 <span>{data.predecessor.name} ist wieder geöffnet: Der Endstand wird geprüft. Die Fristen stehen still und laufen danach um die Dauer der Pause länger. Zusagen geht weiter, aber kein Startrecht verfällt und niemand rückt nach. Nach dem neuen Abschluss oben „Übernahme neu berechnen“.</span>
               </p>
             ) : null}
-            {data.started ? (
+            {data.started && data.open_rights > 0 ? (
               <p className="flex gap-2 rounded-sm border border-white/15 bg-white/[0.03] px-3 py-2 text-sm text-white/85" role="status" data-testid="start-rights-started">
                 <CircleAlert className="mt-0.5 h-4 w-4 shrink-0 text-warn" aria-hidden="true" />
                 <span>Das Startdatum ist erreicht: Ab jetzt verfällt kein Startrecht mehr von selbst, und niemand rückt automatisch nach. Offene Zusagen entscheidest du – „Zusage eintragen“ oder im Eingang ablehnen.</span>

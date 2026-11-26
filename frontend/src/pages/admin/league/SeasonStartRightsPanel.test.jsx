@@ -124,11 +124,28 @@ test("in der Pause sagt die Übersicht, dass die Fristen ruhen und sich verläng
 });
 
 test("ist das Startdatum erreicht, sagt die Übersicht, dass nichts mehr von selbst geschieht - die Leitung trägt die Zusage ein", async () => {
-  show({ ...ON, started: true, rows: [row("a1", "Rudel Eins · Eins", { waits_for_lead: true })] });
+  show({ ...ON, started: true, open_rights: 1, rows: [row("a1", "Rudel Eins · Eins", { waits_for_lead: true })] });
   expect(await screen.findByTestId("start-rights-started")).toHaveTextContent("Das Startdatum ist erreicht: Ab jetzt verfällt kein Startrecht mehr von selbst, und niemand rückt automatisch nach.");
   expect(screen.getByTestId("start-right-a1")).toHaveTextContent("Frist vorbei – jetzt entscheidest du");
   expect(screen.getByTestId("start-right-accept-a1")).toBeInTheDocument();
   expect(screen.queryByTestId("start-right-fill-a3")).toBeNull();
+});
+
+test("der Hinweis zum Startdatum steht nur da, solange noch Zusagen offen sind", async () => {
+  show({ ...ON, started: true, open_rights: 0, rows: [row("a2", "Rudel Zwei · Eins", { state: "accepted", accept_until: null })], open_places: [] });
+  await screen.findByTestId("start-rights-rows");
+  expect(screen.queryByTestId("start-rights-started")).toBeNull();
+});
+
+test("die Restfrist nach einem verstrichenen Nachrück-Angebot ist einstellbar", async () => {
+  show({ ...ON, settings: { ...ON.settings, rest_days: 3 }, defaults: { ...DEFAULTS, rest_days: 3 } });
+  const field = await screen.findByTestId("start-rights-rest");
+  expect(field).toHaveValue(3);
+  fireEvent.change(field, { target: { value: "5" } });
+  apiMock.put.mockResolvedValue({ data: { ...ON, settings: { ...ON.settings, rest_days: 5 } } });
+  fireEvent.click(screen.getByTestId("start-rights-save"));
+  await waitFor(() => expect(apiMock.put).toHaveBeenCalledWith("/admin/leagues/seasons/s2/start-rights",
+    { active: true, mode: "accept", accept_days: 10, successor: "next", remind_hours: 48, announce: true, rest_days: 5 }));
 });
 
 test("Umschalten auf „automatisch“ fragt im Panel nach, bevor offene Startrechte als zugesagt gelten", async () => {

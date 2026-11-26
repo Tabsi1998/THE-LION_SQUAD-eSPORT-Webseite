@@ -5,7 +5,7 @@ import { useState } from "react";
 import { toast } from "sonner";
 import { api, formatApiError } from "@/lib/api";
 import { useConfirm } from "@/components/tls/ConfirmDialog";
-import { rightLine } from "@/lib/leagueStartRights";
+import { declineText, rightLine } from "@/lib/leagueStartRights";
 
 const BUTTON = "inline-flex min-h-[44px] items-center rounded-sm px-3 py-2 text-xs font-bold uppercase tracking-wider disabled:opacity-50";
 
@@ -19,7 +19,7 @@ export function StartRightBlock({ applicationId, carry, onChanged, testPrefix = 
     if (action === "decline") {
       const sure = await confirm({
         title: "Nachrücken ablehnen?",
-        description: `Ihr bleibt in ${right.fills?.from_label || "eurer Liga"}. Der Platz in ${carry.division_label} geht an das nächste Team – zurück geht das nicht.`,
+        description: declineText(carry),
         confirmLabel: "Ablehnen", tone: "danger",
       });
       if (!sure) return;
@@ -27,7 +27,8 @@ export function StartRightBlock({ applicationId, carry, onChanged, testPrefix = 
     setBusy(true);
     try {
       await api.post(`/me/league-applications/${applicationId}/start-right`, { action });
-      toast.success(action === "accept" ? `Zugesagt für ${carry.division_label}. Die Staffel teilt die Liga-Leitung noch zu.` : `Abgelehnt. Ihr bleibt in ${right.fills?.from_label || "eurer Liga"}.`);
+      toast.success(action === "accept" ? `Zugesagt für ${carry.division_label}. Die Staffel teilt die Liga-Leitung noch zu.`
+        : `Abgelehnt. Ihr bleibt in ${right.fills?.from_label || "eurer Liga"}${right.fills?.own_open ? " – das gilt als eure Zusage dort" : ""}.`);
       onChanged?.();
     } catch (failure) {
       toast.error(formatApiError(failure.response?.data?.detail));
