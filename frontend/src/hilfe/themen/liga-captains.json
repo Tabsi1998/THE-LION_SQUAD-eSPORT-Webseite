@@ -257,6 +257,13 @@
           "bild": false
         },
         {
+          "id": "aufstieg-abstieg",
+          "titel": "Aufstieg, Abstieg, Meister",
+          "text": "Steht der Endstand der ganzen Season fest, zeigt die Website euren Ausgang einmal als kurzen Moment. Danach steht er unter Saisonende im Profil und an der Teamseite.",
+          "hinweis": "Den Moment bekommt, wer in der Season gespielt hat, dazu Captain und Vertreter. Mit Moment ansehen spielt ihr ihn noch einmal ab.",
+          "bild": false
+        },
+        {
           "id": "neue-season",
           "titel": "Neue Season",
           "text": "Legt die Liga-Leitung die nächste Season an, ist euer Co-Team automatisch dabei. Wollt ihr nicht, tippt auf Abmelden.",

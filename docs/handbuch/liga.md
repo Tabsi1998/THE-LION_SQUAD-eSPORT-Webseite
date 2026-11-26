@@ -2101,6 +2101,37 @@ solange der Gewinn nicht abgeholt ist.
 
 **Sichtbarkeit:** Öffentlich steht eine Belohnung nur, wenn Gäste die Season und die Staffel sehen dürfen.
 
+### 3.12a Saisonende-Moment: Aufstieg, Abstieg, Meister
+
+Hier stellst du nichts ein – der Moment kommt von selbst, sobald der **Endstand der ganzen Season** feststeht: alle Staffeln
+abgeschlossen, auch Playoffs und Relegation, kein offener Gleichstand an einer Grenze. Ein einzelner Abschluss oder die laufende
+Tabelle lösen nie etwas aus.
+
+**Wer ihn sieht:** die Spieler mit Einsatz in der Season (wie bei den Belohnungen, 3.12 – ohne gemeldete Aufstellung der Kader;
+steht die Season auf „Ganzer Kader zum Abschluss“, der ganze Kader), dazu Captain und Vertreter. Beim nächsten Besuch der Website
+erscheint der Moment einmal:
+
+| Ausgang | So sieht es aus |
+| --- | --- |
+| **Aufstieg** | Das Liga-Wappen hebt sich, die Zahl zählt um, in Liga 1 setzt sich die Krone. |
+| **Meister** | Goldener Moment mit Pokal und goldenem Abzeichen. |
+| **Abstieg** | Ruhig, mit Blick auf die nächste Season – kein Alarm. |
+
+Wer „Bewegung reduzieren“ eingestellt hat (System oder **Zeremonien dezent** im Profil), sieht gleich das fertige Bild. Danach
+bleibt der Ausgang als Hinweis **Saisonende** im Profil und an der Teamseite; dort spielt **Moment ansehen** ihn noch einmal ab.
+Dazu kommt eine Nachricht in der Glocke und als Push. Captain und Vertreter bekommen keine zweite, wenn die Season schon
+„Aufstieg bestätigt“ zu den Startrechten schickt (3.11a).
+
+**Einmal je Person:** Gesehen merkt sich der Server – nach dem Neuladen, in einem zweiten Tab oder auf einem anderen Gerät kommt
+der Moment nicht noch einmal. Nach 45 Tagen erscheint er nicht mehr von selbst; der Hinweis bleibt.
+
+**Korrigieren:** Öffnest du eine Staffel wieder, ruhen alle Momente der Season (unsichtbar). Bleibt der Ausgang nach dem neuen
+Abschluss gleich, ändert sich nichts – niemand bekommt ihn zweimal. Ändert er sich, zieht der Hinweis still nach: Wer den Moment
+schon gesehen hatte, bekommt keinen neuen, sondern nur in der Glocke „Endstand korrigiert“.
+
+**Sichtbarkeit:** Steht die Season auf **Aus**, sieht niemand etwas und es geht keine Nachricht hinaus. Schaltest du sie ein,
+kommen die Nachrichten dann.
+
 ### 3.13 Gesamtwertung über Seasons
 
 **Wo:** **Admin → Ligen → Gesamtwertung** (Knopf an der Liga). Lesen darf jede Zuständigkeit, ändern, abschließen und wieder
