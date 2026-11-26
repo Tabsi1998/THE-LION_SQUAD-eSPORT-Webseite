@@ -1305,7 +1305,7 @@ async def test_a_place_that_the_corrected_final_no_longer_knows_is_not_given_awa
     # Auch von Hand gibt es diesen Platz nicht mehr.
     refused = await flow.post(f"{ADMIN}/seasons/{season['id']}/start-rights/{x['id']}/fill",
                               json={"candidate_id": fourth["id"], "reason": "Platz soll trotzdem vergeben werden"})
-    assert refused.status_code == 409
+    assert refused.status_code == 409 and "korrigierten Endstand" in refused.json()["detail"]
 
 
 @pytest.mark.asyncio
@@ -1482,3 +1482,120 @@ async def test_a_successor_goes_back_when_the_corrected_final_no_longer_knows_th
     flow.act_as(world["lead"])
     again = ok(await flow.get(f"{ADMIN}/seasons/{season['id']}/successor/recompute"))
     assert again["changes"] == []
+
+
+# ---------------------------------------------------------------- Vierte Nachbesserung (Q1): Der Platz hängt an der Platzierung
+
+async def delete_squad(flow, squad: str) -> None:
+    """Das Co-Team gibt es nicht mehr (archiviert) - der Endstand der alten Season nennt es weiter auf seinem Platz."""
+    await flow.db.team_squads.update_one({"id": squad}, {"$set": {"status": "archived"}})
+
+
+@pytest.mark.asyncio
+async def test_a_deleted_squad_does_not_take_its_place_away_and_the_lead_fills_it(flow):
+    """Q1, Regel ``lead``: Der abgemeldete Aufsteiger löscht sein Co-Team. Der Aufstiegsplatz steht im Endstand - er bleibt frei
+    mit Vorschlag. Vorher: ``open_places`` leer und 409 „korrigierter Endstand“, obwohl nichts korrigiert wurde."""
+    world = await build(flow, levels=2)
+    season, rows = await ready(flow, world, successor="lead")
+    x, n = rows[squad_id(world, 2, 0)], rows[squad_id(world, 2, 1)]
+    flow.act_as(await person(flow, x["squad_id"]))
+    ok(await flow.post(f"/api/me/league-applications/{x['id']}/withdraw"))
+    await delete_squad(flow, x["squad_id"])
+    places = (await overview(flow, world, season["id"]))["open_places"]
+    assert [place["application_id"] for place in places] == [x["id"]] and places[0]["pick"] == n["id"]
+    ok(await flow.post(f"{ADMIN}/seasons/{season['id']}/start-rights/{x['id']}/fill", json={"candidate_id": n["id"], "reason": "Platz 2 rückt nach"}))
+    after = await carried(flow, season["id"])
+    assert after[n["squad_id"]]["carry_over"]["division_level"] == 1 and after[x["squad_id"]]["carry_over"]["filled_by"]["application_id"] == n["id"]
+
+
+@pytest.mark.asyncio
+async def test_a_deleted_squad_does_not_stop_the_next_one_from_moving_up(flow):
+    """Q1, Regel ``next``: Der Zweite rückt nach, das Co-Team des Abgemeldeten wird gelöscht, der Zweite lehnt ab - der Dritte hat
+    zugesagt und rückt nach. Vorher blieb der Platz leer."""
+    world = await build(flow, levels=2)
+    season, rows = await ready(flow, world)
+    x, n, third = (rows[squad_id(world, 2, index)] for index in range(3))
+    ok(await answer(flow, third["squad_id"], third["id"]))
+    flow.act_as(await person(flow, x["squad_id"]))
+    ok(await flow.post(f"/api/me/league-applications/{x['id']}/withdraw"))
+    await delete_squad(flow, x["squad_id"])
+    ok(await answer(flow, n["squad_id"], n["id"], action="decline"))
+    after = await carried(flow, season["id"])
+    assert after[x["squad_id"]]["carry_over"]["filled_by"]["application_id"] == third["id"]
+    assert after[third["squad_id"]]["carry_over"]["division_level"] == 1 and after[n["squad_id"]]["carry_over"]["division_level"] == 2
+
+
+@pytest.mark.asyncio
+async def test_recompute_keeps_a_successor_on_the_place_of_a_deleted_squad(flow):
+    """Q1 beim Neuberechnen: Der Nachrücker steht auf dem Platz eines Co-Teams, das es nicht mehr gibt. Der Platz steht im Endstand -
+    er bleibt, wo er ist. Vorher: „Platz entfällt“, zurück in die eigene Liga."""
+    world = await build(flow, levels=2)
+    season, rows = await ready(flow, world)
+    x, n = rows[squad_id(world, 2, 0)], rows[squad_id(world, 2, 1)]
+    flow.act_as(await person(flow, x["squad_id"]))
+    ok(await flow.post(f"/api/me/league-applications/{x['id']}/withdraw"))
+    await delete_squad(flow, x["squad_id"])
+    flow.act_as(world["lead"])
+    preview = ok(await flow.get(f"{ADMIN}/seasons/{season['id']}/successor/recompute"))
+    assert preview["changes"] == []
+    held = (await carried(flow, season["id"]))[n["squad_id"]]["carry_over"]
+    assert held["division_level"] == 1 and held["fills"]["for_application_id"] == x["id"]
+    assert (await overview(flow, world, season["id"]))["open_places"] == []
+
+
+@pytest.mark.asyncio
+async def test_the_refusal_names_a_corrected_final_only_when_there_is_one(flow):
+    """Der Antrag eines abgemeldeten Nachrückers ist kein eigener freier Platz - aber korrigiert wurde nichts: Die Antwort sagt das
+    auch nicht. (Den echten Fall prüft ``test_a_place_that_the_corrected_final_no_longer_knows_is_not_given_away_again``.)"""
+    world = await build(flow, levels=2)
+    season, rows = await ready(flow, world, successor="lead")
+    x, n, third = (rows[squad_id(world, 2, index)] for index in range(3))
+    flow.act_as(await person(flow, x["squad_id"]))
+    ok(await flow.post(f"/api/me/league-applications/{x['id']}/withdraw"))
+    flow.act_as(world["lead"])
+    ok(await flow.post(f"{ADMIN}/seasons/{season['id']}/start-rights/{x['id']}/fill", json={"candidate_id": n["id"], "reason": "Platz 2 rückt nach"}))
+    flow.act_as(await person(flow, n["squad_id"]))
+    ok(await flow.post(f"/api/me/league-applications/{n['id']}/withdraw"))
+    flow.act_as(world["lead"])
+    refused = await flow.post(f"{ADMIN}/seasons/{season['id']}/start-rights/{n['id']}/fill", json={"candidate_id": third["id"], "reason": "Platz 3 rückt nach"})
+    assert refused.status_code == 409 and "korrigiert" not in refused.json()["detail"]
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("rule", ["next", "lead"])
+async def test_a_withdrawn_team_that_the_correction_promotes_leaves_the_promotion_place_free(flow, rule):
+    """Fachfrage (aus Nr. 266): Y (Zweiter der Liga 2, bleibt) hat sich abgemeldet. Die Korrektur macht Y zum Ersten - den
+    Aufstiegsplatz gibt es laut Endstand, und Y hat ihn abgegeben. Der Platz ist frei in Liga 1, es gilt die Nachrückerregel; Y
+    bleibt abgemeldet und steht nicht mehr unter „Bitte von Hand prüfen“."""
+    world = await build(flow, levels=2)
+    season, rows = await ready(flow, world, successor=rule)
+    x, y = rows[squad_id(world, 2, 0)], rows[squad_id(world, 2, 1)]
+    flow.act_as(await person(flow, y["squad_id"]))
+    ok(await flow.post(f"/api/me/league-applications/{y['id']}/withdraw"))
+    tid = world["tids"][2][0]
+    regs = world["regs"][tid]
+    flow.act_as(await second_lead(flow, world))
+    ok(await flow.post(f"{STAFFELN}/{tid}/reopen", json={"reason": "Ergebnis vertauscht eingetragen"}))
+    await flip(flow, tid, regs[1], regs[0])
+    flow.act_as(world["lead"])
+    ok(await flow.post(f"{STAFFELN}/{tid}/close", json={"confirm": True}))
+    preview = ok(await flow.get(f"{ADMIN}/seasons/{season['id']}/successor/recompute"))
+    kinds = {change["squad_id"]: change["kind"] for change in preview["changes"]}
+    assert kinds[y["squad_id"]] == "place" and kinds[x["squad_id"]] == "moved"
+    assert all(row["application_id"] != y["id"] for row in preview["manual"])
+    done = ok(await flow.post(f"{ADMIN}/seasons/{season['id']}/successor/recompute", json={"confirm": True, "stamp": preview["stamp"]}))
+    assert done["released_places"] == [y["id"]] and all(row["application_id"] != y["id"] for row in done["manual"])
+    after = await carried(flow, season["id"])
+    gone = after[y["squad_id"]]
+    assert gone["status"] == "withdrawn" and gone["carry_over"]["division_level"] == 1 and gone["carry_over"]["movement"] == "up"
+    if rule == "next":
+        # Der Nächste der Tabelle ist jetzt X (Zweiter): Er rückt auf den Platz nach, den Y abgegeben hat.
+        assert gone["carry_over"]["filled_by"]["application_id"] == x["id"]
+        assert after[x["squad_id"]]["carry_over"]["division_level"] == 1 and after[x["squad_id"]]["carry_over"]["fills"]["for_application_id"] == y["id"]
+    else:
+        places = (await overview(flow, world, season["id"]))["open_places"]
+        assert [place["application_id"] for place in places] == [y["id"]] and places[0]["pick"] == x["id"]
+        assert places[0]["division_level"] == 1
+    # Ein zweites Neuberechnen ändert nichts mehr.
+    flow.act_as(world["lead"])
+    assert ok(await flow.get(f"{ADMIN}/seasons/{season['id']}/successor/recompute"))["changes"] == []

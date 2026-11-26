@@ -44,7 +44,7 @@ NOTHING_TO_PASS = "Hier gibt es nichts abzulehnen. Wer nicht mitspielen will, me
 REASON_SHORT = f"Bitte einen Grund angeben (mindestens {REASON_MIN} Zeichen)."
 EXPIRED_REASON = "Startrecht verfallen: bis {day} keine Zusage."
 NO_PLACE = "Für diesen Antrag ist kein Platz frei geworden."
-NO_PLACE_NOW = "Nach dem korrigierten Endstand gibt es diesen Platz nicht mehr. Bitte neu laden."
+NO_PLACE_NOW = "Nach dem korrigierten Endstand gibt es diesen Platz nicht mehr. Bitte zuerst „Übernahme neu berechnen“."
 PLACE_TAKEN = "Dieser Platz ist schon vergeben. Bitte neu laden."
 NOT_A_CANDIDATE = "Dieses Co-Team ist kein Kandidat für den Platz. Wählbar sind nur die vorgeschlagenen Co-Teams."
 FILL_STARTED = "Die Season hat schon begonnen. Nachrücken geht jetzt nur noch von Hand im Eingang."
@@ -233,12 +233,14 @@ async def _context(db, season: dict) -> dict:
 
     predecessor = await db.league_seasons.find_one({"id": season.get("predecessor_id")}, {"_id": 0}) if season.get("predecessor_id") else None
     if not predecessor:
-        return {"predecessor": None, "paused": False, "levels": [], "table": {}}
+        return {"predecessor": None, "paused": False, "levels": [], "table": {}, "placed": {}}
     checked = await league_successor.plan(db, predecessor)
     divisions = await db.league_divisions.find({"season_id": season["id"], "status": {"$ne": "archived"}}, {"_id": 0, "level": 1}).to_list(50)
     return {"predecessor": predecessor, "paused": bool(checked["problems"]),
             "levels": sorted(row["level"] for row in divisions if isinstance(row.get("level"), int)),
-            "table": {team["squad_id"]: team for division in checked["divisions"] for team in division["teams"]}}
+            "table": {team["squad_id"]: team for division in checked["divisions"] for team in division["teams"]},
+            # Wo der Endstand jedes Co-Team sieht - auch eines, das es nicht mehr gibt: Daran hängt, ob ein Platz besteht.
+            "placed": league_successor.placed_levels(checked)}
 
 
 def _why(freed: dict) -> str:
@@ -258,9 +260,17 @@ def _still_exists(application: dict, ctx: dict) -> bool:
     """Den Platz gibt es nur, solange der bestätigte Endstand des Vorgängers dieses Co-Team in genau dieser Liga N sieht (Nr. 162,
     Entscheidung 26.11.). Sagt der korrigierte Endstand etwas anderes - das Co-Team steigt doch nicht auf, ist ausgeschieden -,
     entfällt der Platz ganz: Sonst stiege für ihn jemand zusätzlich auf. Das gilt auch für einen abgemeldeten Nachrücker: Sein
-    Antrag steht in der Liga des Platzes, auf den er nachgerückt war - frei wird dann jener Platz, nicht ein zweiter."""
-    team = ctx["table"].get(application.get("squad_id"))
-    return bool(team) and team.get("target_level") == (application.get("carry_over") or {}).get("division_level")
+    Antrag steht in der Liga des Platzes, auf den er nachgerückt war - frei wird dann jener Platz, nicht ein zweiter. Es zählt die
+    Platzierung im Endstand (``placed``), nicht ob es das Co-Team noch gibt: Löscht ein Abgemeldeter sein Co-Team, bleibt der Platz."""
+    level = (application.get("carry_over") or {}).get("division_level")
+    return isinstance(level, int) and ctx["placed"].get(application.get("squad_id")) == level
+
+
+def _corrected_away(application: dict, ctx: dict) -> bool:
+    """Gibt es den Platz nicht, **weil der Endstand korrigiert wurde**? Nur dann, wenn der Endstand das Co-Team jetzt in einer
+    anderen Liga N sieht als der Antrag - und der Antrag seine Liga aus dem Endstand hat, nicht vom Nachrücken (``fills``)."""
+    carry = application.get("carry_over") or {}
+    return application.get("squad_id") in ctx["placed"] and not _still_exists(application, ctx) and not isinstance(carry.get("fills"), dict)
 
 
 def _holds(holder: dict | None, application: dict) -> bool:
@@ -491,7 +501,7 @@ async def fill(db, season: dict, application_id: str, candidate_id: str | None, 
         if ctx["paused"]:
             raise StartRightProblem(FILL_PAUSED, 409)
         if not _still_exists(freed, ctx):
-            raise StartRightProblem(NO_PLACE_NOW, 409)
+            raise StartRightProblem(NO_PLACE_NOW if _corrected_away(freed, ctx) else NO_PLACE, 409)
         freed = await _open_place(db, freed, ctx)
         if not freed:
             raise StartRightProblem(PLACE_TAKEN, 409)
