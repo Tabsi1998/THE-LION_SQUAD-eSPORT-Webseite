@@ -5149,101 +5149,132 @@ Meldung auf Spielservern (nur ein Kanal, gewählt aus dem Hauptserver), eine Kor
 Am Ende einer Season erleben Spieler und Co-Teams den Ausgang einmal als ruhigen Moment: **Aufstieg**, **Abstieg** oder
 **Meister**. Danach bleibt ein Hinweis an Profil und Teamseite. Logik in `services/league_moments.py`, Routen in
 `routes/league_moment_routes.py`, Oberfläche `components/tls/league/moment/SeasonMoment.jsx` (über den Zeremonie-Host) und
-`components/tls/league/LeagueMomentHint.jsx`.
+`components/tls/league/LeagueMomentHint.jsx`. Entscheidungen Fabians vom 26.11. (A bis D) unten an ihrer Stelle.
 
 **Kein zweites System.** Quelle ist allein der bestätigte Endstand der ganzen Season: `league_successor.plan` ohne `problems` -
 alle Staffeln aller Arten abgeschlossen, samt Playoffs und Relegation (Überlagerung `via: "relegation"`), kein offener Gleichstand an
 einer Grenze, nichts Eingeschaltetes fehlt (`league_postseason.missing`). Dieselbe Stelle liest die Folge-Season (F.2) und die
 Nachricht „Aufstieg bestätigt“ (F.2a). Der Meister kommt aus dem geltenden Meister-Eintrag (`tournament_awards`, `league.title:
 "Meister"`, nicht ruhend - aus der Tabelle oder aus den Playoffs, F.6). Nie aus einer laufenden Tabelle und nie aus einer einzelnen
-abgeschlossenen Staffel. Gezeigt wird über die Warteschlange der Zeremonien (wie F.4, `rewards/seen`), die Nachricht läuft über die
-bestehende Art `league_reward` (Thema „Turniere“, Wichtigkeit normal, Push-Kanal der Erfolge) mit `meta.reason: "league_moment"`. TV
-(Saisonfinale F.7) und Discord (Saisonende-Meldung) bleiben, wie sie sind - sie zeigen Auf- und Absteiger schon.
+abgeschlossenen Staffel. Gezeigt wird über die Warteschlange der Zeremonien (wie F.4), die Nachricht läuft über die bestehende Art
+`league_reward` (Thema „Turniere“, Wichtigkeit normal, Push-Kanal der Erfolge) mit `meta.reason: "league_moment"`. TV (Saisonfinale F.7)
+und Discord (Saisonende-Meldung) bleiben, wie sie sind - sie zeigen Auf- und Absteiger schon.
 
-**Sammlung `league_moments`** (neu, ohne Migration; Indizes beim Start): eine Zeile je Season und Co-Team (`key` =
-`<season>:<co-team>`, eindeutig, Index `season_entrant`; in einer Einzel-Liga `<season>:user:<person>`, nur für den Meister).
+**Sammlung `league_moments`** (neu, ohne Migration; Indizes beim Start, eindeutig `season_entrant` auf `key`): eine Zeile je Season und
+Co-Team (`key` = `<season>:<co-team>`; in einer Einzel-Liga `<season>:user:<person>`, nur für den Meister).
 
 | Feld | Inhalt |
 | --- | --- |
-| `id`, `key`, `season_id`, `league_id`, `squad_id`, `team_id`, `user_id`, `registration_id` | Zuordnung |
+| `id`, `key`, `season_id`, `league_id`, `squad_id`, `team_id`, `user_id`, `registration_id`, `registration_ids` | Zuordnung; `registration_ids`: alle Anmeldungen des Co-Teams in der Season (Tabelle, Playoffs, Relegation) |
 | `outcome`, `fact` | `champion`, `up` oder `down`; `fact` = `<outcome>:<Liga N danach>` (etwa `up:1`) - das vergleicht ein Wiederöffnen |
 | `from`, `to` | `{level, nickname}` der Liga N vorher und nachher (Meister: gleich) |
 | `via`, `playoffs`, `display_name`, `staffel` | über die Relegation; Meister aus den Playoffs; Name des Co-Teams; Staffel |
 | `player_ids` | Spieler mit Einsatz in der Season (unten) |
-| `responsible_ids` | Captain und Vertreter (`match_audience.responsible_ids`) |
+| `responsible_ids` | Captain und Vertreter des Co-Teams, ohne beide die Leitung des Hauptteams - dieselben wie bei „Aufstieg bestätigt“ (`league_applications._responsible`) |
 | `audience_ids` | wer den Moment bekommt: `player_ids` und `responsible_ids` |
-| `seen_by` | wer ihn schon gesehen hat - einmal je Person, auf jedem Gerät |
+| `claims` | `{<person>: {token, at}}`: welches Gerät den Moment gerade zeigt (unten „Lesen“) |
+| `seen_by` | wer ihn gesehen und geschlossen hat - danach kommt er für diese Person nirgends mehr |
 | `notified_ids`, `told_ids`, `seq` | wer die Nachricht zum geltenden Stand bekam; wer schon von einem früheren Stand erfuhr; Zähler je Änderung |
 | `active`, `suspended` | `false`: der Ausgang ist nach einer Korrektur weggefallen; `true`: der Endstand steht gerade nicht fest |
 | `confirmed_at`, `corrected_at`, `previous` | wann bestätigt; wann und wovon korrigiert (`{outcome, fact}`) |
 
-**Wer ihn bekommt** (nach den Regeln der Belohnungen, F.4): die Spieler mit Einsatz in dieser Season - aus `sides[].player_ids` aller
-geltenden Endstände der Season (auch Playoffs und Relegation): wer aufgestellt war, ohne gemeldete Aufstellung der Kader (Nr. 167,
-kampflose Spiele zählen nicht, Nr. 168). Steht die Season auf „Ganzer Kader zum Abschluss“ (`reward_players: roster`), der Kader des
-Co-Teams. Dazu Captain und Vertreter wie bei einer Team-Belohnung. Wer nur im Kader stand und nicht spielte, bekommt ihn nicht.
-Ausgetretene und Disqualifizierte haben keinen Ausgang (`plan` führt sie unter `dropped`). Wer bleibt, bekommt keinen Moment. Ein Co-Team,
-das seinen Platz in der schon angelegten Folge-Season aufgegeben hat (abgemeldet, verfallen, abgelehnt), bekommt den Moment wie alle
-anderen - ohne Aufforderung; nur wer ein offenes Startrecht hat (F.2a, `carry_over.start_right.status: "offered"`) und Captain oder
-Vertreter ist, sieht den Knopf **Startrecht zusagen** (`next_step`).
+An der Season: `moment_days` (1-365, Vorgabe 45, D) und die Marke `moments_pending_at` (`{at, mark}`: ein Abgleich steht aus - endet auf
+`_at`, geht also nicht in die Folge-Season).
 
-**Abgleich** (`league_moments.sync`, unter der Blatt-Sperre `league_season_moment_resource` - nimmt keine weitere Sperre): nach jedem
-Schritt, der den Endstand ändert - Abschluss, Wiederöffnen, Entscheid über Staffeln hinweg (gesetzt oder zurückgenommen;
-`routes/league_final_routes._moments_follow`, nach den Sperren des Abschlusses) - und als `after_visibility` nach einer geänderten
-Sichtbarkeit der Season (`routes/league_routes.py`). Ein Fehler hält den Schritt nicht auf. Zweimal hintereinander ändert nichts.
+**Wer ihn bekommt** (nach den Regeln der Belohnungen, F.4 - dieselbe Funktion `league_rewards.players_for` je Staffel der Season, auch
+Playoffs und Relegation): wer in einem **gespielten** Spiel aufgestellt war - kampflose Spiele zählen nicht (Nr. 168); ohne jede gemeldete
+Aufstellung der Kader zum Abschluss (Nr. 167); mit „Ganzer Kader zum Abschluss“ (`reward_players: roster`) der Kader. Dazu Captain und
+Vertreter. Wer nur im Kader stand und nicht spielte, bekommt ihn nicht, ebenso wenig, wer eine Anmeldung nur angelegt hat (Anmeldungen
+von Co-Teams tragen ohnehin kein `user_id`; anmelden dürfen nur Captain und Vertreter, `may_apply`). Ausgetretene und Disqualifizierte
+haben keinen Ausgang (`plan` führt sie unter `dropped`). Wer bleibt, bekommt keinen Moment. Ein Co-Team, das seinen Platz in der schon
+angelegten Folge-Season aufgegeben hat (abgemeldet, verfallen, abgelehnt), bekommt den Moment wie alle anderen - ohne Aufforderung;
+nur Captain und Vertreter mit offenem Startrecht (F.2a, `carry_over.start_right.status: "offered"`) sehen **Startrecht zusagen**.
+
+**Sichtbar erst für Mitglieder** (C): Moment, Nachricht und Hinweis nur, wenn die Season auf „Mitglieder“ oder „Öffentlich“ steht und
+die Person sie sieht (`can_see_season`). „Aus“ und „Nur Liga-Leitung“ zeigen nichts, auch nicht der Liga-Leitung. Wird die Season
+sichtbar, holt `after_visibility` die Nachrichten nach (`routes/league_routes.py`).
+
+**Abgleich** (`league_moments.sync`): nach jedem Schritt, der den Endstand ändert - Abschluss, Wiederöffnen, Entscheid über Staffeln
+hinweg (gesetzt oder zurückgenommen; `routes/league_final_routes._moments_follow`, nach `_start_rights_follow` und nach den Sperren des
+Abschlusses). Erst setzt er die Marke an der Season, dann gleicht er unter der Blatt-Sperre `league_season_moment_resource` ab (nimmt
+keine weitere Sperre), dann nimmt er nur seine eigene Marke wieder weg. Bekommt er die Sperre nicht (ein anderer Abgleich läuft) oder
+bricht er ab, bleibt die Marke stehen - der Job `league_moments` (alle 5 Minuten, `league_moments.sweep`) holt nach. Die Nachrichten
+gehen danach **außerhalb der Sperre** und gebündelt an Expo (`push_batch`, #2553). Ein Fehler hält den Schritt nicht auf. Zweimal
+hintereinander ändert nichts.
 
 | Fall | Wirkung |
 | --- | --- |
-| Endstand steht nicht fest (Staffel offen, wieder geöffnet, Gleichstand an der Grenze, Relegation offen) | jeder Moment der Season ruht (`suspended`) - nichts gezeigt, kein Hinweis, nichts gelöscht |
+| Endstand steht nicht fest (Staffel offen, wieder geöffnet, Gleichstand an der Grenze, Relegation oder Playoffs offen) | jeder Moment der Season ruht (`suspended`) - nichts gezeigt, kein Hinweis, nichts gelöscht |
 | bestätigt, neu | Eintrag mit `seen_by: []`; Nachricht je Person |
-| bestätigt, gleicher Ausgang wie vorher (Wiederöffnen ohne Änderung) | derselbe Eintrag samt `seen_by` - kein zweiter Moment, keine zweite Nachricht |
-| bestätigt, anderer Ausgang | derselbe Eintrag, ruhig nachgezogen (`corrected_at`, `previous`, `seq` + 1). Wer schon sah, bekommt keinen neuen Moment, sondern still „Endstand korrigiert“ (nur Postfach, `in_app_only`); wer noch nicht sah, sieht den neuen Ausgang |
-| Ausgang fällt weg (bleibt jetzt) | `active: false`, kein Hinweis; wer schon davon erfuhr, bekommt still „Endstand korrigiert“ |
+| bestätigt, gleicher Ausgang wie vorher (Wiederöffnen ohne Änderung) | derselbe Eintrag samt `seen_by` - nichts passiert, kein zweiter Moment, keine zweite Nachricht |
+| bestätigt, anderer Ausgang (B) | derselbe Eintrag, `corrected_at`, `previous`, `seq` + 1, `seen_by` und `claims` leer: Der neue Moment kommt **einmal** mit dem Hinweis „Endstand korrigiert“ - auch für alle, die den alten sahen; Nachricht „Endstand korrigiert“ (mit Push) |
+| Ausgang fällt weg (bleibt jetzt) | `active: false`, kein Hinweis, kein Moment; wer davon erfuhr, bekommt still „Endstand korrigiert“ (nur Postfach) |
+
+**Meister mit Belohnungen** (A): ein Ablauf. Zuerst der goldene Meister-Moment, mit **Weiter** die Belohnungen derselben Season als zweite
+Karte in derselben Karte (`RewardCardContent`), ohne neues Aufpoppen. Ohne eingestellte Belohnung bleibt es beim Meister-Moment.
+- Die Belohnungen des Meisters warten so lange auf ihn: `GET /api/me/rewards/unseen` hält sie zurück (`league_moments.held_reward_ids`),
+  solange der Endstand der Season nicht feststeht oder die Person den Moment noch sehen wird; `GET …/league-moments/unseen` bringt sie am
+  Meister-Moment mit (`rewards`). Gesehen sind sie, wenn die zweite Karte kam; schließt die Person vorher, kommen sie danach wie bisher.
+  Hatte ein anderes Gerät den Moment schon, zeigt dieses Gerät die Belohnungen allein.
+- **Eine Nachricht:** „Meister: <Co-Team>“ mit „Dazu: <Belohnungen>“. Dafür schweigen beim Abschluss „Neue Belohnung“ und „Belohnung für
+  euer Team“ für die Anmeldung des Meisters (`league_rewards.grant` → `held_people`, `held_team`) und „Staffel abgeschlossen“ für Captain
+  und Vertreter des Meisters (`league_final.notify_captains`). Bekam der Meister seine Nachricht schon (Belohnung erst nach einem
+  Wiederöffnen nachgetragen), meldet sich die Belohnung wieder selbst. Verluste nach einer Korrektur meldet die Belohnung wie bisher.
 
 **Nachricht:** je Person und Stand eine (`dedupe_key` `league-moment:<moment>:<seq>:<person>`, `unique_dedupe`; vorher wird die Person
-bedingt in `notified_ids` eingetragen - zwei Abgleiche zugleich schicken nicht doppelt). Titel „Aufstieg in Liga 1“, „Nächste Season in
+bedingt in `notified_ids` eingetragen - zwei Läufe zugleich schicken nicht doppelt). Titel „Aufstieg in Liga 1“, „Nächste Season in
 Liga 3“ bzw. „Meister: <Co-Team>“, Text „Der Endstand von <Liga · Season> steht fest: …“, Link zur Season-Seite. **Kein Doppel mit
 #1627:** Führt die Season Startrechte mit Nachricht (`start_rights.announce`), bekommen Captain und Vertreter zu Auf- und Abstieg schon
-„Aufstieg bestätigt“ - der Moment schickt ihnen keine zweite Nachricht (zeigt sich ihnen aber). **Season-Schalter:** Nur wer die Season
-sieht (`can_see_season`), bekommt eine Nachricht; eine Season „Aus“ verrät nichts. Wird sie sichtbar, holt `after_visibility` die
-Nachrichten nach.
+„Aufstieg bestätigt“ - der Moment schickt ihnen keine zweite Nachricht (zeigt sich ihnen aber). Beide Kreise sind dieselben
+(`responsible_ids` = `_responsible`), es bleibt also niemand ohne Nachricht.
 
 **Lesen**
 
-- `GET /api/me/league-moments/unseen` (angemeldet, nur eigene): `{moments: [...]}` - geltend, nicht ruhend, noch nicht gesehen, aus
-  einer Season, die die Person sieht (nie „Aus“, nie archiviert), höchstens `FRESH_DAYS` (45) Tage nach dem bestätigten Endstand; der
-  Meister zuerst, dann Aufstieg, dann Abstieg. Je Moment `{id, outcome, season_id, season_name, season_number, league_name, title, url,
-  squad_id, team_id, display_name, from, to, badge_from, badge_to, via, playoffs, corrected, confirmed_at, texts, next_step}`; `texts`:
-  `{kicker, title, name, meta, line, next, aria}` - die Texte für Web und App, `badge_*` wie das Liga-Abzeichen (#1638, Gold nur für den
-  Meister). Nie Personenlisten.
-- `POST /api/me/league-moments/seen` `{ids}` (höchstens 20): `{ok, claimed}` - die Kennungen, die **dieser Aufruf** eingetragen hat
-  (`update_one` mit `seen_by: {$ne: person}`). Die Seite holt sich den Moment so direkt vor dem Zeigen (Prüfung `check` der
-  Warteschlange, #2450): Nur was dieses Gerät bekommt, wird gezeigt - ein zweiter Tab, ein zweites Gerät, ein Neuladen zeigt ihn nicht
-  noch einmal. Scheitert die Anfrage, wartet der Moment auf den nächsten Besuch.
+- `GET /api/me/league-moments/unseen` (angemeldet, nur eigene): `{moments: [...]}` - geltend, nicht ruhend, nicht geschlossen, aus einer
+  Season, die Mitglieder und die Person sehen, nicht archiviert, **frisch gefragt alle Staffeln abgeschlossen** (nie einem veralteten
+  Abgleich trauen), höchstens `moment_days` Tage nach dem bestätigten Endstand; der Meister zuerst, dann Aufstieg, dann Abstieg. Je Moment
+  `{id, outcome, season_id, season_name, season_number, league_name, title, url, squad_id, team_id, display_name, from, to, badge_from,
+  badge_to, via, playoffs, corrected, confirmed_at, texts, next_step, rewards}`; `texts`: `{label, kicker, title, name, meta, line, next,
+  summary, aria, notice}` - die Texte für Web und App (`notice`: „Endstand korrigiert“), `badge_*` wie das Liga-Abzeichen (#1638, Gold nur
+  für den Meister). Nie Personenlisten.
+- `POST /api/me/league-moments/seen` `{ids, token}` (höchstens 20; `token`: Schlüssel des Geräts, 8-80 Zeichen): holt den Moment für
+  dieses Gerät, `{ok, claimed}`. Geholt bekommt ihn, wer ihn noch nicht geholt hat, dasselbe Gerät noch einmal (gleicher Schlüssel - nach
+  einer verlorenen Antwort kommt er beim nächsten Besuch wieder) oder ein anderes Gerät, wenn das Holen über `CLAIM_HOURS` (12) zurückliegt.
+  Prüft ebenfalls „alle Staffeln abgeschlossen“. Die Website merkt sich den Schlüssel je Moment (`localStorage`, sonst je Sitzung).
+- `POST /api/me/league-moments/done` `{ids}`: gezeigt und geschlossen - `seen_by`, danach kommt der Moment für die Person nirgends mehr.
+  Geht diese Meldung verloren, merkt sich die Website das und meldet beim nächsten Besuch still nach, statt den Moment zu zeigen.
 - Profil (`GET /api/users/public/{name}`): `league_moments` - je Co-Team der jüngste Ausgang (höchstens 3), nach der Regel des Profils:
-  die Person selbst alles, wofür sie den Moment bekam; andere nur bei den Spielern (`player_ids`, wie die Season-Historie), nie aus
-  einer Season „Aus“, nie bei privaten Teams.
-- Teamseite (`GET /api/teams/{id}`): `league_moments` - je Co-Team der jüngste Ausgang (höchstens 6) aus Seasons, die die Person sieht.
+  die Person selbst alles, wofür sie den Moment bekam; andere nur bei den Spielern (`player_ids`, wie die Season-Historie), nur aus
+  Seasons, die Mitglieder sehen, nie bei privaten Teams.
+- Teamseite (`GET /api/teams/{id}`): `league_moments` - je Co-Team der jüngste Ausgang (höchstens 6) aus Seasons, die Mitglieder und die
+  Person sehen.
+
+**Einstellung** (D): Season-Seite, Reiter **Belohnungen**: „Saisonende-Moment beim nächsten Besuch (Tage)“, `PUT …/seasons/{id}/rewards`
+`{moment_days}` (1-365, sonst 422), Vorgabe 45; `GET …/rewards` nennt `moment_days` und `moment_days_default`. Geht mit F.2 in die
+Folge-Season. Seasons, die vor dem Einspielen bestätigt wurden, werden nicht nachgeholt (es lief noch keine echte Season).
 
 **Darstellung** (`SeasonMoment.jsx`, `seasonMoment.css`, im Stil von `RewardMoment`/`PlacementMoment`, Detail-Runde):
 
 | Ausgang | Bild | Bewegung |
 | --- | --- | --- |
 | Aufstieg | das Liga-Wappen (Formen aus `LeagueBadge`) mit der alten und der neuen Zahl | Wappen hebt sich, die Zahl zählt um (alt hinaus, neu von unten mit leichtem Nachfedern), wechselt die Stufe, blendet die Form mit; in Liga 1 setzt sich die Krone; Glanz und Aufleuchten |
-| Meister | goldener Pokal (`TrophyCup`) mit goldenem Abzeichen | Pokal hebt sich, Glanz zieht darüber, goldener Schein dahinter |
-| Abstieg | Wappen in Grau-Blau, Karte „ruhig“ (`data-metal="calm"`) | Wappen setzt sich, Zahl wechselt ohne Nachfedern, kein Glanz; eine Krone von Liga 1 blendet still aus |
+| Meister | goldener Pokal (`TrophyCup`) mit goldenem Abzeichen; mit Belohnungen danach die zweite Karte | Pokal hebt sich, Glanz zieht darüber, goldener Schein dahinter |
+| Abstieg | Wappen in ruhigem Grau-Blau, Karte „ruhig“ (`data-metal="calm"`) | Wappen setzt sich, Zahl wechselt ohne Nachfedern, kein Glanz; eine Krone von Liga 1 blendet still aus |
 
 Die Zeilen folgen gestaffelt (`--tls-stagger-step`); alle Zeiten aus den Tokens (`check-motion-rules`). „Bewegung reduzieren“ oder
 „Zeremonien dezent“: gleich der Endzustand. Dialog mit Titel und Beschreibung, Fokus-Falle und Escape (`useModalBehavior`), Satz für
-Screenreader, **Weiter**, **Endstand ansehen**, gegebenenfalls **Startrecht zusagen**. Reihenfolge in der Warteschlange: vor den
-Belohnungen derselben Season (`RewardWatcher`), nie zugleich mit einer anderen Zeremonie, im Adminbereich wartet er. Der Moment liegt
-im nachgeladenen Teil des Zeremonie-Hosts (`CeremonySlot`).
+Screenreader, **Weiter**, **Endstand ansehen**, gegebenenfalls **Startrecht zusagen**. Ist die Karte höher als das Fenster (Handy im
+Querformat), rollt die Fläche (`.tls-placement` mit `overflow-y: auto`, Karte mit `margin: auto`) - gilt für alle Zeremonie-Karten.
+Reihenfolge in der Warteschlange: vor den Belohnungen (`RewardWatcher`), nie zugleich mit einer anderen Zeremonie, im Adminbereich wartet
+er. Der Moment liegt im nachgeladenen Teil des Zeremonie-Hosts (`CeremonySlot`).
 
 **Hinweis** (`LeagueMomentHint`): Abschnitt **Saisonende** im Profil (nach „Aktuelle Ligen“) und an der Teamseite (nach „Liga“) mit
 Abzeichen, Ausgang, Satz, Link **Endstand** und „Endstand korrigiert“, falls zutrifft. **Moment ansehen** spielt ihn noch einmal ab -
-nur die Person selbst bzw. Mitglieder, ohne Zählung.
+nur die Person selbst bzw. Mitglieder, ohne Zählung, und nur einmal in der Schlange, egal wie oft gedrückt.
 
-**Auskunft und Kontolöschung:** wie die Belohnungen (`tournament_awards`) Vereinsinhalt - an der Person hängen nur Kennungen
-(`personal_data.CLUB_CONTENT`).
+**Auskunft und Kontolöschung:** wie die Belohnungen (`tournament_awards`) Vereinsinhalt (`personal_data.CLUB_CONTENT`). Beim Löschen
+eines Kontos fällt die Kennung aus allen Listen und Gerätevermerken (`league_moments.scrub_person` aus `account_erasure`); der Moment
+selbst bleibt.
 
 **Nicht in F.8:** die App (`mobile/`): Moment in der App mit leichter Vibration und reduzierter Bewegung, Hinweis im Profil - die API
 liefert alles (Folgepunkt im App-Paket). Momente für Playoff-Sieger unterer Liga N und für die Plätze 2 und 3 (die kommen über die
