@@ -1,20 +1,18 @@
 # Changelog
 
-## [1.100.1](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/compare/v1.100.0...v1.100.1) (2026-11-26)
-
+## 1.100.1 (26.11.2026)
 
 ### Fehlerbehebungen
 
-* Matchseite – „Captains“ in der Liga, sonst „Teamleitungen“ statt „Team-Captains“ ([#2591](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/2591)) ([df4048e](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/df4048efbb1770c388cda48d3d75ae54207f8518))
-* Mein Bereich – kein Rahmen mehr um den Titel nach einem Gruppenwechsel ([398b4ec](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/398b4ecfa63a98ce029d77cd36832e89f369bb98))
-* Mein Bereich → Verein zeigt die Mitgliedskarte nicht mehr doppelt – sie steht unter Mitgliedschaft ([398b4ec](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/398b4ecfa63a98ce029d77cd36832e89f369bb98))
-* Saisonende-Moment – korrigierter Moment kommt trotz alter „fertig“-Marke im Browser ([#2591](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/2591)) ([df4048e](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/df4048efbb1770c388cda48d3d75ae54207f8518))
-
+* Matchseite – „Captains“ in der Liga, sonst „Teamleitungen“ statt „Team-Captains“ (#2591)
+* Mein Bereich – kein Rahmen mehr um den Titel nach einem Gruppenwechsel
+* Mein Bereich → Verein zeigt die Mitgliedskarte nicht mehr doppelt – sie steht unter Mitgliedschaft
+* Saisonende-Moment – korrigierter Moment kommt trotz alter „fertig“-Marke im Browser (#2591)
 
 ### Dokumentation
 
-* Backup und Restore – Probelauf, frisches Ziel mit eigenen Containernamen, Hilfsbild alpine ([#1632](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/1632)) ([f42997d](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/f42997d0d615b31d8c25b0d560625ebcfdd362f7))
-* Liga-Abschlussbericht – Stand, abgenommen, offen, Checkliste für den Server ([#1632](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/1632)) ([f42997d](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/f42997d0d615b31d8c25b0d560625ebcfdd362f7))
+* Backup und Restore – Probelauf, frisches Ziel mit eigenen Containernamen, Hilfsbild alpine (#1632)
+* Liga-Abschlussbericht – Stand, abgenommen, offen, Checkliste für den Server (#1632)
 
 ## 1.100.0 (26.11.2026)
 
