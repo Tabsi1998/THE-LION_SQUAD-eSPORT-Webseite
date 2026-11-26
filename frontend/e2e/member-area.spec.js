@@ -106,12 +106,12 @@ test("ist nichts freigeschaltet, steht ein Satz statt leerer Karten", async ({ p
   await expect(page.getByTestId("member-area-documents")).toHaveCount(0);
   await expect(page.getByTestId("member-area-benefits")).toHaveCount(0);
   await expect(page.getByTestId("member-area-board")).toHaveCount(0);
-  // Ohne gültige Mitgliedschaft keine Karte - nur der Gruß.
-  await expect(page.getByTestId("member-area-greeting")).toHaveText("Hallo, LunaByte");
+  // Karte, Gruß und Beitrag stehen seit „Mein Bereich“ nur unter Mitgliedschaft (Fabian 26.11.), hier nie.
+  await expect(page.getByTestId("member-area-greeting")).toHaveCount(0);
   await expect(page.getByTestId("member-area-card")).toHaveCount(0);
 });
 
-test("Dokumente, interne News, Ansprechpartner und der Discord-Link erscheinen, sobald es sie gibt", async ({ page }) => {
+test("Dokumente, interne News und Ansprechpartner erscheinen, sobald es sie gibt", async ({ page }) => {
   await mockServer(page, {
     documents: [{ id: "d-1", title: "Statuten 2026", original_filename: "statuten.pdf" }],
     news: NEWS,
@@ -126,7 +126,6 @@ test("Dokumente, interne News, Ansprechpartner und der Discord-Link erscheinen, 
   await expect(page.getByTestId("member-area-news")).not.toContainText("Für alle");
   await expect(page.getByTestId("member-area-board")).toContainText("Obmann");
   await expect(page.getByTestId("member-area-board")).toContainText("Lion Boss");
-  await expect(page.getByTestId("member-area-discord")).toHaveAttribute("href", "https://discord.com/invite/lions");
   await expect(page.getByTestId("member-area-empty")).toHaveCount(0);
 });
 
@@ -145,22 +144,22 @@ for (const width of [390, 768, 1440, 2560]) {
   test.describe(`Mitgliederbereich bei ${width} px`, () => {
     test.use({ viewport: { width, height: width === 390 ? 844 : 1000 } });
 
-    test(`Karte oben, Sprungleiste, kein Verweis über einer Überschrift (${width})`, async ({ page }) => {
+    test(`ohne Karte oben, Sprungleiste, kein Verweis über einer Überschrift (${width})`, async ({ page }) => {
       // Ohne Bewegung: gemessen wird der Endstand, nicht das Einblenden von „Mein Bereich“ (#2059).
       await page.emulateMedia({ reducedMotion: "reduce" });
       await mockServer(page, FULL);
       await page.goto("/members/area");
       await acceptCookies(page);
 
-      await expect(page.getByTestId("member-area-card")).toBeVisible();
-      await expect(page.getByTestId("member-area-greeting")).toHaveText("Hallo, LunaByte");
-      await expect(page.getByTestId("member-area-fee")).toHaveText("Beitrag bezahlt");
+      // Karte, Gruß und Beitrag nur unter Mitgliedschaft (Fabian 26.11.) - Verein beginnt mit der Sprungleiste.
+      await expect(page.getByTestId("member-area-head")).toHaveCount(0);
+      await expect(page.getByTestId("member-area-card")).toHaveCount(0);
       const bar = page.getByTestId("member-area-links");
       await expect(bar.getByTestId("member-area-jump-versammlung")).toHaveText("Versammlung · 1 offen");
       await expect(bar.getByTestId("member-area-jump-helfen")).toHaveText("Helfen · 6 frei");
       await expect(bar.getByTestId("member-area-jump-news")).toHaveText("News · 1 neu");
       await expect(bar.getByTestId("member-area-jump-dokumente")).toHaveText("Dokumente · 1 neu");
-      await expect(bar.getByTestId("member-area-jump-karte")).toHaveText("Karte");
+      await expect(bar.getByTestId("member-area-jump-karte")).toHaveCount(0);
       await expect(page.getByTestId("member-area-board")).toContainText("Mira Muster");
 
       const items = await bar.locator(".tls-area-jump__item").all();
@@ -181,11 +180,8 @@ for (const width of [390, 768, 1440, 2560]) {
         expect(overlaps(title, more), `${section}: Titel und Verweis überlappen`).toBe(false);
       }
 
-      // Gold nur an Karte und Strich: Verweise sind Cyan, „Meine Mitgliedschaft“ ist ein cyaner Button (#2059).
+      // Verweise sind Cyan, Gold nur am Strich unter dem aktiven Eintrag.
       await expect.poll(() => page.getByTestId("member-area-board-more").evaluate((element) => getComputedStyle(element).color)).toBe("rgb(41, 182, 232)");
-      // Die Maus steht nicht über dem Knopf (sonst zeigt er die Farbe beim Drüberfahren).
-      await page.mouse.move(0, 0);
-      await expect.poll(() => page.getByTestId("member-area-my-membership").evaluate((element) => getComputedStyle(element).backgroundColor)).toBe("rgb(41, 182, 232)");
 
       const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
       expect(overflow).toBeLessThanOrEqual(0);

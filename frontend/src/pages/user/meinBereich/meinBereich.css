@@ -73,3 +73,7 @@
   .tls-mb-panel, .tls-mb-dot { animation: none; }
   .tls-mb-nav__mark, .tls-mb-tabs__line, .tls-mb-nav__icon { transition: none; }
 }
+
+/* Die Ueberschrift bekommt beim Gruppenwechsel den Fokus (fuer Vorleser), ist aber kein Bedienelement: kein Rahmen
+   darum (der allgemeine :focus-visible-Schatten aus index.css zeichnete sonst einen Kasten um den Titel). */
+[data-mein-bereich-titel]:focus-visible { box-shadow: none; }
