@@ -584,6 +584,7 @@ async def _recompute_plan(db, season: dict) -> dict:
             target[team["squad_id"]] = (team, own, division_label(own) if own else division["label"])
     rows = await db.league_applications.find({"season_id": season["id"]}, {"_id": 0}).sort("created_at", 1).to_list(1000)
     carried = {row["squad_id"]: row for row in rows if row.get("carry_over")}
+    by_id = {row["id"]: row for row in rows}
     others = {row["squad_id"]: row for row in rows if not row.get("carry_over") and row.get("active_key")}
     changes, manual = [], []
     unchanged = 0
@@ -601,11 +602,15 @@ async def _recompute_plan(db, season: dict) -> dict:
         free = row["status"] == ACCEPTED and not row.get("assignment")
         new = _carry_of(predecessor, wanted[0], wanted[1], wanted[2]) if wanted else None
         # Ein Nachrücker (#1627, F.2a) steht mit Absicht in einer anderen Liga N: Sagt der Endstand für ihn dasselbe wie vor dem
-        # Nachrücken, bleibt er, wo er ist.
+        # Nachrücken, bleibt er, wo er ist - solange es den Platz noch gibt, auf den er nachgerückt war. Sieht der korrigierte
+        # Endstand das abgemeldete Co-Team nicht mehr in dieser Liga N, geht der Nachrücker zurück (``moved``): Sonst stiege einer
+        # zu viel auf.
         back = (carry.get("fills") or {}).get("back") if isinstance(carry.get("fills"), dict) else None
         if free and new and back and new["division_level"] == back.get("division_level"):
-            unchanged += 1
-            continue
+            place = target.get((by_id.get(carry["fills"].get("for_application_id")) or {}).get("squad_id"))
+            if place and place[0]["target_level"] == carry.get("division_level"):
+                unchanged += 1
+                continue
         if not free:
             if not wanted or new["division_level"] != carry.get("division_level"):
                 why = "zugeteilt" if row.get("assignment") else {"withdrawn": "abgemeldet"}.get(row["status"], "nicht mehr angenommen")
@@ -727,19 +732,18 @@ async def _apply_recompute(db, season: dict, found: dict, actor: dict) -> list[t
             # falsche Liga. ``fills`` fällt weg, bei ``updated`` wie bei ``moved``.
             update["$unset"] = {"carry_over.fills": ""}
             if kind == "moved":
-                # Andere Liga N: Im Zusage-Modus gilt die alte Zusage nicht für die neue Liga, und der Platz, auf den er nachgerückt
-                # war, ist wieder frei.
+                # Andere Liga N: Im Zusage-Modus gilt die alte Zusage nicht für die neue Liga.
                 update["$set"].update({f"carry_over.{key}": value for key, value in fresh_right.items()})
-                await db.league_applications.update_one({"season_id": season["id"], "carry_over.filled_by.application_id": change["application_id"]},
-                                                        {"$unset": {"carry_over.filled_by": ""}})
         try:
             result = await db.league_applications.update_one(query, update)
         except DuplicateKeyError:
             continue
         if result.modified_count:
-            if kind == "revoked":
-                # Zurückgenommener Nachrücker (Entscheidung 26.11.): Der Platz, auf den er nachgerückt war, ist wieder frei -
-                # ``filled_by`` fällt weg, er steht wieder unter den freien Plätzen, und es gilt die Nachrückerregel der Season.
+            if kind in ("revoked", "moved", "updated"):
+                # War es ein Nachrücker (Entscheidung 26.11.) - zurückgenommen, in eine andere Liga N geschickt oder jetzt aus
+                # eigenem Recht dort -, hält er den Platz nicht mehr, auf den er nachgerückt war: ``filled_by`` fällt weg. Ob es
+                # diesen Platz nach dem korrigierten Endstand noch gibt und wer nachrückt, entscheidet ``fill_places``
+                # (``league_start_rights``, die Route ruft es mit ``released_places`` auf).
                 freed = await db.league_applications.find({"season_id": season["id"], "carry_over.filled_by.application_id": change["application_id"]},
                                                           {"_id": 0, "id": 1}).to_list(10)
                 change["released"] = [row["id"] for row in freed]

@@ -44,6 +44,7 @@ NOTHING_TO_PASS = "Hier gibt es nichts abzulehnen. Wer nicht mitspielen will, me
 REASON_SHORT = f"Bitte einen Grund angeben (mindestens {REASON_MIN} Zeichen)."
 EXPIRED_REASON = "Startrecht verfallen: bis {day} keine Zusage."
 NO_PLACE = "Für diesen Antrag ist kein Platz frei geworden."
+NO_PLACE_NOW = "Nach dem korrigierten Endstand gibt es diesen Platz nicht mehr. Bitte neu laden."
 PLACE_TAKEN = "Dieser Platz ist schon vergeben. Bitte neu laden."
 NOT_A_CANDIDATE = "Dieses Co-Team ist kein Kandidat für den Platz. Wählbar sind nur die vorgeschlagenen Co-Teams."
 FILL_STARTED = "Die Season hat schon begonnen. Nachrücken geht jetzt nur noch von Hand im Eingang."
@@ -246,11 +247,49 @@ def _why(freed: dict) -> str:
     return DECLINED if freed.get("status") == "withdrawn" else "rejected"
 
 
-def _is_free(application: dict) -> bool:
-    """Ein frei gewordener Platz: abgemeldet, verfallen oder abgelehnt - nicht zurückgenommen (Nr. 162) - und noch nicht vergeben."""
+def _gave_up(application: dict) -> bool:
+    """Der Antrag hat seinen Platz aufgegeben: abgemeldet, verfallen oder abgelehnt - nicht zurückgenommen (Nr. 162)."""
     carry = application.get("carry_over") or {}
-    return (application.get("status") in ("withdrawn", "rejected") and not carry.get("revoked_at") and not carry.get("filled_by")
+    return (application.get("status") in ("withdrawn", "rejected") and not carry.get("revoked_at")
             and isinstance(carry.get("division_level"), int))
+
+
+def _still_exists(application: dict, ctx: dict) -> bool:
+    """Den Platz gibt es nur, solange der bestätigte Endstand des Vorgängers dieses Co-Team in genau dieser Liga N sieht (Nr. 162,
+    Entscheidung 26.11.). Sagt der korrigierte Endstand etwas anderes - das Co-Team steigt doch nicht auf, ist ausgeschieden -,
+    entfällt der Platz ganz: Sonst stiege für ihn jemand zusätzlich auf. Das gilt auch für einen abgemeldeten Nachrücker: Sein
+    Antrag steht in der Liga des Platzes, auf den er nachgerückt war - frei wird dann jener Platz, nicht ein zweiter."""
+    team = ctx["table"].get(application.get("squad_id"))
+    return bool(team) and team.get("target_level") == (application.get("carry_over") or {}).get("division_level")
+
+
+def _holds(holder: dict | None, application: dict) -> bool:
+    """Hält ``holder`` den frei gewordenen Platz noch? Nur solange er angenommen ist und als Nachrücker auf genau diesem Platz steht.
+    Ein Nachrücker, der sich abgemeldet hat, abgelehnt oder zurückgenommen wurde oder inzwischen aus eigenem Recht woanders steht,
+    hält nichts mehr - der Platz ist wieder frei."""
+    fills = ((holder or {}).get("carry_over") or {}).get("fills")
+    return bool(holder) and holder.get("status") == "accepted" and isinstance(fills, dict) and fills.get("for_application_id") == application["id"]
+
+
+def _is_free(application: dict, ctx: dict, holder: dict | None) -> bool:
+    """Ein frei gewordener Platz: aufgegeben, nach dem Endstand noch vorhanden und von niemandem gehalten. Solange der Vorgänger
+    wieder geöffnet ist (``paused``), steht der Endstand nicht fest - dann bleibt der Platz stehen, bis neu abgeschlossen ist."""
+    return _gave_up(application) and (ctx["paused"] or _still_exists(application, ctx)) and not _holds(holder, application)
+
+
+async def _open_place(db, freed: dict, ctx: dict) -> dict | None:
+    """Der Antrag, wenn sein Platz frei ist (``_is_free``) - sonst ``None``. Unter der Season-Sperre: Eine Vergabe, die niemand mehr
+    hält (``filled_by`` zeigt auf einen früheren Nachrücker), wird dabei weggeräumt, damit der Platz neu vergeben werden kann."""
+    claim = freed["carry_over"].get("filled_by")
+    claim_id = claim.get("application_id") if isinstance(claim, dict) else None
+    holder = await db.league_applications.find_one({"id": claim_id}, {"_id": 0, "id": 1, "status": 1, "carry_over.fills": 1}) if claim_id else None
+    if not _is_free(freed, ctx, holder):
+        return None
+    if "filled_by" not in freed["carry_over"]:
+        return freed
+    await db.league_applications.update_one({"id": freed["id"], "carry_over.filled_by.application_id": claim_id},
+                                            {"$unset": {"carry_over.filled_by": ""}})
+    return await db.league_applications.find_one({"id": freed["id"]}, {"_id": 0})
 
 
 async def _suggest(db, season: dict, freed: dict, ctx: dict) -> dict:
@@ -337,10 +376,13 @@ async def _fill_by_rule(db, season: dict, freed: dict | None, ctx: dict | None =
     """Nachrücken nach der Regel der Season (``successor: "next"``) - nur solange das Startdatum nicht erreicht ist (auch im Entwurf,
     Entscheidung 26.11.: Sonst bekäme der Nachrücker eine Frist, die schon vorbei ist) und bei abgeschlossenem Vorgänger."""
     settings = stored(season)
-    if not settings or settings["successor"] != NEXT or not freed or not _is_free(freed) or start_reached(season):
+    if not settings or settings["successor"] != NEXT or not freed or not _gave_up(freed) or start_reached(season):
         return None
     ctx = ctx or await _context(db, season)
     if ctx["paused"] or not ctx["predecessor"]:
+        return None
+    freed = await _open_place(db, freed, ctx)
+    if not freed:
         return None
     found = await _suggest(db, season, freed, ctx)
     if not found["pick"]:
@@ -354,7 +396,14 @@ async def released(db, season: dict, application: dict) -> dict | None:
     (``start_right.status: "declined"``) schreibt das Abmelden. Ohne die Einstellung der Season geschieht nichts."""
     if not (application or {}).get("carry_over") or not stored(season):
         return None
-    return await _fill_by_rule(db, season, await _application(db, application["id"]))
+    fresh = await _application(db, application["id"])
+    fills = fresh["carry_over"].get("fills")
+    if isinstance(fills, dict):
+        # Ein Nachrücker meldet sich ab: Frei wird der Platz, auf den er nachgerückt war - nicht ein zweiter (``_still_exists``).
+        await db.league_applications.update_one({"id": fills.get("for_application_id"), "carry_over.filled_by.application_id": fresh["id"]},
+                                                {"$unset": {"carry_over.filled_by": ""}})
+        fresh = await db.league_applications.find_one({"id": fills.get("for_application_id"), "season_id": season["id"]}, {"_id": 0})
+    return await _fill_by_rule(db, season, fresh)
 
 
 async def _restore(db, season: dict, application: dict, why: str, actor_id: str | None) -> dict | None:
@@ -391,8 +440,9 @@ async def _restore(db, season: dict, application: dict, why: str, actor_id: str 
 
 
 async def fill_places(db, season_id: str, application_ids: list[str]) -> int:
-    """Plätze, die „Übernahme neu berechnen“ wieder frei gemacht hat, weil es einen Nachrücker zurücknahm (Entscheidung 26.11.):
-    Für jeden gilt die Nachrückerregel der Season - ``next`` rückt sofort nach, sonst steht der Platz wieder unter ``open_places``.
+    """Plätze, die „Übernahme neu berechnen“ wieder frei gemacht hat, weil es einen Nachrücker zurücknahm oder in eine andere
+    Liga N schickte (Entscheidung 26.11.): Für jeden gilt die Nachrückerregel der Season - ``next`` rückt sofort nach, sonst steht
+    der Platz wieder unter ``open_places``. Nur Plätze, die es nach dem korrigierten Endstand noch gibt (``_still_exists``).
     Die Route ruft das nach dem Neuberechnen auf (kein Import von ``league_successor`` hierher)."""
     moved = 0
     async with _Lock(db, season_id):
@@ -433,15 +483,18 @@ async def fill(db, season: dict, application_id: str, candidate_id: str | None, 
     async with _Lock(db, season["id"]):
         fresh = await _season_of(db, season["id"])
         freed = await _application(db, application_id, season["id"])
-        if freed["carry_over"].get("filled_by"):
-            raise StartRightProblem(PLACE_TAKEN, 409)
-        if not _is_free(freed):
+        if not _gave_up(freed):
             raise StartRightProblem(NO_PLACE, 409)
         if start_reached(fresh):
             raise StartRightProblem(FILL_STARTED, 409)
         ctx = await _context(db, fresh)
         if ctx["paused"]:
             raise StartRightProblem(FILL_PAUSED, 409)
+        if not _still_exists(freed, ctx):
+            raise StartRightProblem(NO_PLACE_NOW, 409)
+        freed = await _open_place(db, freed, ctx)
+        if not freed:
+            raise StartRightProblem(PLACE_TAKEN, 409)
         found = await _suggest(db, fresh, freed, ctx)
         if candidate["id"] not in found["candidates"]:
             raise StartRightProblem(NOT_A_CANDIDATE)
@@ -563,7 +616,10 @@ async def _sweep_season(db, season_id: str, now: datetime, out: dict) -> None:
         return
     if start_reached(season, now):
         # Ab dem Startdatum - auch im Entwurf - verfällt nichts mehr von selbst und rückt niemand mehr nach: Die Leitung entscheidet.
-        # Früh heraus, bevor der Endstand des Vorgängers gelesen wird.
+        # Früh heraus, bevor der Endstand des Vorgängers gelesen wird - außer es steht noch eine Pause offen (der Schritt in der
+        # Route fehlte): Die wird vorher geschlossen, sonst stünde dort für immer „Frist ruht“.
+        if open_pause(season) and not (await _context(db, season))["paused"]:
+            await _sync_pause(db, season, False, now)
         return
     query = {"season_id": season_id, **OFFERED_QUERY}
     if not await db.league_applications.count_documents(query):
@@ -578,6 +634,7 @@ async def _sweep_season(db, season_id: str, now: datetime, out: dict) -> None:
         return
     freed: dict[str, dict] = {}
     expired: set[str] = set()
+    fallen_back: set[str] = set()
     for _round in range(2):
         rows = await db.league_applications.find(query, {"_id": 0}).sort("created_at", 1).to_list(1000)
         late = [row for row in rows if overdue(row, season, now)]
@@ -590,6 +647,7 @@ async def _sweep_season(db, season_id: str, now: datetime, out: dict) -> None:
             if place is None:
                 continue
             out["restored"] += 1
+            fallen_back.add(row["id"])
             freed[place["id"]] = place
             back = (row["carry_over"]["fills"].get("back") or {}).get("division_label")
             # Was in der eigenen Liga gilt: die frühere Zusage - oder die restliche Frist, mindestens ``rest_days``.
@@ -626,7 +684,8 @@ async def _sweep_season(db, season_id: str, now: datetime, out: dict) -> None:
                              f"{place.get('display_name')} hat für {place['carry_over'].get('division_label')} nicht zugesagt. {follow}",
                              f"league-start-right:lead:{place['id']}:{(right_of(place) or {}).get('offered_at')}")
     for row in await db.league_applications.find(query, {"_id": 0}).sort("created_at", 1).to_list(1000):
-        if _reminder_due(row, season, settings, now):
+        # Wer in diesem Lauf zurückgefallen ist, hat die Frist eben in „Nachrücken abgelaufen“ gelesen - keine Erinnerung obendrauf.
+        if row["id"] not in fallen_back and _reminder_due(row, season, settings, now):
             out["reminded"] += await _remind(db, season, row, now)
 
 
@@ -830,15 +889,20 @@ async def overview(db, season: dict, user: dict, *, now: datetime | None = None)
     side_teams = await teams_by_id(db, sides.values())
     rows.sort(key=lambda row: (row["carry_over"].get("division_level") or 99, row["carry_over"].get("from_level") or 99,
                                str(row["carry_over"].get("from_staffel") or ""), int(row["carry_over"].get("rank") or 0)))
+    by_id = {row["id"]: row for row in rows}
+    # Wer einen frei gewordenen Platz gerade wirklich hält (``_holds``) - eine veraltete Vergabe wird nicht mehr gezeigt.
+    holders = {row["id"]: by_id.get((row["carry_over"].get("filled_by") or {}).get("application_id") or "") for row in rows
+               if isinstance(row["carry_over"].get("filled_by"), dict)}
+    holders = {key: holder for key, holder in holders.items() if _holds(holder, by_id[key])}
     for row in rows:
         entry = _row(row, season, names, belongs_to_side(user, sides[row["id"]], side_teams.get(row["team_id"])), now)
+        entry["filled_by"] = entry["filled_by"] if row["id"] in holders else None
         out["rows"].append(entry)
         out["counts"][entry["state"]] = out["counts"].get(entry["state"], 0) + 1
     if settings is None:
         return out
-    by_id = {row["id"]: row for row in rows}
     for row in rows:
-        if not _is_free(row):
+        if not _is_free(row, ctx, holders.get(row["id"])):
             continue
         found = await _suggest(db, season, row, ctx) if not ctx["paused"] else {"group": None, "candidates": [], "pick": None, "tied": []}
         out["open_places"].append({
