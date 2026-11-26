@@ -1,5 +1,26 @@
 # Changelog
 
+## [1.98.0](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/compare/v1.97.0...v1.98.0) (2026-11-26)
+
+
+### Neu
+
+* Liga – „Aufstieg bestätigt“ und „Abstieg bestätigt“ erst aus dem bestätigten Endstand, je Team einmal; nach einer Korrektur einmal „Endstand korrigiert“ ([#1627](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/1627)) ([e1cd3a7](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/e1cd3a7b998d137a984484a2c53760950430003d))
+* Liga – „Neue Season aus …“ fragt, ob die Teams ihr Startrecht zusagen müssen ([#1627](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/1627)) ([e1cd3a7](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/e1cd3a7b998d137a984484a2c53760950430003d))
+* Liga – „Übernahme neu berechnen“ zeigt frei gewordene Plätze nach dem korrigierten Endstand als „Platz frei“ ([#1627](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/1627)) ([e1cd3a7](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/e1cd3a7b998d137a984484a2c53760950430003d))
+* Liga – Fristen der Startrechte ruhen, solange der Endstand geprüft wird oder ein Nachrück-Angebot offen ist; ab dem Startdatum entscheidet die Leitung ([#1627](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/1627)) ([e1cd3a7](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/e1cd3a7b998d137a984484a2c53760950430003d))
+* Liga – Reiter „Abschluss“ zeigt den Weg zu den Startrechten ([#1627](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/1627)) ([e1cd3a7](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/e1cd3a7b998d137a984484a2c53760950430003d))
+* Liga – Startrechte für die nächste Season: Zusage innerhalb einer Frist, Verfall und Nachrückerregel, je Season einstellbar ([#1627](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/1627)) ([e1cd3a7](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/e1cd3a7b998d137a984484a2c53760950430003d))
+* Liga – Zuteilen und Los warten auf die Zusage zum Startrecht ([#1627](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/1627)) ([e1cd3a7](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/e1cd3a7b998d137a984484a2c53760950430003d))
+* Liga-Verwaltung – Startrechte einstellen und überblicken: Frist, Stand je Co-Team, Zusage eintragen, Nachrücken lassen mit Grund ([#1627](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/1627)) ([e1cd3a7](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/e1cd3a7b998d137a984484a2c53760950430003d))
+* Teams – Startrecht annehmen, Nachrücken annehmen oder ablehnen, Prognose und bestätigtes Startrecht je Co-Team ([#1627](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/1627)) ([e1cd3a7](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/e1cd3a7b998d137a984484a2c53760950430003d))
+
+
+### Dokumentation
+
+* Liga – Vertrag für Startrechte der nächsten Season (F.2a) ([#1627](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/1627)) ([e1cd3a7](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/e1cd3a7b998d137a984484a2c53760950430003d))
+* Liga-Handbuch – Startrechte: Zusage, Frist und Nachrücker, Spickzettel der Captains ([#1627](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/1627)) ([e1cd3a7](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/commit/e1cd3a7b998d137a984484a2c53760950430003d))
+
 ## 1.97.0 (26.11.2026)
 
 ### Neu
