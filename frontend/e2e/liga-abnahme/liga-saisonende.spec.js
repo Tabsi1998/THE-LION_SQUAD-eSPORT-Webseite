@@ -161,9 +161,17 @@ test.describe("Liga-Gesamtabnahme: Saisonende mit Playoffs, Relegation, Moment u
     const body = { division_id: world.division.id, stamp: division(1).playoffs.stamp, confirm: true };
     const url = `${seasonAdmin()}/postseason/playoffs`;
     const answers = await Promise.all([api(lead, "POST", url, body), api(lead, "POST", url, body)]);
-    expect(answers.map((row) => row.status).sort()).toEqual(expect.arrayContaining([200]));
-    const created = answers.find((row) => row.status === 200).body;
+    // Genau einer legt an. Der andere findet die angelegte Staffel (200 mit replay) oder wartet auf die Sperre (409) - nie 5xx.
+    expect(answers.every((row) => [200, 409].includes(row.status)), answers.map((row) => `${row.status} ${row.text.slice(0, 120)}`).join(" | ")).toBe(true);
+    const fresh = answers.filter((row) => row.status === 200 && row.body.replay === false);
+    expect(fresh).toHaveLength(1);
+    const created = fresh[0].body;
     world.playoffs = created.tournament.tournament_id;
+    for (const row of answers.filter((item) => item.status === 200 && item.body.replay)) {
+      expect(row.body.tournament.tournament_id).toBe(world.playoffs);
+    }
+    const playoffStaffeln = (await get(lead, `${seasonAdmin()}/closing`)).staffeln.filter((row) => row.kind === "playoff");
+    expect(playoffStaffeln.map((row) => row.tournament_id)).toEqual([world.playoffs]);
     const again = await ok(lead, "POST", url, { ...body, stamp: "veraltet" });
     expect(again.replay).toBe(true);
     expect(again.tournament.tournament_id).toBe(world.playoffs);
@@ -257,9 +265,12 @@ test.describe("Liga-Gesamtabnahme: Saisonende mit Playoffs, Relegation, Moment u
     await expect(moment).toHaveCount(0);
     expect(await momentsOf(climber)).toEqual([]);
     const second = await as(browser, testInfo, "captain-7", LARGE);
+    // Das zweite Gerät fragt nach dem Anmelden einmal nach offenen Momenten (RewardWatcher) - die Antwort ist leer, also kein Moment.
+    const asked = second.page.waitForResponse((response) => response.url().includes("/api/me/league-moments/unseen") && response.ok(), { timeout: 20_000 });
     await second.page.goto("/");
+    const answer = await (await asked).json();
+    expect(answer.moments.filter((row) => row.season_id === world.season.id)).toEqual([]);
     await expect(second.page.locator("main").first()).toBeVisible();
-    await second.page.waitForTimeout(1500);
     await expect(second.page.getByTestId("season-moment")).toHaveCount(0);
     // Eine Nachricht je Person: Captain und Vertreter erfahren den Aufstieg aus „Aufstieg bestätigt“ der Startrechte (F.2a) - der
     // Moment schickt ihnen keine zweite. Spieler bekommen die Nachricht zum Moment.

@@ -112,7 +112,10 @@ test.describe("Liga-Gesamtabnahme: Betrieb mit Vorfällen, Leitstand, Rundnachri
     const lead = await as(browser, testInfo, "lead", LARGE);
     // Protokoll: neueste zuerst, nur Bezeichnung und Verweise - nie Gründe oder Texte aus den Daten.
     const log = await get(lead, `${seasonAdmin()}/desk/log`);
-    expect(log.items.length).toBeGreaterThan(0);
+    // Der Entscheid aus Betrieb 1 steht darin - mit Bezeichnung, handelnder Person und Spiel, ohne den Grund.
+    const decided = log.items.filter((item) => item.action === "match.incident.decide" && item.match_id === world.play.id);
+    expect(decided).toHaveLength(1);
+    expect(decided[0]).toMatchObject({ label: "Vorfall · entschieden", actor: "Abnahme Ligaleitung" });
     expect(JSON.stringify(log)).not.toContain("Nachweise geprüft");
 
     const broadcast = `${seasonAdmin()}/broadcast`;
