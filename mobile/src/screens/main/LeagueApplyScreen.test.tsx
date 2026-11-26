@@ -1,5 +1,5 @@
 import React from "react";
-import { fireEvent, render, screen, waitFor } from "@testing-library/react-native";
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react-native";
 import { LeagueApplyScreen } from "./LeagueApplyScreen";
 
 // Mit Co-Team anmelden in der App (#2542, docs/LIGA.md B.4, Web: LeagueApplyPage.jsx): vier Schritte, ohne Vorwissen bedienbar - Co-Team
@@ -12,6 +12,11 @@ jest.mock("../../lib/api", () => ({
   errorMessage: (error: unknown, fallback: string) => (error instanceof Error ? error.message : fallback),
 }));
 jest.mock("../../lib/openLink", () => ({ openLink: jest.fn(() => "browser") }));
+let mockUser: Record<string, unknown> | null = { id: "u1", username: "kapitaen" };
+jest.mock("../../auth/AuthContext", () => ({ useAuth: () => ({ user: mockUser }) }));
+jest.mock("../../live", () => ({ isGuestUser: (user: { id?: string } | null) => !user || user.id === "guest" }));
+const mockOpenSignIn = jest.fn();
+jest.mock("../../navigation/rootNavigation", () => ({ openSignIn: (...args: unknown[]) => mockOpenSignIn(...args) }));
 jest.mock("@expo/vector-icons", () => ({ Ionicons: () => null }));
 
 const navigate = jest.fn();
@@ -27,6 +32,7 @@ const view = (extra: Record<string, unknown> = {}) => ({ application: { state: "
 
 beforeEach(() => {
   jest.clearAllMocks();
+  mockUser = { id: "u1", username: "kapitaen" };
 });
 
 async function next() {
@@ -146,4 +152,35 @@ test("break-ui: sehr langer Co-Team-Name bricht um statt abgeschnitten zu werden
   await render(<LeagueApplyScreen navigation={navigation} route={route} />);
   await waitFor(() => expect(screen.getByText(name)).toBeTruthy());
   expect(screen.getByText(name).props.numberOfLines).toBeUndefined();
+});
+
+// Nachbesserung (#2542): Gäste kommen über einen Link hierher - erst anmelden, danach geht es hierher zurück (wie ProtectedRoute im Web).
+test("als Gast: Anmelden mit Rücksprung statt der Schritte, kein Abruf", async () => {
+  mockUser = { id: "guest" };
+  mockGet.mockResolvedValue({ data: view() });
+  await render(<LeagueApplyScreen navigation={navigation} route={route} />);
+  expect(screen.getByTestId("apply-sign-in")).toBeTruthy();
+  expect(mockGet).not.toHaveBeenCalled();
+  await fireEvent.press(screen.getByTestId("apply-sign-in-button"));
+  expect(mockOpenSignIn).toHaveBeenCalled();
+});
+
+test("zweimal schnell „Anmeldung einreichen“: genau ein Antrag", async () => {
+  mockGet.mockResolvedValue({ data: view() });
+  let finish: (value: unknown) => void = () => {};
+  mockPost.mockImplementation(() => new Promise((resolve) => { finish = resolve; }));
+  await render(<LeagueApplyScreen navigation={navigation} route={route} />);
+  await waitFor(() => expect(screen.getByTestId("apply-next")).toBeTruthy());
+  await next();
+  await next();
+  await fireEvent(screen.getByTestId("apply-accept-rules"), "valueChange", true);
+  await fireEvent(screen.getByTestId("apply-accept-privacy"), "valueChange", true);
+  await next();
+  const submit = screen.getByTestId("apply-submit");
+  await act(async () => {
+    fireEvent.press(submit);
+    fireEvent.press(submit);
+  });
+  expect(mockPost).toHaveBeenCalledTimes(1);
+  await act(async () => { finish({ data: { status: "submitted" } }); });
 });

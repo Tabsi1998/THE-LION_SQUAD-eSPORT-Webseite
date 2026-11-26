@@ -2,11 +2,13 @@ import { Ionicons } from "@expo/vector-icons";
 import type { NativeStackScreenProps } from "@react-navigation/native-stack";
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import { AccessibilityInfo, findNodeHandle, Pressable, ScrollView, StyleSheet, Switch, Text, View } from "react-native";
+import { useAuth } from "../../auth/AuthContext";
 import { Button } from "../../components/Button";
 import { Card } from "../../components/Card";
 import { ErrorState, SkeletonList } from "../../components/ListState";
 import { selectFeedback, switchFeedback } from "../../components/motion";
 import { Screen } from "../../components/Screen";
+import { SignInRequired } from "../../components/SignInRequired";
 import { Body, Heading, Muted, Title } from "../../components/Text";
 import { api, errorMessage } from "../../lib/api";
 import {
@@ -15,6 +17,7 @@ import {
 } from "../../lib/leagueApply";
 import { teamStateLabel } from "../../lib/leagueTeam";
 import { openLink } from "../../lib/openLink";
+import { isGuestUser } from "../../live";
 import type { AppStackParamList } from "../../navigation/types";
 import { colors, radius, roles, surfaces } from "../../theme";
 
@@ -176,6 +179,10 @@ function Summary({ row, view }: { row: ApplySquad; view: ApplyView }) {
 
 export function LeagueApplyScreen({ navigation, route }: Props) {
   const { league, season } = route.params;
+  const { user } = useAuth();
+  // Gäste kommen über einen Link hierher: erst anmelden - danach liegt dieser Screen wieder oben (wie ProtectedRoute im Web).
+  const guest = !user || isGuestUser(user);
+  const userId = guest ? "" : String(user?.id || "");
   const [view, setView] = useState<ApplyView | null>(null);
   const [missing, setMissing] = useState(false);
   const [step, setStep] = useState(0);
@@ -183,12 +190,15 @@ export function LeagueApplyScreen({ navigation, route }: Props) {
   const [acceptRules, setAcceptRules] = useState(false);
   const [acceptPrivacy, setAcceptPrivacy] = useState(false);
   const [busy, setBusy] = useState(false);
+  // Zweimal schnell tippen schickt genau einen Antrag - der Zustand kommt erst mit dem nächsten Zeichnen, die Sperre sofort.
+  const sending = useRef(false);
   const [error, setError] = useState("");
   const [done, setDone] = useState("");
   const heading = useRef<Text>(null);
   const path = applyApiPath(league, season);
 
   const load = useCallback(async () => {
+    if (!userId) return;
     try {
       const { data } = await api.get<ApplyView>(path);
       setView(data || {});
@@ -198,7 +208,7 @@ export function LeagueApplyScreen({ navigation, route }: Props) {
     } catch {
       setMissing(true);
     }
-  }, [path]);
+  }, [path, userId]);
   useEffect(() => { void load(); }, [load]);
 
   const goTo = (next: number) => {
@@ -215,7 +225,8 @@ export function LeagueApplyScreen({ navigation, route }: Props) {
   };
 
   const submit = async () => {
-    if (!view || busy) return;
+    if (!view || busy || sending.current) return;
+    sending.current = true;
     setBusy(true);
     setError("");
     try {
@@ -231,12 +242,20 @@ export function LeagueApplyScreen({ navigation, route }: Props) {
       await load();
       goTo(2);
     } finally {
+      sending.current = false;
       setBusy(false);
     }
   };
 
   const back = <Button variant="secondary" label="Zurück" arrow={false} onPress={() => navigation.goBack()} testID="apply-leave" />;
 
+  if (guest) {
+    return (
+      <Screen>
+        <SignInRequired text="Anmelden dürfen Captain und Vertreter eines Co-Teams. Melde dich an - danach geht es hier weiter." testID="apply-sign-in" />
+      </Screen>
+    );
+  }
   if (missing) {
     return (
       <Screen>
