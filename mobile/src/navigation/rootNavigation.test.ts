@@ -329,6 +329,21 @@ test("Benachrichtigungen: Chats, Teams, Turniere, Gewinne und Freunde - sonst di
   expect(mockRef.navigate).toHaveBeenLastCalledWith("Notifications", undefined);
 });
 
+test("Saisonende-Moment (#2584): die Nachricht zum Moment öffnet Mein Profil mit dem Moment - eine Belohnung bleibt, wie sie war", () => {
+  const note = (kind: string, meta: Record<string, unknown> = {}, url = "") => ({ id: "n", kind, meta, url, title: "Aufstieg in Liga 1", read: false, created_at: "" });
+  expect(targetFromNotification(note("league_reward", { reason: "league_moment", moment_id: "m-1", season_id: "se2" }, "/liga/cod/season-2") as never))
+    .toEqual(detail("OwnProfile", { moment: "m-1" }));
+  // Ohne (gültige) Kennung: das Profil mit dem Hinweis „Saisonende“.
+  expect(targetFromNotification(note("league_reward", { reason: "league_moment" }, "/liga/cod/season-2") as never)).toEqual(detail("OwnProfile"));
+  expect(targetFromNotification(note("league_reward", { reason: "league_moment", moment_id: "../x?y" }, "/liga/cod/season-2") as never)).toEqual(detail("OwnProfile"));
+  // Gegenprobe: dieselbe Art ohne den Grund (neue Belohnung) folgt weiter ihrer Adresse - die Ligaseite gibt es nur im Web.
+  expect(targetFromNotification(note("league_reward", {}, "/liga/cod/season-2") as never)).toBeNull();
+  // Als Adresse: /u/me?moment=<id> - dieselbe Stelle.
+  expect(targetFromUrl("/u/me?moment=m-1")).toEqual(detail("OwnProfile", { moment: "m-1" }));
+  expect(targetFromUrl("/u/me?moment=")).toEqual(detail("OwnProfile"));
+  expect(targetFromUrl("/u/me?tab=trophaeen&moment=m-1")).toEqual(detail("OwnProfile", { tab: "awards", moment: "m-1" }));
+});
+
 test("gemeinsame Herkunfts-Matrix (#998): Adressen und Benachrichtigungen öffnen nur die eigene Website als Screen", () => {
   for (const url of OWN_ARTICLE_LINKS) {
     expect([url, targetFromUrl(url)]).toEqual([url, detail("NewsDetail", { id: ARTICLE })]);

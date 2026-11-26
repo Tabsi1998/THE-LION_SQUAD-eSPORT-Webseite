@@ -144,6 +144,10 @@ export function targetFromNotification(item: UserNotification): AppTarget | null
   // Sammelmeldung nach der Ruhezeit (#2444): die Meldungen liegen in der Glocke - dorthin, egal was die Adresse sagt.
   if (isQuietDigest(item)) return detail("Notifications");
 
+  // Saisonende-Moment (#2584, docs/LIGA.md F.8): Die Nachricht trägt `reason: league_moment` und `moment_id`. Die Ligaseite gibt es
+  // nur im Web - Mein Profil holt den Moment gleich, ist er noch offen; sonst steht er dort unter „Saisonende“ zum Ansehen.
+  if (stringMeta(meta, "reason") === "league_moment") return ownProfileTarget("", stringMeta(meta, "moment_id"));
+
   // Turnierleitung (#1158, #1160): „Dispute: bitte prüfen“, „Ergebnis fehlt“, „Station defekt“ öffnen ihre Ansicht.
   if (kind === "match_attention" && String(item.url || "").includes("/leitung")) {
     const lead = targetFromUrl(item.url);
@@ -235,7 +239,7 @@ export function targetFromUrl(url?: string | null): AppTarget | null {
   // Mein Bereich (#2059): dieselben Adressen wie im Web, jede Gruppe mit Reitern und Ankern.
   if (first === "mein-bereich") return meinBereichTarget(parts.slice(1), query, parsed.hash);
   // Das eigene Profil (/u/me) liegt seit Mein Bereich über dem Tab (#2059) - `?tab=` öffnet einen Reiter wie im Web.
-  if (first === "u" && second === "me") return ownProfileTarget(query.get("tab") || "");
+  if (first === "u" && second === "me") return ownProfileTarget(query.get("tab") || "", query.get("moment") || "");
   if (["u", "users", "user", "players", "player", "profiles"].includes(first || "") && second) return detail("PublicProfile", { username: second });
   if (first === "profile" && second) return detail("PublicProfile", { username: second });
   if (first === "profile") return profileTarget(query);
@@ -363,11 +367,15 @@ function profileTarget(query: URLSearchParams): AppTarget {
   return gruppeTarget("profil");
 }
 
-/** Das eigene Profil mit Reiter - dieselben Namen wie im Web (achievements, honours, trophaeen/trophies/awards). */
-function ownProfileTarget(wanted: string): AppTarget {
-  if (wanted === "achievements" || wanted === "honours") return detail("OwnProfile", { tab: wanted });
-  if (TROPHY_TABS.has(wanted)) return detail("OwnProfile", { tab: "awards" });
-  return detail("OwnProfile");
+/** Eine Kennung des Servers (Saisonende-Moment) - nur Buchstaben, Ziffern, `_` und `-`, sonst keine. */
+const MOMENT_ID = /^[A-Za-z0-9_-]{1,64}$/;
+
+/** Das eigene Profil mit Reiter - dieselben Namen wie im Web (achievements, honours, trophaeen/trophies/awards). `moment` (#2584): ein
+ * Saisonende-Moment, den das Profil gleich holt. */
+function ownProfileTarget(wanted: string, moment = ""): AppTarget {
+  const tab = wanted === "achievements" || wanted === "honours" ? wanted : TROPHY_TABS.has(wanted) ? "awards" : "";
+  const params = { ...(tab ? { tab } : {}), ...(MOMENT_ID.test(moment) ? { moment } : {}) };
+  return detail("OwnProfile", Object.keys(params).length ? params : undefined);
 }
 
 type MeinBereichGruppe = AppStackParamList["MeinBereichGruppe"]["gruppe"];

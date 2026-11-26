@@ -114,7 +114,7 @@ export type DetailParamList = {
   YearReview: { preview?: boolean } | undefined;
   // Das eigene Profil (#1149), wie andere es sehen - seit Mein Bereich (#2059) eine Seite darüber: aus Mein Bereich → Profil,
   // dem Kopf der Übersicht und /u/me. `tab` öffnet gleich einen Reiter (Erfolge, Trophäen …).
-  OwnProfile: { tab?: ProfileTabKey } | undefined;
+  OwnProfile: { tab?: ProfileTabKey; moment?: string } | undefined;
   // Eine Gruppe von Mein Bereich (#2059, #1677): die Einstellungen wohnen hier - flach, ohne Zahnrad. `ziel` springt zu einer
   // Stelle (Suchtreffer, /mein-bereich/<gruppe>#<ziel>).
   MeinBereichGruppe: { gruppe: Exclude<GruppeKey, "start">; ziel?: string };
