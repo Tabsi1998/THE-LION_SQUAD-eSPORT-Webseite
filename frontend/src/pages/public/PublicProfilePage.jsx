@@ -44,6 +44,7 @@ import { LeagueSeasonHistory } from "@/components/tls/league/LeagueSeasonHistory
 import { LeagueOverallStanding } from "@/components/tls/league/LeagueOverallStanding";
 import { LeagueCurrent } from "@/components/tls/league/LeagueCurrent";
 import { LeagueSeasonLine } from "@/components/tls/league/LeagueSeasonLine";
+import { LeagueMomentHint } from "@/components/tls/league/LeagueMomentHint";
 import { RewardChip } from "@/components/tls/rewards/RewardChip";
 import { EmblemRow, TrophyCabinet } from "@/components/tls/rewards/TrophyCabinet";
 import { InternalTag } from "@/components/tls/InternalTag";
@@ -430,6 +431,7 @@ export default function PublicProfilePage() {
   const leagueHistory = Array.isArray(profile.league_history) ? profile.league_history : [];
   const leagueOverall = Array.isArray(profile.league_overall) ? profile.league_overall : [];
   const leagueCurrent = Array.isArray(profile.league_current) ? profile.league_current : [];
+  const leagueMoments = Array.isArray(profile.league_moments) ? profile.league_moments : [];
   // Ehrungen (#848): nur, was der Verein freigibt und die Person selbst zeigt - sonst gibt es den Reiter nicht.
   const honours = Array.isArray(profile.honours) ? profile.honours : [];
   const badges = Array.isArray(achievementsData?.awards) ? achievementsData.awards : [];
@@ -794,6 +796,8 @@ export default function PublicProfilePage() {
 
               {/* Aktuelle Ligen (#1630): Co-Teams in laufenden Staffeln mit Liga-Abzeichen (#1638), Platz von N, Zone, nächstem Spiel. */}
               <LeagueCurrent rows={leagueCurrent} nameOf={(row) => row.display_name || row.squad_name} testId="profile-league-current" />
+              {/* Saisonende-Moment (#1639): je Co-Team der letzte bestätigte Ausgang; die Person selbst spielt ihn noch einmal ab. */}
+              <LeagueMomentHint rows={leagueMoments} canReplay={ownMode} testId="profile-league-moments" />
               {/* Saisonverlauf als Linie (#1630): Platz je Season auf der Leiter aus Liga N und Platz. */}
               <LeagueSeasonLine rows={leagueHistory} testId="profile-season-line" />
               {/* Season-Historie (F.2, #1627): Liga N, Platz, Meister - wo die Person eingesetzt war. */}
