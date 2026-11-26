@@ -48,7 +48,7 @@
 }
 .tls-round-tab[aria-selected="true"] { color: #fff; border-bottom-color: var(--tls-brand); }
 .tls-round-tab:focus-visible { outline: 2px solid var(--tls-brand); outline-offset: -2px; border-radius: 4px 4px 0 0; }
-.tls-round-tab__time { font-size: var(--tls-type-label-size); font-weight: 500; color: var(--tls-quiet); font-variant-numeric: tabular-nums; }
+.tls-round-tab__time { font-size: var(--tls-type-small-size); font-weight: 500; color: var(--tls-quiet); font-variant-numeric: tabular-nums; }
 @media (hover: hover) and (pointer: fine) {
   .tls-round-tab:not([aria-selected="true"]):hover { color: #fff; }
 }

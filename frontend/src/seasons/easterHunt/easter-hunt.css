@@ -70,14 +70,14 @@
 .tls-egg-note--found, .tls-egg-note--done { border-color: rgba(111, 158, 79, 0.75); }
 .tls-egg-note--done { color: #ffd700; }
 .tls-egg-note--error { border-color: rgba(255, 59, 48, 0.6); }
-.tls-egg-note__link { color: #e9c46a; text-transform: uppercase; letter-spacing: 0.08em; font-size: 10px; text-decoration: underline; }
+.tls-egg-note__link { color: #e9c46a; text-transform: uppercase; letter-spacing: 0.08em; font-size: var(--tls-type-label-size); text-decoration: underline; }
 .tls-egg-note__close { color: rgba(255, 255, 255, 0.6); background: transparent; border: 0; cursor: pointer; font-size: 14px; line-height: 1; padding: 0 2px; }
 @keyframes tls-egg-note-in { from { opacity: 0; translate: 0 8px; } to { opacity: 1; translate: 0 0; } }
 
 /* Das Widget neben dem Logo: ein kleines Löwenei mit dem Stand. */
 .tls-egg-widget {
   display: inline-flex; align-items: center; gap: 6px; padding: 4px 8px; border-radius: 2px; border: 1px solid rgba(233, 196, 106, 0.4);
-  color: #e9c46a; font-size: 11px; font-weight: 800; letter-spacing: 0.06em; background: rgba(233, 196, 106, 0.08);
+  color: #e9c46a; font-size: var(--tls-type-label-size); font-weight: 800; letter-spacing: 0.06em; background: rgba(233, 196, 106, 0.08);
 }
 .tls-egg-widget:hover { background: rgba(233, 196, 106, 0.16); }
 .tls-egg-widget .tls-egg__svg { filter: none; }

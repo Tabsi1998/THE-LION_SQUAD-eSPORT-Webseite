@@ -36,7 +36,7 @@
 .mp-fact { display: inline-flex; align-items: center; gap: 6px; font-size: var(--tls-type-small-size); color: rgba(255, 255, 255, 0.8); background: var(--tls-surface-2); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 2px; padding: 6px 10px; }
 .mp-settings__stations { margin-top: 14px; display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; }
 .mp-chips { display: flex; flex-wrap: wrap; gap: 6px; min-width: 0; }
-.mp-chip { display: inline-flex; align-items: baseline; gap: 6px; max-width: 100%; padding: 5px 10px; border: 1px solid rgba(255, 255, 255, 0.14); border-radius: 999px; font-size: var(--tls-type-label-size); color: #fff; background: var(--tls-surface-2); }
+.mp-chip { display: inline-flex; align-items: baseline; gap: 6px; max-width: 100%; padding: 5px 10px; border: 1px solid rgba(255, 255, 255, 0.14); border-radius: 999px; font-size: var(--tls-type-small-size); color: #fff; background: var(--tls-surface-2); }
 .mp-chip > span:first-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .mp-chip__meta { font-size: var(--tls-type-label-size); color: rgba(255, 255, 255, 0.5); white-space: nowrap; }
 .mp-chip[data-status="broken"] { border-color: rgb(var(--tls-warn-rgb) / 0.45); color: var(--tls-warn); }
@@ -113,7 +113,7 @@
   100% { box-shadow: 0 0 0 calc(7px * var(--tls-motion-on)) rgb(var(--tls-warn-rgb) / 0); }
 }
 .mp-was { position: absolute; top: 8px; left: 0; height: 48px; border: 1px dashed rgba(255, 255, 255, 0.28); border-radius: 3px; pointer-events: none; }
-.mp-ghost { position: absolute; top: 6px; left: 0; height: 52px; z-index: 4; padding: 4px 8px; display: flex; align-items: flex-end; font-family: "Rajdhani", "Bahnschrift", sans-serif; font-variant-numeric: tabular-nums; font-weight: 700; font-size: var(--tls-type-label-size); color: var(--tls-brand); border: 2px dashed rgb(var(--tls-brand-rgb) / 0.85); background: linear-gradient(rgb(var(--tls-brand-rgb) / 0.16), rgb(var(--tls-brand-rgb) / 0.16)), var(--tls-surface-1); border-radius: 3px; pointer-events: none; white-space: nowrap; overflow: hidden; }
+.mp-ghost { position: absolute; top: 6px; left: 0; height: 52px; z-index: 4; padding: 4px 8px; display: flex; align-items: flex-end; font-family: "Rajdhani", "Bahnschrift", sans-serif; font-variant-numeric: tabular-nums; font-weight: 700; font-size: var(--tls-type-small-size); color: var(--tls-brand); border: 2px dashed rgb(var(--tls-brand-rgb) / 0.85); background: linear-gradient(rgb(var(--tls-brand-rgb) / 0.16), rgb(var(--tls-brand-rgb) / 0.16)), var(--tls-surface-1); border-radius: 3px; pointer-events: none; white-space: nowrap; overflow: hidden; }
 .mp-ghost[data-blocked="true"] { color: var(--tls-warn); border-color: var(--tls-warn); background: linear-gradient(rgb(var(--tls-warn-rgb) / 0.18), rgb(var(--tls-warn-rgb) / 0.18)), var(--tls-surface-1); }
 .mp-now { position: absolute; top: 0; bottom: 0; left: 0; width: 2px; background: var(--tls-live); z-index: 5; pointer-events: none; }
 .mp-now span { position: absolute; top: 4px; left: 6px; font-size: var(--tls-type-small-size); font-weight: 700; color: var(--tls-live); white-space: nowrap; background: var(--tls-surface-1); padding: 0 4px; }

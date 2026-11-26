@@ -133,7 +133,7 @@
 .tls-lantern__bat { opacity: 0; transform-origin: center; }
 .tls-lantern--open .tls-lantern__bat { animation: tls-bat-out 1.4s ease-out 0.2s 1; }
 .tls-lantern__eyes { transform: translate(var(--eye-x, 0px), var(--eye-y, 0px)); transition: transform 0.12s ease-out; }
-.tls-lantern__note { position: absolute; top: 100%; left: 0; margin-top: 0.4rem; white-space: nowrap; font-size: 11px; color: #FFB366; background: rgba(10, 10, 10, 0.92); border: 1px solid rgba(255, 179, 102, 0.35); padding: 0.3rem 0.55rem; border-radius: 0.25rem; z-index: 63; }
+.tls-lantern__note { position: absolute; top: 100%; left: 0; margin-top: 0.4rem; white-space: nowrap; font-size: var(--tls-type-small-size); color: #FFB366; background: rgba(10, 10, 10, 0.92); border: 1px solid rgba(255, 179, 102, 0.35); padding: 0.3rem 0.55rem; border-radius: 0.25rem; z-index: 63; }
 .tls-footer-pumpkins { position: absolute; right: 2rem; bottom: 0; display: flex; align-items: flex-end; gap: 0.4rem; transform: translateY(-100%); }
 /* Jeder Kürbis im Footer grüßt beim Klick wie die Laterne (Rückmeldung 28.09.): hüpft kurz, der Gruß steht darüber */
 @keyframes tls-pumpkin-hop { 0%, 100% { transform: none; } 25% { transform: translateY(-7px) rotate(-5deg); } 55% { transform: translateY(0) rotate(3deg); } 80% { transform: translateY(-2px) rotate(0deg); } }
@@ -185,7 +185,7 @@
 .tls-scare__bat--2 { transform: translate(10%, 30%) rotate(14deg); }
 .tls-scare__shadow { display: block; width: 46vw; height: 70vh; border-radius: 48% 52% 40% 60% / 60% 40% 60% 40%; background: radial-gradient(ellipse at 50% 30%, rgba(0, 0, 0, 0.98), rgba(0, 0, 0, 0.75) 55%, rgba(0, 0, 0, 0) 75%); filter: blur(6px); }
 .tls-scare-note { position: fixed; left: 50%; bottom: 1.5rem; transform: translateX(-50%); z-index: 101; display: inline-flex; align-items: center; gap: 0.75rem; padding: 0.5rem 0.9rem; border: 1px solid rgba(170, 225, 240, 0.35); border-radius: 0.25rem; background: rgba(10, 10, 10, 0.94); color: #dfe9ee; font-size: 12px; letter-spacing: 0.04em; }
-.tls-scare-note button { border: 0; background: transparent; color: #29B6E8; font-weight: 700; text-transform: uppercase; font-size: 11px; letter-spacing: 0.12em; cursor: pointer; }
+.tls-scare-note button { border: 0; background: transparent; color: #29B6E8; font-weight: 700; text-transform: uppercase; font-size: var(--tls-type-label-size); letter-spacing: 0.12em; cursor: pointer; }
 .tls-scare-note button:hover { text-decoration: underline; }
 .tls-season-scare { display: inline-flex; align-items: center; justify-content: center; width: 2rem; height: 2rem; margin-left: 0.15rem; border: 0; border-radius: 0.25rem; background: transparent; color: rgba(255, 255, 255, 0.55); cursor: pointer; transition: color 0.15s ease-out, background 0.15s ease-out; }
 .tls-season-scare:hover { color: var(--season-accent, #29B6E8); background: rgba(255, 255, 255, 0.06); }

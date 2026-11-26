@@ -87,7 +87,7 @@
 }
 .tls-rules-search::placeholder { color: rgba(255, 255, 255, 0.5); }
 .tls-rules-search:focus-visible { outline: 2px solid rgb(var(--league-accent-rgb, var(--tls-brand-rgb))); outline-offset: 1px; }
-.tls-rules-search__count { font-size: var(--tls-type-label-size); font-variant-numeric: tabular-nums; color: rgba(255, 255, 255, 0.72); white-space: nowrap; }
+.tls-rules-search__count { font-size: var(--tls-type-small-size); font-variant-numeric: tabular-nums; color: rgba(255, 255, 255, 0.72); white-space: nowrap; }
 ::highlight(tls-rules-hit) { background-color: rgba(255, 215, 0, 0.3); color: #fff; }
 ::highlight(tls-rules-hit-active) { background-color: #ffd700; color: #0a0a0a; }
 
