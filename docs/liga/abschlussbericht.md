@@ -1,7 +1,13 @@
 # Abschlussbericht Liga-Ausbau (G.3)
 
-Paket G.3 des Liga-Masterplans (#2211), Abschnitt 26 I des Auftrags vom 02.11.2026. Stand 15.11.2026, `main` 4f59cfcb6 (mit G.1,
-#2423). Der Bericht ist eine überprüfbare Aufstellung: Jede Aussage nennt PR, Issue, Datei oder Test.
+Paket G.3 des Liga-Masterplans (#2211), Abschnitt 26 I des Auftrags vom 02.11.2026. Erster Stand 15.11.2026 (`main` 4f59cfcb6,
+mit G.1, #2423); **fortgeschrieben am 26.11.2026 zur Betriebsfreigabe (#1632)**, `main` 96fde3cce (nach Website 1.99.0). Der Bericht ist
+eine überprüfbare Aufstellung: Jede Aussage nennt PR, Issue, Datei oder Test.
+
+**Stand 26.11. in drei Sätzen:** Seit G.1 sind Playoffs und Relegation, Startrechte, der Saisonende-Moment und die übrigen
+Folgepakete gebaut; die nächtliche Gesamtabnahme prüft jetzt auch sie (zwei neue Specs, Abschnitt 5). Backup und Restore sind
+mit echtem Docker-Stand und Liga-Daten zweimal durchgespielt, Datenbank und Uploads kamen vollständig zurück (Abschnitt 5). Offen
+vor Season 1 sind nur noch Schritte auf dem Server und Entscheidungen des Betreibers - die Checkliste steht in Abschnitt 9.
 
 Dazu gehören:
 
@@ -52,6 +58,13 @@ Selbstanmeldung, Veto, Check-in, Strafen und Saisonabschluss. Dazu kamen 20 Fund
 | G Abnahme | G.1 Gesamtabnahme mit 18 Szenarien, nächtlich; Nachmeldung (Nr. 180) | #2423 | #1632 |
 | | G.2 LionsAPP 1.7.10: Check-in, Veto live, Anmeldestatus, Zonen, Historie, Belohnungen | #2419 | #2173 (Teil) |
 | | G.3 Handbücher, Regelwerksabgleich, Feature-Matrix, dieser Bericht, D-20 | Branch `docs/liga-g3-abschluss` | #2211 |
+| Nach G.3 | Nachmeldung nach dem Start mit Spielen in offenen Wochen | – | #2422 |
+| | Eigene Staffel-Seite, Edition je Season, Partien ohne Maps, Veto-Seitenwahl, Vorfallarten schaltbar, freier Name je Liga N | – | #2262, #2400, #2401, #2402, #2403, #2405 |
+| | Playoffs und Relegation aus dem Endstand (F.6) | #2568 | #2404 |
+| | Auf- und Abstieg bei mehreren Staffeln, Startrechte mit Zusage, Frist und Nachrücken (F.2a) | #2573 | #1627 |
+| | Unterbesetzte Divisionen zusammenlegen | – | #1628 |
+| | Saisonende-Moment für Auf- und Abstieg und Meister (F.8), TV-Sieger-Moment | #2581 | #1639, #2410 |
+| G Freigabe | Gesamtabnahme erweitert (Saisonende, Betrieb), Backup-Probelauf, dieser Bericht fortgeschrieben | Branch `test/liga-abnahme-erweitern` | #1632 |
 
 **Entscheidungen:** 180 Nummern (Nr. 1 bis 180, dazu 11a bis 11c und 34a bis 34d), alle von Fabian entschieden oder als Ergänzung aus
 einem Review bestätigt. Jede ist eine Einstellung je Season oder Liga mit Vorgabe, keine feste Regel im Code. Stand je Nummer:
@@ -115,33 +128,41 @@ G.1 („Altdaten“). Neue Vorgaben gelten nur für neu angelegte Seasons.
 | G.3: Vitest `src/hilfe`, `HelpPages.test.jsx`, `HelpLink.test.jsx` (21) | lokal | grün |
 | G.3: Wächter `pytest -n 2 -k "unit or boundary or inventory"` (5734 Tests, 15 übersprungen), `check-doc-links`, `check-code-patterns`, flake8 wie CI | lokal nach dem Merge von `main` | grün |
 
-Nicht automatisch geprüft: Versand an echte Dienste (Mail, Push, Discord – im Testbetrieb gesperrt), Backup und Wiederherstellung,
-Last bei vielen gleichzeitigen Vetos.
+**Betriebsfreigabe (#1632, 26.11.):**
+
+| Prüfung | Ausgeführt | Ergebnis |
+| --- | --- | --- |
+| Gesamtabnahme erweitert: `liga-saisonende.spec.js` (5 Szenarien), `liga-betrieb.spec.js` (3 Szenarien), dazu alle bisherigen Specs | lokal nach `docs/liga/abnahme.md`, eigenes MongoDB (`mongo:7.0.40-jammy`), je frisch geseedet, 4 volle Läufe | 4 von 4 grün, je 29 Tests in 5,3 bis 5,8 Minuten (Saisonende rund 40 s, Betrieb rund 45 s) |
+| Saisonende-Moment am Meisterprofil: die Prüfung wartete auf die alte Belohnungs-Zeremonie und war nach #2581 auf `main` rot | lokal, Spec angepasst (Moment, zweite Karte mit der Goldmedaille, Reiter Trophäen) | grün |
+| Backup-Probelauf `scripts/liga_backup_probe.sh`: eigener Docker-Stand, Liga-Daten über die Seeds, `backup.sh` mit Schreibpause, frischer Stand, `restore.sh`, Vergleich | lokal, zwei vollständige Läufe (`PROBE_RUNS=2`) | 2 von 2 gleich: 200 Sammlungen, 144 Konten, 4 Endstände, 12 Startrechte, 5 Momente, 766 Indizes, 26 Uploads mit gleichem Inhalt; Schreibversuch in der Pause `503`; Zahlen in `BACKUP_RESTORE.md`, „Probelauf“ |
+| ESLint der Abnahme-Specs | lokal | grün |
+
+Nicht automatisch geprüft: Versand an echte Dienste (Mail, Push, Discord – im Testbetrieb gesperrt; die erste Probe macht der
+Betreiber, Abschnitt 9), Backup-Timer und Offsite-Kopie auf dem Server, Last bei vielen gleichzeitigen Vetos.
 
 ## 6. Welche Punkte sind noch nicht abgenommen?
 
-„Abgenommen“ heißt: in G.1 geprüft. Getestet, aber nicht in G.1: Vorfälle (D.5), Ausrüstung (C.4), Leitstand und Rundnachricht
-(E.4), Erinnerungen (E.5), Punkte nach gewonnenen Maps, Plattform, Transfers, Startseite. Ganz offen:
+„Abgenommen“ heißt: in der nächtlichen Gesamtabnahme geprüft (`docs/liga/abnahme.md`). **Seit 26.11. abgenommen** (neu dazu):
+Playoffs und Relegation (#2404), Startrechte mit Zusage, Frist, Nachrücker, Pause, Startdatum und Korrektur (#1627), der
+Saisonende-Moment je Person mit „Meister sofort“ und Einmaligkeit (#1639), Vorfälle (D.5), Leitstand mit Protokoll und Rundnachricht
+(E.4), Erinnerungen (E.5) sowie Backup und Restore mit Liga-Daten (lokal, Backup-Probelauf).
+
+**Getestet, aber nicht in der Gesamtabnahme** (Flow-, Unit- und Browser-Tests in der CI jedes PRs): Ausrüstung (C.4), Punkte nach
+gewonnenen Maps, Plattform, Transfers, Startseite, eigene Staffel-Seite (#2262), Edition je Season (#2400), Partien ohne Maps (#2401),
+Veto-Seitenwahl (#2402), Vorfallarten schaltbar (#2403), freier Name je Liga N (#2405), TV-Sieger-Moment (#2410), Zusammenlegen
+unterbesetzter Divisionen (#1628). Sie hängen nicht am Ablauf einer Tiroler-Liga-Season und sind darum kein Freigabe-Hindernis.
+
+Noch offen:
 
 | Punkt | Issue |
 | --- | --- |
-| Nachmeldung: Nachrücker bekommen keine Spiele im festen Spielplan (erledigt: Spiele in offenen Wochen, Frist 14 Tage) | #2422 |
-| Eigene Staffel-Seite in der Liga-Verwaltung (Nr. 80) | #2262 |
-| Edition je Season (Titelwechsel ohne neue Liga) | #2400 |
-| Partien ohne Maps, Remis je Partie, Serienart (EA FC, Rocket League) | #2401 |
-| Veto-Seitenwahl und Aufstellungsgröße je Modus | #2402 |
-| Vorfallarten und MOSS je Season schaltbar | #2403 |
-| Playoff- und Relegations-Staffeln aus dem Endstand | #2404 |
-| Freier Name je Liga N | #2405 |
-| TV: Sieger-Moment mit Podest und Belohnungen | #2410 |
-| Sportlicher Auf- und Abstieg als Regel je Spiel, Solo-Ligen | #1627 (Rest nach F.2) |
-| Unterbesetzte Divisionen zusammenlegen | #1628 |
+| Erster Versand an echte Dienste (Mail, Push, Discord) mit Testkonto | #1632 - Betreiber, Abschnitt 9 |
+| Backup-Timer, Offsite-Kopie und Restore-Drill auf dem Server | #1632 - Betreiber, Abschnitt 9 |
 | App: Anmelden, Vorfälle, Verfahren, Ergebnis mit Maps, Strafen in der App | #2173 (Rest nach G.2) |
 | App: Turniertag-Funktionen | #2393 |
 | Wackelige Frontend- und Browser-Tests unter Last | #2390 |
-| Barrierefreiheit: Rest aus #937 | #2412 |
 | Abhängigkeiten: Hauptversionen nacheinander anheben | #2417 |
-| Belohnungen: Rankingbanner, drei Embleme neben dem Namen, Filter (Nr. 34c, 59, 60) | noch kein Issue (Vorschlag A4) |
+| Playoff-Belohnungen, Anlage F im Regelwerk, Mail/Push zu Playoff-Runden (F.6 „Folgepaket“) | noch kein Issue |
 | Gesamtwertung bei mehreren Staffeln einer Stufe (Nr. 66 weicht ab) | noch kein Issue (Vorschlag A3) |
 | Bilder zu den neuen Hilfe-Schritten (Einspruch, Strafen, Saisonende) | Bilder offen |
 
@@ -158,8 +179,13 @@ Last bei vielen gleichzeitigen Vetos.
 - **Regelwerk-Sätze beim Anzeigen gebildet:** Die Bausteine frieren ihre Daten ein, den Satz bildet der Code beim Anzeigen. Eine
   Textkorrektur (wie in G.3) ändert darum auch die Anzeige älterer Fassungen; der Inhalt bleibt.
 - **Veto per kurzem Abruf:** Kein WebSocket. Viele gleichzeitige Vetos erzeugen viele kurze Anfragen; nicht unter Last geprüft.
-- **Echte Dienste:** Mail, Push und Discord laufen in der Abnahme gesperrt; der erste echte Versand passiert in Season 1.
+- **Echte Dienste:** Mail, Push und Discord laufen in der Abnahme gesperrt; der erste echte Versand passiert in Season 1 - vorher
+  eine Probe mit Testkonto (Abschnitt 9, Schritt 3).
 - **Nächtliche Abnahme:** läuft seit dem Merge von #2423 jede Nacht auf `main`. Eine rote Nacht legt ein Issue an – es muss jemand lesen.
+  Rot kann auch die Abnahme selbst sein: Am 26.11. hing Szenario 15 vom gelosten Spielplan ab (#2570), am selben Tag die
+  Profil-Prüfung vom alten Belohnungs-Ablauf vor #1639. Neue Szenarien greifen darum nie auf feste Plätze im Spielplan zu.
+- **Backup:** Der Probelauf lief lokal; auf dem Server sind Timer, Offsite-Ziel (`BACKUP_REMOTE`) und der monatliche Restore-Drill
+  noch einmal zu prüfen. Ohne Passwortdatei und `SETTINGS_ENCRYPTION_KEY` im Passwortspeicher ist kein Backup wiederherstellbar.
 - **App:** Wer nur die App nutzt, kommt für Anmeldung, Vorfälle, Verfahren und Ergebnis mit Maps ins Web (#2173).
 - **Wackelige Tests** unter Last (#2390) können einen grünen Stand verdecken oder einen roten vortäuschen.
 
@@ -176,19 +202,46 @@ Last bei vielen gleichzeitigen Vetos.
 | Wortlaut „Spieltag“ im Regelwerk, Beispiel 3:2 (Vorschläge A5, A6) | Beim nächsten Regelwerk-Update mitnehmen | Rein sprachlich |
 | Starttermin Season 1 | Nach Einrichtung und Prüfung „Was fehlt noch?“ | – |
 
-## 9. Was ist vor Season 1 noch zu tun?
+## 9. Was ist vor Season 1 noch zu tun? Checkliste für den Server
 
-1. **G.3 als PR** prüfen und mergen; die erste grüne Nacht der Gesamtabnahme auf `main` abwarten (G.1 ist mit #2423 gemergt).
-2. **Website-Release** bewusst veröffentlichen (release-please-PR) und auf dem Server einspielen – Fabian.
-3. **Server einrichten** (Fabian): Bereich **Ligen** an alle Liga-Leitungen vergeben, Zwei-Faktor prüfen, Zuständige je Liga.
-4. **Spiel und Bibliothek:** MW4 als Version unter Call of Duty (Nr. 36), Modi mit Ergebnisregel und Symbol, Maps mit Bild,
+Der Reihe nach abhaken. Gebaut ist alles; hier geht es um Einspielen, Einrichten und die erste echte Probe. Den echten
+Versand an Teilnehmer macht der Betreiber in Season 1 - davor nur die Probe mit einem Testkonto (Schritt 3).
+
+1. [ ] **Release einspielen.** Den gesammelten release-please-PR bewusst mergen (die nächste Version nach 1.99.0 bringt den
+   Saisonende-Moment #1639 und die Versionsanzeige #2585; Playoffs #2404 und Startrechte #1627 stecken schon in 1.96.0 und 1.98.0), auf dem Server einspielen, Migrationen laufen beim Start von selbst. Prüfen: `/api/health/ready` grün, die Fußzeile zeigt
+   die neue Version (#2585), die nächste nächtliche Gesamtabnahme auf `main` grün.
+2. [ ] **Bereich „Ligen“ vergeben.** Allen Liga-Leitungen den Bereich **Ligen** geben, Zwei-Faktor bei jedem Konto prüfen,
+   Zuständige je Liga eintragen (B.1). Eine zweite Person mit Bereich Ligen ist Pflicht: Wiederöffnen, Einsprüche und
+   Befangenheit brauchen sie.
+3. [ ] **Erster echter Versand als Probe - mit Testkonto, nicht mit Teilnehmern.**
+   - Vorher: `OUTBOUND_DISABLED` ist auf dem Server **nicht** gesetzt, Mail-Zugang (`RESEND_API_KEY`), Push (App mit Testkonto,
+     Mitteilungen erlaubt) und der Discord-Bot sind eingerichtet; das Testkonto hat Discord verknüpft und Discord-Nachrichten erlaubt.
+   - Eine Probe-Liga mit einer Season auf **Nur Liga-Leitung**, ein Test-Co-Team mit dem Testkonto als Captain, einer Staffel
+     zugeteilt.
+   - **Mail und Glocke:** Rundnachricht (Leitstand, „Mail auch“) an Captains der Probe-Season - kommt sie genau einmal im Postfach,
+     in der Glocke und als Push am Handy an?
+   - **Push und Discord:** In der Probe-Season unter Termine → Erinnerungen **Discord** einschalten, ein Spiel auf morgen legen -
+     kommt „Liga-Spiel in 24 Stunden“ einmal als Push und als Direktnachricht vom Bot?
+   - Danach die Probe-Liga archivieren. Fällt etwas aus, Mail- bzw. Push-Protokoll in der Betriebssicht ansehen, nicht mit echten
+     Teilnehmern weiterprobieren.
+4. [ ] **Backup-Timer prüfen.** `systemctl list-timers 'tls-*'` (Backup täglich 03:15, Restore-Drill monatlich),
+   `journalctl -u tls-backup.service --since yesterday` ohne Fehler, das letzte Manifest mit `consistent: true`,
+   `bash scripts/restore-drill-status.sh` gibt 0. `BACKUP_REMOTE` zeigt auf ein Ziel außerhalb des Servers. Passwortdatei und
+   `SETTINGS_ENCRYPTION_KEY` liegen im Passwortspeicher. Die Dienstdatei mit `TimeoutStartSec=2h` ist kopiert
+   (`BACKUP_RESTORE.md`, „Was am Server zu tun ist“). Den Ablauf hat der Backup-Probelauf lokal belegt (Abschnitt 5).
+5. [ ] **Datenschutztext** für externe Teilnehmer freigeben, rechtlich prüfen lassen, in der Season eintragen (Nr. 1, 72, 141).
+6. [ ] **Spiel und Bibliothek:** MW4 als Version unter Call of Duty (Nr. 36), Modi mit Ergebnisregel und Symbol, Maps mit Bild,
    Ausrüstung.
-5. **Liga und Season anlegen:** „Tiroler Liga MW4 Allmode“ unter `tiroler-liga-mw4-allmode` (Nr. 68), Season mit den Werten aus
-   dem Regelwerk – Checkliste im [Handbuch, Abschnitt 6](../handbuch/liga.md#6-checkliste-vor-dem-season-start).
-6. **Datenschutztext** für externe Teilnehmer freigeben, rechtlich prüfen lassen, in der Season eintragen.
-7. **Regelwerk v0.15** mit Bausteinen und Variablen übertragen, Veto-Folge nach CDL-Prüfung, veröffentlichen mit Zustimmungspflicht.
-   Dabei (#2424, #2426): Anlage B nur mit `[[baustein:veto]]` (die Tabelle entsteht aus der Veto-Vorlage), `[[baustein:lead_rulings]]`
-   in Anlage C bzw. § 9a einsetzen (Regelwerksabgleich A7/A8) und „Ende des ersten Spieltags“ im Fließtext auf „Spielwoche“ ändern.
-8. **„Was fehlt noch?“** ohne Probleme, Ligaseite mit *Nur Liga-Leitung* ansehen, dann Sichtbarkeit und Anmeldefenster öffnen.
-9. **Anmeldungen** entscheiden, Co-Teams zuteilen, **Liga starten** je Staffel.
-10. **Ankündigung** auf Discord von Hand mit Link zur Ligaseite und zum Spickzettel.
+7. [ ] **Liga und Season anlegen:** „Tiroler Liga MW4 Allmode“ unter `tiroler-liga-mw4-allmode` (Nr. 68), Season mit den Werten aus
+   dem Regelwerk – Checkliste im [Handbuch, Abschnitt 6](../handbuch/liga.md#6-checkliste-vor-dem-season-start). **Vor dem ersten
+   Abschluss festlegen**, weil es danach feststeht (Nr. 228): Playoffs (Plätze je Staffel, „Meister aus“), Relegation, Zonen,
+   Startrechte (Zusage, Frist, Nachrückerregel), Dauer des Saisonende-Moments, Erinnerungen samt Discord-Schalter, Vorfälle.
+8. [ ] **Regelwerk v0.15** mit Bausteinen und Variablen übertragen, Veto-Folge nach CDL-Prüfung (Nr. 100), veröffentlichen mit
+   Zustimmungspflicht. Dabei (#2424, #2426): Anlage B nur mit `[[baustein:veto]]`, `[[baustein:lead_rulings]]` in Anlage C bzw. § 9a,
+   „Ende des ersten Spieltags“ im Fließtext auf „Spielwoche“ ändern. Playoffs und Relegation als Anlage F von Hand (der Baustein
+   ist Folgepaket, Nr. 216).
+9. [ ] **„Was fehlt noch?“** ohne Probleme, Ligaseite mit *Nur Liga-Leitung* ansehen, dann Sichtbarkeit und Anmeldefenster öffnen.
+10. [ ] **Anmeldungen** entscheiden, Co-Teams zuteilen, **Liga starten** je Staffel.
+11. [ ] **Ankündigung** auf Discord von Hand mit Link zur Ligaseite und zum Spickzettel.
+12. [ ] **Nach dem ersten Spielabend:** Leitstand und Protokoll der Season ansehen, die erste echte Erinnerung und Rundnachricht
+    kontrollieren; ein rotes Issue „Liga-Gesamtabnahme rot“ sofort lesen.
