@@ -83,7 +83,7 @@ function CompactHead({ look, league, season, title }) {
         <p className="tls-league-head__eyebrow">
           <Link to={sectionPath(league.slug, season.slug)} className="hover:text-white">{league.name} {season.name}</Link>
         </p>
-        <h1 className="tls-type-title leading-none"><ShortCaps>{title}</ShortCaps></h1>
+        <h1 className="tls-type-title leading-none">{title}</h1>
       </div>
     </header>
   );

@@ -24,7 +24,6 @@ import { originalsOf } from "@/lib/referenceOriginals";
 import { SeriesLogo } from "@/components/tls/references/SeriesLogo";
 import { seriesLogo } from "@/lib/seriesLogo";
 import { OPEN_ROUND, kindShows } from "@/lib/seriesKinds";
-import { ShortCaps } from "@/components/tls/ShortCaps";
 
 // Seite einer Serie unter /references/series/<spur>/<saison> (Entscheidung 5 zu #1741), Turnierserie (#1745): Kopf,
 // Rundenfortschritt, Regeln, Gesamtwertung mit Streichergebnissen und Finalgrenze, Finalrechner (Richtwert), das
@@ -140,7 +139,7 @@ export default function ReferenceSeriesPage() {
               <SeriesLogo src={logo} size="lg" testId="series-page-logo" />
               <div className="min-w-0">
                 <p className="tls-type-label text-[#29B6E8]">{eyebrow || "Serie"}</p>
-                <h1 className="tls-type-title mt-2"><ShortCaps>{title}</ShortCaps></h1>
+                <h1 className="tls-type-title mt-2">{title}</h1>
               </div>
             </div>
             <SeriesPartners partners={data.partners} />

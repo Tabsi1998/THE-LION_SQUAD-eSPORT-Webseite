@@ -433,7 +433,7 @@ function NextUp({ items }) {
       </div>
       {target && countdown && (
         <div className="mt-3 flex flex-wrap items-baseline gap-x-3 gap-y-1 min-w-0" data-testid="home-countdown">
-          <span className="inline-flex items-center gap-1.5 tls-type-label text-quiet"><Timer className="w-3 h-3" /> {target.item.label}</span>
+          <span className="inline-flex items-center gap-1.5 tls-type-small text-quiet"><Timer className="w-3 h-3" /> {target.item.label}</span>
           <span key={countdown} className="tls-tick tls-type-section tls-type-num text-white" data-testid="home-countdown-value">{countdown}</span>
         </div>
       )}

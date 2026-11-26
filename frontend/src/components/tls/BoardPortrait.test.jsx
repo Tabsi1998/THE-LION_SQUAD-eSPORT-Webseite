@@ -64,3 +64,13 @@ test("klein und rund für Ansprechpartner", () => {
   expect(screen.getByTestId("a")).toHaveTextContent("StellvertretungKassierSina Muster SternNebel");
   expect(screen.getByTestId("a").querySelector(".tls-portrait--round")).not.toBeNull();
 });
+
+// Großbuchstaben nur für Kurzes (#1303): Rollen stehen normal geschrieben, auch eine lange wie
+// „Stellvertretung Obmann und Jugendreferent“ - kein GROSSES Etikett.
+test("die Rolle ist kein GROSSES Etikett", async () => {
+  const { RoleLine } = await import("./BoardPortrait");
+  const { container } = render(<RoleLine label="Stellvertretung Obmann und Jugendreferent" />);
+  const role = container.querySelector("span > span");
+  expect(role).not.toHaveClass("tls-type-label");
+  expect(role).not.toHaveClass("uppercase");
+});

@@ -14,7 +14,6 @@ import {
 import { SeriesLogo } from "@/components/tls/references/SeriesLogo";
 import { seriesLogo } from "@/lib/seriesLogo";
 import "./roundResults.css";
-import { ShortCaps } from "@/components/tls/ShortCaps";
 
 // Bausteine der Ergebnisseite einer Runde (#1950): Kopf mit Flagge und Pfeilen, Zusammenfassung, Reiter je Lauf, die
 // Tabelle am PC und die Liste am Handy. Zeiten und Abstände zählen beim Öffnen und bei jedem Reiterwechsel hoch
@@ -70,7 +69,7 @@ export function RoundHead({ page, lineageSlug, seasonSlug }) {
         {round.country_code && <span className="tls-round-flag flex shrink-0"><CountryFlag code={round.country_code} size="xl" /></span>}
         <div className="flex flex-col min-w-0">
           <span className="hidden sm:block tls-type-label text-[#29B6E8] tabular-nums" data-testid="round-eyebrow">{roundEyebrow(round)}</span>
-          <h1 className="tls-type-title leading-none sm:mt-1 [overflow-wrap:anywhere]"><ShortCaps>{heading}</ShortCaps></h1>
+          <h1 className="tls-type-title leading-none sm:mt-1 [overflow-wrap:anywhere]">{heading}</h1>
           {sub && <span className="hidden sm:block mt-1 tls-type-small text-white/65">{sub}</span>}
           {/* Am Handy eine Zeile unter dem Namen: Kürzel, Tag und Strecke. */}
           <span className="sm:hidden mt-1 tls-type-small text-white/65 tabular-nums" data-testid="round-subline">{roundSubline(round, sub)}</span>

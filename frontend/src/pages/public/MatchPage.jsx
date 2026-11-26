@@ -50,7 +50,6 @@ import { useLeagueTrail } from "@/hooks/useLeagueTrail";
 import { tournamentCrumbs } from "@/lib/leagueTrail";
 import { LeagueEmblem } from "@/components/tls/league/public/LeagueLook";
 import { noteOwnMatches } from "@/lib/liveQueue";
-import { ShortCaps } from "@/components/tls/ShortCaps";
 
 const DECISION_TOASTS = {
   accept: "Termin bestätigt.",
@@ -469,7 +468,7 @@ function MatchPageView() {
               {trail?.emblemUrl ? <LeagueEmblem src={trail.emblemUrl} size={24} testId="match-league-emblem" /> : null}
               {data.matchday_label}
             </div>
-            <h1 className="mt-2 tls-type-title [overflow-wrap:anywhere]" data-testid="match-headline"><ShortCaps>{headline}</ShortCaps></h1>
+            <h1 className="mt-2 tls-type-title [overflow-wrap:anywhere]" data-testid="match-headline">{headline}</h1>
             <div className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 tls-type-small text-white/55">
               <span className="tls-type-label text-quiet" data-testid="match-key">{formatMatchKind(match)} {match.match_key || ""}</span>
               {data.tournament && (

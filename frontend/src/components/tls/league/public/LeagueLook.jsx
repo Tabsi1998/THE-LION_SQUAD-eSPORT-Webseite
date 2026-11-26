@@ -8,7 +8,6 @@ import { SizedImage } from "@/components/tls/SizedImage";
 import { StaggerIn } from "@/components/tls/motion";
 import { accentStyle, bannerFocus, placeLabel, placeTone } from "@/lib/leagueLook";
 import "./league.css";
-import { ShortCaps } from "@/components/tls/ShortCaps";
 
 /** Das Emblem einer Liga bzw. Season - quadratisch, unverzerrt; ohne Bild das Liga-Zeichen in der Akzentfarbe. */
 export function LeagueEmblem({ src, size = 40, className = "", testId }) {
@@ -43,7 +42,7 @@ export function LeagueHead({ look, title, eyebrow, children, testId = "league-he
         <LeagueEmblem src={look?.emblem_url} size={88} className="tls-league-head__emblem" testId={`${testId}-emblem`} />
         <div className="min-w-0 flex-1">
           {eyebrow ? <p className="tls-league-head__eyebrow">{eyebrow}</p> : null}
-          <h1 className="tls-type-title leading-[0.95] break-words"><ShortCaps>{title}</ShortCaps></h1>
+          <h1 className="tls-type-title leading-[0.95] break-words">{title}</h1>
         </div>
       </div>
       {children}
