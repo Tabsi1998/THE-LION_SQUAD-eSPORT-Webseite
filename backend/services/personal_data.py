@@ -64,6 +64,9 @@ PERSONAL: dict[str, Entry] = {
     "web_push_subscriptions": Entry(DELETED, ("web_push_browsers",)),
     "mobile_client_logs": Entry(DELETED, ("mobile_client_logs",)),
     "notifications": Entry(DELETED, ("notifications",)),
+    # Sammel-Mail (#1662): die gesammelten Mails (Betreff, eine Zeile, Link) und je Zeitraum ein Lauf ohne Inhalt.
+    "mail_digest_items": Entry(DELETED, ("mail_digest_items",)),
+    "mail_digest_runs": Entry(DELETED, note="je Zeitraum ein Merker, dass die Sammel-Mail verschickt ist - ohne Inhalt"),
     "chat_reads": Entry(DELETED, ("chat_reads",)),
     "document_opens": Entry(DELETED, ("document_opens",)),
     "year_review_notices": Entry(DELETED, ("year_review_notices",)),

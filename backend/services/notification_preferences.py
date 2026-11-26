@@ -260,7 +260,79 @@ NOTIFICATION_KIND_CATEGORY = {
     "helper_reminder": "helper_shifts",
     "membership_update": "membership_updates",
     "invoice_ready": "billing_updates",
+    # Benachrichtigungs-Zentrum (#1662): jede Art, die der Code erzeugt, hat ein Thema (Wächter
+    # tests/test_notification_kinds_inventory_unit.py). Diese hatten bisher keins und ließen sich deshalb nicht abschalten.
+    "access_link_invite": "tournament_updates",
+    "tournament_heat_rebuild": "tournament_updates",
+    "jersey_number": "membership_updates",
+    "membership_invited": "membership_updates",
+    # Turnier-Meldungen (#1209): weiter, ausgeschieden, Turnierbaum, Pause - unter „Turnier-Updates“.
+    "tournament_progress": "tournament_updates",
+    "tournament_bracket": "tournament_updates",
+    "tournament_pause": "tournament_updates",
 }
+
+ACCOUNT_TOPIC = "account"
+# „Konto & System“ (#1662) ist kein Thema zum Abschalten und steht darum nicht in ``NOTIFICATION_KIND_CATEGORY``: Rechte,
+# Mitgliedschafts-Entscheidungen, Moderation, Push-Test, die Sammelmeldung nach der Ruhezeit. Wie bisher gilt dafür nur der
+# Kanal-Hauptschalter - für Glocke, Sammel-Mail und Wächter haben sie trotzdem ein Thema.
+ACCOUNT_KINDS: frozenset[str] = frozenset({
+    "rights_change", "membership_decision", "moderation", "admin_push_test", "quiet_digest", "general",
+})
+# Die Namen der Themen für Glocke, Sammel-Mail und Sammelmeldung (#1662) - wie in den Einstellungen.
+TOPIC_LABELS: dict[str, str] = {
+    **{key: meta["label"] for key, meta in OPTIONAL_EMAIL_PREFERENCES.items()
+       if key not in {"birthday_greetings", "achievement_recap"}},
+    ACCOUNT_TOPIC: "Konto & System",
+}
+
+# Wichtigkeit je Art (#1662): ``urgent`` bricht die Ruhezeit und kommt nie in die Sammel-Mail (genau die Ausnahmen der Ruhezeit,
+# quiet_hours_rules.EXEMPT_KINDS); ``important`` verlangt meist etwas von dir; ``normal`` ist zur Kenntnis. Eine einzelne Meldung
+# kann ihre Stufe in ``meta.importance`` nennen. „Nie sammeln“ ohne die Ruhezeit zu brechen ist ``TIMELY_KINDS``.
+IMPORTANCE_LEVELS: tuple[str, ...] = ("urgent", "important", "normal")
+_URGENT = {"match_call", "match_station", "admin_push_test"}
+# Zeitkritisch (Fabian 26.11., E und F): Absage, neuer Termin, Nachrücken. Die Mail wird nie gesammelt; der Push wartet in der
+# Ruhezeit, außer der Termin (``meta.starts_at``) steht bevor und beginnt bis 2 Stunden nach ihrem Ende (services/quiet_hours.py). Weitere
+# Meldungen tragen das Merkmal ``meta.timely`` (Event-Änderung, Nachgerückt).
+TIMELY_KINDS: frozenset[str] = frozenset({"tournament_cancelled"})
+_IMPORTANT = {
+    "match_reminder", "match_report", "match_attention", "schedule_escalation", "match_schedule", "match_dispute",
+    "team_presence_nudge", "tournament_checkin", "tournament_registration", "tournament_cancelled", "tournament_notice",
+    "tournament_staff", "tournament_progress", "tournament_bracket", "tournament_pause", "tournament_heat_rebuild",
+    "access_link_invite", "league_broadcast", "direct_message", "match_chat_mention", "team_chat_mention",
+    "tournament_chat_mention", "team_invite", "prize_status", "prize_pending", "f1_prize", "f1_prize_reminder",
+    "helper_call", "helper_reminder", "ballot_open", "invoice_ready", "membership_invited", "rights_change",
+    "membership_decision", "moderation",
+}
+NOTIFICATION_KIND_IMPORTANCE: dict[str, str] = {
+    kind: "urgent" if kind in _URGENT else "important" if kind in _IMPORTANT else "normal"
+    for kind in (*NOTIFICATION_KIND_CATEGORY, *ACCOUNT_KINDS)
+}
+
+
+def notification_topic(kind: str, meta: dict | None = None) -> str:
+    """Das Thema einer Meldung: ``meta.category``, sonst das der Art - Unbekanntes unter „Konto & System“."""
+    category = (meta or {}).get("category")
+    if category in TOPIC_LABELS:
+        return category
+    return NOTIFICATION_KIND_CATEGORY.get(str(kind or ""), ACCOUNT_TOPIC)  # ACCOUNT_KINDS und Unbekanntes
+
+
+def notification_importance(kind: str, meta: dict | None = None) -> str:
+    """Die Wichtigkeit einer Meldung (#1662) - ``meta.importance``, wenn bekannt, sonst die der Art."""
+    meta = meta or {}
+    named = meta.get("importance")
+    if named in IMPORTANCE_LEVELS:
+        return named
+    # „Match startet jetzt“ in der Liga ist dringend - dieselbe Ausnahme wie bei der Ruhezeit (services/quiet_hours.py).
+    if kind == "match_schedule" and meta.get("reason") == "checkin_started":
+        return "urgent"
+    return NOTIFICATION_KIND_IMPORTANCE.get(str(kind or ""), "normal")
+
+
+def notification_timely(kind: str, meta: dict | None = None) -> bool:
+    """Zeitkritisch (Absage, neuer Termin, Nachrücken) - siehe ``TIMELY_KINDS``."""
+    return str(kind or "") in TIMELY_KINDS or bool((meta or {}).get("timely"))
 
 
 # Rechte und Entscheidungen über die Mitgliedschaft (#2125): die Person muss es erfahren - kein Thema zum Abbestellen.
@@ -457,13 +529,25 @@ def notification_level(user: dict | None, prefs: dict[str, bool] | None = None) 
     return CUSTOM_LEVEL
 
 
-async def send_user_template(user: dict | None, template_key: str, category: str | None = None, **kwargs) -> dict:
-    """Send a named template to a user if their preferences allow it."""
+async def send_user_template(user: dict | None, template_key: str, category: str | None = None, *,
+                             importance: str | None = None, never_collect: bool = False, **kwargs) -> dict:
+    """Send a named template to a user if their preferences allow it.
+
+    Sammel-Mail (#1662): Wer „täglich“ oder „wöchentlich“ eingestellt hat, bekommt optionale Mails gesammelt
+    (services/mail_digest.py) - Pflicht, Dringendes (``importance="urgent"``), Zeitkritisches (``never_collect=True``: neuer
+    Termin, Nachrücken) und die Vorlagen aus ``mail_digest_rules.NEVER_COLLECT_TEMPLATES`` nie. Ein
+    gesammelte Mail meldet ``{"ok": True, "digest": True}``."""
     if not user or not user.get("email"):
         return {"ok": False, "skipped": True, "reason": "missing_email"}
     category = category or TEMPLATE_CATEGORY.get(template_key)
     if not email_allowed(user, template_key, category):
         return {"ok": True, "skipped": True, "reason": "preference_disabled", "category": category}
+    from services import mail_digest_rules
+
+    if not never_collect and user.get("id") and mail_digest_rules.collectable(template_key, importance, template_key in REQUIRED_EMAIL_TEMPLATES):
+        held = await mail_digest_rules.hold(user, template_key, category, kwargs)
+        if held:
+            return held
     from email_service import send_template
     return await send_template(template_key, user["email"], **kwargs)
 

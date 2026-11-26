@@ -100,10 +100,14 @@ async def notify_registration_status(db, tournament: dict, registration: dict, s
     absolute_url = await build_public_url(path)
     stamp = registration.get("updated_at") or registration.get("created_at") or ""
     dedupe = f"registration:{registration.get('id')}:{status}:{stamp}"
+    promoted = status in {"approved", "checked_in"} and previous == "waitlist"
     sent = 0
     for user in recipients:
         meta = {"category": "tournament_updates", "dedupe_key": dedupe, "tournament_id": tournament.get("id"),
                 "registration_id": registration.get("id"), "status": status}
+        if promoted:
+            # Nachgerückt (Fabian 26.11., F): zeitkritisch wie eine Absage.
+            meta.update(timely=True, starts_at=tournament.get("start_date"))
         if user["id"] == actor_id:
             meta["in_app_only"] = True  # wer gerade selbst angemeldet hat, sieht es schon auf dem Bildschirm
         if await create_user_notification(user["id"], message["title"], message["body"], url=path,
@@ -116,7 +120,7 @@ async def notify_registration_status(db, tournament: dict, registration: dict, s
             kwargs.update(url=absolute_url, detail=message.get("detail") or "")
         try:
             await send_user_template(
-                user, message["template"], dedupe_key=f"{dedupe}:{user['id']}:mail",
+                user, message["template"], never_collect=promoted, dedupe_key=f"{dedupe}:{user['id']}:mail",
                 mail_meta={"kind": "tournament_registration", "tournament_id": tournament.get("id"), "user_id": user["id"]},
                 **kwargs,
             )
@@ -158,7 +162,8 @@ async def notify_tournament_cancelled(db, tournament: dict, reason: str | None =
         dedupe = f"tournament_cancelled:{tournament.get('id')}:{user['id']}"
         if await create_user_notification(
             user["id"], message["title"], message["body"], url=path, kind="tournament_cancelled",
-            meta={"category": "tournament_updates", "dedupe_key": dedupe, "tournament_id": tournament.get("id")},
+            meta={"category": "tournament_updates", "dedupe_key": dedupe, "tournament_id": tournament.get("id"),
+                  "starts_at": tournament.get("start_date")},
         ):
             sent += 1
         try:

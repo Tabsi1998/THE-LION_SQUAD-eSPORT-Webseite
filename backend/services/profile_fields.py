@@ -5,6 +5,8 @@
 """
 
 USER_NULLABLE_FIELDS = frozenset({
+    # Sammel-Mail (#1662): leer heißt „Vorgabe des Vereins“.
+    "mail_digest",
     "display_name", "avatar_url", "banner_url", "bio", "first_name", "last_name",
     "nickname", "birth_date", "gender", "country", "state", "city", "favorite_games",
     "main_platform", "main_platforms", "preferred_role", "input_device",

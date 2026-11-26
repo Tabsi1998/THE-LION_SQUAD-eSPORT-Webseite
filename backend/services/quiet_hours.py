@@ -61,12 +61,38 @@ def quiet_until(user: dict | None, now: datetime | None = None) -> datetime | No
     return rules.quiet_until(user, now or now_utc())
 
 
-async def is_exempt(db, kind: str, meta: dict | None) -> bool:
-    """Kommt diese Meldung auch in der Ruhezeit sofort? Siehe Modulbeschreibung."""
+# Zeitkritisches (Absage, neuer Termin, Nachrücken) kommt in der Ruhezeit sofort, wenn sein Termin noch bevorsteht und spätestens
+# so lange nach dem Ende der Ruhezeit beginnt (Fabians Nr. 267: „vor 9 Uhr“ bei Ruhezeit bis 7 Uhr) - sonst nach der Ruhezeit.
+TIMELY_GRACE_HOURS = 2
+
+
+def _timely_now(meta: dict, until: datetime | None, now: datetime | None = None) -> bool:
+    """``jetzt <= Termin < Ende der Ruhezeit + 2 Stunden``. Ein vergangener Termin weckt niemanden."""
+    if not until or not meta.get("starts_at"):
+        return False
+    from datetime import timedelta
+    from zoneinfo import ZoneInfo
+    try:
+        starts = datetime.fromisoformat(str(meta["starts_at"]).replace("Z", "+00:00"))
+    except ValueError:
+        return False
+    if starts.tzinfo is None:
+        starts = starts.replace(tzinfo=ZoneInfo("Europe/Vienna"))
+    now = now or now_utc()
+    return now <= starts < until + timedelta(hours=TIMELY_GRACE_HOURS)
+
+
+async def is_exempt(db, kind: str, meta: dict | None, until: datetime | None = None, now: datetime | None = None) -> bool:
+    """Kommt diese Meldung auch in der Ruhezeit sofort? Siehe Modulbeschreibung. ``until``: Ende der Ruhezeit."""
     meta = meta or {}
+    from services.notification_preferences import notification_timely
+    if notification_timely(kind, meta) and _timely_now(meta, until, now):
+        return True
     if kind in EXEMPT_KINDS:
         return True
-    if kind == "match_schedule" and meta.get("reason") == "checkin_started":
+    # Dringendes kommt trotzdem (#1662): die Wichtigkeit der Meldung - auch „Match startet jetzt“ der Liga (checkin_started).
+    from services.notification_preferences import notification_importance
+    if notification_importance(kind, meta) == "urgent":
         return True
     if kind == "match_attention" and meta.get("tournament_id"):
         tournament = await db.tournaments.find_one(
@@ -81,7 +107,7 @@ async def is_exempt(db, kind: str, meta: dict | None) -> bool:
 async def hold_until(db, user: dict | None, kind: str, meta: dict | None, now: datetime | None = None) -> str | None:
     """Ende der Ruhezeit als UTC-Zeitstempel, wenn diese Meldung zurückgehalten wird - sonst ``None``."""
     until = quiet_until(user, now)
-    if until is None or await is_exempt(db, kind, meta):
+    if until is None or await is_exempt(db, kind, meta, until, now):
         return None
     return until.isoformat()
 

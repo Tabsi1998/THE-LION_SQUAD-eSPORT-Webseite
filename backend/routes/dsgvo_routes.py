@@ -250,6 +250,8 @@ async def _user_data_sections(db, user_id: str) -> list[tuple[str, tuple]]:
         ("season_points", _rows(db.season_points, me)),
         ("prize_pickups", _rows(db.prize_pickups, me)),
         ("notifications", _rows(db.notifications, me)),
+        # Sammel-Mail (#1662): was für die nächste Sammel-Mail bereitliegt oder schon darin stand.
+        ("mail_digest_items", _rows(db.mail_digest_items, me)),
         ("direct_messages", _rows(db.direct_messages, {"$or": [{"sender_id": user_id}, {"recipient_id": user_id}]},
                                   _direct_message(user_id))),
         ("friendships", _rows(db.friendships, {"$or": [{"requester_id": user_id}, {"recipient_id": user_id}]})),

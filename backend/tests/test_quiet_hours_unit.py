@@ -841,3 +841,83 @@ async def test_a_hanging_discord_does_not_hold_the_run(monkeypatch, wires):
     assert _rd(done) == (1, 1)
     assert _digests(db)[0]["quiet_delivered"] is True
     assert sorted(channel for channel, _kind, _user in wires) == ["browser", "push"]
+
+
+# ---------------------------------------------------------------- Benachrichtigungs-Zentrum (#1662)
+
+@pytest.mark.anyio
+async def test_a_notice_marked_urgent_comes_through_the_quiet_hours(monkeypatch, wires):
+    """Dringendes kommt trotzdem (#1662): auch eine Art ohne feste Ausnahme, wenn die Meldung selbst „dringend“ sagt."""
+    db = _Db([{"id": "u1", "quiet_hours": NIGHT, "notification_preferences": {}}])
+    _at(monkeypatch, db, "2026-11-16T23:00:00")
+    await create_user_notification("u1", "Sofort an Station 2", kind="tournament_notice",
+                                   meta={"dedupe_key": "n-1", "importance": "urgent"})
+    assert ("push", "tournament_notice", "u1") in wires
+    assert "quiet_hold_until" not in db.notifications.rows[0]
+
+
+@pytest.mark.anyio
+async def test_the_same_notice_without_urgency_waits(monkeypatch, wires):
+    db = _Db([{"id": "u1", "quiet_hours": NIGHT, "notification_preferences": {}}])
+    _at(monkeypatch, db, "2026-11-16T23:00:00")
+    await create_user_notification("u1", "Pause bis 14:30", kind="tournament_notice", meta={"dedupe_key": "n-2"})
+    assert wires == [] and db.notifications.rows[0]["quiet_hold_until"]
+
+
+@pytest.mark.anyio
+async def test_every_new_notification_carries_topic_and_importance(monkeypatch, wires):
+    db = _Db([{"id": "u1", "notification_preferences": {}}])
+    _at(monkeypatch, db, "2026-11-16T12:00:00")
+    await create_user_notification("u1", "Du bist dran", kind="match_call", meta={"dedupe_key": "c-1"})
+    await create_user_notification("u1", "Rechte geändert", kind="rights_change", meta={"dedupe_key": "r-1"})
+    rows = {row["kind"]: row for row in db.notifications.rows}
+    assert (rows["match_call"]["topic"], rows["match_call"]["importance"]) == ("match_reminders", "urgent")
+    assert (rows["rights_change"]["topic"], rows["rights_change"]["importance"]) == ("account", "important")
+
+
+# ---------------------------------------------------------------- Zeitkritisch (Fabian 26.11., E und F)
+
+@pytest.mark.anyio
+@pytest.mark.parametrize("starts_at,through", [
+    ("2026-11-17T09:30:00+00:00", False),  # 10:30 in Wien: der Push wartet bis 7:00
+    ("2026-11-17T07:30:00+00:00", True),   # 08:30 in Wien, vor 9 Uhr am selben Morgen: sofort
+])
+async def test_a_cancellation_waits_unless_it_concerns_the_early_morning(monkeypatch, wires, starts_at, through):
+    db = _Db([{"id": "u1", "quiet_hours": NIGHT, "notification_preferences": {}}])
+    _at(monkeypatch, db, "2026-11-16T23:00:00")
+    await create_user_notification("u1", "Turnier abgesagt", kind="tournament_cancelled",
+                                   meta={"dedupe_key": "c-1", "starts_at": starts_at})
+    row = db.notifications.rows[0]
+    assert (("push", "tournament_cancelled", "u1") in wires) is through
+    assert ("quiet_hold_until" not in row) is through
+
+
+@pytest.mark.anyio
+async def test_a_new_date_or_moving_up_marked_timely_follows_the_same_rule(monkeypatch, wires):
+    db = _Db([{"id": "u1", "quiet_hours": NIGHT, "notification_preferences": {}}])
+    _at(monkeypatch, db, "2026-11-16T23:00:00")
+    await create_user_notification("u1", "Nachgerückt", kind="event_registration",
+                                   meta={"dedupe_key": "n-1", "timely": True, "starts_at": "2026-11-17T07:00:00+00:00"})
+    await create_user_notification("u1", "Termin geändert", kind="event_message",
+                                   meta={"dedupe_key": "n-2", "timely": True, "starts_at": "2026-11-18T07:00:00+00:00"})
+    assert [kind for _channel, kind, _user in wires] == ["event_registration", "event_registration"]
+    assert [bool(row.get("quiet_hold_until")) for row in db.notifications.rows] == [False, True]
+
+
+
+# ---------------------------------------------------------------- Dritte Prüfrunde (26.11.): Untergrenze und „Ende + 2 Stunden“
+
+@pytest.mark.anyio
+@pytest.mark.parametrize("quiet,now,starts_at,through", [
+    (NIGHT, "2026-11-16T22:30:00", "2026-11-15T17:00:00+00:00", False),   # gestern 18:00 - vorbei, kein Grund zu wecken
+    (NIGHT, "2026-11-16T22:30:00", "2026-11-09T17:00:00+00:00", False),   # vor einer Woche
+    ({"enabled": True, "start": "22:00", "end": "10:00"}, "2026-11-16T23:00:00", "2026-11-17T10:30:00+00:00", True),   # 11:30 < 12:00
+    ({"enabled": True, "start": "22:00", "end": "10:00"}, "2026-11-16T23:00:00", "2026-11-17T11:30:00+00:00", False),  # 12:30
+    ({"enabled": True, "start": "13:00", "end": "15:00"}, "2026-11-16T12:30:00", "2026-11-16T13:00:00+00:00", True),   # Mittagsruhe, Termin 14:00
+])
+async def test_timely_comes_through_only_for_appointments_until_two_hours_after_the_quiet_hours(monkeypatch, wires, quiet, now,
+                                                                                                  starts_at, through):
+    db = _Db([{"id": "u1", "quiet_hours": quiet, "notification_preferences": {}}])
+    _at(monkeypatch, db, now)
+    await create_user_notification("u1", "Turnier abgesagt", kind="tournament_cancelled", meta={"dedupe_key": "c-9", "starts_at": starts_at})
+    assert (("push", "tournament_cancelled", "u1") in wires) is through

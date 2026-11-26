@@ -315,6 +315,15 @@ async def init_indexes():
     await db.notifications.create_index([("user_id", 1), ("read", 1), ("created_at", -1)])
     # Ruhezeit (#1206): nur zurückgehaltene Meldungen tragen das Feld - der Job ``quiet_digest`` sucht danach.
     await db.notifications.create_index("quiet_hold_until", sparse=True)
+    # Sammel-Mail (#1662): je Person die gesammelten Mails, je Person und Zeitraum genau ein Lauf (services/mail_digest.py).
+    await db.mail_digest_items.create_index("id", unique=True)
+    await db.mail_digest_items.create_index([("user_id", 1), ("created_at", 1)])
+    await db.mail_digest_items.create_index("digest_id", sparse=True)
+    await db.mail_digest_items.create_index([("user_id", 1), ("dedupe_key", 1)], unique=True, name="user_dedupe",
+                                            partialFilterExpression={"dedupe_key": {"$type": "string"}})
+    await db.mail_digest_runs.create_index("id", unique=True)
+    await db.mail_digest_runs.create_index([("user_id", 1), ("period", 1)], unique=True, name="user_period")
+    await db.mail_digest_runs.create_index([("status", 1), ("claimed_at", 1)])
     await db.mobile_push_tokens.create_index("token", unique=True)
     # App-Releases (#250): ein Eintrag je Build.
     await db.app_releases.create_index("build", unique=True)

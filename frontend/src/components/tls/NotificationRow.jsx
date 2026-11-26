@@ -55,11 +55,13 @@ function ConfirmResultButton({ bundle, onDone, testId }) {
 }
 
 // `pending` (#987): „gelesen“ ist unterwegs - die Zeile ist kenntlich, bis der Server es bestätigt oder ablehnt.
-export function NotificationRow({ bundle, onOpen, onDelete, compact = false, testIdPrefix = "notification-row", pending = false }) {
+// `leading` (#1205): ein Symbol für das Thema vor dem Titel - Glocke und Postfach geben es mit.
+export function NotificationRow({ bundle, onOpen, onDelete, compact = false, testIdPrefix = "notification-row", pending = false, leading = null }) {
   const badge = notificationBadge(bundle);
   const content = (
     <div className="flex items-start gap-2 min-w-0">
       {!bundle.read ? <span className="mt-1.5 w-2 h-2 rounded-full bg-[#29B6E8] shrink-0" aria-hidden="true" /> : null}
+      {leading}
       {badge ? <Badge material={badge.material} level={badge.level} rank={badge.rank} art={badge.art} icon={badge.icon} size={compact ? "xs" : "sm"} className="shrink-0" title={badge.name} testId={`${testIdPrefix}-badge-${bundle.id}`} /> : null}
       <div className="min-w-0 flex-1">
         <div className="tls-wrap font-bold text-sm text-white">{bundle.title}</div>

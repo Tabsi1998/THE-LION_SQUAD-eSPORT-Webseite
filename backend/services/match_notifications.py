@@ -134,6 +134,8 @@ async def notify_match_result_confirmed(db, match: dict, collection_name: str = 
     meta = {
         "match_id": match.get("id"),
         "tournament_id": match.get("tournament_id"),
+        # Glocke (#1205): „3 neue Ergebnisse in Liga 1“ braucht den Namen.
+        "tournament_title": tournament_title,
         "collection": collection_name,
         "force": bool(force),
         **({"dispute_resolved": True} if dispute_resolved else {}),
@@ -156,6 +158,12 @@ async def notify_match_result_confirmed(db, match: dict, collection_name: str = 
             meta=meta,
         )
         sent += 1
+    # Weiter, Loser Bracket oder ausgeschieden (#1209) - aus dem gespeicherten Spiel mit seinen Weiterleitungen.
+    try:
+        from services.tournament_progress import notify_match_progress
+        await notify_match_progress(db, source_match)
+    except Exception as exc:  # noqa: BLE001 - eine Meldung hält kein Ergebnis auf
+        logger.warning("Progress notice failed for match=%s type=%s", _log_safe(match.get("id")), type(exc).__name__)
     if dispute_resolved:
         absolute_url = await build_public_url(f"/matches/{match.get('id')}")
         for user in await users_for(db, user_ids):

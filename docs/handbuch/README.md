@@ -22,7 +22,7 @@ Technische Hintergründe für die Entwicklung stehen in den Dateien unter [`docs
 | [Events](events.md) | Event anlegen (auch mehrtägig, mit mehreren Orten), Turniere und Fast Laps als Teil des Events, Anmeldung und Warteliste, „Spielst du auch mit?“, „Mein Kalender“, Kalender-Abo und „Nur meine“, Rückblick, Fotos, Freunde beim Event, Newsletter |
 | [Verein und Mitglieder](verein.md) | Mitglied werden, Anträge und Einladungen, Mitgliederbereich, Mitgliedskarte, Vorstand und Stellvertretungen, Statuten, Versammlungen, Helferdienste, persönliche Unterlagen |
 | [Inhalte: News, Galerie und Seiten](inhalte.md) | News schreiben und verteilen, Galerie und Event-Fotos, Medien-Bibliothek, Über uns, Sponsoren, Partner, Referenzen, Serien |
-| [Mails und Benachrichtigungen](mails.md) | Mail-Versand (Resend, SMTP), Vorlagen, Mail-Queue, Newsletter, Push und Kanäle, Discord-Direktnachrichten, Stufen, Themen, Ruhezeit und Kanäle der Mitglieder |
+| [Mails und Benachrichtigungen](mails.md) | Mail-Versand (Resend, SMTP), Vorlagen, Mail-Queue, Newsletter, Push und Kanäle, Discord-Direktnachrichten, Stufen, Themen, Ruhezeit, Sammel-Mail und Kanäle der Mitglieder, Glocke nach Tagen und Themen |
 | [Die LionsAPP](app.md) | Installation und Updates (Play-Testkanal, App-Versionen), Push und Kanäle, App-Sperre, was nur im Web geht, Fehlerbilder |
 | [Discord](discord.md) | Bot, Meldungen, Kanäle, Rollen, Befehle, Hauptserver und Unterserver, Rechte – Einrichtung Schritt für Schritt |
 | [TV und Beamer](tv.md) | Turnierbaum, Aufruf-Tafel, Hallen-Tafel, Stations-Ansicht und Fast-Lap-Rangliste auf Fernseher und Beamer – Link mit Schlüssel, Grundwerte, Sponsoren, Ton |

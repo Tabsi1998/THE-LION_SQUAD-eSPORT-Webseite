@@ -31,7 +31,8 @@ test("Gruppen in der Reihenfolge Übersicht, Verein, Mitglieder, Finanzen, eSpor
     ["Alle Verbindungen", "/admin/integrations"], ["Google", "/admin/settings/google"], ["Resend", "/admin/settings/resend"], ["SMTP", "/admin/settings/smtp"],
   ]);
   // Keine zweite Reiterleiste mehr: E-Mail, Auftritt und System tragen die früheren Reiter als Einträge.
-  expect(group("E-Mail").items.map((item) => item.to)).toEqual(["/admin/settings/newsletter", "/admin/settings/mail-queue", "/admin/email-templates"]);
+  // Sammel-Mail (#1662) steht neben dem Newsletter.
+  expect(group("E-Mail").items.map((item) => item.to)).toEqual(["/admin/settings/newsletter", "/admin/settings/sammel-mail", "/admin/settings/mail-queue", "/admin/email-templates"]);
   expect(group("Auftritt").items.map((item) => item.to)).toEqual(["/admin/settings/branding", "/admin/settings/socials", "/admin/settings/seo", "/admin/settings/jahreszeiten"]);
   expect(group("System").items.map((item) => item.to)).toEqual(expect.arrayContaining(["/admin/settings/status", "/admin/settings/zugang"]));
   expect(ADMIN_GROUPS.flatMap((entry) => entry.items).some((item) => item.to === "/admin/settings" || item.to.includes("/admin/settings?tab="))).toBe(false);
