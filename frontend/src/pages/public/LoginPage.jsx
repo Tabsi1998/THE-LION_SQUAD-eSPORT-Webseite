@@ -14,6 +14,7 @@ import { enrollPasskey, passkeyAutofillAvailable, passkeyError, passkeysSupporte
 import { deviceLabel, dismissPasskeyOffer, readRemember, shouldOfferPasskey, writeRemember } from "@/lib/loginComfort";
 import { nextQuery, safeNextPath } from "@/lib/returnPath";
 import { useReturnPurpose } from "@/hooks/useReturnPurpose";
+import { ShortCaps } from "@/components/tls/ShortCaps";
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -254,8 +255,8 @@ export default function LoginPage() {
       <div className="min-h-screen bg-[#0A0A0A] text-white flex items-center justify-center p-6 bg-grid">
         <div className="w-full max-w-md border border-white/10 rounded-sm bg-[#121212] p-8 md:p-10" data-testid="passkey-offer">
           <div className="flex justify-center mb-8"><Logo size="xl" /></div>
-          <h1 className="font-heading text-2xl font-black uppercase text-center">Nächstes Mal ohne Passwort?</h1>
-          <p className="text-sm text-white/65 text-center mt-3">
+          <h1 className="tls-type-title text-center"><ShortCaps>Nächstes Mal ohne Passwort?</ShortCaps></h1>
+          <p className="tls-type-body text-white/65 text-center mt-3">
             Mit einem Passkey meldest du dich auf diesem Gerät mit Fingerabdruck, Gesicht oder Geräte-PIN an – schneller und sicherer als ein Passwort.
             Dein Passwort bleibt als zweiter Weg bestehen.
           </p>
@@ -265,7 +266,7 @@ export default function LoginPage() {
             <button type="button" disabled={enrolling} onClick={() => answerOffer("later")} data-testid="passkey-offer-later"
               className="tls-btn tls-btn--quiet w-full py-3 font-bold uppercase tracking-wider rounded-sm disabled:opacity-50">Später</button>
             <button type="button" disabled={enrolling} onClick={() => answerOffer("never")} data-testid="passkey-offer-never"
-              className="w-full text-xs text-white/45 hover:text-white">Nicht mehr fragen</button>
+              className="w-full tls-type-small text-white/45 hover:text-white">Nicht mehr fragen</button>
           </div>
         </div>
       </div>
@@ -275,13 +276,13 @@ export default function LoginPage() {
   return (
     <div className="min-h-screen bg-[#0A0A0A] text-white flex items-center justify-center p-6 bg-grid">
       <div className="w-full max-w-md border border-white/10 rounded-sm bg-[#121212] p-8 md:p-10">
-        <Link to="/" onClick={backToSite} data-testid="login-back" className="inline-flex min-h-11 items-center gap-2 -mt-3 mb-3 text-sm text-white/60 hover:text-white">
+        <Link to="/" onClick={backToSite} data-testid="login-back" className="inline-flex min-h-11 items-center gap-2 -mt-3 mb-3 tls-type-small text-white/60 hover:text-white">
           <ArrowLeft className="w-4 h-4" aria-hidden="true" /> Zurück zur Website
         </Link>
         <div className="flex justify-center mb-8"><Logo size="xl" /></div>
-        <h1 className="font-heading text-2xl font-black uppercase text-center">Anmelden</h1>
-        <p className="text-sm text-white/60 text-center mt-1">{mfaTicket ? "Gib den Code aus deiner Authenticator-App ein." : "Willkommen bei THE LION SQUAD."}</p>
-        {!mfaTicket && purpose && <p className="mt-4 border border-[#29B6E8]/30 bg-[#29B6E8]/5 rounded-sm px-3 py-2 text-sm text-white/85 text-center" data-testid="login-purpose">{purpose}</p>}
+        <h1 className="tls-type-title text-center"><ShortCaps>Anmelden</ShortCaps></h1>
+        <p className="tls-type-small text-white/60 text-center mt-1">{mfaTicket ? "Gib den Code aus deiner Authenticator-App ein." : "Willkommen bei THE LION SQUAD."}</p>
+        {!mfaTicket && purpose && <p className="mt-4 border border-[#29B6E8]/30 bg-[#29B6E8]/5 rounded-sm px-3 py-2 tls-type-small text-white/85 text-center" data-testid="login-purpose">{purpose}</p>}
 
         {mfaTicket ? (
           <form onSubmit={submit} className="mt-8 space-y-4" noValidate>
@@ -299,7 +300,7 @@ export default function LoginPage() {
             <button disabled={loading} type="submit" className="tls-btn tls-btn--primary w-full py-3 font-bold uppercase tracking-wider rounded-sm disabled:opacity-50" data-testid="login-mfa-submit">
               {loading ? "Prüfe …" : "Anmeldung bestätigen"}
             </button>
-            <button type="button" disabled={loading} onClick={() => { setMfaTicket(""); setMfaCode(""); setErr(null); }} className="w-full text-xs text-white/45 hover:text-white">Zurück zur Anmeldung</button>
+            <button type="button" disabled={loading} onClick={() => { setMfaTicket(""); setMfaCode(""); setErr(null); }} className="w-full tls-type-small text-white/45 hover:text-white">Zurück zur Anmeldung</button>
           </form>
         ) : settings.password_login_enabled !== false ? <form onSubmit={submit} className="mt-8 space-y-4" noValidate aria-describedby={err ? "login-error" : undefined}>
           <AuthTextField
@@ -327,13 +328,13 @@ export default function LoginPage() {
             error={fieldErrors["login-password"]}
             testId="login-password"
           />
-          <label className="flex items-start gap-2 text-sm text-white/75" htmlFor="login-remember">
+          <label className="flex items-start gap-2 tls-type-small text-white/75" htmlFor="login-remember">
             <input id="login-remember" type="checkbox" checked={remember} onChange={(e) => changeRemember(e.target.checked)} data-testid="login-remember" className="mt-0.5 accent-[#29B6E8]" />
-            <span>Angemeldet bleiben <span className="block text-xs text-white/45">{remember ? "Auf diesem Gerät bleibst du angemeldet, solange du es alle paar Wochen benutzt." : "Du wirst abgemeldet, sobald du den Browser schließt – richtig für fremde Geräte."}</span></span>
+            <span>Angemeldet bleiben <span className="block tls-type-small text-white/45">{remember ? "Auf diesem Gerät bleibst du angemeldet, solange du es alle paar Wochen benutzt." : "Du wirst abgemeldet, sobald du den Browser schließt – richtig für fremde Geräte."}</span></span>
           </label>
           {err && <AuthFormAlert id="login-error">{err}</AuthFormAlert>}
           {verificationRequired && (
-            <div className="space-y-2 text-sm" data-testid="login-verification-recovery">
+            <div className="space-y-2 tls-type-small" data-testid="login-verification-recovery">
               <p className="text-white/70">Dein Konto bleibt bestehen. Bestätige zuerst deine E-Mail-Adresse; danach meldest du dich mit deinem bisherigen Passwort und gegebenenfalls MFA an.</p>
               <Link to="/verify-email" state={{ email: email.trim() }} className="inline-block py-2 text-[#29B6E8] underline">Bestätigungslink anfordern</Link>
             </div>
@@ -347,7 +348,7 @@ export default function LoginPage() {
             {loading ? "Melde an …" : "Anmelden"}
           </button>
         </form> : (
-          <div className="mt-8 border border-white/10 bg-white/5 p-4 text-sm text-white/60" data-testid="password-login-disabled">
+          <div className="mt-8 border border-white/10 bg-white/5 p-4 tls-type-small text-white/60" data-testid="password-login-disabled">
             Die Anmeldung mit E-Mail und Passwort ist derzeit deaktiviert.
           </div>
         )}
@@ -361,7 +362,7 @@ export default function LoginPage() {
             {!passwordForm && err && <AuthFormAlert id="passkey-error">{err}</AuthFormAlert>}
           </div>
         )}
-        <div className="mt-6 text-sm text-white/60 text-center space-y-2">
+        <div className="mt-6 tls-type-small text-white/60 text-center space-y-2">
           {settings.registration_enabled !== false && (
             <div>Kein Konto? <Link to={`/register${nextQuery(next)}`} className="text-[#29B6E8] hover:text-white font-bold" data-testid="login-register-link">Registrieren</Link></div>
           )}

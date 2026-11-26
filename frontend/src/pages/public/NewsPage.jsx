@@ -80,8 +80,8 @@ export default function NewsPage() {
   return (
     <PublicLayout>
       <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-        <span className="text-[11px] font-bold uppercase tracking-[0.3em] text-[#29B6E8]">VEREINS-NEWS</span>
-        <h1 className="mt-2 font-heading text-4xl md:text-6xl font-black uppercase">News & Ankündigungen</h1>
+        <span className="tls-type-label text-[#29B6E8]">VEREINS-NEWS</span>
+        <h1 className="mt-2 tls-type-hero">News & Ankündigungen</h1>
         <p className="mt-3 text-white/60 max-w-2xl">
           Alles was im Rudel passiert — von Turnier-Recaps über Eventankündigungen bis zu Vereinsthemen.
         </p>
@@ -138,7 +138,7 @@ function NewsCard({ n }) {
       to={`/news/${n.slug}`}
       data-testid={`news-card-${n.slug}`}
       data-season-anchor="card"
-      className={`tls-card tls-reveal-item group border border-white/10 rounded-sm bg-[#121212] overflow-hidden flex flex-col`}
+      className="tls-card tls-reveal-item group border border-white/10 rounded-sm bg-[#121212] overflow-hidden flex flex-col"
     >
       <div className="aspect-video bg-[#0A0A0A] overflow-hidden">
         {n.banner_url ? (
@@ -148,19 +148,19 @@ function NewsCard({ n }) {
         )}
         </div>
       <div className="p-5 flex-1 flex flex-col">
-        <div className="flex items-center gap-2 text-[10px] uppercase tracking-widest font-bold">
+        <div className="flex items-center gap-2 tls-type-label">
           <span style={{ color: c }}>{newsCategoryLabel(n.category)}</span>
           {n.pinned && <Pin className="w-3 h-3 text-white" aria-label="Angepinnt" />}
           {VIcon && <VIcon className="w-3 h-3 text-honor" />}
           <span className="text-white/45 ml-auto normal-case tracking-normal">{formatAgo(n.published_at || n.created_at)}</span>
         </div>
-        <h3 className="tls-wrap mt-2 font-heading font-black leading-tight text-lg tls-card__title">
+        <h3 className="tls-wrap mt-2 tls-type-card leading-tight tls-card__title">
           {n.title}
         </h3>
-        {n.excerpt && <p className="mt-2 text-sm text-white/65 line-clamp-3 flex-1">{n.excerpt}</p>}
+        {n.excerpt && <p className="mt-2 tls-type-body text-white/65 line-clamp-3 flex-1">{n.excerpt}</p>}
         <div className="mt-4 flex items-center justify-between gap-3 border-t border-white/10 pt-3">
-          <span className="text-[10px] uppercase tracking-widest font-bold text-white/35">Beitrag</span>
-          <span className="inline-flex items-center gap-1.5 text-[10px] uppercase tracking-widest font-bold text-[#29B6E8]">
+          <span className="tls-type-label text-white/35">Beitrag</span>
+          <span className="inline-flex items-center gap-1.5 tls-type-label text-[#29B6E8]">
             Weiterlesen <ArrowRight className="tls-card__arrow w-3 h-3" />
           </span>
         </div>

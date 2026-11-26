@@ -38,8 +38,8 @@ export default function GalleryPage() {
   return (
     <PublicLayout>
       <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-        <span className="text-[11px] font-bold uppercase tracking-[0.3em] text-[#29B6E8]">RUDEL-IMPRESSIONEN</span>
-        <h1 className="mt-2 font-heading text-4xl md:text-6xl font-black uppercase">Galerie</h1>
+        <span className="tls-type-label text-[#29B6E8]">RUDEL-IMPRESSIONEN</span>
+        <h1 className="mt-2 tls-type-hero">Galerie</h1>
         <p className="mt-3 text-white/60 max-w-2xl">
           Eindrücke aus Turnieren, LAN-Partys, Events und allem dazwischen.
         </p>
@@ -90,30 +90,30 @@ function AlbumCard({ a }) {
           <div className="w-full h-full flex items-center justify-center"><ImageIcon className="w-10 h-10 text-white/15" /></div>
         )}
         {a.visibility === "members" && (
-          <span className="absolute top-2 left-2 inline-flex items-center gap-1 text-[10px] uppercase tracking-widest font-bold text-[#FFD700] bg-black/60 px-2 py-1 rounded-sm">
+          <span className="absolute top-2 left-2 inline-flex items-center gap-1 tls-type-label text-[#FFD700] bg-black/60 px-2 py-1 rounded-sm">
             <Crown className="w-3 h-3" /> Mitglieder
           </span>
         )}
-        <span className="absolute bottom-2 right-2 text-[10px] uppercase tracking-widest font-bold text-white bg-black/60 px-2 py-1 rounded-sm" data-testid={`album-count-${a.slug}`}>
+        <span className="absolute bottom-2 right-2 tls-type-label text-white bg-black/60 px-2 py-1 rounded-sm" data-testid={`album-count-${a.slug}`}>
           {albumMediaLabel(a)}
         </span>
         {!!a.video_count && (
-          <span className="absolute top-2 right-2 inline-flex items-center gap-1 text-[10px] uppercase tracking-widest font-bold text-white bg-[#9F7AEA]/80 px-2 py-1 rounded-sm">
+          <span className="absolute top-2 right-2 inline-flex items-center gap-1 tls-type-label text-white bg-[#9F7AEA]/80 px-2 py-1 rounded-sm">
             <Film className="w-3 h-3" /> {a.video_count}
           </span>
         )}
         {!!a.section_count && (
-          <span className="absolute bottom-2 left-2 inline-flex items-center gap-1 text-[10px] uppercase tracking-widest font-bold text-white bg-black/60 px-2 py-1 rounded-sm">
+          <span className="absolute bottom-2 left-2 inline-flex items-center gap-1 tls-type-label text-white bg-black/60 px-2 py-1 rounded-sm">
             <Layers className="w-3 h-3" /> {a.section_count}
           </span>
         )}
       </div>
       <div className="p-4">
-        <div className="tls-card__title tls-wrap font-heading font-black uppercase">{a.title}</div>
+        <div className="tls-card__title tls-wrap tls-type-card">{a.title}</div>
         {/* Leere Alben (#1224) sieht nur, wer Inhalte pflegt - mit diesem Hinweis. */}
-        {a.is_empty && <div className="mt-1 text-[10px] uppercase tracking-widest font-bold text-[#FFD700]" data-testid={`album-empty-${a.slug}`}>leer – für Besucher unsichtbar</div>}
-        {a.taken_at && <div className="text-xs text-white/45 mt-1">{viennaDate(a.taken_at)}</div>}
-        {a.description && <p className="text-xs text-white/55 mt-2 line-clamp-2">{a.description}</p>}
+        {a.is_empty && <div className="mt-1 tls-type-label text-[#FFD700]" data-testid={`album-empty-${a.slug}`}>leer – für Besucher unsichtbar</div>}
+        {a.taken_at && <div className="tls-type-small text-white/45 mt-1">{viennaDate(a.taken_at)}</div>}
+        {a.description && <p className="tls-type-small text-white/55 mt-2 line-clamp-2">{a.description}</p>}
       </div>
     </Link>
   );

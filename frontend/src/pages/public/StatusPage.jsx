@@ -66,15 +66,15 @@ export default function StatusPage() {
               <div className="mx-auto mb-5 flex justify-center">
                 <LionArt art={view.art} className={`shrink-0 text-white/90 ${LION_ART_SIZE}`} />
               </div>
-              <span className={`inline-block text-[10px] font-black uppercase tracking-widest px-2 py-0.5 rounded-sm border ${view.badge}`}>Status</span>
-              <h1 className="mt-3 font-heading text-2xl md:text-3xl font-black uppercase">{view.title}</h1>
-              <p className="mt-3 text-sm text-white/60">{view.text}</p>
+              <span className={`inline-block tls-type-label px-2 py-0.5 rounded-sm border ${view.badge}`}>Status</span>
+              <h1 className="mt-3 tls-type-title">{view.title}</h1>
+              <p className="mt-3 tls-type-body text-white/60">{view.text}</p>
               {status.checkedAt ? (
-                <p className="mt-4 text-xs text-white/40">Zuletzt geprüft: {viennaDateTime(status.checkedAt)}</p>
+                <p className="mt-4 tls-type-small text-white/40">Zuletzt geprüft: {viennaDateTime(status.checkedAt)}</p>
               ) : null}
             </>
           ) : (
-            <p className="text-sm text-white/60">Wird geprüft …</p>
+            <p className="tls-type-small text-white/60">Wird geprüft …</p>
           )}
         </div>
       </section>

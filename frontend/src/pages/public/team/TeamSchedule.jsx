@@ -21,7 +21,7 @@ export function TeamSchedule({ overview }) {
     <div className="space-y-8" data-testid="team-schedule">
       {upcoming.length > 0 && (
         <section data-testid="team-upcoming">
-          <h2 className="font-heading text-2xl font-bold uppercase mb-4 flex items-center gap-2"><CalendarClock className="w-5 h-5 text-[#29B6E8]" /> Angemeldet für</h2>
+          <h2 className="tls-type-section mb-4 flex items-center gap-2"><CalendarClock className="w-5 h-5 text-[#29B6E8]" /> Angemeldet für</h2>
           <div className="grid gap-3">
             {upcoming.map((row) => (
               <Link
@@ -34,10 +34,10 @@ export function TeamSchedule({ overview }) {
                   <Trophy className="w-5 h-5 text-[#FFD700]" />
                 </div>
                 <div className="min-w-0 flex-1">
-                  <div className="text-[10px] font-bold uppercase tracking-widest text-[#FFD700]">Turnier</div>
-                  <div className="tls-card__title font-heading text-lg font-bold truncate">{row.tournament.title}</div>
-                  <div className="text-xs text-white/55 truncate">{upcomingLine(row)}</div>
-                  <span className="mt-1.5 inline-flex px-2 py-0.5 border border-[#FFD700]/40 bg-[#FFD700]/10 text-[#FFD700] rounded-sm text-[10px] font-bold uppercase tracking-wider" data-testid={`team-upcoming-status-${row.registration_id}`}>
+                  <div className="tls-type-label text-[#FFD700]">Turnier</div>
+                  <div className="tls-card__title tls-type-card truncate">{row.tournament.title}</div>
+                  <div className="tls-type-small text-white/55 truncate">{upcomingLine(row)}</div>
+                  <span className="mt-1.5 inline-flex px-2 py-0.5 border border-[#FFD700]/40 bg-[#FFD700]/10 text-[#FFD700] rounded-sm tls-type-label" data-testid={`team-upcoming-status-${row.registration_id}`}>
                     {row.status_label}
                   </span>
                 </div>
@@ -49,7 +49,7 @@ export function TeamSchedule({ overview }) {
       )}
       {recent.length > 0 && (
         <section data-testid="team-recent">
-          <h2 className="font-heading text-2xl font-bold uppercase mb-4 flex items-center gap-2"><Swords className="w-5 h-5 text-[#29B6E8]" /> Letzte Spiele</h2>
+          <h2 className="tls-type-section mb-4 flex items-center gap-2"><Swords className="w-5 h-5 text-[#29B6E8]" /> Letzte Spiele</h2>
           <div className="border border-white/10 bg-[#121212] rounded-sm divide-y divide-white/5">
             {recent.map((row) => (
               <Link key={row.match_id} to={`/matches/${row.match_id}`} data-testid={`team-recent-${row.match_id}`} className="flex items-center gap-3 px-3 sm:px-4 py-3 hover:bg-white/[0.03] transition">
@@ -57,10 +57,10 @@ export function TeamSchedule({ overview }) {
                   <Trophy className="w-4 h-4" />
                 </div>
                 <div className="min-w-0 flex-1">
-                  <div className={`font-bold text-sm truncate ${row.outcome === "loss" ? "text-white/60" : "text-white"}`}>{recentLine(row)}</div>
-                  <div className="text-xs text-white/45 truncate">{[row.tournament?.title, row.round_label].filter(Boolean).join(" · ")}</div>
+                  <div className={`font-bold tls-type-small truncate ${row.outcome === "loss" ? "text-white/60" : "text-white"}`}>{recentLine(row)}</div>
+                  <div className="tls-type-small text-white/45 truncate">{[row.tournament?.title, row.round_label].filter(Boolean).join(" · ")}</div>
                 </div>
-                <span className={`shrink-0 px-2 py-0.5 border rounded-sm text-[10px] font-bold uppercase tracking-wider ${OUTCOME_TONES[row.outcome] || OUTCOME_TONES.draw}`} data-testid={`team-recent-outcome-${row.match_id}`}>
+                <span className={`shrink-0 px-2 py-0.5 border rounded-sm tls-type-label ${OUTCOME_TONES[row.outcome] || OUTCOME_TONES.draw}`} data-testid={`team-recent-outcome-${row.match_id}`}>
                   {outcomeLabel(row)}
                 </span>
               </Link>

@@ -67,40 +67,40 @@ export function ErrorPage({ code = "404", detail = "", title = "", primary }) {
           <div className="flex flex-col items-center gap-6 text-center lg:flex-row lg:items-center lg:gap-10 lg:text-left">
             <LionArt art={def.art} className={`shrink-0 text-white/90 ${LION_ART_SIZE}`} />
             <div className="min-w-0">
-              <h1 id={`error-heading-${def.code}`} className="font-heading text-3xl md:text-4xl font-black mb-3" data-testid={`error-title-${def.code}`}>
+              <h1 id={`error-heading-${def.code}`} className="tls-type-title mb-3" data-testid={`error-title-${def.code}`}>
                 {def.title}
               </h1>
-              <p className="text-base text-white/65" data-testid={`error-detail-${def.code}`}>{detail || def.desc}</p>
+              <p className="tls-type-body text-white/65" data-testid={`error-detail-${def.code}`}>{detail || def.desc}</p>
               <div className="mt-6 flex flex-wrap items-center justify-center gap-x-5 gap-y-3 lg:justify-start">
                 {primary !== undefined ? primary : def.code === "403" ? (
-                  <Link to="/login" data-testid="error-login-btn" className="tls-btn tls-btn--primary inline-flex min-h-11 items-center gap-2 px-5 py-2.5 rounded-sm font-bold uppercase tracking-wider text-sm">
+                  <Link to="/login" data-testid="error-login-btn" className="tls-btn tls-btn--primary inline-flex min-h-11 items-center gap-2 px-5 py-2.5 rounded-sm font-bold uppercase tracking-wider tls-type-small">
                     <LogIn className="w-4 h-4" aria-hidden="true" /> Anmelden
                   </Link>
                 ) : def.code === "500" ? (
-                  <button type="button" onClick={() => window.location.reload()} data-testid="error-retry-btn" className="tls-btn tls-btn--primary inline-flex min-h-11 items-center gap-2 px-5 py-2.5 rounded-sm font-bold uppercase tracking-wider text-sm">
+                  <button type="button" onClick={() => window.location.reload()} data-testid="error-retry-btn" className="tls-btn tls-btn--primary inline-flex min-h-11 items-center gap-2 px-5 py-2.5 rounded-sm font-bold uppercase tracking-wider tls-type-small">
                     <RefreshCw className="w-4 h-4" aria-hidden="true" /> Nochmal versuchen
                   </button>
                 ) : null}
-                <Link to="/" data-testid="error-home-btn" className={def.code === "404" ? "tls-btn tls-btn--primary inline-flex min-h-11 items-center gap-2 px-5 py-2.5 rounded-sm font-bold uppercase tracking-wider text-sm" : "tls-hit inline-flex items-center gap-2 text-sm font-semibold text-[#29B6E8] hover:text-white"}>
+                <Link to="/" data-testid="error-home-btn" className={def.code === "404" ? "tls-btn tls-btn--primary inline-flex min-h-11 items-center gap-2 px-5 py-2.5 rounded-sm tls-type-small font-bold uppercase tracking-wider" : "tls-hit inline-flex items-center gap-2 tls-type-small font-semibold text-[#29B6E8] hover:text-white"}>
                   <Home className="w-4 h-4" aria-hidden="true" /> Zur Startseite
                 </Link>
-                <button type="button" onClick={goBack} data-testid="error-back-btn" className="tls-hit inline-flex items-center gap-2 text-sm font-semibold text-white/60 hover:text-white">
+                <button type="button" onClick={goBack} data-testid="error-back-btn" className="tls-hit inline-flex items-center gap-2 tls-type-small font-semibold text-white/60 hover:text-white">
                   <ArrowLeft className="w-4 h-4" aria-hidden="true" /> Zurück
                 </button>
                 {/* Fehler melden (#2131): mit der Seite, auf der es passiert ist - nur der Pfad, nie eine Abfrage. */}
                 {def.code !== "403" && (
-                  <Link to={bugReportPath(pathname)} data-testid="error-report-btn" className="tls-hit inline-flex items-center gap-2 text-sm font-semibold text-white/60 hover:text-white">
+                  <Link to={bugReportPath(pathname)} data-testid="error-report-btn" className="tls-hit inline-flex items-center gap-2 tls-type-small font-semibold text-white/60 hover:text-white">
                     <Bug className="w-4 h-4" aria-hidden="true" /> Fehler melden
                   </Link>
                 )}
               </div>
               {def.code === "500" ? (
                 // Statusseite (#1657): ob Website und Server gerade laufen.
-                <p className="mt-5 text-sm text-white/55">
+                <p className="mt-5 tls-type-small text-white/55">
                   Läuft gerade etwas nicht? <Link to="/status" data-testid="error-status-link" className="tls-hit font-semibold text-brand hover:text-white">Status ansehen</Link>
                 </p>
               ) : null}
-              <p className="mt-6 text-xs text-white/40" data-testid="error-code">Fehler {def.code}</p>
+              <p className="mt-6 tls-type-small text-white/40" data-testid="error-code">Fehler {def.code}</p>
             </div>
           </div>
           <div className="mt-8 grid grid-cols-2 sm:grid-cols-5 gap-2">
@@ -110,7 +110,7 @@ export function ErrorPage({ code = "404", detail = "", title = "", primary }) {
                 <Link
                   key={item.to}
                   to={item.to}
-                  className="min-h-[70px] rounded-sm border border-white/10 bg-white/[0.04] px-3 py-3 flex flex-col items-center justify-center gap-2 text-xs font-bold uppercase tracking-wider text-white/70 hover:border-[#29B6E8]/50 hover:text-[#29B6E8] transition"
+                  className="min-h-[70px] rounded-sm border border-white/10 bg-white/[0.04] px-3 py-3 flex flex-col items-center justify-center gap-2 tls-type-label text-white/70 hover:border-[#29B6E8]/50 hover:text-[#29B6E8] transition"
                 >
                   <Icon className="w-4 h-4" />
                   <span>{item.label}</span>
@@ -125,7 +125,7 @@ export function ErrorPage({ code = "404", detail = "", title = "", primary }) {
 }
 
 export function NotFoundPage() { return <ErrorPage code="404" />; }
-const PRIMARY_BTN = "tls-btn tls-btn--primary inline-flex min-h-11 items-center gap-2 px-5 py-2.5 rounded-sm font-bold uppercase tracking-wider text-sm";
+const PRIMARY_BTN = "tls-btn tls-btn--primary inline-flex min-h-11 items-center gap-2 px-5 py-2.5 rounded-sm tls-type-label";
 
 // Rechte nach Bereichen (#292): die Seite sagt, welcher Bereich fehlt und wer ihn vergibt. Angemeldete (#1352) sehen
 // keinen „Anmelden“-Knopf: wer einen Dienst hat, liest genau den Bereich dieser Seite und kommt mit einem Tipp zu seiner

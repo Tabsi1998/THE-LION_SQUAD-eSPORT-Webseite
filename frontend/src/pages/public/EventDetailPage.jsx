@@ -93,24 +93,24 @@ function EventDaysBlock({ schedule }) {
   const columns = days.length <= 2 ? "md:grid-cols-2" : days.length === 4 ? "md:grid-cols-2 xl:grid-cols-4" : "md:grid-cols-3";
   return (
     <div data-testid="event-days">
-      <h3 className="font-heading text-xl font-black uppercase mb-1">Die Tage</h3>
-      {schedule.now?.text && <p className="text-sm text-white/60 mb-4" data-testid="event-days-now">{schedule.now.text}</p>}
+      <h3 className="tls-type-card mb-1">Die Tage</h3>
+      {schedule.now?.text && <p className="tls-type-body text-white/60 mb-4" data-testid="event-days-now">{schedule.now.text}</p>}
       <ol className={`grid gap-4 ${columns}`}>
         {days.map((day) => {
           const frame = day.state === "running" ? "border-[#FF3B30]/60 bg-[#FF3B30]/5" : day.state === "next" ? "border-[#9F7AEA]/60 bg-[#9F7AEA]/5" : "border-white/10 bg-[#121212]";
           return (
             <li key={day.index} className={`tls-card border rounded-sm p-5 min-w-0 ${frame} ${day.state === "past" ? "opacity-60" : ""}`} data-testid={`event-day-${day.index}`} data-state={day.state}>
-              <div className="flex items-center justify-between gap-2 text-[11px] uppercase tracking-widest font-bold text-[#9F7AEA]">
+              <div className="flex items-center justify-between gap-2 tls-type-label text-[#9F7AEA]">
                 <span>Tag {day.index}/{schedule.count}</span>
                 {day.state === "running" && <span className="inline-flex items-center gap-1.5 text-[#FF3B30]"><span className="tls-live-dot" aria-hidden="true" /> Läuft</span>}
                 {day.state === "next" && <span className="text-white/60">Als Nächstes</span>}
                 {day.state === "past" && <span className="text-white/40">Vorbei</span>}
               </div>
-              <div className="mt-1 font-heading text-xl font-black uppercase">{day.label}</div>
-              <div className="text-sm text-white/80 inline-flex items-center gap-2"><Clock className="w-4 h-4 text-[#9F7AEA] shrink-0" /> {day.time_label}{day.ends_next_day ? " (bis in den nächsten Morgen)" : ""}</div>
-              {day.door && <div className="text-xs text-white/50">Einlass {day.door}</div>}
-              {day.title && <div className="mt-2 text-sm text-white/90 break-words">{day.title}</div>}
-              {day.location_name && <div className="mt-1 text-xs text-white/55 inline-flex items-center gap-1.5"><MapPin className="w-3.5 h-3.5 shrink-0" /> {day.location_name}</div>}
+              <div className="mt-1 tls-type-card">{day.label}</div>
+              <div className="tls-type-small text-white/80 inline-flex items-center gap-2"><Clock className="w-4 h-4 text-[#9F7AEA] shrink-0" /> {day.time_label}{day.ends_next_day ? " (bis in den nächsten Morgen)" : ""}</div>
+              {day.door && <div className="tls-type-small text-white/50">Einlass {day.door}</div>}
+              {day.title && <div className="mt-2 tls-type-small text-white/90 break-words">{day.title}</div>}
+              {day.location_name && <div className="mt-1 tls-type-small text-white/55 inline-flex items-center gap-1.5"><MapPin className="w-3.5 h-3.5 shrink-0" /> {day.location_name}</div>}
             </li>
           );
         })}
@@ -147,7 +147,7 @@ function uniqueLogoSponsors(sponsors = []) {
 
 function SectionTitle({ icon: Icon, accent = "#9F7AEA", children }) {
   return (
-    <h2 className="font-heading text-2xl font-black uppercase mb-4 inline-flex items-center gap-2">
+    <h2 className="tls-type-section mb-4 inline-flex items-center gap-2">
       {Icon ? <Icon className="w-5 h-5" style={{ color: accent }} aria-hidden="true" /> : null}{children}
     </h2>
   );
@@ -211,7 +211,7 @@ export default function EventDetailPage() {
   if (error) return (
     <PublicLayout>
       <div className="max-w-2xl mx-auto px-6 py-20 text-center">
-        <h1 className="font-heading text-3xl font-black">{error}</h1>
+        <h1 className="tls-type-title">{error}</h1>
         <Link to="/events" className="mt-6 inline-flex text-[#9F7AEA]">← Zurück zu Events</Link>
       </div>
     </PublicLayout>
@@ -291,14 +291,14 @@ function EventHeader({ e, notices = [] }) {
           <EventBanner event={e} eager className="w-full lg:order-2" />
           <div className="min-w-0 lg:order-1">
             <div className="flex items-center gap-3 flex-wrap">
-              <span className="text-[11px] font-bold uppercase tracking-[0.3em] text-[#9F7AEA]" data-testid="event-kind">{eventKindLabel(e.event_type)}</span>
+              <span className="tls-type-label text-[#9F7AEA]" data-testid="event-kind">{eventKindLabel(e.event_type)}</span>
               <PhaseBadge phase={e.public_phase || e.event_phase} status={e.status || "draft"} size="md" />
-              {chip && <span className={`text-[11px] font-bold ${e.visibility === "members" ? "text-[#FFD700]" : "text-white/60"}`} data-testid="event-visibility">{chip}</span>}
+              {chip && <span className={`tls-type-small font-bold ${e.visibility === "members" ? "text-[#FFD700]" : "text-white/60"}`} data-testid="event-visibility">{chip}</span>}
               {/* Teilen (#1154): oben rechts; interne Events öffnen sich nur für Mitglieder. */}
               <ShareButton kind="event" id={e.slug || e.id} title={e.name} start={e.start_date} end={e.end_date} className="ml-auto" />
             </div>
-            <h1 className="mt-3 font-heading text-4xl md:text-5xl xl:text-6xl font-black uppercase leading-tight break-words">{e.name}</h1>
-            <div className="mt-4 flex flex-wrap gap-x-5 gap-y-2 text-sm text-white/70 min-w-0">
+            <h1 className="mt-3 tls-type-title leading-tight break-words">{e.name}</h1>
+            <div className="mt-4 flex flex-wrap gap-x-5 gap-y-2 tls-type-small text-white/70 min-w-0">
               {e.schedule?.multi_day
                 ? <span className="inline-flex min-w-0 items-center gap-2" data-testid="event-days-summary"><Calendar className="w-4 h-4 text-[#9F7AEA] shrink-0" /><span className="min-w-0 break-words">{[e.schedule.label, e.schedule.now?.state !== "after" && e.schedule.now?.text].filter(Boolean).join(" · ")}</span></span>
                 : e.start_date && <span className="inline-flex min-w-0 items-center gap-2"><Calendar className="w-4 h-4 text-[#9F7AEA] shrink-0" /><span className="min-w-0 break-words">{formatWhen(e.start_date)}</span></span>}
@@ -324,7 +324,7 @@ function EventTabs({ tabs, value, onChange }) {
           aria-selected={value === entry.key}
           onClick={() => onChange(entry.key)}
           data-testid={`event-tab-${entry.key}`}
-          className={`-mb-px min-h-11 border-b-2 px-4 py-2.5 text-xs font-bold uppercase tracking-wider transition ${value === entry.key ? "border-[#9F7AEA] text-white" : "border-transparent text-white/50 hover:text-white"}`}
+          className={`-mb-px min-h-11 border-b-2 px-4 py-2.5 tls-type-label transition ${value === entry.key ? "border-[#9F7AEA] text-white" : "border-transparent text-white/50 hover:text-white"}`}
         >
           {entry.key === "live" ? <Radio className="inline w-3.5 h-3.5 mr-1.5 -mt-0.5 text-[#FF3B30]" aria-hidden="true" /> : null}{entry.label}
         </button>
@@ -353,22 +353,22 @@ function EventFactsBox({ e, user, over, onRegister }) {
   return (
     <FactsBox rows={eventFacts(e)} testId="event-facts">
       {e.has_registration && e.registration_url && !over ? (
-        <a href={e.registration_url} target="_blank" rel="noreferrer" className="tls-btn tls-btn--primary inline-flex items-center justify-center gap-2 px-4 py-2.5 text-xs uppercase tracking-wider font-bold rounded-sm" data-testid="event-facts-register">
+        <a href={e.registration_url} target="_blank" rel="noreferrer" className="tls-btn tls-btn--primary inline-flex items-center justify-center gap-2 px-4 py-2.5 tls-type-label rounded-sm" data-testid="event-facts-register">
           Anmelden <ExternalLink className="w-3.5 h-3.5" />
         </a>
       ) : null}
       {activeOwn ? (
-        <a href={recap ? "#rueckblick" : "#dein-event"} className="tls-btn tls-btn--secondary inline-flex items-center justify-center gap-2 px-4 py-2.5 text-xs font-bold uppercase tracking-wider rounded-sm" data-testid="event-facts-own">
+        <a href={recap ? "#rueckblick" : "#dein-event"} className="tls-btn tls-btn--secondary inline-flex items-center justify-center gap-2 px-4 py-2.5 tls-type-label rounded-sm" data-testid="event-facts-own">
           <CheckCircle className="w-4 h-4" /> {own.status === "waitlist" ? "Warteliste" : recap ? "Du warst dabei" : "Du bist dabei"}
         </a>
       ) : null}
       {canRegister && user ? (
-        <button type="button" onClick={onRegister} className="tls-btn tls-btn--primary inline-flex items-center justify-center gap-2 px-4 py-2.5 text-xs uppercase tracking-wider font-bold rounded-sm" data-testid="event-facts-register">
+        <button type="button" onClick={onRegister} className="tls-btn tls-btn--primary inline-flex items-center justify-center gap-2 px-4 py-2.5 tls-type-label rounded-sm" data-testid="event-facts-register">
           <UserPlus className="w-4 h-4" /> Anmelden
         </button>
       ) : null}
       {canRegister && !user ? (
-        <Link to={loginTarget} className="tls-btn tls-btn--primary inline-flex items-center justify-center gap-2 px-4 py-2.5 text-xs uppercase tracking-wider font-bold rounded-sm" data-testid="event-facts-register">
+        <Link to={loginTarget} className="tls-btn tls-btn--primary inline-flex items-center justify-center gap-2 px-4 py-2.5 tls-type-label rounded-sm" data-testid="event-facts-register">
           Zum Teilnehmen anmelden
         </Link>
       ) : null}
@@ -393,10 +393,10 @@ function EventOverview({ e, user, over, accessToken, hasConsent, onChanged, regi
       {/* Abgesagt (#2118): oben und deutlich - statt Anmeldung oder „Du bist dabei“. */}
       {cancelled && (
         <div role="status" className="border border-[#FF6B6B]/35 bg-[#FF6B6B]/10 rounded-sm px-4 py-3 min-w-0" data-testid="event-cancelled">
-          <div className="inline-flex items-center gap-2 text-sm font-black uppercase tracking-wider text-[#FF6B6B]">
+          <div className="inline-flex items-center gap-2 tls-type-label text-[#FF6B6B]">
             <XCircle className="w-4 h-4 shrink-0" aria-hidden="true" /> Event abgesagt
           </div>
-          <p className="mt-1 text-sm text-white/80 break-words">{cancelled}</p>
+          <p className="mt-1 tls-type-small text-white/80 break-words">{cancelled}</p>
         </div>
       )}
 
@@ -405,12 +405,12 @@ function EventOverview({ e, user, over, accessToken, hasConsent, onChanged, regi
       {recap && (
         <EventRecap event={e} accessToken={accessToken} fallback={(
           <div className="border border-[#FFD700]/30 bg-[#FFD700]/5 rounded-sm px-4 py-3" data-testid="event-over">
-            <div className="text-sm text-white/85">{e.tournaments?.length ? "Das Event ist vorbei – die Ergebnisse stehen bei den Turnieren:" : "Das Event ist vorbei."}</div>
+            <div className="tls-type-small text-white/85">{e.tournaments?.length ? "Das Event ist vorbei – die Ergebnisse stehen bei den Turnieren:" : "Das Event ist vorbei."}</div>
             {!!e.tournaments?.length && (
               <div className="mt-1 flex flex-wrap gap-x-5">
                 {/* Tippfläche mindestens 44 px (#1155), auch wenn ein langer Name am Handy zweizeilig umbricht. */}
                 {e.tournaments.map((t) => (
-                  <Link key={t.id} to={`/tournaments/${t.slug || t.id}${t.access_link ? accessSuffix(accessToken) : ""}`} className="inline-flex min-h-11 items-center gap-1.5 text-sm font-bold text-[#FFD700] hover:text-white">
+                  <Link key={t.id} to={`/tournaments/${t.slug || t.id}${t.access_link ? accessSuffix(accessToken) : ""}`} className="inline-flex min-h-11 items-center gap-1.5 tls-type-small font-bold text-[#FFD700] hover:text-white">
                     <Trophy className="w-3.5 h-3.5 shrink-0" aria-hidden="true" /> {t.title}
                   </Link>
                 ))}
@@ -443,13 +443,13 @@ function EventOverview({ e, user, over, accessToken, hasConsent, onChanged, regi
       {/* 3. Live verfolgen: führt in den Reiter „Live“; „Display“ nur für die Turnierleitung. */}
       {!over && !!rows.length && (
         <section className="flex flex-wrap gap-3" data-section="live" data-testid="event-live-links">
-          <button type="button" onClick={onLive} className="tls-btn tls-btn--secondary inline-flex min-h-11 items-center gap-2 px-4 py-2 text-xs uppercase tracking-wider font-bold rounded-sm" data-testid="event-live-follow">
+          <button type="button" onClick={onLive} className="tls-btn tls-btn--secondary inline-flex min-h-11 items-center gap-2 px-4 py-2 tls-type-label rounded-sm" data-testid="event-live-follow">
             <Radio className="w-4 h-4" /> Live verfolgen
           </button>
           {/* Druckansicht (#1283): Tagesplan auf Papier - mit Turnier-Recht auch die Anmeldeliste. */}
           <PrintLink scope="event" slug={e.slug || e.id} parts="tagesplan" accessToken={accessToken} testId="event-print-link" />
           {hasArea(user, "tournaments") && (
-            <Link to={`/display/event/${e.id}`} data-testid="event-display-link" className="tls-btn tls-btn--quiet inline-flex items-center gap-2 px-4 py-2 text-xs uppercase tracking-wider font-bold rounded-sm">
+            <Link to={`/display/event/${e.id}`} data-testid="event-display-link" className="tls-btn tls-btn--quiet inline-flex items-center gap-2 px-4 py-2 tls-type-label rounded-sm">
               <ExternalLink className="w-4 h-4" /> Display
             </Link>
           )}
@@ -462,7 +462,7 @@ function EventOverview({ e, user, over, accessToken, hasConsent, onChanged, regi
         <section data-section="photos" data-testid="event-gallery">
           <SectionTitle icon={ImageIcon} accent="#29B6E8">Fotos</SectionTitle>
           {photosComing && (
-            <div className="mb-4 border border-[#29B6E8]/30 bg-[#29B6E8]/5 rounded-sm px-4 py-3 text-sm text-white/80" data-testid="event-photos-coming">
+            <div className="mb-4 border border-[#29B6E8]/30 bg-[#29B6E8]/5 rounded-sm px-4 py-3 tls-type-small text-white/80" data-testid="event-photos-coming">
               Fotos folgen in den nächsten Tagen.
             </div>
           )}
@@ -474,8 +474,8 @@ function EventOverview({ e, user, over, accessToken, hasConsent, onChanged, regi
                     {a.cover_url ? <img src={resolveMediaUrl(a.cover_url)} alt={a.title} className="w-full h-full object-cover" /> : <div className="w-full h-full flex items-center justify-center"><ImageIcon className="w-8 h-8 text-white/15" /></div>}
                   </div>
                   <div className="p-4">
-                    <div className="font-heading font-bold">{a.title}</div>
-                    {a.is_empty && <div className="mt-1 text-[10px] uppercase tracking-widest font-bold text-[#FFD700]" data-testid={`event-album-empty-${a.id}`}>leer – für Besucher unsichtbar</div>}
+                    <div className="font-bold">{a.title}</div>
+                    {a.is_empty && <div className="mt-1 tls-type-label text-[#FFD700]" data-testid={`event-album-empty-${a.id}`}>leer – für Besucher unsichtbar</div>}
                   </div>
                 </Link>
               ))}
@@ -491,9 +491,9 @@ function EventOverview({ e, user, over, accessToken, hasConsent, onChanged, regi
           <div className="grid sm:grid-cols-2 gap-4">
             {e.news.map((n) => (
               <Link key={n.id} to={`/news/${n.slug}`} className="tls-card border border-white/10 rounded-sm bg-[#121212] p-4">
-                <div className="text-[10px] uppercase tracking-widest text-white/40">{viennaDate(n.published_at || n.created_at)}</div>
-                <div className="font-heading font-bold mt-1">{n.title}</div>
-                {n.excerpt && <div className="text-xs text-white/60 mt-1 line-clamp-2">{n.excerpt}</div>}
+                <div className="tls-type-label text-white/40">{viennaDate(n.published_at || n.created_at)}</div>
+                <div className="font-bold mt-1">{n.title}</div>
+                {n.excerpt && <div className="tls-type-small text-white/60 mt-1 line-clamp-2">{n.excerpt}</div>}
               </Link>
             ))}
           </div>
@@ -510,7 +510,7 @@ function EventOverview({ e, user, over, accessToken, hasConsent, onChanged, regi
               return (
                 <li key={`${highlight.icon}-${highlight.text}`} className="flex items-center gap-2.5 rounded-sm bg-white/[0.04] px-3 py-2.5 min-w-0">
                   <Icon className="w-4 h-4 text-[#9F7AEA] shrink-0" aria-hidden="true" />
-                  <span className="text-sm font-bold text-white/90 break-words">{highlight.text}</span>
+                  <span className="tls-type-small font-bold text-white/90 break-words">{highlight.text}</span>
                 </li>
               );
             })}
@@ -520,18 +520,18 @@ function EventOverview({ e, user, over, accessToken, hasConsent, onChanged, regi
         {e.schedule?.multi_day && <EventDaysBlock schedule={e.schedule} />}
         {(e.locations?.length || 0) > 1 && (
           <div data-testid="event-locations">
-            <h3 className="font-heading text-xl font-black uppercase mb-4">Standorte</h3>
+            <h3 className="tls-type-card mb-4">Standorte</h3>
             <div className="grid md:grid-cols-2 gap-5">
               {e.locations.map((place, index) => (
                 <div key={place.key || index} className="border border-white/10 bg-[#121212] rounded-sm overflow-hidden flex flex-col" data-testid={`event-location-${index}`}>
                   <div className="p-5 space-y-1.5">
-                    <div className="text-[11px] uppercase tracking-widest font-bold text-[#9F7AEA]">Standort {index + 1}</div>
-                    {place.name && <div className="font-heading text-xl font-black uppercase">{place.name}</div>}
-                    {placeTimeLine(place) && <div className="text-sm text-white/75 inline-flex items-center gap-2"><Calendar className="w-4 h-4 text-[#9F7AEA]" /> {placeTimeLine(place)}</div>}
-                    {place.door_time && <div className="text-xs text-white/50">Einlass {viennaTime(place.door_time, { timeStyle: "short" })}</div>}
-                    {place.address_line && <div className="text-sm text-white/65 inline-flex items-start gap-2"><MapPin className="w-4 h-4 text-[#9F7AEA] shrink-0 mt-0.5" /> <span>{place.address_line}</span></div>}
-                    {place.max_participants != null && <div className="text-xs text-white/50 inline-flex items-center gap-2"><Users className="w-3.5 h-3.5" /> {place.max_participants} Plätze</div>}
-                    {place.note && <div className="text-sm text-white/60">{place.note}</div>}
+                    <div className="tls-type-label text-[#9F7AEA]">Standort {index + 1}</div>
+                    {place.name && <div className="tls-type-card">{place.name}</div>}
+                    {placeTimeLine(place) && <div className="tls-type-small text-white/75 inline-flex items-center gap-2"><Calendar className="w-4 h-4 text-[#9F7AEA]" /> {placeTimeLine(place)}</div>}
+                    {place.door_time && <div className="tls-type-small text-white/50">Einlass {viennaTime(place.door_time, { timeStyle: "short" })}</div>}
+                    {place.address_line && <div className="tls-type-small text-white/65 inline-flex items-start gap-2"><MapPin className="w-4 h-4 text-[#9F7AEA] shrink-0 mt-0.5" /> <span>{place.address_line}</span></div>}
+                    {place.max_participants != null && <div className="tls-type-small text-white/50 inline-flex items-center gap-2"><Users className="w-3.5 h-3.5" /> {place.max_participants} Plätze</div>}
+                    {place.note && <div className="tls-type-small text-white/60">{place.note}</div>}
                   </div>
                   {e.show_map && place.map_query && hasConsent("external_media") && (
                     <iframe title={`Karte ${place.name || `Standort ${index + 1}`}`} src={`https://www.google.com/maps?q=${encodeURIComponent(place.map_query)}&output=embed`} className="w-full h-56 border-0 border-t border-white/10" loading="lazy" referrerPolicy="no-referrer-when-downgrade" />
@@ -562,12 +562,12 @@ function EventOverview({ e, user, over, accessToken, hasConsent, onChanged, regi
         )}
         {e.program && (
           <div>
-            <h3 className="font-heading text-xl font-black uppercase mb-4">Programm</h3>
+            <h3 className="tls-type-card mb-4">Programm</h3>
             <RichContent text={e.program} embeds={e.content_embeds || []} className="border border-white/10 bg-[#121212] p-6 rounded-sm text-white/85" />
           </div>
         )}
         {(e.contact || organizerName) && (
-          <div className="flex flex-wrap gap-x-6 gap-y-2 text-sm text-white/65" data-testid="event-contact">
+          <div className="flex flex-wrap gap-x-6 gap-y-2 tls-type-small text-white/65" data-testid="event-contact">
             {e.contact && <span className="inline-flex min-w-0 items-center gap-2"><Mail className="w-4 h-4 text-[#9F7AEA] shrink-0" /><span className="min-w-0 break-all">{e.contact}</span></span>}
             {organizerName && (e.organizer_url ? (
               <a href={e.organizer_url} target="_blank" rel="noreferrer" className="inline-flex items-center gap-2 text-[#29B6E8] hover:underline">
@@ -588,7 +588,7 @@ function EventOverview({ e, user, over, accessToken, hasConsent, onChanged, regi
                 {e.partners.map((p) => (
                   <Link key={p.id} to={`/partners/${p.slug || p.id}`} data-testid={`event-partner-${p.slug || p.id}`} className="inline-flex items-center gap-3 border border-white/10 bg-[#101010] rounded-sm px-3 py-2 hover:border-[#29B6E8]/60 transition">
                     {p.logo_url ? <img src={resolveMediaUrl(p.logo_url)} alt="" className="h-8 w-8 object-contain" /> : <Handshake className="h-5 w-5 text-[#29B6E8]" />}
-                    <span className="font-heading font-bold uppercase text-sm">{p.name}</span>
+                    <span className="tls-type-small font-bold">{p.name}</span>
                   </Link>
                 ))}
               </div>
@@ -623,25 +623,25 @@ function WhatsOnRow({ row, accessToken }) {
     <li data-testid={`event-row-${row.kind}-${row.id}`}>
       <Link to={`${row.path}${row.accessLink ? accessSuffix(accessToken) : ""}`} className={`tls-card flex items-center gap-3 rounded-sm border border-white/10 bg-[#121212] px-3 py-3 min-w-0 ${row.mine ? "tls-you" : ""}`}>
         <span className="w-16 shrink-0 text-center">
-          {row.dayLabel ? <span className="block text-[10px] font-bold uppercase tracking-widest text-[#9F7AEA]" data-testid="embed-event-day">{row.dayLabel}</span> : null}
-          <span className="block text-sm font-bold tabular-nums text-white/85">{row.timeLabel || "–"}</span>
+          {row.dayLabel ? <span className="block tls-type-label text-[#9F7AEA]" data-testid="embed-event-day">{row.dayLabel}</span> : null}
+          <span className="block tls-type-small tls-type-num text-white/85">{row.timeLabel || "–"}</span>
         </span>
         <Icon className={`w-4 h-4 shrink-0 ${row.kind === "fastlap" ? "text-[#2DD4BF]" : "text-[#29B6E8]"}`} aria-hidden="true" />
         <span className="min-w-0 flex-1">
-          <span className="tls-card__title block font-heading font-bold leading-tight break-words">{row.title}</span>
+          <span className="tls-card__title block tls-type-card leading-tight break-words">{row.title}</span>
           {/* Ecken-Klammern (#1316): deine Karte trägt Winkel, Fläche und „Du“. */}
-          <span className="flex min-w-0 items-center gap-2 text-xs text-white/55">
+          <span className="flex min-w-0 items-center gap-2 tls-type-small text-white/55">
             {row.mine && !saysYou(row.mine.label) ? <span className="tls-you-tag" data-testid="event-row-you">Du</span> : null}
             <span className="tls-wrap">{[row.mode, row.detail].filter(Boolean).join(" · ")}</span>
           </span>
         </span>
         <span className="shrink-0">
           {row.mine ? (
-            <span className="inline-flex items-center gap-1 rounded-sm bg-[#29B6E8]/15 px-2 py-1 text-[11px] font-bold text-[#29B6E8]" data-testid="event-row-mine">
+            <span className="inline-flex items-center gap-1 rounded-sm bg-[#29B6E8]/15 px-2 py-1 tls-type-small font-bold text-[#29B6E8]" data-testid="event-row-mine">
               <CheckCircle className="w-3.5 h-3.5" aria-hidden="true" /> {row.mine.label}{row.mine.team ? ` · ${row.mine.team}` : ""}
             </span>
           ) : row.action === "register" ? (
-            <span className="tls-btn tls-btn--primary inline-flex items-center px-3 py-1.5 text-[11px] font-bold uppercase tracking-wider rounded-sm" data-testid="event-row-register">Anmelden</span>
+            <span className="tls-btn tls-btn--primary inline-flex items-center px-3 py-1.5 tls-type-label rounded-sm" data-testid="event-row-register">Anmelden</span>
           ) : (
             <PhaseBadge phase={row.phase} status={row.status} />
           )}
@@ -752,8 +752,8 @@ function EventRegistrationPanel({ event, user, accessToken = "", onChanged, open
 
   return (
     <div className="border border-white/10 bg-[#121212] rounded-sm p-5">
-      <div className="text-[11px] uppercase tracking-widest font-bold text-[#9F7AEA]">{activeOwn ? "Dein Event" : "Anmeldung"}</div>
-      <h2 className="mt-2 font-heading text-2xl font-black uppercase">{activeOwn ? "Du bist angemeldet" : event.registration_url ? "Registrierung möglich" : "Event-Anmeldung"}</h2>
+      <div className="tls-type-label text-[#9F7AEA]">{activeOwn ? "Dein Event" : "Anmeldung"}</div>
+      <h2 className="mt-2 tls-type-section">{activeOwn ? "Du bist angemeldet" : event.registration_url ? "Registrierung möglich" : "Event-Anmeldung"}</h2>
       {showSteps ? <StepBar steps={steps} current={step} className="mt-3" testId="event-register-steps" /> : null}
       {/* Externer Anmeldelink (#2127, EV11): die Zahlen stehen woanders - hier wären sie immer null. */}
       {!event.registration_url && (
@@ -764,26 +764,26 @@ function EventRegistrationPanel({ event, user, accessToken = "", onChanged, open
         </div>
       )}
       {!!summary.waitlist_count && (
-        <div className="mt-2 text-xs text-[#FFD700]">{countText(summary.waitlist_count, "Anmeldung", "Anmeldungen")} auf der Warteliste.</div>
+        <div className="mt-2 tls-type-small text-[#FFD700]">{countText(summary.waitlist_count, "Anmeldung", "Anmeldungen")} auf der Warteliste.</div>
       )}
       {offer && (
-        <div className="mt-4 border border-[#FFD700]/30 bg-[#FFD700]/5 rounded-sm p-3 text-sm" data-testid="event-offer">
-          <div className="text-[11px] uppercase tracking-widest font-bold text-[#FFD700]">Kosten</div>
+        <div className="mt-4 border border-[#FFD700]/30 bg-[#FFD700]/5 rounded-sm p-3 tls-type-small" data-testid="event-offer">
+          <div className="tls-type-label text-[#FFD700]">Kosten</div>
           <div className="mt-1 text-white">{offerSummary(offer, 1 + Number(companionCount || 0))}</div>
-          <ul className="mt-2 space-y-0.5 text-xs text-white/60">
+          <ul className="mt-2 space-y-0.5 tls-type-small text-white/60">
             {offer.positions.filter((position) => !position.optional).map((position) => (
               <li key={position.key}>{position.label}: {formatCents(position.amount_cents, offer.currency)} {position.basis === "per_person" ? "je Person" : "je Anmeldung"}{position.description ? ` – ${position.description}` : ""}</li>
             ))}
           </ul>
         </div>
       )}
-      <div className="mt-4 space-y-1 text-sm text-white/65">
+      <div className="mt-4 space-y-1 tls-type-small text-white/65">
         {event.registration_opens_at && <div>Öffnet: {viennaDateTime(event.registration_opens_at, { dateStyle: "medium", timeStyle: "short" })}</div>}
         {event.registration_closes_at && <div>Schließt: {viennaDateTime(event.registration_closes_at, { dateStyle: "medium", timeStyle: "short" })}</div>}
         {!event.registration_url && summary.spots_left != null && <div>Freie Plätze: {summary.spots_left}</div>}
       </div>
       {event.registration_url ? (
-        <a href={event.registration_url} target="_blank" rel="noreferrer" className="tls-btn tls-btn--primary mt-5 inline-flex items-center gap-2 px-4 py-2 text-xs uppercase tracking-wider font-bold rounded-sm">
+        <a href={event.registration_url} target="_blank" rel="noreferrer" className="tls-btn tls-btn--primary mt-5 inline-flex items-center gap-2 px-4 py-2 tls-type-label rounded-sm">
           Anmelden <ExternalLink className="w-3.5 h-3.5" />
         </a>
       ) : activeOwn ? (
@@ -792,13 +792,13 @@ function EventRegistrationPanel({ event, user, accessToken = "", onChanged, open
         <div className="mt-5 relative" data-testid="event-own-registration">
         <div className={`border border-[#10B981]/30 bg-[#10B981]/10 rounded-sm p-4 ${own.can_cancel ? "sm:pr-32" : ""}`}>
           <div className="flex flex-wrap items-center gap-2">
-            <span className="inline-flex items-center gap-2 text-[#10B981] text-sm font-bold uppercase tracking-wider" data-testid="event-own-status">
+            <span className="inline-flex items-center gap-2 text-[#10B981] tls-type-label" data-testid="event-own-status">
               <CheckCircle className="w-4 h-4" /> {own.status === "waitlist" ? EVENT_REGISTRATION_LABELS.waitlist : "Du bist dabei"}
             </span>
           </div>
-          <div className="mt-2 text-sm text-white/65" data-testid="event-own-seats">{ownSeatsSentence(own)}</div>
+          <div className="mt-2 tls-type-small text-white/65" data-testid="event-own-seats">{ownSeatsSentence(own)}</div>
           {own.price && (
-            <div className="mt-2 text-sm" data-testid="event-own-price">
+            <div className="mt-2 tls-type-small" data-testid="event-own-price">
               <span className="text-white/65">Dein Kostenbeitrag: </span>
               <strong className="text-white">{formatCents(own.price.total_cents, own.price.currency)}</strong>
               <span className="text-white/45">
@@ -810,38 +810,38 @@ function EventRegistrationPanel({ event, user, accessToken = "", onChanged, open
               </span>
             </div>
           )}
-          {own.status === "waitlist" && offer && <div className="mt-1 text-xs text-white/45">Bezahlt wird erst, wenn du nachrückst.</div>}
-          {own.note && <div className="mt-2 text-sm text-white/65 break-words" data-testid="event-own-note"><span className="text-white/45">Dein Hinweis: </span>{own.note}</div>}
+          {own.status === "waitlist" && offer && <div className="mt-1 tls-type-small text-white/45">Bezahlt wird erst, wenn du nachrückst.</div>}
+          {own.note && <div className="mt-2 tls-type-small text-white/65 break-words" data-testid="event-own-note"><span className="text-white/45">Dein Hinweis: </span>{own.note}</div>}
           {/* Selbst ändern (#2113, L-A3): Begleitpersonen und Hinweis, solange der Server es erlaubt. */}
           <EventRegistrationEdit event={event} own={own} onSaved={onChanged} />
         </div>
         {own.can_cancel && (
           <button type="button" disabled={saving} onClick={cancel} data-testid="event-cancel-link"
-            className="mt-2 sm:mt-0 sm:absolute sm:top-4 sm:right-4 inline-flex items-center gap-1.5 text-xs font-bold text-white/55 underline-offset-4 hover:text-[#FF6B6B] hover:underline disabled:opacity-50">
+            className="mt-2 sm:mt-0 sm:absolute sm:top-4 sm:right-4 inline-flex items-center gap-1.5 tls-type-small font-bold text-white/55 underline-offset-4 hover:text-[#FF6B6B] hover:underline disabled:opacity-50">
             <XCircle className="w-3.5 h-3.5" /> Stornieren
           </button>
         )}
         </div>
       ) : !registrationOpen && !hasRegisterAccess ? (
-        <div className="mt-5 border border-white/10 rounded-sm p-4 text-sm text-white/55">Die Anmeldung ist aktuell nicht offen.</div>
+        <div className="mt-5 border border-white/10 rounded-sm p-4 tls-type-small text-white/55">Die Anmeldung ist aktuell nicht offen.</div>
       ) : !user ? (
-        <Link to={loginTarget} className="tls-btn tls-btn--primary mt-5 inline-flex items-center gap-2 px-4 py-2 text-xs uppercase tracking-wider font-bold rounded-sm">
+        <Link to={loginTarget} className="tls-btn tls-btn--primary mt-5 inline-flex items-center gap-2 px-4 py-2 tls-type-label rounded-sm">
           Zum Teilnehmen anmelden
         </Link>
       ) : (
         <form ref={formRef} onSubmit={register} className="mt-5 space-y-3" data-testid="event-register-form">
           {event.allow_companions && (
             <label className="block">
-              <div className="text-[11px] uppercase tracking-widest text-white/50 font-bold mb-1.5">Begleitpersonen</div>
+              <div className="tls-type-label text-white/50 mb-1.5">Begleitpersonen</div>
               <input type="number" min="0" max={maxCompanions} value={companionCount} onChange={(ev) => { setCompanionCount(ev.target.value); setActionError(""); }} className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm" />
-              <div className="mt-1 text-xs text-white/40">Maximal {maxCompanions} pro Anmeldung.</div>
+              <div className="mt-1 tls-type-small text-white/40">Maximal {maxCompanions} pro Anmeldung.</div>
             </label>
           )}
           {offer?.positions.some((position) => position.optional) && (
             <fieldset className="border border-white/10 rounded-sm p-3">
-              <legend className="text-[11px] uppercase tracking-widest text-white/50 font-bold px-1">Zusätzlich wählbar</legend>
+              <legend className="tls-type-label text-white/50 px-1">Zusätzlich wählbar</legend>
               {offer.positions.filter((position) => position.optional).map((position) => (
-                <label key={position.key} className="flex items-center gap-2 text-sm py-1">
+                <label key={position.key} className="flex items-center gap-2 tls-type-small py-1">
                   <input type="checkbox" checked={selectedPositions.includes(position.key)} onChange={(ev) => setSelectedPositions((current) => (ev.target.checked ? [...current, position.key] : current.filter((key) => key !== position.key)))} data-testid={`event-offer-option-${position.key}`} />
                   <span>{position.label} <span className="text-white/50">{formatCents(position.amount_cents, offer.currency)} {position.basis === "per_person" ? "je Person" : "je Anmeldung"}</span></span>
                 </label>
@@ -849,21 +849,21 @@ function EventRegistrationPanel({ event, user, accessToken = "", onChanged, open
             </fieldset>
           )}
           {waitlisted && (
-            <div className="border border-honor/40 bg-honor/5 rounded-sm p-3 text-sm text-white/85" data-testid="event-waitlist-note">
+            <div className="border border-honor/40 bg-honor/5 rounded-sm p-3 tls-type-small text-white/85" data-testid="event-waitlist-note">
               {waitlisted}{quote && !quote.free ? " Bezahlt wird erst, wenn du nachrückst." : ""}
             </div>
           )}
           {!waitlisted && quote && !quote.free && (
-            <div className="border border-[#FFD700]/40 rounded-sm p-3 text-sm flex items-baseline justify-between gap-3" data-testid="event-quote">
+            <div className="border border-[#FFD700]/40 rounded-sm p-3 tls-type-small flex items-baseline justify-between gap-3" data-testid="event-quote">
               <span className="text-white/65">Summe für {1 + Number(companionCount || 0)} Person{1 + Number(companionCount || 0) === 1 ? "" : "en"}</span>
-              <strong className="font-heading text-xl text-white">{formatCents(quote.total_cents, quote.currency)}</strong>
+              <strong className="tls-type-card text-white">{formatCents(quote.total_cents, quote.currency)}</strong>
             </div>
           )}
           <label className="block">
-            <div className="text-[11px] uppercase tracking-widest text-white/50 font-bold mb-1.5">Hinweis optional</div>
+            <div className="tls-type-label text-white/50 mb-1.5">Hinweis optional</div>
             <textarea value={note} onChange={(ev) => { setNote(ev.target.value); setActionError(""); }} rows={3} maxLength={500} className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-sm" placeholder="z.B. komme etwas später" />
           </label>
-          <button disabled={saving} data-testid="event-register-submit" className="tls-btn tls-btn--primary inline-flex items-center gap-2 px-4 py-2 text-xs uppercase tracking-wider font-bold rounded-sm disabled:opacity-50">
+          <button disabled={saving} data-testid="event-register-submit" className="tls-btn tls-btn--primary inline-flex items-center gap-2 px-4 py-2 tls-type-label rounded-sm disabled:opacity-50">
             <UserPlus className="w-3.5 h-3.5" /> {saving ? "Speichere..." : waitlisted ? "Auf die Warteliste" : quote && !quote.free ? `Verbindlich anmelden · ${formatCents(quote.total_cents, quote.currency)}` : "Anmelden"}
           </button>
         </form>
@@ -871,7 +871,7 @@ function EventRegistrationPanel({ event, user, accessToken = "", onChanged, open
       {actionError && <div className="mt-4"><AuthFormAlert id="event-registration-error">{actionError}</AuthFormAlert></div>}
       {/* Die Arbeitsseite der Turnierleitung (#1372): Suche, Einlass, Nachricht an alle. */}
       {event.can_check_in && !event.registration_url && (
-        <Link to={`/events/${event.slug || event.id}/leitung`} className="tls-btn tls-btn--secondary mt-4 inline-flex min-h-11 items-center gap-2 px-4 py-2 text-xs uppercase tracking-wider font-bold rounded-sm" data-testid="event-lead-link">
+        <Link to={`/events/${event.slug || event.id}/leitung`} className="tls-btn tls-btn--secondary mt-4 inline-flex min-h-11 items-center gap-2 px-4 py-2 tls-type-label rounded-sm" data-testid="event-lead-link">
           Anmeldungen &amp; Einlass
         </Link>
       )}
@@ -891,17 +891,17 @@ function ParticipantList({ title, rows, testId }) {
   const more = rows.length - shown.length;
   return (
     <div className="mt-6 border-t border-white/10 pt-4" data-testid={testId}>
-      <div className="text-[11px] uppercase tracking-widest font-bold text-white/45 mb-2">{title}</div>
+      <div className="tls-type-label text-white/45 mb-2">{title}</div>
       <div className="space-y-1.5">
         {shown.map((registration) => (
-          <div key={registration.id} className="flex items-center justify-between gap-3 text-sm border border-white/5 bg-black/15 rounded-sm px-3 py-2">
+          <div key={registration.id} className="flex items-center justify-between gap-3 tls-type-small border border-white/5 bg-black/15 rounded-sm px-3 py-2">
             <span className="tls-wrap">{registration.display_name || "Teilnehmer"}</span>
-            <span className="text-xs text-white/45 shrink-0">{seatsLabel(registration)}</span>
+            <span className="tls-type-small text-white/45 shrink-0">{seatsLabel(registration)}</span>
           </div>
         ))}
       </div>
       {more > 0 && (
-        <button type="button" onClick={() => setAll(true)} className="tls-btn tls-btn--quiet mt-2 min-h-11 px-3 py-2 rounded-sm text-xs font-bold" data-testid={`${testId}-more`}>+{more} weitere</button>
+        <button type="button" onClick={() => setAll(true)} className="tls-btn tls-btn--quiet mt-2 min-h-11 px-3 py-2 rounded-sm tls-type-small font-bold" data-testid={`${testId}-more`}>+{more} weitere</button>
       )}
     </div>
   );
@@ -910,8 +910,8 @@ function ParticipantList({ title, rows, testId }) {
 function MiniStat({ label, value }) {
   return (
     <div className="border border-white/10 bg-[#0A0A0A] rounded-sm p-3">
-      <div className="text-[10px] uppercase tracking-widest text-white/40">{label}</div>
-      <div className="mt-1 font-heading text-xl font-black">{value}</div>
+      <div className="tls-type-label text-white/40">{label}</div>
+      <div className="mt-1 tls-type-card tls-type-num">{value}</div>
     </div>
   );
 }

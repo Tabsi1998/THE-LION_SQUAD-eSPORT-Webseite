@@ -113,13 +113,13 @@ export default function HomePage() {
             <div className="lg:col-span-7 min-w-0 tls-hero-enter">
               <div className="inline-flex items-center gap-2 px-3 py-1.5 bg-[#29B6E8]/10 border border-[#29B6E8]/30 rounded-sm mb-6" data-testid="hero-tag">
                 <span className="w-2 h-2 rounded-full bg-[#29B6E8] animate-pulse" />
-                <span className="text-[10px] font-bold uppercase tracking-[0.3em] text-[#29B6E8]">THE LION SQUAD · eSPORTS</span>
+                <span className="tls-type-label text-[#29B6E8]">THE LION SQUAD · eSPORTS</span>
               </div>
-              <h1 className="font-heading text-4xl sm:text-5xl lg:text-7xl font-black uppercase tracking-tighter leading-[0.95] text-white break-words" data-testid="hero-title">
+              <h1 className="tls-type-hero leading-[0.95] text-white break-words" data-testid="hero-title">
                 {hero.title}{hero.highlight && <><br /><span className="tls-gradient-text">{hero.highlight}</span></>}
               </h1>
               {hero.text && (
-                <p className="mt-6 text-base md:text-lg text-white/70 max-w-xl leading-relaxed" data-testid="hero-text">{hero.text}</p>
+                <p className="mt-6 tls-type-body text-white/70 max-w-xl leading-relaxed" data-testid="hero-text">{hero.text}</p>
               )}
               {/* Keine Knöpfe im Hero (#425) und keine Extrazeile mehr (#947): der Weg zum Mitglied steht an
                   einer Stelle - „Mitglied werden“ in der Kopfzeile; Mitglieder finden ihren Bereich im Benutzermenü. */}
@@ -183,7 +183,7 @@ export default function HomePage() {
         <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
           <div className="border border-dashed border-white/15 rounded-sm p-12 text-center">
             <Trophy className="w-10 h-10 mx-auto text-white/20 mb-4" />
-            <h2 className="font-heading text-2xl font-black uppercase">Aktuell ruht das Rudel</h2>
+            <h2 className="tls-type-section">Aktuell ruht das Rudel</h2>
             <p className="mt-3 text-white/60 max-w-xl mx-auto">Keine laufenden oder anstehenden Events. Folge uns auf Discord oder schau bei den News, um keine Ankündigung zu verpassen.</p>
             <div className="mt-6 flex flex-wrap justify-center gap-3">
               <Link to="/news" className="tls-btn tls-btn--secondary px-5 py-2.5 font-bold uppercase tracking-wider rounded-sm">News lesen</Link>
@@ -368,8 +368,8 @@ function ClubNumbers({ numbers, shown }) {
 function NumberTile({ id, label, value }) {
   return (
     <div className="tls-hero-enter" data-testid={`home-number-${id}`}>
-      <div className="font-heading text-3xl md:text-4xl font-black text-white tabular-nums" aria-label={`${formatCount(value)} ${label}`}><CountUp value={value} format={formatCount} /></div>
-      <div className="text-[10px] uppercase tracking-widest font-bold text-white/45">{label}</div>
+      <div className="tls-type-title tls-type-num text-white" aria-label={`${formatCount(value)} ${label}`}><CountUp value={value} format={formatCount} /></div>
+      <div className="tls-type-label text-white/45">{label}</div>
     </div>
   );
 }
@@ -390,12 +390,12 @@ function BoardTeaser({ contacts }) {
                 <LazyImg src={contact.avatar} alt="" sizes="(min-width: 768px) 80px, 64px" className="w-full h-full object-cover tls-card__media" />
               </span>
             ) : (
-              <span className="w-16 h-16 md:w-20 md:h-20 rounded-sm bg-[#FFD700]/15 text-[#FFD700] font-heading font-black text-2xl inline-flex items-center justify-center shrink-0">{(contact.name || "?").slice(0, 1).toUpperCase()}</span>
+              <span className="w-16 h-16 md:w-20 md:h-20 rounded-sm bg-[#FFD700]/15 text-[#FFD700] tls-type-section inline-flex items-center justify-center shrink-0">{(contact.name || "?").slice(0, 1).toUpperCase()}</span>
             )}
             <span className="min-w-0">
               {/* Lange Rollen in Etikett und Wort (#1314, wie auf „Vorstand“): „Stellvertretung“ / „Obmann“ statt „…“. */}
               <RoleLine {...splitRole(contact.title)} />
-              <span className="block font-heading text-lg md:text-xl font-black uppercase leading-tight break-words group-hover:text-[#FFD700] transition">{contact.name}</span>
+              <span className="block tls-type-card leading-tight break-words group-hover:text-[#FFD700] transition">{contact.name}</span>
             </span>
           </Link>
         ))}
@@ -417,24 +417,24 @@ function NextUp({ items }) {
   const countdown = useCountdown(target?.targetMs || null, days);
   if (!items.length) return (
     <div className="border border-dashed border-white/15 rounded-sm p-6 text-white/45 min-w-0">
-      <div className="text-[10px] uppercase tracking-widest font-bold text-white/40">Nächster Termin</div>
-      <div className="mt-3 font-heading text-xl font-black uppercase">Aktuell nichts geplant</div>
-      <p className="mt-2 text-sm">Sobald News, Events, Turniere oder Fast-Laps gepflegt werden, erscheint hier automatisch der nächste relevante Eintrag.</p>
+      <div className="tls-type-label text-white/40">Nächster Termin</div>
+      <div className="mt-3 tls-type-card">Aktuell nichts geplant</div>
+      <p className="mt-2 tls-type-body">Sobald News, Events, Turniere oder Fast-Laps gepflegt werden, erscheint hier automatisch der nächste relevante Eintrag.</p>
     </div>
   );
   return (
     <div className="tls-reveal-item border border-white/10 rounded-sm bg-[#111] p-5 min-w-0" style={{ "--tls-i": 1 }} data-testid="home-next-up">
       <div className="flex items-center justify-between gap-3 min-w-0">
-        <div className="text-[10px] uppercase tracking-widest font-bold text-[#FFD700]">Nächste Termine</div>
+        <div className="tls-type-label text-[#FFD700]">Nächste Termine</div>
         <div className="shrink-0 flex items-center gap-3">
-          <Link to="/calendar" data-testid="home-calendar-link" className="text-[10px] uppercase tracking-widest font-bold text-white/40 hover:text-[#29B6E8]">Kalender</Link>
-          <Link to="/events" className="text-[10px] uppercase tracking-widest font-bold text-white/40 hover:text-[#29B6E8]">Alle Events</Link>
+          <Link to="/calendar" data-testid="home-calendar-link" className="tls-type-label text-white/40 hover:text-[#29B6E8]">Kalender</Link>
+          <Link to="/events" className="tls-type-label text-white/40 hover:text-[#29B6E8]">Alle Events</Link>
         </div>
       </div>
       {target && countdown && (
         <div className="mt-3 flex flex-wrap items-baseline gap-x-3 gap-y-1 min-w-0" data-testid="home-countdown">
-          <span className="inline-flex items-center gap-1.5 text-[10px] uppercase tracking-widest font-bold text-white/40"><Timer className="w-3 h-3" /> {target.item.label}</span>
-          <span key={countdown} className="tls-tick font-heading text-xl md:text-2xl font-black uppercase text-white tabular-nums" data-testid="home-countdown-value">{countdown}</span>
+          <span className="inline-flex items-center gap-1.5 tls-type-label text-white/40"><Timer className="w-3 h-3" /> {target.item.label}</span>
+          <span key={countdown} className="tls-tick tls-type-section tls-type-num text-white" data-testid="home-countdown-value">{countdown}</span>
         </div>
       )}
       <div className="mt-4 space-y-3">
@@ -456,13 +456,13 @@ function NextUp({ items }) {
               <div className="flex items-center gap-3 min-w-0 w-full">
                 <KindIcon kind={item.kind} accent={item.accent_color} />
                 <div className="min-w-0 flex-1">
-                  <div className="font-heading font-bold leading-tight flex items-center gap-2 flex-wrap">
+                  <div className="font-bold leading-tight flex items-center gap-2 flex-wrap">
                     <span className="tls-wrap">{item.label}</span>
                     {isChanged && <span className="tls-new-chip" data-testid="home-next-new">Neu</span>}
                   </div>
-                  {counts && <div className="mt-1 inline-flex items-center gap-1.5 text-xs text-white/55 tabular-nums" data-testid="home-live-counts"><Users className="w-3 h-3" /> {counts}</div>}
+                  {counts && <div className="mt-1 inline-flex items-center gap-1.5 tls-type-small text-white/55 tabular-nums" data-testid="home-live-counts"><Users className="w-3 h-3" /> {counts}</div>}
                   {item.children?.length > 0 && (
-                    <div className="tls-wrap mt-1 text-xs text-white/55" data-testid={`home-next-children-${item.slug || item.id}`}>
+                    <div className="tls-wrap mt-1 tls-type-small text-white/55" data-testid={`home-next-children-${item.slug || item.id}`}>
                       {childSummary(item.children.map((child) => ({ kind: child.kind })))}: {item.children.map((child) => child.label).join(", ")}
                     </div>
                   )}
@@ -470,7 +470,7 @@ function NextUp({ items }) {
               </div>
               {/* Einzeilig (#832): die Plakette brach in der schmalen Spalte um - jetzt so breit wie nötig. */}
               <div className="w-full sm:w-auto sm:shrink-0 sm:min-w-[12rem] flex flex-col gap-2 sm:items-start">
-                {when && <div className="text-xs text-white/45" data-testid={league ? `home-next-period-${item.slug}` : undefined}>{when}</div>}
+                {when && <div className="tls-type-small text-white/45" data-testid={league ? `home-next-period-${item.slug}` : undefined}>{when}</div>}
                 {(item.public_phase || item.status) && <PhaseBadge phase={item.public_phase} status={item.status} className="self-start max-w-full sm:whitespace-nowrap" />}
               </div>
             </Link>
@@ -494,11 +494,11 @@ function LiveBanner({ state }) {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3 flex items-center gap-4 flex-wrap">
         <div className="flex items-center gap-2 text-white">
           <Radio className="w-4 h-4 animate-pulse" />
-          <span className="font-display tracking-widest font-bold text-sm">LIVE JETZT</span>
+          <span className="tls-type-label">LIVE JETZT</span>
         </div>
         <div className="flex-1 flex items-center gap-3 flex-wrap">
           {all.slice(0, 3).map((x) => (
-            <Link key={x.id} to={x.url} data-testid={`live-banner-${x.kind}-${x.slug}`} className="inline-flex items-center gap-2 px-3 py-1.5 bg-black/30 hover:bg-black/50 text-white border border-white/20 rounded-sm transition text-sm">
+            <Link key={x.id} to={x.url} data-testid={`live-banner-${x.kind}-${x.slug}`} className="inline-flex items-center gap-2 px-3 py-1.5 bg-black/30 hover:bg-black/50 text-white border border-white/20 rounded-sm transition tls-type-small">
               <span className="font-bold">{x.title || x.name}</span>
               {x.kind === "fastlap" && <Flag className="w-3 h-3" />}
               {x.kind === "tournament" && <Trophy className="w-3 h-3" />}
@@ -544,13 +544,13 @@ function NewsCard({ news, featured = false, index = 0, count = 1 }) {
         <div className={`${media} relative bg-[#0A0A0A] overflow-hidden`}><NewsTextCard news={news} size={featured ? "lg" : "md"} /></div>
       )}
       <div className={`p-4 ${tall ? "" : "flex-1"}`}>
-        <div className="flex items-center gap-1.5 text-[10px] uppercase tracking-widest font-bold text-[#29B6E8]">
+        <div className="flex items-center gap-1.5 tls-type-label text-[#29B6E8]">
           {newsCategoryLabel(news.category)}
           {news.pinned && <Pin className="w-3 h-3 text-white" aria-label="Angepinnt" />}
         </div>
-        <h3 className={`tls-card__title mt-2 font-heading font-black uppercase leading-tight tls-wrap ${featured ? (isLongTitle(news.title) ? "text-lg md:text-xl" : "text-xl md:text-2xl") : ""}`}>{news.title}</h3>
-        {(news.published_at || news.created_at) && <div className="mt-2 text-[11px] text-white/40">{formatAgo(news.published_at || news.created_at)}</div>}
-        {news.excerpt && <p className="mt-2 text-xs text-white/60 line-clamp-3">{news.excerpt}</p>}
+        <h3 className={`tls-card__title mt-2 leading-tight tls-wrap ${featured && !isLongTitle(news.title) ? "tls-type-section" : "tls-type-card"}`}>{news.title}</h3>
+        {(news.published_at || news.created_at) && <div className="mt-2 tls-type-small text-white/40">{formatAgo(news.published_at || news.created_at)}</div>}
+        {news.excerpt && <p className="mt-2 tls-type-small text-white/60 line-clamp-3">{news.excerpt}</p>}
       </div>
     </Link>
   );
@@ -573,12 +573,12 @@ function SectionHeader({ icon: Icon, accent, title, actionLabel, actionTo }) {
   return (
     <div className="tls-reveal-text flex items-end justify-between gap-4 flex-wrap">
       <div>
-        <div className="text-[11px] uppercase tracking-[0.3em] font-bold flex items-center gap-2" style={{ color: accent }}>
+        <div className="tls-type-label flex items-center gap-2" style={{ color: accent }}>
           <Icon className="w-3.5 h-3.5" /> {title}
         </div>
       </div>
       {actionTo && (
-        <Link to={actionTo} className="group/more inline-flex items-center gap-2 text-xs uppercase tracking-wider font-bold text-white/60 hover:text-[#29B6E8] transition">
+        <Link to={actionTo} className="group/more inline-flex items-center gap-2 tls-type-label text-white/60 hover:text-[#29B6E8] transition">
           {actionLabel} <ArrowRight className="w-3 h-3 transition-transform duration-300 group-hover/more:translate-x-0.5" />
         </Link>
       )}

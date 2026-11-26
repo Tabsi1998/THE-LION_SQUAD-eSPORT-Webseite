@@ -186,13 +186,13 @@ export default function AchievementsShowcasePage() {
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.5 }}
             >
-              <div className="flex items-center gap-2 text-[11px] font-bold uppercase tracking-[0.4em] text-[#29B6E8]">
+              <div className="flex items-center gap-2 tls-type-label text-[#29B6E8]">
                 <Sparkles className="w-4 h-4" /> Ruhmeshalle
               </div>
-              <h1 className="font-heading text-4xl md:text-6xl font-black uppercase mt-2 sm:mt-3 leading-none">
+              <h1 className="tls-type-hero mt-2 sm:mt-3 leading-none">
                 Achieve<span className="text-[#FFD700]">ments</span>
               </h1>
-              <p className="mt-4 max-w-2xl text-sm sm:text-base md:text-lg text-white/60">
+              <p className="mt-4 max-w-2xl tls-type-body text-white/60">
                 Spiele Matches, gewinne Turniere, fahre Bestzeiten und engagiere dich im Verein –
                 jede Aktion bringt dich weiter.<span className="hidden sm:inline"> Schalte Abzeichen frei und klettere in der Bestenliste.</span>
               </p>
@@ -214,7 +214,7 @@ export default function AchievementsShowcasePage() {
           </div>
 
           {mine && (
-            <div className="mt-4 text-sm text-white/60" data-testid="my-achievement-summary">
+            <div className="mt-4 tls-type-small text-white/60" data-testid="my-achievement-summary">
               Du hast bereits <span className="text-[#FFD700] font-bold">{mine.count || 0}</span> Erfolge
               freigeschaltet · <Link to="/u/me?tab=achievements" className="text-[#29B6E8] hover:underline">Meine Erfolge ansehen</Link>
             </div>
@@ -229,9 +229,9 @@ export default function AchievementsShowcasePage() {
         <section data-testid="achievements-categories" id="achievements-catalog">
           <div className="flex items-center gap-2 mb-2">
             <Layers className="w-5 h-5 text-[#00FF88]" />
-            <h2 className="font-heading text-2xl md:text-3xl font-bold uppercase">Kategorien</h2>
+            <h2 className="tls-type-section">Kategorien</h2>
           </div>
-          <p className="mb-2 sm:mb-4 text-[10px] uppercase tracking-widest text-white/40" data-testid="categories-caption">
+          <p className="mb-2 sm:mb-4 tls-type-label text-white/40" data-testid="categories-caption">
             {mine ? "Dein Fortschritt je Kategorie · was du selbst erreichen kannst" : `Fortschritt der Community · ${overview?.rarity?.base ?? 0} Konten`}
             <span className="hidden sm:inline"> · antippen zeigt die Abzeichen</span>
           </p>
@@ -256,11 +256,11 @@ export default function AchievementsShowcasePage() {
                     onToggle={() => toggleCategory(category.key)}
                   >
                     {!entry || entry.status === "loading" ? (
-                      <div className="py-6 text-center text-sm text-white/45" data-testid={`category-loading-${category.key}`}>Lade Abzeichen …</div>
+                      <div className="py-6 text-center tls-type-small text-white/45" data-testid={`category-loading-${category.key}`}>Lade Abzeichen …</div>
                     ) : entry.status === "error" ? (
-                      <div className="py-4 flex flex-wrap items-center justify-center gap-3 text-sm text-white/55" data-testid={`category-error-${category.key}`}>
+                      <div className="py-4 flex flex-wrap items-center justify-center gap-3 tls-type-small text-white/55" data-testid={`category-error-${category.key}`}>
                         Die Abzeichen ließen sich nicht laden.
-                        <button type="button" onClick={() => fetchCategory(category.key)} className="tls-btn tls-btn--quiet text-[10px] font-bold uppercase tracking-widest px-2.5 py-1.5 rounded-sm">
+                        <button type="button" onClick={() => fetchCategory(category.key)} className="tls-btn tls-btn--quiet tls-type-label px-2.5 py-1.5 rounded-sm">
                           Nochmal
                         </button>
                       </div>
@@ -298,7 +298,7 @@ export default function AchievementsShowcasePage() {
           <div className="flex items-center justify-between gap-3 mb-3 sm:mb-6 flex-wrap">
             <div className="flex items-center gap-2">
               <Medal className="w-5 h-5 text-[#FFD700]" />
-              <h2 className="font-heading text-2xl md:text-3xl font-bold uppercase">Bestenliste</h2>
+              <h2 className="tls-type-section">Bestenliste</h2>
             </div>
             <div className="flex max-w-full items-center gap-2 flex-nowrap tls-swipe tls-swipe--room pb-1 sm:flex-wrap sm:overflow-visible sm:pb-0 sm:[mask-image:none] sm:[-webkit-mask-image:none]" data-testid="leaderboard-controls">
               <Toggle
@@ -361,7 +361,7 @@ export default function AchievementsShowcasePage() {
                       viewport={{ once: true }}
                       transition={{ delay: Math.min(index * 0.04, 0.4) }}
                     >
-                      <span className="w-7 text-center font-display font-bold text-white/40 tabular-nums">{entry.rank}</span>
+                      <span className="w-7 text-center tls-type-num text-white/40">{entry.rank}</span>
                       <Avatar entry={entry} size={9} />
                       <Link
                         to={entry.username ? `/u/${encodeURIComponent(entry.username)}` : "#"}
@@ -370,8 +370,8 @@ export default function AchievementsShowcasePage() {
                         {entry.display_name}
                         {Number(entry.prestige || 0) > 0 && <span className="ml-1 text-[#FFD700]" title={`Prestige ${entry.prestige}`}>{"★".repeat(Math.min(5, Number(entry.prestige)))}</span>}
                       </Link>
-                      <span className="text-xs text-white/40 tabular-nums">{byLevel ? (entry.title || `Level ${entry.level}`) : erfolge(entry.count)}</span>
-                      <span className="font-display font-bold text-[#FFD700] tabular-nums shrink-0">{byLevel ? `Lv ${entry.level}` : entry.points}</span>
+                      <span className="tls-type-small text-white/40 tabular-nums">{byLevel ? (entry.title || `Level ${entry.level}`) : erfolge(entry.count)}</span>
+                      <span className="tls-type-num text-[#FFD700] shrink-0">{byLevel ? `Lv ${entry.level}` : entry.points}</span>
                     </motion.div>
                   ))}
                 </div>
@@ -382,7 +382,7 @@ export default function AchievementsShowcasePage() {
                     type="button"
                     onClick={() => setShowAll(true)}
                     disabled={boardLoading}
-                    className="tls-btn tls-btn--secondary w-full sm:w-auto px-4 py-2 text-xs font-bold uppercase tracking-widest rounded-sm"
+                    className="tls-btn tls-btn--secondary w-full sm:w-auto px-4 py-2 tls-type-label rounded-sm"
                     data-testid="leaderboard-show-all"
                   >
                     Alle anzeigen
@@ -390,7 +390,7 @@ export default function AchievementsShowcasePage() {
                 </div>
               )}
               {showAll && boardLoading && (
-                <div className="mt-4 text-center text-xs text-white/45" data-testid="leaderboard-loading-more">Lädt weitere Plätze …</div>
+                <div className="mt-4 text-center tls-type-small text-white/45" data-testid="leaderboard-loading-more">Lädt weitere Plätze …</div>
               )}
             </>
           )}
@@ -459,9 +459,9 @@ function CategoryRow({ category, own, progress = null, index = 0, negativeCount 
           : <AchievementIcon name={category.icon || meta.icon} fallback="trophy" className="w-4 h-4 shrink-0" style={{ color: accent }} />}
         <div className="flex-1 min-w-0">
           <div className="flex items-baseline justify-between gap-3">
-            <span className="font-heading font-bold uppercase text-sm md:text-base truncate">{category.label}</span>
+            <span className="tls-type-card truncate">{category.label}</span>
             <span
-              className="font-display font-bold text-sm tabular-nums shrink-0 inline-flex items-center gap-1.5 self-center"
+              className="tls-type-small font-bold tabular-nums shrink-0 inline-flex items-center gap-1.5 self-center"
               style={{ color: accent }}
               title={progress ? (progress.membersOnly ? CLUB_MEMBERS_ONLY_HINT : CATEGORY_PROGRESS_HINT) : undefined}
               data-testid={`category-progress-${category.key}`}
@@ -493,7 +493,7 @@ function CategoryRow({ category, own, progress = null, index = 0, negativeCount 
               />
             )}
           </div>
-          <div className="mt-1 hidden md:flex items-center gap-2 text-[10px] uppercase tracking-widest text-white/40" data-testid={`category-detail-${category.key}`}>
+          <div className="mt-1 hidden md:flex items-center gap-2 tls-type-small text-white/40" data-testid={`category-detail-${category.key}`}>
             <span className="truncate">{detail}</span>
             {category.member_only && <span className="ml-auto shrink-0 text-[#FFD700]/80">Mitglieder</span>}
           </div>
@@ -551,7 +551,7 @@ function Toggle({ value, onChange, options, testId }) {
             type="button"
             onClick={() => onChange(option.key)}
             aria-pressed={active}
-            className={`inline-flex items-center gap-1.5 px-2.5 py-1.5 whitespace-nowrap text-[10px] font-bold uppercase tracking-widest transition ${active ? "bg-[#29B6E8]/15 text-[#29B6E8]" : "text-white/55 hover:text-white"}`}
+            className={`inline-flex items-center gap-1.5 px-2.5 py-1.5 whitespace-nowrap tls-type-label transition ${active ? "bg-[#29B6E8]/15 text-[#29B6E8]" : "text-white/55 hover:text-white"}`}
             data-testid={`${testId}-${option.key}`}
           >
             {Icon && <Icon className="w-3 h-3" />}
@@ -577,36 +577,36 @@ function WeekTile({ week, loading }) {
       transition={{ duration: 0.5, delay: 0.15 }}
     >
       <div className="absolute -top-10 -right-10 w-32 h-32 rounded-full blur-2xl opacity-30 pointer-events-none" style={{ backgroundColor: color }} aria-hidden="true" />
-      <div className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-[0.35em]" style={{ color }}>
+      <div className="flex items-center gap-2 tls-type-label" style={{ color }}>
         <Gem className="w-3.5 h-3.5" /> Erfolg der Woche
       </div>
       {award ? (
         <div className="mt-2 sm:mt-3 flex items-start gap-4">
           <Badge material={award.material} level={award.level} rank={award.rank} art={award.art} icon={award.icon} size="xl" animate title={award.name} testId="week-award-badge" />
           <div className="min-w-0 flex-1">
-            <div className="font-heading text-lg md:text-xl font-black uppercase leading-tight truncate" data-testid="week-award-name">{award.name}</div>
-            <div className="text-[10px] uppercase tracking-widest text-white/45 mt-0.5 truncate">{award.group_name} · <span style={{ color }}>{award.material_name}</span></div>
-            <div className="mt-2 text-xs text-white/60" data-testid="week-award-rarity">
+            <div className="tls-type-card leading-tight truncate" data-testid="week-award-name">{award.name}</div>
+            <div className="tls-type-small text-white/45 mt-0.5 truncate">{award.group_name} · <span style={{ color }}>{award.material_name}</span></div>
+            <div className="mt-2 tls-type-small text-white/60" data-testid="week-award-rarity">
               Nur <span className="text-white font-bold tabular-nums">{formatPercent(award.percent)}</span> haben das · {award.holders === 1 ? "eine Person" : `${award.holders} Personen`}
             </div>
-            <Link to={award.user?.username ? `/u/${encodeURIComponent(award.user.username)}` : "#"} className="mt-3 inline-flex items-center gap-2 text-sm hover:text-[#29B6E8]" data-testid="week-award-user">
+            <Link to={award.user?.username ? `/u/${encodeURIComponent(award.user.username)}` : "#"} className="mt-3 inline-flex items-center gap-2 tls-type-small hover:text-[#29B6E8]" data-testid="week-award-user">
               <Avatar entry={award.user || {}} size={7} />
               <span className="font-semibold truncate">{award.user?.display_name || "Spieler"}</span>
-              {award.earned_at && <span className="text-white/35 text-xs">{viennaDate(award.earned_at)}</span>}
+              {award.earned_at && <span className="text-white/35 tls-type-small">{viennaDate(award.earned_at)}</span>}
             </Link>
             {award.award_id && (
-              <Link to={`/achievements/a/${encodeURIComponent(award.award_id)}`} className="mt-2 ml-1 inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-widest hover:underline" style={{ color }} data-testid="week-award-card">
+              <Link to={`/achievements/a/${encodeURIComponent(award.award_id)}`} className="mt-2 ml-1 inline-flex items-center gap-1 tls-type-label hover:underline" style={{ color }} data-testid="week-award-card">
                 Karte ansehen
               </Link>
             )}
           </div>
         </div>
       ) : (
-        <div className="mt-3 text-sm text-white/55" data-testid="week-award-empty">
+        <div className="mt-3 tls-type-small text-white/55" data-testid="week-award-empty">
           {loading ? "Wird geladen …" : "Vergangene Woche gab es keine Freischaltung auf einem öffentlichen Profil – die nächste Kachel gehört dir."}
         </div>
       )}
-      {week?.week_key && <div className="mt-2 sm:mt-3 text-[9px] uppercase tracking-widest text-white/30">Kalenderwoche {String(week.week_key).split("-W")[1]} · montags 08:00 neu</div>}
+      {week?.week_key && <div className="mt-2 sm:mt-3 tls-type-small text-white/30">Kalenderwoche {String(week.week_key).split("-W")[1]} · montags 08:00 neu</div>}
     </motion.aside>
   );
 }
@@ -624,7 +624,7 @@ function UnlockTicker({ items }) {
       to={item.user?.username ? `/u/${encodeURIComponent(item.user.username)}` : "#"}
       tabIndex={duplicate ? -1 : undefined}
       aria-hidden={duplicate ? "true" : undefined}
-      className="inline-flex items-center gap-2 px-5 text-xs whitespace-nowrap hover:text-white"
+      className="inline-flex items-center gap-2 px-5 tls-type-small whitespace-nowrap hover:text-white"
     >
       <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ backgroundColor: item.material_color || "#29B6E8", boxShadow: `0 0 6px ${item.material_color || "#29B6E8"}` }} aria-hidden="true" />
       <span className="font-semibold text-white/85">{item.user?.display_name || "Spieler"}</span>
@@ -636,7 +636,7 @@ function UnlockTicker({ items }) {
   return (
     <section className="border-b border-white/5 bg-[#070707] overflow-hidden" data-testid="unlock-ticker" data-marquee={marquee ? "true" : "false"}>
       <div className="max-w-6xl mx-auto px-4 md:px-6 flex items-center">
-        <span className="shrink-0 text-[9px] uppercase tracking-[0.35em] font-bold text-white/35 py-2.5 pr-4 border-r border-white/10">Zuletzt freigeschaltet</span>
+        <span className="shrink-0 tls-type-label text-white/35 py-2.5 pr-4 border-r border-white/10">Zuletzt freigeschaltet</span>
         <div className="flex-1 overflow-hidden" style={marquee ? { maskImage: "linear-gradient(90deg, transparent, #000 6%, #000 94%, transparent)", WebkitMaskImage: "linear-gradient(90deg, transparent, #000 6%, #000 94%, transparent)" } : undefined}>
           <div className={`flex items-center py-2 ${marquee ? "tls-unlock-ticker__track" : "flex-wrap"}`} style={marquee ? { "--ticker-duration": `${duration}s` } : undefined}>
             {loop.map((item, index) => renderItem(item, index, marquee && index >= items.length))}
@@ -655,8 +655,8 @@ function StatCard({ icon: Icon, label, value, accent, testId }) {
       style={{ boxShadow: `inset 0 0 0 1px ${accent}12` }}
     >
       <Icon className="w-4 h-4 sm:w-5 sm:h-5 mb-1 sm:mb-2" style={{ color: accent }} />
-      <div className="font-display text-lg sm:text-2xl md:text-3xl font-black tabular-nums truncate">{value}</div>
-      <div className="text-[9px] sm:text-[10px] uppercase tracking-wider sm:tracking-widest text-white/45 mt-0.5 sm:mt-1 leading-tight">{label}</div>
+      <div className="tls-type-title tls-type-num truncate">{value}</div>
+      <div className="tls-type-label sm:tracking-widest text-white/45 mt-0.5 sm:mt-1 leading-tight">{label}</div>
     </div>
   );
 }
@@ -683,7 +683,7 @@ function PodiumCard({ entry, index, byLevel = false }) {
       transition={{ delay: index * 0.12, type: "spring", stiffness: 200, damping: 18 }}
     >
       <div
-        className="absolute left-1.5 top-1.5 w-6 h-6 text-xs sm:static sm:mx-auto sm:w-9 sm:h-9 sm:text-base rounded-full border-2 flex items-center justify-center font-display font-black sm:mb-3"
+        className="absolute left-1.5 top-1.5 w-6 h-6 tls-type-card tls-type-num sm:static sm:mx-auto sm:w-9 sm:h-9 rounded-full border-2 flex items-center justify-center sm:mb-3"
         style={{ borderColor: style.color, color: style.color }}
       >
         {entry.rank}
@@ -702,15 +702,15 @@ function PodiumCard({ entry, index, byLevel = false }) {
       </div>
       <Link
         to={entry.username ? `/u/${encodeURIComponent(entry.username)}` : "#"}
-        className="block font-heading font-bold uppercase truncate text-xs sm:text-base hover:text-[#29B6E8]"
+        className="block tls-type-card truncate hover:text-[#29B6E8]"
       >
         {entry.display_name}
         {Number(entry.prestige || 0) > 0 && <span className="ml-1 text-[#FFD700]" title={`Prestige ${entry.prestige}`}>{"★".repeat(Math.min(5, Number(entry.prestige)))}</span>}
       </Link>
-      <div className="mt-1 sm:mt-2 font-display text-lg sm:text-2xl font-black tabular-nums" style={{ color: style.color }}>
+      <div className="mt-1 sm:mt-2 tls-type-section tabular-nums" style={{ color: style.color }}>
         {byLevel ? `Level ${entry.level}` : entry.points}
       </div>
-      <div className="text-[10px] uppercase tracking-wider sm:tracking-widest text-white/55 truncate">{byLevel ? (entry.title || `${entry.xp || 0} XP`) : erfolge(entry.count)}</div>
+      <div className="tls-type-label sm:tracking-widest text-white/55 truncate">{byLevel ? (entry.title || `${entry.xp || 0} XP`) : erfolge(entry.count)}</div>
     </motion.div>
   );
 }

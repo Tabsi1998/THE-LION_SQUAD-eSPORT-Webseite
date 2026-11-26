@@ -131,8 +131,8 @@ export default function CalendarPage() {
   return (
     <PublicLayout>
       <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-        <span className="text-[11px] font-bold uppercase tracking-[0.3em] text-[#9F7AEA]">TERMINE</span>
-        <h1 className="mt-2 font-heading text-4xl md:text-6xl font-black uppercase break-words">{mineScope ? "Mein Kalender" : "Kalender"}</h1>
+        <span className="tls-type-label text-[#9F7AEA]">TERMINE</span>
+        <h1 className="mt-2 tls-type-title break-words">{mineScope ? "Mein Kalender" : "Kalender"}</h1>
         <p className="mt-3 text-white/60 max-w-2xl">
           {mineScope
             ? "Nur deine Termine: Anmeldungen (auch mit deinem Team), Fast Laps, zugesagte Versammlungen und deine Schichten – mit deinem Stand je Termin."
@@ -146,7 +146,7 @@ export default function CalendarPage() {
               to={to}
               aria-current={scope === key ? "page" : undefined}
               data-testid={`calendar-scope-${key}`}
-              className={`-mb-px px-3 py-2 text-xs font-bold uppercase tracking-wider border-b-2 transition-colors ${scope === key ? "border-[#29B6E8] text-[#29B6E8]" : "border-transparent text-white/55 hover:text-white"}`}
+              className={`-mb-px px-3 py-2 tls-type-label border-b-2 transition-colors ${scope === key ? "border-[#29B6E8] text-[#29B6E8]" : "border-transparent text-white/55 hover:text-white"}`}
             >
               {label}
             </Link>
@@ -157,13 +157,13 @@ export default function CalendarPage() {
           <div className="mt-5 flex flex-wrap items-center gap-x-4 gap-y-3">
             <div role="group" aria-label="Ansicht" className="inline-flex gap-1" data-testid="calendar-view">
               {[["list", mineScope ? "Als Nächstes" : "Liste"], ["month", "Monat"]].map(([key, label]) => (
-                <button key={key} type="button" onClick={() => chooseView(key)} aria-pressed={view === key} data-testid={`calendar-view-${key}`} className={`tls-btn ${view === key ? "tls-btn--secondary" : "tls-btn--quiet"} px-3 py-1.5 rounded-sm text-xs font-bold uppercase tracking-wider`}>
+                <button key={key} type="button" onClick={() => chooseView(key)} aria-pressed={view === key} data-testid={`calendar-view-${key}`} className={`tls-type-label tls-btn ${view === key ? "tls-btn--secondary" : "tls-btn--quiet"} px-3 py-1.5 rounded-sm`}>
                   {label}
                 </button>
               ))}
             </div>
             {shownKinds.length > 1 && (
-              <div className="flex flex-wrap items-center gap-x-3 gap-y-2 text-xs text-white/55">
+              <div className="flex flex-wrap items-center gap-x-3 gap-y-2 tls-type-small text-white/55">
                 {shownKinds.map((kind) => (
                   <button key={kind} type="button" onClick={() => toggleKind(kind)} aria-pressed={kinds.includes(kind)} data-testid={`calendar-kind-${kind}`} className={`inline-flex items-center gap-1.5 px-2 py-1 rounded-sm border transition ${kinds.includes(kind) ? "border-white/15 text-white" : "border-transparent text-white/35 line-through"}`}>
                     <span className="w-2 h-2 rounded-full" style={{ backgroundColor: KIND_COLORS[kind] }} /> {KIND_LABELS[kind]}
@@ -178,19 +178,19 @@ export default function CalendarPage() {
         {loading ? (
           <PublicLoadingState cards={3} className="mt-8" />
         ) : payload?.needs_login ? (
-          <div className="mt-6 max-w-xl border border-white/10 bg-[#121212] rounded-sm p-5 text-sm text-white/65" data-testid="calendar-mine-login">
+          <div className="mt-6 max-w-xl border border-white/10 bg-[#121212] rounded-sm p-5 tls-type-small text-white/65" data-testid="calendar-mine-login">
             <LogIn className="w-4 h-4 text-brand" />
             <p className="mt-2">Melde dich an, dann siehst du hier deine Termine – und kannst sie automatisch in deinen Kalender holen.</p>
-            <Link to={`/login?next=${encodeURIComponent(MY_CALENDAR_PATH)}`} className="mt-3 inline-flex text-[#9F7AEA] font-bold uppercase tracking-wider text-xs">Anmelden</Link>
+            <Link to={`/login?next=${encodeURIComponent(MY_CALENDAR_PATH)}`} className="mt-3 inline-flex text-[#9F7AEA] tls-type-label">Anmelden</Link>
           </div>
         ) : (
           <div className="mt-6 grid lg:grid-cols-3 gap-6 min-w-0">
             <div className="lg:col-span-2 min-w-0">
               {mineEmpty ? (
                 <div className="border border-white/10 bg-[#121212] rounded-sm p-5 sm:p-6" data-testid="calendar-mine-empty">
-                  <h2 className="font-heading text-xl font-black uppercase">Noch keine Termine</h2>
-                  <p className="mt-2 text-sm text-white/60">Sobald du dich zu einem Turnier, Event oder einer Fast Lap anmeldest, steht der Termin hier – mit deinem Stand.</p>
-                  <div className="mt-4 flex flex-wrap gap-2 text-xs">
+                  <h2 className="tls-type-section">Noch keine Termine</h2>
+                  <p className="mt-2 tls-type-body text-white/60">Sobald du dich zu einem Turnier, Event oder einer Fast Lap anmeldest, steht der Termin hier – mit deinem Stand.</p>
+                  <div className="mt-4 flex flex-wrap gap-2 tls-type-small">
                     <Link to="/tournaments" className="tls-btn tls-btn--primary px-3 py-2 rounded-sm font-bold uppercase tracking-wider">Turniere ansehen</Link>
                     <Link to="/events" className="tls-btn tls-btn--quiet px-3 py-2 rounded-sm font-bold uppercase tracking-wider">Events ansehen</Link>
                   </div>
@@ -200,7 +200,7 @@ export default function CalendarPage() {
                   <div className="border border-white/10 bg-[#121212] rounded-sm p-4 sm:p-5" data-testid="calendar-list">
                     {buckets.length ? buckets.map((bucket, bucketIndex) => (
                       <div key={bucket.key} className="mt-5 first:mt-0" data-testid={`calendar-bucket-${bucket.key}`}>
-                        <h2 className="font-heading text-lg font-black uppercase">{bucket.label}</h2>
+                        <h2 className="tls-type-section">{bucket.label}</h2>
                         <ul className="mt-3 space-y-2">
                           {bucket.items.map((item, index) => (
                             <li key={`${item.kind}-${item.id}`} className="tls-cal-enter" style={{ "--tls-i": bucketIndex * 3 + index }}><ItemRow item={item} withDate /></li>
@@ -208,18 +208,18 @@ export default function CalendarPage() {
                         </ul>
                       </div>
                     )) : (
-                      <p className="text-sm text-white/50">{payload?.failed ? failedText : "Gerade steht für dich nichts an. Was vorbei ist, findest du im Monat."}</p>
+                      <p className="tls-type-body text-white/50">{payload?.failed ? failedText : "Gerade steht für dich nichts an. Was vorbei ist, findest du im Monat."}</p>
                     )}
                   </div>
                 ) : (
                   <div className="border border-white/10 bg-[#121212] rounded-sm p-4 sm:p-5" data-testid="calendar-list">
                     {groups.length ? groups.map((group) => (
                       <div key={group.key} className="mt-5 first:mt-0" data-testid={`calendar-list-month-${group.key}`}>
-                        <h2 className="font-heading text-lg font-black uppercase">{group.label}</h2>
+                        <h2 className="tls-type-section">{group.label}</h2>
                         <ul className="mt-3 space-y-2">{group.items.map((item) => <li key={`${item.kind}-${item.id}`}><ItemRow item={item} withDate /></li>)}</ul>
                       </div>
                     )) : (
-                      <p className="text-sm text-white/50">{payload?.failed ? failedText : "Aktuell steht nichts an."}</p>
+                      <p className="tls-type-body text-white/50">{payload?.failed ? failedText : "Aktuell steht nichts an."}</p>
                     )}
                   </div>
                 )
@@ -231,21 +231,21 @@ export default function CalendarPage() {
             <aside className="space-y-5 min-w-0">
               {view === "month" && !mineEmpty ? (
                 <div className="border border-white/10 bg-[#121212] rounded-sm p-5" data-testid="calendar-upcoming">
-                  <div className="text-[11px] uppercase tracking-widest font-bold text-[#9F7AEA]">Als Nächstes</div>
+                  <div className="tls-type-label text-[#9F7AEA]">Als Nächstes</div>
                   {next.length ? (
                     <ul className="mt-3 space-y-2">{next.map((item) => <li key={`${item.kind}-${item.id}`}><ItemRow item={item} withDate /></li>)}</ul>
                   ) : (
-                    <p className="mt-2 text-sm text-white/50">{payload?.failed ? failedText : "Aktuell steht nichts an."}</p>
+                    <p className="mt-2 tls-type-body text-white/50">{payload?.failed ? failedText : "Aktuell steht nichts an."}</p>
                   )}
                 </div>
               ) : null}
 
               {!mineScope && (
                 <div className="border border-[#9F7AEA]/40 bg-[#9F7AEA]/5 rounded-sm p-5" data-testid="calendar-subscribe">
-                  <div className="inline-flex items-center gap-2 text-[11px] uppercase tracking-widest font-bold text-[#9F7AEA]"><CalendarDays className="w-3.5 h-3.5" /> Kalender abonnieren</div>
-                  <p className="mt-2 text-sm text-white/65">Alle öffentlichen Termine in deinem Kalender – Änderungen kommen von selbst nach. Ohne Personendaten, die Adresse darfst du weitergeben.</p>
+                  <div className="inline-flex items-center gap-2 tls-type-label text-[#9F7AEA]"><CalendarDays className="w-3.5 h-3.5" /> Kalender abonnieren</div>
+                  <p className="mt-2 tls-type-body text-white/65">Alle öffentlichen Termine in deinem Kalender – Änderungen kommen von selbst nach. Ohne Personendaten, die Adresse darfst du weitergeben.</p>
                   <FeedAddress url={feed.https} />
-                  <div className="mt-3 flex flex-wrap gap-2 text-xs">
+                  <div className="mt-3 flex flex-wrap gap-2 tls-type-small">
                     <a href={feed.webcal} data-testid="calendar-webcal" className="tls-btn tls-btn--primary inline-flex items-center gap-1.5 px-3 py-2 font-bold uppercase tracking-wider rounded-sm">
                       <ExternalLink className="w-3.5 h-3.5" /> Im Kalender öffnen
                     </a>
@@ -257,10 +257,10 @@ export default function CalendarPage() {
               {signedIn && <PersonalFeedCard origin={currentOrigin()} />}
 
               {!signedIn && !mineScope && (
-                <div className="border border-white/10 rounded-sm p-5 text-sm text-white/65" data-testid="calendar-login-hint">
+                <div className="border border-white/10 rounded-sm p-5 tls-type-small text-white/65" data-testid="calendar-login-hint">
                   <LogIn className="w-4 h-4 text-brand" />
                   <p className="mt-2">Nach dem Anmelden siehst du auch Vereinstermine und unter „Mein Kalender“ deine eigenen Termine.</p>
-                  <Link to="/login?next=%2Fcalendar" className="mt-3 inline-flex text-[#9F7AEA] font-bold uppercase tracking-wider text-xs">Anmelden</Link>
+                  <Link to="/login?next=%2Fcalendar" className="mt-3 inline-flex text-[#9F7AEA] tls-type-label">Anmelden</Link>
                 </div>
               )}
             </aside>
@@ -283,12 +283,12 @@ function MonthView({ items, month, setMonth, selectedDay, selectDay, goToday, to
     <>
       <div className="border border-white/10 bg-[#121212] rounded-sm p-4 sm:p-5" data-testid="calendar-grid">
         <div className="flex items-center justify-between gap-3">
-          <h2 className="font-heading text-xl sm:text-2xl font-black uppercase min-w-0" data-testid="calendar-title">{monthLabel(month.year, month.month)}</h2>
+          <h2 className="tls-type-section min-w-0" data-testid="calendar-title">{monthLabel(month.year, month.month)}</h2>
           <div className="flex items-center gap-2 shrink-0">
             <button type="button" onClick={() => setMonth(shiftMonth(month.year, month.month, -1))} aria-label="Vormonat" data-testid="calendar-prev" className="w-10 h-10 inline-flex items-center justify-center border border-white/10 rounded-sm hover:border-[#9F7AEA]/60 transition">
               <ChevronLeft className="w-4 h-4" />
             </button>
-            <button type="button" onClick={goToday} data-testid="calendar-today" className="tls-btn tls-btn--quiet h-10 px-3 rounded-sm text-xs font-bold uppercase tracking-wider">
+            <button type="button" onClick={goToday} data-testid="calendar-today" className="tls-btn tls-btn--quiet h-10 px-3 rounded-sm tls-type-label">
               Heute
             </button>
             <button type="button" onClick={() => setMonth(shiftMonth(month.year, month.month, 1))} aria-label="Folgemonat" data-testid="calendar-next" className="w-10 h-10 inline-flex items-center justify-center border border-white/10 rounded-sm hover:border-[#9F7AEA]/60 transition">
@@ -296,7 +296,7 @@ function MonthView({ items, month, setMonth, selectedDay, selectDay, goToday, to
             </button>
           </div>
         </div>
-        <div className="mt-4 grid grid-cols-7 gap-1 text-center text-[10px] uppercase tracking-widest text-white/40 font-bold">
+        <div className="mt-4 grid grid-cols-7 gap-1 text-center tls-type-label text-white/40">
           {WEEKDAY_LABELS.map((label) => <div key={label}>{label}</div>)}
         </div>
         <div className="mt-1 space-y-1">
@@ -318,7 +318,7 @@ function MonthView({ items, month, setMonth, selectedDay, selectDay, goToday, to
                     style={{ gridRow: 1 }}
                     className={`min-h-12 sm:min-h-16 rounded-sm border-[1.5px] px-1 pt-1.5 pb-1 flex flex-col items-center gap-1 transition ${selected ? "border-[#9F7AEA] bg-[#9F7AEA]/15" : "border-transparent hover:border-white/20"} ${mine ? "tls-you tls-you--inset" : ""} ${cell.inMonth ? "" : "opacity-40"}`}
                   >
-                    <span className={`text-xs sm:text-sm font-bold ${cell.key === todayKey ? "text-[#9F7AEA] underline underline-offset-4" : ""}`}>{cell.day}</span>
+                    <span className={`tls-type-small font-bold ${cell.key === todayKey ? "text-[#9F7AEA] underline underline-offset-4" : ""}`}>{cell.day}</span>
                     <span className="flex gap-0.5 min-h-1.5">
                       {cellKinds.slice(0, 3).map((kind) => <span key={kind} className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: KIND_COLORS[kind] }} data-testid={`calendar-dot-${cell.key}-${kind}`} />)}
                     </span>
@@ -330,7 +330,7 @@ function MonthView({ items, month, setMonth, selectedDay, selectDay, goToday, to
           ))}
         </div>
         {nextHint ? (
-          <button type="button" onClick={() => selectDay(viennaDay(nextHint.start), false)} data-testid="calendar-next-hint" className="tls-btn tls-btn--secondary mt-4 w-full px-3 py-2 rounded-sm text-xs font-bold text-left">
+          <button type="button" onClick={() => selectDay(viennaDay(nextHint.start), false)} data-testid="calendar-next-hint" className="tls-btn tls-btn--secondary mt-4 w-full px-3 py-2 rounded-sm tls-type-small font-bold text-left">
             Nächster Termin: {startPhrase(nextHint)} – {nextHint.title}
           </button>
         ) : null}
@@ -339,15 +339,15 @@ function MonthView({ items, month, setMonth, selectedDay, selectDay, goToday, to
       <div className="mt-5 border border-white/10 bg-[#121212] rounded-sm p-4 sm:p-5" data-testid="calendar-day-items">
         {selectedDay ? (
           <>
-            <h3 className="font-heading text-lg font-black uppercase">{dayLabel(selectedDay)}</h3>
+            <h3 className="tls-type-card">{dayLabel(selectedDay)}</h3>
             {dayItems.length ? (
               <ul className="mt-3 space-y-2">{dayItems.map((item) => <li key={`${item.kind}-${item.id}`}><ItemRow item={item} /></li>)}</ul>
             ) : (
-              <p className="mt-2 text-sm text-white/50" data-testid="calendar-day-empty">An diesem Tag ist nichts geplant.</p>
+              <p className="mt-2 tls-type-small text-white/50" data-testid="calendar-day-empty">An diesem Tag ist nichts geplant.</p>
             )}
           </>
         ) : (
-          <p className="text-sm text-white/50">Tag antippen, um die Termine zu sehen. Punkte zeigen, was an einem Tag ist; Balken, was mehrere Tage dauert.</p>
+          <p className="tls-type-body text-white/50">Tag antippen, um die Termine zu sehen. Punkte zeigen, was an einem Tag ist; Balken, was mehrere Tage dauert.</p>
         )}
       </div>
     </>
@@ -370,7 +370,7 @@ function SpanBar({ bar }) {
         // Angemeldet (#1305: Cyan heißt „du“) - auf der farbigen Fläche als weißer Rand, Cyan verschwände auf Turnieren.
         boxShadow: item.mine ? "inset 0 0 0 1.5px #FFFFFF" : undefined,
       }}
-      className={`block h-5 min-w-0 truncate px-1.5 text-[10px] leading-5 font-bold text-[#0A0A0A] hover:brightness-110 transition ${continuesBefore ? "rounded-l-none" : "rounded-l-sm"} ${continuesAfter ? "rounded-r-none" : "rounded-r-sm"}`}
+      className={`block h-5 min-w-0 truncate px-1.5 tls-type-small leading-5 font-bold text-[#0A0A0A] hover:brightness-110 transition ${continuesBefore ? "rounded-l-none" : "rounded-l-sm"} ${continuesAfter ? "rounded-r-none" : "rounded-r-sm"}`}
     >
       {continuesBefore ? "… " : ""}{item.title}
     </Link>
@@ -396,17 +396,17 @@ function ItemRow({ item, withDate = false }) {
       {you ? <span aria-hidden="true" className="tls-you pointer-events-none absolute inset-0 rounded-sm" data-testid={`calendar-you-frame-${item.kind}-${item.id}`} /> : null}
       <span className="mt-1.5 w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: KIND_COLORS[item.kind] }} />
       <span className="min-w-0 flex-1">
-        <span className="block text-[10px] uppercase tracking-widest text-white/40 font-bold">
+        <span className="block tls-type-label text-white/40">
           {kindLabel(item)}{when ? ` · ${when}` : ""}{item.location ? ` · ${item.location}` : ""}
         </span>
-        <span className="tls-wrap block text-sm font-bold">{item.title}</span>
+        <span className="tls-wrap block tls-type-small font-bold">{item.title}</span>
         {badge ? (
-          <span className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-white/50">
+          <span className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 tls-type-small text-white/50">
             <span className="tls-own-badge" data-tone={badge.tone} data-testid={`calendar-badge-${item.kind}-${item.id}`}>{badge.label}</span>
             {item.phase?.label && item.kind !== "club" ? <span>{item.phase.label}</span> : null}
           </span>
         ) : (item.phase?.label || item.mine) && (
-          <span className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-white/50">
+          <span className="flex flex-wrap items-center gap-x-2 gap-y-1 tls-type-small text-white/50">
             {you ? <span className="tls-you-tag" data-testid={`calendar-you-${item.kind}-${item.id}`}>Du</span> : null}
             <span>{item.phase?.label}{item.phase?.label && item.mine ? " · " : ""}{item.mine ? <span className="text-brand">Angemeldet</span> : null}</span>
           </span>

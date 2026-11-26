@@ -12,6 +12,7 @@ import {
 } from "@/hilfe";
 import { ankerAus } from "@/hilfe/pfade";
 import { useFaqZugang } from "@/hilfe/useFaqZugang";
+import { ShortCaps } from "@/components/tls/ShortCaps";
 
 // FAQ (#2448, Fabian 16.11.): oben die Suche über Fragen und Schritte (?q=), darunter „Häufige Fragen“ zum Aufklappen,
 // dann die kompakte Liste aller Bereiche mit Rollen-Filter (?rolle=). Mitglieder- und Leitungs-Fragen kommen erst nach
@@ -47,20 +48,20 @@ function FrageEintrag({ frage, offen, onToggle, anker = true, bereich = "", eben
     <li id={anker ? `frage-${frage.id}` : undefined} className="scroll-mt-24 border-b border-white/10 last:border-b-0" data-testid={`faq-frage-${frage.id}${suffix}`}>
       <Kopf className="m-0">
         <button type="button" aria-expanded={offen} aria-controls={panelId} onClick={onToggle} data-testid={`faq-frage-knopf-${frage.id}${suffix}`}
-          className="group flex w-full min-h-[52px] items-center justify-between gap-3 py-3 text-left text-base font-semibold text-white hover:text-[#29B6E8] focus-visible:text-[#29B6E8]">
+          className="group flex w-full min-h-[52px] items-center justify-between gap-3 py-3 text-left tls-type-body font-semibold text-white hover:text-[#29B6E8] focus-visible:text-[#29B6E8]">
           <span className="min-w-0 [overflow-wrap:anywhere]">{frage.frage}</span>
           <ChevronDown aria-hidden="true" className={`h-5 w-5 shrink-0 text-white/45 transition-transform duration-200 motion-reduce:transition-none group-hover:text-[#29B6E8] ${offen ? "rotate-180" : ""}`} />
         </button>
       </Kopf>
       <div id={panelId} hidden={!offen} style={zuStil(offen)} className="tls-reveal pb-4 pr-8" data-testid={panelId}>
-        <p className="text-base leading-relaxed text-white/80">{frage.antwort}</p>
+        <p className="tls-type-body leading-relaxed text-white/80">{frage.antwort}</p>
         <div className="mt-1 flex flex-wrap items-center gap-x-4">
           {frage.link ? (
-            <Link to={frage.link.to} className="inline-flex min-h-[44px] items-center gap-1 text-sm font-semibold text-[#29B6E8] hover:underline">
+            <Link to={frage.link.to} className="inline-flex min-h-[44px] items-center gap-1 tls-type-small font-semibold text-[#29B6E8] hover:underline">
               {frage.link.label} <ArrowRight className="h-4 w-4" aria-hidden="true" />
             </Link>
           ) : null}
-          {bereich ? <span className="text-xs uppercase tracking-widest text-white/40">{bereich}</span> : null}
+          {bereich ? <span className="tls-type-label text-white/40">{bereich}</span> : null}
         </div>
       </div>
     </li>
@@ -77,12 +78,12 @@ function Treffer({ treffer }) {
         <span className="min-w-0 flex-1">
           <span className="flex flex-wrap items-center gap-x-2 gap-y-1">
             {bereich ? (
-              <span className="rounded-sm border border-[#29B6E8]/30 bg-[#29B6E8]/[0.08] px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-widest text-[#29B6E8]" data-testid="faq-treffer-bereich">{bereich}</span>
+              <span className="rounded-sm border border-[#29B6E8]/30 bg-[#29B6E8]/[0.08] px-1.5 py-0.5 tls-type-label text-[#29B6E8]" data-testid="faq-treffer-bereich">{bereich}</span>
             ) : null}
-            <span className="text-[11px] uppercase tracking-widest text-white/45">{art}</span>
+            <span className="tls-type-label text-white/45">{art}</span>
           </span>
           <span className="mt-1 block font-semibold text-white [overflow-wrap:anywhere]">{treffer.titel}</span>
-          <span className="block text-sm text-white/55 line-clamp-2">{treffer.text}</span>
+          <span className="block tls-type-small text-white/55 line-clamp-2">{treffer.text}</span>
         </span>
         <ArrowRight className="mt-1 h-4 w-4 shrink-0 text-[#29B6E8]" aria-hidden="true" />
       </Link>
@@ -99,8 +100,8 @@ function BereichZeile({ bereich, inhalt, offen, onToggle, offeneFragen, onFrage 
         <Icon className="h-5 w-5" />
       </span>
       <span className="min-w-0 flex-1">
-        <span className={`block font-heading text-base font-bold uppercase leading-tight [overflow-wrap:break-word] sm:text-lg ${inhalt.leer ? "text-white/55" : "text-white"}`}>{bereich.titel}</span>
-        <span className="block text-sm text-white/55">{bereich.kurz}</span>
+        <span className={`block tls-type-card leading-tight [overflow-wrap:break-word] ${inhalt.leer ? "text-white/55" : "text-white"}`}>{bereich.titel}</span>
+        <span className="block tls-type-small text-white/55">{bereich.kurz}</span>
       </span>
     </>
   );
@@ -109,7 +110,7 @@ function BereichZeile({ bereich, inhalt, offen, onToggle, offeneFragen, onFrage 
       <li id={`bereich-${bereich.id}`} className="scroll-mt-24" data-testid={`faq-bereich-${bereich.id}`} data-leer="true">
         <div className="flex min-h-[64px] items-center gap-3 px-3 py-3">
           {kopf}
-          <span className="shrink-0 rounded-sm border border-white/15 px-2 py-1 text-[10px] font-bold uppercase tracking-widest text-white/45" data-testid={`faq-bereich-bald-${bereich.id}`}>Kommt bald</span>
+          <span className="shrink-0 rounded-sm border border-white/15 px-2 py-1 tls-type-label text-white/45" data-testid={`faq-bereich-bald-${bereich.id}`}>Kommt bald</span>
         </div>
       </li>
     );
@@ -124,12 +125,12 @@ function BereichZeile({ bereich, inhalt, offen, onToggle, offeneFragen, onFrage 
         <button type="button" aria-expanded={offen} aria-controls={panelId} onClick={onToggle} data-testid={`faq-bereich-knopf-${bereich.id}`}
           className="group flex w-full min-h-[64px] items-center gap-3 px-3 py-3 text-left transition-colors hover:bg-white/[0.03]">
           {kopf}
-          <span className="hidden shrink-0 text-xs text-white/45 sm:block">{zaehler}</span>
+          <span className="hidden shrink-0 tls-type-small text-white/45 sm:block">{zaehler}</span>
           <ChevronDown aria-hidden="true" className={`h-5 w-5 shrink-0 text-white/45 transition-transform duration-200 motion-reduce:transition-none group-hover:text-[#29B6E8] ${offen ? "rotate-180" : ""}`} />
         </button>
       </h3>
       <div id={panelId} hidden={!offen} style={zuStil(offen)} className="tls-reveal px-3 pb-4 sm:pl-16" data-testid={`faq-bereich-inhalt-${bereich.id}`}>
-        <p className="text-xs text-white/45 sm:hidden">{zaehler}</p>
+        <p className="tls-type-small text-white/45 sm:hidden">{zaehler}</p>
         {inhalt.anleitungen.length ? (
           <ul className="mt-2 space-y-1">
             {inhalt.anleitungen.map(({ thema, abschnitt }) => {
@@ -140,10 +141,10 @@ function BereichZeile({ bereich, inhalt, offen, onToggle, offeneFragen, onFrage 
                   <Link to={to} data-testid={`faq-anleitung-${bereich.id}-${thema.slug}${abschnitt ? `-${abschnitt.id}` : ""}`}
                     className="flex min-h-[48px] items-center gap-3 rounded-sm border border-white/10 bg-[#0F0F10] px-3 py-2 hover:border-[#29B6E8]/50">
                     <span className="min-w-0 flex-1">
-                      <span className="block text-[10px] font-bold uppercase tracking-widest text-[#29B6E8]">Anleitung · {thema.zielgruppe}</span>
+                      <span className="block tls-type-label text-[#29B6E8]">Anleitung · {thema.zielgruppe}</span>
                       <span className="block font-semibold text-white [overflow-wrap:anywhere]">{abschnitt ? `${thema.titel}: ${abschnitt.titel}` : thema.titel}</span>
                     </span>
-                    <span className="shrink-0 text-xs text-white/50">{mehrzahl(schritte, "Schritt", "Schritte")}</span>
+                    <span className="shrink-0 tls-type-small text-white/50">{mehrzahl(schritte, "Schritt", "Schritte")}</span>
                     <ArrowRight className="h-4 w-4 shrink-0 text-[#29B6E8]" aria-hidden="true" />
                   </Link>
                 </li>
@@ -224,12 +225,12 @@ export default function FaqPage() {
     <PublicLayout>
       <article className="mx-auto max-w-4xl px-4 py-10 sm:px-6 md:py-12 lg:px-8" data-testid="faq-page">
         <Breadcrumbs items={[{ label: "Start", to: "/" }, { label: "FAQ" }]} />
-        <p className="mt-4 text-[11px] font-bold uppercase tracking-[0.3em] text-[#29B6E8]">FAQ</p>
-        <h1 className="mt-2 font-heading text-4xl font-black uppercase md:text-5xl">So geht&apos;s</h1>
+        <p className="mt-4 tls-type-label text-[#29B6E8]">FAQ</p>
+        <h1 className="mt-2 tls-type-title"><ShortCaps>So geht&apos;s</ShortCaps></h1>
         <p className="mt-3 max-w-2xl text-white/70">Kurze Antworten und Anleitungen mit Bildern. Jeder Schritt hat einen eigenen Link, den du weiterschicken kannst.</p>
 
         <div className="relative mt-8" role="search">
-          <label htmlFor="faq-search" className="mb-2 block text-xs font-bold uppercase tracking-widest text-white/55">FAQ durchsuchen</label>
+          <label htmlFor="faq-search" className="mb-2 block tls-type-label text-white/55">FAQ durchsuchen</label>
           <div className="relative">
             <Search className="pointer-events-none absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-white/45" aria-hidden="true" />
             <input id="faq-search" type="search" value={query} onChange={(event) => setParam("q", event.target.value)} data-testid="faq-search"
@@ -250,7 +251,7 @@ export default function FaqPage() {
         </p>
         {searching ? (
           <section className="mt-6" data-testid="faq-results">
-            <h2 className="text-xs font-bold uppercase tracking-widest text-white/50">
+            <h2 className="tls-type-label text-white/50">
               {results.length ? mehrzahl(results.length, "Treffer", "Treffer") : "Nichts gefunden"}
             </h2>
             {results.length ? (
@@ -263,7 +264,7 @@ export default function FaqPage() {
           </section>
         ) : (
           <section className="mt-10" aria-labelledby="faq-haeufig-titel" data-testid="faq-haeufig">
-            <h2 id="faq-haeufig-titel" className="font-heading text-2xl font-black uppercase text-white md:text-3xl">Häufige Fragen</h2>
+            <h2 id="faq-haeufig-titel" className="tls-type-section text-white">Häufige Fragen</h2>
             <ul className="mt-3 border-t border-white/10">
               {haeufig.map((frage) => (
                 <FrageEintrag key={frage.id} frage={frage} offen={offeneFragen.has(frage.id)} bereich={faqBereich(frage.bereich)?.titel}
@@ -274,14 +275,14 @@ export default function FaqPage() {
         )}
 
         <section className="mt-12" aria-labelledby="faq-bereiche-titel" data-testid="faq-bereiche">
-          <h2 id="faq-bereiche-titel" className="font-heading text-2xl font-black uppercase text-white md:text-3xl">Alle Bereiche</h2>
+          <h2 id="faq-bereiche-titel" className="tls-type-section text-white">Alle Bereiche</h2>
           <div className="mt-3 flex flex-wrap items-center gap-2" role="group" aria-label="Für wen?" data-testid="faq-rollen">
-            <span className="mr-1 text-xs font-bold uppercase tracking-widest text-white/50" aria-hidden="true">Für</span>
+            <span className="mr-1 tls-type-label text-white/50" aria-hidden="true">Für</span>
             {[{ id: "", label: "Alle" }, ...rollen].map((row) => {
               const aktiv = rolle === row.id;
               return (
                 <button key={row.id || "alle"} type="button" aria-pressed={aktiv} onClick={() => setParam("rolle", row.id)} data-testid={`faq-rolle-${row.id || "alle"}`}
-                  className={`min-h-[44px] rounded-full border px-3 text-xs sm:px-4 font-bold uppercase tracking-wider transition-colors motion-reduce:transition-none ${
+                  className={`min-h-[44px] rounded-full border px-3 tls-type-label sm:px-4 transition-colors motion-reduce:transition-none ${
                     aktiv ? "border-[#29B6E8] bg-[#29B6E8] text-black" : "border-white/15 text-white/70 hover:border-white/35 hover:text-white"}`}>
                   {row.label}
                 </button>
@@ -298,7 +299,7 @@ export default function FaqPage() {
           {!bereiche.length ? <p className="mt-3 text-white/60" data-testid="faq-bereiche-leer">Für diese Auswahl gibt es noch nichts.</p> : null}
         </section>
 
-        <p className="mt-10 text-sm text-white/55">
+        <p className="mt-10 tls-type-small text-white/55">
           Nicht gefunden, was du suchst? <Link to="/contact" className="text-[#29B6E8] underline underline-offset-2">Schreib uns</Link>.
         </p>
       </article>

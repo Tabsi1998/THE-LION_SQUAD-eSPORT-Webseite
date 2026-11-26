@@ -60,8 +60,8 @@ export default function CommunityPage() {
   return (
     <PublicLayout>
       <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-        <span className="text-[11px] font-bold uppercase tracking-[0.3em] text-[#29B6E8]">Community</span>
-        <h1 className="mt-2 font-heading text-4xl md:text-6xl font-black uppercase">Konten, Teams & Verein</h1>
+        <span className="tls-type-label text-[#29B6E8]">Community</span>
+        <h1 className="mt-2 tls-type-hero">Konten, Teams & Verein</h1>
         <p className="mt-4 text-white/60 max-w-3xl" data-testid="community-explainer">
           <span className="text-white">Community-Konten</span> hat jeder mit Website-Konto und öffentlichem Profil. <span className="text-white">Vereinsmitglieder</span> sind die eingetragenen Mitglieder laut Mitgliederverwaltung – im Verzeichnis stehen die, die das wollen.
         </p>
@@ -70,8 +70,8 @@ export default function CommunityPage() {
           {stats.map((s) => (
             <div key={s.label} className="border border-white/10 bg-[#121212] rounded-sm p-4">
               <s.icon className="w-5 h-5 text-[#29B6E8]" />
-              <div className="mt-3 text-3xl font-heading font-black">{loading ? "-" : s.value}</div>
-              <div className="text-xs uppercase tracking-widest text-white/45 font-bold">{s.label}</div>
+              <div className="mt-3 tls-type-section">{loading ? "-" : s.value}</div>
+              <div className="tls-type-label text-white/45">{s.label}</div>
             </div>
           ))}
         </div>
@@ -153,10 +153,10 @@ function CommunityPaths() {
     <section className="mt-10 rounded-sm border border-white/10 bg-[#0D0D0D] p-4 md:p-5">
       <div className="flex flex-col gap-2 md:flex-row md:items-end md:justify-between">
         <div>
-          <div className="text-[11px] font-bold uppercase tracking-[0.3em] text-[#29B6E8]">Community-Welt</div>
-          <h2 className="mt-2 font-heading text-2xl font-black uppercase">Alles verbunden</h2>
+          <div className="tls-type-label text-[#29B6E8]">Community-Welt</div>
+          <h2 className="mt-2 tls-type-section">Alles verbunden</h2>
         </div>
-        <p className="max-w-xl text-sm text-white/55">
+        <p className="max-w-xl tls-type-body text-white/55">
           Profile, Teams, Server, Referenzen und Erfolge greifen ineinander, damit Besucher schneller verstehen, was in der TLS-Community passiert.
         </p>
       </div>
@@ -167,8 +167,8 @@ function CommunityPaths() {
               <Icon className="h-4 w-4" style={{ color }} />
             </span>
             <span className="min-w-0 flex-1">
-              <span className="tls-card__title block font-heading font-bold uppercase leading-tight">{label}</span>
-              <span className="mt-1 block text-xs text-white/45 line-clamp-2">{text}</span>
+              <span className="tls-card__title block tls-type-card leading-tight">{label}</span>
+              <span className="mt-1 block tls-type-small text-white/45 line-clamp-2">{text}</span>
             </span>
             <ArrowRight className="tls-card__arrow h-4 w-4 shrink-0 text-white/25" />
           </Link>
@@ -184,8 +184,8 @@ function CommunityBlock({ title, text, to, cta, items, accent = "cyan", icon: Ic
     <section className="tls-reveal-item border border-white/10 bg-[#121212] rounded-sm p-5">
       <div className="flex items-start justify-between gap-4">
         <div>
-          <h2 className="font-heading text-xl font-black uppercase">{title}</h2>
-          <p className="mt-2 text-sm text-white/55">{text}</p>
+          <h2 className="tls-type-section">{title}</h2>
+          <p className="mt-2 tls-type-body text-white/55">{text}</p>
         </div>
         <Icon className="w-5 h-5 shrink-0" style={{ color }} />
       </div>
@@ -196,15 +196,15 @@ function CommunityBlock({ title, text, to, cta, items, accent = "cyan", icon: Ic
               {item.image ? <img src={resolveMediaUrl(item.image)} alt="" className="w-full h-full object-cover" /> : <Users className="w-5 h-5 text-white/25" />}
             </div>
             <div className="min-w-0">
-              <div className="tls-card__title font-bold text-sm truncate">{item.title}</div>
-              <div className="text-[11px] text-white/40 truncate">{item.subtitle}</div>
+              <div className="tls-card__title font-bold tls-type-small truncate">{item.title}</div>
+              <div className="tls-type-small text-white/40 truncate">{item.subtitle}</div>
             </div>
           </Link>
         )) : (
-          <div className="py-10 text-center text-sm text-white/35">Noch keine Einträge.</div>
+          <div className="py-10 text-center tls-type-small text-white/35">Noch keine Einträge.</div>
         )}
       </div>
-      <Link to={to} className="tls-btn tls-btn--secondary mt-5 inline-flex w-full items-center justify-center px-4 py-3 rounded-sm text-xs font-black uppercase tracking-wider">
+      <Link to={to} className="tls-btn tls-btn--secondary mt-5 inline-flex w-full items-center justify-center px-4 py-3 rounded-sm tls-type-label">
         {cta}
       </Link>
     </section>
