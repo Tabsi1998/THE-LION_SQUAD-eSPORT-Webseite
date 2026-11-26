@@ -143,7 +143,7 @@ export default function ImageScanTab() {
             <label className="block">
               <div className="tls-type-small font-bold text-white/60 mb-1.5">Google Cloud Vision API-Schlüssel {form.google_api_key_masked && <span className="text-white/40 normal-case">(aktuell gespeichert)</span>}</div>
               <input type="password" value={form.google_api_key} onChange={(e) => set("google_api_key", e.target.value)} data-testid="image-scan-google-key" autoComplete="off" className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-sm font-mono" placeholder={form.google_api_key_masked ? "Leer lassen, um den Schlüssel zu behalten" : "API-Schlüssel aus der Google Cloud Console (Vision API)"} />
-              <p className="mt-1 tls-type-small text-white/40">Bilder gehen dann an Google – das steht automatisch in der Datenschutzerklärung.</p>
+              <p className="mt-1 tls-type-small text-quiet">Bilder gehen dann an Google – das steht automatisch in der Datenschutzerklärung.</p>
               {form.google_api_key_masked && <button type="button" onClick={clearKey} className="mt-2 tls-type-label text-[#FF6B6B]">Gespeicherten Schlüssel entfernen</button>}
             </label>
           )}
@@ -172,7 +172,7 @@ export default function ImageScanTab() {
             <ScanRow key={row.id} row={row} note={notes[row.id] || ""} onNote={(value) => setNotes((current) => ({ ...current, [row.id]: value }))} onDecide={(action) => decide(row, action)} busy={busy} />
           ))}
           {!rows.length && (
-            <div className="border border-dashed border-white/15 rounded-sm px-4 py-10 text-center tls-type-small text-white/40" data-testid="image-scan-empty">
+            <div className="border border-dashed border-white/15 rounded-sm px-4 py-10 text-center tls-type-small text-quiet" data-testid="image-scan-empty">
               {filter === "review" ? "Nichts wartet auf eine Entscheidung." : "Keine Einträge."}
             </div>
           )}
@@ -211,7 +211,7 @@ function ScanRow({ row, note, onNote, onDecide, busy }) {
         {row.preview_url ? (
           <img src={resolveMediaUrl(row.preview_url)} alt="" className="w-full h-full object-contain" data-testid={`image-scan-preview-${row.id}`} />
         ) : (
-          <span className="tls-type-label text-white/35 px-2 text-center">kein Bild mehr vorhanden</span>
+          <span className="tls-type-label text-quiet px-2 text-center">kein Bild mehr vorhanden</span>
         )}
       </div>
       <div className="min-w-0 space-y-2">
@@ -229,7 +229,7 @@ function ScanRow({ row, note, onNote, onDecide, busy }) {
         </div>
         {row.error && <div className="tls-type-small text-[#FF6B6B]">Fehler: {row.error}</div>}
         {row.note && <div className="tls-type-small text-white/60">Notiz: {row.note}</div>}
-        {row.decided_by && row.decided_by !== "system" && <div className="tls-type-small text-white/40">Entschieden von der Moderation {formatMoment(row.decided_at)}</div>}
+        {row.decided_by && row.decided_by !== "system" && <div className="tls-type-small text-quiet">Entschieden von der Moderation {formatMoment(row.decided_at)}</div>}
         <div className="flex flex-col sm:flex-row gap-2 pt-1">
           <input value={note} onChange={(e) => onNote(e.target.value)} data-testid={`image-scan-note-${row.id}`} placeholder="Grund (optional)" className="flex-1 bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-sm" />
           {row.state !== "safe" && (

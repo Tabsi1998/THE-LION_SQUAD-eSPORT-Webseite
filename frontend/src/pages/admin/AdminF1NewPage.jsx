@@ -203,7 +203,7 @@ export default function AdminF1NewPage() {
               <button type="button" onClick={() => set("prize_places", form.prize_places.filter((_, j) => j !== i))} data-testid={`f1-new-prize-remove-${i}`} className="col-span-1 text-white/40 hover:text-[#FF3B30] text-center py-2">✕</button>
             </div>
           ))}
-          {(form.prize_places || []).length === 0 && <div className="tls-type-small text-white/40">Noch keine Preise - „Platz hinzufügen“ legt die erste Zeile an.</div>}
+          {(form.prize_places || []).length === 0 && <div className="tls-type-small text-quiet">Noch keine Preise - „Platz hinzufügen“ legt die erste Zeile an.</div>}
         </FormSection>
 
         <FastLapStreamFields form={form} set={set} prefix="f1-new" />

@@ -258,7 +258,7 @@ function PackCard({ pack, onToggle, onRename, onDelete, onAdd, onDeleteSticker, 
           </div>
         ))}
         {!pack.builtin && pack.stickers.length === 0 && (
-          <p className="col-span-full tls-type-small text-white/40">Noch leer. Ein leeres Paket erscheint nicht im Chat.</p>
+          <p className="col-span-full tls-type-small text-quiet">Noch leer. Ein leeres Paket erscheint nicht im Chat.</p>
         )}
       </div>
     </div>

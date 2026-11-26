@@ -219,7 +219,7 @@ export default function AdminMobilePushPage() {
                       @{user.username || "-"} · {activeDevices(user.enabled_token_count)}
                       {Number(user.disabled_token_count) > 0 ? <span className="text-white/50"> · {oldDevices(user.disabled_token_count)}</span> : null}
                     </div>
-                    <div className="tls-type-small text-white/35 mt-1">Zuletzt angemeldet: {formatTime(user.latest_updated_at)}</div>
+                    <div className="tls-type-small text-quiet mt-1">Zuletzt angemeldet: {formatTime(user.latest_updated_at)}</div>
                     {/* Rot nur bei einem Fehler an einem aktiven Gerät (#2467). */}
                     {user.active_error ? (
                       <div className="tls-type-small text-[#FF6B61] mt-1 tls-wrap" title={user.active_error}>{pushErrorLabel(user.active_error)}</div>
@@ -238,7 +238,7 @@ export default function AdminMobilePushPage() {
           <div className="border border-white/10 bg-[#121212] rounded-sm p-4">
             <div className="flex flex-wrap items-start justify-between gap-3 mb-4">
               <div>
-                <div className="tls-type-label text-white/40">Zielgerät</div>
+                <div className="tls-type-label text-quiet">Zielgerät</div>
                 <h2 className="tls-type-section">{userLabel(selectedUser)}</h2>
                 <p className="tls-type-small text-white/45">{selectedUser?.email || selectedUser?.id || "Kein Benutzer ausgewählt"}</p>
               </div>
@@ -303,17 +303,17 @@ export default function AdminMobilePushPage() {
                   </div>
                   <div className="grid grid-cols-2 gap-2 tls-type-small">
                     <div className="border border-white/10 bg-[#0A0A0A] rounded-sm p-2">
-                      <div className="text-white/35 tls-type-label">Angenommen</div>
+                      <div className="text-quiet tls-type-label">Angenommen</div>
                       <div>{pushStateLabel(token.last_ticket_status)}</div>
                       {token.last_ticket_error ? <div className="text-[#FF6B61] break-words" title={token.last_ticket_error}>{pushErrorLabel(token.last_ticket_error)}</div> : null}
                     </div>
                     <div className="border border-white/10 bg-[#0A0A0A] rounded-sm p-2">
-                      <div className="text-white/35 tls-type-label">Zugestellt</div>
+                      <div className="text-quiet tls-type-label">Zugestellt</div>
                       <div>{pushStateLabel(token.last_receipt_status)}</div>
                       {token.last_receipt_error ? <div className="text-[#FF6B61] break-words" title={token.last_receipt_error}>{pushErrorLabel(token.last_receipt_error)}</div> : null}
                     </div>
                   </div>
-                  <div className="tls-type-small text-white/40">Letzter Versand: {formatTime(token.last_sent_at)}</div>
+                  <div className="tls-type-small text-quiet">Letzter Versand: {formatTime(token.last_sent_at)}</div>
                 </article>
               ))}
               {!activeTokens.length && (

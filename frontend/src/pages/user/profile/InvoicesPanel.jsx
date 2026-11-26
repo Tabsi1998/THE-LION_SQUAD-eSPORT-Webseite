@@ -113,7 +113,7 @@ export function InvoicesPanel() {
               <div className="space-y-3">{groups.archive.map((row) => <InvoiceRow key={row.key} row={row} currency={currency} onView={setViewing} onPay={pay} />)}</div>
             </div>
           )}
-          <p className="mt-8 tls-type-small text-white/40" data-testid="invoices-help">
+          <p className="mt-8 tls-type-small text-quiet" data-testid="invoices-help">
             Rechnungen kommen aus der Mitgliederverwaltung des Vereins. Stimmt etwas nicht?{" "}
             <Link to={INVOICE_QUESTION} className="text-[#29B6E8] hover:underline" data-testid="invoices-contact">Schreib dem Kassier</Link>.
           </p>

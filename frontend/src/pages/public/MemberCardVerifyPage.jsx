@@ -52,10 +52,10 @@ export default function MemberCardVerifyPage() {
             <div className="mt-3 tls-type-section">{verdict.title}</div>
             {result?.valid ? (
               <dl className="mt-4 space-y-2 tls-type-small">
-                <div><dt className="tls-type-label text-white/40">Mitglied</dt><dd className="tls-type-card text-white">{result.name}</dd></div>
-                <div><dt className="tls-type-label text-white/40">Mitgliedsart</dt><dd className="text-white/85">{result.type_label}</dd></div>
-                <div><dt className="tls-type-label text-white/40">Gültig</dt><dd className="text-white/85">{result.valid_until ? `bis ${formatDate(result.valid_until)}` : "solange die Mitgliedschaft besteht"}</dd></div>
-                {result.checked_at && <div className="pt-2 tls-type-small text-white/40">Geprüft am {viennaDateTime(result.checked_at)}</div>}
+                <div><dt className="tls-type-label text-quiet">Mitglied</dt><dd className="tls-type-card text-white">{result.name}</dd></div>
+                <div><dt className="tls-type-label text-quiet">Mitgliedsart</dt><dd className="text-white/85">{result.type_label}</dd></div>
+                <div><dt className="tls-type-label text-quiet">Gültig</dt><dd className="text-white/85">{result.valid_until ? `bis ${formatDate(result.valid_until)}` : "solange die Mitgliedschaft besteht"}</dd></div>
+                {result.checked_at && <div className="pt-2 tls-type-small text-quiet">Geprüft am {viennaDateTime(result.checked_at)}</div>}
               </dl>
             ) : result ? (
               <p className="mt-3 tls-type-body text-white/70">Dieser Code ist nicht (mehr) gültig. Das Mitglied kann in der App oder auf der Website einen frischen Code anzeigen.</p>
@@ -65,7 +65,7 @@ export default function MemberCardVerifyPage() {
           </div>
         )}
 
-        <p className="mt-6 text-center tls-type-small text-white/40">
+        <p className="mt-6 text-center tls-type-small text-quiet">
           Bitte den Namen mit einem Ausweis abgleichen. Mehr als Vorname und Mitgliedsart zeigt diese Seite nicht. <Link to="/membership/join" className="text-[#FFD700] hover:underline">Selbst Mitglied werden</Link>
         </p>
       </section>

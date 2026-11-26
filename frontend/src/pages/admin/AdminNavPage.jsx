@@ -187,7 +187,7 @@ export default function AdminNavPage() {
         >
           <Undo2 className="w-3.5 h-3.5" /> Zurücksetzen
         </button>
-        <span className="tls-type-small text-white/40 ml-auto">{items.length} Hauptpunkte</span>
+        <span className="tls-type-small text-quiet ml-auto">{items.length} Hauptpunkte</span>
       </div>
       {missing.length > 0 && (
         <p role="alert" className="mt-3 tls-type-small text-[#FF6B6B]" data-testid="nav-missing-label">Jeder Menüpunkt braucht einen Namen – ein Feld ist leer.</p>
@@ -244,7 +244,7 @@ export default function AdminNavPage() {
                     className={`min-w-0 flex-1 bg-[#0A0A0A] border rounded-sm px-3 py-1.5 text-sm font-semibold ${String(it.label || "").trim() ? "border-white/10" : "border-[#FF6B6B]"}`}
                   />
                   {it.to && (
-                    <span className="hidden md:inline tls-type-small text-white/30 font-mono truncate max-w-[180px]">{it.to}</span>
+                    <span className="hidden md:inline tls-type-small text-quiet font-mono truncate max-w-[180px]">{it.to}</span>
                   )}
                   <button
                     onClick={() => toggleVisible(idx)}
@@ -295,7 +295,7 @@ export default function AdminNavPage() {
                             />
                             {ENTRY_NOTES[c.key] && <span className="mt-0.5 block tls-type-small text-white/45" data-testid={`nav-note-${c.key}`}>{ENTRY_NOTES[c.key]}</span>}
                           </div>
-                          {c.to && <span className="hidden md:inline tls-type-small text-white/30 font-mono truncate max-w-[160px]">{c.to}</span>}
+                          {c.to && <span className="hidden md:inline tls-type-small text-quiet font-mono truncate max-w-[160px]">{c.to}</span>}
                           <button
                             onClick={() => toggleVisible(idx, cIdx)}
                             className={`px-2 py-1 tls-type-label rounded-sm inline-flex items-center gap-1 ${

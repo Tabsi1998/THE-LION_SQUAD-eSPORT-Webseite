@@ -50,7 +50,7 @@ export function SocialsTab({ brand, setSocialLink, addSocialLink, removeSocialLi
               </button>
             </div>
           ))}
-          {!(brand.social_links || []).length && <div className="tls-type-small text-white/40 border border-dashed border-white/10 rounded-sm p-4">Noch keine Social Links gepflegt.</div>}
+          {!(brand.social_links || []).length && <div className="tls-type-small text-quiet border border-dashed border-white/10 rounded-sm p-4">Noch keine Social Links gepflegt.</div>}
         </div>
         <button onClick={saveBrand} disabled={saving} data-testid="socials-save" className="px-5 py-2 bg-[#29B6E8] text-black font-bold uppercase tracking-wider rounded-sm disabled:opacity-50">{saving ? "Speichere..." : "Socials speichern"}</button>
       </div>

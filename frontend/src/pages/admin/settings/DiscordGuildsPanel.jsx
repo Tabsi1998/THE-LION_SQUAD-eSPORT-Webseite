@@ -47,8 +47,8 @@ function GuildChannels({ guild, onSave, busy }) {
           </label>
         ))}
       </div>
-      {list && !list.ok && list.text ? <div className="tls-type-small text-white/40">{list.text}</div> : null}
-      <p className="tls-type-small text-white/40">Vorstand, Betrieb, Test und Mitglieder gibt es nur am Hauptserver – hier kommt nie etwas Privates an.</p>
+      {list && !list.ok && list.text ? <div className="tls-type-small text-quiet">{list.text}</div> : null}
+      <p className="tls-type-small text-quiet">Vorstand, Betrieb, Test und Mitglieder gibt es nur am Hauptserver – hier kommt nie etwas Privates an.</p>
       {changed && (
         <button type="button" onClick={() => onSave(Object.fromEntries(SUB_TARGETS.map((target) => [target.key, draft[target.key] || ""])))} disabled={busy}
           data-testid={`discord-guild-${guild.guild_id}-channels-save`} className="px-3 py-1.5 bg-[#29B6E8] text-black tls-type-label rounded-sm disabled:opacity-40">

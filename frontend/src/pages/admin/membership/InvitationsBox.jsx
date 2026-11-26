@@ -43,7 +43,7 @@ export function InvitationsBox({ reloadKey = 0 }) {
           <input type="checkbox" checked={showAll} onChange={(e) => setShowAll(e.target.checked)} data-testid="invitations-show-all" className="accent-[#FFD700]" /> auch erledigte
         </label>
       </div>
-      {rows === null ? <div className="tls-type-small text-white/40 mt-3">Lade …</div> : !rows.length ? (
+      {rows === null ? <div className="tls-type-small text-quiet mt-3">Lade …</div> : !rows.length ? (
         <div className="tls-type-small text-white/45 mt-3" data-testid="invitations-empty">Keine {showAll ? "" : "offenen "}Einladungen.</div>
       ) : (
         <ul className="divide-y divide-white/5 mt-3 tls-type-small">

@@ -57,7 +57,7 @@ export function OpsOverview({ onOpenSource }) {
               </div>
               <div className="mt-4 tls-wrap tls-type-label text-white/45">{item.label}</div>
               <div className="mt-1 tls-type-section tls-type-num text-white">{item.total || 0}</div>
-              <div className="mt-1 tls-wrap tls-type-small text-white/40">{item.latest_at ? formatEventTime(item.latest_at) : "Noch keine Einträge"}</div>
+              <div className="mt-1 tls-wrap tls-type-small text-quiet">{item.latest_at ? formatEventTime(item.latest_at) : "Noch keine Einträge"}</div>
             </button>
           );
         })}

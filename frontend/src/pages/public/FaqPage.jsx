@@ -61,7 +61,7 @@ function FrageEintrag({ frage, offen, onToggle, anker = true, bereich = "", eben
               {frage.link.label} <ArrowRight className="h-4 w-4" aria-hidden="true" />
             </Link>
           ) : null}
-          {bereich ? <span className="tls-type-label text-white/40">{bereich}</span> : null}
+          {bereich ? <span className="tls-type-label text-quiet">{bereich}</span> : null}
         </div>
       </div>
     </li>

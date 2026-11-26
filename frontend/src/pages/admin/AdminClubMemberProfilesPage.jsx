@@ -151,24 +151,24 @@ export function ClubMemberProfilesAdminContent() {
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0">
                     <h2 className="tls-type-section truncate">{profile.gamertag || profile.display_name}</h2>
-                    {profile.real_name && <p className="tls-type-small text-white/40 truncate">{profile.real_name}</p>}
+                    {profile.real_name && <p className="tls-type-small text-quiet truncate">{profile.real_name}</p>}
                     <p className="tls-type-label text-[#FFD700]">{profile.board_title || profile.role_title || "Mitglied"}</p>
                     {profile.board_title && profile.role_title && profile.board_title !== profile.role_title && (
-                      <p className="tls-type-label text-white/35">Profil: {profile.role_title}</p>
+                      <p className="tls-type-label text-quiet">Profil: {profile.role_title}</p>
                     )}
                     {profile.linked_account && (
-                      <p className="tls-type-small text-white/35 truncate">@{profile.linked_account.username}</p>
+                      <p className="tls-type-small text-quiet truncate">@{profile.linked_account.username}</p>
                     )}
                     {/* Verzeichnis per Opt-in (#410): vom Mitglied selbst angelegt, ggf. gesperrt */}
                     {profile.source === "member" && <p className="mt-1 tls-type-label text-[#29B6E8]" data-testid={`club-member-self-${profile.id}`}>vom Mitglied eingetragen</p>}
                     {/* Mitgliederverzeichnis aus der Einwilligung (#410 Nachtrag): vom Abgleich angelegt, Widerruf nimmt offline */}
                     {profile.source === "dolibarr" && <p className="mt-1 tls-type-label text-[#29B6E8]" data-testid={`club-member-dolibarr-${profile.id}`}>aus der Dolibarr-Einwilligung{profile.consent?.moment ? ` (${viennaDate(profile.consent.moment)})` : ""}</p>}
                     {/* Mitgliedsnummer aus Dolibarr (#504): darüber findet der Abgleich die Karte wieder - ohne Konto heißt: Konto noch nicht verknüpft */}
-                    {profile.dolibarr_member_id && <p className="tls-type-small text-white/40" data-testid={`club-member-number-${profile.id}`}>Mitglied Nr. {profile.dolibarr_member_id}{!profile.user_id ? " · ohne Konto" : ""}</p>}
+                    {profile.dolibarr_member_id && <p className="tls-type-small text-quiet" data-testid={`club-member-number-${profile.id}`}>Mitglied Nr. {profile.dolibarr_member_id}{!profile.user_id ? " · ohne Konto" : ""}</p>}
                     {profile.deactivated_reason === "consent_withdrawn" && <p className="tls-type-small font-bold text-[#FFD700]" data-testid={`club-member-withdrawn-${profile.id}`}>Einwilligung widerrufen – offline</p>}
                     {profile.directory_blocked && <p className="tls-type-label text-[#FF3B30]" data-testid={`club-member-blocked-${profile.id}`}>gesperrt</p>}
                   </div>
-                  <span className="tls-type-small text-white/40 font-mono">#{profile.order_index || 0}</span>
+                  <span className="tls-type-small text-quiet font-mono">#{profile.order_index || 0}</span>
                 </div>
                 <div className="mt-3 flex flex-wrap gap-1.5">
                   {(profile.games || []).slice(0, 4).map((game) => <span key={game} className="px-2 py-1 bg-white/5 border border-white/10 rounded-sm tls-type-small text-white/60">{game}</span>)}

@@ -48,7 +48,7 @@ function Person({ user }) {
         ) : (
           <div className="font-bold tls-type-small text-white truncate">{nameOf(user)}</div>
         )}
-        {user?.username ? <div className="tls-type-small text-white/40 truncate">@{user.username}</div> : null}
+        {user?.username ? <div className="tls-type-small text-quiet truncate">@{user.username}</div> : null}
       </div>
     </div>
   );
@@ -67,7 +67,7 @@ function Section({ title, count, rows, empty, testIdPrefix, children }) {
             <div className="flex flex-wrap gap-2">{children(row)}</div>
           </div>
         ))}
-        {rows.length === 0 ? <div className="p-6 tls-type-small text-white/35 text-center">{empty}</div> : null}
+        {rows.length === 0 ? <div className="p-6 tls-type-small text-quiet text-center">{empty}</div> : null}
       </div>
     </section>
   );
@@ -205,7 +205,7 @@ export function FriendsPanel({ onChanged }) {
                       ) : relation.kind === "incoming" ? (
                         <button type="button" onClick={() => act(relation.row, "accept")} className={`${buttonBase} tls-btn tls-btn--primary`}><Check className="w-3 h-3" /> Anfrage annehmen</button>
                       ) : candidate.blocked_by_me ? (
-                        <span className="tls-type-label text-white/40">Blockiert</span>
+                        <span className="tls-type-label text-quiet">Blockiert</span>
                       ) : (
                         <button type="button" onClick={() => request(candidate)} disabled={busyId === candidate.id} data-testid={`friends-request-${candidate.id}`} className={`${buttonBase} tls-btn tls-btn--primary`}>
                           <UserPlus className="w-3 h-3" /> Anfrage senden
@@ -214,8 +214,8 @@ export function FriendsPanel({ onChanged }) {
                     </div>
                   );
                 })}
-                {!searching && candidates.length === 0 ? <div className="p-3 tls-type-small text-white/35">Keine passenden Spieler gefunden.</div> : null}
-                {searching && candidates.length === 0 ? <div className="p-3 tls-type-small text-white/35">Suche …</div> : null}
+                {!searching && candidates.length === 0 ? <div className="p-3 tls-type-small text-quiet">Keine passenden Spieler gefunden.</div> : null}
+                {searching && candidates.length === 0 ? <div className="p-3 tls-type-small text-quiet">Suche …</div> : null}
               </div>
             ) : null}
           </div>

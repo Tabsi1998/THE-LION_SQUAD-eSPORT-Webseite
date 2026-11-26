@@ -363,7 +363,7 @@ export function PublicLayout({ children }) {
         </div>
         {/* Reihe 2 — Bottom Bar; der Strich darüber ist die Kante, auf der die Saison-Deko steht (#662) */}
         <div className="border-t border-white/5" data-season-line="footer">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-5 flex flex-col md:flex-row items-center justify-between gap-3 tls-type-small text-white/40 min-w-0">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-5 flex flex-col md:flex-row items-center justify-between gap-3 tls-type-small text-quiet min-w-0">
             <span>© {new Date().getFullYear()} {clubName} — {tagline}. Alle Rechte vorbehalten.</span>
             <div className="flex flex-wrap items-center justify-center md:justify-end gap-x-2.5 gap-y-2 md:gap-4">
               <Link to="/imprint" className="hover:text-[#29B6E8] transition" data-testid="footer-imprint">Impressum</Link>

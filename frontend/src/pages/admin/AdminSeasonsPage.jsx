@@ -325,7 +325,7 @@ function CompleteSheet({ season, onClose, onDone }) {
         </ul>
       </div>
       {failed && <p className="tls-type-small text-live" role="alert">{failed}</p>}
-      {!preview && !failed && <p className="tls-type-small text-white/40">Lade Vorschau …</p>}
+      {!preview && !failed && <p className="tls-type-small text-quiet">Lade Vorschau …</p>}
       {preview && (
         <div data-testid="season-complete-preview" className="space-y-3">
           <p className="tls-type-small text-white/60">
@@ -340,9 +340,9 @@ function CompleteSheet({ season, onClose, onDone }) {
                 {row.awards?.length > 0 && <span className="w-full pl-9 tls-type-small text-white/45">{row.awards.map((a) => a.name).join(", ")}</span>}
               </li>
             ))}
-            {rows.length === 0 && <li className="px-3 py-4 tls-type-small text-white/40">Noch keine Punkte in dieser Jahreswertung.</li>}
+            {rows.length === 0 && <li className="px-3 py-4 tls-type-small text-quiet">Noch keine Punkte in dieser Jahreswertung.</li>}
           </ol>
-          {rows.length > 10 && <p className="tls-type-small text-white/40">… und {rows.length - 10} weitere Plätze.</p>}
+          {rows.length > 10 && <p className="tls-type-small text-quiet">… und {rows.length - 10} weitere Plätze.</p>}
         </div>
       )}
     </AdminSheet>
@@ -662,7 +662,7 @@ function SourcePicker({ label, helper, items, selected, onToggle, onSetSelected,
       <div className="flex items-start justify-between gap-3">
         <div>
           <div className="tls-type-label text-white/70">{label}</div>
-          <div className="tls-type-small text-white/35 mt-1">{helper}</div>
+          <div className="tls-type-small text-quiet mt-1">{helper}</div>
         </div>
         <span className="tls-type-label px-2 py-1 border border-white/10 bg-white/5 text-white/60 shrink-0">
           {selected.length ? `${selected.length} gewählt` : "keine"}
@@ -690,11 +690,11 @@ function SourcePicker({ label, helper, items, selected, onToggle, onSetSelected,
             <input type="checkbox" checked={selectedSet.has(item.id)} onChange={() => onToggle(item.id)} className="accent-[#29B6E8] mt-1" />
             <span className="min-w-0">
               <span className="block truncate text-white/85">{getLabel(item)}</span>
-              <span className="block tls-type-small text-white/40 mt-0.5">{getMeta(item)}</span>
+              <span className="block tls-type-small text-quiet mt-0.5">{getMeta(item)}</span>
             </span>
           </label>
         ))}
-        {filtered.length === 0 && <div className="tls-type-small text-white/35 p-2">Keine passenden Einträge vorhanden.</div>}
+        {filtered.length === 0 && <div className="tls-type-small text-quiet p-2">Keine passenden Einträge vorhanden.</div>}
       </div>
     </div>
   );
@@ -703,7 +703,7 @@ function SourcePicker({ label, helper, items, selected, onToggle, onSetSelected,
 function InfoPill({ label, value, compact = false }) {
   return (
     <div className="rounded-sm border border-white/10 bg-black/20 px-3 py-2 min-w-0">
-      <div className="tls-type-label text-white/35">{label}</div>
+      <div className="tls-type-label text-quiet">{label}</div>
       <div className={`tls-type-small text-white/75 mt-0.5 ${compact ? "truncate" : ""}`}>{value}</div>
     </div>
   );

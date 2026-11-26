@@ -96,7 +96,7 @@ export function NegativeTab() {
               )}
             </li>
           ))}
-          {!list.length && <li className="py-10 text-center tls-type-small text-white/40">Keine Fun-Erfolge vergeben.</li>}
+          {!list.length && <li className="py-10 text-center tls-type-small text-quiet">Keine Fun-Erfolge vergeben.</li>}
         </ul>
       </Panel>
     </div>

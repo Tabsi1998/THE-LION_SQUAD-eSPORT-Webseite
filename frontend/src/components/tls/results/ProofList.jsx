@@ -69,7 +69,7 @@ function ProofItem({ item, sideLabels, testId, confirming, busy, onRemove }) {
             <span className="truncate">MOSS-Datei (ZIP, {sizeText(item.size)}) herunterladen</span>
           </a>
         ) : <span className="text-white/70">Bild</span>}
-        {item.type === "file" && item.sha256 ? <div className="truncate font-mono tls-type-small text-white/40" title={item.sha256}>SHA-256 {item.sha256}</div> : null}
+        {item.type === "file" && item.sha256 ? <div className="truncate font-mono tls-type-small text-quiet" title={item.sha256}>SHA-256 {item.sha256}</div> : null}
         <div className="text-white/50">{sideName(item, sideLabels)}{item.removed ? " · von der Seite entfernt, nur noch für die Leitung sichtbar" : ""}{waiting ? " · wird noch geprüft, bis dahin nur für dich sichtbar" : ""}</div>
       </div>
       {item.can_remove ? (

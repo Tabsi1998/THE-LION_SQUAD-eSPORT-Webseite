@@ -67,7 +67,7 @@ export function UploadEventsPanel({ events, loading, onRefresh }) {
                 {UPLOAD_STATUS_LABELS[event.status] || event.status || "?"}
               </span>
               <span className="min-w-0 flex-1 break-all font-mono tls-type-small text-white/75">{event.filename || "upload"}</span>
-              <span className="tls-type-label text-white/35">{fmtDateTime(event.created_at)}</span>
+              <span className="tls-type-label text-quiet">{fmtDateTime(event.created_at)}</span>
             </div>
             <div className="mt-2 grid grid-cols-2 gap-2 tls-type-small text-white/45 sm:grid-cols-5">
               <span>{event.kind || "unknown"} · {MEDIA_SCOPE_LABELS[event.media_scope] || event.media_scope || "Scope"}</span>
@@ -82,7 +82,7 @@ export function UploadEventsPanel({ events, loading, onRefresh }) {
               </div>
             )}
             {event.result?.url && (
-              <code className="mt-2 block break-all tls-type-small text-white/35">{event.result.url}</code>
+              <code className="mt-2 block break-all tls-type-small text-quiet">{event.result.url}</code>
             )}
           </div>
         ))}

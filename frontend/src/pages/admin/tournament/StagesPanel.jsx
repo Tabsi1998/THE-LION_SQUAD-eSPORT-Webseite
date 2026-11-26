@@ -145,7 +145,7 @@ function StageRules({ stage, form, set, durationContext, onSave }) {
           <div className="grid md:grid-cols-3 gap-3">
             <div className="block md:col-span-3">
               <SelectField label="Austragung" value={form.event_mode} onChange={(v)=>set("event_mode", v)} options={[["", "Vom Turnier erben"], ...EVENT_MODE_OPTIONS]} testId={`stage-rules-event-mode-${stage.id}`} />
-              <div className="tls-type-small text-white/40 mt-1.5" data-testid={`stage-rules-event-mode-hint-${stage.id}`}>{EVENT_MODE_HINTS[form.event_mode] || EVENT_MODE_HINTS[""]}</div>
+              <div className="tls-type-small text-quiet mt-1.5" data-testid={`stage-rules-event-mode-hint-${stage.id}`}>{EVENT_MODE_HINTS[form.event_mode] || EVENT_MODE_HINTS[""]}</div>
             </div>
             <SelectField label="Ergebniserfassung" value={form.result_entry_mode} onChange={(v)=>set("result_entry_mode", v)} options={[["", "Vom Turnier erben"], ...RESULT_ENTRY_MODE_OPTIONS.filter(([value]) => value)]} />
             <SelectField label="Terminplanung" value={form.schedule_mode} onChange={(v)=>set("schedule_mode", v)} options={[["", "Vom Turnier erben"], ...SCHEDULE_MODE_OPTIONS.filter(([value]) => value)]} />
@@ -170,11 +170,11 @@ function AdvancementField({ value, minutes = "", onChange, onMinutes, testId }) 
   return (
     <div className="block md:col-span-3">
       <SelectField label="Weiterkommen (Gegner der nächsten Runde)" value={value} onChange={onChange} options={STAGE_ADVANCEMENT_OPTIONS} testId={testId} />
-      {value ? <div className="tls-type-small text-white/40 mt-1.5" data-testid={`${testId}-hint`}>{advancementModeHint(value)}</div> : null}
+      {value ? <div className="tls-type-small text-quiet mt-1.5" data-testid={`${testId}-hint`}>{advancementModeHint(value)}</div> : null}
       {value === "draw_show" ? (
         <div className="mt-2 max-w-xs">
           <Fld label="Show-Auslosung: Erinnerung nach Minuten" type="number" min="1" max="240" value={minutes} onChange={onMinutes} placeholder={String(DRAW_SHOW_MINUTES_DEFAULT)} testId={`${testId}-minutes`} />
-          <div className="tls-type-small text-white/40 mt-1">{DRAW_SHOW_MINUTES_HINT}</div>
+          <div className="tls-type-small text-quiet mt-1">{DRAW_SHOW_MINUTES_HINT}</div>
         </div>
       ) : null}
     </div>
@@ -186,7 +186,7 @@ function GrandFinalField({ value, onChange, testId }) {
   return (
     <div className="block md:col-span-3">
       <SelectField label="Grand Final" value={value} onChange={onChange} options={[["", "Vom Turnier erben"], ...GRAND_FINAL_OPTIONS]} testId={testId} />
-      <div className="tls-type-small text-white/40 mt-1.5">{GRAND_FINAL_HINT}</div>
+      <div className="tls-type-small text-quiet mt-1.5">{GRAND_FINAL_HINT}</div>
     </div>
   );
 }
@@ -390,7 +390,7 @@ function MatchV2Card({ match, regById, stations = [], canRecordResults = false, 
     <div className="border border-white/10 bg-[#0A0A0A] rounded-sm p-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <div className="tls-type-label text-white/40">{sectionRoundLabel(match)}</div>
+          <div className="tls-type-label text-quiet">{sectionRoundLabel(match)}</div>
           <div className="font-bold uppercase">{match.match_key}</div>
           <div className="mt-1 tls-type-label text-white/45">
             {match.scheduled_at ? formatDateTime(match.scheduled_at) : "Termin offen"}

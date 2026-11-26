@@ -788,7 +788,7 @@ export default function PublicProfilePage() {
                           <div className="tls-type-small font-bold" style={{ color: a.level_color }}>{a.level_name}</div>
                           <div className="font-semibold truncate tls-type-small">{a.name}</div>
                         </div>
-                        <div className="tls-type-small tls-type-num text-white/40">+{a.points}</div>
+                        <div className="tls-type-small tls-type-num text-quiet">+{a.points}</div>
                       </div>
                     ))}
                   </div>
@@ -1008,7 +1008,7 @@ function PinnedAwardCard({ award }) {
       <div className="min-w-0 flex-1">
         <div className="tls-type-small font-bold truncate" style={{ color }}>{award.material_name || award.level_name}</div>
         <div className="font-semibold truncate tls-type-small">{award.name}</div>
-        <div className="tls-type-small text-white/40 truncate">{award.group_name}</div>
+        <div className="tls-type-small text-quiet truncate">{award.group_name}</div>
       </div>
     </div>
   );
@@ -1144,7 +1144,7 @@ export function AccountsCard({ groups }) {
 function AccountGroup({ title, icon: Icon, color, entries, testId }) {
   return (
     <div data-testid={testId}>
-      <h3 className="tls-type-label text-white/40 mb-2 flex items-center gap-2"><Icon className="w-3.5 h-3.5" style={{ color }} /> {title}</h3>
+      <h3 className="tls-type-label text-quiet mb-2 flex items-center gap-2"><Icon className="w-3.5 h-3.5" style={{ color }} /> {title}</h3>
       <div className="grid gap-2">{entries.map((entry) => <AccountRow key={`${entry.key}:${entry.value}`} entry={entry} />)}</div>
     </div>
   );
@@ -1220,7 +1220,7 @@ function AboutCard({ profile, joinedDate }) {
               <row.icon className="w-4 h-4" />
             </span>
             <div className="min-w-0">
-              <dt className="tls-type-label text-white/40">{row.label}</dt>
+              <dt className="tls-type-label text-quiet">{row.label}</dt>
               <dd className="tls-type-small text-white/90 break-words">{row.value}</dd>
             </div>
           </div>
@@ -1252,7 +1252,7 @@ function SetupCard({ profile }) {
               <span className={`w-7 h-7 rounded-sm border flex items-center justify-center shrink-0 ${PROFILE_TONES[group.tone] || PROFILE_TONES.white}`}>
                 <group.icon className="w-3.5 h-3.5" />
               </span>
-              <span className="tls-type-label text-white/40">{group.label}</span>
+              <span className="tls-type-label text-quiet">{group.label}</span>
             </div>
             <div className="flex flex-wrap gap-1.5">
               {group.items.map((item) => (
@@ -1336,7 +1336,7 @@ function ReferenceRow({ item, expanded = false }) {
       <div className="flex items-center justify-between gap-3 sm:justify-end sm:shrink-0 sm:text-right w-full sm:w-auto border-t border-white/10 pt-3 sm:border-0 sm:pt-0">
         <div>
           <div className="tls-type-card tls-type-num" style={{ color: rankColor }}>{rank}</div>
-          <div className="tls-type-label text-white/35">Rang</div>
+          <div className="tls-type-label text-quiet">Rang</div>
         </div>
         {target && <ExternalLink className="w-4 h-4 text-white/30 shrink-0" />}
       </div>
@@ -1354,7 +1354,7 @@ function QuickStat({ icon: Icon, label, value, color = "#FFFFFF", glory = false,
       className={`border border-white/10 rounded-sm bg-[#121212] px-3 py-3 min-w-0 ${glorious ? "tls-stat-glory" : ""}`}
       style={glorious ? { "--glory-c": color } : undefined}
     >
-      <div className="flex items-center gap-1.5 tls-type-label text-white/40 min-w-0"><Icon className="w-3 h-3 shrink-0" /> <span className="truncate">{label}</span></div>
+      <div className="flex items-center gap-1.5 tls-type-label text-quiet min-w-0"><Icon className="w-3 h-3 shrink-0" /> <span className="truncate">{label}</span></div>
       <div className="mt-1 tls-type-section tls-type-num break-words" style={{ color }}><CountUp value={value} /></div>
     </div>
   );
@@ -1386,7 +1386,7 @@ function TournamentRow({ t, expanded = false }) {
 
 function EmptyState({ text, action = null, testId }) {
   return (
-    <div className="py-12 text-center text-white/40 tls-type-label" data-testid={testId}>
+    <div className="py-12 text-center text-quiet tls-type-label" data-testid={testId}>
       {text}
       {action && <> – <Link to={action.to} className="text-[#29B6E8] hover:underline">{action.label}</Link></>}
     </div>

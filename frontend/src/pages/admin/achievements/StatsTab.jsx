@@ -36,7 +36,7 @@ export function StatsTab() {
     }
   };
 
-  if (!data) return <div className="tls-type-small text-white/40">Lädt …</div>;
+  if (!data) return <div className="tls-type-small text-quiet">Lädt …</div>;
   const maxWeek = Math.max(1, ...data.weekly.map((w) => w.unlocks));
   return (
     <div className="space-y-6" data-testid="ach-stats">
@@ -52,7 +52,7 @@ export function StatsTab() {
               <div key={w.week} className="flex-1 flex flex-col items-center justify-end gap-1 h-full" data-testid={`stats-week-${w.week}`}>
                 <span className="tls-type-small tabular-nums text-white/55">{w.unlocks || ""}</span>
                 <span className="w-full rounded-t-sm bg-[#29B6E8]" style={{ height: `${Math.max(2, Math.round((w.unlocks / maxWeek) * 100))}%`, opacity: w.unlocks ? 1 : 0.25 }} />
-                <span className="tls-type-small text-white/40 whitespace-nowrap">{weekLabel(w.week)}</span>
+                <span className="tls-type-small text-quiet whitespace-nowrap">{weekLabel(w.week)}</span>
               </div>
             ))}
           </div>
@@ -67,7 +67,7 @@ export function StatsTab() {
                 <span className="font-bold tabular-nums text-[#FFD700]">{Number(row.points || 0).toLocaleString("de-DE")}</span>
               </li>
             ))}
-            {!data.top.length && <li className="py-6 text-center tls-type-small text-white/40">Noch niemand mit öffentlichem Profil.</li>}
+            {!data.top.length && <li className="py-6 text-center tls-type-small text-quiet">Noch niemand mit öffentlichem Profil.</li>}
           </ol>
         </Panel>
       </div>

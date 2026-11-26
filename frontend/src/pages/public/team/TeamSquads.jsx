@@ -45,7 +45,7 @@ export function TeamSquads({ team, userId, canManage = false, enabled = false })
               </div>
               {squad.game || squad.game_id ? <p className="mt-1 tls-type-small text-white/60 break-words" data-testid={`team-squad-game-line-${squad.id}`}>{squadGameLabel(squad)}</p> : null}
               <p className="mt-1 tls-type-small text-white/60 break-words" data-testid={`team-squad-roles-line-${squad.id}`}>{rolesSummary(squad, squad.members)}</p>
-              <p className="mt-1 tls-type-small text-white/40">{(squad.members || []).length} im Kader</p>
+              <p className="mt-1 tls-type-small text-quiet">{(squad.members || []).length} im Kader</p>
             </li>
           );
         })}

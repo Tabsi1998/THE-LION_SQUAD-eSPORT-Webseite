@@ -133,7 +133,7 @@ export function ChatStickerPicker({ open, onClose, onPick, disabled = false }) {
       )}
       {failed && <p role="alert" className="py-4 text-center tls-type-small text-[#FF6B61]">Sticker konnten nicht geladen werden.</p>}
       {packs !== null && searching && visible.length === 0 && (
-        <p className="py-4 text-center tls-type-small text-white/40">Kein Sticker passt zu „{query.trim()}“.</p>
+        <p className="py-4 text-center tls-type-small text-quiet">Kein Sticker passt zu „{query.trim()}“.</p>
       )}
     </div>
   );

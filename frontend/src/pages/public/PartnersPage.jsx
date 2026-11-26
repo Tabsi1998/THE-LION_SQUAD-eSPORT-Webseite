@@ -43,7 +43,7 @@ export default function PartnersPage() {
               <Star className="h-3.5 w-3.5" /> Sponsoren
             </div>
             <p className="mt-2 tls-type-small text-white/55">Unterstützer, Tiers und Marken, die Events und Turniere mit möglich machen.</p>
-            <span className="mt-3 inline-flex items-center gap-1.5 tls-type-label text-white/35 group-hover:text-[#FFD700]">
+            <span className="mt-3 inline-flex items-center gap-1.5 tls-type-label text-quiet group-hover:text-[#FFD700]">
               Sponsoren ansehen <ArrowRight className="h-3 w-3" />
             </span>
           </Link>
@@ -52,7 +52,7 @@ export default function PartnersPage() {
               <Handshake className="h-3.5 w-3.5" /> Kooperation
             </div>
             <p className="mt-2 tls-type-body text-white/55">Kontakt für gemeinsame Events, Community-Projekte und langfristige Partnerschaften.</p>
-            <span className="mt-3 inline-flex items-center gap-1.5 tls-type-label text-white/35 group-hover:text-[#29B6E8]">
+            <span className="mt-3 inline-flex items-center gap-1.5 tls-type-label text-quiet group-hover:text-[#29B6E8]">
               Kontakt aufnehmen <ArrowRight className="h-3 w-3" />
             </span>
           </Link>

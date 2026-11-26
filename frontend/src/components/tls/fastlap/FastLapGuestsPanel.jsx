@@ -87,7 +87,7 @@ export function FastLapGuestsPanel({ guests, locked, onChanged }) {
               <UserRound className="w-4 h-4 shrink-0 text-white/40" aria-hidden="true" />
               <span className="tls-type-small text-white truncate">{guest.display_name}</span>
               {guest.linked_user_id && <span className="tls-type-label text-[#29B6E8] border border-[#29B6E8]/40 rounded-sm px-1">Verknüpft</span>}
-              {!guest.has_times && <span className="tls-type-small text-white/40">ohne Zeiten</span>}
+              {!guest.has_times && <span className="tls-type-small text-quiet">ohne Zeiten</span>}
             </div>
             <div className="flex items-center gap-1 shrink-0">
               <button type="button" onClick={() => rename(guest)} data-testid={`f1-guest-rename-${guest.id}`} aria-label={`${guest.display_name} umbenennen`} title="Umbenennen" className="p-2 text-white/40 hover:text-[#29B6E8]">

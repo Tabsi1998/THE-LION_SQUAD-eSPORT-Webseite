@@ -45,7 +45,7 @@ export default function MemberBenefitsPage() {
                     <h3 className="mt-1 tls-type-card">{b.title}</h3>
                     {b.description && <p className="mt-2 tls-type-body text-white/65 flex-1">{b.description}</p>}
                     {b.valid_until && (
-                      <div className="mt-3 tls-type-small text-white/40">Gültig bis {viennaDate(b.valid_until)}</div>
+                      <div className="mt-3 tls-type-small text-quiet">Gültig bis {viennaDate(b.valid_until)}</div>
                     )}
                     {b.link_url && (
                       <a href={b.link_url} target="_blank" rel="noreferrer" className="mt-4 inline-flex items-center gap-1.5 tls-type-label text-[#FFD700] hover:underline">

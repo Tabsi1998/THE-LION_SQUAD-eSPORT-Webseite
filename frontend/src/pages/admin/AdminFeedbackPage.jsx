@@ -78,7 +78,7 @@ export default function AdminFeedbackPage() {
                         <div className="tls-type-small text-white/70">{item.count === 1 ? "1 Antwort" : `${item.count} Antworten`}</div>
                         {item.details
                           ? <div className="inline-flex items-center gap-1 font-black text-honor" data-testid={`feedback-average-${item.target_id}`}>{averageLabel(item.average)} <Star className="w-4 h-4 fill-honor" aria-hidden="true" /></div>
-                          : <div className="tls-type-small text-white/40" data-testid={`feedback-few-${item.target_id}`}>zu wenige</div>}
+                          : <div className="tls-type-small text-quiet" data-testid={`feedback-few-${item.target_id}`}>zu wenige</div>}
                         {item.details && (
                           <button type="button" aria-expanded={expanded} onClick={() => setOpen(expanded ? "" : key)} data-testid={`feedback-open-${item.target_id}`} className="tls-type-label text-[#29B6E8] hover:underline">
                             {expanded ? "Zuklappen" : "Auswertung"}

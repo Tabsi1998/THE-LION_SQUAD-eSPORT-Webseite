@@ -221,7 +221,7 @@ export default function AdminNewsPage() {
                       <div className="tls-type-small text-white/50">/{n.slug}</div>
                       {/* Ende der Anheftung (#1263): die Redaktion sieht, wie lange der Beitrag noch oben steht. */}
                       {pin && (pin.active ? pin.text : pin.until) && (
-                        <div className={`mt-0.5 tls-type-small ${pin.active ? "text-honor/80" : "text-white/40"}`} data-testid={`news-pin-${n.id}`}>
+                        <div className={`mt-0.5 tls-type-small ${pin.active ? "text-honor/80" : "text-quiet"}`} data-testid={`news-pin-${n.id}`}>
                           {pin.active ? `Angepinnt ${pin.text}` : `Anpinnen abgelaufen (${pin.text})`}
                         </div>
                       )}
@@ -271,7 +271,7 @@ export default function AdminNewsPage() {
                 })}
                 {filteredList.length === 0 && (
                   <tr>
-                    <td colSpan="6" className="px-4 py-10 text-center tls-type-small text-white/40">Keine News für diesen Filter.</td>
+                    <td colSpan="6" className="px-4 py-10 text-center tls-type-small text-quiet">Keine News für diesen Filter.</td>
                   </tr>
                 )}
               </tbody>

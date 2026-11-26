@@ -304,7 +304,7 @@ export function SeriesParticipantsSection({ series }) {
             </li>
           );
         })}
-        {data.participants.length === 0 && <li className="py-2 tls-type-small text-white/40">Noch keine Teilnehmer.</li>}
+        {data.participants.length === 0 && <li className="py-2 tls-type-small text-quiet">Noch keine Teilnehmer.</li>}
         {data.participants.length > 0 && visible.length === 0 && (
           <li className="py-3 tls-type-small text-white/45" data-testid="series-participants-none">Kein Teilnehmer passt zu Filter und Suche.</li>
         )}

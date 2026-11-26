@@ -640,7 +640,7 @@ function Badge({ label, tone }) {
 function Info({ label, value }) {
   return (
     <div className="border border-white/10 bg-black/20 rounded-sm px-3 py-2 min-w-0">
-      <div className="tls-type-label text-white/35">{label}</div>
+      <div className="tls-type-label text-quiet">{label}</div>
       <div className="mt-1 text-white/75 break-words">{value}</div>
     </div>
   );

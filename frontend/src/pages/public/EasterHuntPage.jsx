@@ -167,7 +167,7 @@ export default function EasterHuntPage() {
               ) : (
                 <p className="mt-2 tls-type-small text-white/55">{running ? "Noch hat niemand alle Eier – vielleicht bist du die oder der Erste." : "Diesmal hat niemand mit öffentlichem Profil alle Eier gefunden."}</p>
               )}
-              <p className="mt-3 tls-type-small text-white/40">Hier stehen nur Personen, deren Profil und Erfolge öffentlich sind. {page.completed ? `Insgesamt ${page.completed} mit vollem Korb.` : ""}</p>
+              <p className="mt-3 tls-type-small text-quiet">Hier stehen nur Personen, deren Profil und Erfolge öffentlich sind. {page.completed ? `Insgesamt ${page.completed} mit vollem Korb.` : ""}</p>
             </section>
 
             <section className="rounded-sm border border-white/10 bg-[#111] p-5" data-testid="easter-terms">

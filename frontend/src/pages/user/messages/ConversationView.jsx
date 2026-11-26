@@ -94,13 +94,13 @@ export function ConversationView({ me, messages, hasMore, loadingOlder, onLoadOl
             </button>
           </div>
         ) : null}
-        {items.length === 0 ? <div className="text-center py-16 tls-type-small text-white/35">{emptyText}</div> : null}
+        {items.length === 0 ? <div className="text-center py-16 tls-type-small text-quiet">{emptyText}</div> : null}
         {items.map((item) => {
           if (item.type === "day") {
             return (
               <div key={item.key} className="flex items-center gap-3 my-3" data-testid="conversation-day">
                 <span className="h-px flex-1 bg-white/10" />
-                <span className="tls-type-label text-white/40">{item.label}</span>
+                <span className="tls-type-label text-quiet">{item.label}</span>
                 <span className="h-px flex-1 bg-white/10" />
               </div>
             );
@@ -110,7 +110,7 @@ export function ConversationView({ me, messages, hasMore, loadingOlder, onLoadOl
             <div key={item.key} className={`flex ${mine ? "justify-end" : "justify-start"} ${showHeader ? "mt-3" : "mt-1"}`} data-testid={`conversation-message-${message.id}`}>
               <div className={`max-w-[85%] md:max-w-[70%] border rounded-sm px-3 py-2 ${mine ? "border-[#29B6E8]/40 bg-[#29B6E8]/10" : "border-white/10 bg-[#0A0A0A]"}`}>
                 {showHeader ? (
-                  <div className="tls-type-small text-white/35 flex items-center gap-2">
+                  <div className="tls-type-small text-quiet flex items-center gap-2">
                     <span className="font-bold text-white/55">{mine ? "Du" : message.sender?.display_name || message.sender?.username || ""}</span>
                     <span>{timeLabel(message.created_at)}</span>
                   </div>

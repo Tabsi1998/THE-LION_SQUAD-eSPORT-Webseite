@@ -236,12 +236,12 @@ export function PersonPicker({ value, onChange, testId = "person", label = "Pers
             {u.avatar_url ? <img src={resolveMediaUrl(u.avatar_url)} alt="" className="w-7 h-7 rounded-sm object-cover" /> : <div className="w-7 h-7 rounded-sm bg-[#0A0A0A] border border-white/10" />}
             <div className="min-w-0">
               <div className="tls-type-small font-semibold tls-wrap">{personName(u)}</div>
-              <div className="tls-type-small text-white/40 tls-wrap">@{u.username}</div>
+              <div className="tls-type-small text-quiet tls-wrap">@{u.username}</div>
             </div>
             {u.is_club_member && <Crown className="ml-auto w-3.5 h-3.5 text-[#FFD700]" aria-label="Vereinsmitglied" />}
           </button>
         ))}
-        {!users.length && <div className="px-3 py-5 text-center tls-type-small text-white/40">Keine Treffer.</div>}
+        {!users.length && <div className="px-3 py-5 text-center tls-type-small text-quiet">Keine Treffer.</div>}
       </div>
     </div>
   );

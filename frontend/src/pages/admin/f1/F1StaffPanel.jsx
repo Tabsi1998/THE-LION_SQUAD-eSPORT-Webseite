@@ -103,7 +103,7 @@ export function F1StaffPanel({ challengeId, staff, staffError = "", onChanged })
                   <tr key={assignment.id}>
                     <td className="px-4 py-3">
                       <div className="font-semibold">{assignment.user?.display_name || assignment.user?.username || "-"}</div>
-                      {assignment.user?.username && <div className="tls-type-small text-white/40">@{assignment.user.username}</div>}
+                      {assignment.user?.username && <div className="tls-type-small text-quiet">@{assignment.user.username}</div>}
                     </td>
                     <td className="px-4 py-3">{roleLabel(assignment.role)}</td>
                     <td className="px-4 py-3"><StatusBadge status={assignment.is_active === false ? "paused" : "approved"} /></td>

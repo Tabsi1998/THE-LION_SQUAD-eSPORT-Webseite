@@ -151,7 +151,7 @@ export function CheckinBoard({ slug, tournamentId, eventId }) {
         </div>
       ) : null}
 
-      <p className="mt-4 tls-type-small text-white/40">
+      <p className="mt-4 tls-type-small text-quiet">
         {board.tournament?.self_checkin
           ? "Spieler können auch selbst einchecken – was hier steht, gilt für beide Wege. "
           : "Vor Ort checkt nur die Turnierleitung ein. "}
@@ -220,7 +220,7 @@ function TeamMembers({ row }) {
       </div>
       {groups.map((group) => (
         <div key={group.key} className="mt-1.5 flex flex-wrap items-center gap-1">
-          {group.label ? <span className="mr-0.5 tls-type-label text-white/40">{group.label}</span> : null}
+          {group.label ? <span className="mr-0.5 tls-type-label text-quiet">{group.label}</span> : null}
           {group.members.map((member) => (
             <span key={member.id} className={`max-w-full rounded-sm border px-1.5 py-0.5 tls-type-small [overflow-wrap:anywhere] ${member.present ? "border-ok/40 text-white/85" : "border-white/10 text-white/50"}`}>
               {member.present ? <span className="sr-only">da: </span> : null}{member.name}{member.leader ? " (Leitung)" : ""}

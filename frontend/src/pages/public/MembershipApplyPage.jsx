@@ -242,7 +242,7 @@ export default function MembershipApplyPage() {
             <button type="submit" disabled={submitting} data-testid="apply-submit" className="tls-btn tls-btn--primary w-full px-6 py-3 font-bold uppercase tracking-wider rounded-sm inline-flex items-center justify-center gap-2 disabled:opacity-50">
               <Crown className="w-4 h-4" /> {submitting ? "Sende …" : coupled ? "Antrag einreichen" : "Bewerbung einreichen"}
             </button>
-            {coupled && <p className="tls-type-small text-white/40">Der Antrag geht direkt in die Mitgliederverwaltung des Vereins. Aufgenommen wird dort; du siehst hier den Stand und bekommst eine E-Mail.</p>}
+            {coupled && <p className="tls-type-small text-quiet">Der Antrag geht direkt in die Mitgliederverwaltung des Vereins. Aufgenommen wird dort; du siehst hier den Stand und bekommst eine E-Mail.</p>}
           </form>
         )}
       </section>
@@ -316,7 +316,7 @@ function CoupledFields({ setup, form, updateField, fieldErrors, requiredPerson }
               <span className="tls-type-small text-white/70"><span className="text-white font-bold">{consent.label}:</span> {consent.text}</span>
             </label>
           ))}
-          <p className="tls-type-small text-white/40">Nichts davon ist Pflicht. Du kannst jede Einwilligung später widerrufen.</p>
+          <p className="tls-type-small text-quiet">Nichts davon ist Pflicht. Du kannst jede Einwilligung später widerrufen.</p>
         </div>
       )}
     </>

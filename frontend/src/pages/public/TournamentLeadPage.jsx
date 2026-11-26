@@ -427,7 +427,7 @@ export default function TournamentLeadPage() {
         {activeTab === "stations" && queue ? (
           <div className="mt-5" data-testid="lead-stations">
             <StationQueueBoard queue={queue} {...stationHandlers} />
-            <p className="mt-4 tls-type-small text-white/40">Die Reihenfolge rechnet der Server aus Plan, Linien und Stationen – wird eine Station frei, rückt das nächste bereite Spiel nach. „Aufrufen“ schickt den Spielern „Du bist dran“; „nicht erschienen“ greift nach der Frist ab dem Aufruf. „Defekt“ nimmt die Station aus der Planung – was dort läuft oder aufgerufen ist, legst du mit „Umlegen“ auf eine freie Station.</p>
+            <p className="mt-4 tls-type-small text-quiet">Die Reihenfolge rechnet der Server aus Plan, Linien und Stationen – wird eine Station frei, rückt das nächste bereite Spiel nach. „Aufrufen“ schickt den Spielern „Du bist dran“; „nicht erschienen“ greift nach der Frist ab dem Aufruf. „Defekt“ nimmt die Station aus der Planung – was dort läuft oder aufgerufen ist, legst du mit „Umlegen“ auf eine freie Station.</p>
           </div>
         ) : null}
 
@@ -455,7 +455,7 @@ export default function TournamentLeadPage() {
                 onNoShow={(body) => decideNoShow(item, body)}
               />
             )))}
-            <p className="tls-type-small text-white/40">Erledigtes verschwindet von selbst. Bei neuen Fällen kommt eine Benachrichtigung.</p>
+            <p className="tls-type-small text-quiet">Erledigtes verschwindet von selbst. Bei neuen Fällen kommt eine Benachrichtigung.</p>
           </div>
         ) : null}
 
@@ -467,7 +467,7 @@ export default function TournamentLeadPage() {
             </button>
           ))}
         </div>
-        <div className="mt-4 tls-type-small font-bold text-white/40">Zuerst, was fehlt · dann nach Station</div>
+        <div className="mt-4 tls-type-small font-bold text-quiet">Zuerst, was fehlt · dann nach Station</div>
 
         <div className="mt-2 space-y-2" data-testid="lead-list">
           {!data ? <div className="py-10 text-center text-white/40">Wird geladen …</div> : null}
@@ -477,7 +477,7 @@ export default function TournamentLeadPage() {
 
         {(data?.recent || []).length ? (
           <div className="mt-8">
-            <div className="tls-type-label text-white/40">Zuletzt eingetragen</div>
+            <div className="tls-type-label text-quiet">Zuletzt eingetragen</div>
             <div className="mt-2 space-y-2" data-testid="lead-recent">
               {data.recent.map((item) => (
                 <div key={item.id} className="flex items-center gap-3 rounded-sm border border-white/10 bg-[#121212] p-3">
@@ -494,7 +494,7 @@ export default function TournamentLeadPage() {
           </div>
         ) : null}
         </>) : null}
-        {activeTab !== "checkin" && activeTab !== "notice" ? <p className="mt-6 tls-type-small text-white/40">Hier stehen nur Spiele, für die du eingeteilt bist. Jede Eingabe steht im Protokoll (wer, wann, was).</p> : null}
+        {activeTab !== "checkin" && activeTab !== "notice" ? <p className="mt-6 tls-type-small text-quiet">Hier stehen nur Spiele, für die du eingeteilt bist. Jede Eingabe steht im Protokoll (wer, wann, was).</p> : null}
       </section>
 
       {opened && opened.can_enter ? <ResultWindow key={opened.id} entry={opened} onClose={closeEntry} onSaved={undo.start} /> : null}
@@ -663,7 +663,7 @@ function LeadRow({ item, onEnter }) {
   const held = item.hold;
   return (
     <div className={`flex items-center gap-3 rounded-sm border p-3 ${missing ? "border-[#FFD700]/45 bg-[#FFD700]/5" : "border-white/10 bg-[#121212]"}`} data-testid={`lead-row-${item.id}`} data-missing={missing ? "true" : "false"}>
-      <div className={`flex h-12 w-14 shrink-0 flex-col items-center justify-center rounded-sm border text-center tls-type-label leading-tight ${item.station_text ? "border-[#29B6E8]/40 text-[#29B6E8]" : "border-white/10 text-white/40"}`}>
+      <div className={`flex h-12 w-14 shrink-0 flex-col items-center justify-center rounded-sm border text-center tls-type-label leading-tight ${item.station_text ? "border-[#29B6E8]/40 text-[#29B6E8]" : "border-white/10 text-quiet"}`}>
         {item.station_text ? item.station_text.split(" · ")[0] : "ohne Station"}
       </div>
       <div className="min-w-0 flex-1">

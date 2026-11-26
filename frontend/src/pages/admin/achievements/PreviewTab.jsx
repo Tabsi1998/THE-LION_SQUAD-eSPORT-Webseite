@@ -162,7 +162,7 @@ export function PreviewTab() {
       <section className="mt-8" data-testid="preview-gallery">
         <div className="flex items-baseline justify-between mb-4">
           <h2 className="tls-type-section">Alle Motive · {everyMaterial ? "alle Materialien" : <span style={{ color: look.rim }}>{look.name}</span>}</h2>
-          <span className="tls-type-label text-white/40" data-testid="preview-count">{keys.length} Motive</span>
+          <span className="tls-type-label text-quiet" data-testid="preview-count">{keys.length} Motive</span>
         </div>
         {everyMaterial ? (
           <div className="space-y-2" data-testid="preview-matrix">

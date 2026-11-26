@@ -491,7 +491,7 @@ function EventOverview({ e, user, over, accessToken, hasConsent, onChanged, regi
           <div className="grid sm:grid-cols-2 gap-4">
             {e.news.map((n) => (
               <Link key={n.id} to={`/news/${n.slug}`} className="tls-card border border-white/10 rounded-sm bg-[#121212] p-4">
-                <div className="tls-type-label text-white/40">{viennaDate(n.published_at || n.created_at)}</div>
+                <div className="tls-type-label text-quiet">{viennaDate(n.published_at || n.created_at)}</div>
                 <div className="font-bold mt-1">{n.title}</div>
                 {n.excerpt && <div className="tls-type-small text-white/60 mt-1 line-clamp-2">{n.excerpt}</div>}
               </Link>
@@ -834,7 +834,7 @@ function EventRegistrationPanel({ event, user, accessToken = "", onChanged, open
             <label className="block">
               <div className="tls-type-label text-white/50 mb-1.5">Begleitpersonen</div>
               <input type="number" min="0" max={maxCompanions} value={companionCount} onChange={(ev) => { setCompanionCount(ev.target.value); setActionError(""); }} className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm" />
-              <div className="mt-1 tls-type-small text-white/40">Maximal {maxCompanions} pro Anmeldung.</div>
+              <div className="mt-1 tls-type-small text-quiet">Maximal {maxCompanions} pro Anmeldung.</div>
             </label>
           )}
           {offer?.positions.some((position) => position.optional) && (
@@ -910,7 +910,7 @@ function ParticipantList({ title, rows, testId }) {
 function MiniStat({ label, value }) {
   return (
     <div className="border border-white/10 bg-[#0A0A0A] rounded-sm p-3">
-      <div className="tls-type-label text-white/40">{label}</div>
+      <div className="tls-type-label text-quiet">{label}</div>
       <div className="mt-1 tls-type-card tls-type-num">{value}</div>
     </div>
   );

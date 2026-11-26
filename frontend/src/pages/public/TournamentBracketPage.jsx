@@ -86,7 +86,7 @@ export default function TournamentBracketPage() {
             <h1 className="mt-2 tls-type-title">{t.title}</h1>
             <div className="mt-2 flex gap-2 items-center">
               <PhaseBadge phase={t.public_phase} status={t.status} />
-              <span className="text-white/40 tls-type-small">{formatTournamentDisplay(t)}</span>
+              <span className="text-quiet tls-type-small">{formatTournamentDisplay(t)}</span>
             </div>
             <TournamentTabs tournament={t} accessToken={accessToken} className="mt-4" />
           </div>

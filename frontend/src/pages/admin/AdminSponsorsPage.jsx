@@ -318,7 +318,7 @@ function SponsorForm({ sponsor, events = [], locked = new Set(), onClose, onSave
                 </label>
               ))}
             </div>
-            <p className="tls-type-small text-white/40">Nur hier wird festgelegt, wo der Sponsor erscheint – das Event zeigt es nur an.</p>
+            <p className="tls-type-small text-quiet">Nur hier wird festgelegt, wo der Sponsor erscheint – das Event zeigt es nur an.</p>
           </div>
         )}
         {form.show_on_events && eventScope === "selected" && events.length > 0 && (
@@ -357,7 +357,7 @@ function SponsorPlacementPreview({ sponsor }) {
       <div className="flex items-center justify-between gap-3">
         <div>
           <div className="tls-type-label text-white/60">Vorschau Ausspielung</div>
-          <p className="mt-1 tls-type-small text-white/40">
+          <p className="mt-1 tls-type-small text-quiet">
             Öffentlich sichtbar, wenn „Öffentlich zeigen“ an ist und die Laufzeit passt.
           </p>
         </div>
@@ -369,7 +369,7 @@ function SponsorPlacementPreview({ sponsor }) {
         {enabled.length ? enabled.map(([key, label]) => (
           <span key={key} className="tls-type-label px-2 py-1 border border-white/10 text-white/70 rounded-sm">{label}</span>
         )) : (
-          <span className="tls-type-small text-white/35">Keine Platzierung aktiv.</span>
+          <span className="tls-type-small text-quiet">Keine Platzierung aktiv.</span>
         )}
       </div>
     </div>

@@ -92,7 +92,7 @@ export function DiscordServerList({ data, testId = "discord-servers" }) {
             <ServerIcon server={server} className="w-9 h-9" />
             <div className="min-w-0 flex-1">
               <div className="font-bold tls-type-small text-white truncate">{server.name}</div>
-              <div className="tls-type-small text-white/40">{[server.main ? "Hauptserver" : "", members].filter(Boolean).join(" · ")}</div>
+              <div className="tls-type-small text-quiet">{[server.main ? "Hauptserver" : "", members].filter(Boolean).join(" · ")}</div>
             </div>
             <JoinAction server={server} testId={rowId} size="sm" />
           </div>

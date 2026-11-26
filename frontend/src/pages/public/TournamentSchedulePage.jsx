@@ -268,7 +268,7 @@ export default function TournamentSchedulePage() {
                 <div className="mt-0.5 tls-type-small text-white/55 tabular-nums" data-testid="matchday-range">
                   {formatWeekRange(currentWeek.starts_at, currentWeek.ends_at)}
                 </div>
-                <div className="mt-0.5 tls-type-label text-white/30">
+                <div className="mt-0.5 tls-type-label text-quiet">
                   {weekIndex + 1} von {weeks.length}
                 </div>
               </div>
@@ -344,7 +344,7 @@ function When({ entry, resolved }) {
       <span className="tls-type-small text-white/70 tabular-nums" data-testid={`schedule-when-${match.id}`}>{formatWhen(scheduledAt, { fallback: "Termin offen" })}</span>
       {entry.forecast && scheduledAt && <span className="tls-type-small text-white/45" data-testid={`schedule-forecast-${match.id}`}>voraussichtlich</span>}
       {source && !entry.forecast && (
-        <span className="tls-type-label text-white/35" data-testid={`schedule-source-${match.id}`}>{source}</span>
+        <span className="tls-type-label text-quiet" data-testid={`schedule-source-${match.id}`}>{source}</span>
       )}
     </span>
   );
@@ -430,7 +430,7 @@ function StationView({ entries, changedMatches, queue = null, staleSince = 0 }) 
                 >
                   <span className="tls-sched-line__time tabular-nums">
                     {entry.scheduledAt ? formatWhen(entry.scheduledAt) : "offen"}
-                    {entry.forecast && <span className="block tls-type-small font-normal text-white/40">voraussichtlich</span>}
+                    {entry.forecast && <span className="block tls-type-small font-normal text-quiet">voraussichtlich</span>}
                   </span>
                   <span className="min-w-0">
                     {entry.heat ? (

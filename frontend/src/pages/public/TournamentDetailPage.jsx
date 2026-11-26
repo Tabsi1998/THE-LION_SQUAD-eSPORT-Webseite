@@ -572,7 +572,7 @@ function TournamentDetailView() {
                   </div>
                 );
               })}
-              {regs.length === 0 && <div className="p-6 text-white/40 tls-type-small text-center">Noch keine Teilnehmer</div>}
+              {regs.length === 0 && <div className="p-6 text-quiet tls-type-small text-center">Noch keine Teilnehmer</div>}
             </div>
           </section>
         </div>
@@ -684,7 +684,7 @@ function TournamentChat({ tournament, user }) {
                 return (
                   <div key={message.id} className={`flex ${mine ? "justify-end" : "justify-start"}`}>
                     <div className={`max-w-[85%] border rounded-sm px-3 py-2 ${mine ? "border-[#29B6E8]/40 bg-[#29B6E8]/10" : "border-white/10 bg-[#0A0A0A]"}`}>
-                      <div className="flex items-center gap-2 tls-type-small text-white/40">
+                      <div className="flex items-center gap-2 tls-type-small text-quiet">
                         <span className={mine ? "text-[#29B6E8]" : "text-white/55"}>{message.author?.display_name || message.author?.username || "Benutzer"}</span>
                         {message.created_at && <span>{viennaDateTime(message.created_at, { dateStyle: "short", timeStyle: "short" })}</span>}
                       </div>
@@ -696,7 +696,7 @@ function TournamentChat({ tournament, user }) {
                   </div>
                 );
               })}
-              {messages.length === 0 && <div className="text-center py-8 tls-type-small text-white/35">Noch keine Nachrichten.</div>}
+              {messages.length === 0 && <div className="text-center py-8 tls-type-small text-quiet">Noch keine Nachrichten.</div>}
             </div>
             <ChatAttachmentDrafts drafts={attachments.drafts} onRemove={attachments.remove} />
             <ChatStickerPicker open={stickersOpen} onClose={() => setStickersOpen(false)} onPick={sendSticker} disabled={loading} />

@@ -425,7 +425,7 @@ export default function AdminDolibarrPage() {
               {withoutAccount.ended.length > 0 && (
                 <Panel title={`Beendete Mitgliedschaften ohne Konto (${withoutAccount.ended.length})`}>
                   <p className="tls-type-small text-white/45 mb-3">Ehemalige – keine Mitglieder mehr. Sie stehen hier nur, damit nichts fehlt.</p>
-                  <div className="tls-type-small text-white/40 line-through decoration-white/20 columns-1 sm:columns-2 lg:columns-3" data-testid="dolibarr-ended">
+                  <div className="tls-type-small text-quiet line-through decoration-white/20 columns-1 sm:columns-2 lg:columns-3" data-testid="dolibarr-ended">
                     {withoutAccount.ended.map((entry) => <div key={entry.member_id}>{entry.name} <span className="text-white/25">Nr. {entry.ref}</span></div>)}
                   </div>
                 </Panel>
@@ -517,7 +517,7 @@ export default function AdminDolibarrPage() {
                   <li>Speichern → „Verbindung testen“. Steht dort „Verbunden“, rechts den Modus auf „Vorschau“ stellen.</li>
                 </ol>
               </details>
-              <p className="tls-type-small text-white/40">Der Schlüssel wird verschlüsselt gespeichert und nie wieder angezeigt.</p>
+              <p className="tls-type-small text-quiet">Der Schlüssel wird verschlüsselt gespeichert und nie wieder angezeigt.</p>
               <div className="flex flex-wrap gap-2">
                 <button type="button" disabled={!!busy} data-testid="dolibarr-save" onClick={saveConnection}
                   className="px-5 py-2 bg-[#29B6E8] text-black tls-type-label rounded-sm disabled:opacity-40">Speichern</button>
@@ -595,7 +595,7 @@ export default function AdminDolibarrPage() {
                 {status?.signed_webhook?.source === "env" && (
                   <p className="tls-type-small text-white/45" data-testid="dolibarr-signed-env">In der Server-Umgebung steht schon ein Schlüssel (DOLIBARR_WEBHOOK_SECRETS). Er gilt weiter und hat bei gleicher Kennung Vorrang.</p>
                 )}
-                <p className="tls-type-small text-white/40">Das Geheimnis wird verschlüsselt gespeichert und nie wieder angezeigt.</p>
+                <p className="tls-type-small text-quiet">Das Geheimnis wird verschlüsselt gespeichert und nie wieder angezeigt.</p>
                 <div className="flex flex-wrap gap-2">
                   <button type="button" disabled={!!busy || !signedKeyId.trim() || (!signedSecret && !status?.signed_webhook?.secret_stored) || (!signedSecret && signedKeyId.trim() === (status?.signed_webhook?.key_id || ""))} onClick={saveSignedWebhook} data-testid="dolibarr-signed-save"
                     className="px-4 py-2 bg-[#29B6E8] text-black tls-type-label rounded-sm disabled:opacity-40">Speichern</button>

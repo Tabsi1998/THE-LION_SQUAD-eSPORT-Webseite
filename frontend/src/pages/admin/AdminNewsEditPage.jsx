@@ -442,7 +442,7 @@ function NewsForm({ post, meta, onDone, onReload }) {
                     <AtSign className="w-4 h-4 text-[#29B6E8] shrink-0" />
                     <span className="min-w-0">
                       <span className="block tls-wrap text-white">{userLabel(user)}</span>
-                      <span className="block tls-wrap tls-type-small text-white/40">@{user.username}</span>
+                      <span className="block tls-wrap tls-type-small text-quiet">@{user.username}</span>
                     </span>
                   </button>
                 ))}

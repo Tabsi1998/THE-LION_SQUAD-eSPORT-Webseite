@@ -38,7 +38,7 @@ function Detail({ job, testId }) {
     <>
       <div className="mt-1 tls-type-small text-white/60" data-testid={testId}>{queueDetail(job, when)}</div>
       {job.last_error && !mailErrorKnown(job.last_error) && (
-        <div className="mt-0.5 tls-type-small text-white/35 break-words">Meldung des Servers: {String(job.last_error).slice(0, 200)}</div>
+        <div className="mt-0.5 tls-type-small text-quiet break-words">Meldung des Servers: {String(job.last_error).slice(0, 200)}</div>
       )}
     </>
   );
@@ -185,7 +185,7 @@ export function MailQueueSection({ queue, queueStats, queueFilter, setQueueFilte
       </div>
 
       {filteredQueue.length === 0 ? (
-        <div className="border border-white/10 bg-[#121212] rounded-sm py-10 text-center tls-type-small text-white/40" data-testid="queue-empty">
+        <div className="border border-white/10 bg-[#121212] rounded-sm py-10 text-center tls-type-small text-quiet" data-testid="queue-empty">
           {queueSearch && queue.length === 0 ? "Keine Mail an diese Adresse." : queue.length === 0 ? "Die Warteschlange ist leer." : "Keine Mails mit diesem Stand."}
         </div>
       ) : (

@@ -93,14 +93,14 @@ export default function MyMembershipPage() {
               <h2 className="tls-type-section inline-flex items-center gap-2"><Wallet className="w-4 h-4 text-[#FFD700]" /> Mitgliedsbeitrag</h2>
               <span className={`tls-type-label ${fee.tone === "warn" ? "text-[#FFD700]" : fee.tone === "info" ? "text-[#29B6E8]" : "text-[#00FF88]"}`}>{fee.label}</span>
             </div>
-            {fee.amount && <div className="mt-2 tls-type-section">{fee.amount} <span className="tls-type-small text-white/40 font-normal">je Beitragsperiode</span></div>}
+            {fee.amount && <div className="mt-2 tls-type-section">{fee.amount} <span className="tls-type-small text-quiet font-normal">je Beitragsperiode</span></div>}
             <ul className="mt-2 space-y-1 tls-type-small text-white/75">
               {fee.lines.map((line) => <li key={line}>{line}</li>)}
             </ul>
             {!!erp.functions?.length && (
               <div className="mt-3 tls-type-small text-white/75">Funktion im Verein: {erp.functions.map((fn) => fn.label).join(", ")}</div>
             )}
-            <div className={`mt-3 tls-type-small ${fee.stale ? "text-[#FFD700]" : "text-white/40"}`}>
+            <div className={`mt-3 tls-type-small ${fee.stale ? "text-[#FFD700]" : "text-quiet"}`}>
               Stand aus der Mitgliederverwaltung vom {formatDate(fee.asOf)}{fee.stale ? " – seither nicht mehr abgeglichen" : ""}. Stimmt etwas nicht, melde dich beim Vorstand.
             </div>
           </div>
@@ -155,7 +155,7 @@ export default function MyMembershipPage() {
                         <span className="text-white/40"> (vorher: {STATUS_LABELS[h.from_status] || h.from_status})</span>
                       )}
                     </div>
-                    <div className="tls-type-small text-white/40 mt-0.5">{viennaDateTime(h.at)}</div>
+                    <div className="tls-type-small text-quiet mt-0.5">{viennaDateTime(h.at)}</div>
                     {h.source === "dolibarr" && <div className="tls-type-small text-white/45 mt-1">aus der Mitgliederverwaltung übernommen</div>}
                   </div>
                 </div>

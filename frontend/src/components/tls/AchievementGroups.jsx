@@ -210,7 +210,7 @@ export function AchievementGroupsView({
       <div className="space-y-4" data-testid="achievement-groups" data-sort="rarity">
         <div className="flex items-baseline justify-between">
           <h2 className="tls-type-section">Die seltensten zuerst</h2>
-          <span className="tls-type-label text-white/40">{ordered.length} Gruppen</span>
+          <span className="tls-type-label text-quiet">{ordered.length} Gruppen</span>
         </div>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
           {ordered.map((g) => <GroupCard key={g.code} group={g} earnedOnly={earnedOnly} rarity={rarity} pins={pins} share={share} />)}
@@ -245,7 +245,7 @@ export function AchievementGroupsView({
                   </span>
                 )}
               </div>
-              <span className="tls-type-label text-white/40">
+              <span className="tls-type-label text-quiet">
                 {byCat[cat].length} Gruppen{cat === "hidden" && hidden ? ` · ${hidden.earned} von ${hidden.total} gefunden` : ""}
               </span>
             </div>
@@ -434,7 +434,7 @@ function GroupCard({ group, earnedOnly = false, rarity = null, pins = null, shar
           </div>
           <div className="mt-1 tls-type-small text-white/55 line-clamp-1">{group.description}</div>
           {rare?.top && (
-            <div className="mt-1 tls-type-small text-white/40 tabular-nums" data-testid={`achievement-rarity-${group.code}`}>
+            <div className="mt-1 tls-type-small text-quiet tabular-nums" data-testid={`achievement-rarity-${group.code}`}>
               <span style={{ color: accent }}>{formatPercent(rare.top.percent)}</span> haben {rare.top.material_name || "die höchste Stufe"}
               {Number(rare.holders || 0) > 0 && <span className="text-white/30"> · {rare.holders} mit mindestens einer Stufe</span>}
             </div>
@@ -445,7 +445,7 @@ function GroupCard({ group, earnedOnly = false, rarity = null, pins = null, shar
               <div className="flex-1 h-1 bg-white/5 rounded-sm overflow-hidden max-w-[200px]">
                 <div className={`h-full ${nextLocked.percent >= 80 ? "tls-near-fill" : ""}`} style={{ width: `${nextLocked.percent}%`, backgroundColor: accent, color: accent }} />
               </div>
-              <span className="tls-type-small text-white/40 tabular-nums">{nextLocked.current}/{nextLocked.target}</span>
+              <span className="tls-type-small text-quiet tabular-nums">{nextLocked.current}/{nextLocked.target}</span>
               {nextLocked.percent >= 80 && (
                 <span className="tls-near-chip tls-type-label shrink-0" style={{ color: accent }}>Fast geschafft!</span>
               )}
@@ -453,7 +453,7 @@ function GroupCard({ group, earnedOnly = false, rarity = null, pins = null, shar
           )}
         </div>
         <div className="flex items-center gap-2 shrink-0">
-          <span className="tls-type-label text-white/40 hidden sm:inline">
+          <span className="tls-type-label text-quiet hidden sm:inline">
             {earnedOnly ? group.earned_count : (isNegative ? `${group.earned_count} geheim` : `${group.earned_count}/${group.tier_count}`)}
           </span>
           <ChevronDown className={`w-4 h-4 text-white/40 transition-transform ${open ? "rotate-180" : ""}`} />
@@ -514,7 +514,7 @@ function TierRow({ tier, group, accent, isNegative = false, rarityPercent, pins 
             </span>
           )}
           {tier.condition_status === "planned" && !tier.earned && (
-            <span className="tls-type-label px-1.5 py-0.5 rounded-sm border border-white/10 text-white/35">
+            <span className="tls-type-label px-1.5 py-0.5 rounded-sm border border-white/10 text-quiet">
               geplant
             </span>
           )}
@@ -529,17 +529,17 @@ function TierRow({ tier, group, accent, isNegative = false, rarityPercent, pins 
             <div className="flex-1 h-1 bg-white/5 rounded-sm overflow-hidden">
               <div className={`h-full ${tier.percent >= 80 ? "tls-near-fill" : ""}`} style={{ width: `${tier.percent}%`, backgroundColor: accent, color: accent }} />
             </div>
-            <span className="tls-type-small text-white/40 tabular-nums">{tier.current}/{tier.target}</span>
+            <span className="tls-type-small text-quiet tabular-nums">{tier.current}/{tier.target}</span>
             {tier.percent >= 80 && (
               <span className="tls-near-chip tls-type-label shrink-0" style={{ color: accent }}>Fast geschafft!</span>
             )}
           </div>
         )}
         {!tier.earned && tier.condition_status === "planned" && !tier.manual_only && (
-          <div className="mt-1 tls-type-label text-white/30">Automatisierung geplant</div>
+          <div className="mt-1 tls-type-label text-quiet">Automatisierung geplant</div>
         )}
         {!tier.earned && tier.manual_only && (
-          <div className="mt-1 tls-type-label text-white/30">Wird manuell vergeben</div>
+          <div className="mt-1 tls-type-label text-quiet">Wird manuell vergeben</div>
         )}
       </div>
       <div className="shrink-0 text-right">
@@ -552,7 +552,7 @@ function TierRow({ tier, group, accent, isNegative = false, rarityPercent, pins 
           <div className="tls-type-label text-white/50">+{tier.points}</div>
         )}
         {hasRarity && (
-          <div className="mt-0.5 tls-type-label text-white/35 tabular-nums" data-testid={`achievement-tier-rarity-${tier.code}`}>
+          <div className="mt-0.5 tls-type-label text-quiet tabular-nums" data-testid={`achievement-tier-rarity-${tier.code}`}>
             {formatPercent(rarityPercent)} haben das
           </div>
         )}

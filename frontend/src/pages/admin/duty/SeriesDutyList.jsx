@@ -24,7 +24,7 @@ export function SeriesDutyList({ rows, testId = "duty-series" }) {
             <div className="flex items-center gap-2 min-w-0">
               <ListOrdered className="w-4 h-4 shrink-0 text-white/45" aria-hidden="true" />
               <span className="font-bold text-white tls-wrap">{row.title || row.lineage_title}</span>
-              <span className="shrink-0 tls-type-label text-white/40">{KIND_LABELS[row.lineage_kind] || "Serie"}</span>
+              <span className="shrink-0 tls-type-label text-quiet">{KIND_LABELS[row.lineage_kind] || "Serie"}</span>
             </div>
             <div className="mt-1 tls-type-small text-white/60">
               {seasonText(row)}{row.status ? ` · ${STATUS_LABELS[row.status] || row.status}` : ""} · Captain, {publishText(row.can_publish)}

@@ -158,7 +158,7 @@ function PersonAwards({ person, tick, onDone }) {
             )}
           </li>
         ))}
-        {person && !rows.length && <li className="py-6 text-center tls-type-small text-white/40">Noch keine Erfolge.</li>}
+        {person && !rows.length && <li className="py-6 text-center tls-type-small text-quiet">Noch keine Erfolge.</li>}
       </ul>
     </Panel>
   );

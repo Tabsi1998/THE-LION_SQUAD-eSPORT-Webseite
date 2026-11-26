@@ -48,7 +48,7 @@ export function OverviewTab() {
     }
   };
 
-  if (!data) return <div className="tls-type-small text-white/40" data-testid="ach-overview-loading">Lädt …</div>;
+  if (!data) return <div className="tls-type-small text-quiet" data-testid="ach-overview-loading">Lädt …</div>;
   const rarest = data.rarest;
   const active = data.most_active_category;
   const queue = data.queue || {};
@@ -121,7 +121,7 @@ export function OverviewTab() {
       )}
       {/* Neuberechnung (#2340): Probelauf und Abschluss nur für den Superadmin. */}
       {isSuperAdmin && <RecountPanel />}
-      <p className="tls-type-small text-white/35">Katalog: {data.catalog?.groups ?? 0} Gruppen · {data.catalog?.tiers ?? 0} Stufen</p>
+      <p className="tls-type-small text-quiet">Katalog: {data.catalog?.groups ?? 0} Gruppen · {data.catalog?.tiers ?? 0} Stufen</p>
     </div>
   );
 }

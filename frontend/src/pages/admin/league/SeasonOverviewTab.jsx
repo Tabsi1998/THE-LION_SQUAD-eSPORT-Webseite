@@ -50,7 +50,7 @@ export function SeasonPhaseBar({ season, calendar, divisions, now }) {
                   {current ? <span className="rounded-sm bg-[#29B6E8]/15 px-1.5 py-0.5 tls-type-small text-[#29B6E8]">Jetzt</span> : <span className="sr-only">({STATE_TEXT[step.state]})</span>}
                 </div>
                 {step.when ? <div className="mt-0.5 tls-type-small tabular-nums text-white/60">{step.when}</div> : null}
-                <div className={`mt-0.5 tls-type-small ${current ? "text-white/75" : "text-white/40"}`}>{step.note}</div>
+                <div className={`mt-0.5 tls-type-small ${current ? "text-white/75" : "text-quiet"}`}>{step.note}</div>
               </div>
             </li>
           );

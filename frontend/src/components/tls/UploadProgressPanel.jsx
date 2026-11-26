@@ -39,7 +39,7 @@ export function UploadProgressPanel({ progress, className = "" }) {
         </div>
         <div className="shrink-0 text-right">
           <div className="tls-type-section tls-type-num text-white">{Math.round(overallPercent)}%</div>
-          <div className="tls-type-label text-white/40">{progress.completed || 0}/{progress.total || 0}</div>
+          <div className="tls-type-label text-quiet">{progress.completed || 0}/{progress.total || 0}</div>
         </div>
       </div>
 
@@ -49,19 +49,19 @@ export function UploadProgressPanel({ progress, className = "" }) {
 
       <div className="mt-3 grid gap-2 tls-type-small text-white/55 sm:grid-cols-4">
         <div className="rounded-sm border border-white/10 bg-white/[0.03] px-3 py-2">
-          <div className="tls-type-label text-white/35">Erledigt</div>
+          <div className="tls-type-label text-quiet">Erledigt</div>
           <div className="mt-1 font-bold text-white">{progress.completed || 0}</div>
         </div>
         <div className="rounded-sm border border-white/10 bg-white/[0.03] px-3 py-2">
-          <div className="tls-type-label text-white/35">Offen</div>
+          <div className="tls-type-label text-quiet">Offen</div>
           <div className="mt-1 font-bold text-white">{remaining}</div>
         </div>
         <div className="rounded-sm border border-white/10 bg-white/[0.03] px-3 py-2">
-          <div className="tls-type-label text-white/35">Speed</div>
+          <div className="tls-type-label text-quiet">Speed</div>
           <div className="mt-1 font-bold text-white">{progress.speedBps ? `${fmtBytes(progress.speedBps)}/s` : done ? "-" : "..."}</div>
         </div>
         <div className="rounded-sm border border-white/10 bg-white/[0.03] px-3 py-2">
-          <div className="tls-type-label text-white/35">Aktuell</div>
+          <div className="tls-type-label text-quiet">Aktuell</div>
           <div className="mt-1 font-bold text-white">
             {progress.totalBytes ? `${fmtBytes(progress.loaded)} / ${fmtBytes(progress.totalBytes)}` : progress.originals ? `${progress.originals} Originale` : "-"}
           </div>

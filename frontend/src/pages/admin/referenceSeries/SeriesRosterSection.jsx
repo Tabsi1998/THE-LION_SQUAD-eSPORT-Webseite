@@ -117,7 +117,7 @@ export function SeriesRosterSection({ series }) {
                   {roster.map((row) => (
                     <li key={row.id} className="inline-flex items-center gap-1.5 pl-2.5 pr-1 min-h-[32px] border border-white/10 rounded-sm tls-type-small text-white/85" data-testid="roster-player">
                       {row.name}
-                      <span className={`tls-type-label ${row.link === "member" && row.link_status !== "open" ? "text-[#29B6E8]" : "text-white/40"}`}>{linkLabel(row)}</span>
+                      <span className={`tls-type-label ${row.link === "member" && row.link_status !== "open" ? "text-[#29B6E8]" : "text-quiet"}`}>{linkLabel(row)}</span>
                       <button type="button" disabled={busy} onClick={() => remove(row)} aria-label={`${row.name} aus dem Kader nehmen`} data-testid="roster-remove"
                         className="tls-hit p-1 text-white/40 hover:text-white disabled:opacity-40"><X className="w-3.5 h-3.5" /></button>
                     </li>

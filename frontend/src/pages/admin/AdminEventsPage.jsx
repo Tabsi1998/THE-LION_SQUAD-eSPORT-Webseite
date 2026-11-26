@@ -286,7 +286,7 @@ export default function AdminEventsPage() {
               </div>
             </li>
           ))}
-          {filteredList.length === 0 && <li className="py-10 text-center tls-type-small text-white/40">Keine Events für diesen Filter.</li>}
+          {filteredList.length === 0 && <li className="py-10 text-center tls-type-small text-quiet">Keine Events für diesen Filter.</li>}
         </ul>
         <div className="hidden md:block border border-white/10 rounded-sm bg-[#121212] overflow-hidden">
           <div className="tls-swipe pb-0">
@@ -319,7 +319,7 @@ export default function AdminEventsPage() {
                       ) : e.has_registration ? (
                         <div>
                           <div className="font-bold text-white">{e.registration_summary?.reserved_seats || 0}{e.max_participants ? `/${e.max_participants}` : ""} Plätze</div>
-                          <div className="tls-type-small text-white/40">{e.registration_summary?.registered_count || 0} Anm. · {e.registration_summary?.companion_count || 0} Begleitp.</div>
+                          <div className="tls-type-small text-quiet">{e.registration_summary?.registered_count || 0} Anm. · {e.registration_summary?.companion_count || 0} Begleitp.</div>
                           {e.registration_summary?.waitlist_count ? (
                             <div className="tls-type-small text-honor" data-testid={`event-waitlist-${e.id}`}>
                               {e.registration_summary.waitlist_count} Warteliste{e.registration_summary?.spots_left ? ` · ${e.registration_summary.spots_left} frei` : ""}
@@ -345,7 +345,7 @@ export default function AdminEventsPage() {
                 ))}
                 {filteredList.length === 0 && (
                   <tr>
-                    <td colSpan="8" className="px-4 py-10 text-center tls-type-small text-white/40">Keine Events für diesen Filter.</td>
+                    <td colSpan="8" className="px-4 py-10 text-center tls-type-small text-quiet">Keine Events für diesen Filter.</td>
                   </tr>
                 )}
               </tbody>

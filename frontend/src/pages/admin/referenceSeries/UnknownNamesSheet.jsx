@@ -48,7 +48,7 @@ function UnknownNameRow({ item, profiles, busy, onAssign }) {
           ))}
         </ul>
       ) : (
-        <div className="tls-type-small text-white/40" data-testid={`${testId}-none`}>Kein Vorschlag.</div>
+        <div className="tls-type-small text-quiet" data-testid={`${testId}-none`}>Kein Vorschlag.</div>
       )}
       <div className="flex items-end gap-2 flex-wrap">
         <SelectField label="Mitglied" value={profileId} onChange={setProfileId} options={profileOptions(suggestions, profiles)} testId={`${testId}-profile`} className="flex-1 min-w-[12rem]" />
@@ -110,7 +110,7 @@ export function UnknownNamesSheet({ series, onClose, onChanged }) {
         Gäste zählen fürs Team, aber nicht in der Vereinsstatistik. Für Externe wird nichts gespeichert.
       </p>
       {notice && <p className="tls-type-small text-white/55 border-l-2 border-[#29B6E8]/50 pl-3" role="status" data-testid="unknown-names-notice">{notice}</p>}
-      {!data && <div className="tls-type-small text-white/40">Lädt …</div>}
+      {!data && <div className="tls-type-small text-quiet">Lädt …</div>}
       {data && items.length === 0 && <div className="tls-type-small text-white/50" data-testid="unknown-names-empty">Alle Namen sind zugeordnet.</div>}
       {items.length > 0 && (
         <ul className="divide-y divide-white/5" data-testid="unknown-names-list">

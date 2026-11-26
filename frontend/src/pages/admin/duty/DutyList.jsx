@@ -39,7 +39,7 @@ export function DutyList({ rows, testId = "duty-list" }) {
               <div className="flex items-center gap-2 min-w-0">
                 <Icon className="w-4 h-4 shrink-0 text-white/45" aria-hidden="true" />
                 <span className="font-bold text-white tls-wrap">{row.title}</span>
-                <span className="shrink-0 tls-type-label text-white/40">{kind.label}</span>
+                <span className="shrink-0 tls-type-label text-quiet">{kind.label}</span>
               </div>
               {roles && <div className="mt-1 tls-type-small text-white/60" data-testid={`duty-roles-${row.id}`}>Deine Rolle: {roles}</div>}
               {/* Was die Rollen dürfen (#1384) - derselbe Satz wie in der Verwaltung und in der Nachricht. */}

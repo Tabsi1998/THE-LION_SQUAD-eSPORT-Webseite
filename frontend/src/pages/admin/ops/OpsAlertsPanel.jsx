@@ -177,11 +177,11 @@ export function OpsAlertsPanel() {
               <div className="tls-type-small font-bold text-white/60 mb-1.5">Upload-Routen, die nicht als langsam zählen (eine je Zeile, * am Ende = beginnt mit)</div>
               <textarea value={form.upload_routes} onChange={(e) => setForm((c) => ({ ...c, upload_routes: e.target.value }))} rows={5} spellCheck={false} data-testid="ops-alert-upload-routes"
                 className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-sm font-mono" />
-              <div className="tls-type-small text-white/40 mt-1">Anfragen mit Datei (multipart) erkennt die Website selbst; die Liste gilt für ältere Einträge und Sonderfälle.</div>
+              <div className="tls-type-small text-quiet mt-1">Anfragen mit Datei (multipart) erkennt die Website selbst; die Liste gilt für ältere Einträge und Sonderfälle.</div>
             </label>
           ) : null}
         </div>
-        <p className="tls-type-small text-white/40 mt-2">App-Logs, Tempo-Messungen und Upload-Ereignisse räumt die Datenbank selbst nach ihrer festen Frist.</p>
+        <p className="tls-type-small text-quiet mt-2">App-Logs, Tempo-Messungen und Upload-Ereignisse räumt die Datenbank selbst nach ihrer festen Frist.</p>
         <button type="button" onClick={save} disabled={!!busy} data-testid="ops-alert-save" className="mt-3 px-5 py-2 bg-[#29B6E8] text-black tls-type-label rounded-sm disabled:opacity-50">{busy === "save" ? "Speichere …" : "Alarme speichern"}</button>
       </div>
 
@@ -191,7 +191,7 @@ export function OpsAlertsPanel() {
           <ul className="divide-y divide-white/5 tls-type-small">
             {data.recent.map((row) => (
               <li key={row.id} className="py-2 flex flex-wrap gap-x-3 gap-y-1">
-                <span className="text-white/40 tls-type-small w-36 shrink-0">{formatTime(row.at)}</span>
+                <span className="text-quiet tls-type-small w-36 shrink-0">{formatTime(row.at)}</span>
                 <span className="font-bold">{row.title}</span>
                 <span className="tls-type-small text-white/45">{row.channels?.length ? row.channels.map((c) => (c === "discord" ? "Discord" : "E-Mail")).join(", ") : "kein Weg (Regel aus oder nichts eingerichtet)"}</span>
                 {row.description ? <span className="basis-full tls-type-small text-white/50 break-words">{row.description}</span> : null}

@@ -53,7 +53,7 @@ export function SmtpSection({ smtp, setSmtp, smtpTestEmail, setSmtpTestEmail, sm
               <option value="auto">Automatisch (Altbestand)</option>
               <option value="none">Ohne Anmeldung (lokaler Relay)</option>
             </select>
-            <p className="mt-1 tls-type-small text-white/40">Für normalen Versand: Benutzer/Passwort auf Port 587.</p>
+            <p className="mt-1 tls-type-small text-quiet">Für normalen Versand: Benutzer/Passwort auf Port 587.</p>
           </div>
           <div>
             <div className="tls-type-label text-white/60 mb-1.5">User</div>
@@ -102,7 +102,7 @@ export function SmtpSection({ smtp, setSmtp, smtpTestEmail, setSmtpTestEmail, sm
               className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-sm font-mono"
               placeholder="office@lionsquad.at"
             />
-            <p className="mt-1 tls-type-small text-white/40">MAIL FROM / Return-Path. Leer = SMTP User.</p>
+            <p className="mt-1 tls-type-small text-quiet">MAIL FROM / Return-Path. Leer = SMTP User.</p>
           </div>
           <div>
             <div className="tls-type-label text-white/60 mb-1.5">Antworten an</div>
@@ -114,7 +114,7 @@ export function SmtpSection({ smtp, setSmtp, smtpTestEmail, setSmtpTestEmail, sm
               className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-sm font-mono"
               placeholder="office@lionsquad.at"
             />
-            <p className="mt-1 tls-type-small text-white/40">Reply-To für Rückfragen.</p>
+            <p className="mt-1 tls-type-small text-quiet">Reply-To für Rückfragen.</p>
           </div>
         </div>
         <p className="tls-type-small text-white/55" data-testid="smtp-shared-hint">Absender, „Antworten an“ und „Versand aktiv“ gelten für SMTP und Resend gemeinsam – im Resend-Abschnitt ist es dieselbe Einstellung.</p>
@@ -128,7 +128,7 @@ export function SmtpSection({ smtp, setSmtp, smtpTestEmail, setSmtpTestEmail, sm
               className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-sm font-mono"
               placeholder="lionsquad.at"
             />
-            <p className="mt-1 tls-type-small text-white/40">Optional. Leer = Domain der Absender-E-Mail. Das ist nicht der SMTP Host.</p>
+            <p className="mt-1 tls-type-small text-quiet">Optional. Leer = Domain der Absender-E-Mail. Das ist nicht der SMTP Host.</p>
           </div>
           <div>
             <div className="tls-type-label text-white/60 mb-1.5">HELO/EHLO Name</div>
@@ -139,7 +139,7 @@ export function SmtpSection({ smtp, setSmtp, smtpTestEmail, setSmtpTestEmail, sm
               className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-sm font-mono"
               placeholder="lionsquad.at"
             />
-            <p className="mt-1 tls-type-small text-white/40">Optional. Leer lassen ist erlaubt; dann nutzt die SMTP-Bibliothek ihren Standardnamen.</p>
+            <p className="mt-1 tls-type-small text-quiet">Optional. Leer lassen ist erlaubt; dann nutzt die SMTP-Bibliothek ihren Standardnamen.</p>
           </div>
           <div className="tls-type-small text-white/45 flex items-end pb-1">
             Hinweis: Diese Domain-Felder sind Mail-Identität, nicht Verbindung. Der SMTP Host darf weiterhin nur die IP sein.

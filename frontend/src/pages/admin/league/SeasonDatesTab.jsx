@@ -31,7 +31,7 @@ export function CalendarStrip({ calendar }) {
       <ol className="flex flex-wrap gap-1.5" aria-label="Spielwochen">
         {calendar.weeks.map((week) => (
           <li key={week.number} title={`${dayText(week.start_day)} – ${dayText(week.end_day)}`}
-            className={`rounded-sm border px-2 py-1 tls-type-small tabular-nums ${week.blocked ? "border-white/5 bg-transparent text-white/35 line-through" : "border-white/10 bg-[#0A0A0A] text-white/75"}`}>
+            className={`rounded-sm border px-2 py-1 tls-type-small tabular-nums ${week.blocked ? "border-white/5 bg-transparent text-quiet line-through" : "border-white/10 bg-[#0A0A0A] text-white/75"}`}>
             <span className="font-bold">W{week.number}</span> {dayText(week.start_day)}
           </li>
         ))}

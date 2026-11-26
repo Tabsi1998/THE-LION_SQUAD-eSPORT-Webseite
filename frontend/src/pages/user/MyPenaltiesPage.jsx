@@ -88,7 +88,7 @@ function PenaltyCard({ p }) {
             <span className="font-black uppercase text-white" style={{ color: meta.color }}>
               {p.label}
             </span>
-            <span className="tls-type-label text-white/40">{meta.label}</span>
+            <span className="tls-type-label text-quiet">{meta.label}</span>
           </div>
           <div className="mt-1 tls-type-small text-white/80">
             {p.context_url ? (

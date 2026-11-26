@@ -172,7 +172,7 @@ export default function AdminMembershipApplicationsPage() {
               return (
                 <tr key={a.id} data-testid={`app-row-${a.id}`}>
                   <td className="px-4 py-3 tls-type-small text-white/45 whitespace-nowrap">{day(a.created_at)}</td>
-                  <td className="px-4 py-3"><div className="font-semibold">{a.user_display_name || a.user_username}</div><div className="tls-type-small text-white/40">@{a.user_username}</div></td>
+                  <td className="px-4 py-3"><div className="font-semibold">{a.user_display_name || a.user_username}</div><div className="tls-type-small text-quiet">@{a.user_username}</div></td>
                   <td className="px-4 py-3 tls-type-small">{wish(a)}</td>
                   <td className="px-4 py-3 max-w-md" data-testid={`app-state-${a.id}`}>
                     <StateBadge state={state} />
@@ -182,7 +182,7 @@ export default function AdminMembershipApplicationsPage() {
                 </tr>
               );
             })}
-            {!list.length && <tr><td colSpan="5" className="px-4 py-12 text-center text-white/40 tls-type-small">Keine Bewerbungen.</td></tr>}
+            {!list.length && <tr><td colSpan="5" className="px-4 py-12 text-center text-quiet tls-type-small">Keine Bewerbungen.</td></tr>}
           </tbody>
         </table>
       </div>
@@ -203,7 +203,7 @@ export default function AdminMembershipApplicationsPage() {
             </li>
           );
         })}
-        {!list.length && <li className="py-10 text-center text-white/40 tls-type-small">Keine Bewerbungen.</li>}
+        {!list.length && <li className="py-10 text-center text-quiet tls-type-small">Keine Bewerbungen.</li>}
       </ul>
 
       {/* Detail als Seitenblatt (#435): Annehmen und Ablehnen stehen in der Leiste unten - nur, wo die Website entscheidet. */}

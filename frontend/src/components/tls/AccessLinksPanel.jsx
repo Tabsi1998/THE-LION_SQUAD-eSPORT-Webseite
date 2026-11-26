@@ -270,7 +270,7 @@ export function AccessLinksPanel({ targetType, targetId, allowRegister = false, 
                 <span className="text-white/30"> · </span>
                 {(link.grants || []).join(", ")} {link.note ? <span className="text-white/40 font-normal">- {link.note}</span> : null}
               </div>
-              <div className="mt-0.5 tls-type-small text-white/35">
+              <div className="mt-0.5 tls-type-small text-quiet">
                 {link.use_count || 0}{link.max_uses ? `/${link.max_uses}` : ""} Aktionen
                 {link.expires_at ? ` · bis ${viennaDate(link.expires_at)}` : " · ohne Ablauf"}
                 {link.last_used_at ? ` · zuletzt ${viennaDate(link.last_used_at)}` : " · nie geöffnet"}
@@ -300,7 +300,7 @@ export function AccessLinksPanel({ targetType, targetId, allowRegister = false, 
           </div>
         ))}
         {loadError ? <div role="alert" className="tls-type-small text-warn border border-warn/40 bg-warn/10 rounded-sm p-3" data-testid="access-links-error">{loadError}</div> : null}
-        {links.length === 0 && !loadError && <div className="tls-type-small text-white/40 border border-dashed border-white/10 rounded-sm p-3">Noch keine aktiven {word}.</div>}
+        {links.length === 0 && !loadError && <div className="tls-type-small text-quiet border border-dashed border-white/10 rounded-sm p-3">Noch keine aktiven {word}.</div>}
       </div>
     </>
   );

@@ -705,7 +705,7 @@ export function EmptyBracketNotice({ tournament }) {
   return (
     <div className="text-center py-14 px-6 space-y-2">
       <div className="text-white/60 tls-type-num">{title}</div>
-      <p className="text-white/40 tls-type-small max-w-lg mx-auto">{detail}</p>
+      <p className="text-quiet tls-type-small max-w-lg mx-auto">{detail}</p>
       {action && <p className="text-[#29B6E8]/70 tls-type-small">{action}</p>}
     </div>
   );
@@ -747,7 +747,7 @@ function SeasonWeightField({ value, onChange }) {
         </select>
         <input type="number" step="0.05" min="0" value={value ?? ""} onChange={(e)=>onChange(e.target.value)} data-testid="tr-edit-season-weight" className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-sm" aria-label="Jahreswertungs-Faktor" />
       </div>
-      <div className="tls-type-small text-white/40 mt-1.5">
+      <div className="tls-type-small text-quiet mt-1.5">
         Das hier bestimmt Major/Normal/Mini: Die Jahreswertung nimmt Platzierungs- oder Teilnahmepunkte und multipliziert sie mit diesem Faktor. 0 bedeutet: Dieses Turnier gibt keine Jahrespunkte.
       </div>
     </label>

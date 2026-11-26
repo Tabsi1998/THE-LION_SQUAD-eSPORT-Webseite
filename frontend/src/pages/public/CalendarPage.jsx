@@ -296,7 +296,7 @@ function MonthView({ items, month, setMonth, selectedDay, selectDay, goToday, to
             </button>
           </div>
         </div>
-        <div className="mt-4 grid grid-cols-7 gap-1 text-center tls-type-label text-white/40">
+        <div className="mt-4 grid grid-cols-7 gap-1 text-center tls-type-label text-quiet">
           {WEEKDAY_LABELS.map((label) => <div key={label}>{label}</div>)}
         </div>
         <div className="mt-1 space-y-1">
@@ -396,7 +396,7 @@ function ItemRow({ item, withDate = false }) {
       {you ? <span aria-hidden="true" className="tls-you pointer-events-none absolute inset-0 rounded-sm" data-testid={`calendar-you-frame-${item.kind}-${item.id}`} /> : null}
       <span className="mt-1.5 w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: KIND_COLORS[item.kind] }} />
       <span className="min-w-0 flex-1">
-        <span className="block tls-type-label text-white/40">
+        <span className="block tls-type-label text-quiet">
           {kindLabel(item)}{when ? ` · ${when}` : ""}{item.location ? ` · ${item.location}` : ""}
         </span>
         <span className="tls-wrap block tls-type-small font-bold">{item.title}</span>

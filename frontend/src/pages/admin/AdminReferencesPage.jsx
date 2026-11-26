@@ -427,7 +427,7 @@ function SeasonBadge({ item, lineages }) {
 }
 
 function Chip({ children, muted = false }) {
-  return <span className={`px-2 py-0.5 border rounded-sm tls-type-label ${muted ? "border-white/10 text-white/40" : "border-[#29B6E8]/30 bg-[#29B6E8]/10 text-[#29B6E8]"}`}>{children}</span>;
+  return <span className={`px-2 py-0.5 border rounded-sm tls-type-label ${muted ? "border-white/10 text-quiet" : "border-[#29B6E8]/30 bg-[#29B6E8]/10 text-[#29B6E8]"}`}>{children}</span>;
 }
 
 function helpersToForm(helpers) {
@@ -1016,7 +1016,7 @@ function MemberPicker({ profiles, selectedIds, frozenMembers, onToggle, single =
             </span>
           </label>
         ))}
-        {sorted.length === 0 && <div className="tls-type-small text-white/40">Keine Vereinsprofile vorhanden.</div>}
+        {sorted.length === 0 && <div className="tls-type-small text-quiet">Keine Vereinsprofile vorhanden.</div>}
       </div>
       {missing.length > 0 && (
         <div className="mt-3 tls-type-small text-white/45">

@@ -130,7 +130,7 @@ export function GlobalSearch() {
                 {recent.length ? (
                   <section className="mb-3" data-testid="global-search-recent">
                     <div className="mb-2 flex items-center justify-between">
-                      <span className="tls-type-label text-white/35">Letzte Suchen</span>
+                      <span className="tls-type-label text-quiet">Letzte Suchen</span>
                       <button type="button" onClick={() => { clearRecentSearches(); setRecent([]); }} className="tls-type-small font-bold text-[#29B6E8] hover:underline" data-testid="global-search-recent-clear">Alle löschen</button>
                     </div>
                     <div className="space-y-1">
@@ -165,7 +165,7 @@ export function GlobalSearch() {
                 </div>
                 </>
               ) : loading ? (
-                <div className="py-12 text-center tls-type-label text-white/35" role="status">Suche läuft...</div>
+                <div className="py-12 text-center tls-type-label text-quiet" role="status">Suche läuft...</div>
               ) : error ? (
                 <div className="py-12 text-center tls-type-small" role="alert">
                   <p className="text-warn">{error}</p>
@@ -177,7 +177,7 @@ export function GlobalSearch() {
                 <div className="space-y-4">
                   {grouped.map(([kind, rows]) => (
                     <section key={kind}>
-                      <div className="mb-2 tls-type-label text-white/35">{KIND_META[kind]?.label || "Treffer"}</div>
+                      <div className="mb-2 tls-type-label text-quiet">{KIND_META[kind]?.label || "Treffer"}</div>
                       <div className="space-y-1.5">
                         {rows.map((item) => (
                           <SearchResult key={`${item.kind}:${item.url}`} item={item} onClose={() => { remember(); close(); }} />

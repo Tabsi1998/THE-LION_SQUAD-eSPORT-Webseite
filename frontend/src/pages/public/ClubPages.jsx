@@ -181,7 +181,7 @@ function StatutesBox({ statutes }) {
               ))}
             </ul>
           )}
-          {!fromDocuments && <p className="tls-type-small text-white/40">Die Fassungen kommen aus der Vereinsverwaltung; jede Datei wird gegen die Prüfsumme der Vereinsakte geprüft.</p>}
+          {!fromDocuments && <p className="tls-type-small text-quiet">Die Fassungen kommen aus der Vereinsverwaltung; jede Datei wird gegen die Prüfsumme der Vereinsakte geprüft.</p>}
         </div>
       )}
     </section>

@@ -220,7 +220,7 @@ function MetaList({ item }) {
     <div className="border border-white/10 bg-[#121212] rounded-sm divide-y divide-white/5" data-testid="reference-detail-meta">
       {rows.map(([label, value]) => (
         <div key={label} className="px-4 py-2.5 flex items-start justify-between gap-3">
-          <span className="tls-type-label text-white/40 pt-0.5">{label}</span>
+          <span className="tls-type-label text-quiet pt-0.5">{label}</span>
           <span className="tls-type-small text-white/80 text-right">{value}</span>
         </div>
       ))}

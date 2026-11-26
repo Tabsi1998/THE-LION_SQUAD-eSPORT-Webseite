@@ -54,7 +54,7 @@ function DayRow({ year, item, kinds, busy, onEdit, onDelete, onDraw, onRedraw })
         <div className="min-w-[11rem] flex-1">
           <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
             <span className="tls-type-label text-white/45">{dayText(year, day)}</span>
-            <span className={`tls-type-label ${item.is_open ? "text-[#5fd38d]" : "text-white/35"}`}>{item.is_open ? "offen" : `öffnet ${opensLabel(item.opens_at)}`}</span>
+            <span className={`tls-type-label ${item.is_open ? "text-[#5fd38d]" : "text-quiet"}`}>{item.is_open ? "offen" : `öffnet ${opensLabel(item.opens_at)}`}</span>
           </div>
           {door ? (
             <>
@@ -63,7 +63,7 @@ function DayRow({ year, item, kinds, busy, onEdit, onDelete, onDraw, onRedraw })
                 <span className="tls-type-label text-[#e9c46a]">{kindLabel}</span>
                 <span className="min-w-0 break-words font-bold text-white" data-testid={`advent-admin-title-${day}`}>{door.title}</span>
               </div>
-              {door.copied_from && <div className="mt-0.5 tls-type-small text-white/40">Übernommen aus {door.copied_from}</div>}
+              {door.copied_from && <div className="mt-0.5 tls-type-small text-quiet">Übernommen aus {door.copied_from}</div>}
             </>
           ) : (
             <div className="mt-1 tls-type-small text-white/50">Noch nichts eingetragen</div>

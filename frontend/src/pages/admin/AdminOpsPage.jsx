@@ -237,7 +237,7 @@ export default function AdminOpsPage() {
             key={tile.label}
             className={`border rounded-sm p-3 ${tile.tone === "danger" ? "border-[#FF3B30]/30 bg-[#FF3B30]/10" : tile.tone === "warn" ? "border-[#FFD95A]/30 bg-[#FFD95A]/10" : "border-white/10 bg-[#121212]"}`}
           >
-            <div className="tls-type-label text-white/40">{tile.label}</div>
+            <div className="tls-type-label text-quiet">{tile.label}</div>
             <div className="tls-type-section tls-type-num">{tile.value}</div>
             {tile.detail ? <div className="tls-type-small text-white/50 truncate" title={tile.detail}>{tile.detail}</div> : null}
           </div>
@@ -356,7 +356,7 @@ export default function AdminOpsPage() {
                             <span className="tls-type-label px-2 py-0.5 rounded-sm border border-brand/40 text-brand">{SOURCE_LABELS[row.source]}</span>
                           ) : null}
                           <span className="tls-type-small font-mono text-white/60 break-all">{`${row.method || ""} ${row.route || ""}`.trim()}</span>
-                          {isClient ? null : <span className="tls-type-small text-white/40">HTTP {row.status_code}</span>}
+                          {isClient ? null : <span className="tls-type-small text-quiet">HTTP {row.status_code}</span>}
                         </div>
                         <div className="mt-1 tls-type-small font-semibold break-words font-mono">{row.message || topPlace(row) || "Ohne Stelle"}</div>
                         <div className="mt-1 tls-type-small text-white/45">
@@ -396,7 +396,7 @@ export default function AdminOpsPage() {
             );
           })}
           {errors.length ? (
-            <p className="tls-type-small text-white/40">Die Prüfung „Fehlergruppen“ unter Checks zählt nur die offenen Gruppen des Servers – nach dem Lösen dort „Jetzt neu prüfen“, damit die Ampel gleich stimmt. Website und App stehen hier, färben die Ampel aber nicht.</p>
+            <p className="tls-type-small text-quiet">Die Prüfung „Fehlergruppen“ unter Checks zählt nur die offenen Gruppen des Servers – nach dem Lösen dort „Jetzt neu prüfen“, damit die Ampel gleich stimmt. Website und App stehen hier, färben die Ampel aber nicht.</p>
           ) : null}
         </div>
       ) : (
@@ -404,7 +404,7 @@ export default function AdminOpsPage() {
           <div className="border border-white/10 bg-[#121212] rounded-sm tls-swipe pb-0">
             <table className="w-full tls-type-small">
               <thead>
-                <tr className="tls-type-label text-white/40 border-b border-white/10">
+                <tr className="tls-type-label text-quiet border-b border-white/10">
                   <th className="text-left p-3">Route</th>
                   <th className="text-right p-3">Anfragen</th>
                   <th className="text-right p-3">Ø ms</th>
@@ -435,7 +435,7 @@ export default function AdminOpsPage() {
               </tbody>
             </table>
           </div>
-          <p className="tls-type-small text-white/40">
+          <p className="tls-type-small text-quiet">
             Gemessen wird die Zeit im Backend je Anfrage; Bilder und Dateien, die nginx liefert, stehen hier nicht. Datei-Uploads (Kennzeichen „Upload“)
             dauern so lange wie die Leitung des Hochladenden – sie stehen am Ende und zählen nicht als langsam (Liste unter Alarme).
           </p>
@@ -463,7 +463,7 @@ function VitalsTab({ vitals, loading }) {
           const metric = vitals?.overall?.[name];
           return (
             <div key={name} className="border border-white/10 bg-[#121212] rounded-sm p-3">
-              <div className="tls-type-small text-white/40">{name} · p75 · alle Seiten</div>
+              <div className="tls-type-small text-quiet">{name} · p75 · alle Seiten</div>
               <div className={`tls-type-section tls-type-num ${toneClass(ratingTone(metric?.rating))}`}>{metric ? formatVital(name, metric.p75) : "–"}</div>
               <div className="tls-type-small text-white/50">{metric ? `${metric.count} Messungen · ${Math.round((metric.good_share || 0) * 100)} % gut` : "keine Messungen"}</div>
             </div>
@@ -473,7 +473,7 @@ function VitalsTab({ vitals, loading }) {
       <div className="border border-white/10 bg-[#121212] rounded-sm tls-swipe pb-0">
         <table className="w-full tls-type-small">
           <thead>
-            <tr className="tls-type-small text-white/40 border-b border-white/10">
+            <tr className="tls-type-small text-quiet border-b border-white/10">
               <th className="text-left p-3">Route</th>
               <th className="text-right p-3">Messungen</th>
               {VITAL_COLUMNS.map((name) => <th key={name} className="text-right p-3">{name} p75</th>)}
@@ -504,7 +504,7 @@ function VitalsTab({ vitals, loading }) {
           </tbody>
         </table>
       </div>
-      <p className="tls-type-small text-white/40">
+      <p className="tls-type-small text-quiet">
         LCP: größtes Element sichtbar (gut ≤ 2,5 s). INP: Reaktion auf Eingaben (gut ≤ 200 ms). CLS: Springen des Layouts (gut ≤ 0,1). TTFB: erstes Byte (gut ≤ 0,8 s).
         Werte der letzten {vitals?.days ?? 7} Tage, p75 = drei von vier Besuchen sind so schnell oder schneller. Ohne Adresse, Nutzer oder Cookies, {vitals?.retention_days ?? 30} Tage aufgehoben.
       </p>
@@ -551,7 +551,7 @@ function ChecksTab({ checks, loading, running, onRun }) {
       <FileCleanupsPanel onChanged={onRun} />
       {history.length ? (
         <div className="border border-white/10 bg-[#121212] rounded-sm p-4" data-testid="ops-checks-history">
-          <div className="tls-type-small text-white/40 mb-2">Verlauf {checks?.history_days ?? 7} Tage · Läufe mit rot / gelb</div>
+          <div className="tls-type-small text-quiet mb-2">Verlauf {checks?.history_days ?? 7} Tage · Läufe mit rot / gelb</div>
           <div className="flex flex-wrap gap-2">
             {history.map((day) => (
               <div key={day.day} className="border border-white/10 rounded-sm px-3 py-2 tls-type-small">
@@ -567,7 +567,7 @@ function ChecksTab({ checks, loading, running, onRun }) {
           </div>
         </div>
       ) : null}
-      <p className="tls-type-small text-white/40">
+      <p className="tls-type-small text-quiet">
         Rote Prüfungen und neue 5xx-Fehlergruppen schickt der Discord-Bot in den Betriebskanal (Verbindungen → Discord), höchstens eine Meldung je Prüfung und Stunde.
       </p>
     </div>

@@ -185,7 +185,7 @@ export function NoticeComposer({ slug, tournament, stations = [] }) {
           className="mt-2 w-full resize-none rounded-sm border border-white/15 bg-black/40 px-3 py-2 text-base text-white placeholder:text-white/30 focus:border-[#29B6E8] focus:outline-none"
           data-testid="notice-text-input"
         />
-        <div className={`mt-1 text-right tls-type-small tabular-nums ${length > NOTICE_MAX - 20 ? "text-honor" : "text-white/40"}`} data-testid="notice-count">{length}/{NOTICE_MAX}</div>
+        <div className={`mt-1 text-right tls-type-small tabular-nums ${length > NOTICE_MAX - 20 ? "text-honor" : "text-quiet"}`} data-testid="notice-count">{length}/{NOTICE_MAX}</div>
 
         <fieldset className="mt-3">
           <legend className="tls-type-label text-white/50">An wen</legend>
@@ -237,7 +237,7 @@ export function NoticeComposer({ slug, tournament, stations = [] }) {
       </form>
 
       <section aria-labelledby="notice-log-title">
-        <div id="notice-log-title" className="tls-type-small font-bold text-white/40">Gesendet · wer, wann, an wen</div>
+        <div id="notice-log-title" className="tls-type-small font-bold text-quiet">Gesendet · wer, wann, an wen</div>
         {list?.error ? <p className="mt-2 tls-type-small text-warn">{list.error}</p> : null}
         {list && !items.length && !list.error ? <div className="mt-2 rounded-sm border border-white/10 bg-[#121212] p-5 text-center tls-type-small text-white/50" data-testid="notice-log-empty">Noch kein Hinweis gesendet.</div> : null}
         <ul className="mt-2 space-y-2" data-testid="notice-log">
@@ -250,7 +250,7 @@ export function NoticeComposer({ slug, tournament, stations = [] }) {
                     {noticeClock(item)} · {item.author || "Turnierleitung"} · {item.target_label}{item.tv ? " · am TV" : ""}
                   </div>
                   <div className="mt-0.5 tls-type-small text-white/60" data-testid={`notice-delivery-${item.id}`}>{deliveryText(item)}</div>
-                  <div className={`mt-0.5 tls-type-small font-bold ${item.active ? "text-honor" : "text-white/35"}`}>
+                  <div className={`mt-0.5 tls-type-small font-bold ${item.active ? "text-honor" : "text-quiet"}`}>
                     {item.removed_at ? `entfernt${item.removed_by ? ` von ${item.removed_by}` : ""}` : item.active ? `steht · ${remainingText(item.expires_at, now)}` : "abgelaufen"}
                   </div>
                 </div>
@@ -270,7 +270,7 @@ export function NoticeComposer({ slug, tournament, stations = [] }) {
             </li>
           ))}
         </ul>
-        <p className="mt-3 tls-type-small text-white/40">Die Benachrichtigung kommt nach den Einstellungen jeder Person (Thema „Turnier-Updates“). Banner und TV zeigen nur Text und Zeit, nie, wer geschrieben hat.</p>
+        <p className="mt-3 tls-type-small text-quiet">Die Benachrichtigung kommt nach den Einstellungen jeder Person (Thema „Turnier-Updates“). Banner und TV zeigen nur Text und Zeit, nie, wer geschrieben hat.</p>
       </section>
     </div>
   );

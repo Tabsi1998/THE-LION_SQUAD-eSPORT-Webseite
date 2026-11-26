@@ -115,14 +115,14 @@ export function SeasonHighlightCard({ profile, level, stats, awards, crown, seas
               <div key={s.label} className="border border-white/10 rounded-sm bg-white/[0.03] px-1 py-2.5">
                 <s.icon className="w-3.5 h-3.5 mx-auto" style={{ color: s.color }} />
                 <div className="mt-1 tls-type-card tls-type-num" style={{ color: s.color }}>{s.value}</div>
-                <div className="tls-type-label text-white/40">{s.label}</div>
+                <div className="tls-type-label text-quiet">{s.label}</div>
               </div>
             ))}
           </div>
 
           {best.length > 0 && (
             <div className="relative mt-5">
-              <div className="tls-type-label text-white/40 mb-2">Top-Erfolge</div>
+              <div className="tls-type-label text-quiet mb-2">Top-Erfolge</div>
               <div className="space-y-1.5">
                 {best.map((a) => (
                   <div key={a.id || a.code} className="flex items-center gap-2.5 border border-white/8 rounded-sm bg-white/[0.03] px-2.5 py-1.5" style={{ boxShadow: `inset 2px 0 0 ${a.level_color || "#29B6E8"}` }}>
@@ -138,8 +138,8 @@ export function SeasonHighlightCard({ profile, level, stats, awards, crown, seas
           )}
 
           <div className="relative mt-5 pt-3 border-t border-white/10 flex items-center justify-between">
-            <span className="tls-type-label text-white/35">lionsquad · esports</span>
-            <span className="tls-type-small text-white/30">{viennaDate(new Date())}</span>
+            <span className="tls-type-label text-quiet">lionsquad · esports</span>
+            <span className="tls-type-small text-quiet">{viennaDate(new Date())}</span>
           </div>
         </div>
 

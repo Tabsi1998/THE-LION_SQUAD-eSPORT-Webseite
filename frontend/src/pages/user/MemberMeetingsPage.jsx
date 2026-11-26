@@ -89,7 +89,7 @@ function MeetingCard({ meeting, busy, onRespond, onMotion, askCalendar = false, 
           </button>
         )) : null}
       </div>
-      <p className="mt-1 tls-type-small text-white/40">Zu- oder Absage ist keine Anwesenheit und keine Stimme – die Anwesenheitsliste führt der Verein in der Versammlung.</p>
+      <p className="mt-1 tls-type-small text-quiet">Zu- oder Absage ist keine Anwesenheit und keine Stimme – die Anwesenheitsliste führt der Verein in der Versammlung.</p>
 
       {calendarItem ? (
         askCalendar ? (

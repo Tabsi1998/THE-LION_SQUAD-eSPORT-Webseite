@@ -192,7 +192,7 @@ function Week({ week, logos, order }) {
         <div className="tls-league-week__head">
           <Coffee className="h-4 w-4 text-white/40" aria-hidden="true" />
           <span className="font-semibold text-white/70">{week.label}</span>
-          <span className="ml-auto tls-type-small text-white/40 tabular-nums">{weekHeading(week)}</span>
+          <span className="ml-auto tls-type-small text-quiet tabular-nums">{weekHeading(week)}</span>
         </div>
       </li>
     );

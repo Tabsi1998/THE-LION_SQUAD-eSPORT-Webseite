@@ -57,7 +57,7 @@ function ManualField({ platform, value, onChange, note = "", error = "" }) {
             <ExternalLink className="w-3 h-3 shrink-0" aria-hidden="true" /> {preview}
           </a>
         ) : null}
-        {note ? <span className="tls-type-small text-white/35" data-testid={`${testId}-not-linkable`}>{note}</span> : null}
+        {note ? <span className="tls-type-small text-quiet" data-testid={`${testId}-not-linkable`}>{note}</span> : null}
       </div>
     </div>
   );

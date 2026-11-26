@@ -88,7 +88,7 @@ export function DiscordBotPanel({ canSystem = false }) {
         <label className="block">
           <div className="tls-type-label text-white/60 mb-1.5">Server-ID (optional)</div>
           <input value={draft.bot_guild_id} onChange={(e) => setDraft((d) => ({ ...d, bot_guild_id: e.target.value.replace(/\D/g, "") }))} inputMode="numeric" placeholder="leer = der Server, auf dem der Bot ist" data-testid="discord-bot-guild" className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-sm font-mono" />
-          <p className="mt-1 tls-type-small text-white/40">Nur nötig, wenn der Bot auf mehreren Servern ist. Discord → Einstellungen → Erweitert → Entwicklermodus, dann Rechtsklick auf den Server → „ID kopieren“.</p>
+          <p className="mt-1 tls-type-small text-quiet">Nur nötig, wenn der Bot auf mehreren Servern ist. Discord → Einstellungen → Erweitert → Entwicklermodus, dann Rechtsklick auf den Server → „ID kopieren“.</p>
         </label>
       </div>
       <div className="grid md:grid-cols-3 gap-3">
@@ -96,7 +96,7 @@ export function DiscordBotPanel({ canSystem = false }) {
           <label key={role.key} className="block">
             <div className="tls-type-label text-white/60 mb-1.5">{role.label}</div>
             <input value={draft.bot_roles?.[role.key] || ""} onChange={(e) => setDraft((d) => ({ ...d, bot_roles: { ...d.bot_roles, [role.key]: e.target.value } }))} placeholder={data.roles?.[role.key] || ""} data-testid={`discord-bot-role-${role.key}`} className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-sm" />
-            <p className="mt-1 tls-type-small text-white/40">{role.hint} – Rollenname genau wie im Discord.</p>
+            <p className="mt-1 tls-type-small text-quiet">{role.hint} – Rollenname genau wie im Discord.</p>
           </label>
         ))}
       </div>

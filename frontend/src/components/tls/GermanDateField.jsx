@@ -205,7 +205,7 @@ export function GermanDateField({
           <div className="p-3">
             <div className="grid grid-cols-7 mb-1">
               {WEEKDAYS.map((d) => (
-                <div key={d} className="text-center tls-type-label text-white/40 py-1">{d}</div>
+                <div key={d} className="text-center tls-type-label text-quiet py-1">{d}</div>
               ))}
             </div>
             <div ref={gridRef} className="grid grid-cols-7 gap-0.5">
@@ -241,7 +241,7 @@ export function GermanDateField({
               })}
             </div>
             <div className="mt-2 pt-2 border-t border-white/8 flex items-center justify-between">
-              <span className="tls-type-label text-white/35">
+              <span className="tls-type-label text-quiet">
                 {value ? formatGermanDate(value) : "Kein Datum gewählt"}
               </span>
               {value && (

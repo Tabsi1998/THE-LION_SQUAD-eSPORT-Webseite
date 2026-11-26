@@ -676,7 +676,7 @@ function TeamChat({ team, user }) {
             return (
               <div key={message.id} className={`flex ${mine ? "justify-end" : "justify-start"}`}>
                 <div className={`max-w-[85%] border rounded-sm px-3 py-2 ${mine ? "border-[#29B6E8]/40 bg-[#29B6E8]/10" : "border-white/10 bg-[#0A0A0A]"}`}>
-                  <div className="flex items-center gap-2 tls-type-small text-white/40">
+                  <div className="flex items-center gap-2 tls-type-small text-quiet">
                     <span className={mine ? "text-[#29B6E8]" : "text-white/55"}>{message.author?.display_name || message.author?.username || "Benutzer"}</span>
                     {message.created_at && <span>{viennaDateTime(message.created_at, { dateStyle: "short", timeStyle: "short" })}</span>}
                   </div>
@@ -688,7 +688,7 @@ function TeamChat({ team, user }) {
               </div>
             );
           })}
-          {messages.length === 0 && <div className="text-center py-10 tls-type-small text-white/35">Noch keine Nachrichten im Team-Chat.</div>}
+          {messages.length === 0 && <div className="text-center py-10 tls-type-small text-quiet">Noch keine Nachrichten im Team-Chat.</div>}
         </div>
         <ChatAttachmentDrafts drafts={attachments.drafts} onRemove={attachments.remove} />
         <ChatStickerPicker open={stickersOpen} onClose={() => setStickersOpen(false)} onPick={sendSticker} disabled={loading} />
@@ -854,8 +854,8 @@ function TeamLevelPanel({ info }) {
           <div className="mt-1 tls-type-section" data-testid="team-level-value">LEVEL {info.level}</div>
         </div>
         <div className="text-right">
-          <div className="tls-type-section tls-type-num text-white" data-testid="team-points-value">{info.points} <span className="tls-type-small text-white/40 font-bold">PUNKTE</span></div>
-          <div className="tls-type-small text-white/40">{inLevel} / {span} bis Level {info.level + 1}</div>
+          <div className="tls-type-section tls-type-num text-white" data-testid="team-points-value">{info.points} <span className="tls-type-small text-quiet font-bold">PUNKTE</span></div>
+          <div className="tls-type-small text-quiet">{inLevel} / {span} bis Level {info.level + 1}</div>
         </div>
       </div>
       <div className="mt-3 h-2.5 bg-black/50 border border-white/10 rounded-full overflow-hidden">

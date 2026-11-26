@@ -139,7 +139,7 @@ function GuidedForm({ matchId, guide, sides, busy, onSubmit, createdId, onDone, 
               <span className="mb-1 block tls-type-small text-white/75">Begründung</span>
               <textarea value={form.text} onChange={(event) => set("text", event.target.value)} rows={4} maxLength={guide.reason_max || 1000} className="input w-full min-h-[6rem] resize-y"
                 placeholder="Was ist passiert, auf welcher Map, in welcher Runde?" data-testid="match-dispute-input" />
-              <span className="mt-1 block text-right tls-type-small tabular-nums text-white/40">{form.text.trim().length} / {guide.reason_max || 1000}</span>
+              <span className="mt-1 block text-right tls-type-small tabular-nums text-quiet">{form.text.trim().length} / {guide.reason_max || 1000}</span>
             </label>
           </div>
         ) : <p className="tls-type-small text-white/50">Tippe an, worum es geht – dann fragen wir nur, was dazu nötig ist.</p>}

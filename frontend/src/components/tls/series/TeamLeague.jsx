@@ -460,7 +460,7 @@ function Lineup({ lineup, rounds, ownTeams }) {
                 <tbody key={group.key} data-testid={group.key === "guests" ? "team-league-guests" : "team-league-squad"}>
                   {group.label && (
                     <tr className="border-t border-white/10">
-                      <th scope="rowgroup" colSpan={span} className="text-left pl-3 sm:pl-4 pt-3 pb-1 tls-type-label text-white/40">{group.label}</th>
+                      <th scope="rowgroup" colSpan={span} className="text-left pl-3 sm:pl-4 pt-3 pb-1 tls-type-label text-quiet">{group.label}</th>
                     </tr>
                   )}
                   <LineupRows players={group.players} roundIds={roundIds} offset={start} />

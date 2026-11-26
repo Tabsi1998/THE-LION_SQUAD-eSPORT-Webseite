@@ -197,11 +197,11 @@ function CommunityBlock({ title, text, to, cta, items, accent = "cyan", icon: Ic
             </div>
             <div className="min-w-0">
               <div className="tls-card__title font-bold tls-type-small truncate">{item.title}</div>
-              <div className="tls-type-small text-white/40 truncate">{item.subtitle}</div>
+              <div className="tls-type-small text-quiet truncate">{item.subtitle}</div>
             </div>
           </Link>
         )) : (
-          <div className="py-10 text-center tls-type-small text-white/35">Noch keine Einträge.</div>
+          <div className="py-10 text-center tls-type-small text-quiet">Noch keine Einträge.</div>
         )}
       </div>
       <Link to={to} className="tls-btn tls-btn--secondary mt-5 inline-flex w-full items-center justify-center px-4 py-3 rounded-sm tls-type-label">

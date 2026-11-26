@@ -237,7 +237,7 @@ function MapRow({ match, item, index, errors, choices, onChange, onRemove }) {
         {ROLE_OPTIONS.map(([value, label]) => <option key={value} value={value}>{label}</option>)}
       </select>
       {banned ? (
-        <span className="w-[6.75rem] text-center tls-type-label text-white/40" data-testid="result-map-banned">gesperrt</span>
+        <span className="w-[6.75rem] text-center tls-type-label text-quiet" data-testid="result-map-banned">gesperrt</span>
       ) : (
         <div className="flex items-center gap-1">
           <input aria-label={`Map ${number} Heim`} inputMode="numeric" value={item.home_score} onChange={(event) => set({ home_score: event.target.value })} {...invalidProps(invalid, "home_score")} className={`${SMALL_INPUT} !w-12 text-center tabular-nums ${invalid?.home_score ? INVALID : ""}`} data-testid="result-map-home" />

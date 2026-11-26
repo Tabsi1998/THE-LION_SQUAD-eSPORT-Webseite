@@ -35,7 +35,7 @@ export function PublicSeasonFinds({ userId, own = false }) {
         </div>
         <div className="text-right shrink-0">
           <div className="tls-type-section tls-type-num leading-none" data-testid="public-season-finds-total">{number(data.total)}</div>
-          <div className="tls-type-label text-white/40 mt-1 inline-flex items-center gap-1"><Sparkles className="w-3 h-3" /> insgesamt</div>
+          <div className="tls-type-label text-quiet mt-1 inline-flex items-center gap-1"><Sparkles className="w-3 h-3" /> insgesamt</div>
         </div>
       </div>
       <div className="grid sm:grid-cols-2 gap-3">
@@ -55,7 +55,7 @@ export function PublicSeasonFinds({ userId, own = false }) {
         ))}
       </div>
       {own && (
-        <p className="mt-3 tls-type-small text-white/40" data-testid="public-season-finds-note">
+        <p className="mt-3 tls-type-small text-quiet" data-testid="public-season-finds-note">
           {data.public ? "Andere sehen hier nur die Summen." : "Nur du siehst diese Karte. "}
           {!data.public && <Link to="/mein-bereich/datenschutz" className="text-[#29B6E8] hover:underline">Unter Datenschutz → Sichtbarkeit kannst du sie zeigen.</Link>}
         </p>

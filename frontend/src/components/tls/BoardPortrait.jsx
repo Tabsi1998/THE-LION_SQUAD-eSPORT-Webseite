@@ -86,7 +86,7 @@ export function BoardPortrait({ person, title, label = "", withheld = false, siz
                 <Gamepad2 className="w-3.5 h-3.5 shrink-0" aria-hidden="true" /> <span className="break-all">{names.secondary}</span>
               </span>
             ) : null}
-            {since ? <span className="tls-type-small text-white/40">seit {since}</span> : null}
+            {since ? <span className="tls-type-small text-quiet">seit {since}</span> : null}
           </>
         ) : (
           <span className="tls-type-small text-white/50">{withheld ? "Name nicht freigegeben" : "Position offen"}</span>

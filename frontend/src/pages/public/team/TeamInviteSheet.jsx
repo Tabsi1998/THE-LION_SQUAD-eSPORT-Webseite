@@ -185,12 +185,12 @@ export function InviteMemberPanel({ team }) {
         />
       </div>
       <div className="space-y-2">
-        {loading && <div className="tls-type-small text-white/40">Suche läuft...</div>}
+        {loading && <div className="tls-type-small text-quiet">Suche läuft...</div>}
         {candidates.map((candidate) => (
           <div key={candidate.id} className="flex items-center gap-2 border border-white/10 bg-[#0A0A0A] rounded-sm p-2">
             <div className="min-w-0 flex-1">
               <div className="font-bold tls-type-small truncate">{candidate.display_name || candidate.username}</div>
-              <div className="tls-type-small text-white/40 truncate">@{candidate.username}</div>
+              <div className="tls-type-small text-quiet truncate">@{candidate.username}</div>
             </div>
             <button
               type="button"
@@ -202,7 +202,7 @@ export function InviteMemberPanel({ team }) {
             </button>
           </div>
         ))}
-        {search.status === "empty" && <div className="tls-type-small text-white/35">Keine passenden Benutzer gefunden.</div>}
+        {search.status === "empty" && <div className="tls-type-small text-quiet">Keine passenden Benutzer gefunden.</div>}
         {search.status === "error" && <LoadNotice testId="team-invite-search-error" message="Die Suche hat nicht geklappt." onRetry={search.reload} />}
         {inviteError && <AuthFormAlert id="team-invite-error">{inviteError}</AuthFormAlert>}
       </div>
@@ -256,7 +256,7 @@ export function PendingInvites({ team, load, onWithdrawn }) {
         <div key={invite.id} className="flex items-center gap-2 border border-white/10 bg-[#0A0A0A] rounded-sm p-2" data-testid={`team-pending-invite-${invite.id}`}>
           <div className="min-w-0 flex-1">
             <div className="font-bold tls-type-small truncate">{invite.user?.display_name || invite.user?.username || "Unbekannt"}</div>
-            <div className="tls-type-small text-white/40 truncate">
+            <div className="tls-type-small text-quiet truncate">
               {invite.inviter ? `eingeladen von ${invite.inviter.display_name || invite.inviter.username}` : "wartet auf Antwort"}
               {invite.created_at ? ` · ${viennaDate(invite.created_at)}` : ""}
             </div>

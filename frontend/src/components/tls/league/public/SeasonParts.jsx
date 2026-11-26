@@ -53,7 +53,7 @@ export function SeasonPlay({ league, season, pool, platform }) {
                 <span className="mt-0.5 block tls-type-small text-white/70" data-testid={`season-mode-${mode.mode}-rule`}>
                   {mode.rule || "Regel steht im Regelwerk"}
                 </span>
-                {mode.maps ? <span className="mt-1 block tls-type-label text-white/40">{mode.maps} {mode.maps === 1 ? "Map" : "Maps"} im Pool</span> : null}
+                {mode.maps ? <span className="mt-1 block tls-type-label text-quiet">{mode.maps} {mode.maps === 1 ? "Map" : "Maps"} im Pool</span> : null}
               </span>
             </li>
           ))}

@@ -81,7 +81,7 @@ export function SocialsEditor({ socials, onChange }) {
           )}
         </div>
       ))}
-      {!socials.length && <div className="tls-type-small text-white/40 border border-dashed border-white/10 rounded-sm p-4">Noch keine Socials – mit „Social“ kommt die erste Zeile.</div>}
+      {!socials.length && <div className="tls-type-small text-quiet border border-dashed border-white/10 rounded-sm p-4">Noch keine Socials – mit „Social“ kommt die erste Zeile.</div>}
       <button type="button" onClick={() => onChange([...socials, emptySocial()])} className="inline-flex items-center gap-2 px-4 py-2 border border-[#29B6E8]/45 text-[#29B6E8] rounded-sm tls-type-label" data-testid="partner-social-add">
         <Plus className="w-3.5 h-3.5" /> Social
       </button>
@@ -276,7 +276,7 @@ function ToolsEditor({ tools, onChange }) {
       {tools.map((tool, index) => (
         <div key={tool.id || `neu-${index}`} className="border border-white/10 rounded-sm p-3 space-y-3 bg-[#0A0A0A]" data-testid={`partner-tool-${index}`}>
           <div className="flex items-center justify-between gap-2">
-            <span className="tls-type-label text-white/40">Eintrag {index + 1}</span>
+            <span className="tls-type-label text-quiet">Eintrag {index + 1}</span>
             <button type="button" onClick={() => remove(index)} data-testid={`partner-tool-remove-${index}`} aria-label="Eintrag entfernen" className="text-white/40 hover:text-[#FF3B30]"><Trash2 className="w-4 h-4" /></button>
           </div>
           <FormGrid>

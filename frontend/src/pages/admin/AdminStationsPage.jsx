@@ -383,13 +383,13 @@ export default function AdminStationsPage() {
             <div className="space-y-1.5 max-h-[360px] overflow-y-auto">
               {unassignedMatches.map((m) => (
                 <div key={m.id} data-testid={`match-unassigned-${m.id}`} className="p-2 border border-white/10 rounded-sm tls-type-small bg-[#0A0A0A] hover:border-[#29B6E8]/40">
-                  <div className="text-white/40 tls-type-label">{detailOfMatch(m)}</div>
+                  <div className="text-quiet tls-type-label">{detailOfMatch(m)}</div>
                   <div className="text-white font-semibold mt-0.5 truncate">{nameOfMatch(m)}</div>
                   <div className="mt-1 text-white/40">{m.scheduled_at ? formatDateTime(m.scheduled_at) : "Keine feste Zeit"}{m.planned_minutes ? ` · ${m.planned_minutes} Min.` : ""}</div>
                 </div>
               ))}
-              {loadingMatches && <div className="text-white/40 tls-type-small text-center py-6">Spiele werden geladen …</div>}
-              {!loadingMatches && unassignedMatches.length === 0 && <div className="text-white/40 tls-type-small text-center py-6">Keine offenen Spiele</div>}
+              {loadingMatches && <div className="text-quiet tls-type-small text-center py-6">Spiele werden geladen …</div>}
+              {!loadingMatches && unassignedMatches.length === 0 && <div className="text-quiet tls-type-small text-center py-6">Keine offenen Spiele</div>}
             </div>
           </div>
           <div className="border border-white/10 rounded-sm bg-[#121212] p-5">
@@ -397,12 +397,12 @@ export default function AdminStationsPage() {
             <div className="space-y-1.5 max-h-[260px] overflow-y-auto">
               {plannedQueue.map((m) => (
                 <div key={m.id} className="p-2 border border-white/10 rounded-sm tls-type-small bg-[#0A0A0A]">
-                  <div className="text-white/40 tls-type-label">{detailOfMatch(m)}</div>
+                  <div className="text-quiet tls-type-label">{detailOfMatch(m)}</div>
                   <div className="text-white font-semibold mt-0.5 truncate">{nameOfMatch(m)}</div>
                   <div className="mt-1 text-white/40">Station {stationName(m.station_id, list)}{m.scheduled_at ? ` · ${formatDateTime(m.scheduled_at)}` : ""}</div>
                 </div>
               ))}
-              {plannedQueue.length === 0 && <div className="text-white/40 tls-type-small text-center py-6">Keine geplanten Spiele</div>}
+              {plannedQueue.length === 0 && <div className="text-quiet tls-type-small text-center py-6">Keine geplanten Spiele</div>}
             </div>
           </div>
         </div>

@@ -75,7 +75,7 @@ export function SubmissionQueue() {
       <div className="flex items-center gap-2">
         <Inbox className="w-4 h-4 text-[#29B6E8]" />
         <h2 className="tls-type-section">Eingesandte Fotos</h2>
-        <span className="tls-type-label text-white/40">{rows.length ? `${rows.length} warten auf Freigabe` : "nichts offen"}</span>
+        <span className="tls-type-label text-quiet">{rows.length ? `${rows.length} warten auf Freigabe` : "nichts offen"}</span>
       </div>
       {!rows.length ? (
         <p className="mt-2 tls-type-small text-white/50">Wenn Mitglieder Fotos vom Event schicken, stehen sie hier zur Freigabe.</p>

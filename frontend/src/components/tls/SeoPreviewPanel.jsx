@@ -106,7 +106,7 @@ export function SeoPreviewPanel({ path, fallback = {}, className = "" }) {
             )}
           </div>
           <div className="space-y-1 p-3">
-            <div className="flex items-center gap-1.5 tls-type-label text-white/35">
+            <div className="flex items-center gap-1.5 tls-type-label text-quiet">
               <Share2 className="h-3 w-3 text-[#29B6E8]" />
               Beim Teilen
             </div>

@@ -94,7 +94,7 @@ export function AccessSection({ authSwitches, authConfig, savingAuth, saveAuth }
         <p>Wer sich auf Website und App anmelden und registrieren darf. Passkeys und die Zwei-Faktor-Anmeldung sind immer möglich; die Anmeldung mit Google hat ihre eigene Seite unter Verbindungen → Google.</p>
       </div>
       {authSwitches(ACCESS_SWITCHES)}
-      <p className="tls-type-small text-white/40">Deaktivierte Optionen werden für Web und App serverseitig blockiert.</p>
+      <p className="tls-type-small text-quiet">Deaktivierte Optionen werden für Web und App serverseitig blockiert.</p>
       {authConfig && saveAuth && <AccessLimitsCard authConfig={authConfig} savingAuth={savingAuth} saveAuth={saveAuth} />}
     </div>
   );

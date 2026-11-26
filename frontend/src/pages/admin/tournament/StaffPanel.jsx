@@ -141,7 +141,7 @@ export function TournamentStaffPanel({ tournamentId, staff, staffError = "", onC
               <div className="flex items-start justify-between gap-3 min-w-0">
                 <div className="min-w-0">
                   <div className="font-semibold [overflow-wrap:anywhere]">{a.user?.display_name || a.user?.username || "—"}</div>
-                  {a.user?.username && <div className="tls-type-small text-white/40 truncate">@{a.user.username}</div>}
+                  {a.user?.username && <div className="tls-type-small text-quiet truncate">@{a.user.username}</div>}
                 </div>
                 <StatusBadge status={a.is_active === false ? "paused" : "approved"} />
               </div>
@@ -179,7 +179,7 @@ export function TournamentStaffPanel({ tournamentId, staff, staffError = "", onC
                 <tr key={a.id}>
                   <td className="px-4 py-3">
                     <div className="font-semibold">{a.user?.display_name || a.user?.username || "—"}</div>
-                    {a.user?.username && <div className="tls-type-small text-white/40">@{a.user.username}</div>}
+                    {a.user?.username && <div className="tls-type-small text-quiet">@{a.user.username}</div>}
                   </td>
                   <td className="px-4 py-3">
                     <div>{roleLabel(a.role)}</div>
@@ -187,8 +187,8 @@ export function TournamentStaffPanel({ tournamentId, staff, staffError = "", onC
                   </td>
                   <td className="px-4 py-3">
                     <div>{scopeLabel(a.scope || "tournament")}</div>
-                    {a.scope_id ? <div className="tls-type-small text-white/40">{scopeName(a.scope, a.scope_id)}</div>
-                      : a.scope && a.scope !== "tournament" ? <div className="tls-type-small text-white/40">{ALL_LABELS[a.scope]}</div> : null}
+                    {a.scope_id ? <div className="tls-type-small text-quiet">{scopeName(a.scope, a.scope_id)}</div>
+                      : a.scope && a.scope !== "tournament" ? <div className="tls-type-small text-quiet">{ALL_LABELS[a.scope]}</div> : null}
                   </td>
                   <td className="px-4 py-3">
                     <StatusBadge status={a.is_active === false ? "paused" : "approved"} />

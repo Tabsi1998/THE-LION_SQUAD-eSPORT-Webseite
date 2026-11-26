@@ -42,7 +42,7 @@ export function AutoBannerList() {
           </div>
         ))}
         {items && items.length === 0 && (
-          <div className="tls-type-small text-white/35 py-4 text-center">
+          <div className="tls-type-small text-quiet py-4 text-center">
             {failed ? "Automatische Banner konnten nicht geladen werden." : "Gerade läuft kein automatischer Banner."}
           </div>
         )}

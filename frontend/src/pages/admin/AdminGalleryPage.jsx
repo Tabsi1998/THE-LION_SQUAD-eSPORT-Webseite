@@ -90,7 +90,7 @@ export default function AdminGalleryPage() {
               <div className="p-4">
                 <div className="flex items-center justify-between gap-2">
                   <div className="font-black uppercase tls-wrap">{a.title}</div>
-                  <span className="tls-type-label text-white/40">{albumMediaCount(a)} Medien</span>
+                  <span className="tls-type-label text-quiet">{albumMediaCount(a)} Medien</span>
                 </div>
                 {/* Leere Alben (#1224) sehen Besucher nicht - sie erscheinen von selbst, sobald Medien da sind. */}
                 {albumMediaCount(a) === 0 && <div className="mt-1 tls-type-label text-[#FFD700]" data-testid={`admin-album-empty-${a.id}`}>leer – für Besucher unsichtbar</div>}

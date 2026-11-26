@@ -118,7 +118,7 @@ export function DiscordWelcomePanel() {
             className="px-3 py-1.5 border border-[#5865F2]/60 text-[#b8c0ff] tls-type-label rounded-sm inline-flex items-center gap-1 disabled:opacity-40">
             <Send className="w-3 h-3" /> An mich senden
           </button>
-          <span className="tls-type-small text-white/40" data-testid="discord-welcome-count">{draft.length}/{max}</span>
+          <span className="tls-type-small text-quiet" data-testid="discord-welcome-count">{draft.length}/{max}</span>
         </div>
       </div>
       {preview?.embed && <DiscordMessagePreview embed={preview.embed} buttons={preview.buttons} testId="discord-welcome-message" />}

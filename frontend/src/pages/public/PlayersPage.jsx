@@ -165,7 +165,7 @@ function PlayerGrid({ players, memberUsernames, crowns }) {
                 </span>
               </div>
             )}
-            <div className="mt-2 flex items-center justify-between gap-2 tls-type-label text-white/35">
+            <div className="mt-2 flex items-center justify-between gap-2 tls-type-label text-quiet">
               <span>{p.achievements_count || 0} Erfolge</span>
               {p.achievement_level && <AccountLevelPill level={p.achievement_level.level} className="px-1.5 py-0 tls-type-small" />}
             </div>

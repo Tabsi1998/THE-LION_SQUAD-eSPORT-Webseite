@@ -283,7 +283,7 @@ function FastLapPrizeEditor({ value, onChange }) {
           </button>
         </div>
       ))}
-      {prizes.length === 0 && <div className="tls-type-small text-white/40">Noch keine Preise hinterlegt.</div>}
+      {prizes.length === 0 && <div className="tls-type-small text-quiet">Noch keine Preise hinterlegt.</div>}
     </div>
   );
 }

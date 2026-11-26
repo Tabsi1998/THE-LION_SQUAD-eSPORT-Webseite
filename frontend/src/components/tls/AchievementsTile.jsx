@@ -41,7 +41,7 @@ export function AchievementsTile({ className = "" }) {
       {failed && !summary ? (
         <div className="mt-2 tls-type-card">Erfolge</div>
       ) : !summary ? (
-        <div className="mt-2 tls-type-small text-white/40" data-testid="dashboard-achievements-loading">Wird geladen …</div>
+        <div className="mt-2 tls-type-small text-quiet" data-testid="dashboard-achievements-loading">Wird geladen …</div>
       ) : (
         <>
           <div className="mt-2 flex items-baseline gap-2 flex-wrap">
@@ -59,7 +59,7 @@ export function AchievementsTile({ className = "" }) {
           {level && (
             <div className="mt-2">
               <AccountLevelProgress level={level.level} points={level.xp ?? level.points ?? 0} nextLevelPoints={level.next_level_xp ?? level.next_level_points ?? 100} progress={level.progress ?? 0} compact />
-              <div className="mt-1 tls-type-label text-white/40 tabular-nums">{Number(level.xp ?? 0).toLocaleString("de-DE")} / {Number(level.next_level_xp ?? 0).toLocaleString("de-DE")} XP</div>
+              <div className="mt-1 tls-type-label text-quiet tabular-nums">{Number(level.xp ?? 0).toLocaleString("de-DE")} / {Number(level.next_level_xp ?? 0).toLocaleString("de-DE")} XP</div>
             </div>
           )}
           {next ? (

@@ -102,7 +102,7 @@ export function FeedbackDialog({ target, onClose, onDone }) {
               <span className="tls-type-label text-white/60">Ein Satz (freiwillig)</span>
               <textarea value={text} onChange={(event) => setText(event.target.value.slice(0, textMax))} rows={2} maxLength={textMax} data-testid="feedback-text"
                 className="mt-1.5 w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-sm resize-none" placeholder="Was sollen wir beibehalten oder besser machen?" />
-              <span className="block text-right tls-type-small text-white/40">{text.length}/{textMax}</span>
+              <span className="block text-right tls-type-small text-quiet">{text.length}/{textMax}</span>
             </label>
             {error ? <div className="tls-type-small text-[#FF6B6B]" role="alert">{error}</div> : null}
             <button type="button" onClick={() => send(false)} disabled={!stars || submitting || !prompt} data-testid="feedback-submit"

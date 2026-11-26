@@ -275,7 +275,7 @@ export default function EventLeadPage() {
             </div>
           </aside>
         </div>
-        <p className="mt-6 tls-type-small text-white/40">Jede Änderung steht im Protokoll (wer, wann, was). Mail-Adressen stehen hier nur gekürzt.</p>
+        <p className="mt-6 tls-type-small text-quiet">Jede Änderung steht im Protokoll (wer, wann, was). Mail-Adressen stehen hier nur gekürzt.</p>
       </section>
 
       {undo ? <UndoBar undo={undo} onUndo={undoLast} /> : null}
@@ -306,7 +306,7 @@ function RegistrationRow({ row, busy, selected, showStatus, undoable, onSelect, 
       ) : row.status === "waitlist" ? (
         <button type="button" disabled={busy} onClick={onMoveUp} className="tls-btn tls-btn--secondary shrink-0 min-h-[44px] px-3 py-2 rounded-sm tls-type-label" data-testid={`event-lead-moveup-${row.id}`}>Nachrücken</button>
       ) : (
-        <span className="shrink-0 tls-type-label text-white/40">{STATUS_LABELS[row.status] || row.status}</span>
+        <span className="shrink-0 tls-type-label text-quiet">{STATUS_LABELS[row.status] || row.status}</span>
       )}
     </div>
   );
@@ -388,8 +388,8 @@ function Details({ row, event, busy, onChange, onStatus, onRename, onDelete, onC
             ) : null}
           </dd>
         </div>
-        {row.has_note && !notes ? <div className="tls-type-small text-white/40">Notiz wird geladen …</div> : null}
-        {notes?.error ? <div className="tls-type-small text-white/40">Notiz konnte nicht geladen werden.</div> : null}
+        {row.has_note && !notes ? <div className="tls-type-small text-quiet">Notiz wird geladen …</div> : null}
+        {notes?.error ? <div className="tls-type-small text-quiet">Notiz konnte nicht geladen werden.</div> : null}
         {notes?.note ? (
           <div>
             <dt className="text-white/50">Notiz der Person</dt>
@@ -412,7 +412,7 @@ function Details({ row, event, busy, onChange, onStatus, onRename, onDelete, onC
           {STATUS_ORDER.map((status) => <option key={status} value={status}>{STATUS_LABELS[status]}</option>)}
         </select>
       </label>
-      {row.created_at ? <div className="mt-3 tls-type-small text-white/40">Angemeldet am {viennaDateTime(row.created_at, { dateStyle: "medium", timeStyle: "short" })}</div> : null}
+      {row.created_at ? <div className="mt-3 tls-type-small text-quiet">Angemeldet am {viennaDateTime(row.created_at, { dateStyle: "medium", timeStyle: "short" })}</div> : null}
     </div>
   );
 }
@@ -478,7 +478,7 @@ function MessageDialog({ event, recipients, onClose, onSent }) {
               Text
               <textarea value={text} onChange={(e) => setText(e.target.value.slice(0, MESSAGE_MAX))} rows={4} className="mt-1 block w-full rounded-sm border border-white/10 bg-[#0A0A0A] p-3 text-sm normal-case tracking-normal text-white" data-testid="event-lead-message-text" />
             </label>
-            <div className="mt-1 text-right tls-type-small text-white/40">{text.length} / {MESSAGE_MAX}</div>
+            <div className="mt-1 text-right tls-type-small text-quiet">{text.length} / {MESSAGE_MAX}</div>
             <p className="mt-2 flex items-start gap-2 tls-type-small text-white/70" data-testid="event-lead-message-preview"><Users className="mt-0.5 w-4 h-4 shrink-0 text-[#29B6E8]" /> {messagePreview(recipients)}</p>
             <div className="mt-5 flex justify-end gap-2">
               <button type="button" onClick={onClose} className="tls-btn tls-btn--quiet min-h-[44px] px-4 py-2 rounded-sm tls-type-label">Abbrechen</button>
@@ -568,7 +568,7 @@ function MessageLog({ messages }) {
   if (!messages.length) return null;
   return (
     <div className="mt-8" data-testid="event-lead-log">
-      <div className="tls-type-label text-white/40">Nachrichten an alle</div>
+      <div className="tls-type-label text-quiet">Nachrichten an alle</div>
       <ul className="mt-2 space-y-2">
         {messages.map((message) => (
           <li key={message.id} className="rounded-sm border border-white/10 bg-[#121212] p-3">

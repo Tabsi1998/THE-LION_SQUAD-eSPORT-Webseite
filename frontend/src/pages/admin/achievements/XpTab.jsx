@@ -117,7 +117,7 @@ export function XpTab({ board = false }) {
             </div>
           </div>
         ) : (
-          <p className="tls-type-small text-white/40 self-center" data-testid="xp-empty">Eine Person wählen, um Stand und Deckel zu sehen.</p>
+          <p className="tls-type-small text-quiet self-center" data-testid="xp-empty">Eine Person wählen, um Stand und Deckel zu sehen.</p>
         )}
       </div>
     </div>

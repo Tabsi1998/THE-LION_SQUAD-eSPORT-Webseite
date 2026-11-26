@@ -102,7 +102,7 @@ export function ResultImageButton({ image, pasteHint = true, testId = "result-im
         className="tls-btn tls-btn--quiet px-3 py-1.5 rounded-sm tls-type-label inline-flex items-center gap-1.5 disabled:opacity-50">
         <ScanText className="w-3.5 h-3.5" /> {image.busy ? "Liest …" : "Bild auslesen"}
       </button>
-      {pasteHint && <span className="hidden sm:inline tls-type-small text-white/40" data-testid="result-image-paste-hint">
+      {pasteHint && <span className="hidden sm:inline tls-type-small text-quiet" data-testid="result-image-paste-hint">
         oder <kbd className="px-1 py-px rounded-[3px] border border-white/15 bg-white/5 font-sans tls-type-small text-white/60">Strg</kbd>+<kbd className="px-1 py-px rounded-[3px] border border-white/15 bg-white/5 font-sans tls-type-small text-white/60">V</kbd>
       </span>}
       <input ref={input} type="file" accept={ACCEPT} className="sr-only" tabIndex={-1} aria-hidden="true" data-testid={fileTestId}

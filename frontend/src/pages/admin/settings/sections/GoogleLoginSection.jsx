@@ -39,7 +39,7 @@ export function GoogleLoginSection({ authConfig, setAuthConfig, savingAuth, test
         </div>
       </div>
       {authSwitches(GOOGLE_SWITCHES)}
-      <p className="tls-type-small text-white/40">
+      <p className="tls-type-small text-quiet">
         Deaktivierte Optionen werden für Web und App serverseitig blockiert. Hinterlege in Google Cloud dieselbe Produktions- und Staging-Origin, die du hier verwendest.
       </p>
     </div>

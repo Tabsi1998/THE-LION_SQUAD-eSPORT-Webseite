@@ -417,7 +417,7 @@ function NextUp({ items }) {
   const countdown = useCountdown(target?.targetMs || null, days);
   if (!items.length) return (
     <div className="border border-dashed border-white/15 rounded-sm p-6 text-white/45 min-w-0">
-      <div className="tls-type-label text-white/40">Nächster Termin</div>
+      <div className="tls-type-label text-quiet">Nächster Termin</div>
       <div className="mt-3 tls-type-card">Aktuell nichts geplant</div>
       <p className="mt-2 tls-type-body">Sobald News, Events, Turniere oder Fast-Laps gepflegt werden, erscheint hier automatisch der nächste relevante Eintrag.</p>
     </div>
@@ -427,13 +427,13 @@ function NextUp({ items }) {
       <div className="flex items-center justify-between gap-3 min-w-0">
         <div className="tls-type-label text-[#FFD700]">Nächste Termine</div>
         <div className="shrink-0 flex items-center gap-3">
-          <Link to="/calendar" data-testid="home-calendar-link" className="tls-type-label text-white/40 hover:text-[#29B6E8]">Kalender</Link>
-          <Link to="/events" className="tls-type-label text-white/40 hover:text-[#29B6E8]">Alle Events</Link>
+          <Link to="/calendar" data-testid="home-calendar-link" className="tls-type-label text-quiet hover:text-[#29B6E8]">Kalender</Link>
+          <Link to="/events" className="tls-type-label text-quiet hover:text-[#29B6E8]">Alle Events</Link>
         </div>
       </div>
       {target && countdown && (
         <div className="mt-3 flex flex-wrap items-baseline gap-x-3 gap-y-1 min-w-0" data-testid="home-countdown">
-          <span className="inline-flex items-center gap-1.5 tls-type-label text-white/40"><Timer className="w-3 h-3" /> {target.item.label}</span>
+          <span className="inline-flex items-center gap-1.5 tls-type-label text-quiet"><Timer className="w-3 h-3" /> {target.item.label}</span>
           <span key={countdown} className="tls-tick tls-type-section tls-type-num text-white" data-testid="home-countdown-value">{countdown}</span>
         </div>
       )}
@@ -549,7 +549,7 @@ function NewsCard({ news, featured = false, index = 0, count = 1 }) {
           {news.pinned && <Pin className="w-3 h-3 text-white" aria-label="Angepinnt" />}
         </div>
         <h3 className={`tls-card__title mt-2 leading-tight tls-wrap ${featured && !isLongTitle(news.title) ? "tls-type-section" : "tls-type-card"}`}>{news.title}</h3>
-        {(news.published_at || news.created_at) && <div className="mt-2 tls-type-small text-white/40">{formatAgo(news.published_at || news.created_at)}</div>}
+        {(news.published_at || news.created_at) && <div className="mt-2 tls-type-small text-quiet">{formatAgo(news.published_at || news.created_at)}</div>}
         {news.excerpt && <p className="mt-2 tls-type-small text-white/60 line-clamp-3">{news.excerpt}</p>}
       </div>
     </Link>

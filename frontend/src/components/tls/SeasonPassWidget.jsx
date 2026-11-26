@@ -103,11 +103,11 @@ export function SeasonPassWidget() {
                     </div>
                     <div className="mt-4 flex items-end gap-4">
                       <div>
-                        <div className="tls-type-label text-white/40">Punkte</div>
+                        <div className="tls-type-label text-quiet">Punkte</div>
                         <div className="tls-type-hero tls-type-num text-[#29B6E8]">{spotlight.points}</div>
                       </div>
                       <div className="pb-2">
-                        <div className="tls-type-label text-white/40">Erfolge / Wertungen</div>
+                        <div className="tls-type-label text-quiet">Erfolge / Wertungen</div>
                         <div className="tls-type-card tls-type-num text-white">{spotlight.wins} <span className="text-white/40">/</span> {spotlight.events_count}</div>
                       </div>
                     </div>
@@ -137,7 +137,7 @@ export function SeasonPassWidget() {
                 </div>
               ))}
               {standings.length === 0 && (
-                <div className="text-white/40 text-center tls-type-label py-10">NOCH KEINE PUNKTE</div>
+                <div className="text-quiet text-center tls-type-label py-10">NOCH KEINE PUNKTE</div>
               )}
             </div>
           </div>

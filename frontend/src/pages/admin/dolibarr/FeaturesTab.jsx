@@ -145,7 +145,7 @@ export function FeaturesTab({ status, busy, run, consentTexts = [], consentError
                         {label}
                         <input value={draft[name]} onChange={(e) => setCategories({ ...draft, [name]: e.target.value })} data-testid={`dolibarr-source-${stateKey}-category`}
                           className="mt-1 w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-sm font-normal normal-case tracking-normal text-white" />
-                        <span className="block mt-1 tls-type-small font-normal text-white/40">{stateOf(stateKey)}</span>
+                        <span className="block mt-1 tls-type-small font-normal text-quiet">{stateOf(stateKey)}</span>
                       </label>
                     ))}
                     <button type="button" onClick={saveCategories} disabled={!!busy || !categoriesChanged} data-testid="dolibarr-source-save" className="mb-5 px-3 py-2 border border-[#29B6E8]/50 text-[#29B6E8] rounded-sm tls-type-label disabled:opacity-40">Speichern</button>
@@ -199,7 +199,7 @@ export function FeaturesTab({ status, busy, run, consentTexts = [], consentError
                         );
                       })}
                     </div>
-                    {!known.length && <div className="tls-type-small text-white/40 mt-1">Noch keine Felder aus dem Modul gelesen – sie erscheinen nach dem nächsten Abgleich (Vereine ab 1.2).</div>}
+                    {!known.length && <div className="tls-type-small text-quiet mt-1">Noch keine Felder aus dem Modul gelesen – sie erscheinen nach dem nächsten Abgleich (Vereine ab 1.2).</div>}
                   </div>
                 </div>
               )}
@@ -215,7 +215,7 @@ export function FeaturesTab({ status, busy, run, consentTexts = [], consentError
           );
         })}
       </ul>
-      <p className="tls-type-small text-white/35 mt-3">Ausschalten stoppt die Übernahme; der zuletzt übernommene Stand bleibt stehen.</p>
+      <p className="tls-type-small text-quiet mt-3">Ausschalten stoppt die Übernahme; der zuletzt übernommene Stand bleibt stehen.</p>
     </Panel>
   );
 }

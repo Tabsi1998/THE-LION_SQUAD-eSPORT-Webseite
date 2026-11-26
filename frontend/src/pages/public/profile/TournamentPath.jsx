@@ -93,7 +93,7 @@ export function ReferenceWithPath({ item, username, own = false, publicView = fa
       </button>
       {open ? (
         <div className="mt-2 ml-1 border-l border-white/10 pl-4 py-2" data-testid={`tournament-path-${item.id}`}>
-          {state === "loading" ? <div className="tls-type-small text-white/40">Lade den Weg …</div> : null}
+          {state === "loading" ? <div className="tls-type-small text-quiet">Lade den Weg …</div> : null}
           {state === "error" ? <div className="tls-type-small text-white/45">Für dieses Turnier gibt es keinen Weg zum Anzeigen.</div> : null}
           {state === "ready" && path ? (
             <>

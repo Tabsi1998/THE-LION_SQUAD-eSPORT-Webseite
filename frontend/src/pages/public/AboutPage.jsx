@@ -94,7 +94,7 @@ export default function AboutPage() {
               </ul>
             )}
             {organization.purpose && (
-              <p className="mt-6 tls-type-small text-white/55 max-w-3xl" data-testid="about-purpose"><span className="text-white/40 tls-type-label mr-2">Vereinszweck</span>{organization.purpose}</p>
+              <p className="mt-6 tls-type-small text-white/55 max-w-3xl" data-testid="about-purpose"><span className="text-quiet tls-type-label mr-2">Vereinszweck</span>{organization.purpose}</p>
             )}
           </div>
           {photo ? (

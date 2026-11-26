@@ -49,7 +49,7 @@ export function SeriesPartnersField({ partners = [], value, onChange, inherited 
         })}
       </ul>
       <ArchivedPartnersNote count={archived.length} onRemove={() => onChange(archived.reduce((next, id) => togglePartner(next, id, false), value))} testId={`${testPrefix}-archived`} />
-      {hint && <p className="mt-2 tls-type-small text-white/40">{hint}</p>}
+      {hint && <p className="mt-2 tls-type-small text-quiet">{hint}</p>}
     </fieldset>
   );
 }

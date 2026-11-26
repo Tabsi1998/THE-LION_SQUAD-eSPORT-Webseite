@@ -292,7 +292,7 @@ function ServerCard({ server }) {
 
         {tags.length > 0 && (
           <div className="mt-4" data-testid="server-tags">
-            <div className="tls-type-label text-white/35 mb-2">Server-Merkmale</div>
+            <div className="tls-type-label text-quiet mb-2">Server-Merkmale</div>
             <div className="flex flex-wrap gap-1.5">
               {tags.map((tag) => (
                 <span key={tag} className="px-2 py-0.5 border border-white/10 bg-white/5 rounded-sm tls-type-small text-white/70 break-all">
@@ -305,7 +305,7 @@ function ServerCard({ server }) {
 
         {max > 0 && (
           <div className="mt-5">
-            <div className="flex items-center justify-between tls-type-label text-white/35">
+            <div className="flex items-center justify-between tls-type-label text-quiet">
               <span>Auslastung</span>
               <span>{pct}%</span>
             </div>
@@ -397,7 +397,7 @@ function MaintenanceTape({ text }) {
 function Info({ label, value }) {
   return (
     <div className="min-w-0 border-t border-white/10 pt-2">
-      <div className="tls-type-label text-white/35">{label}</div>
+      <div className="tls-type-label text-quiet">{label}</div>
       <div className="mt-1 text-white/75 truncate tls-type-small">{value || "-"}</div>
     </div>
   );

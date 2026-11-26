@@ -1,7 +1,7 @@
 // Selbsttest des Umbaus auf die Schrift-Treppe (#1302): node --test scripts/type-codemod.test.mjs
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { classify, rewriteTokens, transformCss, transformSource } from "./type-codemod.mjs";
+import { classify, quietSmallText, rewriteTokens, transformCss, transformSource } from "./type-codemod.mjs";
 
 const run = (code, file = "src/pages/public/X.jsx") => transformSource(code, { file });
 
@@ -219,4 +219,17 @@ test("Unbounded nur im Seitentitel: eine große h2 oder ein großer Text ohne Za
 test("eine Kopfzeile mit kurzen Spalten bleibt Etikett - lang ist nur ein langer Block", () => {
   const head = '<thead className="text-[10px] uppercase tracking-widest text-white/45"><tr><th>#</th><th>Fahrer</th><th>Beste Zeit</th><th>Abstand</th><th>Versuche</th></tr></thead>';
   assert.equal(run(head).code, head.replace('text-[10px] uppercase tracking-widest', 'tls-type-label'));
+});
+
+test("Kleintext lesbar (#1232): Klein und Etikett in Weiß 25-42 % werden ruhiges Grau (text-quiet, 6 : 1)", () => {
+  assert.equal(quietSmallText('<p className="mt-2 tls-type-small text-white/40">Stand</p>').code, '<p className="mt-2 tls-type-small text-quiet">Stand</p>');
+  assert.equal(quietSmallText('const A = "tls-type-label text-white/35 hover:text-white/40";').code, 'const A = "tls-type-label text-quiet hover:text-white/40";');
+  // Andere Stufen und hellere Töne bleiben.
+  const keep = '<p className="tls-type-body text-white/40">x</p><p className="tls-type-small text-white/60">y</p>';
+  assert.equal(quietSmallText(keep).code, keep);
+});
+
+test("der Titel eines Moments bleibt in der Vereinsschrift", () => {
+  const moment = '<h2 key="title" className="tls-placement__title font-heading">{title}</h2>';
+  assert.equal(run(moment).code, moment);
 });

@@ -67,7 +67,7 @@ export function MentionSuggestionList({ id, items, activeIndex = 0, onPick, load
       tabIndex={-1}
       aria-label="Vorschläge zum Erwähnen"
     >
-      {loading && <div className="px-3 py-2 tls-type-small text-white/40">Benutzer werden gesucht...</div>}
+      {loading && <div className="px-3 py-2 tls-type-small text-quiet">Benutzer werden gesucht...</div>}
       {!loading && items.map((user, index) => (
         <button
           key={user.id}
@@ -90,7 +90,7 @@ export function MentionSuggestionList({ id, items, activeIndex = 0, onPick, load
           </span>
           <span className="min-w-0">
             <span className="block truncate font-bold">{userLabel(user)}</span>
-            <span className="block truncate tls-type-small text-white/40">@{user.username}</span>
+            <span className="block truncate tls-type-small text-quiet">@{user.username}</span>
           </span>
         </button>
       ))}

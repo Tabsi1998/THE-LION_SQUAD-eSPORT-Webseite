@@ -57,36 +57,36 @@ export function MediaDetailSheet({ item, onClose, onCopy, onRotateLeft, onRotate
 
       <div className="grid grid-cols-2 gap-4 tls-type-small">
         <div>
-          <div className="tls-type-label text-white/40">Größe</div>
+          <div className="tls-type-label text-quiet">Größe</div>
           <div className="text-white/80">{fmtBytes(item.size)}</div>
         </div>
         <div>
-          <div className="tls-type-label text-white/40">Geändert</div>
+          <div className="tls-type-label text-quiet">Geändert</div>
           <div className="text-white/80">{viennaDateTime(item.mtime)}</div>
         </div>
         {item.width && item.height ? (
           <div>
-            <div className="tls-type-label text-white/40">Abmessungen</div>
+            <div className="tls-type-label text-quiet">Abmessungen</div>
             <div className="text-white/80" data-testid="media-sheet-dimensions">{item.width} × {item.height} px</div>
           </div>
         ) : null}
         <div>
-          <div className="tls-type-label text-white/40">Bereich</div>
+          <div className="tls-type-label text-quiet">Bereich</div>
           <div className="text-white/80">{MEDIA_SCOPE_LABELS[item.media_scope] || MEDIA_SCOPE_LABELS.legacy}</div>
         </div>
         <div>
-          <div className="tls-type-label text-white/40">Verwendung</div>
+          <div className="tls-type-label text-quiet">Verwendung</div>
           <div className="text-white/80">{item.usage_count || 0}× verwendet{item.tracked ? "" : " · nicht erfasst"}</div>
         </div>
         {item.original_filename && (
           <div className="col-span-2">
-            <div className="tls-type-label text-white/40">Originalname</div>
+            <div className="tls-type-label text-quiet">Originalname</div>
             <div className="text-white/80 font-mono break-all">{item.original_filename}</div>
           </div>
         )}
         {item.duplicate_count > 1 && (
           <div className="col-span-2">
-            <div className="tls-type-label text-white/40">Duplikate</div>
+            <div className="tls-type-label text-quiet">Duplikate</div>
             <div className="mt-1 flex flex-wrap gap-1">
               {(item.duplicate_filenames || []).map((name) => (
                 <span key={name} className="rounded-sm border border-[#FFD700]/25 bg-[#FFD700]/5 px-2 py-1 font-mono tls-type-small text-[#FFD700]">{name}</span>
@@ -100,14 +100,14 @@ export function MediaDetailSheet({ item, onClose, onCopy, onRotateLeft, onRotate
           </div>
         )}
         <div className="col-span-2">
-          <div className="tls-type-label text-white/40">Adresse</div>
+          <div className="tls-type-label text-quiet">Adresse</div>
           <code className="text-white/80 font-mono tls-type-small break-all">{fullUrl}</code>
         </div>
       </div>
 
       {(item.references || []).length > 0 && (
         <div className="border border-white/10 rounded-sm p-3" data-testid="media-sheet-references">
-          <div className="tls-type-label text-white/40 mb-2">Verwendet in</div>
+          <div className="tls-type-label text-quiet mb-2">Verwendet in</div>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 tls-type-small">
             {item.references.map((ref, idx) => (
               <div key={`${ref.collection}-${ref.id}-${ref.field}-${idx}`} className="border border-white/10 bg-black/20 rounded-sm px-3 py-2">

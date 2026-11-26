@@ -136,10 +136,10 @@ export default function SetupWizardPage() {
         <div className="flex items-center justify-between mb-8 px-2">
           {STEPS.map((s, i) => (
             <div key={s.key} className="flex-1 flex flex-col items-center">
-              <div className={`w-8 h-8 rounded-full flex items-center justify-center tls-type-small font-bold ${i <= step ? "bg-[#29B6E8] text-black" : "bg-white/10 text-white/40"}`} data-testid={`wizard-step-${i}`}>
+              <div className={`w-8 h-8 rounded-full flex items-center justify-center tls-type-small font-bold ${i <= step ? "bg-[#29B6E8] text-black" : "bg-white/10 text-quiet"}`} data-testid={`wizard-step-${i}`}>
                 {i < step ? <Check className="w-4 h-4" /> : i + 1}
               </div>
-              <span className="tls-type-label text-white/40 mt-1.5 hidden sm:block">{s.label}</span>
+              <span className="tls-type-label text-quiet mt-1.5 hidden sm:block">{s.label}</span>
               {i < STEPS.length - 1 && <div className={`absolute h-0.5 ${i < step ? "bg-[#29B6E8]" : "bg-white/10"}`} style={{ width: "calc(100% / 5 - 2rem)", transform: "translateY(15px)", display: "none" }} />}
             </div>
           ))}
@@ -262,7 +262,7 @@ export default function SetupWizardPage() {
                 <Field label="Absender E-Mail" testId="wizard-sender-email" type="email" value={data.sender_email} onChange={(v) => upd("sender_email", v)} />
               </div>
               <Field label="Antworten an" testId="wizard-reply-to" type="email" value={data.reply_to_email} onChange={(v) => upd("reply_to_email", v)} placeholder="office@lionsquad.at" />
-              <p className="tls-type-small text-white/40">Du kannst das später unter <em>Einstellungen → SMTP</em> ändern oder leer lassen.</p>
+              <p className="tls-type-small text-quiet">Du kannst das später unter <em>Einstellungen → SMTP</em> ändern oder leer lassen.</p>
             </div>
           )}
 
@@ -284,7 +284,7 @@ export default function SetupWizardPage() {
             </button>
           ) : <div />}
           <div className="flex gap-2">
-            {step === 0 && <button onClick={skip} data-testid="wizard-skip" className="px-4 py-2 text-white/40 hover:text-white tls-type-small">Überspringen</button>}
+            {step === 0 && <button onClick={skip} data-testid="wizard-skip" className="px-4 py-2 text-quiet hover:text-white tls-type-small">Überspringen</button>}
             {step < STEPS.length - 2 && (
               <button onClick={next} data-testid="wizard-next" className="px-6 py-2.5 bg-[#29B6E8] text-black font-bold uppercase tracking-wider rounded-sm inline-flex items-center gap-2">
                 Weiter <ArrowRight className="w-4 h-4" />

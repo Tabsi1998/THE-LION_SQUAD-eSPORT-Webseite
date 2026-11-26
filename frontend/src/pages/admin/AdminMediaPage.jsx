@@ -616,7 +616,7 @@ export default function AdminMediaPage() {
         {loading ? (
           <div className="text-white/50 tls-type-small">Lade Medien…</div>
         ) : items.length === 0 ? (
-          <div className="border border-white/10 rounded-sm p-12 bg-[#121212] text-center text-white/40 tls-type-small">
+          <div className="border border-white/10 rounded-sm p-12 bg-[#121212] text-center text-quiet tls-type-small">
             Keine Dateien {q || filter !== "all" || scopeFilter !== "all" ? "gefunden" : "vorhanden"}.
           </div>
         ) : (
@@ -667,7 +667,7 @@ export default function AdminMediaPage() {
                       {!it.tracked && <span className="tls-type-label border border-[#FF3B30]/30 px-1.5 py-0.5 text-[#FF3B30]">nicht erfasst</span>}
                       {it.duplicate_count > 1 && <span className="tls-type-label border border-[#FFD700]/30 px-1.5 py-0.5 text-[#FFD700]">duplikat</span>}
                     </span>
-                    <span id={`${infoId}-size`} className="block tls-type-small text-white/40 mt-1">{fmtBytes(it.size)} · {it.usage_count || 0}x genutzt</span>
+                    <span id={`${infoId}-size`} className="block tls-type-small text-quiet mt-1">{fmtBytes(it.size)} · {it.usage_count || 0}x genutzt</span>
                     {it.kept_for_results && <span id={`${infoId}-kept`} className="block tls-type-small text-white/60 mt-1" data-testid={`media-kept-${it.filename}`}>wird noch von gespeicherten Ergebnissen gezeigt</span>}
                   </span>
                 </button>

@@ -258,7 +258,7 @@ export default function AdminPrizesPage() {
             <div className="text-center py-12 px-4">
               <Award className="w-10 h-10 text-white/30 mx-auto mb-2" />
               <p className="text-white/50">{allItems.length ? "Keine Gewinne für diesen Filter." : "Noch keine Abhol-Einträge erfasst."}</p>
-              <p className="tls-type-small text-white/30 mt-1">Preise werden nach veröffentlichten Ergebnissen oder über "Gewinne neu erzeugen" zu Abhol-Einträgen.</p>
+              <p className="tls-type-small text-quiet mt-1">Preise werden nach veröffentlichten Ergebnissen oder über "Gewinne neu erzeugen" zu Abhol-Einträgen.</p>
             </div>
           ) : items.map((p) => (
             <PrizeMobileCard key={p.id} p={p} updateStatus={updateStatus} markPickedUp={markPickedUp} remove={remove} edit={setSheet} />
@@ -285,7 +285,7 @@ export default function AdminPrizesPage() {
                 <tr><td colSpan="7" className="text-center py-12">
                   <Award className="w-10 h-10 text-white/30 mx-auto mb-2" />
                   <p className="text-white/50">{allItems.length ? "Keine Gewinne für diesen Filter." : "Noch keine Gewinne erfasst."}</p>
-                  <p className="tls-type-small text-white/30 mt-1">Gewinne werden automatisch erstellt, sobald Ergebnisse veröffentlicht werden.</p>
+                  <p className="tls-type-small text-quiet mt-1">Gewinne werden automatisch erstellt, sobald Ergebnisse veröffentlicht werden.</p>
                 </td></tr>
               ) : items.map((p) => {
                 const s = STATUS_LABEL[p.status] || STATUS_LABEL.pending;
@@ -298,7 +298,7 @@ export default function AdminPrizesPage() {
                     <td className="px-4 py-3">
                       <div className="font-semibold">{p.fastlap_challenge_title || p.tournament_title || "—"}</div>
                       {p.fastlap_source_label && <div className="tls-type-small text-[#29B6E8]">{p.fastlap_source_label}</div>}
-                      {p.source_type === "fastlap" && <div className="tls-type-label text-white/35">Fast Lap</div>}
+                      {p.source_type === "fastlap" && <div className="tls-type-label text-quiet">Fast Lap</div>}
                       <ReviewMark p={p} />
                       {p.source_type === "season" && <div className="tls-type-small text-[#e9c46a]">Verlosung{p.season_source_label ? ` · ${p.season_source_label}` : ""}</div>}
                     </td>
@@ -307,7 +307,7 @@ export default function AdminPrizesPage() {
                         <RecipientIcon className={`w-4 h-4 ${p.recipient_type === "team" ? "text-[#10B981]" : "text-[#29B6E8]"}`} />
                         <div>
                           <div className="font-semibold">{p.recipient_label || p.display_name || "—"}</div>
-                          <div className="tls-type-small text-white/40">{p.recipient_subtitle || p.email || "—"}</div>
+                          <div className="tls-type-small text-quiet">{p.recipient_subtitle || p.email || "—"}</div>
                         </div>
                       </div>
                     </td>
@@ -388,7 +388,7 @@ function PrizeMobileCard({ p, updateStatus, markPickedUp, remove, edit }) {
     <article data-testid={`prize-mobile-${p.id}`} className="p-4">
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
-          <div className="tls-type-label text-white/35">{p.source_type === "fastlap" ? "Fast Lap" : p.source_type === "season" ? "Verlosung" : "Turnier"}</div>
+          <div className="tls-type-label text-quiet">{p.source_type === "fastlap" ? "Fast Lap" : p.source_type === "season" ? "Verlosung" : "Turnier"}</div>
           <h2 className="mt-1 tls-type-section leading-tight break-words">{p.fastlap_challenge_title || p.tournament_title || "Quelle offen"}</h2>
           {p.fastlap_source_label && <div className="mt-1 tls-type-small text-[#29B6E8]">{p.fastlap_source_label}</div>}
           {p.source_type === "season" && p.season_source_label && <div className="mt-1 tls-type-small text-[#e9c46a]">{p.season_source_label}</div>}
@@ -401,21 +401,21 @@ function PrizeMobileCard({ p, updateStatus, markPickedUp, remove, edit }) {
 
       <div className="mt-4 grid grid-cols-2 gap-3 tls-type-small">
         <div className="border border-white/10 bg-black/20 rounded-sm p-3">
-          <div className="tls-type-label text-white/35">Empfänger</div>
+          <div className="tls-type-label text-quiet">Empfänger</div>
           <div className="mt-1 flex items-center gap-2 min-w-0">
             <RecipientIcon className={`w-4 h-4 shrink-0 ${p.recipient_type === "team" ? "text-[#10B981]" : "text-[#29B6E8]"}`} />
             <span className="font-semibold truncate">{p.recipient_label || p.display_name || "-"}</span>
           </div>
-          <div className="mt-1 tls-type-small text-white/35 truncate">{p.recipient_subtitle || p.email || "-"}</div>
+          <div className="mt-1 tls-type-small text-quiet truncate">{p.recipient_subtitle || p.email || "-"}</div>
         </div>
         <div className="border border-white/10 bg-black/20 rounded-sm p-3">
-          <div className="tls-type-label text-white/35">Platz</div>
+          <div className="tls-type-label text-quiet">Platz</div>
           <div className="mt-1 tls-type-section tls-type-num text-[#29B6E8]">#{p.place}</div>
         </div>
       </div>
 
       <div className="mt-3 border border-white/10 bg-black/20 rounded-sm p-3">
-        <div className="tls-type-label text-white/35">Gewinn</div>
+        <div className="tls-type-label text-quiet">Gewinn</div>
         <div className="mt-1 font-semibold">{p.prize_label || "-"}</div>
         {p.prize_value && <div className="mt-1 tls-type-small text-white/45">{p.prize_value}</div>}
       </div>

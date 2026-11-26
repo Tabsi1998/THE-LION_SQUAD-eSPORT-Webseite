@@ -193,13 +193,13 @@ export function DiscordSettings({ initialTab = "messages" }) {
                   {entry.avatar_url ? (
                     <img src={resolveMediaUrl(entry.avatar_url)} alt="" className="w-10 h-10 rounded-sm object-cover border border-white/10" />
                   ) : (
-                    <div className="w-10 h-10 rounded-sm bg-[#0A0A0A] border border-white/10 flex items-center justify-center tls-type-small font-black text-white/40">
+                    <div className="w-10 h-10 rounded-sm bg-[#0A0A0A] border border-white/10 flex items-center justify-center tls-type-small font-black text-quiet">
                       {(entry.display_name || entry.username || "?").slice(0, 2).toUpperCase()}
                     </div>
                   )}
                   <div className="min-w-0">
                     <div className="font-bold tls-wrap">{entry.display_name || entry.username}</div>
-                    <div className="tls-type-small text-white/40 tls-wrap">@{entry.username}{entry.discord_name ? ` · ${entry.discord_name}` : ""}</div>
+                    <div className="tls-type-small text-quiet tls-wrap">@{entry.username}{entry.discord_name ? ` · ${entry.discord_name}` : ""}</div>
                   </div>
                 </div>
                 <div className="flex flex-wrap items-center gap-2 justify-start lg:justify-end">
@@ -215,7 +215,7 @@ export function DiscordSettings({ initialTab = "messages" }) {
             );
           })}
           {!counters.length && (
-            <div className="px-4 py-10 text-center tls-type-small text-white/40">
+            <div className="px-4 py-10 text-center tls-type-small text-quiet">
               Keine Discord-Zähler gefunden. Suche nach einem Benutzer, um den ersten Wert zu setzen.
             </div>
           )}

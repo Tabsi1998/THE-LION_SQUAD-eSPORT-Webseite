@@ -124,7 +124,7 @@ export default function SponsorsPage() {
                       )}
                     </div>
                     {s.since_year && ["main", "platinum", "gold"].includes(t) && (
-                      <span className="tls-type-label text-white/40" data-testid={`sponsor-since-${s.id}`}>Seit {s.since_year} dabei</span>
+                      <span className="tls-type-label text-quiet" data-testid={`sponsor-since-${s.id}`}>Seit {s.since_year} dabei</span>
                     )}
                   </a>
                 ))}
@@ -147,7 +147,7 @@ export default function SponsorsPage() {
                   <div className="h-16 w-full flex items-center justify-center overflow-hidden grayscale">
                     <SmartLogo src={resolveMediaUrl(s.logo_url)} alt={s.name} className="max-w-full max-h-full w-auto h-auto" />
                   </div>
-                  <span className="tls-type-label text-white/40 tabular-nums">
+                  <span className="tls-type-label text-quiet tabular-nums">
                     {s.since_year && s.until_year && s.since_year !== s.until_year ? `${s.since_year}–${s.until_year}` : s.until_year || s.since_year || ""}
                   </span>
                 </a>
@@ -242,7 +242,7 @@ function SupportLink({ to, icon: Icon, label, text, testId }) {
         <Icon className="h-3.5 w-3.5" /> {label}
       </div>
       <p className="mt-2 tls-type-body text-white/55 line-clamp-2">{text}</p>
-      <span className="tls-card__title mt-3 inline-flex items-center gap-1.5 tls-type-label text-white/35">
+      <span className="tls-card__title mt-3 inline-flex items-center gap-1.5 tls-type-label text-quiet">
         Öffnen <ArrowRight className="tls-card__arrow h-3 w-3" />
       </span>
     </Link>

@@ -69,7 +69,7 @@ export function TwitchTab({ brand, setBrandField, status, saving, refreshing, on
               Twitch Client Secret {brand.twitch_client_secret_masked && <span className="text-white/40 normal-case">(aktuell gespeichert)</span>}
             </div>
             <input type="password" value={brand.twitch_client_secret || ""} onChange={(e) => setBrandField("twitch_client_secret", e.target.value)} data-testid="twitch-client-secret" className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-sm font-mono" placeholder={brand.twitch_client_secret_masked ? "Leer lassen, um Secret beizubehalten" : "Client Secret eintragen"} />
-            <p className="mt-1 tls-type-small text-white/40">Das Secret wird beim Laden nicht mehr im Klartext zurückgegeben.</p>
+            <p className="mt-1 tls-type-small text-quiet">Das Secret wird beim Laden nicht mehr im Klartext zurückgegeben.</p>
             {brand.twitch_client_secret_masked && <button type="button" onClick={onClearSecret} className="mt-2 tls-type-label text-[#FF6B6B]">Gespeichertes Secret entfernen</button>}
           </label>
           <div className="flex flex-col sm:flex-row gap-2">

@@ -208,7 +208,7 @@ export function NotificationBell() {
             <div className="shrink-0 flex items-center justify-between gap-3 px-4 py-3 border-b border-white/10">
               <div className="min-w-0">
                 <div className="tls-wrap tls-type-label">Benachrichtigungen</div>
-                <div className="mt-0.5 tls-type-small text-white/40">{unread} ungelesen · {read} gelesen</div>
+                <div className="mt-0.5 tls-type-small text-quiet">{unread} ungelesen · {read} gelesen</div>
               </div>
               <div className="flex items-center gap-1 shrink-0">
                 {unread > 0 && (
@@ -250,7 +250,7 @@ export function NotificationBell() {
               {feed.status === "error" ? (
                 <LoadNotice testId="notification-load-error" className="m-2" message={feed.problem === "offline" ? "Ohne Netz. Die Benachrichtigungen laden, sobald das Netz wieder da ist." : "Die Benachrichtigungen konnten nicht geladen werden."} onRetry={feed.load} />
               ) : feed.status === "loading" ? (
-                <div className="px-4 py-10 text-center tls-type-small text-white/40" role="status">Lade Benachrichtigungen …</div>
+                <div className="px-4 py-10 text-center tls-type-small text-quiet" role="status">Lade Benachrichtigungen …</div>
               ) : (
                 // Nach Tagen und Themen, Gleichartiges gebündelt (#1205); neue Meldungen gleiten hinein.
                 <NotificationGroupedList

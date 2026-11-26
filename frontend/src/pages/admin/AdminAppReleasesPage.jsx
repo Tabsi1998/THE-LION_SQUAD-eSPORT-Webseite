@@ -248,7 +248,7 @@ export default function AdminAppReleasesPage() {
       <div className="border border-white/10 bg-[#121212] rounded-sm tls-swipe pb-0 mb-6">
         <table className="w-full tls-type-small" data-testid="app-releases-table">
           <thead>
-            <tr className="tls-type-label text-white/40 border-b border-white/10">
+            <tr className="tls-type-label text-quiet border-b border-white/10">
               <th className="text-left p-3">Build</th>
               <th className="text-left p-3">Version</th>
               <th className="text-left p-3">Kanal</th>
@@ -264,7 +264,7 @@ export default function AdminAppReleasesPage() {
               <tr key={row.build} className="border-b border-white/5" data-testid={`app-release-${row.build}`}>
                 <td className="p-3 tls-type-card tls-type-num">{row.build}</td>
                 <td className="p-3 font-mono tls-type-small">v{row.version}<div className="text-white/40 truncate max-w-[16rem]" title={row.sha256 || ""}>{row.sha256 ? `sha256 ${row.sha256.slice(0, 12)}…` : ""}</div></td>
-                <td className="p-3"><ChannelBadge channel={row.channel || (String(row.version || "").endsWith("-beta") ? "beta" : "release")} />{row.source === "github" ? <div className="tls-type-small text-white/35 mt-1">von GitHub</div> : null}</td>
+                <td className="p-3"><ChannelBadge channel={row.channel || (String(row.version || "").endsWith("-beta") ? "beta" : "release")} />{row.source === "github" ? <div className="tls-type-small text-quiet mt-1">von GitHub</div> : null}</td>
                 <td className="p-3 text-right">{formatSize(row.size)}</td>
                 <td className="p-3 text-white/70">{formatTime(row.published_at)}</td>
                 <td className="p-3">{row.min_build ? `Build ${row.min_build}` : "–"}</td>

@@ -153,7 +153,7 @@ export function SectionTitle({ icon: Icon, accent, eyebrow, title, hint }) {
         </div>
         <h2 className="mt-2 tls-type-section">{title}</h2>
       </div>
-      {hint && <div className="tls-type-label text-white/40">{hint}</div>}
+      {hint && <div className="tls-type-label text-quiet">{hint}</div>}
     </div>
   );
 }

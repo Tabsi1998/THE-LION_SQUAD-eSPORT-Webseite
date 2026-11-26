@@ -136,7 +136,7 @@ function PeopleTab() {
           <div className="tls-type-label text-white/60">{people.length} Personen</div>
           <a href="/api/moderation/people/export.csv" data-testid="people-export" className="inline-flex items-center gap-1 tls-type-label text-[#29B6E8] hover:text-white"><Download className="w-3 h-3" /> CSV</a>
         </div>
-        {people.length === 0 ? <div className="tls-type-small text-white/40 py-6 text-center">Noch keine Treffer oder Maßnahmen.</div> : (
+        {people.length === 0 ? <div className="tls-type-small text-quiet py-6 text-center">Noch keine Treffer oder Maßnahmen.</div> : (
           <ul className="divide-y divide-white/5">
             {people.map((row) => (
               <li key={row.user_id}>
@@ -160,7 +160,7 @@ function PeopleTab() {
           <div className="border border-white/10 bg-[#121212] rounded-sm p-4">
             <div className="flex flex-wrap items-start justify-between gap-3">
               <div>
-                <div className="font-bold">{detail.user.display_name || detail.user.username} <span className="text-white/40 tls-type-small font-normal">@{detail.user.username}</span></div>
+                <div className="font-bold">{detail.user.display_name || detail.user.username} <span className="text-quiet tls-type-small font-normal">@{detail.user.username}</span></div>
                 <div className="tls-type-small text-white/50 mt-1">{detail.active_strike_count} Treffer in den letzten {detail.settings?.strike_ttl_months} Monaten · {detail.sanctions.length} Maßnahmen · {detail.reports.length} Meldungen gegen die Person</div>
               </div>
               {active ? (
@@ -214,7 +214,7 @@ function PeopleTab() {
           <div className="grid md:grid-cols-2 gap-4">
             <div className="border border-white/10 bg-[#121212] rounded-sm p-4">
               <div className="tls-type-label text-white/60 mb-2">Treffer</div>
-              {detail.strikes.length === 0 ? <div className="tls-type-small text-white/40">Keine.</div> : (
+              {detail.strikes.length === 0 ? <div className="tls-type-small text-quiet">Keine.</div> : (
                 <ul className="space-y-2 tls-type-small">
                   {detail.strikes.map((strike) => (
                     <li key={strike.id} className={`flex items-start justify-between gap-2 ${strike.revoked ? "opacity-50 line-through" : ""}`} data-testid={`people-strike-${strike.id}`}>
@@ -227,7 +227,7 @@ function PeopleTab() {
             </div>
             <div className="border border-white/10 bg-[#121212] rounded-sm p-4">
               <div className="tls-type-label text-white/60 mb-2">Maßnahmen</div>
-              {detail.sanctions.length === 0 ? <div className="tls-type-small text-white/40">Keine.</div> : (
+              {detail.sanctions.length === 0 ? <div className="tls-type-small text-quiet">Keine.</div> : (
                 <ul className="space-y-2 tls-type-small">
                   {detail.sanctions.map((entry) => (
                     <li key={entry.id} className="flex items-start justify-between gap-2" data-testid={`people-sanction-${entry.id}`}>
@@ -262,7 +262,7 @@ function LevelsTab() {
     api.get("/moderation/levels").then(({ data }) => setSettings(data && Array.isArray(data.levels) ? data : { levels: [], strike_ttl_months: 12 })).catch(() => setSettings({ levels: [], strike_ttl_months: 12 }));
   }, []);
 
-  if (!settings) return <div className="text-white/40 tls-type-small">Lade Stufen …</div>;
+  if (!settings) return <div className="text-quiet tls-type-small">Lade Stufen …</div>;
   const setLevel = (index, key, value) => setSettings((c) => ({ ...c, levels: c.levels.map((level, i) => (i === index ? { ...level, [key]: value } : level)) }));
   const save = async () => {
     setBusy(true);
@@ -384,7 +384,7 @@ function ReportCard({ report, onSaved }) {
         <blockquote className="mt-2 border-l-2 border-white/20 pl-3 tls-type-small text-white/60 whitespace-pre-wrap break-words" data-testid={`report-message-${report.id}`}>{report.message_excerpt}</blockquote>
       )}
       {report.resolution_note && <div className="mt-2 tls-type-small text-white/70" data-testid={`report-note-${report.id}`}><span className="text-white/45">Grund:</span> {report.resolution_note}</div>}
-      <div className="mt-2 tls-type-small text-white/35">Gemeldet von {personName(report.reporter, "einem gelöschten Konto")}{report.created_at ? ` · ${viennaDateTime(report.created_at)}` : ""}</div>
+      <div className="mt-2 tls-type-small text-quiet">Gemeldet von {personName(report.reporter, "einem gelöschten Konto")}{report.created_at ? ` · ${viennaDateTime(report.created_at)}` : ""}</div>
       <div className="mt-3 flex flex-wrap gap-2">
         {REPORT_STEPS[reportStatusOf(report.status)].map((next) => (
           <button key={next} type="button" disabled={busy} aria-pressed={step === next} onClick={() => open(next)} data-testid={`report-step-${next}-${report.id}`} className={`min-h-10 px-3 py-2 border rounded-sm tls-type-label disabled:opacity-40 ${step === next ? "border-[#29B6E8] text-[#29B6E8]" : next === "justified" ? "border-[#FF9500]/50 text-[#FF9500]" : "border-white/15 text-white/70 hover:text-white"}`}>
@@ -456,7 +456,7 @@ function ItemsTab() {
               <div className="min-w-0">
                 <div className="tls-type-label text-[#FFD700]">{item.kind_label || item.kind} · {ITEM_STATE_LABEL[item.state] || item.state} · {item.action === "hold" ? "zurückgehalten" : "markiert"}</div>
                 <div className="mt-1 tls-type-small text-white/80 whitespace-pre-wrap break-words">{item.excerpt}</div>
-                <div className="mt-2 tls-type-small text-white/35">
+                <div className="mt-2 tls-type-small text-quiet">
                   {item.user?.display_name || item.user?.username || item.user_id}{item.user?.username ? ` (@${item.user.username})` : ""} · Treffer: {(item.matched || []).join(", ")} · {item.created_at && viennaDateTime(item.created_at)}
                   {item.note ? ` · Notiz: ${item.note}` : ""}
                 </div>
@@ -543,7 +543,7 @@ function WordFilterTab() {
     if (data) setImportText("");
   };
 
-  if (!view) return <div className="text-white/40 tls-type-small">Lade Wortfilter …</div>;
+  if (!view) return <div className="text-quiet tls-type-small">Lade Wortfilter …</div>;
   const entries = view.entries || [];
 
   return (
@@ -554,7 +554,7 @@ function WordFilterTab() {
           Wortfilter einschalten
         </label>
         <p className="mt-2 tls-type-small text-white/50">Geprüft wird beim Senden in Direktnachrichten, Team-, Turnier- und Match-Chat sowie bei Profil-Bio, Anzeigename, Teamname und Benutzername. „Zurückhalten“: die Nachricht sieht nur der Absender („wird geprüft“), bis ihr freigebt oder zurückweist – zurückgewiesen zählt als Treffer; bei Namen und Bio wird die Änderung abgewiesen. „Nur markieren“: geht durch, steht aber in den Funden. Groß/Klein, Umlaute, Leetspeak (sch31ße) und Trennzeichen (s.c.h.e.i.ß.e) werden mitgeprüft; kurze Wörter nur als ganzes Wort.</p>
-        <div className="mt-2 tls-type-small text-white/40">{view.counts?.entries ?? entries.length} Einträge · {view.counts?.pending ?? 0} warten · {view.counts?.flagged ?? 0} markiert</div>
+        <div className="mt-2 tls-type-small text-quiet">{view.counts?.entries ?? entries.length} Einträge · {view.counts?.pending ?? 0} warten · {view.counts?.flagged ?? 0} markiert</div>
       </div>
 
       <form onSubmit={add} className="border border-white/10 bg-[#121212] rounded-sm p-4 grid sm:grid-cols-[1fr_auto_1fr_auto] gap-2 items-end" data-testid="word-filter-form">
@@ -593,7 +593,7 @@ function WordFilterTab() {
                 </td>
               </tr>
             ))}
-            {!entries.length && <tr><td colSpan="4" className="px-4 py-8 text-center text-white/40 tls-type-small">Noch keine Einträge.</td></tr>}
+            {!entries.length && <tr><td colSpan="4" className="px-4 py-8 text-center text-quiet tls-type-small">Noch keine Einträge.</td></tr>}
           </tbody>
         </table>
       </div>

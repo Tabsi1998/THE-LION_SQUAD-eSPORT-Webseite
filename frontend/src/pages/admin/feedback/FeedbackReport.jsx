@@ -30,7 +30,7 @@ export function FeedbackReport({ kind, targetId }) {
         <div>
           <div className="tls-type-label text-white/50">Rückmeldungen</div>
           <div className="tls-type-title tls-type-num" data-testid="feedback-report-count">{report.count}</div>
-          {report.declined ? <div className="tls-type-small text-white/40">{report.declined} wollten lieber nicht</div> : null}
+          {report.declined ? <div className="tls-type-small text-quiet">{report.declined} wollten lieber nicht</div> : null}
         </div>
         {report.details ? (
           <div>
@@ -92,7 +92,7 @@ function TagList({ title, tags, tone }) {
             </span>
           ))}
         </div>
-      ) : <p className="tls-type-small text-white/40">–</p>}
+      ) : <p className="tls-type-small text-quiet">–</p>}
     </div>
   );
 }

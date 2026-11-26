@@ -95,7 +95,7 @@ export function SeasonTab() {
         )}
       </div>
 
-      {loading && <p className="tls-type-small text-white/40">Lädt …</p>}
+      {loading && <p className="tls-type-small text-quiet">Lädt …</p>}
       {preview && !loading && (
         <>
           <Panel
@@ -127,7 +127,7 @@ export function SeasonTab() {
                   {preview.standings.map((row) => (
                     <tr key={row.user_id || row.rank} data-testid={`season-row-${row.rank}`}>
                       <td className="py-2 pr-3 tls-type-num" style={{ color: row.rank === 1 ? "#FFD700" : undefined }}>{row.rank}</td>
-                      <td className="py-2 pr-3">{personName(row)} {row.username && <span className="tls-type-small text-white/35">@{row.username}</span>}</td>
+                      <td className="py-2 pr-3">{personName(row)} {row.username && <span className="tls-type-small text-quiet">@{row.username}</span>}</td>
                       <td className="py-2 pr-3 text-right tabular-nums">{Number(row.points || 0).toLocaleString("de-DE")}</td>
                       <td className="py-2 pr-3">
                         <div className="flex flex-wrap gap-1.5">
@@ -136,7 +136,7 @@ export function SeasonTab() {
                               {a.name} <MaterialChip tier={a} />
                             </span>
                           ))}
-                          {!row.awards.length && <span className="tls-type-small text-white/30">–</span>}
+                          {!row.awards.length && <span className="tls-type-small text-quiet">–</span>}
                         </div>
                       </td>
                       {preview.mvp && (
@@ -148,7 +148,7 @@ export function SeasonTab() {
                       )}
                     </tr>
                   ))}
-                  {!preview.standings.length && <tr><td colSpan="5" className="py-6 text-center tls-type-small text-white/40">Noch keine Punkte in dieser Saison.</td></tr>}
+                  {!preview.standings.length && <tr><td colSpan="5" className="py-6 text-center tls-type-small text-quiet">Noch keine Punkte in dieser Saison.</td></tr>}
                 </tbody>
               </table>
             </div>

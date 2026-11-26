@@ -58,7 +58,7 @@ function LegalArticle({ title, intro, updatedAt, children }) {
         <p className="mt-4 tls-type-label text-[#29B6E8]">Rechtliches</p>
         <h1 className="tls-type-title mt-2"><ShortCaps>{title}</ShortCaps></h1>
         <p className="mt-3 text-white/60 max-w-2xl">{intro}</p>
-        {formattedUpdatedAt && <p className="mt-2 tls-type-small text-white/40">Stand: {formattedUpdatedAt}</p>}
+        {formattedUpdatedAt && <p className="mt-2 tls-type-small text-quiet">Stand: {formattedUpdatedAt}</p>}
         <div className="mt-10 space-y-8 tls-type-body leading-relaxed text-white/75">{children}</div>
       </article>
     </PublicLayout>

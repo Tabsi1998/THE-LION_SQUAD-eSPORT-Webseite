@@ -42,7 +42,7 @@ export function EventFactsSection({ bringText, onBringText, highlights, onHighli
         <span className="block tls-type-small text-white/50 font-bold mb-1.5">Mitbringen – eine Zeile je Punkt</span>
         <textarea value={bringText} onChange={(ev) => onBringText(ev.target.value)} rows={4} data-testid="event-bring-along"
           placeholder={"eigener Controller\nKopfhörer"} className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-sm" />
-        <span className={`block mt-1 tls-type-small ${lines.length > BRING_ALONG_MAX ? "text-[#FF6B6B]" : "text-white/40"}`}>
+        <span className={`block mt-1 tls-type-small ${lines.length > BRING_ALONG_MAX ? "text-[#FF6B6B]" : "text-quiet"}`}>
           {lines.length} von höchstens {BRING_ALONG_MAX} Zeilen · steht im Fakten-Kasten oben auf der Event-Seite.
         </span>
       </label>
@@ -70,7 +70,7 @@ export function EventFactsSection({ bringText, onBringText, highlights, onHighli
             className="mt-2 inline-flex items-center gap-1.5 tls-type-small font-bold text-[#9F7AEA] hover:text-white">
             <Plus className="w-3.5 h-3.5" /> Highlight hinzufügen
           </button>
-        ) : <p className="mt-2 tls-type-small text-white/40">Höchstens {HIGHLIGHTS_MAX} Highlights.</p>}
+        ) : <p className="mt-2 tls-type-small text-quiet">Höchstens {HIGHLIGHTS_MAX} Highlights.</p>}
       </div>
     </div>
   );
@@ -93,7 +93,7 @@ export function EventBannerFields({ url, style, focusX, focusY, onChange }) {
           className="w-full sm:w-auto bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-sm">
           {BANNER_STYLE_LABELS.map(([key, label]) => <option key={key} value={key}>{label}</option>)}
         </select>
-        <span className="block mt-1 tls-type-small text-white/40">Dasselbe Bild steht auf der Event-Karte. „Automatisch“: Bilder mit durchsichtigem Hintergrund oder wenigen Farben gelten als Logo.</span>
+        <span className="block mt-1 tls-type-small text-quiet">Dasselbe Bild steht auf der Event-Karte. „Automatisch“: Bilder mit durchsichtigem Hintergrund oder wenigen Farben gelten als Logo.</span>
       </label>
       {style !== "logo" ? (
         <div>

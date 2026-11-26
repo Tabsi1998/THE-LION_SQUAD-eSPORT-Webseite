@@ -173,7 +173,7 @@ function ProtestSettings({ seasonId, canEdit }) {
                 <input type="checkbox" checked={Boolean(row.ask_notified)} onChange={(event) => setReason(index, { ask_notified: event.target.checked })} data-testid={`protest-reason-ask-${index}`} />
                 Sofort hingewiesen?
               </label>
-              {row.fixed ? <span className="row-start-1 col-start-2 tls-type-label text-white/40 sm:col-start-3 sm:mt-5">fest</span> : (
+              {row.fixed ? <span className="row-start-1 col-start-2 tls-type-label text-quiet sm:col-start-3 sm:mt-5">fest</span> : (
                 <button type="button" onClick={() => set("protest_reasons", form.protest_reasons.filter((_, at) => at !== index))} aria-label={`Grund ${index + 1} entfernen`}
                   className="row-start-1 col-start-2 flex min-h-11 min-w-11 items-center justify-center rounded-sm text-white/50 hover:text-live focus-visible:outline focus-visible:outline-1 focus-visible:outline-[#29B6E8] sm:col-start-3 sm:mt-5" data-testid={`protest-reason-remove-${index}`}>
                   <Trash2 className="h-4 w-4" aria-hidden="true" />

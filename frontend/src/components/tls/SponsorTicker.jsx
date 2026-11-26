@@ -73,7 +73,7 @@ export function SponsorTicker({ className = "", compact = false, placement = "ho
     <section className={`relative max-w-full overflow-hidden ${shellClass} ${className}`} aria-label={compact ? "Sponsoren" : undefined} data-testid="sponsor-ticker">
       {!compact && !spotlight && (
         <div className="max-w-7xl mx-auto px-4 pt-4 pb-1 text-right">
-          <span className="tls-type-label text-white/35">Presented by our Partners</span>
+          <span className="tls-type-label text-quiet">Presented by our Partners</span>
         </div>
       )}
       {mainBanner ? (

@@ -150,7 +150,7 @@ function NumberInput({ field, value, onChange, disabled, testId }) {
         onChange={(event) => setText(event.target.value)} onBlur={commit} onKeyDown={(event) => { if (event.key === "Enter") commit(); }}
         className={`${INPUT} w-24`} data-testid={testId} aria-label={field.label} />
       <span className="text-white/60">{field.unit}</span>
-      <span className="tls-type-small text-white/35">({field.min} bis {field.max})</span>
+      <span className="tls-type-small text-quiet">({field.min} bis {field.max})</span>
     </label>
   );
 }
@@ -210,7 +210,7 @@ function SettingField({ field, value, defaultValue, onChange, disabled }) {
     <div className={`${FIELD_BOX} ${field.type === "playlist" ? "md:col-span-2" : ""}`} data-testid={`tv-setting-${field.key}`}>
       <div className="flex items-start justify-between gap-3">
         <div className="tls-type-small font-bold text-white/90">{field.label}</div>
-        <span className={`tls-type-label text-right ${isDefault ? "text-white/35" : "text-[#FFD700]"}`}>
+        <span className={`tls-type-label text-right ${isDefault ? "text-quiet" : "text-[#FFD700]"}`}>
           {isDefault ? "Standard" : `Standard: ${tvValueLabel(field.key, defaultValue)}`}
         </span>
       </div>

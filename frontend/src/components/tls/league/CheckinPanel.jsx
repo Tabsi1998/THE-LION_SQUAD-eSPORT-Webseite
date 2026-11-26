@@ -116,7 +116,7 @@ function RosterPicker({ roster, selected, onToggle, testId, minimum }) {
           const checked = selected.includes(person.id);
           return (
             <li key={person.id}>
-              <label className={`flex min-h-11 cursor-pointer items-start gap-2 rounded-sm border px-3 py-2 tls-type-small ${person.blocked ? "cursor-not-allowed border-white/5 text-white/40" : checked ? "border-[#29B6E8]/60 bg-[#29B6E8]/10 text-white" : "border-white/10 text-white/80"}`}>
+              <label className={`flex min-h-11 cursor-pointer items-start gap-2 rounded-sm border px-3 py-2 tls-type-small ${person.blocked ? "cursor-not-allowed border-white/5 text-quiet" : checked ? "border-[#29B6E8]/60 bg-[#29B6E8]/10 text-white" : "border-white/10 text-white/80"}`}>
                 <input type="checkbox" className="mt-1 accent-[#29B6E8]" checked={checked} disabled={Boolean(person.blocked)}
                   onChange={() => onToggle(person.id)} data-testid={`${testId}-${person.id}`} />
                 <span className="min-w-0">

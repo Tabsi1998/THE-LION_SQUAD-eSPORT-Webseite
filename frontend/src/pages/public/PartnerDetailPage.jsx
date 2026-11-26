@@ -231,7 +231,7 @@ export default function PartnerDetailPage() {
               <p className="mt-2 tls-type-small text-white/55">Gemeinsame Events, Turniere und Community-Projekte mit {partner.name} laufen über den Verein.</p>
               <Link to="/contact" className="mt-3 inline-flex items-center gap-1.5 tls-type-label text-[#29B6E8] hover:text-white">Kontakt aufnehmen <ArrowRight className="w-3 h-3" /></Link>
             </section>
-            <Link to="/partners" className="inline-flex items-center gap-1.5 tls-type-label text-white/40 hover:text-white">← Alle Partner</Link>
+            <Link to="/partners" className="inline-flex items-center gap-1.5 tls-type-label text-quiet hover:text-white">← Alle Partner</Link>
           </aside>
         </div>
       </section>
@@ -361,7 +361,7 @@ function ToolEmbed({ tool, hasConsent, onClose }) {
       {hasConsent("external_media") ? (
         <>
           <iframe title={tool.title} src={tool.url} className="block w-full border-0 h-[70vh] min-h-[420px] bg-white" sandbox="allow-scripts allow-same-origin allow-popups allow-forms" loading="lazy" />
-          <p className="px-4 py-2 tls-type-small text-white/40">Bleibt der Rahmen leer, lässt die Seite des Partners das Einbetten nicht zu – dann „Direkt öffnen“.</p>
+          <p className="px-4 py-2 tls-type-small text-quiet">Bleibt der Rahmen leer, lässt die Seite des Partners das Einbetten nicht zu – dann „Direkt öffnen“.</p>
         </>
       ) : (
         <div className="p-4">

@@ -133,7 +133,7 @@ export function TournamentFlowStepper({ tournament, registrations = [], matchesV
                 >
                   {step.label}
                 </span>
-                <span className="tls-type-small text-white/40 tabular-nums">{step.meta}</span>
+                <span className="tls-type-small text-quiet tabular-nums">{step.meta}</span>
               </button>
               {i < steps.length - 1 && (
                 <span

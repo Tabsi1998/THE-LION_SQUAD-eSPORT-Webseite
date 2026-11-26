@@ -68,7 +68,7 @@ export function AddToCalendar({ item, days = null, className = "", block = false
             </div>
             {multi && (
               <div className="mb-3" role="group" aria-label="Welche Tage">
-                <div className="tls-type-label text-white/40 mb-1.5">Welche Tage</div>
+                <div className="tls-type-label text-quiet mb-1.5">Welche Tage</div>
                 <div className="flex flex-wrap gap-1.5">
                   <ScopeChip active={scope === "all"} onClick={() => setScope("all")} testId={`${testId}-scope-all`}>Alle {days.length} Tage</ScopeChip>
                   {days.map((day) => (

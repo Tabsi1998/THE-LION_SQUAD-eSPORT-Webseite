@@ -323,7 +323,7 @@ export function CatalogTab({ board = false }) {
                                 </tr>
                               );
                             })}
-                            {!groupTiers.length && <tr><td colSpan="5" className="px-3 py-6 text-center text-white/40 tls-type-small">Noch keine Stufen.</td></tr>}
+                            {!groupTiers.length && <tr><td colSpan="5" className="px-3 py-6 text-center text-quiet tls-type-small">Noch keine Stufen.</td></tr>}
                           </tbody>
                         </table>
                       </div>
@@ -338,7 +338,7 @@ export function CatalogTab({ board = false }) {
           </div>
         </section>
       ))}
-      {!sections.length && <p className="tls-type-small text-white/40">Keine Gruppe passt zur Suche.</p>}
+      {!sections.length && <p className="tls-type-small text-quiet">Keine Gruppe passt zur Suche.</p>}
 
       <Panel title="Katalog einspielen" icon={Upload} accent="#29B6E8" hint="Eine Exportdatei (JSON) übernehmen: erst wird der zusammengeführte Stand geprüft, bei Fehlern wird nichts geschrieben. Gelöscht wird nie etwas." testId="catalog-import">
         <BoardOnly board={board} what="Einspielen">

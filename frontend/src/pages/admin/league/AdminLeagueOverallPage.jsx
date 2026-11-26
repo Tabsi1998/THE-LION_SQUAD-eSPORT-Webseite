@@ -224,7 +224,7 @@ function PeriodsTab({ data, onSaved }) {
                     {(data.seasons || []).map((season) => {
                       const other = takenBy(rows, season.id, row.key);
                       return (
-                        <label key={season.id} className={`flex min-h-11 items-center gap-2 tls-type-small ${other ? "text-white/40" : "cursor-pointer text-white/85"}`}>
+                        <label key={season.id} className={`flex min-h-11 items-center gap-2 tls-type-small ${other ? "text-quiet" : "cursor-pointer text-white/85"}`}>
                           <input type="checkbox" checked={row.season_ids.includes(season.id)} disabled={readOnly || locked || Boolean(other)}
                             onChange={() => update(row.key, { season_ids: row.season_ids.includes(season.id) ? row.season_ids.filter((id) => id !== season.id) : [...row.season_ids, season.id] })}
                             className="h-4 w-4 accent-[var(--tls-cyan)]" data-testid={`overall-period-${index}-season-${season.number}`} />

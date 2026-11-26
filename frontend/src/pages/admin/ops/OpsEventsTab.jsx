@@ -65,8 +65,8 @@ export function EventRow({ row, onResend, resending = false, onAck, acking = fal
               {SEVERITY_LABELS[row.severity] || row.severity || "Log"}
             </span>
             <span className="rounded-sm border border-white/10 px-2 py-1 tls-type-label text-white/45">{row.source_label}</span>
-            {row.status && <span className="tls-type-label text-white/35">{row.status}</span>}
-            <span className="ml-auto tls-type-small text-white/35">{formatEventTime(row.time)}</span>
+            {row.status && <span className="tls-type-label text-quiet">{row.status}</span>}
+            <span className="ml-auto tls-type-small text-quiet">{formatEventTime(row.time)}</span>
           </div>
           <div className="break-words tls-type-small font-bold text-white">{row.title}</div>
           {row.subtitle && <div className="mt-1 break-words tls-type-small text-white/45">{row.subtitle}</div>}

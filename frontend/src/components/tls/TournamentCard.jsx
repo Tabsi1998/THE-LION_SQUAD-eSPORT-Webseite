@@ -65,8 +65,8 @@ export function TournamentCard({ tournament, index = 0 }) {
                 {t.game.short_name}
               </span>
             )}
-            {t.game?.short_name && t.platform ? <span className="text-white/25 tls-type-small" aria-hidden="true">·</span> : null}
-            {t.platform && <span className="text-white/40 tls-type-small">{t.platform}</span>}
+            {t.game?.short_name && t.platform ? <span className="text-quiet tls-type-small" aria-hidden="true">·</span> : null}
+            {t.platform && <span className="text-quiet tls-type-small">{t.platform}</span>}
           </div>
         ) : null}
         <h3 className="tls-card__title tls-type-card text-white line-clamp-2">

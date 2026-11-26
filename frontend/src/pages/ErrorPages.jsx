@@ -100,7 +100,7 @@ export function ErrorPage({ code = "404", detail = "", title = "", primary }) {
                   Läuft gerade etwas nicht? <Link to="/status" data-testid="error-status-link" className="tls-hit font-semibold text-brand hover:text-white">Status ansehen</Link>
                 </p>
               ) : null}
-              <p className="mt-6 tls-type-small text-white/40" data-testid="error-code">Fehler {def.code}</p>
+              <p className="mt-6 tls-type-small text-quiet" data-testid="error-code">Fehler {def.code}</p>
             </div>
           </div>
           <div className="mt-8 grid grid-cols-2 sm:grid-cols-5 gap-2">

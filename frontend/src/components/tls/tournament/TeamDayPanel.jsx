@@ -123,7 +123,7 @@ export function TeamDayPanel({ tournament }) {
             {data.members.filter((member) => counted.has(member.id)).map((member) => (
               <li key={member.id} className="flex items-center justify-between gap-3 tls-type-small" data-testid={`team-presence-${member.id}`}>
                 <span className="truncate">{member.display_name}</span>
-                <span className={`tls-type-label ${present[member.id] ? "text-[#29B6E8]" : "text-white/40"}`}>
+                <span className={`tls-type-label ${present[member.id] ? "text-[#29B6E8]" : "text-quiet"}`}>
                   {present[member.id] ? `da · ${viennaTime(present[member.id], { hour: "2-digit", minute: "2-digit" })}` : "fehlt"}
                 </span>
               </li>

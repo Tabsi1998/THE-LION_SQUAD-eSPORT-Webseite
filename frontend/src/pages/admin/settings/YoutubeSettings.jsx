@@ -107,7 +107,7 @@ export function YoutubeSettings() {
       <div className="grid sm:grid-cols-[minmax(0,1fr)_auto] gap-2 items-start">
         <div>
           <input value={url} onChange={(e) => setChannelUrl(e.target.value)} placeholder={data.branding_url ? `Standard: ${data.branding_url}` : "https://www.youtube.com/@Vereinskanal"} data-testid="youtube-feed-channel" className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-sm" />
-          <p className="mt-1 tls-type-small text-white/40">Leer = die YouTube-Adresse aus Einstellungen → Branding. Ein Handle (@…) wird beim ersten Abruf einmal zur Kanal-ID aufgelöst.</p>
+          <p className="mt-1 tls-type-small text-quiet">Leer = die YouTube-Adresse aus Einstellungen → Branding. Ein Handle (@…) wird beim ersten Abruf einmal zur Kanal-ID aufgelöst.</p>
         </div>
         <button type="button" onClick={() => save({ channel_url: url.trim() }, "Kanal gespeichert.")} disabled={!!busy || channelUrl === null} data-testid="youtube-feed-channel-save" className="px-3 py-2 bg-[#29B6E8] text-black tls-type-label rounded-sm disabled:opacity-40">Speichern</button>
       </div>

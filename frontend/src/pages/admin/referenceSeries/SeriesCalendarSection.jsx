@@ -265,7 +265,7 @@ export function SeriesCalendarSection({ series }) {
                   // Handy: Lauf, Zeit und Status in einer Zeile, die Knöpfe darunter; ab sm alles in einer Zeile.
                   return (
                     <li key={round.id} data-testid="calendar-round" data-state={round.state} className={`grid grid-cols-[6.5rem_minmax(0,1fr)_auto] sm:grid-cols-[7rem_minmax(0,1fr)_auto_auto] items-center gap-x-3 gap-y-1 ${hintIds.has(round.id) ? "bg-amber-400/[0.04]" : ""}`}>
-                      <span className={`tls-type-label [overflow-wrap:anywhere] ${round.state === "cancelled" ? "text-white/40 line-through" : "text-white/75"}`} data-testid="calendar-session">{round.session || "Rennen"}</span>
+                      <span className={`tls-type-label [overflow-wrap:anywhere] ${round.state === "cancelled" ? "text-quiet line-through" : "text-white/75"}`} data-testid="calendar-session">{round.session || "Rennen"}</span>
                       <span className="min-w-0">
                         <span className={`block tls-type-small tabular-nums ${round.state === "cancelled" ? "text-white/45" : "text-white/85"}`}>{round.club_day !== weekend.lead.club_day ? roundWhen(round) : round.time || "ohne Uhrzeit"}</span>
                         <RoundNotes round={round} profile={profile} />

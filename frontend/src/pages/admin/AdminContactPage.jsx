@@ -316,7 +316,7 @@ export default function AdminContactPage() {
               <label htmlFor="contact-note" className="block tls-type-label text-white/60 mb-2">Interne Notiz</label>
               <textarea id="contact-note" key={active.id} defaultValue={active.internal_note || ""} maxLength={4000} onBlur={(e) => saveNote(active, e.target.value)} data-testid="contact-note"
                 className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-sm" rows={4} />
-              <p className="mt-1 tls-type-small text-white/40">Geht nie an die Person.</p>
+              <p className="mt-1 tls-type-small text-quiet">Geht nie an die Person.</p>
             </div>
             <button onClick={() => remove(active.id)} className="w-full px-4 py-2 border border-[#FF3B30]/30 text-[#FF3B30] tls-type-label rounded-sm hover:bg-[#FF3B30]/10 inline-flex items-center justify-center gap-2"><Trash2 className="w-3.5 h-3.5" /> Löschen</button>
           </div>
@@ -396,7 +396,7 @@ export default function AdminContactPage() {
                 return (
                   <tr key={m.id} onClick={() => openMessage(m)} data-testid={`contact-row-${m.id}`} className="cursor-pointer hover:bg-white/5">
                     <td className="px-4 py-3 text-white/50 tls-type-small whitespace-nowrap">{viennaDate(m.created_at)}</td>
-                    <td className="px-4 py-3"><div className="text-white/85">{m.name}</div><div className="tls-type-small text-white/40">{m.email}</div></td>
+                    <td className="px-4 py-3"><div className="text-white/85">{m.name}</div><div className="tls-type-small text-quiet">{m.email}</div></td>
                     <td className="px-4 py-3 tls-type-small text-[#29B6E8]" data-testid={`contact-topic-${m.id}`}>{topics[m.topic] || m.topic}</td>
                     <td className="px-4 py-3"><div className="font-semibold tls-wrap max-w-md">{m.subject}</div></td>
                     <td className="px-4 py-3 tls-type-small text-white/60">{m.assigned_to_name || "–"}</td>

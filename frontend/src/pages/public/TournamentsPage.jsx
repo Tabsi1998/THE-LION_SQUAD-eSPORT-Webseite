@@ -216,7 +216,7 @@ export default function TournamentsPage() {
         ) : error ? (
           <div className="col-span-full text-center py-20">
             <div className="text-[#FF3B30] tls-type-label">FEHLER BEIM LADEN</div>
-            <p className="mt-2 text-white/40 tls-type-small">Turniere konnten nicht geladen werden. Bitte Seite neu laden.</p>
+            <p className="mt-2 text-quiet tls-type-small">Turniere konnten nicht geladen werden. Bitte Seite neu laden.</p>
             <button onClick={load} className="tls-btn tls-btn--secondary mt-4 px-4 py-2 rounded-sm tls-type-label">
               Erneut versuchen
             </button>

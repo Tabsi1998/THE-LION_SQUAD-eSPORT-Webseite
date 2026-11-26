@@ -127,7 +127,7 @@ export function MemberCardPanel() {
               <RefreshCw className="w-3.5 h-3.5" /> Code erneuern
             </button>
           </div>
-          <div className="inline-flex items-center gap-1.5 tls-type-small text-white/40"><Smartphone className="w-3.5 h-3.5" /> In der LionsAPP unter „Verein → Karte“ immer dabei.</div>
+          <div className="inline-flex items-center gap-1.5 tls-type-small text-quiet"><Smartphone className="w-3.5 h-3.5" /> In der LionsAPP unter „Verein → Karte“ immer dabei.</div>
         </div>
       </div>
       {/* Die Vorlage für das Bild: dieselbe Karte, groß, ohne Code - außerhalb des sichtbaren Bereichs. */}

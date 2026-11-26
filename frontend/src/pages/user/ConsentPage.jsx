@@ -33,7 +33,7 @@ export default function ConsentPage() {
         <span className="tls-type-label text-[#29B6E8]">Datenschutz-Update</span>
         <h1 className="tls-type-title mt-2"><ShortCaps>Aktuelle Bedingungen bestätigen</ShortCaps></h1>
         <p className="mt-3 tls-type-body text-white/60">Für dein Konto gelten aktualisierte Dokumentversionen. Bitte lies sie und bestätige sie ausdrücklich. Ohne Bestätigung bleibt der restliche Mitgliederbereich gesperrt.</p>
-        <div className="mt-3 tls-type-small text-white/40">Datenschutz: {user?.required_privacy_policy_version || "aktuell"} · Bedingungen: {user?.required_terms_version || "aktuell"}</div>
+        <div className="mt-3 tls-type-small text-quiet">Datenschutz: {user?.required_privacy_policy_version || "aktuell"} · Bedingungen: {user?.required_terms_version || "aktuell"}</div>
         <form onSubmit={submit} className="mt-6 space-y-4">
           <label className="flex items-start gap-3 border border-white/10 p-4 rounded-sm">
             <input type="checkbox" checked={privacy} onChange={(event) => setPrivacy(event.target.checked)} className="mt-1 accent-[#29B6E8]" />

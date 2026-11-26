@@ -111,7 +111,7 @@ export function AccountBox({ form, set, profile, profiles = [] }) {
             <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Konto suchen: Name, E-Mail oder Benutzername" data-testid="club-member-account-search"
               className="w-full bg-[#0A0A0A] border border-white/10 focus:border-[#29B6E8] pl-9 pr-3 py-2 rounded-sm text-sm text-white" />
           </label>
-          {searching ? <p className="tls-type-small text-white/40">Suche …</p> : null}
+          {searching ? <p className="tls-type-small text-quiet">Suche …</p> : null}
           {results.length > 0 ? (
             <ul className="divide-y divide-white/5 border border-white/10 rounded-sm bg-[#0A0A0A]" data-testid="club-member-account-results">
               {results.map((user) => {
@@ -129,7 +129,7 @@ export function AccountBox({ form, set, profile, profiles = [] }) {
               })}
             </ul>
           ) : null}
-          {query.trim().length >= 2 && !searching && results.length === 0 ? <p className="tls-type-small text-white/40">Kein Konto gefunden.</p> : null}
+          {query.trim().length >= 2 && !searching && results.length === 0 ? <p className="tls-type-small text-quiet">Kein Konto gefunden.</p> : null}
         </>
       )}
     </div>

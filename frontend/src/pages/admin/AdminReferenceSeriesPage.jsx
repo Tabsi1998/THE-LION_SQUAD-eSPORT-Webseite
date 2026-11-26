@@ -151,7 +151,7 @@ export default function AdminReferenceSeriesPage() {
                   </div>
                 </li>
               ))}
-              {lineage.series.length === 0 && <li className="py-2 tls-type-small text-white/40">Noch keine Saison.</li>}
+              {lineage.series.length === 0 && <li className="py-2 tls-type-small text-quiet">Noch keine Saison.</li>}
             </ul>
           </section>
         ))}

@@ -88,7 +88,7 @@ function WeatherSwitch({ season, busy, onSeasonSave, onPreview }) {
           <Eye className="w-3 h-3" /> Vorschau 60 Sekunden
         </button>
       </div>
-      <p className="tls-type-small text-white/40 max-w-2xl">
+      <p className="tls-type-small text-quiet max-w-2xl">
         Das ganze Jahr: regnet, schneit oder gewittert es am Vereinsort, zeigen es Website und App (wo angehakt) – sonst nichts. Vom 1. Advent bis Dreikönig schneit es immer, Regen wird zu Schnee.
         Die Vorschau zeigt einen Gewitterregen, auch wenn es draußen trocken ist – nur dir, sofort, in diesem Tab.
       </p>

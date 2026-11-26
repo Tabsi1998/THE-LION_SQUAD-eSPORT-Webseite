@@ -90,7 +90,7 @@ export function DiscordSamplesPanel() {
               <div key={entry.key} className="border border-white/10 rounded-sm p-3 space-y-2" data-testid={`discord-sample-${entry.key}`}>
                 <div className="flex flex-wrap items-center justify-between gap-2">
                   <div className="tls-type-small font-bold">{entry.label}</div>
-                  <div className="flex flex-wrap items-center gap-2 tls-type-label text-white/40">
+                  <div className="flex flex-wrap items-center gap-2 tls-type-label text-quiet">
                     {entry.enabled === false && <span className="text-[#FFD700]" data-testid={`discord-sample-${entry.key}-off`}>Ereignis aus</span>}
                     {entry.only_main && <span className="text-[#FFD700]" data-testid={`discord-sample-${entry.key}-only-main`}>nur am Hauptserver</span>}
                     {entry.place && <span className="text-[#b8c0ff]" data-testid={`discord-sample-${entry.key}-place`}>{entry.place}</span>}
@@ -113,7 +113,7 @@ export function DiscordSamplesPanel() {
           </div>
         );
       })}
-      {data && !entries.length && !loadError && <div className="tls-type-small text-white/40">Keine Meldungsarten bekannt.</div>}
+      {data && !entries.length && !loadError && <div className="tls-type-small text-quiet">Keine Meldungsarten bekannt.</div>}
     </div>
   );
 }

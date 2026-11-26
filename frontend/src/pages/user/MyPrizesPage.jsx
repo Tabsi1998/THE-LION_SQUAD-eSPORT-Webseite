@@ -202,7 +202,7 @@ function PrizeCard({ p, highlight }) {
         </Link>
       )}
       {p.fastlap_source_label && <div className="tls-type-small text-[#29B6E8] mb-2">{p.fastlap_source_label}</div>}
-      {p.prize_value && <div className="tls-type-small text-white/40">{p.prize_value}</div>}
+      {p.prize_value && <div className="tls-type-small text-quiet">{p.prize_value}</div>}
       {p.status === "ready" && (
         <div className="mt-3 tls-type-small text-[#29B6E8] flex items-center gap-1.5 border border-[#29B6E8]/20 bg-[#29B6E8]/5 rounded-sm px-3 py-2">
           <MapPin className="w-3 h-3" /> Hol dir deinen Preis beim nächsten Vereinsabend!
@@ -210,20 +210,20 @@ function PrizeCard({ p, highlight }) {
       )}
       {/* Die Abholfrist läuft ab „Bereit“ (#2123, ER1) - vorher bereitet der Verein den Gewinn noch vor. */}
       {p.status === "pending" && (
-        <div className="mt-3 tls-type-small flex items-center gap-1.5 text-white/40" data-testid={`my-prize-pending-${p.id}`}>
+        <div className="mt-3 tls-type-small flex items-center gap-1.5 text-quiet" data-testid={`my-prize-pending-${p.id}`}>
           <CalendarDays className="w-3 h-3" />
           Wir melden uns, sobald er abholbereit ist – ab dann hast du 90 Tage Zeit.
         </div>
       )}
       {p.pickup_deadline && p.status === "ready" && (
-        <div className={`mt-3 tls-type-small flex items-center gap-1.5 ${urgent ? "text-[#FFD700]" : "text-white/40"}`}>
+        <div className={`mt-3 tls-type-small flex items-center gap-1.5 ${urgent ? "text-[#FFD700]" : "text-quiet"}`}>
           <CalendarDays className="w-3 h-3" />
           Abholbar bis: {formatDate(p.pickup_deadline)}
           {urgent && <span className="font-bold uppercase tracking-widest">· {due < 0 ? "überfällig" : `${due} Tage`}</span>}
         </div>
       )}
       {p.picked_up_at && (
-        <div className="mt-2 tls-type-small text-white/40">
+        <div className="mt-2 tls-type-small text-quiet">
           Übergeben: {formatDate(p.picked_up_at)}
         </div>
       )}

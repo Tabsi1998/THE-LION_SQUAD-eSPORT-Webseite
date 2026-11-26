@@ -172,11 +172,11 @@ export default function AdminBoardPage() {
                 <Crown className="w-4 h-4 text-[#FFD700] shrink-0 mt-1" />
                 <div className="min-w-0">
                   <div className="font-semibold">{postTitle(p)}</div>
-                  <div className="tls-type-small text-white/40">{p.is_active ? "aktiv" : "inaktiv"}{p.is_default ? " · Standard" : " · eigener Posten"}</div>
+                  <div className="tls-type-small text-quiet">{p.is_active ? "aktiv" : "inaktiv"}{p.is_default ? " · Standard" : " · eigener Posten"}</div>
                 </div>
               </div>
               <div className="min-w-[12rem] flex-1 tls-type-small">
-                <div data-testid={`board-holder-${p.slug}`}>{p.user ? <><span className="font-semibold">{holderName(p.user)}</span>{p.user_since ? <span className="text-white/40 tls-type-small"> · seit {viennaDate(p.user_since)}</span> : null}</> : <span className="text-white/45">offen</span>}</div>
+                <div data-testid={`board-holder-${p.slug}`}>{p.user ? <><span className="font-semibold">{holderName(p.user)}</span>{p.user_since ? <span className="text-quiet tls-type-small"> · seit {viennaDate(p.user_since)}</span> : null}</> : <span className="text-white/45">offen</span>}</div>
                 {p.allow_deputy && <div className="tls-type-small text-white/50 mt-0.5" data-testid={`board-deputy-${p.slug}`}>Vertretung: {p.deputy_user ? holderName(p.deputy_user) : "keine"}</div>}
               </div>
               {!readOnly && (
@@ -206,7 +206,7 @@ export default function AdminBoardPage() {
             )}
           </li>
         ))}
-        {!positions.length && <li className="py-10 text-center text-white/40 tls-type-small">Noch keine Posten.</li>}
+        {!positions.length && <li className="py-10 text-center text-quiet tls-type-small">Noch keine Posten.</li>}
       </ul>
 
       {assigning && (

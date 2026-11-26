@@ -36,7 +36,7 @@ export function PartnerPicker({ partners, value = [], onChange, testPrefix = "pa
         ))}
       </FormGrid>
       <ArchivedPartnersNote count={archived.length} onRemove={() => onChange(selected.filter((id) => shown.has(id)))} testId={`${testPrefix}-archived`} />
-      {hint && <p className="mt-2 tls-type-small text-white/40">{hint}</p>}
+      {hint && <p className="mt-2 tls-type-small text-quiet">{hint}</p>}
     </div>
   );
 }

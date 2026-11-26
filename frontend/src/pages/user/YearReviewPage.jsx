@@ -62,7 +62,7 @@ function SharePage({ review }) {
       <div className="tls-type-section leading-tight">Dein Jahr als Bild</div>
       <div className="flex-1 min-h-0 flex items-center justify-center">
         {url ? <img src={url} alt={`Mein ${review.year} – Zusammenfassung`} className="max-h-[46vh] w-auto rounded-sm border border-[#FFD700]/30" data-testid="year-review-card" />
-          : <div className="tls-type-small text-white/40" data-testid="year-review-card-loading">Bild wird gezeichnet …</div>}
+          : <div className="tls-type-small text-quiet" data-testid="year-review-card-loading">Bild wird gezeichnet …</div>}
       </div>
       <div className="flex flex-wrap gap-2">
         {mobile ? (

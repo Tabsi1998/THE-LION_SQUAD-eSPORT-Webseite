@@ -592,11 +592,11 @@ export const MarkdownEditor = forwardRef(function MarkdownEditor({
               HTML übernehmen
             </button>
           </div>
-          <p className="tls-type-small text-white/40">Scripts, iFrames und fremde Layout-Attribute werden nicht übernommen. Tabellen, Links, Bilder, Listen und Basisformatierungen werden konvertiert.</p>
+          <p className="tls-type-small text-quiet">Scripts, iFrames und fremde Layout-Attribute werden nicht übernommen. Tabellen, Links, Bilder, Listen und Basisformatierungen werden konvertiert.</p>
         </div>
       )}
 
-      {helperText && <div className="border-t border-white/10 px-3 py-2 tls-type-small text-white/40">{helperText}</div>}
+      {helperText && <div className="border-t border-white/10 px-3 py-2 tls-type-small text-quiet">{helperText}</div>}
 
       {mediaOpen && (
         <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm p-4 overflow-y-auto" role="presentation" data-testid="markdown-media-backdrop" onClick={(e) => { if (e.target === e.currentTarget) setMediaOpen(false); }}>

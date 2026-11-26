@@ -87,7 +87,7 @@ function TimelineRow({ item, live = false }) {
       className={`flex flex-wrap items-center gap-3 px-3 py-3 border-b border-white/5 last:border-b-0 transition hover:bg-white/[0.03] ${live ? "bg-[#29B6E8]/5" : ""}`}
     >
       <div className="shrink-0 w-14 text-center">
-        <div className="tls-type-label text-white/40">{item.kind === "event" ? "Event" : "Turnier"}</div>
+        <div className="tls-type-label text-quiet">{item.kind === "event" ? "Event" : "Turnier"}</div>
         <div className="tls-type-small text-white/80 mt-0.5">{formatVienna(item.date, { withTime: false })}</div>
       </div>
       {/* Titel und Zeit brechen um (#1155); mit großer Schrift rutschen Status und Pfeil in die nächste Zeile. */}
@@ -281,7 +281,7 @@ export default function DashboardPage() {
                   Keine Termine – <Link to="/events" className="text-[#29B6E8] hover:underline">zu den Events</Link> oder <Link to="/tournaments" className="text-[#29B6E8] hover:underline">zu den Turnieren</Link>.
                 </div>
               )}
-              {timeline.moreCount > 0 ? <div className="mt-2 tls-type-small text-white/40">{timeline.moreCount} weitere unter Turniere und Events.</div> : null}
+              {timeline.moreCount > 0 ? <div className="mt-2 tls-type-small text-quiet">{timeline.moreCount} weitere unter Turniere und Events.</div> : null}
             </section>
 
             {matches.length > 0 && (

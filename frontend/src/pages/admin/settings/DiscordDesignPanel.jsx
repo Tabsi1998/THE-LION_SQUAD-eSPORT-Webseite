@@ -53,7 +53,7 @@ function TextField({ label, path, draft, onChange, onFocus, multiline = false, r
     <label className="block">
       <div className={LABEL}>{label}</div>
       {multiline ? <textarea rows={rows} {...common} /> : <input {...common} />}
-      {hint && <div className="mt-1 tls-type-small text-white/40">{hint}</div>}
+      {hint && <div className="mt-1 tls-type-small text-quiet">{hint}</div>}
     </label>
   );
 }
@@ -357,10 +357,10 @@ export function DiscordDesignPanel({ initialKind = "stream_live" }) {
             <DiscordMessagePreview embed={preview.embed} content={preview.content || ""} botName="THE LION SQUAD"
               buttons={isStream && preview.embed?.url ? [{ label: "Zuschauen", url: preview.embed.url }] : []} testId="discord-design-message" />
           ) : (
-            <div className="border border-dashed border-white/15 rounded-sm p-6 text-center tls-type-small text-white/40">Noch keine Vorschau.</div>
+            <div className="border border-dashed border-white/15 rounded-sm p-6 text-center tls-type-small text-quiet">Noch keine Vorschau.</div>
           )}
           {preview?.note && <div className="tls-type-small text-white/50" data-testid="discord-design-note">{preview.note}</div>}
-          {typeof preview?.length === "number" && <div className="tls-type-small text-white/40" data-testid="discord-design-length">{preview.length} / {data.limits?.total || 6000} Zeichen</div>}
+          {typeof preview?.length === "number" && <div className="tls-type-small text-quiet" data-testid="discord-design-length">{preview.length} / {data.limits?.total || 6000} Zeichen</div>}
           {errors.length > 0 && (
             <ul className="border border-[#FF3B30]/40 bg-[#FF3B30]/10 rounded-sm p-3 tls-type-small text-white/80 list-disc pl-5 space-y-1" data-testid="discord-design-errors">
               {errors.map((error) => <li key={error}>{error}</li>)}

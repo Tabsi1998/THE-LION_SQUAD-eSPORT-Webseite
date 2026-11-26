@@ -546,7 +546,7 @@ export default function AdminTournamentEditPage() {
                   {!visibleStatusOptions.some(([value]) => value === t.status) && <option key={t.status} value={t.status}>{TOURNAMENT_STATUS_OPTIONS.find(([value]) => value === t.status)?.[1] || t.status}</option>}
                   {visibleStatusOptions.map(([s, label]) => <option key={s} value={s}>{label}</option>)}
                 </select>
-                <div className="mt-1 max-w-[16rem] tls-type-small text-white/40">Operativ durch Turnierleitung; Zeitautomatik nur wenn ausdrücklich aktiviert.</div>
+                <div className="mt-1 max-w-[16rem] tls-type-small text-quiet">Operativ durch Turnierleitung; Zeitautomatik nur wenn ausdrücklich aktiviert.</div>
                 {/* „Pause bis“ (#1123): nur beim Status „Pausiert“ - der TV zählt bis dahin herunter. */}
                 <PauseUntilControl tournament={t} onSaved={load} />
               </div>
@@ -676,7 +676,7 @@ export default function AdminTournamentEditPage() {
               <div key={r.id} className="p-4 space-y-3">
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0">
-                    <div className="tls-type-label text-white/35">#{i + 1}</div>
+                    <div className="tls-type-label text-quiet">#{i + 1}</div>
                     <div className="mt-1 font-bold break-words">{r.display_name || r.user?.display_name || r.ingame_name}</div>
                     <div className="mt-1 tls-type-small text-white/45 break-all">{r.discord || "Kein Discord"}</div>
                     <EventGateMark mark={r.event_gate} />
@@ -888,5 +888,5 @@ function SeedField({ registration, onSave, testId }) {
 // Turnier nur mit Event-Anmeldung (#875): ob die Event-Anmeldung (noch) reicht - nur für die Turnierleitung.
 function EventGateMark({ mark }) {
   if (!mark) return null;
-  return <div className={`mt-1 tls-type-small ${mark.ok ? "text-white/40" : "text-[#FFD700]"}`} data-testid="admin-reg-event-gate">{mark.label}</div>;
+  return <div className={`mt-1 tls-type-small ${mark.ok ? "text-quiet" : "text-[#FFD700]"}`} data-testid="admin-reg-event-gate">{mark.label}</div>;
 }

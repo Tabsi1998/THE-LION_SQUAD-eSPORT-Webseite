@@ -339,7 +339,7 @@ export function GameMapsTab({ gameId, reloadKey = 0, onOpenModes }) {
                   return (
                     <th key={mode.mode} scope="col" className="px-2 py-2.5 text-center font-bold normal-case tracking-normal" data-testid={`game-maps-mode-${mode.mode}`}>
                       <span className={`block tls-type-small ${modeStatusOf(mode) === "active" ? "text-white/80" : "text-white/45"}`}>{mode.label}</span>
-                      <span className="block tls-type-small font-normal text-white/40">{modeSuffix(mode) || (count === 1 ? "1 Map" : `${count} Maps`)}</span>
+                      <span className="block tls-type-small font-normal text-quiet">{modeSuffix(mode) || (count === 1 ? "1 Map" : `${count} Maps`)}</span>
                     </th>
                   );
                 })}
@@ -359,7 +359,7 @@ export function GameMapsTab({ gameId, reloadKey = 0, onOpenModes }) {
                         <MapThumb item={item} />
                         <div className="min-w-0">
                           <div className="max-w-[8.5rem] sm:max-w-[16rem] truncate font-semibold text-white" title={item.name}>{item.name}</div>
-                          <div className="max-w-[8.5rem] sm:max-w-[16rem] truncate tls-type-small text-white/40">{item.slug}</div>
+                          <div className="max-w-[8.5rem] sm:max-w-[16rem] truncate tls-type-small text-quiet">{item.slug}</div>
                         </div>
                       </div>
                     </td>

@@ -29,8 +29,8 @@ export function DashboardNotifications() {
         />
       ) : (
         <div id="dashboard-notification-list" className="-mx-2 border border-white/5 rounded-sm bg-[#0F0F10] overflow-hidden" aria-busy={status === "loading" || undefined}>
-          {status === "loading" || status === "idle" ? <div className="p-3 tls-type-small text-white/40" role="status">Lade Benachrichtigungen …</div> : null}
-          {status === "empty" ? <div className="p-3 tls-type-small text-white/40">Keine Benachrichtigungen.</div> : null}
+          {status === "loading" || status === "idle" ? <div className="p-3 tls-type-small text-quiet" role="status">Lade Benachrichtigungen …</div> : null}
+          {status === "empty" ? <div className="p-3 tls-type-small text-quiet">Keine Benachrichtigungen.</div> : null}
           {shown.map((bundle) => (
             <NotificationRow
               key={bundle.id}

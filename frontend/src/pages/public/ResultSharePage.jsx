@@ -119,7 +119,7 @@ export default function ResultSharePage() {
               <Link to={`/u/${encodeURIComponent(data.user.username)}`} className="mt-3 inline-flex items-center gap-2 tls-type-small hover:text-[#29B6E8]" data-testid="result-share-person">
                 <span className="w-7 h-7 rounded-sm border border-white/15 bg-white/5 flex items-center justify-center font-bold text-white/60 tls-type-small">{person.trim().charAt(0).toUpperCase()}</span>
                 <span className="font-semibold">{person}</span>
-                {data.team_name ? <span className="text-white/40 tls-type-small">geteilt von {data.user.display_name}</span> : null}
+                {data.team_name ? <span className="text-quiet tls-type-small">geteilt von {data.user.display_name}</span> : null}
               </Link>
               <div className="mt-6">
                 <PathList steps={data.steps} title={data.team_name ? "Weg des Teams" : "Weg durchs Turnier"} />

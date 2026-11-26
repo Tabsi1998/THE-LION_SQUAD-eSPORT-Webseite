@@ -625,7 +625,7 @@ function InlineFastLapTimeEntry({ challenge, trackId, currentUser, onSaved }) {
           </div>
           {/* Am Simulator (#1585): Ziffernblock, Gäste und „Am Start / Als Nächstes“ stehen in der Verwaltung. */}
           <div className="flex items-center gap-3 shrink-0">
-            {currentUser && <div className="hidden sm:block tls-type-small text-white/35">{currentUser.display_name || currentUser.username}</div>}
+            {currentUser && <div className="hidden sm:block tls-type-small text-quiet">{currentUser.display_name || currentUser.username}</div>}
             <Link to={`/admin/f1/${challenge.id}#vor-ort`} data-testid="fastlap-quick-link" className="tls-btn tls-btn--quiet px-3 py-1.5 rounded-sm tls-type-label">Schnelleingabe</Link>
           </div>
         </div>
@@ -659,14 +659,14 @@ function InlineFastLapTimeEntry({ challenge, trackId, currentUser, onSaved }) {
       <div className="mt-4 border-t border-white/10 pt-3">
         <div className="mb-2 flex items-center justify-between gap-3">
           <div className="tls-type-label text-white/55">Letzte Zeiten</div>
-          <div className="tls-type-label text-white/35">{times.length} Einträge</div>
+          <div className="tls-type-label text-quiet">{times.length} Einträge</div>
         </div>
         <div className="grid md:grid-cols-2 gap-2">
           {times.slice(0, 8).map((time) => (
             <div key={time.id} className={`border rounded-sm px-3 py-2 flex items-center justify-between gap-3 ${time.is_invalid ? "border-[#FF3B30]/35 bg-[#FF3B30]/5" : "border-white/10 bg-[#0A0A0A]/70"}`}>
               <div className="min-w-0">
                 <div className="font-bold tls-type-small truncate">{time.user?.display_name || time.user?.username || "Unbekannt"}</div>
-                <div className="mt-0.5 flex flex-wrap items-center gap-2 tls-type-label text-white/42">
+                <div className="mt-0.5 flex flex-wrap items-center gap-2 tls-type-label text-quiet">
                   <span>#{time.attempt_number || "-"}</span>
                   {(time.score_scope || "official") === "club_reference" && <span className="text-[#FFD700]">Referenz</span>}
                   {time.penalty_seconds > 0 && <span className="text-[#FF3B30]">+{time.penalty_seconds}s</span>}
@@ -687,7 +687,7 @@ function InlineFastLapTimeEntry({ challenge, trackId, currentUser, onSaved }) {
               </div>
             </div>
           ))}
-          {times.length === 0 && <div className="md:col-span-2 text-center py-5 tls-type-small text-white/40 border border-dashed border-white/10 rounded-sm">Noch keine Zeiten auf dieser Strecke.</div>}
+          {times.length === 0 && <div className="md:col-span-2 text-center py-5 tls-type-small text-quiet border border-dashed border-white/10 rounded-sm">Noch keine Zeiten auf dieser Strecke.</div>}
         </div>
       </div>
     </div>
@@ -713,7 +713,7 @@ function ClubReferenceTimes({ entries }) {
               <span className="tls-type-num text-white">{showLapTime(entry.time_str)}</span>
             </div>
             <div className="mt-1 tls-type-small font-bold truncate">{entry.display_name}</div>
-            <div className="tls-type-label text-white/40">{entry.attempts} Versuche</div>
+            <div className="tls-type-label text-quiet">{entry.attempts} Versuche</div>
           </div>
         ))}
       </div>

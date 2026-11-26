@@ -427,7 +427,7 @@ export default function AdminDashboardPage() {
               Offene Aufgaben{activeTaskItems.length > 0 ? ` · ${activeTaskItems.length}` : ""}
             </h2>
           </div>
-          <span className="tls-type-small text-white/40">{viennaDate(new Date())}</span>
+          <span className="tls-type-small text-quiet">{viennaDate(new Date())}</span>
         </div>
         {activeTaskItems.length > 0 ? (
           <div className="grid md:grid-cols-2 xl:grid-cols-4 gap-3">
@@ -466,7 +466,7 @@ export default function AdminDashboardPage() {
                   ) : (
                     <span className="min-w-0 flex-1 tls-wrap text-white">{item.title}</span>
                   )}
-                  {item.detail && <span className="tls-type-small text-white/40 shrink-0">{item.detail}</span>}
+                  {item.detail && <span className="tls-type-small text-quiet shrink-0">{item.detail}</span>}
                 </li>
               ))}
             </ul>
@@ -639,7 +639,7 @@ export default function AdminDashboardPage() {
           {(data?.recent_audit_logs || []).slice(0, 8).map((l, i) => (
             <div key={i} className="flex items-center justify-between gap-3 border-b border-white/5 pb-2">
               <span className="text-white/80 tls-wrap">{l.action}</span>
-              <span className="text-white/40 tls-type-small shrink-0">{l.created_at && viennaDateTime(l.created_at)}</span>
+              <span className="text-quiet tls-type-small shrink-0">{l.created_at && viennaDateTime(l.created_at)}</span>
             </div>
           ))}
           {data.recent_audit_logs.length === 0 && <div className="text-white/40">Keine Einträge.</div>}

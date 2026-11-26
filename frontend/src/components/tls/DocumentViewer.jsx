@@ -112,7 +112,7 @@ export function DocumentViewer({ path, title, subtitle, downloadPath, onClose, o
           )}
           {!state.loading && !state.error && <canvas ref={canvasRef} className="bg-white shadow-lg max-w-full" data-testid="document-viewer-canvas" />}
         </div>
-        {state.sha256 && <div className="px-3 py-1 tls-type-small text-white/30 font-mono truncate border-t border-white/5" data-testid="document-viewer-hash">Original unverändert · SHA-256 {state.sha256.slice(0, 16)}…</div>}
+        {state.sha256 && <div className="px-3 py-1 tls-type-small text-quiet font-mono truncate border-t border-white/5" data-testid="document-viewer-hash">Original unverändert · SHA-256 {state.sha256.slice(0, 16)}…</div>}
       </div>
     </div>
   );

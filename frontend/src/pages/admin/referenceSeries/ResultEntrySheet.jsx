@@ -684,7 +684,7 @@ export function ResultEntrySheet({ series, round, onClose, onSaved }) {
           Nur als Entwurf
         </button>
       ) : null}>
-      {!data || !form ? <div className="tls-type-small text-white/40">Lädt …</div> : (
+      {!data || !form ? <div className="tls-type-small text-quiet">Lädt …</div> : (
         <>
           <div className="flex flex-wrap items-center gap-x-3 gap-y-1 tls-type-small text-white/60" data-testid="result-round">
             <span className="tabular-nums">{roundWhen(data.round)}</span>

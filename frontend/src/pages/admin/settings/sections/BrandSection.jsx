@@ -163,7 +163,7 @@ export function BrandSection({ brand, siteBanners, bannerForm, editingBannerId, 
                       </div>
                     </div>
                   ))}
-                  {siteBanners.length === 0 && <div className="tls-type-small text-white/35 py-6 text-center">Noch keine separaten Banner angelegt.</div>}
+                  {siteBanners.length === 0 && <div className="tls-type-small text-quiet py-6 text-center">Noch keine separaten Banner angelegt.</div>}
                 </div>
               </div>
               {/* Automatische Banner (#2352): nur lesbar, mit Zahlen und dem Weg zur Stelle, wo man sie schaltet. */}

@@ -159,7 +159,7 @@ function NewsCard({ n }) {
         </h3>
         {n.excerpt && <p className="mt-2 tls-type-body text-white/65 line-clamp-3 flex-1">{n.excerpt}</p>}
         <div className="mt-4 flex items-center justify-between gap-3 border-t border-white/10 pt-3">
-          <span className="tls-type-label text-white/35">Beitrag</span>
+          <span className="tls-type-label text-quiet">Beitrag</span>
           <span className="inline-flex items-center gap-1.5 tls-type-label text-[#29B6E8]">
             Weiterlesen <ArrowRight className="tls-card__arrow w-3 h-3" />
           </span>

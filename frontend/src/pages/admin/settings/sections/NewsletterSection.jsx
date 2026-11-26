@@ -37,7 +37,7 @@ export function NewsletterSection() {
               <span className="text-white/45 tls-type-small">{VISIBILITY_LABELS[row.visibility] || "Öffentlich"}{row.sent_by ? ` · von Hand: ${row.sent_by}` : " · beim Veröffentlichen"}</span>
             </li>
           ))}
-          {!items.length && <li className="px-4 py-10 text-center tls-type-small text-white/40">Noch kein Newsletter verschickt.</li>}
+          {!items.length && <li className="px-4 py-10 text-center tls-type-small text-quiet">Noch kein Newsletter verschickt.</li>}
         </ul>
       )}
     </div>

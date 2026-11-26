@@ -257,7 +257,7 @@ export function GameModesEditor({ modes = [], onChange, usage, testPrefix = "gam
         </p>
       ) : (
         <div className="space-y-2">
-          <div className={`${ROW_GRID} hidden md:grid px-3 pr-12 tls-type-label text-white/40`} aria-hidden="true">
+          <div className={`${ROW_GRID} hidden md:grid px-3 pr-12 tls-type-label text-quiet`} aria-hidden="true">
             <span />
             <span>Modus</span>
             <span>Zustand</span>

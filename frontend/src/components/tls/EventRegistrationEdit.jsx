@@ -72,7 +72,7 @@ export function EventRegistrationEdit({ event, own, onSaved }) {
           <div className="tls-type-label text-white/50 mb-1.5">Begleitpersonen</div>
           <input type="number" min="0" max={maxCompanions} value={companions} onChange={(ev) => { setCompanions(ev.target.value); setError(""); }}
             data-testid="event-edit-companions" className="w-full min-h-11 bg-[#121212] border border-white/10 px-3 py-2 rounded-sm" />
-          <div className="mt-1 tls-type-small text-white/40">Maximal {maxCompanions} pro Anmeldung.</div>
+          <div className="mt-1 tls-type-small text-quiet">Maximal {maxCompanions} pro Anmeldung.</div>
         </label>
       )}
       {seatsChanged && quote && !quote.free && (

@@ -471,7 +471,7 @@ function MatchPageView() {
             </div>
             <h1 className="mt-2 tls-type-title [overflow-wrap:anywhere]" data-testid="match-headline"><ShortCaps>{headline}</ShortCaps></h1>
             <div className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 tls-type-small text-white/55">
-              <span className="tls-type-label text-white/40" data-testid="match-key">{formatMatchKind(match)} {match.match_key || ""}</span>
+              <span className="tls-type-label text-quiet" data-testid="match-key">{formatMatchKind(match)} {match.match_key || ""}</span>
               {data.tournament && (
                 <>
                   <span aria-hidden="true" className="text-white/25">·</span>
@@ -750,7 +750,7 @@ function MatchPageView() {
                 <ScheduleProposalList proposals={data.schedule_proposals} page={data} userId={user?.id} canManage={canManageSchedule}
                   fixedTime={fixedTime} busy={busy} min={earliestProposalInput()} formatDateTime={formatDateTime}
                   onDecide={decide} onGroupDecide={decideGroup} onCounter={counterPropose} hintsFor={timeHints} />
-                {!latestProposal && (data.schedule_proposals || []).length === 0 && !data.schedule_block?.fixed && <div className="tls-type-small text-white/40">Noch kein Terminvorschlag vorhanden.</div>}
+                {!latestProposal && (data.schedule_proposals || []).length === 0 && !data.schedule_block?.fixed && <div className="tls-type-small text-quiet">Noch kein Terminvorschlag vorhanden.</div>}
               </div>
               {/* Liga-Termine (#2194): Verschiebung, Grenzen und Verlauf - nur Beteiligte und Leitung bekommen den Block. */}
               <ScheduleChangePanel block={data.schedule_block} matchId={id} busy={busy} run={runAction} onChanged={() => load({ preserveDrafts: false })} onAskLead={canUseChat ? askStaff : null} />
@@ -782,7 +782,7 @@ function MatchPageView() {
                   <ChatMessageSticker sticker={m.sticker} />
                 </div>
               ))}
-              {chat.length === 0 && <div className="tls-type-small text-white/40">Noch keine Nachrichten.</div>}
+              {chat.length === 0 && <div className="tls-type-small text-quiet">Noch keine Nachrichten.</div>}
             </div>
             {chatClosed ? (
               <p className="mt-4 tls-type-small text-white/45" data-testid="match-chat-closed">Das Match ist beendet – der Chat bleibt zum Nachlesen.</p>

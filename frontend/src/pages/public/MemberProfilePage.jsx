@@ -43,7 +43,7 @@ export default function MemberProfilePage() {
         <Breadcrumbs items={[{ label: "Start", to: "/" }, { label: "Vereinsmitglieder", to: "/members" }, { label: profile?.display_name || "Profil" }]} className="mb-6" />
 
         {loading ? (
-          <div className="text-white/40 tls-type-small">Lade Profil...</div>
+          <div className="text-quiet tls-type-small">Lade Profil...</div>
         ) : !profile ? (
           <div className="border border-dashed border-white/15 bg-[#121212] rounded-sm p-12 text-center">
             <UserIcon className="w-9 h-9 mx-auto text-white/20 mb-3" />
@@ -159,7 +159,7 @@ function LinkedAccountCard({ account }) {
   const progress = account.achievement_level?.progress || 0;
   return (
     <div>
-      <div className="tls-type-label text-white/40">Plattformkonto</div>
+      <div className="tls-type-label text-quiet">Plattformkonto</div>
       <Link
         to={account.profile_url}
         className={`tls-card mt-2 group block border ${accountLevelFrameClass(level)} bg-[#08151A] rounded-sm p-3`}
@@ -202,7 +202,7 @@ function InfoChips({ icon: Icon, label, values }) {
   if (!values?.length) return null;
   return (
     <div>
-      <div className="tls-type-label text-white/40 flex items-center gap-1.5"><Icon className="w-3 h-3" /> {label}</div>
+      <div className="tls-type-label text-quiet flex items-center gap-1.5"><Icon className="w-3 h-3" /> {label}</div>
       <div className="mt-2 flex flex-wrap gap-1.5">
         {values.map((value) => <span key={value} className="px-2 py-1 bg-white/5 border border-white/10 rounded-sm tls-type-small text-white/70">{value}</span>)}
       </div>

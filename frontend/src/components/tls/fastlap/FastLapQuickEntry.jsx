@@ -213,7 +213,7 @@ export function FastLapQuickEntry({ challenge, track, times, guests, onGuestCrea
             Zuletzt: <span className="text-white/80">{last.driverName}</span> · {last.is_invalid ? "ungültig" : showLapTime(last.time_ms)}
           </div>
         )}
-        <div className="mt-2 hidden sm:block tls-type-small text-white/35">Tastatur: Enter = eintragen · + = eintragen &amp; nächster Fahrer · / = Doppelpunkt</div>
+        <div className="mt-2 hidden sm:block tls-type-small text-quiet">Tastatur: Enter = eintragen · + = eintragen &amp; nächster Fahrer · / = Doppelpunkt</div>
       </form>
     </section>
   );

@@ -113,6 +113,8 @@ export function classify(tokens, ctx = {}) {
   if (t.stepped) return null;
   // TV-Bausteine (tv-…) haben eigene Beamer-Größen und Schriften (lib/tvType.js) - auch in geteilten Bausteinen.
   if (tokens.some((token) => /^tv-/.test(token))) return null;
+  // Der Titel eines Moments (Platz, Belohnung, Saisonende) ist die Bühne des Augenblicks - bleibt in der Vereinsschrift.
+  if (tokens.includes("tls-placement__title")) return null;
   const level = ctx.level || ((t.cardTitle) ? 3 : 0);
   const children = ctx.children || { text: "", exprText: "", dynamic: false, leafs: [], tags: [], elements: false };
   const namedCaps = (t.upper || t.wide) && (children.leafs || []).some((leaf) => NAME_LIKE.test(leaf) && !LABEL_LIKE.test(leaf));
@@ -525,6 +527,27 @@ export function transformSource(code, { file = "datei.jsx" } = {}) {
   return { code: out, changed: edits.length, manual, wrapped };
 }
 
+// ---------------------------------------------------------------- Kleintext lesbar (#1232)
+
+// Klein und Etikett sind Kleintext: Weiß mit 25 bis 42 % Deckkraft liegt auf unserem Grund unter 4,5 : 1 (white/40 hat
+// 3,8 : 1). Es wird das ruhige Grau der Farb-Rollen (text-quiet, 6 : 1, #1305) - nur in Klassen-Texten mit einer der
+// beiden Stufen, Hover und andere Zustände bleiben.
+const FAINT = /(?<![\w:/-])text-white\/(?:25|30|35|40|42)(?![\w/-])/g;
+
+export function quietSmallText(code) {
+  let changed = 0;
+  const out = code.replace(/(["'`])((?:(?!\1)[^\n])*?)\1/g, (match, quote, inner) => {
+    if (!/(?<![\w-])tls-type-(?:small|label)(?![\w-])/.test(inner) || !FAINT.test(inner)) return match;
+    FAINT.lastIndex = 0;
+    const next = inner.replace(FAINT, () => {
+      changed += 1;
+      return "text-quiet";
+    });
+    return `${quote}${next}${quote}`;
+  });
+  return { code: out, changed };
+}
+
 // ---------------------------------------------------------------- CSS der Bausteine
 
 // Kleine Größen in eigenen Bausteinen (index.css und die CSS-Dateien der Bereiche): unter 12 px und bis 13,5 px wird
@@ -583,7 +606,13 @@ function main(argv) {
   for (const file of files) {
     const code = readFileSync(file, "utf8");
     const rel = path.relative(process.cwd(), file).split(path.sep).join("/");
-    const result = file.endsWith(".css") ? { ...transformCss(code), manual: [] } : transformSource(code, { file: rel });
+    let result;
+    if (file.endsWith(".css")) result = { ...transformCss(code), manual: [] };
+    else {
+      const stepped = transformSource(code, { file: rel });
+      const quiet = quietSmallText(stepped.code);
+      result = { ...stepped, code: quiet.code, changed: stepped.changed + quiet.changed };
+    }
     manual.push(...result.manual);
     if (!result.changed) continue;
     changed += result.changed;

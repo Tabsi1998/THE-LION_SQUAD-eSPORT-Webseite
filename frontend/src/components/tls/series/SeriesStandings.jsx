@@ -151,7 +151,7 @@ function WeekendHead({ groups, columns, label, extraColumn, roundHref }) {
       </tr>
       <tr>
         {sub.map((round) => (
-          <th key={round.id} scope="col" title={round.session || "Rennen"} className={`px-2 pb-2 pt-0 text-right font-semibold tls-type-small text-white/40 border-b border-white/10 ${cancelled(round)}`} data-testid="series-session-head">
+          <th key={round.id} scope="col" title={round.session || "Rennen"} className={`px-2 pb-2 pt-0 text-right font-semibold tls-type-small text-quiet border-b border-white/10 ${cancelled(round)}`} data-testid="series-session-head">
             <HeadLink href={roundHref?.(round, true)} title={`Ergebnis ${round.session || "Rennen"}`}>{sessionAbbr(round)}</HeadLink>
           </th>
         ))}

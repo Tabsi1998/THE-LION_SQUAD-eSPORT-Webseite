@@ -62,7 +62,7 @@ function StepRow({ step, index, count, modes, labelOf, onChange, onMove, onRemov
         {step.kind !== "ban" ? (
           <input aria-label={`Schritt ${number}: Position (Map Nr.)`} type="number" min={1} max={9} inputMode="numeric" className={`${FIELD} w-[5rem] shrink-0 tabular-nums`}
             value={step.position} onChange={(event) => set({ position: event.target.value })} placeholder="Map" data-testid={`veto-step-${index}-position`} />
-        ) : <span className="inline-flex min-h-9 w-[5rem] shrink-0 items-center px-2 tls-type-small text-white/40">keine Map</span>}
+        ) : <span className="inline-flex min-h-9 w-[5rem] shrink-0 items-center px-2 tls-type-small text-quiet">keine Map</span>}
         <span className="ml-auto flex shrink-0 items-center gap-0.5">
           <button type="button" className={ICON} onClick={() => onMove(-1)} disabled={index === 0} aria-label={`Schritt ${number} nach oben`} data-testid={`veto-step-${index}-up`}><ArrowUp className="h-4 w-4" aria-hidden="true" /></button>
           <button type="button" className={ICON} onClick={() => onMove(1)} disabled={index === count - 1} aria-label={`Schritt ${number} nach unten`} data-testid={`veto-step-${index}-down`}><ArrowDown className="h-4 w-4" aria-hidden="true" /></button>

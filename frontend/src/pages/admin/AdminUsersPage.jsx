@@ -121,7 +121,7 @@ export default function AdminUsersPage() {
                         {info.can.map((line) => <li key={line}>✓ {line}</li>)}
                       </ul>
                       {info.cannot.length ? (
-                        <ul className="mt-1 tls-type-small leading-relaxed text-white/35" data-testid={`role-cannot-${role}`}>
+                        <ul className="mt-1 tls-type-small leading-relaxed text-quiet" data-testid={`role-cannot-${role}`}>
                           {info.cannot.map((line) => <li key={line}>✗ {line}</li>)}
                         </ul>
                       ) : null}
@@ -153,14 +153,14 @@ export default function AdminUsersPage() {
               <tr key={u.id} className={u.is_banned ? "opacity-60" : ""} data-testid={`user-row-${u.username}`}>
                 <td className="px-4 py-3">
                   <div className="font-semibold">{displayName(u)}</div>
-                  <div className="tls-type-small text-white/40">@{u.username}</div>
+                  <div className="tls-type-small text-quiet">@{u.username}</div>
                 </td>
                 <td className="px-4 py-3 text-white/70 tls-type-small">{accountKind(u)}</td>
                 <td className="px-4 py-3" data-testid={`user-role-${u.username}`}>{roleLabel(u.role || "player")}</td>
                 <td className="px-4 py-3">
                   <div className="flex flex-wrap gap-1" data-testid={`user-areas-${u.username}`}>
                     {areaBadges(u).map((area) => <span key={area.key} className="tls-type-label px-2 py-0.5 rounded-sm border border-[#29B6E8]/30 text-[#29B6E8]">{area.label}</span>)}
-                    {!areaBadges(u).length && <span className="tls-type-small text-white/35">–</span>}
+                    {!areaBadges(u).length && <span className="tls-type-small text-quiet">–</span>}
                   </div>
                 </td>
                 <td className="px-4 py-3 tls-type-small">
@@ -197,7 +197,7 @@ export default function AdminUsersPage() {
             )}
           </li>
         ))}
-        {!list.length && <li className="py-10 text-center text-white/40 tls-type-small">Keine Konten gefunden.</li>}
+        {!list.length && <li className="py-10 text-center text-quiet tls-type-small">Keine Konten gefunden.</li>}
       </ul>
 
       {creating && <CreateUserModal onClose={() => setCreating(false)} onCreated={load} onSaved={() => { setCreating(false); load(); }} />}

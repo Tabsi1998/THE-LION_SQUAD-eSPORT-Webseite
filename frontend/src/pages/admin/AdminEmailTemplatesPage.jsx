@@ -50,11 +50,11 @@ export default function AdminEmailTemplatesPage() {
                       {row.sample_leaks?.length ? <span className="tls-type-label border border-warn/60 text-warn px-1.5 py-0.5 rounded-sm" data-testid={`tpl-leaks-${row.key}`} title={row.sample_leaks.join(", ")}>Beispielwerte im Text</span> : null}
                     </div>
                     <div className="tls-type-small text-white/50">{row.purpose}</div>
-                    <div className="tls-type-small text-white/40 mt-0.5">Empfänger: {row.recipient}{row.vars?.length ? ` · Variablen: ${row.vars.map((v) => `{{${v}}}`).join(", ")}` : ""}</div>
+                    <div className="tls-type-small text-quiet mt-0.5">Empfänger: {row.recipient}{row.vars?.length ? ` · Variablen: ${row.vars.map((v) => `{{${v}}}`).join(", ")}` : ""}</div>
                   </div>
                   {row.editable ? (
                     <button type="button" onClick={() => setEditing(row)} data-testid={`tpl-edit-${row.key}`} className="tls-type-label text-[#29B6E8] hover:text-white">Bearbeiten</button>
-                  ) : <span className="tls-type-small text-white/35">fester Text</span>}
+                  ) : <span className="tls-type-small text-quiet">fester Text</span>}
                 </div>
               ))}
             </div>

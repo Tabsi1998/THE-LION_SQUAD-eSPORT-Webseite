@@ -53,7 +53,7 @@ function Find({ item, active }) {
             <span className="tls-type-small text-white/45 tabular-nums whitespace-nowrap" data-testid={`season-find-${item.signal}-today`}>heute {number(item.today)} von {number(item.per_day)}</span>
           </span>
         ) : (
-          item.season_count > 0 && item.season_count !== item.count && <span className="block tls-type-small text-white/40">zuletzt {number(item.season_count)}</span>
+          item.season_count > 0 && item.season_count !== item.count && <span className="block tls-type-small text-quiet">zuletzt {number(item.season_count)}</span>
         )}
       </span>
     </li>
@@ -73,7 +73,7 @@ function Season({ season }) {
           {season.label}
           {season.active && <span className="tls-type-label px-1.5 py-0.5 rounded-sm bg-[#00FF88]/15 text-[#00FF88]">läuft</span>}
         </span>
-        <span className="tls-type-label text-white/40 whitespace-nowrap" data-testid={`season-finds-${season.key}-hint`}>{seasonHint(season)}</span>
+        <span className="tls-type-label text-quiet whitespace-nowrap" data-testid={`season-finds-${season.key}-hint`}>{seasonHint(season)}</span>
       </header>
       <ul className={season.active && season.items.length > 1 ? "grid sm:grid-cols-2 gap-x-4 gap-y-0.5" : "space-y-0.5"}>
         {season.items.map((item) => <Find key={item.signal} item={item} active={season.active} />)}
@@ -125,7 +125,7 @@ export function SeasonFindsPanel() {
         </div>
         <div className="text-right shrink-0">
           <div className="tls-type-section tls-type-num leading-none" data-testid="season-finds-total">{number(data.total)}</div>
-          <div className="tls-type-label text-white/40 mt-1 inline-flex items-center gap-1"><Sparkles className="w-3 h-3" /> insgesamt</div>
+          <div className="tls-type-label text-quiet mt-1 inline-flex items-center gap-1"><Sparkles className="w-3 h-3" /> insgesamt</div>
         </div>
       </div>
       {data.total === 0 && (
@@ -143,7 +143,7 @@ export function SeasonFindsPanel() {
           {others.map((season) => <Season key={season.key} season={season} />)}
         </div>
       )}
-      <p className="mt-4 tls-type-small text-white/35">Nur du siehst diese Karte. Je Tag zählt eine Höchstzahl – was darüber hinausgeht, ist Spaß an der Freude.</p>
+      <p className="mt-4 tls-type-small text-quiet">Nur du siehst diese Karte. Je Tag zählt eine Höchstzahl – was darüber hinausgeht, ist Spaß an der Freude.</p>
     </div>
   );
 }

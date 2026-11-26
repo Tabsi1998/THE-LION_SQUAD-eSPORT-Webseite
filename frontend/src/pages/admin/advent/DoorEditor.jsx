@@ -48,7 +48,7 @@ function StickerPicker({ packs, value, onChange }) {
     <div className="space-y-3" data-testid="advent-editor-stickers">
       {packs.map((pack) => (
         <div key={pack.id}>
-          <div className="mb-1.5 tls-type-small font-bold text-white/40">{pack.name}</div>
+          <div className="mb-1.5 tls-type-small font-bold text-quiet">{pack.name}</div>
           <div className="flex flex-wrap gap-1.5">
             {pack.stickers.map((sticker) => (
               <button

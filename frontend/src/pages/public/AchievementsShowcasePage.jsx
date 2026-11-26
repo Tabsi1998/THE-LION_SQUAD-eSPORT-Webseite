@@ -231,7 +231,7 @@ export default function AchievementsShowcasePage() {
             <Layers className="w-5 h-5 text-[#00FF88]" />
             <h2 className="tls-type-section">Kategorien</h2>
           </div>
-          <p className="mb-2 sm:mb-4 tls-type-label text-white/40" data-testid="categories-caption">
+          <p className="mb-2 sm:mb-4 tls-type-label text-quiet" data-testid="categories-caption">
             {mine ? "Dein Fortschritt je Kategorie · was du selbst erreichen kannst" : `Fortschritt der Community · ${overview?.rarity?.base ?? 0} Konten`}
             <span className="hidden sm:inline"> · antippen zeigt die Abzeichen</span>
           </p>
@@ -370,7 +370,7 @@ export default function AchievementsShowcasePage() {
                         {entry.display_name}
                         {Number(entry.prestige || 0) > 0 && <span className="ml-1 text-[#FFD700]" title={`Prestige ${entry.prestige}`}>{"★".repeat(Math.min(5, Number(entry.prestige)))}</span>}
                       </Link>
-                      <span className="tls-type-small text-white/40 tabular-nums">{byLevel ? (entry.title || `Level ${entry.level}`) : erfolge(entry.count)}</span>
+                      <span className="tls-type-small text-quiet tabular-nums">{byLevel ? (entry.title || `Level ${entry.level}`) : erfolge(entry.count)}</span>
                       <span className="tls-type-num text-[#FFD700] shrink-0">{byLevel ? `Lv ${entry.level}` : entry.points}</span>
                     </motion.div>
                   ))}
@@ -493,7 +493,7 @@ function CategoryRow({ category, own, progress = null, index = 0, negativeCount 
               />
             )}
           </div>
-          <div className="mt-1 hidden md:flex items-center gap-2 tls-type-small text-white/40" data-testid={`category-detail-${category.key}`}>
+          <div className="mt-1 hidden md:flex items-center gap-2 tls-type-small text-quiet" data-testid={`category-detail-${category.key}`}>
             <span className="truncate">{detail}</span>
             {category.member_only && <span className="ml-auto shrink-0 text-[#FFD700]/80">Mitglieder</span>}
           </div>
@@ -592,7 +592,7 @@ function WeekTile({ week, loading }) {
             <Link to={award.user?.username ? `/u/${encodeURIComponent(award.user.username)}` : "#"} className="mt-3 inline-flex items-center gap-2 tls-type-small hover:text-[#29B6E8]" data-testid="week-award-user">
               <Avatar entry={award.user || {}} size={7} />
               <span className="font-semibold truncate">{award.user?.display_name || "Spieler"}</span>
-              {award.earned_at && <span className="text-white/35 tls-type-small">{viennaDate(award.earned_at)}</span>}
+              {award.earned_at && <span className="text-quiet tls-type-small">{viennaDate(award.earned_at)}</span>}
             </Link>
             {award.award_id && (
               <Link to={`/achievements/a/${encodeURIComponent(award.award_id)}`} className="mt-2 ml-1 inline-flex items-center gap-1 tls-type-label hover:underline" style={{ color }} data-testid="week-award-card">
@@ -606,7 +606,7 @@ function WeekTile({ week, loading }) {
           {loading ? "Wird geladen …" : "Vergangene Woche gab es keine Freischaltung auf einem öffentlichen Profil – die nächste Kachel gehört dir."}
         </div>
       )}
-      {week?.week_key && <div className="mt-2 sm:mt-3 tls-type-small text-white/30">Kalenderwoche {String(week.week_key).split("-W")[1]} · montags 08:00 neu</div>}
+      {week?.week_key && <div className="mt-2 sm:mt-3 tls-type-small text-quiet">Kalenderwoche {String(week.week_key).split("-W")[1]} · montags 08:00 neu</div>}
     </motion.aside>
   );
 }
@@ -636,7 +636,7 @@ function UnlockTicker({ items }) {
   return (
     <section className="border-b border-white/5 bg-[#070707] overflow-hidden" data-testid="unlock-ticker" data-marquee={marquee ? "true" : "false"}>
       <div className="max-w-6xl mx-auto px-4 md:px-6 flex items-center">
-        <span className="shrink-0 tls-type-label text-white/35 py-2.5 pr-4 border-r border-white/10">Zuletzt freigeschaltet</span>
+        <span className="shrink-0 tls-type-label text-quiet py-2.5 pr-4 border-r border-white/10">Zuletzt freigeschaltet</span>
         <div className="flex-1 overflow-hidden" style={marquee ? { maskImage: "linear-gradient(90deg, transparent, #000 6%, #000 94%, transparent)", WebkitMaskImage: "linear-gradient(90deg, transparent, #000 6%, #000 94%, transparent)" } : undefined}>
           <div className={`flex items-center py-2 ${marquee ? "tls-unlock-ticker__track" : "flex-wrap"}`} style={marquee ? { "--ticker-duration": `${duration}s` } : undefined}>
             {loop.map((item, index) => renderItem(item, index, marquee && index >= items.length))}

@@ -297,11 +297,11 @@ export default function MessagesPage() {
                       className="w-full text-left border border-white/10 hover:border-[#29B6E8]/45 bg-[#0A0A0A] rounded-sm p-3 transition"
                     >
                       <div className="font-bold tls-type-small truncate">{candidate.display_name || candidate.username}</div>
-                      <div className="tls-type-small text-white/40 truncate">@{candidate.username}</div>
+                      <div className="tls-type-small text-quiet truncate">@{candidate.username}</div>
                       {!candidate.can_message ? <div className="mt-1 tls-type-small text-[#FFD700]">{candidate.message_hint}</div> : null}
                     </button>
                   ))}
-                  {candidates.length === 0 ? <div className="p-3 tls-type-small text-white/35">Keine passenden Benutzer gefunden.</div> : null}
+                  {candidates.length === 0 ? <div className="p-3 tls-type-small text-quiet">Keine passenden Benutzer gefunden.</div> : null}
                 </div>
               ) : (
                 <>
@@ -317,7 +317,7 @@ export default function MessagesPage() {
                         <span className="min-w-0 flex-1">
                           <span className="flex items-center justify-between gap-2">
                             <span className={`font-bold tls-type-small truncate ${unread ? "text-white" : "text-white/85"}`}>{item.title}</span>
-                            <span className={`shrink-0 tls-type-small ${unread ? "text-[#29B6E8]" : "text-white/35"}`}>{chatTime(item.updated_at)}</span>
+                            <span className={`shrink-0 tls-type-small ${unread ? "text-[#29B6E8]" : "text-quiet"}`}>{chatTime(item.updated_at)}</span>
                           </span>
                           <span className="flex items-center justify-between gap-2">
                             <span className="tls-type-small text-white/45 truncate">{chatPreview(item)}</span>
@@ -337,8 +337,8 @@ export default function MessagesPage() {
                       </Link>
                     );
                   })}
-                  {chatsLoading && !chats.items.length ? <div className="p-5 tls-type-small text-white/35">Lade Chats …</div> : null}
-                  {!chatsLoading && chats.items.length === 0 ? <div className="p-5 tls-type-small text-white/35">Noch keine Chats. Suche oben einen Namen für eine neue Nachricht – Team- und Turnier-Chats erscheinen hier von selbst.</div> : null}
+                  {chatsLoading && !chats.items.length ? <div className="p-5 tls-type-small text-quiet">Lade Chats …</div> : null}
+                  {!chatsLoading && chats.items.length === 0 ? <div className="p-5 tls-type-small text-quiet">Noch keine Chats. Suche oben einen Namen für eine neue Nachricht – Team- und Turnier-Chats erscheinen hier von selbst.</div> : null}
                 </>
               )}
             </div>

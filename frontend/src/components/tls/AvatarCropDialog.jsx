@@ -277,7 +277,7 @@ export function AvatarCropDialog({ file, busy = false, onCancel, onApply, onLoad
               <div className="relative w-10 h-10 rounded-full overflow-hidden bg-[#0A0A0A] border border-white/15">
                 {url && dims && <CropImage url={url} dims={dims} crop={crop} />}
               </div>
-              <span className="tls-type-label text-white/40">Klein</span>
+              <span className="tls-type-label text-quiet">Klein</span>
             </div>
             <button type="button" onClick={() => update(INITIAL_AVATAR_CROP)} disabled={!dims || locked} className="tls-btn tls-btn--quiet inline-flex min-h-11 items-center gap-2 px-3 py-2 rounded-sm tls-type-label disabled:opacity-40">
               <RotateCcw className="w-3.5 h-3.5" /> Zurücksetzen

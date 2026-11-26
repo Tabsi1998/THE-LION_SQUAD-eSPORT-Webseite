@@ -152,7 +152,7 @@ export function PersonPicker({ purpose, contextId = null, value = null, onChange
       {state === "error" && <div className="mt-2 tls-type-small text-[#FFB4AE]" role="alert" data-testid={`${testId}-error`}>{error}</div>}
       {(showRecent || (showHits && state !== "error")) && (
         <div id={`${listId}-list`} role="listbox" className="mt-2 sm:absolute sm:inset-x-0 sm:top-full sm:mt-1 z-30 max-h-72 overflow-y-auto border border-white/10 bg-[#121212] rounded-sm shadow-2xl shadow-black/50 divide-y divide-white/5" data-testid={`${testId}-list`}>
-          {showRecent && <div className="px-3 pt-2 pb-1 tls-type-label text-white/40">Zuletzt gewählt</div>}
+          {showRecent && <div className="px-3 pt-2 pb-1 tls-type-label text-quiet">Zuletzt gewählt</div>}
           {(showRecent ? recent : hits).map((person) => (
             <button
               key={person.id}
@@ -170,8 +170,8 @@ export function PersonPicker({ purpose, contextId = null, value = null, onChange
               </span>
             </button>
           ))}
-          {showHits && state === "loading" && !hits.length && <div className="px-3 py-3 tls-type-small text-white/40" role="status">Suche …</div>}
-          {showHits && state === "ready" && !hits.length && <div className="px-3 py-3 tls-type-small text-white/40" data-testid={`${testId}-empty`}>{emptyText}</div>}
+          {showHits && state === "loading" && !hits.length && <div className="px-3 py-3 tls-type-small text-quiet" role="status">Suche …</div>}
+          {showHits && state === "ready" && !hits.length && <div className="px-3 py-3 tls-type-small text-quiet" data-testid={`${testId}-empty`}>{emptyText}</div>}
         </div>
       )}
     </div>

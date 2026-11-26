@@ -57,7 +57,7 @@ export function PlatformSwitches({ platforms, off, onChange, onSave, saving, dir
                 <label key={platform.key} className="inline-flex items-center gap-2 tls-type-small cursor-pointer" data-testid={`platform-toggle-${platform.key}-row`}>
                   <input type="checkbox" checked={!off.has(platform.key)} onChange={(event) => toggle(platform.key, event.target.checked)} data-testid={`platform-toggle-${platform.key}`} className="accent-[#29B6E8] w-4 h-4" />
                   <span className={off.has(platform.key) ? "text-white/40 line-through" : "text-white"}>{platform.label}</span>
-                  {!platform.linkable && <span className="tls-type-label text-white/30">getippt</span>}
+                  {!platform.linkable && <span className="tls-type-label text-quiet">getippt</span>}
                 </label>
               ))}
             </div>
@@ -150,7 +150,7 @@ export default function AdminIntegrationsOverviewPage() {
       <PlatformSwitches platforms={platforms} off={off} onChange={setPlatformsOff} onSave={savePlatforms} saving={savingPlatforms} dirty={platformsDirty} />
 
       {data === null ? (
-        <p className="text-white/40 tls-type-small" data-testid="integrations-loading">Verbindungen werden geprüft …</p>
+        <p className="text-quiet tls-type-small" data-testid="integrations-loading">Verbindungen werden geprüft …</p>
       ) : groups.map((group) => (
         <section key={group} className="mb-8" data-testid={`integrations-group-${group}`}>
           <h2 className="tls-type-section mb-3 inline-flex items-center gap-2"><Link2 className="w-4 h-4 text-[#29B6E8]" /> {group}</h2>

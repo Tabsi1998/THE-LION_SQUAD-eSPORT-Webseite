@@ -170,7 +170,7 @@ function SeasonCard({ season, busy, onSave, onPreview, previewRunning = false })
                 <input value={draft[name] || ""} maxLength={200} placeholder={season.defaults[name]} onChange={(e) => setTexts({ ...draft, [name]: e.target.value })} className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-sm" data-testid={`season-${season.key}-text-${name}`} />
               </label>
             ))}
-            <p className="tls-type-small text-white/40">Leer = Vorgabe. {season.key === "club_birthday" ? "{years} wird durch die Jahre ersetzt." : ""}</p>
+            <p className="tls-type-small text-quiet">Leer = Vorgabe. {season.key === "club_birthday" ? "{years} wird durch die Jahre ersetzt." : ""}</p>
           </div>
           <button type="button" onClick={() => onSave({ texts: draft }, "Texte gespeichert.", () => setTexts(null))} disabled={busy || !dirty} data-testid={`season-${season.key}-text-save`} className="px-3 py-2 bg-[#29B6E8] text-black tls-type-label rounded-sm disabled:opacity-40">Texte speichern</button>
         </div>
@@ -185,7 +185,7 @@ function SeasonCard({ season, busy, onSave, onPreview, previewRunning = false })
             <input type="datetime-local" value={previewAt} onChange={(e) => setPreviewAt(e.target.value)} className="bg-[#0A0A0A] border border-white/10 px-2 py-1 rounded-sm text-xs" data-testid={`season-${season.key}-preview-at`} />
           </label>
         )}
-        <span className="tls-type-small text-white/40">Nur du siehst sie – sofort, in diesem Tab.</span>
+        <span className="tls-type-small text-quiet">Nur du siehst sie – sofort, in diesem Tab.</span>
         {previewRunning && (
           // Im selben Tab (#1838): das Token liegt nur in dieser Sitzung - ein neuer Tab kennt es nicht. Auf der Website
           // steht auch, was die Verwaltung nicht hat (Logo, Kopfzeile, Fußzeile).
@@ -349,7 +349,7 @@ export function SeasonsSettings() {
           ))}
           {rows.length === 0 && <div className="px-3 py-2 text-white/40">Keine Termine in diesem Jahr.</div>}
         </div>
-        {!data.founded_on && <p className="tls-type-small text-white/40">Der Vereinsgeburtstag erscheint, sobald unter Verein → Über uns ein Gründungsdatum steht.</p>}
+        {!data.founded_on && <p className="tls-type-small text-quiet">Der Vereinsgeburtstag erscheint, sobald unter Verein → Über uns ein Gründungsdatum steht.</p>}
       </div>
     </div>
   );

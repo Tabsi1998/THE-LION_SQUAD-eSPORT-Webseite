@@ -21,7 +21,7 @@ export function Panel({ title, children }) {
 }
 
 export function Empty({ text }) {
-  return <div className="tls-type-small text-white/40 py-4">{text}</div>;
+  return <div className="tls-type-small text-quiet py-4">{text}</div>;
 }
 
 export function Field({ label, value, onChange, placeholder = "", type = "text", testId }) {

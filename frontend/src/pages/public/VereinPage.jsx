@@ -141,7 +141,7 @@ export default function VereinPage() {
         )}
 
         <div>
-          <span className="tls-type-label text-white/40">Vom Verein</span>
+          <span className="tls-type-label text-quiet">Vom Verein</span>
           <div className="mt-4 grid grid-cols-1 gap-8 lg:grid-cols-2">
             <section className="min-w-0" data-testid="verein-news">
               <SectionHead icon={Newspaper} title="News" to="/news" label="Alle News" testId="verein-news-all" />

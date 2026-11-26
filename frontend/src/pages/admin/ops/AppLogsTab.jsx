@@ -90,7 +90,7 @@ export function AppLogsTab() {
 
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-5">
         <div className="border border-white/10 bg-[#121212] rounded-sm p-3">
-          <div className="tls-type-label text-white/40">Offen</div>
+          <div className="tls-type-label text-quiet">Offen</div>
           <div className="tls-type-section tls-type-num">{summary.open}</div>
         </div>
         <div className="border border-[#FF3B30]/30 bg-[#FF3B30]/10 rounded-sm p-3">
@@ -102,7 +102,7 @@ export function AppLogsTab() {
           <div className="tls-type-section tls-type-num">{summary.high}</div>
         </div>
         <div className="border border-white/10 bg-[#121212] rounded-sm p-3">
-          <div className="tls-type-label text-white/40">Gruppiert</div>
+          <div className="tls-type-label text-quiet">Gruppiert</div>
           <div className="tls-type-section tls-type-num">{summary.repeated}</div>
         </div>
       </div>
@@ -147,7 +147,7 @@ export function AppLogsTab() {
                     {Number(log.repeat_count || 0) > 1 && (
                       <span className="tls-type-label border border-[#29B6E8]/30 px-2 py-1 rounded-sm text-[#29B6E8]">x{log.repeat_count}</span>
                     )}
-                    <span className="tls-type-small text-white/35">{formatTime(log.received_at || log.created_at)}</span>
+                    <span className="tls-type-small text-quiet">{formatTime(log.received_at || log.created_at)}</span>
                     <span className="tls-type-small text-[#29B6E8]">{log.display_name || log.username || log.user_id?.slice(0, 8) || "Unbekannt"}</span>
                   </div>
                   <p className="tls-type-body font-semibold text-white break-words">{log.message}</p>

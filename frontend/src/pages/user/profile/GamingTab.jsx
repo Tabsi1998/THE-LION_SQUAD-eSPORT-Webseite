@@ -42,7 +42,7 @@ export function GamingTab({ form, set, setNow = set, setGameId, gameIdGroups }) 
                       {gameIdGroups.map((group) => (
                         <div key={group.slug} className="border-t border-white/10 pt-4 first:border-t-0 first:pt-0">
                           <div className="tls-type-label text-[#29B6E8] mb-1">{group.title}</div>
-                          {group.games.length > 1 && <div className="tls-type-small text-white/40 mb-3">Gilt für: {group.games.join(", ")}</div>}
+                          {group.games.length > 1 && <div className="tls-type-small text-quiet mb-3">Gilt für: {group.games.join(", ")}</div>}
                           <Row>
                             {group.fields.map((field) => (
                               <Field key={field.key} label={`${field.label}${field.required !== false ? " *" : ""}`}>

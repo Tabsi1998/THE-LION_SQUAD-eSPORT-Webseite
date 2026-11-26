@@ -623,7 +623,7 @@ export function ImageUpload({ value, onChange, label, testId = "image-upload", v
               </button>
             </div>
           )}
-          <p className="tls-type-small text-white/40" data-testid={`${testId}-hint`}>
+          <p className="tls-type-small text-quiet" data-testid={`${testId}-hint`}>
             {logo ? `${LOGO_HINT} SVG bis ${limits.svg_mb} MB, Bilder bis ${maxMb} MB.` : `PNG/JPG/WebP bis ${maxMb} MB. SVG geht nicht.`}
           </p>
         </div>
@@ -724,7 +724,7 @@ export function ImageUpload({ value, onChange, label, testId = "image-upload", v
               )}
             </div>
             {editor.cropMode !== "original" && (
-              <div className="mt-2 flex flex-wrap items-center justify-center gap-2 tls-type-small font-bold text-white/40">
+              <div className="mt-2 flex flex-wrap items-center justify-center gap-2 tls-type-small font-bold text-quiet">
                 <span>Ziehen zum Verschieben</span>
                 <span>·</span>
                 <span>Zoom unter 100% erzeugt Rand statt harten Anschnitt</span>

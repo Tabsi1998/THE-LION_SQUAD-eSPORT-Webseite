@@ -160,7 +160,7 @@ export function BlockierteBenutzer() {
           <p className="tls-type-small text-white/50">Blockierte Konten können dir keine Nachrichten oder Freundschaftsanfragen senden.</p>
           <div className="mt-4 divide-y divide-white/5 border border-white/10 rounded-sm">
             {blocks.map((row) => <div key={row.id} className="p-3 flex items-center justify-between gap-3">
-              <div className="min-w-0"><div className="font-bold tls-wrap">{row.user?.display_name || row.user?.username || "Gelöschter Benutzer"}</div>{row.user?.username && <div className="tls-type-small text-white/40 tls-wrap">@{row.user.username}</div>}</div>
+              <div className="min-w-0"><div className="font-bold tls-wrap">{row.user?.display_name || row.user?.username || "Gelöschter Benutzer"}</div>{row.user?.username && <div className="tls-type-small text-quiet tls-wrap">@{row.user.username}</div>}</div>
               <button type="button" onClick={() => unblock(row.blocked_id)} className="tls-btn tls-btn--quiet shrink-0 px-3 py-1.5 rounded-sm tls-type-label">Freigeben</button>
             </div>)}
             {blocks.length === 0 && <div className="p-4 tls-type-small text-white/45">Keine blockierten Benutzer.</div>}

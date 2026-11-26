@@ -153,7 +153,7 @@ export default function AdminGamesPage() {
                 <td className="px-4 py-3 min-w-0">
                   <Link to={gamePageUrl(g.id)} className="font-semibold text-white hover:text-[#29B6E8] [overflow-wrap:anywhere]" data-testid={`game-open-${g.slug}`}>{gameLabel(g)}</Link>
                   {isArchivedGame(g) ? <div className="mt-0.5 tls-type-small text-warn" data-testid={`game-archived-${g.slug}`}>Archiviert – beim Anlegen nicht zur Wahl</div> : null}
-                  {gameLabel(g) !== g.name && <div className="mt-0.5 tls-type-small text-white/35">Version: {g.name}</div>}
+                  {gameLabel(g) !== g.name && <div className="mt-0.5 tls-type-small text-quiet">Version: {g.name}</div>}
                   {g.discord_guild_id && servers.length ? <div className="mt-0.5 tls-type-small text-[#8EA1FF]" data-testid={`game-discord-${g.slug}`}>Discord: {servers.find((server) => server.guild_id === g.discord_guild_id)?.name || g.discord_guild_id}</div> : null}
                 </td>
                 <td className="hidden md:table-cell px-4 py-3 text-white/60">{gameKindLabel(g.kind)}</td>

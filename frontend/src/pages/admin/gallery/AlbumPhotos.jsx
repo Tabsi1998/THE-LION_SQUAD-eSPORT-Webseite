@@ -327,7 +327,7 @@ export function AlbumPhotos({ album, onBack }) {
               ) : sections.map((section) => (
                 <div key={section.id} className="inline-flex items-center gap-2 rounded-sm border border-white/10 bg-black/20 px-2.5 py-1.5">
                   <span className="tls-type-label text-white">{section.title}</span>
-                  <span className="tls-type-small text-white/35">#{section.order_index || 0}</span>
+                  <span className="tls-type-small text-quiet">#{section.order_index || 0}</span>
                   <button type="button" onClick={() => setEditingSection(section)} className="text-white/45 hover:text-[#29B6E8]" aria-label={`${section.title} bearbeiten`}>
                     <Pencil className="w-3 h-3" />
                   </button>
@@ -381,10 +381,10 @@ export function AlbumPhotos({ album, onBack }) {
                   <h2 className="tls-type-section">{group.title}</h2>
                   {group.description && <p className="mt-1 tls-type-body text-white/50">{group.description}</p>}
                 </div>
-                <span className="tls-type-label text-white/40">{group.items.length} Medien</span>
+                <span className="tls-type-label text-quiet">{group.items.length} Medien</span>
               </div>
               {group.items.length === 0 ? (
-                <div className="border border-dashed border-white/10 rounded-sm p-6 text-center tls-type-small text-white/35">Leer</div>
+                <div className="border border-dashed border-white/10 rounded-sm p-6 text-center tls-type-small text-quiet">Leer</div>
               ) : (
                 <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 gap-2">
                   {group.items.map((p) => (

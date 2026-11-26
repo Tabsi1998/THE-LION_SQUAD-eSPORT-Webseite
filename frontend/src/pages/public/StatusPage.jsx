@@ -70,7 +70,7 @@ export default function StatusPage() {
               <h1 className="mt-3 tls-type-title">{view.title}</h1>
               <p className="mt-3 tls-type-body text-white/60">{view.text}</p>
               {status.checkedAt ? (
-                <p className="mt-4 tls-type-small text-white/40">Zuletzt geprüft: {viennaDateTime(status.checkedAt)}</p>
+                <p className="mt-4 tls-type-small text-quiet">Zuletzt geprüft: {viennaDateTime(status.checkedAt)}</p>
               ) : null}
             </>
           ) : (

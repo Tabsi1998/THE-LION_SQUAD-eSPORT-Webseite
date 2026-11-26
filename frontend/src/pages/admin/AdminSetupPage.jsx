@@ -63,7 +63,7 @@ export default function AdminSetupPage() {
           <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Frage suchen – z. B. Webhook, Rechnung, Sponsor, Turnier …" data-testid="setup-faq-search"
             className="w-full bg-[#0A0A0A] border border-white/10 rounded-sm pl-9 pr-3 py-2.5 text-sm focus:border-[#29B6E8] outline-none" />
         </label>
-        <div className="tls-type-small text-white/40 mb-4" data-testid="setup-faq-count">{shown} von {total} Fragen{query ? ` zu „${query}“` : ""}</div>
+        <div className="tls-type-small text-quiet mb-4" data-testid="setup-faq-count">{shown} von {total} Fragen{query ? ` zu „${query}“` : ""}</div>
         {!topics.length && <div className="border border-dashed border-white/15 rounded-sm p-6 tls-type-small text-white/50" data-testid="setup-faq-empty">Keine Frage passt – anders formulieren oder unten im Menü suchen.</div>}
         <div className="space-y-6">
           {topics.map((topic) => (

@@ -352,7 +352,7 @@ export default function AdminF1EditPage() {
                   <option key={s} value={s} disabled={s === "archived" && archiveBlocked(challenge)}>{s === "archived" && archiveBlocked(challenge) ? `${label} (erst nach dem Veröffentlichen)` : label}</option>
                 ))}
               </select>
-              <div className="mt-1 tls-type-small text-white/40">Live schaltet sich selbst, den Rest setzt ihr von Hand.</div>
+              <div className="mt-1 tls-type-small text-quiet">Live schaltet sich selbst, den Rest setzt ihr von Hand.</div>
             </div>
           )}
           <Link target="_blank" to={`/display/f1/${challenge.id}`} data-testid="f1-tv-admin-link" className="inline-flex items-center gap-2 px-4 py-2 border border-[#29B6E8] text-[#29B6E8] rounded-sm tls-type-label hover:bg-[#29B6E8]/10">
@@ -543,10 +543,10 @@ export default function AdminF1EditPage() {
                     </div>
                   </div>
                 ))}
-                {times.length === 0 && <div className="text-center py-6 text-white/40 tls-type-small">Noch keine Zeiten</div>}
+                {times.length === 0 && <div className="text-center py-6 text-quiet tls-type-small">Noch keine Zeiten</div>}
               </div>
             </>
-          ) : <div className="text-white/40 tls-type-small">Bitte erst eine Strecke anlegen.</div>}
+          ) : <div className="text-quiet tls-type-small">Bitte erst eine Strecke anlegen.</div>}
         </div>
       </div>
 

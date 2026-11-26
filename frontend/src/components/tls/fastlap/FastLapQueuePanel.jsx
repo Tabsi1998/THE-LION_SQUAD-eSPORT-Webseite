@@ -88,7 +88,7 @@ export function FastLapQueuePanel({ challenge, track, queue, guests, onGuestCrea
             </Row>
           </motion.div>
         ))}
-        {onTrack.length === 0 && <div className="tls-type-small text-white/40 border border-dashed border-white/10 rounded-sm px-3 py-2">Niemand am Start.</div>}
+        {onTrack.length === 0 && <div className="tls-type-small text-quiet border border-dashed border-white/10 rounded-sm px-3 py-2">Niemand am Start.</div>}
       </div>
 
       <div className="tls-type-label text-white/50 mb-1.5">Als Nächstes</div>
@@ -103,7 +103,7 @@ export function FastLapQueuePanel({ challenge, track, queue, guests, onGuestCrea
             </Row>
           </motion.li>
         ))}
-        {waiting.length === 0 && <li className="tls-type-small text-white/40 border border-dashed border-white/10 rounded-sm px-3 py-2">Niemand wartet.</li>}
+        {waiting.length === 0 && <li className="tls-type-small text-quiet border border-dashed border-white/10 rounded-sm px-3 py-2">Niemand wartet.</li>}
       </ol>
 
       <form onSubmit={add} className="space-y-2 border-t border-white/5 pt-3">

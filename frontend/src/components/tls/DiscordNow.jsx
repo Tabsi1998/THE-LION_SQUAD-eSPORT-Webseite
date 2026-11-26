@@ -76,7 +76,7 @@ export function DiscordVoice({ data }) {
           <span className="inline-flex items-center gap-2 min-w-0"><Volume2 className="w-3.5 h-3.5 text-[#5865F2] shrink-0" aria-hidden="true" /><span className="truncate">{channel.name}</span></span>
           <span className="font-bold tabular-nums text-white">{channel.count}</span>
         </div>
-      )) : <div className="tls-type-small text-white/40">Gerade ist niemand in einem Sprachkanal.</div>}
+      )) : <div className="tls-type-small text-quiet">Gerade ist niemand in einem Sprachkanal.</div>}
       {data.invite ? <a href={data.invite} target="_blank" rel="noreferrer" className="inline-block tls-type-label text-[#B8C0FF] hover:text-white">Discord öffnen →</a> : null}
     </div>
   );

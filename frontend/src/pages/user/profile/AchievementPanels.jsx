@@ -192,7 +192,7 @@ export function NextUpPanel({ items = [] }) {
                     <div className="tls-type-card leading-tight truncate">{tier.name}</div>
                     <div className="mt-1 flex items-center gap-1.5 flex-wrap">
                       <MaterialChip tier={tier} />
-                      <span className="tls-type-label text-white/40">+{tier.points}</span>
+                      <span className="tls-type-label text-quiet">+{tier.points}</span>
                       {tier.member_only && <span className="tls-type-label text-[#FFD700]">Verein</span>}
                     </div>
                   </div>
@@ -204,7 +204,7 @@ export function NextUpPanel({ items = [] }) {
                   <span className="tls-type-small text-white/45 tabular-nums">{tier.current}/{tier.target}</span>
                 </div>
                 <p className="mt-3 tls-type-small text-white/60 flex-1">
-                  <span className="text-white/40 tls-type-label block mb-0.5">So schaffst du es</span>
+                  <span className="text-quiet tls-type-label block mb-0.5">So schaffst du es</span>
                   {tier.how_to || tier.description}{tier.missing ? ` Noch ${Number(tier.missing).toLocaleString("de-DE")}.` : ""}
                 </p>
                 {tier.link && (
@@ -238,7 +238,7 @@ function PinnedCard({ award, onRemove, dragging }) {
       <div className="min-w-0 flex-1">
         <div className="tls-type-small font-bold truncate" style={{ color }}>{award.material_name || award.level_name}</div>
         <div className="font-semibold tls-type-small truncate">{award.name}</div>
-        <div className="tls-type-small text-white/40 truncate">{award.group_name}</div>
+        <div className="tls-type-small text-quiet truncate">{award.group_name}</div>
       </div>
       <button
         type="button"
@@ -276,7 +276,7 @@ export function PinnedPanel({ pinned = [], codes = [], onChange }) {
           <div className="tls-type-label text-[#FFD700]">Angeheftet</div>
           <h3 className="tls-type-card mt-1">Was dein Profil zuerst zeigt</h3>
         </div>
-        <span className="tls-type-label text-white/40 tabular-nums" data-testid="achievement-pinned-count">{items.length} von {MAX_PINS}</span>
+        <span className="tls-type-label text-quiet tabular-nums" data-testid="achievement-pinned-count">{items.length} von {MAX_PINS}</span>
       </div>
       {items.length ? (
         <Reorder.Group
@@ -399,7 +399,7 @@ export function AchievementFilters({ filters, onChange, resultCount }) {
         {MATERIAL_OPTIONS.map(([value, label]) => <option key={value} value={value}>{label}</option>)}
       </select>
       {typeof resultCount === "number" && (
-        <span className="tls-type-label text-white/40 tabular-nums" data-testid="achievement-filter-count">{resultCount} Gruppen</span>
+        <span className="tls-type-label text-quiet tabular-nums" data-testid="achievement-filter-count">{resultCount} Gruppen</span>
       )}
       {(filters.material || (filters.status && filters.status !== "all")) && (
         <button type="button" onClick={() => onChange({ status: "all", material: "" })} className="tls-type-label text-white/60 hover:text-white" data-testid="achievement-filter-reset">

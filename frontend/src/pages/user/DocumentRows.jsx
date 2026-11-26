@@ -31,7 +31,7 @@ function fmtSize(bytes) {
 export function DocumentGroup({ label, docs, onView }) {
   return (
     <div>
-      {label && <div className="tls-type-label text-white/40 mb-3">{label}</div>}
+      {label && <div className="tls-type-label text-quiet mb-3">{label}</div>}
       <div className="space-y-2">
         {docs.map((d) => <DocumentRow key={d.id} d={d} onView={onView} />)}
       </div>
@@ -55,7 +55,7 @@ export function DocumentRow({ d, onView }) {
         </div>
         <div className="font-bold text-white mt-0.5">{d.title}</div>
         {d.description && <div className="tls-type-small text-white/55 mt-1 line-clamp-2">{d.description}</div>}
-        <div className="mt-2 flex items-center gap-3 tls-type-small text-white/40">
+        <div className="mt-2 flex items-center gap-3 tls-type-small text-quiet">
           {d.original_filename && <span>{d.original_filename}</span>}
           {d.file_size && <span>{fmtSize(d.file_size)}</span>}
           {d.view_count > 0 && <span>{d.view_count} Ansichten</span>}

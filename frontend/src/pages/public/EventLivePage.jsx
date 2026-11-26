@@ -220,7 +220,7 @@ function MatchCard({ match, stationMap, featured = false }) {
     <Link to={match.publicUrl} className={`block rounded-sm border bg-[#121212] p-4 transition hover:border-[#29B6E8]/50 ${featured ? "border-[#29B6E8]/35" : "border-white/10"}`}>
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
-          <div className="flex flex-wrap items-center gap-2 tls-type-small text-white/40">
+          <div className="flex flex-wrap items-center gap-2 tls-type-small text-quiet">
             <span>{match.tournament?.title || "Turnier"}</span>
             <span>{match.groupLabel}</span>
           </div>
@@ -242,7 +242,7 @@ function ResultRow({ match }) {
     <Link to={match.publicUrl} className="block border border-white/10 bg-black/20 rounded-sm p-3 hover:border-[#29B6E8]/40 transition">
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
-          <div className="tls-wrap tls-type-small text-white/35">{match.tournament?.title || "Turnier"}</div>
+          <div className="tls-wrap tls-type-small text-quiet">{match.tournament?.title || "Turnier"}</div>
           <div className="tls-wrap mt-1 font-bold uppercase">{match.labels.join(" vs. ") || match.groupLabel}</div>
           {match.resultText && <div className="tls-wrap mt-1 tls-type-small text-[#00FF88]">{match.resultText}</div>}
         </div>
@@ -263,7 +263,7 @@ function ActivityRow({ item, accessToken }) {
         <Icon className="w-5 h-5" />
       </div>
       <div className="min-w-0">
-        <div className="tls-type-label text-white/35">{isFastLap ? "Fast Lap" : "Turnier"}</div>
+        <div className="tls-type-label text-quiet">{isFastLap ? "Fast Lap" : "Turnier"}</div>
         <div className="tls-wrap font-bold">{item.title || item.name}</div>
       </div>
     </Link>
@@ -278,7 +278,7 @@ function StationRow({ station }) {
       <div className="min-w-0">
         <div className="tls-wrap font-bold">{station.name || station.label || station.id}</div>
         {/* Notizen sind Vorschau-Text (#1314): eine Zeile, der volle Text im title. */}
-        <div className="tls-type-small text-white/40 truncate" title={station.notes || undefined}>{station.notes || station.device_type || "Station"}</div>
+        <div className="tls-type-small text-quiet truncate" title={station.notes || undefined}>{station.notes || station.device_type || "Station"}</div>
       </div>
       <span className={`shrink-0 rounded-sm border px-2 py-1 tls-type-label ${broken ? "border-[#FF3B30]/40 text-[#FF3B30]" : busy ? "border-[#29B6E8]/40 text-[#29B6E8]" : "border-[#00FF88]/35 text-[#00FF88]"}`}>
         {broken ? "Defekt" : busy ? "Belegt" : "Frei"}
@@ -317,7 +317,7 @@ function LiveStat({ icon: Icon, label, value, tone }) {
 function MiniMetric({ label, value }) {
   return (
     <div className="border border-white/10 bg-black/20 rounded-sm p-3">
-      <div className="tls-type-label text-white/35">{label}</div>
+      <div className="tls-type-label text-quiet">{label}</div>
       <div className="mt-1 tls-type-section tls-type-num">{value}</div>
     </div>
   );

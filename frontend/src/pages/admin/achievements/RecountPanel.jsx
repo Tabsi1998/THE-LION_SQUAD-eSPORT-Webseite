@@ -160,7 +160,7 @@ export function RecountPanel() {
             {plural(dry.affected_users || 0, "Person bekäme", "Personen bekämen")} {plural(dry.awards || 0, "Stufe", "Stufen")} neu dazu.
           </p>
           {dry.tiers?.length ? <TierTable rows={dry.tiers} testPrefix="ach-recount-row" /> : <p className="mt-2 tls-type-small text-white/45">Niemand bekäme etwas dazu.</p>}
-          <p className="mt-2 tls-type-small text-white/40">
+          <p className="mt-2 tls-type-small text-quiet">
             Folge-Stufen wie Sammler entstehen erst durch Vergaben – die Zahl ist eine Untergrenze.
             {dry.errors ? ` ${plural(dry.errors, "Konto ließ", "Konten ließen")} sich nicht rechnen (siehe Server-Protokoll).` : ""}
           </p>

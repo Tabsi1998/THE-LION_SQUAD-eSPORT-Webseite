@@ -284,7 +284,7 @@ export default function AdminFinancePage() {
               </label>
             </div>
           </div>
-          <p className={`mt-2 tls-type-small ${periodBackwards ? "text-[#FF9500]" : "text-white/40"}`} data-testid="finance-export-hint">
+          <p className={`mt-2 tls-type-small ${periodBackwards ? "text-[#FF9500]" : "text-quiet"}`} data-testid="finance-export-hint">
             {periodBackwards ? "Der Zeitraum beginnt nach seinem Ende." : "Der CSV-Export enthält alle Belege dieser Auswahl, ohne Grenze. Der Zeitraum gilt für den Tag, an dem der Beleg angelegt wurde; ohne Zeitraum alle."}
           </p>
 
@@ -301,7 +301,7 @@ export default function AdminFinancePage() {
                   </div>
                 ))}
               </div>
-              <p className="mt-2 tls-type-small text-white/40">Gutschrift und Erstattung sind zwei Dinge: Die Gutschrift gleicht den Beleg in Dolibarr aus, erstattet ist erst, was ihr hier mit Tag und Referenz festgehalten habt.</p>
+              <p className="mt-2 tls-type-small text-quiet">Gutschrift und Erstattung sind zwei Dinge: Die Gutschrift gleicht den Beleg in Dolibarr aus, erstattet ist erst, was ihr hier mit Tag und Referenz festgehalten habt.</p>
             </div>
           )}
 
@@ -362,7 +362,7 @@ export default function AdminFinancePage() {
                   <tr key={row.id} data-testid={`finance-order-${row.id}`}>
                     <td className="px-4 py-3">
                       {row.source?.slug ? <Link to={row.source.kind === "tournament" ? `/tournaments/${row.source.slug}` : `/events/${row.source.slug}`} className="text-white hover:text-[#29B6E8]">{row.source.name}</Link> : sourceName(row)}
-                      <div className="tls-type-small text-white/40">{viennaDateTime(row.created_at, { dateStyle: "medium", timeStyle: "short" })}</div>
+                      <div className="tls-type-small text-quiet">{viennaDateTime(row.created_at, { dateStyle: "medium", timeStyle: "short" })}</div>
                       {Array.isArray(row.invoice_text) && (
                         <InvoiceTextEditor row={row} busy={busy} onSave={(text) => run(`text-${row.id}`, () => api.put(`/admin/finance/orders/${row.id}/text`, { extra_text: text }), "Rechnungstext gespeichert.")} />
                       )}
@@ -371,7 +371,7 @@ export default function AdminFinancePage() {
                     <td className="px-4 py-3 text-right tls-type-num">{row.total}</td>
                     <td className={`px-4 py-3 ${STATUS_TONE[row.status] || "text-white/70"}`}>
                       {labels[row.status] || row.status}
-                      {row.note && <div className="tls-type-small text-white/40">{row.note}</div>}
+                      {row.note && <div className="tls-type-small text-quiet">{row.note}</div>}
                     </td>
                     <td className="px-4 py-3 text-right">
                       {row.status === "held" && (

@@ -195,7 +195,7 @@ export default function GalleryAlbumPage() {
                       <h2 className="tls-type-section">{group.title}</h2>
                       {group.description && <p className="mt-1 tls-type-body text-white/55 max-w-2xl">{group.description}</p>}
                     </div>
-                    <span className="tls-type-label text-white/40">{group.items.length} Medien</span>
+                    <span className="tls-type-label text-quiet">{group.items.length} Medien</span>
                   </div>
                 )}
                 <div className="columns-2 sm:columns-3 xl:columns-4 gap-3">

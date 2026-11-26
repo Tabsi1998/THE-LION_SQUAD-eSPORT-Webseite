@@ -200,7 +200,7 @@ export function DiscordTargets() {
               <label className="flex items-center gap-2 tls-type-small">
                 <input type="checkbox" checked={!!event.enabled} disabled={!!busy} onChange={(e) => toggleEvent(event.key, e.target.checked)} className="accent-[#29B6E8]" />
                 <span>{event.label}</span>
-                <span className="tls-type-label text-white/35">{status[event.target]?.label || event.target}</span>
+                <span className="tls-type-label text-quiet">{status[event.target]?.label || event.target}</span>
               </label>
               {event.routable ? (
                 <div className="pl-6 space-y-1">

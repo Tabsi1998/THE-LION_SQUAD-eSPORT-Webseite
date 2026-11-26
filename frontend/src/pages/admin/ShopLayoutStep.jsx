@@ -863,7 +863,7 @@ function SurfaceField({ layer, info, labels, editable, onChange, testId, stale }
     const from = info?.ink?.fixed ? "fest" : SURFACE_FROM[surface?.source] || SURFACE_FROM.garment;
     return (
       <div className="border-t border-white/10 pt-2 mt-2 space-y-2">
-        <p className={`tls-type-small ${stale ? "text-white/40" : "text-white/60"}`} role="status" data-testid={`${testId}-surface`}>
+        <p className={`tls-type-small ${stale ? "text-quiet" : "text-white/60"}`} role="status" data-testid={`${testId}-surface`}>
           {info?.ink?.label ? `Farbe: ${info.ink.label} (${from})` : `Farbe ${from}.`}
         </p>
         {value !== "auto" && (
@@ -886,7 +886,7 @@ function SurfaceField({ layer, info, labels, editable, onChange, testId, stale }
           {Object.entries(options).map(([key, label]) => <option key={key} value={key}>{VARIANT_HINTS[key] ? `${label} (${VARIANT_HINTS[key]})` : label}</option>)}
         </select>
       </label>
-      <p className={`tls-type-small sm:pb-2.5 ${stale ? "text-white/40" : "text-white/60"}`} role="status" data-testid={`${testId}-surface`}>
+      <p className={`tls-type-small sm:pb-2.5 ${stale ? "text-quiet" : "text-white/60"}`} role="status" data-testid={`${testId}-surface`}>
         {surface?.text ? `${surface.text}${ink}` : `Fassung nach der Shirtfarbe.${ink}`}
       </p>
     </div>

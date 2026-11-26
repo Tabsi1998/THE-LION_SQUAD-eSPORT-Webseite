@@ -177,7 +177,7 @@ export default function SeasonPage() {
                     <td className="px-4 py-3 text-right text-white/70">{r.events_count}</td>
                     <td className="px-4 py-3 text-right text-white/70">
                       <div className="font-bold text-white/80">{r.achievement_count || 0}</div>
-                      <div className="tls-type-label text-white/35">{formatPoints(r.profile_points || r.achievement_points || 0)} Profil</div>
+                      <div className="tls-type-label text-quiet">{formatPoints(r.profile_points || r.achievement_points || 0)} Profil</div>
                     </td>
                     <td className="px-4 py-3 text-right text-white/70">{r.wins}</td>
                     <td className="px-4 py-3 text-right tls-type-card tls-type-num text-[#29B6E8]">{formatPoints(r.points)}</td>
@@ -194,8 +194,8 @@ export default function SeasonPage() {
                 <PlayerIdentity row={r} mine={isMine(r)} />
                 <div className="ml-auto text-right">
                   <div className="tls-type-section tls-type-num text-[#29B6E8]">{formatPoints(r.points)}</div>
-                  <div className="tls-type-label text-white/40">{r.events_count} Wertungen · {r.wins} Siege</div>
-                  <div className="tls-type-label text-white/30">{r.achievement_count || 0} Achievements</div>
+                  <div className="tls-type-label text-quiet">{r.events_count} Wertungen · {r.wins} Siege</div>
+                  <div className="tls-type-label text-quiet">{r.achievement_count || 0} Achievements</div>
                 </div>
               </div>
             ))}
@@ -262,7 +262,7 @@ function PlayerIdentity({ row, mine = false }) {
           <span className="font-bold truncate">{row.display_name}</span>
           {mine ? <span className="tls-you-tag">Du</span> : null}
         </div>
-        {row.username && <div className="tls-type-small text-white/40 truncate">@{row.username}</div>}
+        {row.username && <div className="tls-type-small text-quiet truncate">@{row.username}</div>}
       </div>
     </div>
   );
@@ -270,7 +270,7 @@ function PlayerIdentity({ row, mine = false }) {
 
 function SourceBreakdown({ row }) {
   const items = (row.source_breakdown || []).filter((item) => Number(item.total_points || 0) > 0).slice(0, 3);
-  if (!items.length) return <span className="tls-type-small text-white/35">Keine Detaildaten</span>;
+  if (!items.length) return <span className="tls-type-small text-quiet">Keine Detaildaten</span>;
   return (
     <div className="flex flex-wrap gap-1.5 max-w-xs">
       {items.map((item) => (
@@ -319,7 +319,7 @@ function MiniStat({ label, value }) {
   return (
     <div className="border border-white/10 bg-black/25 rounded-sm p-2">
       <div className="tls-type-card tls-type-num text-white">{value}</div>
-      <div className="tls-type-label text-white/40">{label}</div>
+      <div className="tls-type-label text-quiet">{label}</div>
     </div>
   );
 }
