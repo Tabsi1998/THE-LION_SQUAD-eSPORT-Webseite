@@ -1,4 +1,4 @@
-import { readFileSync } from "node:fs";
+import { readFileSync, readdirSync, statSync } from "node:fs";
 import path from "node:path";
 
 // Schrift-Treppe (#1302, #1303, #1304): acht feste Stufen statt vierzig Größen. Dieser Test hält die Werte der Stufen
@@ -82,4 +82,127 @@ describe("die acht Stufen in styles/system.css", () => {
     const layer = system.slice(system.indexOf("@layer components {"));
     for (const name of [...Object.keys(STEPS), "num"]) expect(layer).toContain(`.tls-type-${name} {`);
   });
+});
+
+// ---------------------------------------------------------------- Wächter (Ratschen-Prinzip)
+// Nach dem Umbau (scripts/type-codemod.mjs) ist der Stand die Grundlinie: Jede neue freie Größe, jedes neue Unbounded
+// außerhalb von Bühne und Seitentitel, jedes GROSS an einer Überschrift und jeder abgekürzte Countdown lässt den Test
+// scheitern. Wer eine Ausnahme braucht, trägt sie unten mit Grund ein. Wer eine Ausnahme abbaut, senkt die Zahl mit.
+
+const TEST_FILE = /\.(test|spec)\.[jt]sx?$/;
+const rel = (file) => path.relative(SRC, file).split(path.sep).join("/");
+
+function filesIn(dir, pattern) {
+  return readdirSync(dir).flatMap((name) => {
+    const full = path.join(dir, name);
+    if (statSync(full).isDirectory()) return filesIn(full, pattern);
+    return pattern.test(name) && !TEST_FILE.test(name) ? [full] : [];
+  });
+}
+
+// TV-Seiten behalten ihre Beamer-Größen und Schriften (lib/tvType.js), Druckbögen ihre pt-Größen (styles/printView.css).
+const TV_OR_PRINT = /^(pages\/display|components\/tv|pages\/print|components\/tls\/print)\//;
+const SOURCES = filesIn(SRC, /\.(jsx?|mjs)$/).filter((file) => !rel(file).startsWith("hilfe/"));
+
+function countIn(files, pattern, skip = TV_OR_PRINT) {
+  const found = {};
+  for (const file of files) {
+    const name = rel(file);
+    if (skip.test(name)) continue;
+    const hits = (readFileSync(file, "utf8").match(pattern) || []).length;
+    if (hits) found[name] = hits;
+  }
+  return found;
+}
+
+// Freie Größen: text-[…px|rem], text-[clamp(…)] und text-4xl und größer. text-xs bis text-3xl sind Tailwind-Werte, die
+// mit einer Stufe zusammenfallen - neue Stellen nehmen trotzdem die Stufe (tls-type-*).
+const FREE_SIZE = /(?<![\w-])(?:[\w-]+:)*text-(?:\[(?:[\d.]+(?:px|rem)|clamp\([^\]]*\))\]|[4-9]xl)(?![\w-])/g;
+const FREE_SIZE_EXCEPTIONS = {
+  "components/tls/BottomNav.jsx": 1, // Zähler an Symbolen: die Zahl in der Plakette am Symbol (#1232)
+};
+
+test("keine neue freie Schriftgröße - neue Stellen nehmen eine der acht Stufen", () => {
+  expect(countIn(SOURCES, FREE_SIZE)).toEqual(FREE_SIZE_EXCEPTIONS);
+});
+
+// CSS der Bausteine: nichts unter 12 px (#1232). Kleine Punkte mit fester Breite (Zähler an Symbolen) und SVG-Grafiken
+// rechnen anders und stehen hier mit Grund.
+const CSS_SKIP = /^(components\/tv\/|styles\/printView\.css|seasons\/|advent\/|components\/achievements\/ceremony\/)/;
+const CSS_TINY = /font-size:\s*(?:(?:[0-9]|1[01])(?:\.\d+)?px|0?\.(?:[0-6]\d*|7[0-4]\d*)rem)\s*[;}]/g;
+const CSS_TINY_EXCEPTIONS = {
+  "components/tls/league/leagueBadge.css": 4, // Saisonverlauf als SVG-Grafik (fill) - Größe in Einheiten der Grafik
+  "components/tls/series/racingLeague.css": 2, // Kürzel des Laufs (S, R, HR) und Plätze gutgemacht - feste Höhe unter dem Rennen
+  "index.css": 2, // Formpunkte S/U/N der Tabelle in einem 16-px-Kästchen (am Handy 13 px)
+};
+
+test("CSS: keine Schrift unter 12 px - außer kleinen Punkten und Grafiken mit Grund", () => {
+  expect(countIn(filesIn(SRC, /\.css$/), CSS_TINY, CSS_SKIP)).toEqual(CSS_TINY_EXCEPTIONS);
+});
+
+// Unbounded nur für Bühne und Seitentitel (Fabians Variante B): font-heading steht nur noch an begründeten Stellen.
+const HEADING_FONT = /(?<![\w-])font-heading(?![\w-])/g;
+const HEADING_FONT_EXCEPTIONS = {
+  "components/tls/BracketTree.jsx": 2, // derselbe Baum auf dem TV (tv-t-head): Beamer-Schrift wie die übrigen TV-Seiten
+};
+
+test("Unbounded (font-heading) nur auf Bühne und Seitentitel - sonst tls-type-*", () => {
+  expect(countIn(SOURCES, HEADING_FONT)).toEqual(HEADING_FONT_EXCEPTIONS);
+});
+
+/** Die öffnenden Tags eines Elements (bis zum `>`, das nicht in {…} oder in Anführungszeichen steht). */
+function openingTags(text, pattern) {
+  const tags = [];
+  for (const match of text.matchAll(pattern)) {
+    let depth = 0;
+    let quote = "";
+    let index = match.index + match[0].length;
+    for (; index < text.length; index += 1) {
+      const char = text[index];
+      if (quote) {
+        if (char === quote && text[index - 1] !== "\\") quote = "";
+        continue;
+      }
+      if (char === '"' || char === "'" || char === "`") quote = char;
+      else if (char === "{") depth += 1;
+      else if (char === "}") depth -= 1;
+      else if (char === ">" && depth === 0) break;
+    }
+    tags.push(text.slice(match.index, index + 1));
+  }
+  return tags;
+}
+
+test("Großbuchstaben nur für Kurzes (#1303): kein uppercase an h1-h3 und an Kartentiteln (tls-card__title)", () => {
+  const found = [];
+  for (const file of SOURCES) {
+    const name = rel(file);
+    if (TV_OR_PRINT.test(name)) continue;
+    const text = readFileSync(file, "utf8");
+    const tags = [...openingTags(text, /<h[1-3](?=[\s>])/g), ...openingTags(text, /<[A-Za-z][\w.]*(?=[^<>]*tls-card__title)/g)];
+    for (const tag of tags) {
+      if (/(?<![\w-])uppercase(?![\w-])/.test(tag) && /className/.test(tag)) found.push(`${name}: ${tag.slice(0, 90)}`);
+    }
+  }
+  expect(found).toEqual([]);
+});
+
+// Dauern ausgeschrieben (#1304): „154 Tage 16 Std.“, nie „154T 16h“ oder „3 T.“ - lib/datetime formatDuration.
+const SHORT_UNIT = /\$\{[^{}`]+\}\s?(?:T|Tg|d|h|H)\.?(?=[\s`"'])|(?<![\w-])\d+\s?(?:T|Tg)\.\s/g;
+
+test("keine abgekürzten Countdowns und Dauern („154T 16h“) - formatDuration schreibt sie aus", () => {
+  expect(countIn(SOURCES, SHORT_UNIT, /^$/)).toEqual({});
+});
+
+test("der Wächter selbst: erkennt neue Stellen", () => {
+  expect('<span className="text-[10px] uppercase">'.match(FREE_SIZE)).toHaveLength(1);
+  expect('<p className="md:text-5xl">'.match(FREE_SIZE)).toHaveLength(1);
+  expect('<p className="text-[#FFD700] text-xs text-3xl">'.match(FREE_SIZE)).toBeNull();
+  expect(".x { font-size: 11px; }".match(CSS_TINY)).toHaveLength(1);
+  expect(".x { font-size: 0.68rem; }".match(CSS_TINY)).toHaveLength(1);
+  expect(".x { font-size: 12px; } .y { font-size: 0.75rem; }".match(CSS_TINY)).toBeNull();
+  expect(openingTags('<h2 className={`a ${b ? "uppercase" : ""}`} onClick={() => x > 1}>Titel</h2>', /<h[1-3](?=[\s>])/g)[0]).toContain("uppercase");
+  expect("`noch ${days}T ${hours}h`".match(SHORT_UNIT)).toHaveLength(2);
+  expect("`${day}T${clock}`".match(SHORT_UNIT)).toBeNull();
+  expect('"154 T. 16 Std."'.match(SHORT_UNIT)).toHaveLength(1);
 });
