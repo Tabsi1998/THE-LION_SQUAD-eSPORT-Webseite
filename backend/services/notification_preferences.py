@@ -532,10 +532,10 @@ async def send_user_template(user: dict | None, template_key: str, category: str
     category = category or TEMPLATE_CATEGORY.get(template_key)
     if not email_allowed(user, template_key, category):
         return {"ok": True, "skipped": True, "reason": "preference_disabled", "category": category}
-    from services import mail_digest
+    from services import mail_digest_rules
 
-    if user.get("id") and mail_digest.collectable(template_key, importance):
-        held = await mail_digest.hold(user, template_key, category, kwargs)
+    if user.get("id") and mail_digest_rules.collectable(template_key, importance, template_key in REQUIRED_EMAIL_TEMPLATES):
+        held = await mail_digest_rules.hold(user, template_key, category, kwargs)
         if held:
             return held
     from email_service import send_template

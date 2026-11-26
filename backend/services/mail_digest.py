@@ -26,167 +26,42 @@ stellt.
 from __future__ import annotations
 
 import logging
-from datetime import datetime, timedelta, timezone
-from typing import Any
-from zoneinfo import ZoneInfo
+from datetime import datetime, timedelta
 
 from pymongo.errors import DuplicateKeyError
 
 from models import new_id, now_utc
 from services.log_safe import log_safe
 
+from services import mail_digest_rules as rules
+from services.mail_digest_rules import (  # noqa: F401 - hier weiter erreichbar (Job, Einstellungen, Tests)
+    DEFAULTS, DIGEST_TEMPLATE, OWN_FORMAT_TEMPLATES, PREVIEW_FIELDS, PREVIEW_MAX, RHYTHM_LABELS, RHYTHMS, SETTINGS_ID,
+    URGENT_TEMPLATES, VIENNA, WEEKDAYS, hold, last_slot, load_settings, normalized_settings, period_key, preview_line, rhythm_of,
+    schedule_text, settings_payload,
+)
+
 logger = logging.getLogger("tls.mail_digest")
 
-VIENNA = ZoneInfo("Europe/Vienna")
-SETTINGS_ID = "notification_digest"
-DIGEST_TEMPLATE = "notification_digest"
-RHYTHMS: tuple[str, ...] = ("instant", "daily", "weekly")
-RHYTHM_LABELS = {"instant": "Sofort", "daily": "Täglich", "weekly": "Wöchentlich"}
-WEEKDAYS = ("Montags", "Dienstags", "Mittwochs", "Donnerstags", "Freitags", "Samstags", "Sonntags")
-DEFAULTS: dict[str, Any] = {"default_rhythm": "instant", "daily_time": "07:00", "weekly_weekday": 0, "weekly_time": "07:00"}
-# Kann nicht warten: Spiel in 10 Minuten, Erinnerung vor dem Spiel, Check-in schließt, Ergebnis bestätigen, Dispute offen.
-URGENT_TEMPLATES = frozenset({
-    "match_lead_10m", "match_reminder", "checkin_closes_soon", "checkin_closes_soon_on_site", "score_reported", "dispute_opened",
-})
-# Schon selbst ein Gruß bzw. eine Zusammenfassung - und die Newsletter mit eigenem Abmeldeweg.
-OWN_FORMAT_TEMPLATES = frozenset({"birthday_greeting", "achievement_recap", "newsletter_news", "newsletter_event", DIGEST_TEMPLATE})
-PREVIEW_FIELDS = ("text", "detail", "summary", "message", "preview", "decision", "reason", "when")
-PREVIEW_MAX = 200
 CLAIM_SECONDS = 600
 # Verschickte und herausgefallene Zeilen und abgeschlossene Läufe bleiben so lange (Nachfragen), dann räumt ``send_due`` auf.
 KEEP_DAYS = 90
+# Was der Versand vom Konto braucht - nie die privaten Felder (services/private_fields.py).
+USER_FIELDS = {"_id": 0, "id": 1, "email": 1, "display_name": 1, "username": 1, "is_active": 1, "is_banned": 1, "mail_digest": 1,
+               "newsletter_consent": 1, "notification_preferences": 1}
 SETTINGS_PATH = "/profile?tab=notifications&bereich=mail"
 MEMBER_STATUSES = ("active", "honorary")
 
 
-# ---------------------------------------------------------------- Regeln ohne Datenbank
-
-def _clock(value: Any) -> str | None:
-    from services.quiet_hours_rules import parse_time
-
-    return str(value).strip() if parse_time(value) is not None else None
-
-
-def normalized_settings(raw: dict | None) -> dict[str, Any]:
-    """Die Vorgaben der Verwaltung - Ungültiges fällt auf den Standard zurück."""
-    raw = raw or {}
-    weekday = raw.get("weekly_weekday")
-    return {
-        "default_rhythm": raw.get("default_rhythm") if raw.get("default_rhythm") in RHYTHMS else DEFAULTS["default_rhythm"],
-        "daily_time": _clock(raw.get("daily_time")) or DEFAULTS["daily_time"],
-        "weekly_weekday": weekday if isinstance(weekday, int) and not isinstance(weekday, bool) and 0 <= weekday <= 6
-        else DEFAULTS["weekly_weekday"],
-        "weekly_time": _clock(raw.get("weekly_time")) or DEFAULTS["weekly_time"],
-    }
-
-
-def rhythm_of(user: dict | None, cfg: dict) -> str:
-    own = (user or {}).get("mail_digest")
-    return own if own in RHYTHMS else cfg["default_rhythm"]
-
+# ---------------------------------------------------------------- Regeln
 
 def collectable(template_key: str, importance: str | None = None) -> bool:
-    """Darf diese Mail in die Sammlung? Nie: Pflicht, Dringendes, eigene Formate."""
+    """Darf diese Mail in die Sammlung? Wie ``mail_digest_rules.collectable`` - Pflicht-Mails aus den Einstellungen."""
     from services.notification_preferences import REQUIRED_EMAIL_TEMPLATES
 
-    if importance == "urgent":
-        return False
-    return template_key not in REQUIRED_EMAIL_TEMPLATES and template_key not in URGENT_TEMPLATES \
-        and template_key not in OWN_FORMAT_TEMPLATES
-
-
-def _at(day, clock: str) -> datetime:
-    hours, minutes = (int(part) for part in clock.split(":"))
-    return datetime(day.year, day.month, day.day, hours, minutes, tzinfo=VIENNA).astimezone(timezone.utc)
-
-
-def last_slot(rhythm: str, cfg: dict, now: datetime) -> datetime:
-    """Der zuletzt begonnene Termin (UTC) - täglich zur Uhrzeit, wöchentlich am Wochentag zur Uhrzeit, Wiener Zeit."""
-    today = now.astimezone(VIENNA).date()
-    if rhythm == "weekly":
-        day = today - timedelta(days=(today.weekday() - cfg["weekly_weekday"]) % 7)
-        slot = _at(day, cfg["weekly_time"])
-        return slot if slot <= now else _at(day - timedelta(days=7), cfg["weekly_time"])
-    slot = _at(today, cfg["daily_time"])
-    return slot if slot <= now else _at(today - timedelta(days=1), cfg["daily_time"])
-
-
-def period_key(rhythm: str, slot: datetime) -> str:
-    return f"{rhythm}:{slot.astimezone(VIENNA).date().isoformat()}"
-
-
-def schedule_text(rhythm: str, cfg: dict) -> str:
-    if rhythm == "daily":
-        return f"Täglich um {cfg['daily_time']} Uhr"
-    if rhythm == "weekly":
-        return f"{WEEKDAYS[cfg['weekly_weekday']]} um {cfg['weekly_time']} Uhr"
-    return "Jede Mail sofort"
-
-
-def preview_line(values: dict) -> str:
-    """Eine Zeile Vorschau aus den Werten der Mail - der erste Text, Leerraum zusammengefasst, höchstens 200 Zeichen."""
-    for field in PREVIEW_FIELDS:
-        value = values.get(field)
-        if isinstance(value, str) and value.strip():
-            text = " ".join(value.split())
-            return text if len(text) <= PREVIEW_MAX else text[:PREVIEW_MAX - 1].rstrip() + "…"
-    return ""
-
-
-def settings_payload(user: dict | None, cfg: dict) -> dict:
-    """Für die Einstellungen der Person."""
-    own = (user or {}).get("mail_digest")
-    return {
-        "rhythm": rhythm_of(user, cfg),
-        "own": own if own in RHYTHMS else None,
-        "default": cfg["default_rhythm"],
-        "options": [{"key": key, "label": RHYTHM_LABELS[key], "schedule": schedule_text(key, cfg)} for key in RHYTHMS],
-    }
+    return rules.collectable(template_key, importance, template_key in REQUIRED_EMAIL_TEMPLATES)
 
 
 # ---------------------------------------------------------------- Datenbank
-
-async def load_settings(db) -> dict:
-    return normalized_settings(await db.settings.find_one({"id": SETTINGS_ID}, {"_id": 0}))
-
-
-async def hold(user: dict, template_key: str, category: str | None, values: dict) -> dict | None:
-    """Die Mail sammeln statt einreihen - ``None``: geht wie bisher sofort. Gleicher ``dedupe_key``: nur einmal gesammelt."""
-    from database import get_db
-    from email_service import render_named
-
-    db = get_db()
-    cfg = await load_settings(db)
-    if "mail_digest" not in user:
-        # Viele Aufrufer lesen das Konto mit schmaler Projektion - der Rhythmus wird dann hier nachgelesen.
-        stored = await db.users.find_one({"id": user["id"]}, {"_id": 0, "mail_digest": 1}) or {}
-        user = {**user, "mail_digest": stored.get("mail_digest")}
-    if rhythm_of(user, cfg) == "instant":
-        return None
-    template_values = {key: value for key, value in values.items() if key not in ("dedupe_key", "mail_meta", "mail_headers")}
-    rendered = await render_named(template_key, **template_values)
-    if rendered is None:
-        return None
-    dedupe_key = values.get("dedupe_key") or None
-    item = {
-        "id": new_id(),
-        "user_id": user["id"],
-        "template_key": template_key,
-        "category": category,
-        "subject": rendered[0],
-        "preview": preview_line(template_values),
-        "url": str(template_values.get("url") or ""),
-        "created_at": now_utc().isoformat(),
-        **({"dedupe_key": dedupe_key} if dedupe_key else {}),
-    }
-    if dedupe_key and await db.mail_digest_items.find_one({"user_id": user["id"], "dedupe_key": dedupe_key}, {"_id": 1}):
-        return {"ok": True, "digest": True, "deduped": True}
-    try:
-        await db.mail_digest_items.insert_one(dict(item))
-    except DuplicateKeyError:
-        return {"ok": True, "digest": True, "deduped": True}
-    return {"ok": True, "digest": True, "id": item["id"]}
-
 
 async def claim_run(db, user_id: str, key: str, now: datetime, cutoff: str | None = None) -> dict | None:
     """Den Zeitraum für diesen Lauf beanspruchen - ``None``: schon verschickt oder ein anderer Lauf ist dran. ``cutoff``: bis
@@ -195,10 +70,9 @@ async def claim_run(db, user_id: str, key: str, now: datetime, cutoff: str | Non
            "cutoff": cutoff or now.isoformat(), "created_at": now.isoformat()}
     try:
         await db.mail_digest_runs.insert_one(dict(run))
-        # Ohne den eindeutigen Index (Testdatenbank im Speicher) könnte ein zweiter Lauf eingefügt haben: Es gilt der erste.
-        first = await db.mail_digest_runs.find({"user_id": user_id, "period": key}, {"_id": 0, "id": 1}) \
-            .sort([("created_at", 1), ("id", 1)]).to_list(1)
-        if first and first[0]["id"] == run["id"]:
+        # Ohne den eindeutigen Index (Testdatenbank im Speicher) kann ein zweiter Lauf einfügen: Gibt es schon einen anderen,
+        # zieht sich dieser zurück - unabhängig davon, wie die Kennungen sortiert sind.
+        if not await db.mail_digest_runs.find_one({"user_id": user_id, "period": key, "id": {"$ne": run["id"]}}, {"_id": 1}):
             return run
         await db.mail_digest_runs.delete_one({"id": run["id"]})
     except DuplicateKeyError:
@@ -308,9 +182,7 @@ async def send_due(db, now: datetime | None = None) -> dict[str, int]:
             await _settle(db, taken, now, run.get("cutoff") or now.isoformat(), counts)
     user_ids = sorted(await db.mail_digest_items.distinct("user_id", {"digest_id": {"$exists": False}}))
     for user_id in user_ids:
-        user = await db.users.find_one({"id": user_id}, {"_id": 0, "id": 1, "email": 1, "display_name": 1, "username": 1,
-                                                          "is_active": 1, "is_banned": 1, "mail_digest": 1,
-                                                          "newsletter_consent": 1, "notification_preferences": 1})
+        user = await db.users.find_one({"id": user_id}, USER_FIELDS)
         rhythm = rhythm_of(user, cfg)
         if rhythm == "instant":
             oldest = await db.mail_digest_items.find({"user_id": user_id, "digest_id": {"$exists": False}}, {"_id": 0, "id": 1}) \
@@ -335,7 +207,7 @@ async def send_due(db, now: datetime | None = None) -> dict[str, int]:
 
 async def _settle(db, run: dict, now: datetime, cutoff: str, counts: dict, user: dict | None = None) -> None:
     if user is None:
-        user = await db.users.find_one({"id": run["user_id"]}, {"_id": 0}) or {"id": run["user_id"]}
+        user = await db.users.find_one({"id": run["user_id"]}, USER_FIELDS) or {"id": run["user_id"]}
     try:
         shown, dropped = await _finish(db, run, user, now, cutoff)
     except Exception:  # noqa: BLE001 - eine Person hält die anderen nicht auf; der Anspruch verfällt, ein späterer Lauf holt nach

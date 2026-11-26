@@ -39,6 +39,7 @@ async def flow():
 def _clock(monkeypatch, when):
     moment = _utc(when)
     monkeypatch.setattr("services.mail_digest.now_utc", lambda: moment)
+    monkeypatch.setattr("services.mail_digest_rules.now_utc", lambda: moment)
     return moment
 
 
@@ -303,3 +304,16 @@ async def test_the_admin_sets_the_defaults_and_sees_a_preview(flow):
     member = await flow.add_user(name="Mitglied")
     flow.act_as(member)
     assert (await flow.get("/api/settings/notification-digest")).status_code == 403
+
+
+@pytest.mark.asyncio
+async def test_a_second_claim_never_wins_whatever_the_ids(flow, monkeypatch):
+    """Ohne eindeutigen Index (Speicher-Datenbank) entscheidet nicht die Reihenfolge der Kennungen: Wer zuerst da war, behält
+    den Zeitraum - auch wenn die Kennung des Zweiten kleiner ist."""
+    moment = _utc("2026-11-26T06:00:00")
+    ids = iter(["zzz-first", "aaa-second"])
+    monkeypatch.setattr("services.mail_digest.new_id", lambda: next(ids))
+    first = await mail_digest.claim_run(flow.db, "u1", "daily:2026-11-26", moment)
+    second = await mail_digest.claim_run(flow.db, "u1", "daily:2026-11-26", moment)
+    assert first["id"] == "zzz-first" and second is None
+    assert [row["id"] for row in await flow.db.mail_digest_runs.find({}, {"_id": 0}).to_list(5)] == ["zzz-first"]

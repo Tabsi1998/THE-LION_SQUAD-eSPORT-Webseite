@@ -146,3 +146,15 @@ async def test_no_second_pause_message_right_after_a_notice_of_the_lead(flow):
     res = await flow.post(f"/api/tournaments/{tournament['id']}/status", json={"status": "paused"})
     assert res.status_code == 200, res.text
     assert await flow.db.notifications.count_documents({"kind": "tournament_pause"}) == 0
+
+
+@pytest.mark.asyncio
+async def test_a_league_staffel_gets_no_extra_schedule_message(flow):
+    """Liga-Staffeln haben eigene Meldungen (docs/LIGA.md) - „Der Spielplan ist da“ kommt dort nicht dazu (Fachfrage #1662)."""
+    from services.tournament_progress import notify_bracket_ready
+
+    staff, tournament, player = await _bracket(flow)
+    staffel = {**tournament, "matchday_weeks_total": 6}
+    assert await notify_bracket_ready(flow.db, staffel) == 0
+    assert await notify_bracket_ready(flow.db, {**tournament, "league_context": {"season_id": "s1"}}) == 0
+    assert await flow.db.notifications.count_documents({"kind": "tournament_bracket"}) == 0

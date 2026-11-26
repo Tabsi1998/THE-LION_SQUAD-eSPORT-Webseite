@@ -9,7 +9,8 @@ Ereignis höchstens einmal (``meta.dedupe_key``):
   erschienen ist, kommt nie über den Sieger-Weg weiter (#1823). Spiele ohne Weiterleitung (Finale, Gruppe, Liga-Spieltag)
   melden nichts - dafür gibt es „Turnier beendet“ bzw. die Tabelle. Bei Durchgängen steht der Platz dabei („Platz 2 im
   Durchgang C: weiter“, „Ausgeschieden: Platz 5 von 8“).
-- **Turnierbaum da** beim Start (``notify_bracket_ready``): einmal je Turnier, mit dem eigenen ersten Spiel als Ziel.
+- **Turnierbaum da** beim Start (``notify_bracket_ready``): einmal je Turnier, mit dem eigenen ersten Spiel als Ziel - nicht
+  bei Liga-Staffeln (eigene Meldungen der Liga).
 - **Pause** beim Pausieren und wenn sich „Pause bis“ ändert (``notify_pause``): einmal je Pause und Uhrzeit.
 """
 from __future__ import annotations
@@ -177,13 +178,14 @@ async def _active_registrations(db, tournament_id: str) -> list[dict]:
 
 
 async def notify_bracket_ready(db, tournament: dict) -> int:
-    """Beim Start: „Der Turnierbaum ist da“ (Liga-Staffel: „Der Spielplan ist da“) - einmal je Turnier."""
+    """Beim Start: „Der Turnierbaum ist da“ - einmal je Turnier. Liga-Staffeln nicht: Die Liga hat eigene Meldungen
+    (docs/LIGA.md); ob dort „Der Spielplan ist da“ dazukommt, entscheidet Fabian (Fachfrage #1662)."""
+    if tournament.get("matchday_weeks_total") or isinstance(tournament.get("league_context"), dict):
+        return 0
     if not await db.matches_v2.find_one({"tournament_id": tournament["id"], "slots.registration_id": {"$type": "string"}}, {"_id": 1}):
         return 0
-    league = bool(tournament.get("matchday_weeks_total"))
-    title = "Der Spielplan ist da" if league else "Der Turnierbaum ist da"
-    body = f"{tournament.get('title') or 'Turnier'}: " + (
-        "Deine Spiele und Termine stehen fest." if league else "Schau nach, gegen wen du spielst.")
+    title = "Der Turnierbaum ist da"
+    body = f"{tournament.get('title') or 'Turnier'}: Schau nach, gegen wen du spielst."
     sent = 0
     for registration in await _active_registrations(db, tournament["id"]):
         url = await _next_match_url(db, tournament, registration["id"])

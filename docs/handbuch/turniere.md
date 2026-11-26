@@ -1257,7 +1257,7 @@ einmal, unter dem Thema **Turnier-Updates** (die Person kann es abschalten):
 
 | Wann | Meldung | Ein Tipp öffnet |
 | --- | --- | --- |
-| Beim Start (Status **Läuft**, nicht nach einer Pause) | **Der Turnierbaum ist da** – in der Liga **Der Spielplan ist da** | das eigene erste Spiel |
+| Beim Start (Status **Läuft**, nicht nach einer Pause; nicht bei Liga-Staffeln, die haben eigene Meldungen) | **Der Turnierbaum ist da** | das eigene erste Spiel |
 | Ergebnis gilt, Sieger kommt weiter | **Du bist weiter!** bzw. bei Durchgängen **Platz 2 im Durchgang C: weiter** | das nächste Spiel |
 | Ergebnis gilt, Verlierer im Double Elimination | **Weiter im Loser Bracket** | das nächste Spiel |
 | Ergebnis gilt, kein Weg weiter | **Ausgeschieden** bzw. **Ausgeschieden: Platz 5 von 8** im Durchgang | die Turnierseite |
