@@ -902,3 +902,22 @@ async def test_a_new_date_or_moving_up_marked_timely_follows_the_same_rule(monke
                                    meta={"dedupe_key": "n-2", "timely": True, "starts_at": "2026-11-18T07:00:00+00:00"})
     assert [kind for _channel, kind, _user in wires] == ["event_registration", "event_registration"]
     assert [bool(row.get("quiet_hold_until")) for row in db.notifications.rows] == [False, True]
+
+
+
+# ---------------------------------------------------------------- Dritte Prüfrunde (26.11.): Untergrenze und „Ende + 2 Stunden“
+
+@pytest.mark.anyio
+@pytest.mark.parametrize("quiet,now,starts_at,through", [
+    (NIGHT, "2026-11-16T22:30:00", "2026-11-15T17:00:00+00:00", False),   # gestern 18:00 - vorbei, kein Grund zu wecken
+    (NIGHT, "2026-11-16T22:30:00", "2026-11-09T17:00:00+00:00", False),   # vor einer Woche
+    ({"enabled": True, "start": "22:00", "end": "10:00"}, "2026-11-16T23:00:00", "2026-11-17T10:30:00+00:00", True),   # 11:30 < 12:00
+    ({"enabled": True, "start": "22:00", "end": "10:00"}, "2026-11-16T23:00:00", "2026-11-17T11:30:00+00:00", False),  # 12:30
+    ({"enabled": True, "start": "13:00", "end": "15:00"}, "2026-11-16T12:30:00", "2026-11-16T13:00:00+00:00", True),   # Mittagsruhe, Termin 14:00
+])
+async def test_timely_comes_through_only_for_appointments_until_two_hours_after_the_quiet_hours(monkeypatch, wires, quiet, now,
+                                                                                                  starts_at, through):
+    db = _Db([{"id": "u1", "quiet_hours": quiet, "notification_preferences": {}}])
+    _at(monkeypatch, db, now)
+    await create_user_notification("u1", "Turnier abgesagt", kind="tournament_cancelled", meta={"dedupe_key": "c-9", "starts_at": starts_at})
+    assert (("push", "tournament_cancelled", "u1") in wires) is through

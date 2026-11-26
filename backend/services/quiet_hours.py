@@ -61,14 +61,16 @@ def quiet_until(user: dict | None, now: datetime | None = None) -> datetime | No
     return rules.quiet_until(user, now or now_utc())
 
 
-# Zeitkritisches (Absage, neuer Termin, Nachrücken) kommt in der Ruhezeit sofort, wenn sein Termin vor dieser Uhrzeit am Morgen
-# liegt, an dem die Ruhezeit endet (Fabian 26.11., E) - sonst nach der Ruhezeit.
-TIMELY_MORNING_HOUR = 9
+# Zeitkritisches (Absage, neuer Termin, Nachrücken) kommt in der Ruhezeit sofort, wenn sein Termin noch bevorsteht und spätestens
+# so lange nach dem Ende der Ruhezeit beginnt (Fabians Nr. 267: „vor 9 Uhr“ bei Ruhezeit bis 7 Uhr) - sonst nach der Ruhezeit.
+TIMELY_GRACE_HOURS = 2
 
 
-def _timely_now(meta: dict, until: datetime | None) -> bool:
+def _timely_now(meta: dict, until: datetime | None, now: datetime | None = None) -> bool:
+    """``jetzt <= Termin < Ende der Ruhezeit + 2 Stunden``. Ein vergangener Termin weckt niemanden."""
     if not until or not meta.get("starts_at"):
         return False
+    from datetime import timedelta
     from zoneinfo import ZoneInfo
     try:
         starts = datetime.fromisoformat(str(meta["starts_at"]).replace("Z", "+00:00"))
@@ -76,15 +78,15 @@ def _timely_now(meta: dict, until: datetime | None) -> bool:
         return False
     if starts.tzinfo is None:
         starts = starts.replace(tzinfo=ZoneInfo("Europe/Vienna"))
-    morning = until.astimezone(ZoneInfo("Europe/Vienna")).replace(hour=TIMELY_MORNING_HOUR, minute=0, second=0, microsecond=0)
-    return starts < morning
+    now = now or now_utc()
+    return now <= starts < until + timedelta(hours=TIMELY_GRACE_HOURS)
 
 
-async def is_exempt(db, kind: str, meta: dict | None, until: datetime | None = None) -> bool:
+async def is_exempt(db, kind: str, meta: dict | None, until: datetime | None = None, now: datetime | None = None) -> bool:
     """Kommt diese Meldung auch in der Ruhezeit sofort? Siehe Modulbeschreibung. ``until``: Ende der Ruhezeit."""
     meta = meta or {}
     from services.notification_preferences import notification_timely
-    if notification_timely(kind, meta) and _timely_now(meta, until):
+    if notification_timely(kind, meta) and _timely_now(meta, until, now):
         return True
     if kind in EXEMPT_KINDS:
         return True
@@ -105,7 +107,7 @@ async def is_exempt(db, kind: str, meta: dict | None, until: datetime | None = N
 async def hold_until(db, user: dict | None, kind: str, meta: dict | None, now: datetime | None = None) -> str | None:
     """Ende der Ruhezeit als UTC-Zeitstempel, wenn diese Meldung zurückgehalten wird - sonst ``None``."""
     until = quiet_until(user, now)
-    if until is None or await is_exempt(db, kind, meta, until):
+    if until is None or await is_exempt(db, kind, meta, until, now):
         return None
     return until.isoformat()
 

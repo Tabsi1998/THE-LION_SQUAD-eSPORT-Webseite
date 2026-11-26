@@ -78,8 +78,24 @@ async def _recipients(db, user_ids: list[str]) -> list[dict]:
     return sorted(users, key=lambda user: user["id"])
 
 
+def change_starts_at(before: dict, after: dict, now) -> str | None:
+    """Bei einer Terminänderung zählt für die Ruhezeit der frühere Termin (alt oder neu), solange er noch bevorsteht."""
+    from datetime import datetime, timezone
+
+    def parse(value):
+        try:
+            moment = datetime.fromisoformat(str(value).replace("Z", "+00:00"))
+        except (TypeError, ValueError):
+            return None
+        return moment if moment.tzinfo else moment.replace(tzinfo=timezone.utc)
+
+    upcoming = [(moment, value) for value in (before.get("start_date"), after.get("start_date"))
+                if value and (moment := parse(value)) and moment >= now]
+    return min(upcoming)[1] if upcoming else after.get("start_date")
+
+
 async def _inform(db, event: dict, users: list[dict], *, title: str, message: str, dedupe: str,
-                  template: str = MESSAGE_TEMPLATE) -> dict:
+                  template: str = MESSAGE_TEMPLATE, starts_at: str | None = None) -> dict:
     """Benachrichtigung und Mail über die vorhandenen Wege; ein Fehler bei einer Person hält die anderen nicht auf.
     Die Absage hat ihre eigene Mail ``event_cancelled`` (#2119), die Terminänderung bleibt bei ``event_message``."""
     from services.notification_preferences import send_user_template
@@ -94,9 +110,9 @@ async def _inform(db, event: dict, users: list[dict], *, title: str, message: st
             doc = await create_user_notification(
                 user["id"], f"{name}: {title}", message, path, kind=MESSAGE_KIND,
                 # Absage und neuer Termin sind zeitkritisch (Fabian 26.11., A/E): nie gesammelt; der Push wartet in der Ruhezeit,
-                # außer das Event beginnt vor 9 Uhr am Morgen.
+                # außer das Event beginnt bis 2 Stunden nach dem Ende der Ruhezeit (services/quiet_hours.py).
                 meta={"category": MESSAGE_CATEGORY, "event_id": event["id"], "dedupe_key": f"{dedupe}:{user['id']}",
-                      "timely": True, "starts_at": event.get("start_date"), "importance": "important"},
+                      "timely": True, "starts_at": starts_at or event.get("start_date"), "importance": "important"},
             )
             notified += 1 if doc else 0
         except Exception:
@@ -199,7 +215,7 @@ async def announce_change(db, before: dict, after: dict, me: dict) -> dict | Non
         message += f" {details}."
     message += " Wenn du nicht mehr kannst, melde dich bitte auf der Event-Seite ab."
     sent = await _inform(db, after, users, title="Termin oder Ort geändert", message=message,
-                         dedupe=f"event-changed:{after['id']}:{now}")
+                         dedupe=f"event-changed:{after['id']}:{now}", starts_at=change_starts_at(before, after, now_utc()))
     result = {"recipients": len(users), "notified": sent["notified"], "mails": sent["mails"]}
     await db.audit_logs.insert_one({
         "id": new_id(), "action": "event.change_notice", "actor_id": me["id"], "target_id": after["id"],

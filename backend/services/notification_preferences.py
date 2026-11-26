@@ -292,7 +292,7 @@ TOPIC_LABELS: dict[str, str] = {
 IMPORTANCE_LEVELS: tuple[str, ...] = ("urgent", "important", "normal")
 _URGENT = {"match_call", "match_station", "admin_push_test"}
 # Zeitkritisch (Fabian 26.11., E und F): Absage, neuer Termin, Nachrücken. Die Mail wird nie gesammelt; der Push wartet in der
-# Ruhezeit, außer der Termin (``meta.starts_at``) liegt vor 9 Uhr am Morgen, an dem sie endet (services/quiet_hours.py). Weitere
+# Ruhezeit, außer der Termin (``meta.starts_at``) steht bevor und beginnt bis 2 Stunden nach ihrem Ende (services/quiet_hours.py). Weitere
 # Meldungen tragen das Merkmal ``meta.timely`` (Event-Änderung, Nachgerückt).
 TIMELY_KINDS: frozenset[str] = frozenset({"tournament_cancelled"})
 _IMPORTANT = {

@@ -70,3 +70,18 @@ def test_round_names_read_as_german():
     assert progress.message("Cup", {"match_type": "ffa", "round_name": "Viertelfinale"}, "advanced", 1, 4)[0] == "Platz 1 im Viertelfinale: weiter"
     assert progress.message("Cup", {"match_type": "ffa"}, "advanced", 2, 8) == ("Platz 2: weiter", "Cup: Du bist in der nächsten Runde.")
     assert progress.message("Cup", {"match_type": "duel"}, "eliminated", 2, 2) == ("Ausgeschieden", "Cup: leider raus. Danke fürs Mitspielen!")
+
+
+def test_a_heat_whose_two_qualifiers_go_to_the_same_match_is_no_grand_final():
+    """Prüfung 26.11. (dritte Runde): Ein Lauf ``A: W1→C, W2→C`` mit vier Teilnehmern ist kein Grand Final - Platz 3 und 4
+    sind ausgeschieden, Platz 1 und 2 weiter, niemand liest „Entscheidungsspiel“."""
+    results = [{"registration_id": rid, "rank": rank} for rank, rid in enumerate("abcd", start=1)]
+    heat = {"id": "A", "match_type": "ffa", "round_name": "Durchgang A", "status": "completed", "results": results,
+            "advancement": [{"flow": "W", "rank": 1, "to_match_key": "C"}, {"flow": "W", "rank": 2, "to_match_key": "C"}]}
+    assert not progress.is_grand_final_with_decider(heat)
+    assert progress.outcomes(heat) == {"a": ("advanced", 1), "b": ("advanced", 2), "c": ("eliminated", 3), "d": ("eliminated", 4)}
+    # Auch ein Duell-Format mit drei Ergebnissen ist keins.
+    three = {**heat, "match_type": "duel", "results": results[:3]}
+    assert not progress.is_grand_final_with_decider(three)
+    duel = {**heat, "match_type": "duel", "match_key": "GF", "results": results[:2]}
+    assert progress.is_grand_final_with_decider(duel)

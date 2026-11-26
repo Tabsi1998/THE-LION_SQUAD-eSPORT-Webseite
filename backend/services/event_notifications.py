@@ -120,7 +120,7 @@ async def _send(db, event: dict, registration: dict, status: str, previous: str 
     meta = {"category": "tournament_updates", "dedupe_key": dedupe, "event_id": event.get("id"), "registration_id": registration.get("id"), "status": status}
     promoted = status in ACTIVE and previous == "waitlist"
     if promoted:
-        # Nachgerückt (Fabian 26.11., F): zeitkritisch wie eine Absage - nie gesammelt, Ruhezeit nur vor 9 Uhr gebrochen.
+        # Nachgerückt (Fabian 26.11., F): zeitkritisch wie eine Absage - nie gesammelt, Ruhezeit nur bei Termin bis 2 h nach ihrem Ende gebrochen.
         meta.update(timely=True, starts_at=event.get("start_date"))
     if user["id"] == actor_id:
         meta["in_app_only"] = True  # wer es gerade selbst getan hat, sieht es schon auf dem Bildschirm

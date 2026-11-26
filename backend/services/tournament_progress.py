@@ -90,10 +90,19 @@ IN_WORDS = frozenset({"Runde", "Gruppe", "Phase", "Vorrunde", "Zwischenrunde", "
 
 
 def is_grand_final_with_decider(match: dict) -> bool:
-    """Beide Plätze gehen als Sieger-Weg in dasselbe Spiel (``W:X:1`` und ``W:X:2``) - das Reset-Spiel des Grand Finals."""
-    edges = [edge for edge in match.get("advancement") or [] if str(edge.get("flow") or "").upper() == "W"]
+    """Das Grand Final mit Reset (#1549, services/custom_bracket.py): ein **Duell**, dessen Plätze 1 und 2 beide als Sieger-Weg
+    in dasselbe Spiel gehen (``W:X:1`` und ``W:X:2``). Ein Lauf (``ffa``) mit ``W1→C, W2→C`` ist das nicht - dort gehen die
+    ersten zwei weiter und die übrigen scheiden aus (Prüfung 26.11.). Erkannt wird am Aufbau, nicht am Namen: Eigene Schemata
+    dürfen das Grand Final anders nennen."""
+    if str(match.get("match_type") or "duel") == "ffa":
+        return False
+    if len([row for row in match.get("results") or [] if row.get("registration_id")]) != 2:
+        return False
+    edges = match.get("advancement") or []
+    if len(edges) != 2 or any(str(edge.get("flow") or "").upper() != "W" for edge in edges):
+        return False
     targets = {edge.get("to_match_id") or edge.get("to_match_key") for edge in edges}
-    return len(edges) >= 2 and len(targets) == 1 and len(match.get("advancement") or []) == len(edges)
+    return len(targets) == 1 and {int(edge.get("rank") or 0) for edge in edges} == {1, 2}
 
 
 def _round(match: dict) -> str:
