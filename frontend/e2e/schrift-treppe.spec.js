@@ -146,4 +146,55 @@ test.describe("Schrift-Treppe", () => {
       expect(Math.abs(early.width - late.width)).toBeLessThanOrEqual(0.5);
     });
   }
+
+  // Teilnehmerliste eines Turniers bei 320 px: Das Schild „ANGENOMMEN“ ist ein Etikett (12 px) - kurze Namen wie
+  // „NeonFalke“ stehen daneben ganz da, nur sehr lange Namen enden mit „…“ (der ganze Name steht im Profil).
+  const TOURNAMENT = { id: "t-cup", slug: "herbst-cup", title: "Herbst-Cup 2026", status: "registration_open", start_date: "2026-12-05T13:00:00+00:00", max_participants: 16, participant_count: 8, public_phase: { state: "registration_open", label: "Anmeldung offen" } };
+  const PLAYERS = ["NeonFalke", "Der unglaublich schnelle Kartfahrer", "LuckyLion", "🦁 Löwenherz Ostalpen", "DriftDaniel", "BoostBernd", "TurboTom", "SchnellSchnecke"];
+  const REGISTRATIONS = PLAYERS.map((name, index) => ({ id: `r${index + 1}`, display_name: name, status: "approved", seed: index + 1 }));
+
+  test("Teilnehmerliste bei 320 px: Schilder als Etikett, kurze Namen ungekürzt", async ({ page }) => {
+    await page.setViewportSize({ width: 320, height: 740 });
+    await mockLongApi(page);
+    await page.route(`**/api/tournaments/${TOURNAMENT.slug}`, (route) => route.fulfill(json(TOURNAMENT)));
+    await page.route(`**/api/tournaments/${TOURNAMENT.id}/registrations**`, (route) => route.fulfill(json(REGISTRATIONS)));
+    await page.route(`**/api/tournaments/${TOURNAMENT.id}/standings**`, (route) => route.fulfill(json([])));
+    await page.goto(`/tournaments/${TOURNAMENT.slug}`);
+    const first = page.getByTestId("tournament-participant-r1");
+    await expect(first).toBeVisible();
+    const badge = first.getByTestId("status-approved");
+    expect(await badge.evaluate((node) => getComputedStyle(node).fontSize)).toBe("12px");
+    for (const id of ["r1", "r3", "r7"]) {
+      const cut = await page.getByTestId(`tournament-participant-${id}`).evaluate((row) => {
+        const name = [...row.querySelectorAll("span")].find((node) => node.className.includes("truncate"));
+        return name.scrollWidth > name.clientWidth + 1;
+      });
+      expect(cut, `Name in ${id} abgeschnitten`).toBe(false);
+    }
+  });
+
+  // Kopf der Matchseite: Die Überschrift besteht aus Namen - nie GROSS (#1303), auch kurz („Jo gegen Max“).
+  for (const [label, participants] of [["kurz", ["Jo", "Max"]], ["ein Name", ["NeonFalke", null]]]) {
+    test(`Match-Kopf (${label}): Namen stehen, wie sie eingetippt wurden`, async ({ page }) => {
+      await page.setViewportSize({ width: 390, height: 844 });
+      await mockLongApi(page);
+      const MATCH = {
+        match: { id: "m1", match_key: "A", status: "scheduled", round: 1, round_name: "Halbfinale", scheduled_at: "2026-11-28T16:00:00+00:00", slots: [{ slot: 1, status: "filled", registration_id: "r1" }, { slot: 2, status: participants[1] ? "filled" : "bye", registration_id: participants[1] ? "r2" : null }], results: [] },
+        tournament: { id: "t1", slug: "kart-cup", title: "Kart-Cup" },
+        participants: participants.map((name, index) => ({ slot: index + 1, status: name ? "filled" : "bye", registration_id: name ? `r${index + 1}` : null, display_name: name })),
+        schedule_proposals: [], can_act: false, can_report_score: false, can_player_report_result: false, can_submit_result: false, can_staff_submit_result: false,
+        can_propose_schedule: false, can_manage_schedule: false, can_dispute: false, can_forfeit: false, event_mode: "local", result_entry_mode: "staff_only",
+        schedule_mode: "fixed_by_staff", collection: "matches_v2", matchday: 1, matchday_label: "Halbfinale",
+      };
+      await page.route("**/api/matches/m1/page", (route) => route.fulfill(json(MATCH)));
+      await page.route("**/api/matches/m1/chat", (route) => route.fulfill(json([])));
+      await page.goto("/matches/m1");
+      const headline = page.getByTestId("match-headline");
+      await expect(headline).toBeVisible();
+      const facts = await headline.evaluate((node) => ({ shown: node.innerText.trim(), text: node.textContent.trim(), upper: [...node.querySelectorAll("*")].concat(node).some((el) => getComputedStyle(el).textTransform === "uppercase") }));
+      expect(facts.upper).toBe(false);
+      expect(facts.shown).toBe(facts.text);
+      expect(facts.shown).toContain(participants[0]);
+    });
+  }
 });
