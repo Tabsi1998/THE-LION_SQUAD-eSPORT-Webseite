@@ -1181,7 +1181,9 @@ async def my_notifications(me: dict = Depends(get_current_user)):
 
     # Meldungen zu News nur für die App (#1532) stehen nicht in der Glocke der Website.
     notes = await db.notifications.find({"user_id": me["id"], "in_app_visible": {"$ne": False}, **inbox_query("web")}, {"_id": 0}).sort("created_at", -1).to_list(50)
-    return notes
+    # Thema und Wichtigkeit (#1662) - die Glocke gliedert danach.
+    from services.user_notifications import with_topic
+    return [with_topic(note) for note in notes]
 
 
 @router.post("/notifications/{nid}/read")

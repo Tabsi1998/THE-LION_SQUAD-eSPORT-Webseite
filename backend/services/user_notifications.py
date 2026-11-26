@@ -9,7 +9,8 @@ from pymongo.errors import DuplicateKeyError
 from database import get_db
 from models import new_id, now_utc
 from services.notification_preferences import (
-    NOTIFICATION_KIND_CATEGORY, browser_allowed, discord_allowed, notification_allowed, push_allowed,
+    NOTIFICATION_KIND_CATEGORY, browser_allowed, discord_allowed, notification_allowed, notification_importance,
+    notification_topic, push_allowed,
 )
 from services.log_safe import log_safe
 
@@ -69,6 +70,15 @@ async def achievement_push_capped(db, user_id: str, kind: str, now=None) -> bool
         "$or": [{"push_sent_count": {"$gt": 0}}, {"browser_sent_count": {"$gt": 0}}],
     })
     return sent >= ACHIEVEMENT_PUSH_DAILY_CAP
+
+
+def with_topic(row: dict) -> dict:
+    """Eine Zeile fürs Postfach (#1662): mit Thema und Wichtigkeit - ältere Zeilen ohne die Felder bekommen sie beim Lesen."""
+    if row.get("topic") and row.get("importance"):
+        return row
+    kind, meta = str(row.get("kind") or ""), row.get("meta") or {}
+    return {**row, "topic": row.get("topic") or notification_topic(kind, meta),
+            "importance": row.get("importance") or notification_importance(kind, meta)}
 
 
 async def build_public_url(path: str = "") -> str:
@@ -179,6 +189,10 @@ async def create_user_notification(
         "url": url,
         "read": False,
         "in_app_visible": bool(in_app_allowed),
+        # Benachrichtigungs-Zentrum (#1662): Glocke, App und Sammel-Mail gliedern danach. Ältere Zeilen ohne die Felder
+        # rechnen ``with_topic`` beim Lesen nach - eine Migration gibt es nicht.
+        "topic": notification_topic(kind, meta),
+        "importance": notification_importance(kind, meta),
         "meta": meta,
         "created_at": now_utc().isoformat(),
     }

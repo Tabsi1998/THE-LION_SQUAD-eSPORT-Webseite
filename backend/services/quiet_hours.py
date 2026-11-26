@@ -66,7 +66,9 @@ async def is_exempt(db, kind: str, meta: dict | None) -> bool:
     meta = meta or {}
     if kind in EXEMPT_KINDS:
         return True
-    if kind == "match_schedule" and meta.get("reason") == "checkin_started":
+    # Dringendes kommt trotzdem (#1662): die Wichtigkeit der Meldung - auch „Match startet jetzt“ der Liga (checkin_started).
+    from services.notification_preferences import notification_importance
+    if notification_importance(kind, meta) == "urgent":
         return True
     if kind == "match_attention" and meta.get("tournament_id"):
         tournament = await db.tournaments.find_one(

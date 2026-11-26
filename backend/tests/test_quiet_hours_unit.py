@@ -841,3 +841,35 @@ async def test_a_hanging_discord_does_not_hold_the_run(monkeypatch, wires):
     assert _rd(done) == (1, 1)
     assert _digests(db)[0]["quiet_delivered"] is True
     assert sorted(channel for channel, _kind, _user in wires) == ["browser", "push"]
+
+
+# ---------------------------------------------------------------- Benachrichtigungs-Zentrum (#1662)
+
+@pytest.mark.anyio
+async def test_a_notice_marked_urgent_comes_through_the_quiet_hours(monkeypatch, wires):
+    """Dringendes kommt trotzdem (#1662): auch eine Art ohne feste Ausnahme, wenn die Meldung selbst „dringend“ sagt."""
+    db = _Db([{"id": "u1", "quiet_hours": NIGHT, "notification_preferences": {}}])
+    _at(monkeypatch, db, "2026-11-16T23:00:00")
+    await create_user_notification("u1", "Sofort an Station 2", kind="tournament_notice",
+                                   meta={"dedupe_key": "n-1", "importance": "urgent"})
+    assert ("push", "tournament_notice", "u1") in wires
+    assert "quiet_hold_until" not in db.notifications.rows[0]
+
+
+@pytest.mark.anyio
+async def test_the_same_notice_without_urgency_waits(monkeypatch, wires):
+    db = _Db([{"id": "u1", "quiet_hours": NIGHT, "notification_preferences": {}}])
+    _at(monkeypatch, db, "2026-11-16T23:00:00")
+    await create_user_notification("u1", "Pause bis 14:30", kind="tournament_notice", meta={"dedupe_key": "n-2"})
+    assert wires == [] and db.notifications.rows[0]["quiet_hold_until"]
+
+
+@pytest.mark.anyio
+async def test_every_new_notification_carries_topic_and_importance(monkeypatch, wires):
+    db = _Db([{"id": "u1", "notification_preferences": {}}])
+    _at(monkeypatch, db, "2026-11-16T12:00:00")
+    await create_user_notification("u1", "Du bist dran", kind="match_call", meta={"dedupe_key": "c-1"})
+    await create_user_notification("u1", "Rechte geändert", kind="rights_change", meta={"dedupe_key": "r-1"})
+    rows = {row["kind"]: row for row in db.notifications.rows}
+    assert (rows["match_call"]["topic"], rows["match_call"]["importance"]) == ("match_reminders", "urgent")
+    assert (rows["rights_change"]["topic"], rows["rights_change"]["importance"]) == ("account", "important")
