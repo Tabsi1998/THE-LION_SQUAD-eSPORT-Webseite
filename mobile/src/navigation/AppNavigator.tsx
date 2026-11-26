@@ -253,6 +253,7 @@ export const DETAIL_OPTIONS: Record<DetailScreenName, NativeStackNavigationOptio
   ReferenceSeason: { title: "Saison" },
   ReferenceRound: { title: "Runde" },
   LeagueOverall: { title: "Gesamtwertung" },
+  LeagueApply: { title: "Anmelden" },
   ClubAbout: { title: "Über uns" },
   YearReview: { title: "Dein Jahr", ...gold },
   // Mein Bereich (#2059): das eigene Profil und je Gruppe eine Seite mit ihrem Namen wie im Web.

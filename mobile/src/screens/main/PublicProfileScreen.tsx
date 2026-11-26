@@ -39,6 +39,8 @@ import { useMemberPlacements } from "../../lib/memberPlacements";
 import { Button } from "../../components/Button";
 import { LeagueOverallStanding } from "../../components/league/LeagueOverallStanding";
 import { LeagueSeasonHistory } from "../../components/league/LeagueSeasonHistory";
+import { LeagueMomentHint } from "../../components/league/LeagueMomentHint";
+import type { LeagueMoment } from "../../lib/leagueMoments";
 import { RewardChip } from "../../components/league/RewardArt";
 import { EmblemRow, TrophyCabinet } from "../../components/league/TrophyCabinet";
 import type { RewardAward } from "../../lib/leagueRewards";
@@ -62,6 +64,8 @@ export type PublicProfilePayload = {
   // Liga (#2173, docs/LIGA.md F.2/F.4): der Titel neben dem Namen und die Seasons der Person.
   featured_title?: RewardAward | null;
   league_history?: LeagueHistoryRow[];
+  // Saisonende (#2584, F.8): je Co-Team der jüngste bestätigte Ausgang - nach der Regel des Profils, ältere Server liefern es nicht.
+  league_moments?: LeagueMoment[];
   // Trophäen (#2425, Nr. 34c): bis zu drei Embleme neben dem Namen - nur Öffentliches, nie Ruhendes. Ältere Server liefern das Feld nicht.
   featured_emblems?: TrophyAward[];
   // Gesamtwertung über Seasons (F.5, #2215): Platz je Zeitraum und Liga N - nach derselben Sichtbarkeit wie die Ligaseite.
@@ -522,6 +526,9 @@ export function ProfileView({ username, navigation, own, header, scrollRef }: { 
 
             {/* Season-Historie (#2173, F.2): je abgeschlossener Liga-Staffel Platz, Meister, Auf- oder Abstieg. */}
             {hiddenForOthers ? null : <LeagueSeasonHistory rows={shown.league_history} showTeam testID="profile-league-history" />}
+
+            {/* Saisonende (#2584, F.8): Aufstieg, Abstieg oder Meister - „Moment ansehen“ nur im eigenen Profil. */}
+            {hiddenForOthers ? null : <LeagueMomentHint rows={shown.league_moments} canReplay={ownMode} testID="profile-league-moments" />}
 
             {/* Gesamtwertung über Seasons (F.5, #2215): Platz je Zeitraum und Liga N, mit Weg zur Gesamtwertung. */}
             {hiddenForOthers ? null : <LeagueOverallStanding rows={shown.league_overall} showTeam testID="profile-league-overall" />}

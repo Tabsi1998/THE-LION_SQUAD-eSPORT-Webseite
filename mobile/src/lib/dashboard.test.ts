@@ -80,3 +80,13 @@ describe("Zeile zur Jahreswertung", () => {
     expect(seasonLine(null)).toBe("");
   });
 });
+
+// Abgesagtes Event (#2542, #2127 EV3): Es bleibt bis zu seinem Termin unter „Kommend“ (gedämpft) - wie im Web. Abgesagte Turniere wie bisher.
+test("EV3: ein abgesagtes Event steht bis zum Termin bei „Kommend“, danach vorbei; ein abgesagtes Turnier gleich", () => {
+  const now = new Date("2026-09-14T10:00:00Z");
+  expect(isStillRelevant({ kind: "event", status: "cancelled", date: "2026-09-20T18:00:00Z" }, now)).toBe(true);
+  expect(isStillRelevant({ kind: "event", status: "cancelled", date: "2026-09-12T18:00:00Z", endDate: "2026-09-14T08:00:00Z" }, now)).toBe(true);
+  expect(isStillRelevant({ kind: "event", status: "cancelled", date: "2026-09-12T18:00:00Z" }, now)).toBe(false);
+  expect(isStillRelevant({ kind: "tournament", status: "cancelled", date: "2026-09-20T18:00:00Z" }, now)).toBe(false);
+  expect(isStillRelevant({ kind: "event", status: "completed", date: "2026-09-20T18:00:00Z" }, now)).toBe(false);
+});

@@ -40,6 +40,11 @@ export type TeamApplication = {
   can_withdraw?: boolean;
 };
 
+/** Wer für ein Team spricht (Glossar, #2542): in der Liga „Captains“, sonst „Teamleitungen“ - nie „Team-Captains“. */
+export function teamLeadsWord(isLeague: boolean): string {
+  return isLeague ? "Captains" : "Teamleitungen";
+}
+
 /** Was das eigene Team sieht: angenommen heißt „Angemeldet“, ohne Staffel mit „Zuteilung folgt“. */
 export function teamStateLabel(state?: string | null, application?: Pick<TeamApplication, "staffel" | "staffel_left"> | null): string {
   if (state === "accepted" && !application?.staffel_left) return application?.staffel ? "Angemeldet" : "Angemeldet – Zuteilung folgt";

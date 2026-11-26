@@ -26,6 +26,8 @@ export type GroupRow<T extends Doc = Doc> = { kind: GroupKind; key: string; item
 export type GroupCard<T extends Doc = Doc> = GroupRow<T> & { children: GroupRow<T>[] };
 
 export const LIST_MODE_KEY = "tls_events_list_mode";
+// Beendet oder abgesagt - wie DONE in eventGroups.js im Web.
+const DONE = new Set(["completed", "results_published", "archived", "cancelled"]);
 const MINE_GROUP: Record<GroupKind, "events" | "tournaments" | "fastlaps"> = { event: "events", tournament: "tournaments", fastlap: "fastlaps" };
 
 export function listMode(stored: string | null | undefined): ListMode {
@@ -68,7 +70,11 @@ export function buildCards<E extends Doc, T extends Doc = E, F extends Doc = E>(
     if (!item?.id) return;
     const parent = item.event_id ? eventById.get(item.event_id) || null : null;
     const row: GroupRow<Any> = { kind, key: `${kind}-${item.id}`, item, mine: mineState(mine, kind, item.id), event: parent };
-    if (parent) {
+    // Abgesagtes Event (#2542, #2127 EV3): Ein Turnier, das trotzdem noch läuft, bleibt sichtbar - als eigene Karte mit „gehört zu …“,
+    // nicht versteckt in der abgesagten.
+    if (parent && parent.status === "cancelled" && !DONE.has(String(item.status))) {
+      loose.push(row);
+    } else if (parent) {
       children.set(parent.id, [...(children.get(parent.id) || []), row]);
       if (mode === "separate" || filter === "tournaments" || filter === "fastlaps") loose.push(row);
     } else {

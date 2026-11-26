@@ -401,3 +401,20 @@ test("Team mit älterem Kürzel unter der Grenze: unverändert speichert es, ein
   await fireEvent.press(screen.getByText("Team speichern"));
   await waitFor(() => expect(mockPatch).toHaveBeenCalledWith("/teams/t1", expect.objectContaining({ tag: "L", color: "green" })));
 });
+
+// Saisonende-Moment (#2584, docs/LIGA.md F.8): Hinweis „Saisonende“ an der Teamseite (Feld `league_moments`), „Moment ansehen“ für Mitglieder.
+test("Saisonende an der Teamseite: Mitglieder sehen „Moment ansehen“, Besucher nur den Hinweis", async () => {
+  const row = { id: "lm1", outcome: "champion", title: "CoD-Liga · Season 2", url: "/liga/cod/season-2", badge_to: { level: 1, champion: true },
+    texts: { label: "Meister", summary: "Lions ist Meister in Liga 1." } };
+  mockAuth.user = MEMBER;
+  serve({ ...TEAM, is_member: true, member_ids: ["u-1"], league_moments: [row] });
+  await render(<TeamDetailScreen navigation={navigation} route={route} />);
+  await waitFor(() => expect(screen.getByTestId("team-league-moments")).toBeTruthy());
+  expect(screen.getByText("Lions ist Meister in Liga 1.")).toBeTruthy();
+  expect(screen.getByTestId("team-league-moments-lm1-replay")).toBeTruthy();
+  mockAuth.user = { id: "u-gast", username: "gast" };
+  serve({ ...TEAM, league_moments: [row] });
+  await render(<TeamDetailScreen navigation={navigation} route={route} />);
+  await waitFor(() => expect(screen.getByTestId("team-league-moments")).toBeTruthy());
+  expect(screen.queryByTestId("team-league-moments-lm1-replay")).toBeNull();
+});

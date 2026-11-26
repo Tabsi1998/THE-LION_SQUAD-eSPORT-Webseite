@@ -65,3 +65,8 @@ test("Team, Rechte, Mitgliedschaft und Event-Anmeldung haben eigene Wörter (#21
   expect(notificationKindLabel("membership_decision")).toBe("Mitgliedschaft entschieden");
   expect(notificationKindLabel("event_registration")).toBe("Event-Anmeldung");
 });
+
+// News-Kanal (#1532, Nachtrag in #2542): „Nur App“-News haben ein eigenes Wort statt des Themas.
+test("news_app heißt „News“", () => {
+  expect(notificationKindLabel("news_app")).toBe("News");
+});

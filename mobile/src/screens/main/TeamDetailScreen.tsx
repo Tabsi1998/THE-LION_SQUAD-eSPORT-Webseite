@@ -32,6 +32,7 @@ import { WEB_BASE_URL } from "../../lib/siteUrls";
 import { LeagueApplicationsCard } from "../../components/league/LeagueApplicationsCard";
 import { LeagueOverallStanding } from "../../components/league/LeagueOverallStanding";
 import { LeagueSeasonHistory } from "../../components/league/LeagueSeasonHistory";
+import { LeagueMomentHint } from "../../components/league/LeagueMomentHint";
 import { RankBanners } from "../../components/league/RankBanners";
 import { RewardChip } from "../../components/league/RewardArt";
 import { EmblemRow, TrophyCabinet } from "../../components/league/TrophyCabinet";
@@ -607,6 +608,8 @@ export function TeamDetailScreen({ navigation, route }: Props) {
             Rankingbanner (#2425). Die Belohnungen stehen im Reiter „Trophäen“. */}
         <LeagueApplicationsCard squadIds={squads.map((squad) => squad.id)} enabled={isMember && !isGuestUser(user)} />
         <LeagueSeasonHistory rows={team.league_history} showTeam testID="team-league-history" />
+        {/* Saisonende (#2584, F.8): je Co-Team der jüngste Ausgang - „Moment ansehen“ für Mitglieder. */}
+        <LeagueMomentHint rows={team.league_moments} canReplay={isMember && !isGuestUser(user)} testID="team-league-moments" />
         <LeagueOverallStanding rows={team.league_overall} showTeam testID="team-league-overall" />
         <RankBanners rows={team.rank_banners} />
 

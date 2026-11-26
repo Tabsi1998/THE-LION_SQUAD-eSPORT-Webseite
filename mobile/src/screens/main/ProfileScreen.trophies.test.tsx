@@ -1,8 +1,9 @@
 import React from "react";
-import { NavigationContext } from "@react-navigation/native";
+import { NavigationContext, NavigationRouteContext } from "@react-navigation/native";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react-native";
 import { ProfileScreen } from "./ProfileScreen";
 import { PublicProfileScreen } from "./PublicProfileScreen";
+import * as leagueMoments from "../../lib/leagueMoments";
 
 // Profil (#2173, Web: PublicProfilePage.jsx #2425, #2215): Reiter „Trophäen“ mit Vitrine, Embleme neben dem Namen (eigenes Profil wählt
 // über PUT /api/me/awards/emblems), Platz in der Gesamtwertung. Ohne die neuen Felder (ältere Server) bleibt das Profil wie bisher.
@@ -122,4 +123,36 @@ test("ohne die neuen Felder (älterer Server) wie bisher: keine Embleme, keine G
   expect(screen.queryByTestId("profile-featured-emblems")).toBeNull();
   await fireEvent.press(screen.getByText("Trophäen"));
   await waitFor(() => expect(screen.getByTestId("profile-trophies-emblem-hint")).toHaveTextContent(/0 von 3 gewählt/));
+});
+
+// Saisonende-Moment (#2584, docs/LIGA.md F.8): Hinweis „Saisonende“ im Profil (Feld `league_moments`), „Moment ansehen“ nur im eigenen.
+const MOMENT_ROW = { id: "lm1", outcome: "up", title: "CoD-Liga · Season 2", url: "/liga/cod/season-2", badge_to: { level: 1 }, corrected: false,
+  texts: { label: "Aufstieg", summary: "Löwen steigt von Liga 2 in Liga 1 auf." } };
+
+test("Saisonende im eigenen Profil mit „Moment ansehen“ - der Weg aus der Nachricht holt den Moment gleich", async () => {
+  const request = jest.spyOn(leagueMoments, "requestMoment");
+  publicProfile = { ...BASE_PROFILE, league_moments: [MOMENT_ROW] };
+  await render(
+    <NavigationContext.Provider value={navigation}>
+      <NavigationRouteContext.Provider value={{ key: "own", name: "OwnProfile", params: { moment: "lm1" } } as never}>
+        <ProfileScreen />
+      </NavigationRouteContext.Provider>
+    </NavigationContext.Provider>,
+  );
+  await waitFor(() => expect(screen.getByTestId("profile-league-moments")).toBeTruthy());
+  expect(screen.getByText("Löwen steigt von Liga 2 in Liga 1 auf.")).toBeTruthy();
+  expect(screen.getByTestId("profile-league-moments-lm1-replay")).toBeTruthy();
+  expect(request).toHaveBeenCalledWith("lm1");
+  request.mockRestore();
+});
+
+test("Saisonende im fremden Profil: der Hinweis ohne „Moment ansehen“; ohne das Feld (älterer Server) nichts", async () => {
+  publicProfile = { ...BASE_PROFILE, league_moments: [MOMENT_ROW] };
+  await render(<PublicProfileScreen navigation={navigation} route={kiwiRoute} />);
+  await waitFor(() => expect(screen.getByTestId("profile-league-moments")).toBeTruthy());
+  expect(screen.queryByTestId("profile-league-moments-lm1-replay")).toBeNull();
+  publicProfile = { ...BASE_PROFILE };
+  await render(<PublicProfileScreen navigation={navigation} route={kiwiRoute} />);
+  await waitFor(() => expect(screen.getByText("Spielerprofil")).toBeTruthy());
+  expect(screen.queryByTestId("profile-league-moments")).toBeNull();
 });
