@@ -307,7 +307,7 @@ export default function DashboardPage() {
             {season ? (
               <Link to={`/seasons/${season.slug || "current"}`} data-testid="dashboard-season" className="block border border-honor/30 hover:border-honor/70 rounded-sm bg-gradient-to-br from-honor/10 to-transparent p-5 transition">
                 <div className="flex items-center justify-between">
-                  <div className="tls-type-label text-brand">Jahreswertung</div>
+                  <div className="tls-type-label text-honor">Jahreswertung</div>
                   <Award className="w-4 h-4 text-honor" />
                 </div>
                 <div className="mt-2 tls-type-card">{season.name || "Jahreswertung"}</div>
