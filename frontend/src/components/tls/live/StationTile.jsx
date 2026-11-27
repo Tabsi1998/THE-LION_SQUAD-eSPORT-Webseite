@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { ArrowRightLeft, BellRing, Eraser, Hourglass, ListPlus, Play, RotateCcw, Unlock, Wrench } from "lucide-react";
+import { StatusChip } from "@/components/tls/StatusChip";
 import { delayText } from "@/lib/liveQueue";
 import { stationWho, queueWhat } from "@/lib/tvQueue";
 import { viennaTime } from "@/lib/vienna";
@@ -29,16 +30,17 @@ function calledLine(entry) {
   ].filter(Boolean).join(" · ");
 }
 
-// Zustand der Kachel: Farbe aus den Tokens (live, brand, warn, ok) - dieselben wie auf TV und Matchplan.
+// Zustand der Kachel als Zustands-Schild (#1306): dieselben Arten wie überall - läuft (rot, Punkt), aufgerufen (bald),
+// defekt und hängt (Problem), frei (wartet auf ein Spiel). Dieselben Arten zeigt das TV.
 const TONES = {
-  running: ["Läuft", "border-live/40 bg-live/10 text-live"],
-  called: ["Aufgerufen", "border-brand/50 bg-brand/10 text-brand"],
-  broken: ["Defekt", "border-warn/50 bg-warn/10 text-warn"],
-  free: ["Frei", "border-ok/40 bg-ok/10 text-ok"],
+  running: ["Läuft", "live"],
+  called: ["Aufgerufen", "soon"],
+  broken: ["Defekt", "problem"],
+  free: ["Frei", "waiting"],
   // Geteilte Event-Station (#1162): hier spielt gerade ein anderes Turnier - dessen Leitung bedient sie.
-  other: ["Anderes Turnier", "border-white/25 bg-white/5 text-white/70"],
+  other: ["Anderes Turnier", "live"],
   // Als belegt gespeichert, aber ohne offenes Spiel (#1162) - etwa nach dem Löschen einer Phase.
-  stuck: ["Hängt", "border-warn/50 bg-warn/10 text-warn"],
+  stuck: ["Hängt", "problem"],
 };
 
 export function stationTone(station) {
@@ -90,7 +92,7 @@ const BTN = "inline-flex min-h-[44px] w-full items-center justify-center gap-2 r
 
 export function StationTile({ station, index = 0, highlighted = "", busy = false, canOperate = false, targets = [], callable = [], onCall, onStart, onRelease, onBroken, onMove, onClear }) {
   const tone = stationTone(station);
-  const [chip, chipClass] = TONES[tone];
+  const [chip, chipKind] = TONES[tone];
   const { running, next, after } = station;
   const broken = tone === "broken";
   const holds = stationHolds(station);
@@ -101,9 +103,7 @@ export function StationTile({ station, index = 0, highlighted = "", busy = false
     <section className={`tls-live-station rounded-sm border bg-[#121212] p-3 ${broken ? "border-warn/40" : "border-white/10"}`} style={{ "--tls-live-i": index }} data-tone={tone} data-highlighted={highlighted || undefined} data-testid={`live-station-${station.id}`} aria-label={station.station_text || station.name}>
       <header className="flex items-center justify-between gap-2">
         <h3 className="min-w-0 tls-type-small font-black text-white [overflow-wrap:anywhere]">{station.station_text || station.name}</h3>
-        <span className={`tls-live-chip inline-flex shrink-0 items-center gap-1.5 rounded-sm border px-2 py-0.5 tls-type-label ${chipClass}`} data-tone={tone} data-testid={`live-chip-${station.id}`}>
-          {running && !broken ? <span className="tls-live-dot" aria-hidden="true" /> : null}{chip}
-        </span>
+        <StatusChip kind={chipKind} label={chip} className="tls-live-chip" testId={`live-chip-${station.id}`} dataTone={tone} />
       </header>
 
       {station.hold_issue?.kind === "other" ? (
