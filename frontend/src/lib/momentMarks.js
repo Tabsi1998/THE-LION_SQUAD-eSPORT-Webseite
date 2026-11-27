@@ -8,6 +8,16 @@ const memory = new Map();
 export const claimKey = (userId, id) => `${PREFIX}claim:${userId || "gast"}:${id}`;
 export const doneKey = (userId, id) => `${PREFIX}done:${userId || "gast"}:${id}`;
 
+/**
+ * Der Stand eines Moments (Nr. 277, #2591) - dieselbe Regel wie die App (`mobile/src/lib/leagueMoments.ts`, `momentVersion`): Eine
+ * Korrektur des Endstands bringt den Moment mit derselben Kennung neu - mit neuem `confirmed_at`, `corrected` und oft anderem Ausgang
+ * oder anderer Liga N. Die Marke „fertig“ hält diesen Stand fest: Eine alte Marke meldet einen korrigierten Moment nie still als fertig.
+ * Gleicher Ausgang ergibt gleichen Stand (Texte, Belohnungen und der nächste Schritt zählen nicht) - kein neuer Moment.
+ */
+export function momentVersion(moment) {
+  return [moment?.confirmed_at || "", moment?.corrected ? "k" : "", moment?.outcome ?? "", moment?.to?.level ?? ""].join("|");
+}
+
 export function readMark(key) {
   try {
     return window.localStorage.getItem(key) ?? memory.get(key) ?? null;

@@ -20,7 +20,15 @@ export const AVOID = {
   Account: "Konto",
   Accounts: "Konten",
   "Public Event": "Öffentliches Event",
+  // Glossar (#2542, #2591): Wer für ein Team spricht, heißt in der Liga „Captain“, sonst „Teamleitung“ - nie „Team-Captain“.
+  "Team-Captain": "Captain (Liga) bzw. Teamleitung",
+  "Team-Captains": "Captains (Liga) bzw. Teamleitungen",
 };
+
+/** Wer für ein Team spricht (Glossar, #2542): in der Liga „Captains“, sonst „Teamleitungen“ - wie die App (`teamLeadsWord`). */
+export function teamLeadsWord(isLeague) {
+  return isLeague ? "Captains" : "Teamleitungen";
+}
 
 // Vereinsname mit Untertitel (#1238): steht der Untertitel schon im Namen, kommt er nicht doppelt.
 export function nameWithSubtitle(name, subtitle) {

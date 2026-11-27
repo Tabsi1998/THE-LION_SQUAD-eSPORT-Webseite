@@ -76,3 +76,81 @@ async def test_vorstand_sieht_teilnehmer_aber_nicht_die_notiz(flow):
     freigabe["areas"] = ["tournaments"]
     flow.act_as(freigabe)
     assert (await flow.get(f"/api/events/{event['slug']}")).json()["registrations"][0]["internal_note"] == "nur intern"
+
+
+# ---------------------------------------------------------------- Lesen und Schreiben nach derselben Regel (#2591)
+
+async def with_areas(flow, name: str, areas: list[str], **fields) -> dict:
+    person = await flow.add_user(role="player", name=name)
+    await flow.db.users.update_one({"id": person["id"]}, {"$set": {"areas": areas, **fields}})
+    person.update({"areas": areas, **fields})
+    return person
+
+
+@pytest.mark.asyncio
+async def test_vorstand_ohne_turnierleitung_schreibt_die_notiz_nicht_und_liest_sie_nirgends(flow):
+    lead, event, _player, first = await setup(flow)
+    assert (await flow.patch(f"/api/events/{event['id']}/registrations/{first['id']}", json={"internal_note": "nur intern"})).status_code == 200
+    vorstand = await with_areas(flow, "vorstand", ["club"], is_club_member=True)
+    flow.act_as(vorstand)
+    # Schreiben: Die Notiz gehört der Turnierleitung - abgelehnt, nichts geändert, die Antwort verrät sie nicht.
+    refused = await flow.patch(f"/api/events/{event['id']}/registrations/{first['id']}", json={"internal_note": "vom Vorstand"})
+    assert refused.status_code == 403 and "nur intern" not in refused.text
+    stored = await flow.db.event_registrations.find_one({"id": first["id"]}, {"_id": 0})
+    assert stored["internal_note"] == "nur intern"
+    # Auch keine andere Änderung über diesen Weg und keine Liste der Verwaltung - wie die Leitungsseite.
+    assert (await flow.patch(f"/api/events/{event['id']}/registrations/{first['id']}", json={"status": "checked_in"})).status_code == 403
+    listed = await flow.get(f"/api/events/{event['id']}/registrations")
+    assert listed.status_code == 403 and "nur intern" not in listed.text
+    detail = await flow.get(f"/api/events/{event['slug']}/lead/registrations/{first['id']}")
+    assert detail.status_code == 403 and "nur intern" not in detail.text
+    # Lesen: Teilnehmer ja, Notiz nein.
+    page = await flow.get(f"/api/events/{event['slug']}")
+    assert page.status_code == 200 and page.json()["registrations"] and "nur intern" not in page.text
+    assert all("internal_note" not in row for row in page.json()["registrations"])
+
+
+@pytest.mark.asyncio
+async def test_turnierleitung_liest_und_schreibt_die_notiz_als_rolle_und_als_freigabe(flow):
+    lead, event, _player, first = await setup(flow)
+    url = f"/api/events/{event['id']}/registrations/{first['id']}"
+    written = await flow.patch(url, json={"internal_note": "Platz 4 reserviert"})
+    assert written.status_code == 200 and written.json()["internal_note"] == "Platz 4 reserviert"
+    assert (await flow.get(f"/api/events/{event['slug']}")).json()["registrations"][0]["internal_note"] == "Platz 4 reserviert"
+    assert (await flow.get(f"/api/events/{event['slug']}/lead/registrations/{first['id']}")).json()["internal_note"] == "Platz 4 reserviert"
+    freigabe = await with_areas(flow, "freigabe", ["tournaments"])
+    flow.act_as(freigabe)
+    changed = await flow.patch(url, json={"internal_note": "Platz 5 reserviert"})
+    assert changed.status_code == 200 and changed.json()["internal_note"] == "Platz 5 reserviert"
+    listed = (await flow.get(f"/api/events/{event['id']}/registrations")).json()["registrations"]
+    assert [row["internal_note"] for row in listed] == ["Platz 5 reserviert"]
+    # Leer gespeichert löscht sie.
+    cleared = await flow.patch(url, json={"internal_note": None})
+    assert cleared.status_code == 200 and cleared.json()["internal_note"] is None
+
+
+@pytest.mark.asyncio
+async def test_mitglied_sieht_und_schreibt_keine_notiz(flow):
+    _lead, event, player, first = await setup(flow)
+    assert (await flow.patch(f"/api/events/{event['id']}/registrations/{first['id']}", json={"internal_note": "nur intern"})).status_code == 200
+    mitglied = await with_areas(flow, "mitglied", [], is_club_member=True)
+    for person in (mitglied, player):
+        flow.act_as(person)
+        page = await flow.get(f"/api/events/{event['slug']}")
+        assert page.status_code == 200 and "nur intern" not in page.text
+        assert all("internal_note" not in row for row in page.json()["registrations"])
+        assert "internal_note" not in (page.json().get("own_registration") or {})
+        refused = await flow.patch(f"/api/events/{event['id']}/registrations/{first['id']}", json={"internal_note": "von mir"})
+        assert refused.status_code == 403 and "nur intern" not in refused.text
+    stored = await flow.db.event_registrations.find_one({"id": first["id"]}, {"_id": 0})
+    assert stored["internal_note"] == "nur intern"
+
+
+def test_eine_regel_fuer_lesen_und_schreiben():
+    from routes.event_routes import _sees_internal_note
+
+    # Vorstand (Bereich Vereinsverwaltung) nein, Turnierleitung als Bereich ja, Mitglied ohne Bereich nein.
+    assert _sees_internal_note({"role": "player"}, {"club"}) is False
+    assert _sees_internal_note({"role": "player"}, {"tournaments"}) is True
+    assert _sees_internal_note({"role": "player"}, set()) is False
+    assert _sees_internal_note(None, set()) is False
