@@ -540,7 +540,7 @@ Captains und Vertreter melden ihr Co-Team selbst auf der Ligaseite an, du entsch
 4. **Wer darf sich anmelden:** alle Konten (Vorgabe) oder nur Vereinsmitglieder. Bei Mitgliedern gilt das für den ganzen Kader.
 5. **Zwei Co-Teams eines Hauptteams in derselben Staffel:** Vorgabe Nein.
 5a. **Anmeldungen automatisch annehmen:** Vorgabe aus, dann prüfst du jede Anmeldung. Mehr dazu unten unter „Automatisch annehmen“.
-6. **Hinweis zum Datenschutz:** Der Text steht bei der Anmeldung über dem Link zur Datenschutzerklärung und wird mit der Zustimmung gespeichert. Leer steht dort ein vorläufiger Platzhalter-Satz. Den Wortlaut gibt der Obmann frei.
+6. **Hinweis zum Datenschutz:** Der Text steht bei der Anmeldung über dem Link zur Datenschutzerklärung und wird mit der Zustimmung gespeichert. Leer steht dort ein vorläufiger Platzhalter-Satz. Den Wortlaut gibt der Obmann frei. Gäste ohne Mitgliedschaft sehen ihn erst, wenn der Superadmin ihn **für Gäste freigibt** (2.5c).
 7. **Regelwerk veröffentlichen** (2.11): Ohne gültige Version geht keine Anmeldung. Der alte Regeltext reicht dafür nicht, weil er keine Version hat und sich eine Zustimmung darauf nicht belegen lässt.
 
 **Nachmeldung nach dem Season-Start** (#2422):
@@ -648,6 +648,45 @@ dann nur noch über die Teilnehmerliste der Staffel. Nicht gelost wird, sobald e
 steht: Dann teilst du von Hand zu (Nachmeldung, siehe 2.5a).
 
 **Eigenes Team:** Steht dein eigenes Team im Los, lost, tauscht und teilt eine andere Person zu (wie in 2.5a).
+
+### 2.5c Gastteams anderer Vereine und Schulen
+
+Ein **Gastteam** spielt als Gast für einen anderen Verein oder eine Schule: eigene Konten, keine Mitgliedschaft. Es meldet sich an wie jedes
+Team (2.5a), du lässt es über den **Eingang** zu. Eine eigene Einladung gibt es nicht. Gäste haben dieselben Rechte wie jedes Konto ohne
+Mitgliedschaft: Für ihr Team machen sie Termin, Check-in, Veto und Ergebnis, Vereinsinternes sehen sie nicht.
+
+**Wer was macht:**
+
+- Die **Teamleitung** des Gastteams trägt auf der Teamseite unter **Bearbeiten → Gastteam in der Liga** ein, für welchen Verein oder welche
+  Schule sie spielt. Bei einer Schule entscheidet sie auch, ob der Name öffentlich stehen darf.
+- **Du** setzt das Kennzeichen „Gast“ (Zuständigkeit „Teams freigeben“ in einer Liga, in der das Team angemeldet ist). Es kommt nie von
+  selbst aus der Mitgliedschaft – sonst könnte jeder an der Plakette ablesen, wer Mitglied ist.
+
+**Kennzeichnen** (Season-Seite, Reiter **Anmeldung und Kader** → **Anmeldungen**): Hat die Teamleitung etwas angegeben, steht bei der
+Anmeldung ein Kasten **Gastteam** mit „Angabe der Teamleitung“ – auch ein Schulname ohne Freigabe, den nur du siehst – und
+„Wartet auf die Bestätigung der Liga-Leitung“. **Als Gastteam bestätigen** setzt das Kennzeichen. Ohne Angabe steht nur der leise Knopf
+**Als Gastteam kennzeichnen**, die Plakette zeigt dann nur „Gast“. Die Teamleitung bekommt eine Nachricht. Der Leitstand zeigt bei der
+Aufgabe zur Anmeldung, ob eine Angabe auf dich wartet.
+
+| Fall | Was öffentlich steht |
+| --- | --- |
+| Verein angegeben, bestätigt | „Gast · Name des Vereins“ |
+| Schule angegeben, Name freigegeben, bestätigt | „Gast · Name der Schule“ |
+| Schule ohne Freigabe, oder nichts angegeben | „Gast“ |
+| Teamleitung ändert Verein oder Schule nach der Bestätigung | „Gast“, bis du **Neu bestätigen** drückst |
+| Nicht bestätigt | nichts – das Team steht wie jedes andere da |
+
+**Wo die Plakette steht:** Tabelle, Spielplan und Spieltage, Teams der Season, Matchseite, Teamseite, Profil (aktuelle Ligen), Eingang und
+Leitstand – im Web und in der App. Am **TV** und im **Discord** steht nur „Gast“, nie der Name von Verein oder Schule, weil beides öffentlich
+und dauerhaft zu sehen ist.
+
+**Zurücknehmen:** **Kennzeichen zurücknehmen** nimmt die Plakette weg, die Angabe der Teamleitung bleibt stehen. Bestätigen und Zurücknehmen
+stehen im Protokoll der Season („Gastteam · bestätigt“). **Eigenes Team:** Gehörst du selbst zum Team, entscheidet eine andere Person; der
+Superadmin nur mit Grund für die Notausnahme.
+
+**Datenschutzhinweis für Gäste:** Konten ohne Mitgliedschaft sehen bei der Anmeldung den Platzhalter-Satz, bis der **Superadmin** den
+**Hinweis zum Datenschutz** (2.5a, Schritt 6) nach der rechtlichen Prüfung **für Gäste freigibt**. Die Freigabe gilt nur für genau diesen
+Wortlaut: Änderst du den Text, sehen Gäste wieder den Platzhalter. Mitglieder sehen den Text sofort.
 
 ### 2.6 Spielplan und Start
 
