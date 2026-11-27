@@ -3,14 +3,14 @@ import { contactLines, footerButtons, footerColumns } from "./siteFooter";
 // Footer (#403): Spalten aus festen Wegen plus Discord, wenn ein Link gepflegt ist; der
 // Kontaktblock zeigt nur, was da ist.
 
-test("drei Spalten; Discord nur mit Link; Mitglieder sehen „Mein Bereich · Verein“ statt Mitglied werden", () => {
+test("drei Spalten; Discord nur mit Link; Mitglieder sehen weder „Mitglied werden“ noch „Mein Bereich“", () => {
   const plain = footerColumns({});
   expect(plain.map((column) => column.title)).toEqual(["Verein", "eSports", "Mitmachen"]);
   expect(plain[2].links.map((link) => link.label)).toEqual(["Community", "Kalender", "Mitglied werden", "FAQ", "Kontakt"]);
 
   const withDiscord = footerColumns({ discord_invite_url: "https://discord.gg/lions" }, { isMember: true });
   expect(withDiscord[2].links.find((link) => link.label === "Discord")).toEqual({ href: "https://discord.gg/lions", label: "Discord", external: true });
-  expect(withDiscord[2].links.map((link) => link.label)).toContain("Mein Bereich · Verein");
+  expect(withDiscord[2].links.map((link) => link.label)).toEqual(["Community", "Discord", "Kalender", "FAQ", "Kontakt"]);
   expect(withDiscord[2].links.map((link) => link.label)).not.toContain("Mitglied werden");
 });
 
