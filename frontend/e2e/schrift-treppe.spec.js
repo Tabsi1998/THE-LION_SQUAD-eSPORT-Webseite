@@ -148,6 +148,59 @@ test.describe("Schrift-Treppe", () => {
     });
   }
 
+  // Jahreswertung am Handy: Unter 360 px stehen „Wertungen · Siege“ und „Achievements“ unter dem Namen statt rechts
+  // daneben - der Name hat so Platz und bricht nur zwischen Wörtern (ein Wort, das allein breiter ist als die Spalte,
+  // darf brechen). Ab 360 px bleibt alles, wie es war: die Etiketten rechts unter den Punkten.
+  for (const [width, below] of [[320, true], [390, false]]) {
+    test(`Jahreswertung bei ${width} px: Namen in ganzen Wörtern, Etiketten ${below ? "unter dem Namen" : "rechts"}`, async ({ page }) => {
+      await page.setViewportSize({ width, height: 844 });
+      await mockLongApi(page);
+      await page.route(`**/api/seasons/${SEASON.slug}/standings**`, (route) => route.fulfill(json({ season: SEASON, standings: STANDINGS })));
+      await page.goto(`/seasons/${SEASON.slug}`);
+      await expect(page.getByTestId("season-item-u-5")).toBeVisible();
+      const rows = await page.evaluate((ids) => ids.map((id) => {
+        const row = document.querySelector(`[data-testid="season-item-${id}"]`);
+        const name = row.querySelector(".tls-wrap--name");
+        const facts = row.querySelector(`[data-testid="season-item-facts-${id}"]`);
+        const nameBox = name.getBoundingClientRect();
+        const factsBox = facts?.getBoundingClientRect();
+        // Jedes Wort, das allein in die Spalte passt, steht auf einer Zeile.
+        const broken = [];
+        const text = name.firstChild;
+        let offset = 0;
+        for (const word of name.textContent.split(/(?<=[\s-])/)) {
+          const range = document.createRange();
+          range.setStart(text, offset);
+          range.setEnd(text, offset + word.trimEnd().length);
+          offset += word.length;
+          const probe = document.createElement("span");
+          probe.style.whiteSpace = "nowrap";
+          probe.textContent = word.trimEnd();
+          name.after(probe);
+          const alone = probe.getBoundingClientRect().width;
+          probe.remove();
+          const lines = new Set([...range.getClientRects()].map((rect) => Math.round(rect.top))).size;
+          if (alone <= nameBox.width && lines > 1) broken.push(word.trim());
+        }
+        return {
+          id,
+          nameWidth: Math.round(nameBox.width),
+          broken,
+          below: factsBox ? factsBox.top >= nameBox.bottom - 1 : null,
+          right: factsBox ? factsBox.left >= nameBox.right - 1 : null,
+        };
+      }), STANDINGS.map((row) => row.user_id));
+      for (const row of rows) {
+        expect(row.broken, `${row.id}: Wörter mitten im Wort gebrochen`).toEqual([]);
+        expect(row.right, `${row.id}: Etiketten rechts neben dem Namen`).toBe(!below);
+        if (below) expect(row.below, `${row.id}: Etiketten unter dem Namen`).toBe(true);
+      }
+      const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
+      expect(overflow).toBeLessThanOrEqual(1);
+      if (process.env.SHOT_DIR) await page.locator('[data-testid="season-item-u-0"]').locator("xpath=..").screenshot({ path: `${process.env.SHOT_DIR}/jahreswertung-${width}.png` });
+    });
+  }
+
   // Teilnehmerliste eines Turniers bei 320 px: Das Schild „ANGENOMMEN“ ist ein Etikett (12 px) - kurze Namen wie
   // „NeonFalke“ stehen daneben ganz da, nur sehr lange Namen enden mit „…“ (der ganze Name steht im Profil).
   const TOURNAMENT = { id: "t-cup", slug: "herbst-cup", title: "Herbst-Cup 2026", status: "registration_open", start_date: "2026-12-05T13:00:00+00:00", max_participants: 16, participant_count: 8, public_phase: { state: "registration_open", label: "Anmeldung offen" } };
