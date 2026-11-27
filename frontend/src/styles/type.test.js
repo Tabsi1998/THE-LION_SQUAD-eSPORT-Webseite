@@ -131,7 +131,13 @@ test("keine neue freie Schriftgröße - neue Stellen nehmen eine der acht Stufen
 // Zeremonien haben Text ab 12 px - nur reine Schmuckzeichen ohne Text dürfen kleiner sein (gezählt, mit Grund).
 // Ausgenommen sind nur die TV-Seiten (Beamer-Größen) und der Druck (pt).
 const CSS_SKIP = /^(components\/tv\/|styles\/printView\.css)/;
-const CSS_TINY = /font-size:\s*(?:(?:[0-9]|1[01])(?:\.\d+)?px|0?\.(?:[0-6]\d*|7[0-4]\d*)rem)\s*[;}]/g;
+// Unter 12 px: 0-11,99 px oder unter 0,75 rem. Erkannt als feste Größe (auch mit !important), als kleinster Wert von
+// clamp(…) und im Kürzel font: (font: 700 10px/1.2 …) - so rutscht kein kleiner Wert über eine andere Schreibweise durch.
+const TINY = String.raw`(?:(?:[0-9]|1[01])(?:\.\d+)?px|0?\.(?:[0-6]\d*|7(?:[0-4]\d*)?)rem)`;
+const CSS_TINY = new RegExp(
+  String.raw`font-size:\s*(?:${TINY}\s*(?:!important\s*)?[;}]|clamp\(\s*${TINY}\s*,)|(?<![\w-])font:[^;{}]*?(?<![\w./-])${TINY}(?![\w.])`,
+  "g",
+);
 const CSS_TINY_EXCEPTIONS = {
   "components/tls/league/leagueBadge.css": 4, // Saisonverlauf als SVG-Grafik (fill) - Größe in Einheiten der Grafik
   "components/tls/series/racingLeague.css": 2, // Kürzel des Laufs (S, R, HR) und Plätze gutgemacht - feste Höhe unter dem Rennen
@@ -140,6 +146,54 @@ const CSS_TINY_EXCEPTIONS = {
 
 test("CSS: keine Schrift unter 12 px - außer kleinen Punkten und Grafiken mit Grund", () => {
   expect(countIn(filesIn(SRC, /\.css$/), CSS_TINY, CSS_SKIP)).toEqual(CSS_TINY_EXCEPTIONS);
+});
+
+test("der Wächter erkennt kleine Schrift in jeder Schreibweise - und lässt 12 px und mehr durch", () => {
+  const hits = (css) => (css.match(CSS_TINY) || []).length;
+  for (const tiny of [
+    "a { font-size: 11px; }",
+    "a { font-size: 9.5px }",
+    "a { font-size: 0.7rem; }",
+    "a { font-size: .625rem; }",
+    "a { font-size: 10px !important; }",
+    "a { font-size: clamp(8px, calc(var(--cell) * 0.064), 11px); }",
+    "a { font-size: clamp(0.6rem, 2vw, 1rem); }",
+    "a { font: 700 10px/1.2 Outfit, sans-serif; }",
+    "a { font: italic 0.7rem Rajdhani; }",
+  ]) {
+    expect(hits(tiny), tiny).toBe(1);
+  }
+  for (const fine of [
+    "a { font-size: 12px; }",
+    "a { font-size: 100px; }",
+    "a { font-size: 0.75rem; }",
+    "a { font-size: 1.5rem !important; }",
+    "a { font-size: clamp(12px, calc(var(--leaf) * 0.1), 15px); }",
+    "a { font-size: clamp(1.25rem, 5vw, 1.5rem); }",
+    "a { font: 700 14px/11px Outfit; }",
+    "a { font: inherit; }",
+  ]) {
+    expect(hits(fine), fine).toBe(0);
+  }
+});
+
+// Relative Größen (em, calc) hängen von der Umgebung ab - sie stehen einzeln mit Grund hier, neue Stellen nehmen eine
+// Stufe oder eine Größe ab 12 px.
+const CSS_RELATIVE = /font-size:\s*(?:[\d.]+em\b|calc\()/g;
+const CSS_RELATIVE_EXCEPTIONS = {
+  "index.css": 2, // Code und Tabellen im CMS-Text (.prose-cms, 16-17 px): 0,9 em und 0,92 em = mindestens 14 px
+};
+
+test("CSS: em und calc() nur mit Grund - sonst eine Stufe", () => {
+  expect(countIn(filesIn(SRC, /\.css$/), CSS_RELATIVE, CSS_SKIP)).toEqual(CSS_RELATIVE_EXCEPTIONS);
+});
+
+// Schrift im Code (Diagramm-Achsen von recharts, style={{ fontSize }}): auch hier nichts unter 12 px. SVG-Grafiken mit
+// eigener viewBox (fontSize="7" in Einheiten der Grafik) rechnen anders und sind nicht gemeint.
+const INLINE_TINY = /fontSize:\s*["']?(?:[0-9]|1[01])(?:\.\d+)?(?:px)?["']?(?![\d.])/g;
+
+test("Schrift im Code: kein fontSize unter 12 px", () => {
+  expect(countIn(SOURCES, INLINE_TINY)).toEqual({});
 });
 
 // Unbounded nur für Bühne und Seitentitel (Fabians Variante B): font-heading steht nur noch an begründeten Stellen.

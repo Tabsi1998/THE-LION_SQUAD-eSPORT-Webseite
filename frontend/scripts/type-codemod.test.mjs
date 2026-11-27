@@ -261,3 +261,12 @@ test("CSS: Zahlen ohne GROSS mit 13 px werden nicht kleiner (Klein, 14 px) - unt
   assert.equal(transformCss(".facts { font-size: 13px; font-variant-numeric: tabular-nums; }").code, ".facts { font-size: var(--tls-type-small-size); font-variant-numeric: tabular-nums; }");
   assert.equal(transformCss(".n { font-family: 'Rajdhani', sans-serif; font-size: 11px; }").code, ".n { font-family: 'Rajdhani', sans-serif; font-size: var(--tls-type-label-size); }");
 });
+
+test("CSS: clamp() mit kleinstem Wert unter 12 px und das Kuerzel font: stehen im Bericht", () => {
+  const css = ".t { font-size: clamp(8px, calc(var(--cell) * 0.064), 11px); }\n.f { font: 700 10px/1.2 Outfit; }\n.ok { font-size: clamp(12px, 3vw, 15px); }";
+  const { code, manual } = transformCss(css);
+  assert.equal(code, css);
+  assert.equal(manual.length, 2);
+  assert.match(manual[0], /\.t: clamp\(\) unter 12 px von Hand/);
+  assert.match(manual[1], /\.f: font: unter 12 px von Hand/);
+});

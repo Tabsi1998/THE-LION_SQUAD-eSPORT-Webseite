@@ -578,10 +578,19 @@ export function quietSmallText(code) {
 // Breite bis 16 px bleiben (Zähler an Symbolen, #1232). Relative Größen (em) und alles ab 14 px bleiben, wie sie sind.
 export const CSS_SKIP = ["components/tv/", "styles/printView.css", "fonts.css"];
 const FONT_SIZE = /font-size:\s*([\d.]+)(px|rem)\s*(?=;|\})/g;
+// Werte unter 12 px, die das Skript nicht selbst umschreibt: kleinster Wert von clamp() und das Kürzel font: -
+// die Stelle steht im Bericht und wird von Hand gelöst (größerer kleinster Wert, eine Zeile mehr oder kürzerer Text).
+const TINY_VALUE = String.raw`(?:(?:[0-9]|1[01])(?:\.\d+)?px|0?\.(?:[0-6]\d*|7(?:[0-4]\d*)?)rem)`;
+const CLAMP_TINY = new RegExp(String.raw`font-size:\s*clamp\(\s*${TINY_VALUE}\s*,`);
+const FONT_TINY = new RegExp(String.raw`(?<![\w-])font:[^;{}]*?(?<![\w./-])${TINY_VALUE}(?![\w.])`);
 
 export function transformCss(css) {
   let changed = 0;
+  const manual = [];
   const code = css.replace(/([^{}]*)\{([^{}]*)\}/g, (rule, selector, body) => {
+    const name = selector.trim().split("\n").pop().trim();
+    if (CLAMP_TINY.test(body)) manual.push(`${name}: clamp() unter 12 px von Hand`);
+    if (FONT_TINY.test(body)) manual.push(`${name}: font: unter 12 px von Hand`);
     // SVG-Beschriftungen (fill) rechnen in der Größe ihrer Grafik - sie bleiben.
     if (!/font-size/.test(body) || /(?:^|[;\s])fill:/.test(body)) return rule;
     const upper = /text-transform:\s*uppercase/.test(body);
@@ -601,7 +610,7 @@ export function transformCss(css) {
     });
     return `${selector}{${next}}`;
   });
-  return { code, changed };
+  return { code, changed, manual };
 }
 
 // ---------------------------------------------------------------- Aufruf von der Kommandozeile
@@ -632,7 +641,10 @@ function main(argv) {
     const code = readFileSync(file, "utf8");
     const rel = path.relative(process.cwd(), file).split(path.sep).join("/");
     let result;
-    if (file.endsWith(".css")) result = { ...transformCss(code), manual: [] };
+    if (file.endsWith(".css")) {
+      const css = transformCss(code);
+      result = { ...css, manual: css.manual.map((line) => `${rel}: ${line}`) };
+    }
     else {
       const stepped = transformSource(code, { file: rel });
       const quiet = quietSmallText(stepped.code);
