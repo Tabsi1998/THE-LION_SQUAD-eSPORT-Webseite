@@ -234,7 +234,7 @@ export default function NewsDetailPage() {
             <div className="flex flex-wrap items-center gap-3 tls-type-label">
               <span className="text-[#29B6E8]">{newsCategoryLabel(post.category)}</span>
               {post.pinned && <span className="inline-flex items-center gap-1 text-white"><Pin className="w-3 h-3" /> Angepinnt</span>}
-              <span className="text-white/40 lg:hidden ml-auto">{formatDate(post.published_at || post.created_at)}</span>
+              <span className="text-quiet lg:hidden ml-auto">{formatDate(post.published_at || post.created_at)}</span>
             </div>
             <h1 className="mt-3 tls-type-title leading-[1.02] break-words">{post.title}</h1>
             {post.excerpt && <p className="mt-4 tls-type-body text-white/70 max-w-4xl">{post.excerpt}</p>}
