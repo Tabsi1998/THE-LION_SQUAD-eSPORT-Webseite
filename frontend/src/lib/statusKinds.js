@@ -4,14 +4,16 @@
 // später), das Aussehen je Art in styles/system.css (.tls-status-chip); lib/statusKinds.test.js hält alle drei gleich.
 // Die Wörter folgen der Wortliste (#1238): normal geschrieben, kurz, Check-in bleibt englisch.
 
-/** Die neun Arten in fester Reihenfolge (so stehen sie auch in der Doku und im Bildvergleich). */
-export const STATUS_KIND_ORDER = ["soon", "registration", "checkin", "live", "joined", "waiting", "problem", "done", "cancelled"];
+/** Die zehn Arten in fester Reihenfolge (so stehen sie auch in der Doku und im Bildvergleich). „Frei“ (Station) kam
+ *  nach Fabians Entscheidung vom 27.11. als zehnte Art dazu: grüner Rahmen, keine Füllung. */
+export const STATUS_KIND_ORDER = ["soon", "registration", "checkin", "free", "live", "joined", "waiting", "problem", "done", "cancelled"];
 
 /** Name und Symbol je Art. Gefüllt sind nur „Anmeldung offen“ und „Check-in offen“, rot ist nur „Läuft“. */
 export const STATUS_KINDS = {
   soon: { label: "Bald", icon: "clock" },
   registration: { label: "Anmeldung offen", icon: "user-plus", filled: true },
   checkin: { label: "Check-in offen", icon: "circle-check", filled: true },
+  free: { label: "Frei", icon: "plug" },
   live: { label: "Läuft", icon: "live-dot", pulse: true },
   joined: { label: "Du bist dabei", icon: "check" },
   waiting: { label: "Wartet", icon: "hourglass" },
@@ -63,7 +65,7 @@ export const STATUS_STATES = {
   withdrawn: ["cancelled", "Ausgetreten"],
   disqualified: ["cancelled", "Disqualifiziert"],
   // Stationen
-  free: ["waiting", "Frei"],
+  free: ["free", "Frei"],
   busy: ["live", "Belegt"],
   in_use: ["live", "Belegt"],
   broken: ["problem", "Defekt"],
@@ -79,17 +81,22 @@ export const OWN_STATUS_STATES = {
   cancelled: ["cancelled", "Abgemeldet"],
 };
 
+/** Zustände, die „Läuft“ zeigen, deren Punkt aber still steht (Fabians Entscheidung vom 27.11.): eine Saison läuft
+ *  Monate, ein Puls hieße „gerade jetzt“. */
+export const STILL_STATES = ["active"];
+
 /** Ein unbekannter Zustand zeigt nie den Rohwert: ruhig, mit dem Wort der Stelle oder „Unbekannt“. */
-export const UNKNOWN_STATUS = { kind: "waiting", word: "Unbekannt", known: false };
+export const UNKNOWN_STATUS = { kind: "waiting", word: "Unbekannt", known: false, pulse: false };
 
 const normalize = (status) => String(status ?? "").trim().toLowerCase();
 
-/** Art und Wort zu einem Zustand: `{ kind, word, known }`. `own` nimmt die Du-Form der eigenen Anmeldung. */
+/** Art und Wort zu einem Zustand: `{ kind, word, known, pulse }`. `own` nimmt die Du-Form der eigenen Anmeldung.
+ *  `pulse` sagt, ob der Punkt bei „Läuft“ pulsiert - still bei den STILL_STATES. */
 export function statusKind(status, { own = false } = {}) {
   const key = normalize(status);
   const hit = (own && OWN_STATUS_STATES[key]) || STATUS_STATES[key];
   if (!hit) return { ...UNKNOWN_STATUS };
-  return { kind: hit[0], word: hit[1], known: true };
+  return { kind: hit[0], word: hit[1], known: true, pulse: Boolean(STATUS_KINDS[hit[0]].pulse) && !STILL_STATES.includes(key) };
 }
 
 /** Nur das Wort - für Stellen, die kein Schild zeigen (Vorlesetext, TV-Kopf). */

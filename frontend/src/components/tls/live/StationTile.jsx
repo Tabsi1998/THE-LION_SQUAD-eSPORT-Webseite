@@ -31,12 +31,12 @@ function calledLine(entry) {
 }
 
 // Zustand der Kachel als Zustands-Schild (#1306): dieselben Arten wie überall - läuft (rot, Punkt), aufgerufen (bald),
-// defekt und hängt (Problem), frei (wartet auf ein Spiel). Dieselben Arten zeigt das TV.
+// defekt und hängt (Problem), frei (eigene Art „Frei“, grüner Rahmen). Dieselben Arten zeigt das TV.
 const TONES = {
   running: ["Läuft", "live"],
   called: ["Aufgerufen", "soon"],
   broken: ["Defekt", "problem"],
-  free: ["Frei", "waiting"],
+  free: ["Frei", "free"],
   // Geteilte Event-Station (#1162): hier spielt gerade ein anderes Turnier - dessen Leitung bedient sie.
   other: ["Anderes Turnier", "live"],
   // Als belegt gespeichert, aber ohne offenes Spiel (#1162) - etwa nach dem Löschen einer Phase.

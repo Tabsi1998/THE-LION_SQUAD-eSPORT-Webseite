@@ -257,16 +257,17 @@ table tr.tls-you > :last-child { background-position: top right, top right, bott
 }
 
 /* Zustands-Schilder (#1306, Fabians Variante C - gefüllt fürs Wichtige): ein Baustein für jeden Zustand
-   (components/tls/StatusChip.jsx). Neun Arten mit fester Bedeutung, jede mit Symbol und Wort, normal geschrieben, Outfit
+   (components/tls/StatusChip.jsx). Zehn Arten mit fester Bedeutung, jede mit Symbol und Wort, normal geschrieben, Outfit
    600 in 12,5 px (groß: 14 px), Symbol 13 px. Nur „Anmeldung offen“ und „Check-in offen“ sind gefüllt (Grün, dunkle
-   Schrift) - sie sollen auffallen; „Läuft“ ist das einzige rote Schild, sein Punkt pulsiert leise (.tls-live-dot). Alles
-   andere tritt zurück. Der Countdown steht nie im Schild, sondern als kleiner Text daneben (.tls-status__meta) - am
+   Schrift) - sie sollen auffallen; „Läuft“ ist das einzige rote Schild, sein Punkt pulsiert leise (.tls-live-dot) - bei
+   einer laufenden Saison steht er still (.tls-live-dot--still). Alles andere tritt zurück. Der Countdown steht nie im Schild, sondern als kleiner Text daneben (.tls-status__meta) - am
    Handy darunter, wenn der Platz nicht reicht. Welcher Zustand zu welcher Art gehört, sagt lib/statusKinds.js; die
    Werte hier hält lib/statusKinds.test.js gleich mit docs/status-kinds.json (die App liest sie später).
 
    soon          Bald             Rahmen, Uhr
    registration  Anmeldung offen  Grün gefüllt, dunkle Schrift
    checkin       Check-in offen   Grün gefüllt, Haken im Kreis
+   free          Frei             grüner Rahmen ohne Füllung, Stecker (Station)
    live          Läuft            rot getönt, roter Punkt
    joined        Du bist dabei    Cyan-Rahmen, Haken
    waiting       Wartet           gestrichelter Rahmen, Sanduhr
@@ -360,6 +361,11 @@ table tr.tls-you > :last-child { background-position: top right, top right, bott
     --tls-chip-fill: var(--tls-ok);
     --tls-chip-line: var(--tls-ok);
   }
+  .tls-status-chip[data-kind="free"] {
+    --tls-chip-text: var(--tls-ok);
+    --tls-chip-fill: transparent;
+    --tls-chip-line: rgb(var(--tls-ok-rgb) / 0.6);
+  }
   .tls-status-chip[data-kind="live"] {
     --tls-chip-text: rgb(255 255 255);
     --tls-chip-fill: rgb(var(--tls-live-rgb) / 0.16);
@@ -409,6 +415,10 @@ table tr.tls-you > :last-child { background-position: top right, top right, bott
   margin-inline: 0.0625rem;
   color: var(--tls-live);
 }
+
+/* Still (#1306, laufende Saison): „Läuft“ ohne Puls - der Ring fällt weg, der ruhige Hof bleibt. */
+.tls-status-chip .tls-live-dot--still { box-shadow: 0 0 0 2px rgb(var(--tls-live-rgb) / 0.3); }
+.tls-status-chip .tls-live-dot--still::after { animation: none; opacity: 0; }
 
 @media (prefers-reduced-motion: reduce) {
   .tls-status-chip .tls-live-dot { box-shadow: 0 0 0 2px rgb(var(--tls-live-rgb) / 0.3); }

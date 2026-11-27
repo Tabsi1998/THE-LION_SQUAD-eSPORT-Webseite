@@ -342,6 +342,7 @@
 .tv-pill--status .tv-live-dot-tv { width: 0.6em; height: 0.6em; }
 .tv-pill[data-kind="registration"],
 .tv-pill[data-kind="checkin"] { color: var(--tls-on-ok); background: var(--tv-green); border-color: var(--tv-green); }
+.tv-pill[data-kind="free"] { color: var(--tv-green); background: transparent; border-color: currentColor; }
 .tv-pill[data-kind="live"] { color: var(--tv-text); background: rgb(var(--tls-live-rgb) / 0.18); border-color: var(--tv-live); }
 .tv-pill[data-kind="joined"] { color: var(--tv-accent); background: var(--tv-accent-soft); border-color: currentColor; }
 .tv-pill[data-kind="waiting"] { color: var(--tv-muted); border-style: dashed; }

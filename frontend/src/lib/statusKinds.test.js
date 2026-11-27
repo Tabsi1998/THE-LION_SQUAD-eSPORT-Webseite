@@ -2,7 +2,7 @@ import { readFileSync } from "node:fs";
 import path from "node:path";
 import { MATCH_STATUS_LABELS, REGISTRATION_STATUS_LABELS } from "./tournamentLabels";
 import { ROLE_COLORS } from "./categoryColors";
-import { OWN_STATUS_STATES, STATUS_KIND_ORDER, STATUS_KINDS, STATUS_STATES, isKnownStatus, statusKind, statusWord } from "./statusKinds";
+import { OWN_STATUS_STATES, STATUS_KIND_ORDER, STATUS_KINDS, STATUS_STATES, STILL_STATES, isKnownStatus, statusKind, statusWord } from "./statusKinds";
 
 // Zustands-Schilder (#1306): eine Tabelle für jeden Zustand. Dieser Test hält drei Stellen gleich - lib/statusKinds.js,
 // docs/status-kinds.json (die App liest sie später, wie docs/category-colors.json) und das Aussehen in styles/system.css -
@@ -23,6 +23,16 @@ test("docs/status-kinds.json nennt genau die Arten, Zustände und Du-Wörter der
   }
   expect(shared.states).toEqual(STATUS_STATES);
   expect(shared.own).toEqual(OWN_STATUS_STATES);
+  expect(shared.still).toEqual(STILL_STATES);
+});
+
+test("zehn Arten; eine laufende Saison zeigt „Läuft“, der Punkt steht aber still (Fabian, 27.11.)", () => {
+  expect(STATUS_KIND_ORDER).toHaveLength(10);
+  expect(statusKind("active")).toMatchObject({ kind: "live", word: "Läuft", pulse: false });
+  expect(statusKind("live")).toMatchObject({ kind: "live", pulse: true });
+  expect(statusKind("busy")).toMatchObject({ kind: "live", pulse: true });
+  expect(statusKind("free")).toMatchObject({ kind: "free", word: "Frei" });
+  for (const state of STILL_STATES) expect(STATUS_STATES[state][0], state).toBe("live");
 });
 
 // ---------------------------------------------------------------- Aussehen: system.css = JSON
@@ -141,13 +151,13 @@ test("kein Wort ist ein Rohwert oder GROSS geschrieben", () => {
 });
 
 test("statusKind: Schreibweise egal, eigene Anmeldung in der Du-Form, Unbekanntes ohne Rohwert", () => {
-  expect(statusKind("LIVE")).toEqual({ kind: "live", word: "Läuft", known: true });
-  expect(statusKind("checked_in", { own: true })).toEqual({ kind: "joined", word: "Eingecheckt", known: true });
+  expect(statusKind("LIVE")).toEqual({ kind: "live", word: "Läuft", known: true, pulse: true });
+  expect(statusKind("checked_in", { own: true })).toEqual({ kind: "joined", word: "Eingecheckt", known: true, pulse: false });
   expect(statusKind("approved", { own: true }).word).toBe("Du bist dabei");
   expect(statusKind("approved").word).toBe("Bestätigt");
   expect(statusKind("waitlist", { own: true }).word).toBe("Warteliste");
   expect(statusKind("cancelled", { own: true }).word).toBe("Abgemeldet");
-  expect(statusKind("gibt_es_nicht")).toEqual({ kind: "waiting", word: "Unbekannt", known: false });
+  expect(statusKind("gibt_es_nicht")).toEqual({ kind: "waiting", word: "Unbekannt", known: false, pulse: false });
   expect(statusKind(null).known).toBe(false);
   // Die Beispiele aus dem Ticket.
   expect(statusKind("results_published")).toMatchObject({ kind: "done", word: "Ergebnisse da" });

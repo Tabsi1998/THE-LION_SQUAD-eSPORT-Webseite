@@ -118,7 +118,7 @@ function StationTv() {
   const publicUrl = t ? `${window.location.origin}/tournaments/${t.slug || t.id}/bracket` : window.location.origin;
   const call = mode === "next" && match ? callsOf([match], station ? [station] : [], { reportMinutes: settings.report_minutes })[0] || null : null;
   // Zustands-Schild (#1306): dieselben Arten wie die Stationen-Kacheln der Turnierleitung.
-  const pill = mode === "live" ? ["live", "Läuft"] : mode === "done" ? ["done", "Entschieden"] : call ? ["soon", "Aufgerufen"] : mode === "next" ? ["soon", "Als Nächstes"] : ["waiting", "Frei"];
+  const pill = mode === "live" ? ["live", "Läuft"] : mode === "done" ? ["done", "Entschieden"] : call ? ["soon", "Aufgerufen"] : mode === "next" ? ["soon", "Als Nächstes"] : ["free", "Frei"];
 
   return (
     <div className="tv-page" data-testid="station-tv">

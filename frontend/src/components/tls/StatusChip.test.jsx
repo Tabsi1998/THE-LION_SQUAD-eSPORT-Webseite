@@ -10,6 +10,7 @@ const LUCIDE = {
   clock: "lucide-clock",
   "user-plus": "lucide-user-plus",
   "circle-check": "lucide-circle-check",
+  plug: "lucide-plug",
   check: "lucide-check",
   hourglass: "lucide-hourglass",
   "triangle-alert": "lucide-triangle-alert",
@@ -38,6 +39,17 @@ test.each(STATUS_KIND_ORDER)("Art %s: Symbol, Farbe und Wort", (kind) => {
   }
   // Der Name für Vorleseprogramme ist das Wort - das Symbol spricht nicht mit.
   expect(chip.textContent).toBe(info.label);
+});
+
+test("laufende Saison: rotes „Läuft“, der Punkt steht still; pulse={false} geht auch von Hand", () => {
+  const { rerender } = render(<StatusChip status="active" testId="chip" dotTestId="dot" />);
+  expect(screen.getByTestId("chip")).toHaveAttribute("data-kind", "live");
+  expect(screen.getByTestId("chip")).toHaveTextContent(/^Läuft$/);
+  expect(screen.getByTestId("dot")).toHaveClass("tls-live-dot", "tls-live-dot--still");
+  rerender(<StatusChip status="live" testId="chip" dotTestId="dot" />);
+  expect(screen.getByTestId("dot")).not.toHaveClass("tls-live-dot--still");
+  rerender(<StatusChip status="live" pulse={false} testId="chip" dotTestId="dot" />);
+  expect(screen.getByTestId("dot")).toHaveClass("tls-live-dot--still");
 });
 
 test("ein Zustand wählt Art und Wort aus der Tabelle; ein eigenes Wort geht vor", () => {
