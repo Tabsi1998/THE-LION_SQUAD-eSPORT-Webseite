@@ -163,7 +163,7 @@ export function GermanDateField({
             </button>
           )}
         </div>
-        <PopoverContent align="start" sideOffset={6} onOpenAutoFocus={focusOnOpen} className="w-[19.5rem] p-0 z-[130] border border-white/12 bg-[#101012] rounded-sm shadow-2xl shadow-black/70 text-white">
+        <PopoverContent align="start" sideOffset={6} onOpenAutoFocus={focusOnOpen} className="w-[19.5rem] p-0 z-[130] border border-white/10 bg-[#101012] rounded-sm shadow-2xl shadow-black/70 text-white">
           <div className="flex items-center gap-2 p-3 border-b border-white/10">
             <button
               type="button"
@@ -240,7 +240,7 @@ export function GermanDateField({
                 );
               })}
             </div>
-            <div className="mt-2 pt-2 border-t border-white/8 flex items-center justify-between">
+            <div className="mt-2 pt-2 border-t border-white/10 flex items-center justify-between">
               <span className="tls-type-label text-quiet">
                 {value ? formatGermanDate(value) : "Kein Datum gewählt"}
               </span>

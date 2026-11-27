@@ -81,7 +81,7 @@ export default function EsportsOverviewPage() {
     <PublicLayout>
       <section className="relative overflow-hidden border-b border-white/10">
         <LazyImg src={heroImage} priority alt="" sizes="100vw" className="absolute inset-0 h-full w-full object-cover opacity-35" />
-        <div className="absolute inset-0 bg-gradient-to-b from-[#0A0A0A]/55 via-[#0A0A0A]/78 to-[#0A0A0A]" />
+        <div className="absolute inset-0 bg-gradient-to-b from-[#0A0A0A]/55 via-[#0A0A0A]/80 to-[#0A0A0A]" />
         <div className="relative mx-auto grid max-w-7xl gap-8 px-4 py-16 sm:px-6 md:grid-cols-[minmax(0,1fr)_360px] md:py-20 lg:px-8">
           <div className="max-w-3xl self-end">
             <span className="tls-type-label text-[#29B6E8]">THE LION SQUAD</span>

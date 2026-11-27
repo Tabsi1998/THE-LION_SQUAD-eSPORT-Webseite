@@ -679,7 +679,7 @@ function InlineFastLapTimeEntry({ challenge, trackId, currentUser, onSaved }) {
                   type="button"
                   onClick={() => deleteTime(time)}
                   disabled={saving}
-                  className="p-1.5 text-white/42 hover:text-[#FF3B30] disabled:opacity-40"
+                  className="p-1.5 text-white/45 hover:text-[#FF3B30] disabled:opacity-40"
                   title="Zeit löschen"
                 >
                   <Trash2 className="w-3.5 h-3.5" />

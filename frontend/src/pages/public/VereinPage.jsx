@@ -132,7 +132,7 @@ export default function VereinPage() {
             <ul className="mt-3 divide-y divide-white/10">
               {JOIN_REASONS.map((reason) => (
                 <li key={reason.title} className="flex items-center gap-3 py-3">
-                  <span className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-sm bg-[#29B6E8]/12 text-[#29B6E8]"><reason.icon className="w-4 h-4" /></span>
+                  <span className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-sm bg-[#29B6E8]/10 text-[#29B6E8]"><reason.icon className="w-4 h-4" /></span>
                   <span><span className="block font-bold">{reason.title}</span><span className="block tls-type-small text-white/55">{reason.detail}</span></span>
                 </li>
               ))}

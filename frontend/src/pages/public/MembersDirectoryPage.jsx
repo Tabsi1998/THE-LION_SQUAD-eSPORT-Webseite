@@ -102,7 +102,7 @@ export default function MembersDirectoryPage() {
                       className="absolute inset-0 z-10 w-full h-full object-cover object-top group-hover:scale-[1.03] transition duration-500"
                     />
                   ) : (
-                    <div className="absolute inset-0 z-10 flex items-center justify-center bg-gradient-to-b from-[#FFD700]/12 via-[#121212] to-[#0A0A0A]" data-testid={`member-card-initials-${m.slug}`}>
+                    <div className="absolute inset-0 z-10 flex items-center justify-center bg-gradient-to-b from-[#FFD700]/10 via-[#121212] to-[#0A0A0A]" data-testid={`member-card-initials-${m.slug}`}>
                       <span className="tls-type-section text-[#FFD700]/70">{memberInitials(m)}</span>
                     </div>
                   )}

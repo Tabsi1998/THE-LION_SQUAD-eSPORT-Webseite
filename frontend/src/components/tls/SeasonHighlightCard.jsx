@@ -76,7 +76,7 @@ export function SeasonHighlightCard({ profile, level, stats, awards, crown, seas
       <div ref={dialogRef} className="my-auto" role="dialog" aria-modal="true" aria-label="Season-Highlight-Karte">
         <div
           ref={cardRef}
-          className="w-[min(380px,calc(100vw-2rem))] rounded-md border border-white/12 bg-gradient-to-b from-[#0D141A] via-[#0A0A0A] to-[#050505] p-6 relative overflow-hidden"
+          className="w-[min(380px,calc(100vw-2rem))] rounded-md border border-white/10 bg-gradient-to-b from-[#0D141A] via-[#0A0A0A] to-[#050505] p-6 relative overflow-hidden"
           data-testid="highlight-card"
         >
           <div className="absolute -top-16 -right-16 w-56 h-56 rounded-full blur-[70px] opacity-25" style={{ backgroundColor: tier.color }} />
@@ -125,7 +125,7 @@ export function SeasonHighlightCard({ profile, level, stats, awards, crown, seas
               <div className="tls-type-label text-quiet mb-2">Top-Erfolge</div>
               <div className="space-y-1.5">
                 {best.map((a) => (
-                  <div key={a.id || a.code} className="flex items-center gap-2.5 border border-white/8 rounded-sm bg-white/[0.03] px-2.5 py-1.5" style={{ boxShadow: `inset 2px 0 0 ${a.level_color || "#29B6E8"}` }}>
+                  <div key={a.id || a.code} className="flex items-center gap-2.5 border border-white/10 rounded-sm bg-white/[0.03] px-2.5 py-1.5" style={{ boxShadow: `inset 2px 0 0 ${a.level_color || "#29B6E8"}` }}>
                     <Medal className="w-3.5 h-3.5 shrink-0" style={{ color: a.level_color || "#29B6E8" }} />
                     <div className="min-w-0">
                       <div className="tls-type-small font-bold text-white truncate">{a.name}</div>

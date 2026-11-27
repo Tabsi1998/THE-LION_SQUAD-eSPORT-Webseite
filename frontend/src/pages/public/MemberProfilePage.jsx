@@ -106,10 +106,10 @@ function MemberHero({ profile }) {
   return (
     <div className="relative min-h-[25rem] overflow-visible bg-[#0D0D0D] rounded-sm">
       {profile.cover_url && (
-        <LazyImg src={profile.cover_url} alt="" priority sizes="100vw" className="absolute inset-0 w-full h-full object-cover opacity-32" />
+        <LazyImg src={profile.cover_url} alt="" priority sizes="100vw" className="absolute inset-0 w-full h-full object-cover opacity-30" />
       )}
       <div className="absolute inset-0 bg-[radial-gradient(circle_at_25%_25%,rgba(255,215,0,0.13),rgba(41,182,232,0.07)_36%,rgba(10,10,10,0)_70%)]" />
-      <div className="absolute inset-0 bg-gradient-to-t from-[#0A0A0A] via-[#0A0A0A]/68 to-[#0A0A0A]/10" />
+      <div className="absolute inset-0 bg-gradient-to-t from-[#0A0A0A] via-[#0A0A0A]/70 to-[#0A0A0A]/10" />
       <div className="relative z-10 min-h-[25rem] grid md:grid-cols-[18rem_1fr] gap-4 items-end p-5 sm:p-8">
         <div className="relative h-80 md:h-[22rem] flex items-end justify-center md:justify-start -mb-10 md:-mb-12">
           <div className="absolute inset-x-8 bottom-5 h-10 bg-black/50 blur-2xl rounded-full" />
