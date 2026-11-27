@@ -4,7 +4,7 @@ import { CalendarDays, MapPin } from "lucide-react";
 import { resolveMediaUrl } from "@/lib/api";
 import { DisplayStatusBanner } from "@/components/tls/DisplayStatusBanner";
 import { TvScreen, useTv } from "@/components/tv/TvScreen";
-import { TvFooter, TvHeader, TvKeyRefused, TvPill } from "@/components/tv/TvParts";
+import { TvFooter, TvHeader, TvKeyRefused, TvStatusPill } from "@/components/tv/TvParts";
 import { TvDayPlan, TvNowNext, TvStationBoard } from "@/components/tv/TvHall";
 import { TvNoticeBand } from "@/components/tv/TvNotice";
 import { TvSponsorMoment } from "@/components/tv/TvSlides";
@@ -27,9 +27,8 @@ import { sponsorFor, sponsorPlan } from "@/lib/tvSponsors";
 // Seit #1564: dieselbe Station aus mehreren Turnieren steht nur einmal da (bis die Stationen dem Event gehören, #1555),
 // und „Als Nächstes“ nennt das nächste Spiel mit Prognose, Station und Verzug.
 
-// Die Pille oben folgt der öffentlichen Phase (#1888), nicht dem Rohstatus: nach dem Ende kein „Live“ mehr, zwischen
-// zwei Tagen eines mehrtägigen Events die Pause.
-const ACTIVE_STATUSES = new Set(["live", "check_in", "checkin_open", "registration_open", "paused", "day_break"]);
+// Die Pille oben folgt der öffentlichen Phase (#1888), nicht dem Rohstatus: nach dem Ende kein „Läuft“ mehr, zwischen
+// zwei Tagen eines mehrtägigen Events die Pause. Art und Wort wie auf der Website (#1306, lib/statusKinds.js).
 
 export default function EventTVPage() {
   return (
@@ -37,24 +36,6 @@ export default function EventTVPage() {
       <EventTv />
     </TvScreen>
   );
-}
-
-function statusLabel(status, fallback) {
-  return {
-    draft: "Entwurf",
-    scheduled: "Geplant",
-    registration_open: "Anmeldung",
-    registration_closed: "Geschlossen",
-    check_in: "Check-in",
-    checkin_open: "Check-in",
-    live: "Live",
-    paused: "Pause",
-    day_break: "Pause",
-    completed: "Beendet",
-    results_published: "Ergebnisse",
-    archived: "Archiv",
-    cancelled: "Abgesagt",
-  }[status] || fallback || status || "Offen";
 }
 
 function EventTv() {
@@ -140,7 +121,7 @@ function EventTv() {
             {place ? <span className="inline-flex items-center gap-[0.4em]"><MapPin className="tv-icon tv-gold" /> {place}</span> : null}
           </span>
         ) : null}
-        aside={<TvPill testId="tv-event-status" tone={ACTIVE_STATUSES.has(eventState) ? (eventState === "live" ? "live" : "accent") : "muted"} live={eventState === "live"}>{statusLabel(eventState, event.public_phase?.label)}</TvPill>}
+        aside={<TvStatusPill testId="tv-event-status" status={eventState} label={event.public_phase?.label} />}
       />
 
       <DisplayStatusBanner error={loadError} lastUpdated={lastUpdated} label="Event-Daten" onRetry={load} />

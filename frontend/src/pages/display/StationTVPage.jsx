@@ -117,7 +117,8 @@ function StationTv() {
   const lastStage = lastStageId(matches, data?.stages || []);
   const publicUrl = t ? `${window.location.origin}/tournaments/${t.slug || t.id}/bracket` : window.location.origin;
   const call = mode === "next" && match ? callsOf([match], station ? [station] : [], { reportMinutes: settings.report_minutes })[0] || null : null;
-  const pill = mode === "live" ? ["live", "Läuft"] : mode === "done" ? ["gold", "Entschieden"] : call ? ["gold", "Aufgerufen"] : mode === "next" ? ["accent", "Als Nächstes"] : ["green", "Frei"];
+  // Zustands-Schild (#1306): dieselben Arten wie die Stationen-Kacheln der Turnierleitung.
+  const pill = mode === "live" ? ["live", "Läuft"] : mode === "done" ? ["done", "Entschieden"] : call ? ["soon", "Aufgerufen"] : mode === "next" ? ["soon", "Als Nächstes"] : ["waiting", "Frei"];
 
   return (
     <div className="tv-page" data-testid="station-tv">
@@ -126,7 +127,7 @@ function StationTv() {
         live={mode === "live"}
         title={stationTitle}
         subtitle={t?.title || null}
-        aside={<TvPill tone={pill[0]} live={mode === "live"} testId="station-tv-state">{pill[1]}</TvPill>}
+        aside={<TvPill kind={pill[0]} testId="station-tv-state">{pill[1]}</TvPill>}
       />
       <DisplayStatusBanner error={loadError} lastUpdated={lastUpdated} label="Station" onRetry={load} />
       <main className="tv-main" data-testid="tv-main">

@@ -16,7 +16,8 @@ import { isOlderVeto, plannedRoleLabel, sideName, sideTone, VETO_STATUS_LABELS }
 // auch für Staffeln „Nur Mitglieder“. Live per kurzem Abruf (läuft: alle 2 Sekunden, sonst alle 10) und über den Änderungsstrom.
 
 const IDLE_MS = 10000;
-const PILL = { running: "live", paused: "gold", done: "green", waiting: "accent", skipped: "muted" };
+// Zustands-Schild (#1306): das Veto läuft (rot), wartet oder ist pausiert, steht fest bzw. entfällt (vorbei).
+const PILL = { running: "live", paused: "waiting", done: "done", waiting: "waiting", skipped: "done" };
 
 export default function VetoTVPage() {
   return (
@@ -110,7 +111,7 @@ function VetoTv() {
         live={block?.status === "running"}
         title={title}
         subtitle={[head?.tournament_title, head?.matchday_label].filter(Boolean).join(" · ") || null}
-        aside={block ? <TvPill tone={PILL[block.status] || "muted"} live={block.status === "running"} testId="veto-tv-state">{VETO_STATUS_LABELS[block.status] || "Veto"}</TvPill> : null}
+        aside={block ? <TvPill kind={PILL[block.status] || "waiting"} testId="veto-tv-state">{VETO_STATUS_LABELS[block.status] || "Veto"}</TvPill> : null}
       />
       <DisplayStatusBanner error={loadError} lastUpdated={lastUpdated} label="Veto" onRetry={load} />
       <main className="tv-main tv-veto" data-testid="tv-main">

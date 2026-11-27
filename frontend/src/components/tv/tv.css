@@ -326,6 +326,31 @@
 .tv-pill--gold { color: var(--tv-gold); background: var(--tv-gold-soft); }
 .tv-pill--red { color: var(--tv-red); background: var(--tv-red-soft); }
 .tv-pill--live { color: var(--tv-live); background: var(--tv-live-soft); }
+/* Zustands-Schild in Beamer-Größe (#1306): dieselben neun Arten wie auf der Website (styles/system.css,
+   .tls-status-chip) - normal geschrieben, mit Symbol. Gefüllt nur Anmeldung und Check-in offen, rot nur Läuft. Im
+   Kontrast-Modus werden die Flächen schwarz (die --tv-*-soft-Werte), Schrift und Rahmen voll. */
+.tv-pill--status {
+  gap: calc(var(--tv-u) * 0.45);
+  font-weight: 600;
+  text-transform: none;
+  letter-spacing: 0.01em;
+  color: var(--tv-text);
+  border-color: var(--tv-line-strong);
+  background: transparent;
+}
+.tv-pill__icon { flex: none; width: 1em; height: 1em; stroke-width: 2.25; }
+.tv-pill--status .tv-live-dot-tv { width: 0.6em; height: 0.6em; }
+.tv-pill[data-kind="registration"],
+.tv-pill[data-kind="checkin"] { color: var(--tls-on-ok); background: var(--tv-green); border-color: var(--tv-green); }
+.tv-pill[data-kind="live"] { color: var(--tv-text); background: rgb(var(--tls-live-rgb) / 0.18); border-color: var(--tv-live); }
+.tv-pill[data-kind="joined"] { color: var(--tv-accent); background: var(--tv-accent-soft); border-color: currentColor; }
+.tv-pill[data-kind="waiting"] { color: var(--tv-muted); border-style: dashed; }
+.tv-pill[data-kind="problem"] { color: var(--tv-warn); background: var(--tv-red-soft); border-color: currentColor; }
+.tv-pill[data-kind="done"] { color: var(--tv-muted); background: rgb(255 255 255 / 0.08); border-color: transparent; }
+.tv-pill[data-kind="cancelled"] { color: var(--tv-muted); background: rgb(255 255 255 / 0.05); border-color: transparent; }
+.tv-pill[data-kind="cancelled"] .tv-pill__word { text-decoration: line-through; text-decoration-thickness: 2px; }
+.tv-screen[data-tv-contrast="1"] .tv-pill[data-kind="live"] { background: #000000; }
+.tv-screen[data-tv-contrast="1"] .tv-pill:is([data-kind="done"], [data-kind="cancelled"]) { background: #000000; border-color: currentColor; }
 .tv-toggle { display: inline-flex; gap: calc(var(--tv-u) * 0.3); padding: calc(var(--tv-u) * 0.3); border: var(--tv-line-w) solid var(--tv-line); border-radius: 2px; background: var(--tv-panel); }
 .tv-toggle button {
   padding: calc(var(--tv-u) * 0.35) calc(var(--tv-u) * 1);

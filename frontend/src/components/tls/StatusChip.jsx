@@ -17,12 +17,15 @@ const ICONS = {
   ban: Ban,
 };
 
-function KindIcon({ kind, testId }) {
+/** Das Symbol einer Art - auch für die TV-Pille (TvPill), die es in Beamer-Größe zeigt. */
+export function StatusKindIcon({ kind, testId, className = "tls-status-chip__icon", dotClassName = "tls-live-dot" }) {
   const icon = STATUS_KINDS[kind]?.icon;
-  if (icon === "live-dot") return <span className="tls-live-dot" aria-hidden="true" data-testid={testId} />;
+  if (icon === "live-dot") return <span className={dotClassName} aria-hidden="true" data-testid={testId} />;
   const Icon = ICONS[icon];
-  return Icon ? <Icon className="tls-status-chip__icon" aria-hidden="true" focusable="false" /> : null;
+  return Icon ? <Icon className={className} aria-hidden="true" focusable="false" /> : null;
 }
+
+const KindIcon = StatusKindIcon;
 
 /**
  * @param {string} status   Zustand (Phase, Status, Anmeldung, Spiel, Station)

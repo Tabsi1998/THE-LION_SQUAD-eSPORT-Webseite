@@ -1,4 +1,6 @@
 import { MascotBadge } from "@/components/tls/Logo";
+import { StatusKindIcon } from "@/components/tls/StatusChip";
+import { STATUS_KINDS, statusKind } from "@/lib/statusKinds";
 import { BrandedQRCode } from "@/components/tls/BrandedQRCode";
 import { SmartLogo } from "@/components/tls/SmartLogo";
 import { SponsorGrid } from "@/components/tls/SponsorTicker";
@@ -115,14 +117,32 @@ const TONES = {
   disputed: "red",
 };
 
-/** Ein Schild in der Farbe seines Zustands. */
-export function TvPill({ tone = "muted", children, live = false, testId }) {
+/**
+ * Ein Schild in der Farbe seines Zustands. Mit `kind` (#1306) ist es ein Zustands-Schild: dieselben neun Arten, Farben
+ * und Symbole wie auf der Website (lib/statusKinds.js), normal geschrieben, in Beamer-Größe (tv.css, .tv-pill--status).
+ * Ohne `kind` bleibt es ein Hinweis-Schild (Zähler wie „3 Aufrufe“).
+ */
+export function TvPill({ tone = "muted", children, live = false, testId, kind }) {
+  if (kind && STATUS_KINDS[kind]) {
+    return (
+      <span className="tv-pill tv-pill--status tv-t-meta" data-kind={kind} data-testid={testId}>
+        <StatusKindIcon kind={kind} className="tv-pill__icon" dotClassName="tv-live-dot-tv tv-live-dot" />
+        <span className="tv-pill__word">{children}</span>
+      </span>
+    );
+  }
   return (
     <span className={`tv-pill tv-t-meta ${tone !== "muted" ? `tv-pill--${tone}` : ""}`} data-testid={testId}>
       {live ? <span className="tv-live-dot-tv tv-live-dot" aria-hidden="true" /> : null}
       {children}
     </span>
   );
+}
+
+/** Ein Zustand als Pille (#1306): Art und Wort aus lib/statusKinds.js - dasselbe Schild wie auf der Website. */
+export function TvStatusPill({ status, label, testId }) {
+  const { kind, word, known } = statusKind(status);
+  return <TvPill kind={kind} testId={testId}>{known ? word : label || word}</TvPill>;
 }
 
 export function toneFor(status) {

@@ -5,9 +5,8 @@ import { useLiveRefresh } from "@/hooks/useLiveRefresh";
 import { invalidationMatches, isStreamConnected, subscribeApiInvalidation, subscribeStreamState } from "@/lib/apiInvalidation";
 import { DisplayStatusBanner } from "@/components/tls/DisplayStatusBanner";
 import { isTableFormat } from "@/components/tls/BracketTree";
-import { statusBadgeLabel } from "@/components/tls/StatusBadge";
 import { TvScreen, useTv } from "@/components/tv/TvScreen";
-import { TvFooter, TvHeader, TvPill, TvPresentedBy, toneFor } from "@/components/tv/TvParts";
+import { TvFooter, TvHeader, TvPresentedBy, TvStatusPill, toneFor } from "@/components/tv/TvParts";
 import { TvBracketStage } from "@/components/tv/TvBracketStage";
 import { TvChampionCard, avatarOfRegistration, nameOfRegistration } from "@/components/tv/TvMoments";
 import { TvCallBoard } from "@/components/tv/TvCallBoard";
@@ -527,7 +526,7 @@ function BracketTv() {
               {parked && ((parkSpot === "header" && active === "tree") || active === TABLE_SLIDE) ? (
                 <TvChampionCard champion={champion} registrations={registrations} parked spot="header" testId="tv-champion-parked" />
               ) : null}
-              <TvPill tone={toneFor(t.status)} live={toneFor(t.status) === "live"} testId={`status-${t.status}`}>{statusBadgeLabel(t.status)}</TvPill>
+              <TvStatusPill status={t.status} testId={`status-${t.status}`} />
             </>
           )}
         />
