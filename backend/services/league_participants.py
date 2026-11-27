@@ -35,7 +35,10 @@ OPERATIONS_FOLLOW = ("Der Spielbetrieb einer Solo-Liga (Check-in, Veto, Ergebnis
                      "bleibt bis dahin im Entwurf.")
 SUCCESSOR_FOLLOWS = ("Die Folge-Season mit Auf- und Abstieg und Startrechten folgt für Solo-Ligen in einem späteren Ausbau – bis dahin "
                      "eine neue Season anlegen und die Spieler zuteilen.")
-WRONG_ENTRY_SOLO = "In dieser Staffel spielen Spieler, keine Co-Teams – bitte eine Person zuteilen."
+# Prüfung vor der Veröffentlichung (Nr. 297): Veröffentlichen bleibt erlaubt, „Was fehlt noch?“ warnt aber, bis P3 steht.
+READINESS_FOLLOWS = ("Solo-Liga: Spielbetrieb folgt – Spiele lassen sich noch nicht austragen. Veröffentlichen geht, die Staffeln "
+                     "starten aber erst, wenn Check-in, Veto und Melden für Spieler fertig sind.")
+WRONG_ENTRY_SOLO ="In dieser Staffel spielen Spieler, keine Co-Teams – bitte eine Person zuteilen."
 WRONG_ENTRY_TEAM = "In dieser Staffel spielen Co-Teams – bitte ein Co-Team zuteilen."
 # Status einer Solo-Staffel, die erst mit dem Spielbetrieb (P3) Sinn haben.
 OPERATING_STATUSES = frozenset({"live", "paused", "completed", "results_published"})
@@ -57,6 +60,14 @@ def game_allows(game: dict | None, kind: str) -> bool:
     if kind != SOLO:
         return True
     return (game or {}).get("supports_solo") is not False
+
+
+def solo_off_problem(league_names: list[str]) -> str | None:
+    """Einzelspieler am Spiel ausschalten (#1629, Nr. 296): nicht still, solange Solo-Ligen (auch archivierte) das Spiel spielen."""
+    if not league_names:
+        return None
+    return (f"Spiel hat Solo-Ligen: {', '.join(league_names)}. Einzelspieler bleiben erlaubt, solange eine Solo-Liga dieses Spiel "
+            "spielt – auch eine archivierte. Für Teams allein eine neue Team-Liga anlegen.")
 
 
 def game_problem(game: dict | None, kind: str) -> str | None:
