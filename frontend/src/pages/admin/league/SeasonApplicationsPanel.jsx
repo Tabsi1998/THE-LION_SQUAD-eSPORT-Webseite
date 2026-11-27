@@ -14,6 +14,8 @@ import { carryLine } from "@/lib/leagueSuccessor";
 import { APPLICATION_STATES, statsLine } from "@/lib/leagueApplications";
 import { viennaDateTime } from "@/lib/vienna";
 import { staffelAdminUrl } from "@/lib/staffelTabs";
+import { GuestBadge } from "@/components/tls/league/GuestBadge";
+import { GuestTeamControl } from "./GuestTeamControl";
 
 const WHEN = { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" };
 const BUTTON = "inline-flex min-h-[40px] items-center rounded-sm px-3 py-1.5 text-[11px] font-bold uppercase tracking-wider disabled:opacity-50";
@@ -150,13 +152,16 @@ function historyLine(step) {
   return `${when(step.at)}: ${APPLICATION_STATES[step.status]?.label || step.status}, ${step.by_name}${step.reason ? `, ${step.reason}` : ""}${step.conflict_reason ? ` (Notausnahme: ${step.conflict_reason})` : ""}`;
 }
 
-function ApplicationRow({ row, options, busy, act, superadmin }) {
+function ApplicationRow({ row, options, busy, act, superadmin, seasonId = null, reload = null }) {
   return (
     <li className="rounded-sm border border-white/10 bg-[#0A0A0A] p-3" data-testid={`application-${row.id}`}>
       <div className="flex flex-wrap items-center gap-2">
         <span className="min-w-0 font-semibold text-white [overflow-wrap:anywhere]">{row.display_name}</span>
         <ApplicationStateBadge state={row.status} />
+        {row.guest_badge ? <GuestBadge badge={row.guest_badge} testId={`application-guest-mark-${row.id}`} /> : null}
       </div>
+      {/* Gastteam (#1665): Angabe der Teamleitung und Kennzeichen - nur bei offenen Anmeldungen zum Bestätigen. */}
+      {seasonId ? <GuestTeamControl row={row} seasonId={seasonId} superadmin={superadmin} onChanged={reload} /> : null}
       {row.carry_over ? (
         <p className="mt-1 text-sm text-white/85 [overflow-wrap:anywhere]" data-testid={`application-carry-${row.id}`}>{carryLine(row.carry_over)}</p>
       ) : null}
@@ -261,7 +266,9 @@ export function SeasonApplicationsPanel({ seasonId, version }) {
           return (
             <div key={group.key} className="space-y-2">
               <h3 className="text-[11px] font-bold uppercase tracking-widest text-white/60">{group.title} ({rows.length})</h3>
-              <ul className="space-y-2">{rows.map((row) => <ApplicationRow key={row.id} row={row} options={options(row)} busy={busy} act={act} superadmin={Boolean(data.superadmin)} />)}</ul>
+              <ul className="space-y-2">{rows.map((row) => (
+                <ApplicationRow key={row.id} row={row} options={options(row)} busy={busy} act={act} superadmin={Boolean(data.superadmin)} seasonId={seasonId} reload={load} />
+              ))}</ul>
             </div>
           );
         })}

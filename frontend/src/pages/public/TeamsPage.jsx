@@ -38,6 +38,7 @@ import { TeamSquads } from "@/pages/public/team/TeamSquads";
 import { TeamInviteSheet } from "@/pages/public/team/TeamInviteSheet";
 import { TeamJoinCard } from "@/pages/public/team/TeamJoinCard";
 import { TeamDissolveSection } from "@/pages/public/team/TeamDissolveSection";
+import { TeamGuestSection } from "@/pages/public/team/TeamGuestSection";
 import { SideSheet } from "@/components/tls/SideSheet";
 import { TeamHeader } from "@/pages/public/team/TeamHeader";
 import { inviteTokenFrom, memberRole, ROLE_LABELS, TEAM_NAME_MAX, TEAM_NAME_MIN, TEAM_TAG_MAX, TEAM_TAG_MIN } from "@/lib/teamPage";
@@ -594,6 +595,7 @@ function TeamDetail({ id }) {
           team={editing}
           onClose={() => setEditing(null)}
           onSaved={() => { setEditing(null); load(); }}
+          onGuestSaved={load}
           canDissolve={canDissolve}
           canChangeVisibility={canChangeRoles}
           canEditBanner={canEdit}
@@ -722,7 +724,7 @@ function TeamChat({ team, user }) {
   );
 }
 
-function TeamModal({ team, onClose, onSaved, canDissolve = false, canChangeVisibility = false, canEditBanner = true, onDissolved }) {
+function TeamModal({ team, onClose, onSaved, onGuestSaved, canDissolve = false, canChangeVisibility = false, canEditBanner = true, onDissolved }) {
   const isNew = !team?.id;
   const [form, setForm] = useState({ ...emptyTeam, ...team });
   const { submitting: saving, submitOnce } = useSubmissionGuard();
@@ -792,6 +794,8 @@ function TeamModal({ team, onClose, onSaved, canDissolve = false, canChangeVisib
           </div>
         ) : null}
       </form>
+      {/* Gastteam (#1665): Verein oder Schule gibt nur die Teamleitung an - eigenes Speichern wie „Team auflösen“. */}
+      {!isNew && team.can_edit_guest_team ? <div className="mt-4"><TeamGuestSection team={team} onSaved={onGuestSaved} /></div> : null}
       {!isNew && canDissolve ? <TeamDissolveSection team={team} onDissolved={onDissolved} /> : null}
     </SideSheet>
   );

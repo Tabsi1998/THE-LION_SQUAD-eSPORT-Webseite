@@ -43,7 +43,7 @@ export function SeasonEntryTab({ seasonId, season, form, set, canSeason, canAppl
       {canSeason ? (
         <SeasonTabForm {...formProps}>
           <SeasonApplicationSection form={form} set={set} id="selbstanmeldung" deadlineField={deadline} waiting={applicationsWaiting}
-            late={lateRegistration} seasonId={seasonId} onReload={onReload} />
+            late={lateRegistration} seasonId={seasonId} onReload={onReload} season={season} />
           <SeasonEligibilitySection form={form} set={set} id="spielberechtigung" />
           <SeasonPlatformSection seasonId={seasonId} form={form} set={set} id="plattform" version={season.updated_at} />
         </SeasonTabForm>
