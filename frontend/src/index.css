@@ -3412,17 +3412,9 @@ html[data-season-still-cards] .tls-card[data-season-perch="card"]:focus-visible 
   transition: opacity var(--tls-motion-mid) var(--tls-ease);
 }
 
-/* Mein Kalender (#1788): der eigene Stand als Plakette - Cyan heißt „du“ (#1305), Warteliste wartet, Erledigtes ist grün,
-   Vereinstermine tragen Vereinsgold. Termine heben sich gestaffelt an, der Abo-Hinweis ebenso, beim Kopieren erscheint
-   der Haken. Mit „Bewegung reduzieren“ steht --tls-motion-on auf 0 und die Dauern auf fast null: nichts bewegt sich. */
-.tls-own-badge {
-  display: inline-flex; align-items: center; padding: 1px 6px; border-radius: 3px; font-size: var(--tls-type-label-size); font-weight: 700;
-  letter-spacing: 0.06em; text-transform: uppercase; white-space: nowrap;
-  color: var(--tls-brand); background: rgb(var(--tls-brand-rgb) / 0.12);
-}
-.tls-own-badge[data-tone="wait"] { color: var(--tls-warn); background: rgb(var(--tls-warn-rgb) / 0.14); }
-.tls-own-badge[data-tone="done"] { color: var(--tls-ok); background: rgb(var(--tls-ok-rgb) / 0.14); }
-.tls-own-badge[data-tone="club"] { color: var(--tls-honor); background: rgb(var(--tls-honor-rgb) / 0.12); }
+/* Mein Kalender (#1788): der eigene Stand ist seit #1306 ein Zustands-Schild (StatusChip). Termine heben sich gestaffelt
+   an, der Abo-Hinweis ebenso, beim Kopieren erscheint der Haken. Mit „Bewegung reduzieren“ steht --tls-motion-on auf 0
+   und die Dauern auf fast null: nichts bewegt sich. */
 @keyframes tls-cal-rise {
   from { opacity: 0; transform: translateY(calc(6px * var(--tls-motion-on))); }
   to { opacity: 1; transform: none; }

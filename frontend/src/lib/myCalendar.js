@@ -69,13 +69,24 @@ const BADGE_TONES = {
   done: "done",
 };
 
-/** Die Plakette zu einem Termin: der eigene Stand vom Server, beim Turnier mit Team „mit Lions Rocket“. */
+// Als Zustands-Schild (#1306): Warteliste und Anfrage warten, gefahren und erledigt ist vorbei, alles andere heißt „du
+// bist dabei“ (angemeldet, eingecheckt, zugesagt, Schicht). Das Wort kommt vom Server, das Team steht neben dem Schild.
+const BADGE_KINDS = {
+  waitlist: "waiting",
+  pending: "waiting",
+  requested: "waiting",
+  driven: "done",
+  done: "done",
+};
+
+/** Die Plakette zu einem Termin: der eigene Stand vom Server, beim Turnier mit Team „mit Lions Rocket“. `kind`, `word`
+ *  und `team` für das Zustands-Schild; `label` ist der ganze Satz (Vorlesetext, Kalender-Abo). */
 export function ownBadge(item) {
   const own = item?.own;
   if (!own?.label) return null;
   const tone = item.kind === "club" ? "club" : BADGE_TONES[own.state] || "mine";
   const label = own.team_name ? `${own.label} · mit ${own.team_name}` : own.label;
-  return { label, tone };
+  return { label, tone, kind: BADGE_KINDS[own.state] || "joined", word: own.label, team: own.team_name || null };
 }
 
 /** Status des Abos in einem Satz - „aktiv seit 3. Okt., zuletzt abgerufen …“; ohne Abo nichts. */

@@ -411,7 +411,8 @@ function ItemRow({ item, withDate = false }) {
         <span className="tls-wrap block tls-type-small font-bold">{item.title}</span>
         {badge ? (
           <span className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 tls-type-small text-white/50">
-            <span className="tls-own-badge" data-tone={badge.tone} data-testid={`calendar-badge-${item.kind}-${item.id}`}>{badge.label}</span>
+            {/* Der eigene Stand als Zustands-Schild (#1306), das Team daneben. */}
+            <StatusChip kind={badge.kind} label={badge.word} dataTone={badge.tone} testId={`calendar-badge-${item.kind}-${item.id}`} meta={badge.team ? `mit ${badge.team}` : null} metaTestId={`calendar-badge-team-${item.kind}-${item.id}`} />
             {item.phase?.label && item.kind !== "club" ? <PhaseText item={item} /> : null}
           </span>
         ) : (item.phase?.label || item.mine) && (
