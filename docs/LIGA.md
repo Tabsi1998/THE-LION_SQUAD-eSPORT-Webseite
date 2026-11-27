@@ -5317,7 +5317,7 @@ je Liga N, auch nach der ersten Staffel.
 | Wo | Feld / Wert | Regel |
 | --- | --- | --- |
 | `leagues` | `participant_kind: "team" \| "solo"` | beim Anlegen gewählt, Vorgabe `team`. `solo` nur mit einem Spiel, das Einzelspieler erlaubt (`games.supports_solo`, ohne Feld ja), sonst 422 mit Satz. Jeder andere Wert beim Ändern: 409 „Die Teilnehmerart steht ab dem Anlegen fest …“. Ein Spielwechsel einer Solo-Liga prüft das neue Spiel genauso |
-| `games` | `supports_solo` | Schalter „Einzelspieler erlaubt“ auf der Spielseite (Reiter Allgemein, Nr. 296), Vorgabe an, ein Altspiel ohne Feld gilt als erlaubt. Ausschalten, solange eine Solo-Liga - auch archiviert - das Spiel spielt: 409 „Spiel hat Solo-Ligen: …“ (`game_routes.update_game`) |
+| `games` | `supports_solo` | Schalter „Einzelspieler erlaubt“ auf der Spielseite (Reiter Allgemein, Nr. 296), Vorgabe an, ein Altspiel ohne Feld gilt als erlaubt. Ausschalten, solange eine Solo-Liga - auch archiviert - das Spiel spielt: 409 „Spiel hat Solo-Ligen: …“ (`game_routes.update_game`). Ausschalten und Solo-Liga anlegen laufen unter derselben Sperre (`mutation_lock.game_solo_resource`) - nie beides zugleich |
 | Prüfung vor der Veröffentlichung | Warnung `solo_operations_follow` | „Solo-Liga: Spielbetrieb folgt – Spiele lassen sich noch nicht austragen. …“ ganz oben, gelb hervorgehoben (Nr. 297). Hält das Veröffentlichen nicht auf; fällt mit P3 weg |
 | neue Season einer Solo-Liga | `team_size 1`, `min_squad_size 1`, `max_squad_size 1`, `lineup_min_players 1` | Vorgaben (S11), was die Leitung mitschickt, gilt. Check-in `min_present` folgt daraus (1). Teamgröße und Mindestkader sind in Season und Liga N fest 1 (422 mit Satz) |
 | Season einer Solo-Liga | `application_opens_at` / `…_closes_at` | gibt es noch nicht (422 „Die Selbstanmeldung als Spieler folgt …“); `league_applications.season_problems` lehnt zusätzlich jeden Antrag ab |
@@ -5328,20 +5328,26 @@ je Liga N, auch nach der ersten Staffel.
 **Zuteilen durch die Leitung** (Zuständigkeit „Teams freigeben“): derselbe Weg wie beim Co-Team.
 
 - `GET /api/tournaments/{tid}/squad-candidates?q=` liefert in einer Solo-Staffel `{kind: "solo", people[], seats_taken,
-  max_participants, id_label}`: Konten ab zwei Zeichen nach Name, ohne E-Mail, je Person `problems` (gesperrt, schon in der Staffel,
-  in einer anderen Staffel der Season, Staffel voll) und Hinweise (Alter, Plattform, Spiel-ID). Eine Team-Staffel antwortet wie bisher.
-- `POST …/squad-registrations` mit `{user_id}`: Prüfung, Anmeldung, Protokoll `league.player.assign`, Vorschau neu mischen, Nachricht an
-  die Person, Spiel-ID für die Season festhalten (`league_roster.after_assign` mit der Person als Kader). Ein Co-Team in einer
-  Solo-Staffel oder eine Person in einer Team-Staffel: 400 mit Satz.
+  max_participants, id_label}`: aktive, nicht gesperrte Konten ab zwei Zeichen nach Name (wie `mention-search`), ohne E-Mail, je Person
+  `problems` (schon in der Staffel, in einer anderen Staffel der Season, Staffel voll) und Hinweise (Alter, Plattform, Spiel-ID). Eine
+  Team-Staffel antwortet wie bisher.
+- `POST …/squad-registrations` mit `{user_id}`: Prüfung (ein gesperrtes Konto: 400), Anmeldung, Protokoll `league.player.assign`, Vorschau
+  neu mischen, Nachricht an die Person, Spiel-ID für die Season festhalten (`league_roster.after_assign` mit der Person als Kader). Ein
+  Co-Team in einer Solo-Staffel oder eine Person in einer Team-Staffel: 400 mit Satz. **Sich selbst** teilt die Leitung nicht zu (403);
+  der Superadmin nur als Notausnahme mit `conflict_reason` (mindestens fünf Zeichen), im Protokoll `league.conflict.override` - wie bei
+  der eigenen Anmeldung (#2245).
 - `DELETE …/squad-registrations/{id}` nimmt auch eine Person zurück, solange sie in keinem festen Spiel steht (`league.player.remove`).
+  Selbst abmelden (`DELETE …/registrations/{id}`) kann sich die Person nicht: 403 „Eine zugeteilte Person nimmt nur die Leitung aus der
+  Staffel.“ (wie beim Co-Team).
+- Protokoll im Leitstand: „Spieler · übernommen“ bzw. „Spieler · entfernt“; Austritt und Ausschluss heißen in der Solo-Liga „Spieler · …“.
 
 **Gesperrt mit „folgt“** (kein halber Weg):
 
 | Weg | Sperre | folgt in |
 | --- | --- | --- |
 | Selbstanmeldung als Spieler, Eingang, Los, Nachmeldung | kein Anmeldefenster, kein Antrag; die Verwaltung zeigt den Satz statt der Abschnitte | P2 (S7, S8) |
-| Spielbetrieb: Check-in, Veto, Melden, Vorfälle, Strafen | Status `live`, `paused`, `completed`, `results_published` einer Solo-Staffel: 400 (`staffel_guard.staffel_status_problem`); „Liga starten“ gesperrt mit Satz | P3 |
-| Folge-Season, Startrechte, Auf- und Abstieg je Person | Vorschau und Anlegen nennen den Satz als ersten Grund (`league_successor.plan`) | P4 (S9) |
+| Spielbetrieb: Check-in, Veto, Melden, Vorfälle, Strafen | Status `live`, `paused`, `completed`, `results_published` einer Solo-Staffel: 400 (`staffel_guard.staffel_status_problem`); „Liga starten“ gesperrt mit Satz. Ein **fester Spielplan** entsteht auf keinem Weg (`stages/{id}/generate` ohne `preview`, `bracket/from-format` mit `preview=false`, `bracket/apply`: 400, `staffel_guard.solo_fixed_plan_problem`), die Vorschau bleibt. **Check-in** selbst (`POST …/checkin`) und durch die Leitung (`…/registrations/{id}/checkin`): 409 | P3 |
+| Folge-Season, Startrechte, Auf- und Abstieg je Person | Vorschau und Anlegen nennen den Satz als ersten Grund (`league_successor.plan`); `PUT …/start-rights`: 409; der Knopf „Neue Season aus …“ ist gesperrt mit Satz | P4 (S9) |
 | App | unverändert | A9 |
 
 **Verwaltung:** Liga anlegen mit „Teilnehmer“ neben dem Spiel (nur bei Spielen mit Einzelspielern), danach nur lesend. Übersicht,

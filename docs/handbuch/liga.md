@@ -671,15 +671,22 @@ neue Liga an. Spielt eine Solo-Liga das Spiel, lässt sich **Einzelspieler erlau
 
 1. Season-Seite, Reiter **Ligen und Staffeln** → bei der Staffel **Staffel öffnen** → Reiter **Teilnehmer**.
 2. **Spieler zuteilen** → Namen oder Benutzernamen eintippen (ab zwei Zeichen) → die Person wählen → **Zuteilen**.
-3. Wer nicht passt, steht grau mit dem Grund da: Konto gesperrt, schon in dieser Staffel, schon in einer anderen Staffel der Season
-   oder die Staffel ist voll. Fehlendes Geburtsdatum, andere Plattform oder fehlende Spiel-ID stehen nur als Hinweis da.
-4. **Entfernen** nimmt die Person wieder heraus, solange der Spielplan nicht fest ist.
+3. Wer nicht passt, steht grau mit dem Grund da: schon in dieser Staffel, schon in einer anderen Staffel der Season oder die Staffel
+   ist voll. Gesperrte und deaktivierte Konten erscheinen in der Suche gar nicht. Fehlendes Geburtsdatum, andere Plattform oder fehlende
+   Spiel-ID stehen nur als Hinweis da.
+4. **Entfernen** nimmt die Person wieder heraus, solange der Spielplan nicht fest ist. Selbst abmelden kann sich die Person nicht – das
+   macht die Leitung, wie beim Co-Team.
+
+**Dich selbst** teilst du nicht zu – das macht eine andere Person aus der Leitung. Nur der **Superadmin** darf als Notausnahme mit einem
+Grund (mindestens fünf Zeichen); er steht im Protokoll.
 
 **Was noch folgt** (die Seite sagt es an der Stelle):
 
 - **Selbstanmeldung als Spieler** mit Eingang, Los und Nachmeldung: bis dahin teilst du alle Spieler zu.
-- **Spielbetrieb** (Check-in, Veto, Ergebnis melden): **Liga starten** ist bis dahin gesperrt, die Staffel bleibt vor dem Start.
-- **Neue Season aus der Vorgänger-Season** mit Auf- und Abstieg und Startrechten: bis dahin legst du die nächste Season neu an.
+- **Spielbetrieb** (Check-in, Veto, Ergebnis melden): **Liga starten** ist bis dahin gesperrt, die Staffel bleibt vor dem Start. Einen
+  festen Spielplan und den Check-in gibt es bis dahin auf keinem Weg; die Vorschau des Spielplans schon.
+- **Neue Season aus der Vorgänger-Season** mit Auf- und Abstieg und Startrechten: Der Knopf ist gesperrt, bis dahin legst du die nächste
+  Season neu an.
 
 ### 2.6 Spielplan und Start
 
