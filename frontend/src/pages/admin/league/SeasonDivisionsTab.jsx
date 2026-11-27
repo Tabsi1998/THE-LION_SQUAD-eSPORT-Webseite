@@ -13,6 +13,7 @@ import { nicknameRepeatsLevel, seasonWithEnd } from "@/lib/seasonTabs";
 import { crossFieldsShown } from "@/lib/leagueCrossZones";
 import { byMaps, zonesLine, zonesPayload, zonesToForm } from "@/lib/leagueTable";
 import { staffelAdminUrl } from "@/lib/staffelTabs";
+import { isSoloLeague } from "@/lib/leagueParticipants";
 import { PrizeEditor } from "./LeagueLookFields";
 import { DivisionPlatformFields } from "./DivisionPlatformFields";
 import { SeasonTabForm } from "./SeasonTabForm";
@@ -28,7 +29,7 @@ export const DIVISIONS_LOCKED_HINT = "Gesperrt: In dieser Season ist schon eine 
 // Staffeln stehen fest (#2404): In einer Liga mit Playoffs oder Relegation rechnet beides mit den Staffeln vom ersten Abschluss.
 const STAFFELN_LOCKED = "Gesperrt: In dieser Liga ist schon eine Staffel abgeschlossen. Playoffs und Relegation rechnen mit den Staffeln, die es beim Abschluss gab – eine weitere Staffel geht erst, wenn alle abgeschlossenen Staffeln dieser Liga im Reiter „Abschluss“ wieder geöffnet sind.";
 
-export function DivisionSheet({ division, season, nextLevel, divisionsLocked = false, onClose, onSaved }) {
+export function DivisionSheet({ division, season, nextLevel, divisionsLocked = false, solo = false, onClose, onSaved }) {
   const [nickname, setNickname] = useState(division?.nickname || "");
   const [status, setStatus] = useState(division?.status || "active");
   const [form, setForm] = useState(() => overridesToForm(division?.overrides || {}));
@@ -83,12 +84,17 @@ export function DivisionSheet({ division, season, nextLevel, divisionsLocked = f
       <FormGrid>
         <SelectField label="Best of" value={form.best_of} onChange={(value) => set("best_of", value)}
           options={[["", `wie Season (Best of ${season.best_of})`], ...BEST_OF_OPTIONS]} testId="override-best-of" />
-        <TextField label="Teamgröße" type="number" min={1} max={20} value={form.team_size} onChange={(value) => set("team_size", value)}
-          placeholder={`wie Season (${season.team_size})`} testId="override-team-size" />
-        <TextField label="Mindestkader" type="number" min={1} max={40} value={form.min_squad_size} onChange={(value) => set("min_squad_size", value)}
-          placeholder={`wie Season (${season.min_squad_size})`} testId="override-min-squad" />
-        <TextField label="Teams je Staffel höchstens" type="number" min={2} max={20} value={form.max_staffel_size} onChange={(value) => set("max_staffel_size", value)}
-          placeholder={`wie Season (${season.max_staffel_size})`} testId="override-staffel-size" />
+        {/* Solo-Liga (#1629): 1 gegen 1 und der Kader ist die Person - Teamgröße und Mindestkader gibt es dort nicht abweichend. */}
+        {solo ? null : (
+          <>
+            <TextField label="Teamgröße" type="number" min={1} max={20} value={form.team_size} onChange={(value) => set("team_size", value)}
+              placeholder={`wie Season (${season.team_size})`} testId="override-team-size" />
+            <TextField label="Mindestkader" type="number" min={1} max={40} value={form.min_squad_size} onChange={(value) => set("min_squad_size", value)}
+              placeholder={`wie Season (${season.min_squad_size})`} testId="override-min-squad" />
+          </>
+        )}
+        <TextField label={solo ? "Spieler je Staffel höchstens" : "Teams je Staffel höchstens"} type="number" min={2} max={20} value={form.max_staffel_size}
+          onChange={(value) => set("max_staffel_size", value)} placeholder={`wie Season (${season.max_staffel_size})`} testId="override-staffel-size" />
         <TextField label="Antwort auf Terminvorschlag (Stunden)" type="number" min={1} max={720} value={form.match_schedule_response_hours}
           onChange={(value) => set("match_schedule_response_hours", value)} testId="override-response"
           placeholder={season.match_schedule_response_hours ? `wie Season (${season.match_schedule_response_hours})` : "wie Season"} />
@@ -190,6 +196,8 @@ export function SeasonDivisionsTab({ data, form, set, canSeason, formProps, staf
   const now = new Date();
   // Mit dem wirksamen Ende der Anmeldung (Nachmeldefrist #2422) vom Server.
   const season = seasonWithEnd(data);
+  // Solo-Liga (#1629): Spieler statt Teams je Staffel.
+  const solo = isSoloLeague(data.league);
   return (
     <div className="space-y-6">
       <section id="staffeln" className="scroll-mt-24 space-y-4 rounded-sm border border-white/10 bg-[#121212] p-4 md:p-5" aria-label="Ligen und Staffeln" data-testid="season-divisions">
@@ -218,8 +226,8 @@ export function SeasonDivisionsTab({ data, form, set, canSeason, formProps, staf
                 {nicknameRepeatsLevel(division.nickname) ? (
                   <p className="tls-type-small text-warn" data-testid={`division-nickname-repeat-${division.level}`}>Der Beiname wiederholt die Stufe. Über den Stift leeren oder ändern.</p>
                 ) : null}
-                <p className="tls-type-small text-white/55">{settingsLine(division.settings)}{Object.keys(division.overrides || {}).length ? " · weicht von der Season ab" : ""}</p>
-                <p className="tls-type-small text-white/55">{division.calendar.active_weeks} Spielwochen – höchstens {division.calendar.max_teams_per_staffel} Teams je Staffel</p>
+                <p className="tls-type-small text-white/55">{settingsLine(division.settings, { solo })}{Object.keys(division.overrides || {}).length ? " · weicht von der Season ab" : ""}</p>
+                <p className="tls-type-small text-white/55">{division.calendar.active_weeks} Spielwochen – höchstens {division.calendar.max_teams_per_staffel} {solo ? "Spieler" : "Teams"} je Staffel</p>
                 {division.zones_effective ? (
                   <p className="tls-type-small text-white/55" data-testid={`division-zones-${division.level}`}>Auf- und Abstieg: {zonesLine(division.zones_effective)}</p>
                 ) : null}

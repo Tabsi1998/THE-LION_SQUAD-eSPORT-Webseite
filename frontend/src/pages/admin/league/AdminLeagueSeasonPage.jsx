@@ -47,8 +47,9 @@ import { SeasonTableLinks } from "./SeasonTablePanel";
 import { SeasonPointsFields, SeasonTableRules } from "./SeasonTableRules";
 import { SeasonTabForm } from "./SeasonTabForm";
 import { toast } from "sonner";
+import { isSoloLeague, participantLabel } from "@/lib/leagueParticipants";
 
-const LONG_DAY = { day: "2-digit", month: "2-digit", year: "numeric" };
+const LONG_DAY ={ day: "2-digit", month: "2-digit", year: "numeric" };
 const SAVE_LABELS = {
   ueberblick: "Überblick speichern", spielbetrieb: "Spielbetrieb speichern", termine: "Termine speichern", anmeldung: "Anmeldung und Kader speichern",
   tabelle: "Tabelle speichern", ligen: "Staffelgröße speichern",
@@ -153,6 +154,8 @@ export default function AdminLeagueSeasonPage() {
   const canSeason = can("season");
   const canRules = can("rules");
   const season = data?.season;
+  // Solo-Liga (#1629, P1): 1 gegen 1, Spieler statt Co-Teams - die Reiter blenden aus, was es für Spieler (noch) nicht gibt.
+  const solo = isSoloLeague(data?.league);
   const saved = useMemo(() => (season ? seasonToForm(season) : null), [season]);
   const staffelCount = (data?.divisions || []).reduce((sum, division) => sum + division.staffeln.length, 0);
   const readinessVersion = data ? `${season.updated_at}-${data.map_pool?.version ?? 0}-${data.divisions.length}-${staffelCount}` : "";
@@ -297,7 +300,7 @@ export default function AdminLeagueSeasonPage() {
     const ok = await confirm({
       title: `Staffel in ${division.label} anlegen?`,
       // Liga-Wörter (Paket D, #2262): kein „Liga-Turnier“, kein „Entwurf“.
-      description: `Eine Staffel mit allen Vorgaben der Season (${settingsLine(division.settings)}), noch vor dem Start. Danach teilst du auf der Staffel-Seite die Co-Teams zu.`,
+      description: `Eine Staffel mit allen Vorgaben der Season (${settingsLine(division.settings, { solo })}), noch vor dem Start. Danach teilst du auf der Staffel-Seite die ${solo ? "Spieler" : "Co-Teams"} zu.`,
       confirmLabel: "Staffel anlegen",
     });
     if (!ok) return;
@@ -364,14 +367,14 @@ export default function AdminLeagueSeasonPage() {
     // Leitstand (E.4, Nr. 152): offene Aufgaben, Protokoll und Rundnachricht - lesen darf jede Zuständigkeit, der Server filtert.
     leitstand: () => <SeasonDeskTab seasonId={seasonId} divisions={data.divisions} />,
     spielbetrieb: () => (
-      <SeasonPlayTab seasonId={seasonId} data={data} form={form} set={set} canSeason={canSeason} readiness={readiness} formProps={formProps("spielbetrieb")}
+      <SeasonPlayTab seasonId={seasonId} data={data} form={form} set={set} canSeason={canSeason} readiness={readiness} formProps={formProps("spielbetrieb")} solo={solo}
         modes={modes} longest={longest} orderNote={orderNote} seasonModes={seasonModes} onSeasonModes={setSeasonModes} onPoolDirty={setPoolDirty}
         onSavePool={savePool} onClearPool={clearPool} onPendingSync={setPendingSync} reload={reload} />
     ),
     termine: () => <SeasonDatesTab seasonId={seasonId} data={data} form={form} set={set} canSeason={canSeason} formProps={formProps("termine")} />,
     anmeldung: () => (
       <SeasonEntryTab seasonId={seasonId} season={season} form={form} set={set} canSeason={canSeason} canApplications={can("applications")} canRoster={can("roster")}
-        formProps={formProps("anmeldung")} onJump={go} applicationsWaiting={data.applications_waiting || 0}
+        formProps={formProps("anmeldung")} onJump={go} applicationsWaiting={data.applications_waiting || 0} solo={solo}
         lateRegistration={data.late_registration || null} onReload={reload} />
     ),
     tabelle: () => (
@@ -422,7 +425,7 @@ export default function AdminLeagueSeasonPage() {
               <div className="min-w-0">
                 <h1 className="tls-type-title break-words">{data.league.name} · {season.name}</h1>
                 <p className="mt-1 tls-type-small text-white/60" data-testid="season-head">
-                  {data.game?.name || "Spiel fehlt"} · ab {viennaDate(season.start_date, LONG_DAY)} · Sichtbarkeit: {VISIBILITY_SHORT[season.visibility]}
+                  {data.game?.name || "Spiel fehlt"} · {participantLabel(data.league)} · ab {viennaDate(season.start_date, LONG_DAY)} · Sichtbarkeit: {VISIBILITY_SHORT[season.visibility]}
                 </p>
               </div>
             </div>
@@ -479,7 +482,7 @@ export default function AdminLeagueSeasonPage() {
 
           {divisionSheet ? (
             <DivisionSheet division={divisionSheet.id ? divisionSheet : null} season={season} nextLevel={(data.divisions.at(-1)?.level || 0) + 1}
-              divisionsLocked={Boolean(data.divisions_locked)}
+              divisionsLocked={Boolean(data.divisions_locked)} solo={solo}
               onClose={() => setDivisionSheet(null)} onSaved={() => { setDivisionSheet(null); reload(); }} />
           ) : null}
           {recomputeOpen ? (

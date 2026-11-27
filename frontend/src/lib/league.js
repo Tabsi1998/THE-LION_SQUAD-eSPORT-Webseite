@@ -259,11 +259,12 @@ export function overridesToForm(overrides = {}) {
 }
 
 /** Kurztext der geltenden Vorgaben einer Liga N: „Best of 3 · 4 gegen 4 · bis 8 Teams“. */
-export function settingsLine(settings = {}) {
+// Solo-Liga (#1629): `solo` zählt Spieler statt Teams je Staffel.
+export function settingsLine(settings = {}, { solo = false } = {}) {
   const parts = [];
   if (settings.best_of) parts.push(`Best of ${settings.best_of}`);
   if (settings.team_size) parts.push(`${settings.team_size} gegen ${settings.team_size}`);
-  if (settings.max_staffel_size) parts.push(`bis ${settings.max_staffel_size} Teams je Staffel`);
+  if (settings.max_staffel_size) parts.push(`bis ${settings.max_staffel_size} ${solo ? "Spieler" : "Teams"} je Staffel`);
   const points = settings.scoring_rules?.match_points;
   if (byMaps(settings.scoring_rules)) parts.push("Punkte je gewonnene Map");
   else if (points) parts.push(`Punkte ${points.win}/${points.draw}/${points.loss}`);

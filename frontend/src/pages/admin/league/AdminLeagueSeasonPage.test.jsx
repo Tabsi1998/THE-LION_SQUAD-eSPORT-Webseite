@@ -946,3 +946,59 @@ test("ohne das Kennzeichen des Servers bleibt „Staffel anlegen“ bedienbar, o
   expect(await screen.findByTestId("staffel-add-1")).toBeEnabled();
   expect(screen.queryByTestId("staffeln-locked-1")).toBeNull();
 });
+
+// ---------------------------------------------------------------- Solo-Liga (#1629, P1)
+
+const SOLO_SEASON = { ...SEASON, team_size: 1, min_squad_size: 1, max_squad_size: 1, lineup_mode: "series", lineup_min_players: 1, min_age: 18 };
+const SOLO_BODY = {
+  ...BODY,
+  league: { ...BODY.league, participant_kind: "solo" },
+  season: SOLO_SEASON,
+  divisions: [{ ...BODY.divisions[0], settings: { ...BODY.divisions[0].settings, team_size: 1, min_squad_size: 1 } }],
+};
+
+test("Solo-Liga: Kopf nennt die Art, Teamgröße fest auf 1, Anmeldung mit „folgt“ statt Eingang und Kaderregeln", async () => {
+  body = SOLO_BODY;
+  const first = renderPage("#spielbetrieb");
+  expect(await screen.findByTestId("season-head")).toHaveTextContent("Probe Shooter · Spieler (1 gegen 1) · ab");
+  expect(screen.getByTestId("season-form-team-size")).toBeDisabled();
+  expect(screen.getByText("Solo-Liga: Jede Person spielt für sich – immer 1 gegen 1.")).toBeInTheDocument();
+  first.unmount();
+
+  renderPage("#anmeldung");
+  expect(await screen.findByTestId("season-solo-entry-follows")).toHaveTextContent("Die Selbstanmeldung als Spieler folgt");
+  expect(screen.getByTestId("season-form-deadline")).toBeInTheDocument();
+  expect(screen.queryByTestId("season-form-application-opens")).toBeNull();
+  expect(screen.queryByTestId("season-form-min-squad")).toBeNull();
+  expect(screen.queryByTestId("season-form-one-team")).toBeNull();
+  expect(screen.getByTestId("season-form-min-age")).toBeInTheDocument();
+  expect(screen.getAllByRole("button").map((row) => row.textContent)).not.toContain("Startrechte");
+  // Eingang, Startrechte, Los und Kaderübersicht rechnen mit Co-Teams - in der Solo-Liga fragt die Seite sie gar nicht erst ab.
+  expect(apiMock.get).not.toHaveBeenCalledWith("/admin/leagues/seasons/s1/applications");
+});
+
+test("Solo-Liga: Liga N ohne eigene Teamgröße und Mindestkader, Staffel anlegen spricht von Spielern", async () => {
+  body = SOLO_BODY;
+  renderPage("#ligen");
+  expect(await screen.findByTestId("division-1")).toHaveTextContent("1 gegen 1 · bis 8 Spieler je Staffel");
+  fireEvent.click(screen.getByTestId("staffel-add-1"));
+  await waitFor(() => expect(confirmMock).toHaveBeenCalled());
+  expect(confirmMock.mock.calls.at(-1)[0].description).toMatch(/die Spieler zu\.$/);
+
+  fireEvent.click(screen.getByTestId("division-add"));
+  const sheet = screen.getByTestId("division-sheet");
+  expect(within(sheet).queryByTestId("override-team-size")).toBeNull();
+  expect(within(sheet).queryByTestId("override-min-squad")).toBeNull();
+  expect(within(sheet).getByText("Spieler je Staffel höchstens")).toBeInTheDocument();
+});
+
+test("Gegenprobe Team-Liga: Kopf nennt Co-Teams, Teamgröße bleibt änderbar, Eingang wie bisher", async () => {
+  const first = renderPage("#spielbetrieb");
+  expect(await screen.findByTestId("season-head")).toHaveTextContent("Probe Shooter · Co-Teams · ab");
+  expect(screen.getByTestId("season-form-team-size")).toBeEnabled();
+  first.unmount();
+  renderPage("#anmeldung");
+  expect(await screen.findByTestId("season-form-min-squad")).toBeInTheDocument();
+  expect(screen.queryByTestId("season-solo-entry-follows")).toBeNull();
+  await waitFor(() => expect(apiMock.get).toHaveBeenCalledWith("/admin/leagues/seasons/s1/applications"));
+});
