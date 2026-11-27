@@ -33,7 +33,7 @@ function KindIcon({ kind, testId }) {
  * @param {boolean} [onMedia] auf einem Bild: mit dunkler Unterlage
  * @param {import("react").ReactNode} [meta] kleiner Text daneben (Countdown, Tag) - am Handy darunter
  */
-export function StatusChip({ status, kind: kindProp, label, own = false, size = "sm", onMedia = false, meta = null, className = "", testId, dotTestId, metaTestId }) {
+export function StatusChip({ status, kind: kindProp, label, own = false, size = "sm", onMedia = false, meta = null, className = "", testId, dotTestId, metaTestId, dataTone }) {
   const resolved = statusKind(status, { own });
   const kind = kindProp && STATUS_KINDS[kindProp] ? kindProp : resolved.kind;
   const word = label || (kindProp && !status ? STATUS_KINDS[kind].label : resolved.word);
@@ -42,6 +42,7 @@ export function StatusChip({ status, kind: kindProp, label, own = false, size = 
       className={`tls-status-chip${size === "lg" ? " tls-status-chip--lg" : ""}${onMedia ? " tls-status-chip--media" : ""}${meta ? "" : className ? ` ${className}` : ""}`}
       data-kind={kind}
       data-status={status || undefined}
+      data-tone={dataTone}
       data-testid={testId}
     >
       <KindIcon kind={kind} testId={dotTestId} />
@@ -50,7 +51,7 @@ export function StatusChip({ status, kind: kindProp, label, own = false, size = 
   );
   if (!meta) return chip;
   return (
-    <span className={`tls-status${className ? ` ${className}` : ""}`}>
+    <span className={`tls-status${onMedia ? " tls-status--media" : ""}${className ? ` ${className}` : ""}`}>
       {chip}
       <span className="tls-status__meta tls-type-small" data-testid={metaTestId}>
         <span className="sr-only">, </span>

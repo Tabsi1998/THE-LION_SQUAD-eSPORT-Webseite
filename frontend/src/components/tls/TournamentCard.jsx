@@ -49,7 +49,8 @@ export function TournamentCard({ tournament, index = 0 }) {
         <div className="absolute inset-x-0 top-0 h-16 bg-gradient-to-b from-black/60 to-transparent" />
         <div className="absolute inset-x-0 bottom-0 h-1/4 bg-gradient-to-t from-[#18181B]/90 to-transparent" />
         <div className="absolute top-3 inset-x-3 flex flex-col items-start gap-1.5 sm:flex-row sm:items-start sm:justify-between">
-          <PhaseBadge phase={t.public_phase} status={t.status} className="max-w-full sm:max-w-[68%]" />
+          {/* Zustands-Schild (#1306): bricht nie um; auf der Grafik mit dunkler Unterlage, der Countdown daneben. */}
+          <PhaseBadge phase={t.public_phase} status={t.status} onMedia className="sm:max-w-[68%]" />
           {formatLabel && formatLabel !== "—" ? (
             <span className="max-w-full sm:max-w-[48%] tls-type-label text-[#29B6E8] bg-black/55 border border-[#29B6E8]/40 px-2 py-1 rounded-sm leading-tight break-words" data-testid="tournament-card-format">
               {formatLabel}
