@@ -225,7 +225,7 @@ function TemplateEditor({ template, onClose, onSaved }) {
           </div>
         </div>
         <div className="flex flex-wrap justify-between gap-2 pt-4 mt-4 border-t border-white/10">
-          <button type="button" onClick={reset} disabled={!!busy || !template.custom} data-testid="tpl-reset" className="inline-flex items-center gap-1 px-3 py-2 tls-type-label text-white/60 hover:text-[#FF3B30] disabled:opacity-40"><RotateCcw className="w-3.5 h-3.5" /> Auf Standard zurücksetzen</button>
+          <button type="button" onClick={reset} disabled={!!busy || !template.custom} data-testid="tpl-reset" className="inline-flex items-center gap-1 px-3 py-2 tls-type-label text-white/60 hover:text-live disabled:opacity-40"><RotateCcw className="w-3.5 h-3.5" /> Auf Standard zurücksetzen</button>
           <div className="flex gap-2">
             <button type="button" onClick={sendTest} disabled={!!busy || form === null} data-testid="tpl-test" className="inline-flex items-center gap-1 px-4 py-2 border border-[#29B6E8] text-[#29B6E8] tls-type-label rounded-sm disabled:opacity-50"><Send className="w-3.5 h-3.5" /> Testmail an mich</button>
             <button type="button" onClick={save} disabled={!!busy || form === null} data-testid="tpl-save" className="inline-flex items-center gap-1 px-5 py-2 bg-[#FFD700] text-black tls-type-label rounded-sm disabled:opacity-50"><Save className="w-3.5 h-3.5" /> {busy === "save" ? "Speichere …" : "Speichern"}</button>

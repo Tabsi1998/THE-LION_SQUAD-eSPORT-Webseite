@@ -79,7 +79,7 @@ export function CalendarPreview({ year, doors, onClose }) {
       <div className="flex-1 overflow-y-auto px-4 py-6 md:px-6">
         <div className="tls-adv mx-auto w-full max-w-[1180px]">
           <p className="mb-4 tls-type-body text-white/55">Hier wird nichts gezählt. Geöffnet ist, was Gäste an diesem Tag schon öffnen dürfen – ein Klick zeigt den Inhalt.</p>
-          {problem && <div className="rounded-sm border border-[#FF3B30]/40 bg-[#FF3B30]/10 px-4 py-3 tls-type-small text-[#ffb4ae]" role="alert" data-testid="advent-preview-problem">{problem}</div>}
+          {problem && <div className="rounded-sm border border-warn/40 bg-warn/10 px-4 py-3 tls-type-small text-warn" role="alert" data-testid="advent-preview-problem">{problem}</div>}
           {calendar?.active === false && <div className="rounded-sm border border-white/10 bg-[#121212] p-8 text-center text-white/60" data-testid="advent-preview-empty">Für {year} ist noch kein Türchen angelegt – der Kalender erscheint erst mit dem ersten.</div>}
           {calendar?.active && (
             <>

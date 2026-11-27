@@ -27,6 +27,7 @@ import { feeLine } from "@/lib/membershipFees";
 import { BIRTH_MISSING_TEXT, MEMBERSHIP_AGE_TEXT } from "@/lib/minimumAge";
 import { ShortCaps } from "@/components/tls/ShortCaps";
 
+import { ROLE_COLORS } from "@/lib/categoryColors";
 const CONTRIB_OPTIONS = [
   { value: "full", label: "Vollmitgliedschaft" },
   { value: "supporter", label: "Unterstützer-Mitgliedschaft" },
@@ -186,18 +187,18 @@ export default function MembershipApplyPage() {
         ) : setup.coupled && setup.available === false ? (
           <StatusCard testId="apply-unavailable" icon={AlertTriangle} color="#FFD700" title="Gerade nicht möglich" body="Die Mitgliederverwaltung ist im Moment nicht erreichbar. Bitte in ein paar Minuten noch einmal versuchen – nichts ist verloren." />
         ) : !showForm && status === "submitting" ? (
-          <StatusCard testId="apply-submitting" icon={Send} color="#29B6E8" title="Antrag wird übermittelt" body="Dein Antrag ist gespeichert und geht gerade an die Mitgliederverwaltung. Klappt das nicht sofort, versuchen wir es automatisch weiter – du musst nichts tun." action={<button type="button" onClick={withdraw} data-testid="apply-withdraw" className="tls-type-label text-white/50 hover:text-[#FF3B30] inline-flex items-center gap-1"><Undo2 className="w-3.5 h-3.5" /> Zurückziehen</button>} />
+          <StatusCard testId="apply-submitting" icon={Send} color="#29B6E8" title="Antrag wird übermittelt" body="Dein Antrag ist gespeichert und geht gerade an die Mitgliederverwaltung. Klappt das nicht sofort, versuchen wir es automatisch weiter – du musst nichts tun." action={<button type="button" onClick={withdraw} data-testid="apply-withdraw" className="tls-type-label text-white/50 hover:text-live inline-flex items-center gap-1"><Undo2 className="w-3.5 h-3.5" /> Zurückziehen</button>} />
         ) : !showForm && status === "pending" ? (
           <StatusCard testId="apply-pending" icon={existing.dolibarr?.application_status === "in_review" ? Clock : Mail} color="#29B6E8"
             title={existing.dolibarr?.application_status === "in_review" ? "Antrag in Prüfung" : existing.coupled ? "Antrag eingegangen" : "Bewerbung eingegangen"}
             body={`Eingereicht am ${viennaDate(existing.created_at)}. ${existing.coupled ? "Der Verein prüft den Antrag in der Mitgliederverwaltung; du erhältst eine E-Mail, sobald entschieden ist." : "Du erhältst eine E-Mail sobald entschieden wurde."}`}
-            action={<button type="button" onClick={withdraw} data-testid="apply-withdraw" className="tls-type-label text-white/50 hover:text-[#FF3B30] inline-flex items-center gap-1"><Undo2 className="w-3.5 h-3.5" /> Antrag zurückziehen</button>} />
+            action={<button type="button" onClick={withdraw} data-testid="apply-withdraw" className="tls-type-label text-white/50 hover:text-live inline-flex items-center gap-1"><Undo2 className="w-3.5 h-3.5" /> Antrag zurückziehen</button>} />
         ) : !showForm && status === "approved" ? (
           <StatusCard testId="apply-approved" icon={Crown} color="#FFD700" title="Du bist Mitglied 🦁" body="Willkommen im Rudel! Schau in den Mitgliederbereich für Benefits und Dokumente." />
         ) : !showForm && status === "rejected" ? (
-          <StatusCard testId="apply-rejected" icon={FileText} color="#FF3B30" title={existing.coupled ? "Antrag abgelehnt" : "Bewerbung abgelehnt"} body={existing.decision_note || "Du kannst zu einem späteren Zeitpunkt erneut versuchen."} action={<RenewButton onClick={() => setRenew(true)} />} />
+          <StatusCard testId="apply-rejected" icon={FileText} color={ROLE_COLORS.quiet} title={existing.coupled ? "Antrag abgelehnt" : "Bewerbung abgelehnt"} body={existing.decision_note || "Du kannst zu einem späteren Zeitpunkt erneut versuchen."} action={<RenewButton onClick={() => setRenew(true)} />} />
         ) : !showForm && status === "failed" ? (
-          <StatusCard testId="apply-failed" icon={AlertTriangle} color="#FF3B30" title="Antrag nicht angenommen" body={`Die Mitgliederverwaltung hat den Antrag nicht angenommen${existing.dolibarr?.error_text ? ` (${existing.dolibarr.error_text})` : ""}. Bitte die Angaben prüfen und den Antrag neu stellen.`} action={<RenewButton onClick={() => setRenew(true)} />} />
+          <StatusCard testId="apply-failed" icon={AlertTriangle} color={ROLE_COLORS.warn} title="Antrag nicht angenommen" body={`Die Mitgliederverwaltung hat den Antrag nicht angenommen${existing.dolibarr?.error_text ? ` (${existing.dolibarr.error_text})` : ""}. Bitte die Angaben prüfen und den Antrag neu stellen.`} action={<RenewButton onClick={() => setRenew(true)} />} />
         ) : !showForm && status === "withdrawn" ? (
           <StatusCard testId="apply-withdrawn" icon={Undo2} color="#FFD700" title="Antrag zurückgezogen" body="Du hast deinen Antrag zurückgezogen. Wenn du magst, stell jederzeit einen neuen." action={<RenewButton onClick={() => setRenew(true)} />} />
         ) : (

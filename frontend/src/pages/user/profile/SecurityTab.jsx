@@ -78,7 +78,7 @@ export function SecurityTab({ user, refresh, siteSettings }) {
                 disabled={googleOnly}
                 title={googleOnly ? "Setze zuerst ein Passwort, dann kannst du Google trennen." : undefined}
                 data-testid="profile-google-unlink"
-                className="px-4 py-2.5 rounded-sm border border-[#FF3B30]/40 text-[#FF3B30] tls-type-label hover:bg-[#FF3B30]/10 disabled:opacity-40 disabled:cursor-not-allowed shrink-0"
+                className="px-4 py-2.5 rounded-sm border border-live/40 text-live tls-type-label hover:bg-live/10 disabled:opacity-40 disabled:cursor-not-allowed shrink-0"
               >
                 Trennen
               </button>

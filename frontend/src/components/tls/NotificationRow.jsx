@@ -94,7 +94,7 @@ export function NotificationRow({ bundle, onOpen, onDelete, compact = false, tes
         <button
           type="button"
           onClick={() => onDelete(bundle)}
-          className="w-11 shrink-0 inline-flex items-center justify-center text-quiet hover:text-[#FF3B30] hover:bg-[#FF3B30]/10 border-l border-white/5"
+          className="w-11 shrink-0 inline-flex items-center justify-center text-quiet hover:text-live hover:bg-live/10 border-l border-white/5"
           title="Benachrichtigung löschen"
           aria-label="Benachrichtigung löschen"
         >

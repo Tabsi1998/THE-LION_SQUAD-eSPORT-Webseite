@@ -331,7 +331,7 @@ export function AlbumPhotos({ album, onBack }) {
                   <button type="button" onClick={() => setEditingSection(section)} className="text-white/45 hover:text-[#29B6E8]" aria-label={`${section.title} bearbeiten`}>
                     <Pencil className="w-3 h-3" />
                   </button>
-                  <button type="button" onClick={() => deleteSection(section)} className="text-white/45 hover:text-[#FF3B30]" aria-label={`${section.title} löschen`}>
+                  <button type="button" onClick={() => deleteSection(section)} className="text-white/45 hover:text-live" aria-label={`${section.title} löschen`}>
                     <Trash2 className="w-3 h-3" />
                   </button>
                 </div>
@@ -403,7 +403,7 @@ export function AlbumPhotos({ album, onBack }) {
                         <option value={UNSECTIONED_VALUE}>Ohne Abschnitt</option>
                         {sections.map((section) => <option key={section.id} value={section.id}>{section.title}</option>)}
                       </select>
-                      <button onClick={() => remove(p.id)} className="absolute top-1 right-1 p-1 bg-black/70 text-[#FF3B30] opacity-0 group-hover:opacity-100 transition" aria-label="Löschen"><Trash2 className="w-3.5 h-3.5" /></button>
+                      <button onClick={() => remove(p.id)} className="absolute top-1 right-1 p-1 bg-black/70 text-live opacity-0 group-hover:opacity-100 transition" aria-label="Löschen"><Trash2 className="w-3.5 h-3.5" /></button>
                       {/* Beschriftung und Reihenfolge (#2112) - am Handy immer sichtbar, am PC beim Darüberfahren. */}
                       <button
                         type="button"

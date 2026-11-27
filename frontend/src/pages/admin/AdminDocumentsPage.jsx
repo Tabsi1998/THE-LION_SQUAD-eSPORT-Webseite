@@ -44,7 +44,7 @@ function DocActions({ doc, onEdit, onRemove, testPrefix = "doc" }) {
       <a href={`${API}/documents/${doc.id}/view`} target="_blank" rel="noreferrer" className="tls-type-label px-3 py-1 rounded-sm border border-white/15 text-white/70 hover:text-white inline-flex items-center gap-1"><Eye className="w-3 h-3" /> Ansicht</a>
       <a href={`${API}/documents/${doc.id}/download`} target="_blank" rel="noreferrer" className="tls-type-label px-3 py-1 rounded-sm border border-white/15 text-white/70 hover:text-white inline-flex items-center gap-1"><Download className="w-3 h-3" /> Datei</a>
       <button onClick={onEdit} data-testid={`${testPrefix}-edit-${doc.id}`} className="tls-type-label px-3 py-1 rounded-sm border border-[#FFD700]/40 text-[#FFD700] hover:bg-[#FFD700]/10">Bearbeiten</button>
-      <button onClick={onRemove} data-testid={`${testPrefix}-delete-${doc.id}`} aria-label={`„${doc.title}“ löschen`} className="tls-type-label px-3 py-1 rounded-sm border border-[#FF3B30]/40 text-[#FF3B30] hover:bg-[#FF3B30]/10 inline-flex items-center"><Trash2 className="w-3 h-3" /></button>
+      <button onClick={onRemove} data-testid={`${testPrefix}-delete-${doc.id}`} aria-label={`„${doc.title}“ löschen`} className="tls-type-label px-3 py-1 rounded-sm border border-live/40 text-live hover:bg-live/10 inline-flex items-center"><Trash2 className="w-3 h-3" /></button>
     </>
   );
 }

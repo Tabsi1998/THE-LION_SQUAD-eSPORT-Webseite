@@ -14,8 +14,8 @@ export const STATE_META = {
   active: { label: "aktiv", className: "border-ok/40 text-ok bg-ok/10" },
   off: { label: "aus", className: "border-white/15 text-white/50 bg-white/5" },
   missing: { label: "fehlt", className: "border-[#FFD700]/40 text-[#FFD700] bg-[#FFD700]/10" },
-  unreadable: { label: "nicht lesbar", className: "border-[#FF3B30]/50 text-[#FF3B30] bg-[#FF3B30]/10" },
-  error: { label: "Fehler", className: "border-[#FF3B30]/50 text-[#FF3B30] bg-[#FF3B30]/10" },
+  unreadable: { label: "nicht lesbar", className: "border-warn/50 text-warn bg-warn/10" },
+  error: { label: "Fehler", className: "border-warn/50 text-warn bg-warn/10" },
 };
 
 export function StateChip({ state, testId }) {
@@ -134,10 +134,10 @@ export default function AdminIntegrationsOverviewPage() {
       </div>
 
       {unreadable.length > 0 && (
-        <div data-testid="integrations-unreadable-hint" className="flex items-start gap-3 border border-[#FF3B30]/40 bg-[#FF3B30]/5 rounded-sm p-4 mb-6 tls-type-small">
-          <AlertTriangle className="w-5 h-5 text-[#FF3B30] shrink-0 mt-0.5" />
+        <div data-testid="integrations-unreadable-hint" className="flex items-start gap-3 border border-warn/40 bg-warn/5 rounded-sm p-4 mb-6 tls-type-small">
+          <AlertTriangle className="w-5 h-5 text-warn shrink-0 mt-0.5" />
           <div>
-            <div className="tls-type-label text-[#FF3B30]">Gespeichert, aber nicht lesbar: {unreadable.map((item) => item.label).join(", ")}</div>
+            <div className="tls-type-label text-warn">Gespeichert, aber nicht lesbar: {unreadable.map((item) => item.label).join(", ")}</div>
             <p className="text-white/70 mt-1">
               Diese Zugangsdaten liegen in der Datenbank, lassen sich aber mit dem aktuellen Schlüssel nicht entschlüsseln. Meist wurde
               SETTINGS_ENCRYPTION_KEY in der .env am Server geändert – zum Beispiel nach einem Server-Update oder einer Neuinstallation.

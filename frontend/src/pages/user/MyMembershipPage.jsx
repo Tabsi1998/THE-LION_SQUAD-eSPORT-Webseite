@@ -527,7 +527,7 @@ function SelfServiceCard() {
               <div className="tls-type-small font-bold text-white/60 mb-1.5">Austritt – Wunschdatum (optional)</div>
               <input type="date" value={wishedDay} onChange={(e) => setWishedDay(e.target.value)} data-testid="membership-self-exit-date" className="bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-sm" />
             </label>
-            <button type="button" onClick={leave} disabled={busy === "exit"} data-testid="membership-self-exit-button" className="px-4 py-2 border border-[#FF3B30]/60 text-[#FF3B30] tls-type-label rounded-sm disabled:opacity-50">Austritt erklären</button>
+            <button type="button" onClick={leave} disabled={busy === "exit"} data-testid="membership-self-exit-button" className="px-4 py-2 border border-live/60 text-live tls-type-label rounded-sm disabled:opacity-50">Austritt erklären</button>
           </div>
         )}
       </div>
@@ -649,7 +649,7 @@ export function ConsentsCard() {
                     <button type="button" onClick={() => setOpen(row.code)} disabled={busy} data-testid={`consent-open-${row.code}`} className="px-3 py-1.5 border border-[#FFD700]/40 text-[#FFD700] rounded-sm tls-type-label disabled:opacity-50">{!row.can_give ? "Text lesen" : row.state === "given" ? "Neue Fassung lesen" : "Lesen und zustimmen"}</button>
                   )}
                   {row.can_withdraw && (
-                    <button type="button" onClick={() => decide(row, "withdrawn")} disabled={busy} data-testid={`consent-withdraw-${row.code}`} className="px-3 py-1.5 border border-white/15 text-white/70 hover:text-[#FF3B30] hover:border-[#FF3B30]/40 rounded-sm tls-type-label disabled:opacity-50">Widerrufen</button>
+                    <button type="button" onClick={() => decide(row, "withdrawn")} disabled={busy} data-testid={`consent-withdraw-${row.code}`} className="px-3 py-1.5 border border-white/15 text-white/70 hover:text-live hover:border-live/40 rounded-sm tls-type-label disabled:opacity-50">Widerrufen</button>
                   )}
                 </div>
               </div>

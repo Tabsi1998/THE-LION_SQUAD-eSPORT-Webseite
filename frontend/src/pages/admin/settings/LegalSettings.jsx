@@ -78,7 +78,7 @@ export function LegalTab({ brand, setBrandField, setCanonicalLegalText, saveBran
                   <span className="text-white/60">Stand {viennaDateTime(dolibarrPublic.fetched_at, { dateStyle: "short", timeStyle: "short" })}: <span className="text-white">{dolibarrPublic.overlay?.legal_name}</span>, ZVR {dolibarrPublic.overlay?.zvr_number || "–"}</span>
                   <span className="text-white/60">Vertretung: {dolibarrPublic.representative ? <span className="text-white">{dolibarrPublic.representative.name} ({dolibarrPublic.representative.role})</span> : <span className="text-[#FFD700]">kein freigegebener Name – bleibt von Hand</span>}</span>
                   {dolibarrPublic.statutes && <span className="text-white/60" data-testid="legal-dolibarr-statutes">Statuten: <span className={dolibarrPublic.statutes.state === "in_force" ? "text-white" : "text-[#FFD700]"}>{statutesSummary(dolibarrPublic.statutes)}</span></span>}
-                  {dolibarrPublic.error && <span className="text-[#FF3B30]">Letzter Abgleich fehlgeschlagen ({dolibarrPublic.error_text || dolibarrPublic.error}) – alter Stand bleibt.</span>}
+                  {dolibarrPublic.error && <span className="text-warn">Letzter Abgleich fehlgeschlagen ({dolibarrPublic.error_text || dolibarrPublic.error}) – alter Stand bleibt.</span>}
                 </>
               )}
             <button type="button" onClick={refreshDolibarrPublic} disabled={dolibarrPublicBusy || dolibarrPublic?.unavailable} data-testid="legal-dolibarr-refresh" className="px-3 py-1 border border-white/20 text-white/80 rounded-sm tls-type-label disabled:opacity-40">Jetzt nachlesen</button>

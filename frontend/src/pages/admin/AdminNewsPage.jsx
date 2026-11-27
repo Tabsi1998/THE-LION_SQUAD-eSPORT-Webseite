@@ -257,7 +257,7 @@ export default function AdminNewsPage() {
                           <RotateCcw className="w-3 h-3" /> Wiederherstellen
                         </button>
                       ) : n.can_delete ? (
-                        <button type="button" onClick={() => remove(n)} data-testid={`news-delete-${n.id}`} aria-label={`„${n.title || "Ohne Titel"}“ löschen`} className="tls-type-label px-3 py-1 rounded-sm border border-[#FF3B30]/40 text-[#FF3B30] hover:bg-[#FF3B30]/10 inline-flex items-center gap-1">
+                        <button type="button" onClick={() => remove(n)} data-testid={`news-delete-${n.id}`} aria-label={`„${n.title || "Ohne Titel"}“ löschen`} className="tls-type-label px-3 py-1 rounded-sm border border-live/40 text-live hover:bg-live/10 inline-flex items-center gap-1">
                           <Trash2 className="w-3 h-3" />
                         </button>
                       ) : (

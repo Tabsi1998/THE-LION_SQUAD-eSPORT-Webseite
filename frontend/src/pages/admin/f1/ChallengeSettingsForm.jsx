@@ -277,7 +277,7 @@ function FastLapPrizeEditor({ value, onChange }) {
             type="button"
             onClick={() => onChange(prizes.filter((_, j) => j !== i))}
             data-testid={`f1-edit-prize-remove-${i}`}
-            className="col-span-1 text-white/40 hover:text-[#FF3B30] text-center py-2"
+            className="col-span-1 text-white/40 hover:text-live text-center py-2"
           >
             x
           </button>

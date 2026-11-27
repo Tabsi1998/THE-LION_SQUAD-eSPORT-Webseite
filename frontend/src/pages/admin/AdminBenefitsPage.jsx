@@ -88,7 +88,7 @@ export default function AdminBenefitsPage() {
               {b.description && <p className="mt-2 tls-type-body text-white/65 line-clamp-3">{b.description}</p>}
               <div className="mt-4 flex gap-2">
                 <button onClick={() => setEditing(b)} data-testid={`benefit-edit-${b.id}`} className="tls-type-label px-3 py-1 border border-[#FFD700]/40 text-[#FFD700] rounded-sm hover:bg-[#FFD700]/10">Bearbeiten</button>
-                <button onClick={() => remove(b.id)} data-testid={`benefit-delete-${b.id}`} className="tls-type-label px-3 py-1 border border-[#FF3B30]/40 text-[#FF3B30] rounded-sm hover:bg-[#FF3B30]/10 inline-flex items-center gap-1">
+                <button onClick={() => remove(b.id)} data-testid={`benefit-delete-${b.id}`} className="tls-type-label px-3 py-1 border border-live/40 text-live rounded-sm hover:bg-live/10 inline-flex items-center gap-1">
                   <Trash2 className="w-3 h-3" /> Löschen
                 </button>
               </div>

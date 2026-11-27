@@ -192,7 +192,7 @@ export default function AdminUsersPage() {
             {(areaBadges(u).length > 0 || statusText(u)) && (
               <div className="mt-2 flex flex-wrap gap-1">
                 {areaBadges(u).map((area) => <span key={area.key} className="tls-type-label px-2 py-0.5 rounded-sm border border-[#29B6E8]/30 text-[#29B6E8]">{area.label}</span>)}
-                {statusText(u) && <span className={`tls-type-label px-2 py-0.5 rounded-sm border ${u.is_banned ? "border-[#FF3B30]/40 text-[#FF6B6B]" : "border-[#FFD700]/40 text-[#FFD700]"}`}>{statusText(u)}</span>}
+                {statusText(u) && <span className={`tls-type-label px-2 py-0.5 rounded-sm border ${u.is_banned ? "border-warn/40 text-warn" : "border-[#FFD700]/40 text-[#FFD700]"}`}>{statusText(u)}</span>}
               </div>
             )}
           </li>
@@ -381,7 +381,7 @@ function UserSheet({ target, me, isSuperAdmin, canClub, onClose, onChanged }) {
                   <p className="tls-type-small text-white/45">Ein neuer Link, um das Passwort zu setzen – etwa wenn die erste Mail nicht ankam.</p>
                 </div>
                 {target.id !== me?.id && target.role !== "superadmin" && (
-                  <div className="border border-[#FF3B30]/30 rounded-sm p-3 space-y-2" data-testid="user-sheet-delete-box">
+                  <div className="border border-live/30 rounded-sm p-3 space-y-2" data-testid="user-sheet-delete-box">
                     <div className="tls-type-small font-bold text-[#FF6B6B]">Konto löschen</div>
                     <p className="tls-type-small text-white/55">Anmeldung und persönliche Daten werden entfernt; Ergebnisse bleiben ohne Namen erhalten. Zum Bestätigen den Namen eintippen: <strong className="text-white">{name}</strong></p>
                     <input value={deleteName} onChange={(event) => setDeleteName(event.target.value)} aria-label="Namen zum Löschen eintippen" data-testid="user-sheet-delete-name" className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-sm" />
@@ -540,7 +540,7 @@ function BanDialog({ target, onCancel, onBanned }) {
     >
       <form ref={dialogRef} tabIndex={-1} onSubmit={submit} role="dialog" aria-modal="true" aria-labelledby="ban-dialog-title" data-testid="ban-dialog" className="w-full max-w-md bg-[#121212] border border-white/10 rounded-sm shadow-2xl focus:outline-none">
         <div className="flex items-start gap-3 p-5 border-b border-white/10">
-          <div className="w-10 h-10 rounded-sm border border-[#FF3B30]/45 text-[#FF3B30] bg-[#FF3B30]/10 flex items-center justify-center shrink-0">
+          <div className="w-10 h-10 rounded-sm border border-warn/45 text-warn bg-warn/10 flex items-center justify-center shrink-0">
             <AlertTriangle className="w-5 h-5" />
           </div>
           <div className="min-w-0 flex-1">

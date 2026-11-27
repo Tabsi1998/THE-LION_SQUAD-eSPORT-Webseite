@@ -241,7 +241,7 @@ export function FriendsPanel({ onChanged }) {
               {(row) => (
                 <>
                   <Link to={`/messages/${row.user?.id}`} className={`${buttonBase} border border-[#29B6E8]/45 text-[#29B6E8]`}><MessageSquare className="w-3 h-3" /> Schreiben</Link>
-                  <button type="button" onClick={() => act(row, "remove")} className={`${buttonBase} border border-[#FF3B30]/40 text-[#FF3B30]`}>Entfernen</button>
+                  <button type="button" onClick={() => act(row, "remove")} className={`${buttonBase} border border-live/40 text-live`}>Entfernen</button>
                 </>
               )}
             </Section>

@@ -157,7 +157,7 @@ export function ChatAttachmentDrafts({ drafts, onRemove }) {
             key={draft.localId}
             title={draft.error || draft.name}
             data-status={draft.status}
-            className={`relative h-16 w-16 overflow-hidden rounded-sm border bg-[#0A0A0A] ${draft.status === "error" ? "border-[#FF3B30]/70" : "border-white/10"}`}
+            className={`relative h-16 w-16 overflow-hidden rounded-sm border bg-[#0A0A0A] ${draft.status === "error" ? "border-warn/70" : "border-white/10"}`}
           >
             {draft.previewUrl ? (
               <img src={draft.previewUrl} alt="" className="h-full w-full object-cover" />

@@ -223,7 +223,7 @@ export function DistributeBox() {
       <label className="block tls-type-small">
         <span className="block tls-type-small text-white/55 mb-1">
           Text
-          <span className={`float-right${tooLong ? " text-[#FF3B30]" : ""}`} data-testid="discord-distribute-count">{form.text.length} / {limit}</span>
+          <span className={`float-right${tooLong ? " text-warn" : ""}`} data-testid="discord-distribute-count">{form.text.length} / {limit}</span>
         </span>
         <textarea value={form.text} onChange={(e) => change({ text: e.target.value })} rows={4} className={FIELD} data-testid="discord-distribute-text" />
       </label>
@@ -261,7 +261,7 @@ export function DistributeBox() {
       {result && (
         <ul className="tls-type-small space-y-1 border-t border-white/5 pt-4" data-testid="discord-distribute-result">
           {(result.servers || []).map((row) => (
-            <li key={row.guild_id} className={row.ok ? "text-ok" : "text-[#FF3B30]"} data-testid={`discord-distribute-result-${row.guild_id}`}>
+            <li key={row.guild_id} className={row.ok ? "text-ok" : "text-warn"} data-testid={`discord-distribute-result-${row.guild_id}`}>
               {row.name}: {row.ok ? "gesendet" : (row.error || "nicht angekommen")}
             </li>
           ))}

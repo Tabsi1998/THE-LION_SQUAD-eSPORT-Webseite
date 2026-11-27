@@ -386,7 +386,7 @@ export function GameMapsTab({ gameId, reloadKey = 0, onOpenModes }) {
                         <button type="button" className={ICON_BUTTON} onClick={() => setEditing(item)} aria-label={`${item.name} bearbeiten`} data-testid={`game-map-edit-${item.slug}`}><Pencil className="w-4 h-4" aria-hidden="true" /></button>
                         {/* Zustand (#2207): deaktivieren, aktivieren, archivieren - mit Rückfrage, die betroffene Seasons nennt. */}
                         <MapStatusActions gameId={gameId} item={item} onChanged={load} />
-                        <button type="button" className={ICON_BUTTON.replace("hover:text-[#29B6E8]", "hover:text-[#FF3B30]")} onClick={() => remove(item)} disabled={item.in_pools > 0}
+                        <button type="button" className={ICON_BUTTON.replace("hover:text-[#29B6E8]", "hover:text-live")} onClick={() => remove(item)} disabled={item.in_pools > 0}
                           title={item.in_pools > 0 ? "Steht in einem gespeicherten Pool – archivieren statt löschen" : "Löschen"}
                           aria-label={`${item.name} löschen`} data-testid={`game-map-delete-${item.slug}`}><Trash2 className="w-4 h-4" aria-hidden="true" /></button>
                       </div>

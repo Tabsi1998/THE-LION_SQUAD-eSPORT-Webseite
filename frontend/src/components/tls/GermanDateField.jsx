@@ -142,7 +142,7 @@ export function GermanDateField({
               aria-labelledby={label ? `${id}-label ${id}-value` : undefined}
               aria-describedby={describedBy}
               className={`w-full bg-[#0A0A0A] border pl-3 py-2.5 rounded-sm text-left flex items-center justify-between gap-2 transition focus:outline-none disabled:opacity-50 disabled:cursor-not-allowed ${showClear ? "pr-14" : "pr-3"} ${
-                error ? "border-[#FF3B30] focus:border-[#FF3B30]" : "border-white/10 focus:border-[#29B6E8] hover:border-white/25"
+                error ? "border-warn focus:border-warn" : "border-white/10 focus:border-[#29B6E8] hover:border-white/25"
               }`}
             >
               <span id={`${id}-value`} className={value ? "text-white" : "text-muted-text"}>
@@ -157,7 +157,7 @@ export function GermanDateField({
               aria-label="Datum entfernen"
               data-testid={testId ? `${testId}-clear` : undefined}
               onClick={clear}
-              className="absolute right-8 top-1/2 -translate-y-1/2 inline-flex h-7 w-7 items-center justify-center rounded-sm text-muted-text hover:text-[#FF3B30] focus:outline-none focus-visible:ring-2 focus-visible:ring-brand transition"
+              className="absolute right-8 top-1/2 -translate-y-1/2 inline-flex h-7 w-7 items-center justify-center rounded-sm text-muted-text hover:text-live focus:outline-none focus-visible:ring-2 focus-visible:ring-brand transition"
             >
               <X className="w-3.5 h-3.5" aria-hidden="true" />
             </button>
@@ -248,7 +248,7 @@ export function GermanDateField({
                 <button
                   type="button"
                   onClick={() => { onChange(""); setOpen(false); }}
-                  className="tls-type-label text-white/45 hover:text-[#FF3B30] transition"
+                  className="tls-type-label text-white/45 hover:text-live transition"
                 >
                   Entfernen
                 </button>

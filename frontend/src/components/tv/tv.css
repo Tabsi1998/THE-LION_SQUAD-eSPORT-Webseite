@@ -46,12 +46,12 @@
   --tv-accent: #29b6e8;
   --tv-gold: #ffd700;
   --tv-green: var(--tls-ok);
-  --tv-red: #ff3b30;
+  --tv-red: var(--tls-warn);
   --tv-accent-soft: rgba(41, 182, 232, 0.12);
   --tv-green-soft: rgba(0, 255, 136, 0.06);
   --tv-gold-soft: rgba(255, 215, 0, 0.08);
   --tv-red-soft: rgba(255, 59, 48, 0.1);
-  --tv-live: var(--tls-live, #ff3b30);
+  --tv-live: var(--tls-live);
   --tv-live-soft: rgb(var(--tls-live-rgb, 255 59 48) / 0.1);
   --tv-vignette: rgba(1, 3, 4, 0.85);
   --tv-on-accent: #000000;
@@ -84,7 +84,7 @@
   --tv-green-soft: #000000;
   --tv-gold-soft: #000000;
   --tv-red-soft: #000000;
-  --tv-live: color-mix(in srgb, var(--tls-live, #ff3b30) 55%, #ffffff);
+  --tv-live: color-mix(in srgb, var(--tls-live) 55%, #ffffff);
   --tv-live-soft: #000000;
   --tv-hero-opacity: 0;
   --tv-medal-1: #ffe66b;

@@ -16,6 +16,7 @@ import { GermanDateField } from "@/components/tls/GermanDateField";
 import { SkeletonList } from "@/components/tls/Skeleton";
 import { viennaDate, viennaDateTime } from "@/lib/vienna";
 
+import { ROLE_COLORS } from "@/lib/categoryColors";
 const emptyForm = {
   display_name: "",
   gamertag: "",
@@ -166,7 +167,7 @@ export function ClubMemberProfilesAdminContent() {
                     {/* Mitgliedsnummer aus Dolibarr (#504): darüber findet der Abgleich die Karte wieder - ohne Konto heißt: Konto noch nicht verknüpft */}
                     {profile.dolibarr_member_id && <p className="tls-type-small text-quiet" data-testid={`club-member-number-${profile.id}`}>Mitglied Nr. {profile.dolibarr_member_id}{!profile.user_id ? " · ohne Konto" : ""}</p>}
                     {profile.deactivated_reason === "consent_withdrawn" && <p className="tls-type-small font-bold text-[#FFD700]" data-testid={`club-member-withdrawn-${profile.id}`}>Einwilligung widerrufen – offline</p>}
-                    {profile.directory_blocked && <p className="tls-type-label text-[#FF3B30]" data-testid={`club-member-blocked-${profile.id}`}>gesperrt</p>}
+                    {profile.directory_blocked && <p className="tls-type-label text-warn" data-testid={`club-member-blocked-${profile.id}`}>gesperrt</p>}
                   </div>
                   <span className="tls-type-small text-quiet font-mono">#{profile.order_index || 0}</span>
                 </div>
@@ -180,7 +181,7 @@ export function ClubMemberProfilesAdminContent() {
                   <button onClick={() => setEditing({ profile, form: toForm(profile) })} className="px-3 py-2 border border-[#29B6E8]/40 text-[#29B6E8] rounded-sm tls-type-label inline-flex items-center gap-2 hover:bg-[#29B6E8]/10">
                     <Edit3 className="w-3.5 h-3.5" /> Bearbeiten
                   </button>
-                  <button onClick={() => remove(profile)} className="ml-auto px-3 py-2 border border-[#FF3B30]/35 text-[#FF3B30] rounded-sm tls-type-label hover:bg-[#FF3B30]/10">
+                  <button onClick={() => remove(profile)} className="ml-auto px-3 py-2 border border-live/35 text-live rounded-sm tls-type-label hover:bg-live/10">
                     <Trash2 className="w-3.5 h-3.5" />
                   </button>
                 </div>
@@ -295,7 +296,7 @@ function ProfileModal({ entry, profiles = [], onClose, onSaved }) {
           <TextField label="Sortierung" type="number" value={form.order_index} onChange={(v) => set("order_index", v)} />
           <CheckField label="Öffentlich anzeigen" checked={form.is_active} onChange={(v) => set("is_active", v)} accent="#FFD700" className="self-end pb-2" />
         </FormGrid>
-        <CheckField label="Für das Mitglied sperren" checked={form.directory_blocked} onChange={(v) => set("directory_blocked", v)} accent="#FF3B30" testId="club-member-blocked" hint="Der Eintrag geht offline, und das Mitglied kann ihn unter „Meine Mitgliedschaft“ nicht wieder einschalten, bis die Sperre weg ist." />
+        <CheckField label="Für das Mitglied sperren" checked={form.directory_blocked} onChange={(v) => set("directory_blocked", v)} accent={ROLE_COLORS.warn} testId="club-member-blocked" hint="Der Eintrag geht offline, und das Mitglied kann ihn unter „Meine Mitgliedschaft“ nicht wieder einschalten, bis die Sperre weg ist." />
       </FormSection>
     </AdminSheet>
   );

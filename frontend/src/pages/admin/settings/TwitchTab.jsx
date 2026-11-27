@@ -93,7 +93,7 @@ export function TwitchTab({ brand, setBrandField, status, saving, refreshing, on
           <div className="divide-y divide-white/5">
             {status.live_streams.map((stream) => (
               <a key={stream.stream_id || stream.user_id} href={stream.stream_url} target="_blank" rel="noreferrer" className="flex items-center gap-3 px-4 py-3 hover:bg-white/5">
-                <Radio className="w-4 h-4 text-[#FF3B30] animate-pulse" />
+                <Radio className="w-4 h-4 text-live animate-pulse" />
                 <div className="min-w-0 flex-1">
                   <div className="font-bold tls-wrap">{stream.display_name || stream.username || stream.twitch_login}</div>
                   <div className="tls-type-small text-white/45 tls-wrap">{stream.title || "Stream läuft"}{stream.game_name ? ` · ${stream.game_name}` : ""}</div>

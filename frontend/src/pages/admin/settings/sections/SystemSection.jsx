@@ -27,8 +27,8 @@ export function SystemSection({ systemStatus, load }) {
               <div key={c.label} className="grid md:grid-cols-[120px_1fr_120px] gap-2 border-b border-white/5 pb-2">
                 <span className="text-white/70">{c.label}</span>
                 <span className="font-mono text-white/50 break-all">{c.path}</span>
-                <span className={c.ok ? "text-ok" : "text-[#FF3B30]"}>{c.ok ? "beschreibbar" : "nicht beschreibbar"}</span>
-                {c.error && <span className="md:col-start-2 md:col-span-2 text-[#FF3B30] break-words">{c.error}</span>}
+                <span className={c.ok ? "text-ok" : "text-warn"}>{c.ok ? "beschreibbar" : "nicht beschreibbar"}</span>
+                {c.error && <span className="md:col-start-2 md:col-span-2 text-warn break-words">{c.error}</span>}
               </div>
             ))}
           </div>

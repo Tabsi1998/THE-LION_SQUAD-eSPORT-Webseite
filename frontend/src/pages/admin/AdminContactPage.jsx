@@ -14,7 +14,7 @@ const STATUS_LABEL = {
   in_progress: { l: "In Bearbeitung", c: "text-[#FFD700] bg-[#FFD700]/10 border-[#FFD700]/30" },
   answered: { l: "Beantwortet", c: "text-ok bg-ok/10 border-ok/30" },
   closed: { l: "Geschlossen", c: "text-white/50 bg-white/5 border-white/10" },
-  spam: { l: "Spam", c: "text-[#FF3B30] bg-[#FF3B30]/10 border-[#FF3B30]/30" },
+  spam: { l: "Spam", c: "text-quiet bg-quiet/10 border-quiet/30" },
 };
 
 const PAGE_SIZE = 50;
@@ -318,7 +318,7 @@ export default function AdminContactPage() {
                 className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-sm" rows={4} />
               <p className="mt-1 tls-type-small text-quiet">Geht nie an die Person.</p>
             </div>
-            <button onClick={() => remove(active.id)} className="w-full px-4 py-2 border border-[#FF3B30]/30 text-[#FF3B30] tls-type-label rounded-sm hover:bg-[#FF3B30]/10 inline-flex items-center justify-center gap-2"><Trash2 className="w-3.5 h-3.5" /> Löschen</button>
+            <button onClick={() => remove(active.id)} className="w-full px-4 py-2 border border-live/30 text-live tls-type-label rounded-sm hover:bg-live/10 inline-flex items-center justify-center gap-2"><Trash2 className="w-3.5 h-3.5" /> Löschen</button>
           </div>
         </div>
       </AdminLayout>

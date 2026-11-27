@@ -6,7 +6,7 @@ import { MEDIA_SCOPE_LABELS, UPLOAD_STATUS_LABELS, VIDEO_EXT, fmtBytes, fmtDateT
 export function BrokenImageState({ compact = false }) {
   return (
     // Spans (als Block bzw. Flex): die Vorschau steht auch in der Kachel, und die ist ein Knopf (#937).
-    <span className="w-full h-full flex flex-col items-center justify-center gap-1 p-2 text-center text-[#FF3B30]/80">
+    <span className="w-full h-full flex flex-col items-center justify-center gap-1 p-2 text-center text-warn/80">
       <ImageIcon className={compact ? "w-6 h-6" : "w-10 h-10"} />
       <span className="tls-type-label">Bild nicht erreichbar</span>
     </span>

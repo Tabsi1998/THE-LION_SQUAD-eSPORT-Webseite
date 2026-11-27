@@ -25,7 +25,7 @@ const STATUS_CLASSES = {
   active: "bg-ok/10 text-ok",
   planned: "bg-[#29B6E8]/10 text-[#29B6E8]",
   expired: "bg-white/10 text-white/60",
-  inactive: "bg-[#FF3B30]/10 text-[#FF3B30]",
+  inactive: "bg-quiet/10 text-quiet",
 };
 const TIER_DEFAULTS = {
   main: { show_on_home: true, show_on_footer: true, show_on_events: false, show_on_tv: true, show_on_pdf: true, show_in_emails: true },
@@ -158,7 +158,7 @@ export default function AdminSponsorsPage() {
                 ) : (
                   <button onClick={() => setArchived(s, true)} title="Archivieren" aria-label="Sponsor archivieren" data-testid={`sponsor-archive-${s.id}`} className="p-1.5 text-white/40 hover:text-brand"><Archive className="w-4 h-4" /></button>
                 )}
-                <button onClick={() => del(s.id)} disabled={dolibarrKeepsEntry(dolibarrSource, s)} title={dolibarrKeepsEntry(dolibarrSource, s) ? DOLIBARR_DELETE_HINT : "Sponsor löschen"} aria-label="Sponsor löschen" data-testid={`sponsor-delete-${s.id}`} className="p-1.5 text-white/40 hover:text-[#FF3B30] disabled:opacity-30 disabled:hover:text-white/40 disabled:cursor-not-allowed"><Trash2 className="w-4 h-4" /></button>
+                <button onClick={() => del(s.id)} disabled={dolibarrKeepsEntry(dolibarrSource, s)} title={dolibarrKeepsEntry(dolibarrSource, s) ? DOLIBARR_DELETE_HINT : "Sponsor löschen"} aria-label="Sponsor löschen" data-testid={`sponsor-delete-${s.id}`} className="p-1.5 text-white/40 hover:text-live disabled:opacity-30 disabled:hover:text-white/40 disabled:cursor-not-allowed"><Trash2 className="w-4 h-4" /></button>
               </div>
             </div>
             {(s.contract_start || s.contract_end || s.contact_name) && (

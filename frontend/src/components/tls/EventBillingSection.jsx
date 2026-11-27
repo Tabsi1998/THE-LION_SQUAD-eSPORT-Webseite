@@ -101,7 +101,7 @@ export function EventBillingSection({ value, onChange, canEdit, dolibarrConnecte
                   <label className="inline-flex items-center gap-2 pb-2">
                     <input type="checkbox" checked={position.optional} onChange={(ev) => setPosition(index, { optional: ev.target.checked })} /> wählbar
                   </label>
-                  <button type="button" onClick={() => set({ positions: form.positions.filter((_, i) => i !== index) })} className="inline-flex items-center gap-1 px-2 py-2 border border-[#FF3B30]/40 text-[#FF3B30] rounded-sm uppercase tracking-wider font-bold" aria-label={`Position ${index + 1} entfernen`}>
+                  <button type="button" onClick={() => set({ positions: form.positions.filter((_, i) => i !== index) })} className="inline-flex items-center gap-1 px-2 py-2 border border-live/40 text-live rounded-sm uppercase tracking-wider font-bold" aria-label={`Position ${index + 1} entfernen`}>
                     <Trash2 className="w-3.5 h-3.5" />
                   </button>
                 </div>
@@ -121,7 +121,7 @@ export function EventBillingSection({ value, onChange, canEdit, dolibarrConnecte
             </label>
             <div className="tls-type-small text-white/55 border border-white/10 rounded-sm p-3">
               <div className="uppercase tracking-widest text-white/45 font-bold mb-1">Vorschau</div>
-              {error ? <span className="text-[#FF3B30]" data-testid="event-billing-error">{error}</span> : preview ? (
+              {error ? <span className="text-warn" data-testid="event-billing-error">{error}</span> : preview ? (
                 <span data-testid="event-billing-preview">{copy.preview(formatCents(preview.total_cents))}</span>
               ) : null}
             </div>

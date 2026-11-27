@@ -80,7 +80,7 @@ function DayRow({ year, item, kinds, busy, onEdit, onDelete, onDraw, onRedraw })
             {door ? <Pencil className="h-3.5 w-3.5" /> : <Plus className="h-3.5 w-3.5" />} {door ? "Bearbeiten" : "Anlegen"}
           </button>
           {door && (
-            <button type="button" onClick={() => onDelete(item)} disabled={busy} aria-label={`Türchen ${day} leeren`} title="Türchen leeren" data-testid={`advent-admin-delete-${day}`} className="inline-flex h-9 w-9 items-center justify-center rounded-sm border border-white/10 text-white/45 transition hover:border-[#FF3B30]/50 hover:text-[#FF3B30] disabled:opacity-40">
+            <button type="button" onClick={() => onDelete(item)} disabled={busy} aria-label={`Türchen ${day} leeren`} title="Türchen leeren" data-testid={`advent-admin-delete-${day}`} className="inline-flex h-9 w-9 items-center justify-center rounded-sm border border-white/10 text-white/45 transition hover:border-live/50 hover:text-live disabled:opacity-40">
               <Trash2 className="h-3.5 w-3.5" />
             </button>
           )}
@@ -215,7 +215,7 @@ export default function AdminAdventPage() {
           <SeasonSwitch seasonKey="advent_calendar" label="Adventkalender" className="w-full xl:w-96" />
         </div>
 
-        {failed && <div className="mb-6 rounded-sm border border-[#FF3B30]/40 bg-[#FF3B30]/10 px-4 py-3 tls-type-small text-[#ffb4ae]" role="alert" data-testid="advent-admin-error">{failed}</div>}
+        {failed && <div className="mb-6 rounded-sm border border-warn/40 bg-warn/10 px-4 py-3 tls-type-small text-warn" role="alert" data-testid="advent-admin-error">{failed}</div>}
         {!data && !failed && <div className="py-16 text-center tls-type-small text-white/45" role="status">Lade Adventkalender …</div>}
 
         {data && (

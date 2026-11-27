@@ -219,7 +219,7 @@ function PeopleTab() {
                   {detail.strikes.map((strike) => (
                     <li key={strike.id} className={`flex items-start justify-between gap-2 ${strike.revoked ? "opacity-50 line-through" : ""}`} data-testid={`people-strike-${strike.id}`}>
                       <span><span className="text-white/45 tls-type-small">{formatMoment(strike.created_at)}</span> · {strike.source_label}{strike.note ? ` · ${strike.note}` : ""}{strike.revoked && strike.revoke_note ? ` (zurückgenommen: ${strike.revoke_note})` : ""}</span>
-                      {!strike.revoked && !locked && <button type="button" disabled={!!busy} onClick={() => run("revoke", () => api.post(`/moderation/strikes/${strike.id}/revoke`, { note: note || null }), "Treffer zurückgenommen.")} data-testid={`strike-revoke-${strike.id}`} className="tls-type-label text-white/50 hover:text-[#FF3B30] shrink-0">Zurücknehmen</button>}
+                      {!strike.revoked && !locked && <button type="button" disabled={!!busy} onClick={() => run("revoke", () => api.post(`/moderation/strikes/${strike.id}/revoke`, { note: note || null }), "Treffer zurückgenommen.")} data-testid={`strike-revoke-${strike.id}`} className="tls-type-label text-white/50 hover:text-live shrink-0">Zurücknehmen</button>}
                     </li>
                   ))}
                 </ul>
@@ -299,7 +299,7 @@ function LevelsTab() {
                   <span className="text-white/50">Stunden Chat-Sperre</span>
                 </>
               )}
-              <button type="button" onClick={() => setSettings((c) => ({ ...c, levels: c.levels.filter((_, i) => i !== index) }))} aria-label="Stufe entfernen" data-testid={`levels-remove-${index}`} className="ml-auto text-white/40 hover:text-[#FF3B30]"><Trash2 className="w-4 h-4" /></button>
+              <button type="button" onClick={() => setSettings((c) => ({ ...c, levels: c.levels.filter((_, i) => i !== index) }))} aria-label="Stufe entfernen" data-testid={`levels-remove-${index}`} className="ml-auto text-white/40 hover:text-live"><Trash2 className="w-4 h-4" /></button>
             </div>
           ))}
         </div>
@@ -465,7 +465,7 @@ function ItemsTab() {
                 {item.state === "pending" && (
                   <>
                     <button type="button" disabled={busy === item.id} onClick={() => decide(item, "release")} data-testid={`item-release-${item.id}`} className="px-3 py-2 bg-ok text-black rounded-sm tls-type-label disabled:opacity-50">Freigeben</button>
-                    <button type="button" disabled={busy === item.id} onClick={() => decide(item, "reject")} data-testid={`item-reject-${item.id}`} className="px-3 py-2 border border-[#FF3B30]/40 text-[#FF3B30] rounded-sm tls-type-label disabled:opacity-50">Zurückweisen</button>
+                    <button type="button" disabled={busy === item.id} onClick={() => decide(item, "reject")} data-testid={`item-reject-${item.id}`} className="px-3 py-2 border border-live/40 text-live rounded-sm tls-type-label disabled:opacity-50">Zurückweisen</button>
                   </>
                 )}
                 {item.state === "flagged" && (
@@ -589,7 +589,7 @@ function WordFilterTab() {
                 </td>
                 <td className="px-4 py-2 tls-type-small text-white/50">{entry.note || ""}</td>
                 <td className="px-4 py-2 text-right">
-                  <button type="button" disabled={busy} onClick={() => run(() => api.delete(`/moderation/word-filter/entries/${entry.id}`), "Eintrag entfernt.")} data-testid={`word-filter-entry-delete-${entry.id}`} className="p-1.5 text-white/40 hover:text-[#FF3B30]"><Trash2 className="w-4 h-4" /></button>
+                  <button type="button" disabled={busy} onClick={() => run(() => api.delete(`/moderation/word-filter/entries/${entry.id}`), "Eintrag entfernt.")} data-testid={`word-filter-entry-delete-${entry.id}`} className="p-1.5 text-white/40 hover:text-live"><Trash2 className="w-4 h-4" /></button>
                 </td>
               </tr>
             ))}
@@ -606,7 +606,7 @@ function WordFilterTab() {
         <textarea value={importText} onChange={(e) => setImportText(e.target.value)} rows={4} placeholder='{"entries": [{"term": "…", "action": "hold"}]}' data-testid="word-filter-import-text" className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-white text-xs font-mono focus:outline-none focus:border-[#29B6E8]" />
         <div className="flex flex-wrap gap-2">
           <button type="button" disabled={busy || !importText.trim()} onClick={() => importList(false)} data-testid="word-filter-import" className="px-3 py-2 border border-[#29B6E8]/40 text-[#29B6E8] rounded-sm tls-type-label inline-flex items-center gap-1 disabled:opacity-50"><Upload className="w-3.5 h-3.5" /> Einträge übernehmen</button>
-          <button type="button" disabled={busy || !importText.trim()} onClick={() => { if (window.confirm("Die ganze Liste durch den Import ersetzen?")) importList(true); }} data-testid="word-filter-import-replace" className="px-3 py-2 border border-[#FF3B30]/40 text-[#FF3B30] rounded-sm tls-type-label disabled:opacity-50">Liste ersetzen</button>
+          <button type="button" disabled={busy || !importText.trim()} onClick={() => { if (window.confirm("Die ganze Liste durch den Import ersetzen?")) importList(true); }} data-testid="word-filter-import-replace" className="px-3 py-2 border border-live/40 text-live rounded-sm tls-type-label disabled:opacity-50">Liste ersetzen</button>
         </div>
       </div>
     </div>

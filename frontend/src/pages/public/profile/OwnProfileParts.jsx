@@ -36,7 +36,7 @@ function money(amount, currency = "EUR") {
 function Row({ to, icon: Icon, title, detail, tone = "gold", testId }) {
   return (
     <Link to={to} data-testid={testId} className="flex items-center gap-3 min-h-14 border-t border-[#FFD700]/15 py-2 first:border-t-0 hover:bg-white/[0.02]">
-      <span className={`inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-sm ${tone === "danger" ? "bg-[#FF3B30]/10 text-[#FF6B6B]" : "bg-[#FFD700]/10 text-[#FFD700]"}`}><Icon className="w-4 h-4" /></span>
+      <span className={`inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-sm ${tone === "danger" ? "bg-live/10 text-[#FF6B6B]" : "bg-[#FFD700]/10 text-[#FFD700]"}`}><Icon className="w-4 h-4" /></span>
       <span className="min-w-0 flex-1">
         <span className="block font-bold tls-type-small">{title}</span>
         <span className="block tls-type-small text-white/55 truncate">{detail}</span>

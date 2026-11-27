@@ -62,7 +62,7 @@ export function DolibarrSourceBlock({ source, onChange, onSynced, kind = "sponso
         ) : (
           <span className="text-[#FFD700]">Noch nichts aus Dolibarr gelesen – „Jetzt nachlesen“ oder auf den stündlichen Abgleich warten.</span>
         )}
-        {source.error && <span className="text-[#FF3B30]">Letzter Abgleich fehlgeschlagen ({source.error_text || source.error}) – alter Stand bleibt.</span>}
+        {source.error && <span className="text-warn">Letzter Abgleich fehlgeschlagen ({source.error_text || source.error}) – alter Stand bleibt.</span>}
         <span className="text-white/45">Schalter und Kategorien: <Link to="/admin/dolibarr?tab=features" className="text-[#29B6E8] hover:underline" data-testid="dolibarr-source-features">Dolibarr → Funktionen</Link>.</span>
       </div>
     </div>

@@ -102,11 +102,11 @@ export function KontoLoeschen() {
 
   const onlySuperadmin = roleBlockers.length > 0 && roleBlockers.every((row) => row.role === "superadmin");
   return (
-    <div className="border border-[#FF3B30]/30 rounded-sm bg-[#FF3B30]/5 p-5 md:p-6" data-testid="dsgvo-erase">
+    <div className="border border-live/30 rounded-sm bg-live/5 p-5 md:p-6" data-testid="dsgvo-erase">
       <div className="flex items-start gap-3">
-        <AlertTriangle className="w-5 h-5 text-[#FF3B30] mt-1 shrink-0" aria-hidden="true" />
+        <AlertTriangle className="w-5 h-5 text-live mt-1 shrink-0" aria-hidden="true" />
         <div className="flex-1 min-w-0">
-          <h2 className="tls-type-section text-[#FF3B30]">Konto löschen</h2>
+          <h2 className="tls-type-section text-live">Konto löschen</h2>
           <p className="mt-1 tls-type-body text-white/60">Dein Konto wird dauerhaft deaktiviert und alle persönlichen Daten (E-Mail, Discord, Plattform-IDs, Bio, Avatar) werden überschrieben. Deine Turnier-Ergebnisse bleiben ohne Namen erhalten, damit Tabellen und Bäume stimmen. Das lässt sich <strong>nicht rückgängig machen</strong>.</p>
           {roleBlockers.length > 0 && (
             <div className="mt-4 border border-warn/35 bg-warn/5 rounded-sm p-4" data-testid="dsgvo-erasure-blockers">

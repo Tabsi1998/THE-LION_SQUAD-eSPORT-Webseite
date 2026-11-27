@@ -490,7 +490,7 @@ function LiveBanner({ state }) {
   ];
   if (!all.length) return null;
   return (
-    <div className="relative bg-gradient-to-r from-[#FF3B30] via-[#FF3B30]/80 to-[#FF3B30] border-b border-[#FF3B30]/40">
+    <div className="relative bg-gradient-to-r from-live via-live/80 to-live border-b border-live/40">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3 flex items-center gap-4 flex-wrap">
         <div className="flex items-center gap-2 text-white">
           <Radio className="w-4 h-4 animate-pulse" />

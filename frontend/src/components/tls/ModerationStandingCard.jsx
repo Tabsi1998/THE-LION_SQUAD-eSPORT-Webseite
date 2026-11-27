@@ -11,7 +11,7 @@ import { ROLE_COLORS } from "@/lib/categoryColors";
 // was beim nächsten Treffer käme, und der Einspruch. `compact` (Dashboard) zeigt die Karte nur,
 // wenn es etwas gibt; die volle Karte steht unter „Meine Strafen“. Nur die Person sieht das.
 
-const ACTION_TONE = { notice: "#FFD700", warning: "#FF9500", suspension: "#FF3B30" };
+const ACTION_TONE = { notice: "#FFD700", warning: ROLE_COLORS.warn, suspension: ROLE_COLORS.warn };
 
 export function formatMoment(value) {
   if (!value) return "";

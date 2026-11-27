@@ -610,7 +610,7 @@ function MatchPageView() {
           {data.conflict ? <ConflictNotice conflict={data.conflict} /> : null}
 
           {data.in_dispute && (
-            <p className="mt-5 rounded-sm border border-[#FF3B30]/40 bg-[#FF3B30]/10 px-4 py-3 tls-type-body text-[#FFD2CF]" data-testid="match-in-dispute">
+            <p className="mt-5 rounded-sm border border-warn/40 bg-warn/10 px-4 py-3 tls-type-body text-warn" data-testid="match-in-dispute">
               <strong>In Klärung</strong> – zu diesem Spiel wurde ein Problem gemeldet. Die {data.league ? "Liga-Leitung" : "Turnierleitung"} prüft und entscheidet.
               {/* Die Turnierleitung entscheidet in ihrer Ansicht (#1158) - mit Meldung, Foto und Ergebnis. */}
               {(canStaffSubmit || data.can_decide_dispute) && data.tournament && !procedures.length ? (

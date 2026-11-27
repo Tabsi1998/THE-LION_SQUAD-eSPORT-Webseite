@@ -14,7 +14,7 @@ import { ProofPhotoPicker } from "@/components/tls/results/ProofPhotoPicker";
 
 const TONE = {
   waiting: "border-[#29B6E8]/35 bg-[#29B6E8]/10 text-[#BFE9F8]",
-  conflict: "border-[#FF3B30]/40 bg-[#FF3B30]/10 text-[#FFD2CF]",
+  conflict: "border-warn/40 bg-warn/10 text-warn",
   confirm: "border-[#FFD700]/40 bg-[#FFD700]/10 text-[#FFF2B3]",
 };
 

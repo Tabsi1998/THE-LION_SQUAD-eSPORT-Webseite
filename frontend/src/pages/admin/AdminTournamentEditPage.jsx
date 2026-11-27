@@ -396,7 +396,7 @@ export default function AdminTournamentEditPage() {
   if (!t) return (
     <AdminLayout>
       {loadError
-        ? <div className="p-10 text-[#FF3B30]" data-testid="admin-tr-load-error">{loadError}</div>
+        ? <div className="p-10 text-warn" data-testid="admin-tr-load-error">{loadError}</div>
         : <div className="p-10"><SkeletonDetailHeader label="Lade Turnier" /></div>}
     </AdminLayout>
   );
@@ -488,7 +488,7 @@ export default function AdminTournamentEditPage() {
     ),
     // Nach dem Ende bleibt der Baum (#2120): daran hängen Platzierungen, Punkte und Gewinne.
     t.can_manage_structure && !FINISHED_STATUSES.has(t.status) && (
-      <button key="reset" type="button" onClick={reset} data-testid="admin-tr-reset" className="px-3 py-2 border border-[#FF3B30]/40 text-[#FF3B30] tls-type-label rounded-sm hover:bg-[#FF3B30]/10 inline-flex items-center gap-2">
+      <button key="reset" type="button" onClick={reset} data-testid="admin-tr-reset" className="px-3 py-2 border border-live/40 text-live tls-type-label rounded-sm hover:bg-live/10 inline-flex items-center gap-2">
         <RefreshCw className="w-3.5 h-3.5" /> Zurücksetzen
       </button>
     ),
@@ -698,7 +698,7 @@ export default function AdminTournamentEditPage() {
                   )}
                   <ParticipantRemovalActions tournament={t} registration={r} onDone={load} compact />
                   {t.can_manage_participants && !inFixedBracket.has(r.id) && (
-                    <button type="button" onClick={() => deleteParticipant(r)} className="px-2 py-2 border border-[#FF3B30]/40 text-[#FF3B30] rounded-sm tls-type-label hover:bg-[#FF3B30]/10">Entfernen</button>
+                    <button type="button" onClick={() => deleteParticipant(r)} className="px-2 py-2 border border-live/40 text-live rounded-sm tls-type-label hover:bg-live/10">Entfernen</button>
                   )}
                 </div>
               </div>
@@ -738,7 +738,7 @@ export default function AdminTournamentEditPage() {
                       )}
                       <ParticipantRemovalActions tournament={t} registration={r} onDone={load} />
                       {t.can_manage_participants && !inFixedBracket.has(r.id) && (
-                        <button type="button" onClick={() => deleteParticipant(r)} className="px-2 py-1 border border-[#FF3B30]/40 text-[#FF3B30] rounded-sm tls-type-label hover:bg-[#FF3B30]/10">Entfernen</button>
+                        <button type="button" onClick={() => deleteParticipant(r)} className="px-2 py-1 border border-live/40 text-live rounded-sm tls-type-label hover:bg-live/10">Entfernen</button>
                       )}
                     </div>
                   </td>

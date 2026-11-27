@@ -360,7 +360,7 @@ export default function MessagesPage() {
                   <div className="flex flex-wrap items-center justify-end gap-2">
                     {!canSend && hint ? <div className="tls-type-small text-[#FFD700] max-w-xs text-right">{hint}</div> : null}
                     <button type="button" onClick={report} className="px-2 py-1 border border-[#FFD700]/35 text-[#FFD700] tls-type-label">Melden</button>
-                    <button type="button" onClick={toggleBlock} className="px-2 py-1 border border-[#FF3B30]/35 text-[#FF6B6B] tls-type-label">{blockedByMe ? "Freigeben" : "Blockieren"}</button>
+                    <button type="button" onClick={toggleBlock} className="px-2 py-1 border border-warn/35 text-warn tls-type-label">{blockedByMe ? "Freigeben" : "Blockieren"}</button>
                   </div>
                 </div>
                 <ConversationView

@@ -83,7 +83,7 @@ export function MyStandCard({ tournament: t, registration: myReg, team = null, i
         {scheduleTo ? <Link to={scheduleTo} className="tls-type-label text-[#29B6E8] hover:text-white">Zum Spielplan</Link> : null}
         {detailsEdit}
         {canUnregister ? (
-          <button type="button" onClick={onUnregister} disabled={busy} data-testid="tournament-unregister-btn" className="ml-auto tls-type-small text-white/45 hover:text-[#FF3B30] underline underline-offset-2 disabled:opacity-50">Vom Turnier abmelden</button>
+          <button type="button" onClick={onUnregister} disabled={busy} data-testid="tournament-unregister-btn" className="ml-auto tls-type-small text-white/45 hover:text-live underline underline-offset-2 disabled:opacity-50">Vom Turnier abmelden</button>
         ) : leagueSquad && !FINISHED.has(t.status) ? (
           // Liga-Staffel (#2110): ein Co-Team ist zugeteilt - abmelden kann es nur die Liga-Leitung (#2424).
           <span className="ml-auto tls-type-small text-white/45" data-testid="tournament-unregister-league">Austritt nur über die Liga-Leitung</span>

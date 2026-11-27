@@ -22,11 +22,11 @@ import { ShortCaps } from "@/components/tls/ShortCaps";
 const STATUS_TONE = {
   pending: "text-white/70", ready: "text-ok", invoiced: "text-ok",
   waiting_write_access: "text-[#FFD700]", waiting_link: "text-[#FFD700]", waiting_review: "text-[#FFD700]", held: "text-[#29B6E8]",
-  failed: "text-[#FF3B30]", cancelled: "text-white/40",
+  failed: "text-warn", cancelled: "text-white/40",
 };
 
 const INVOICE_STATUS = { draft: "Entwurf", validated: "freigegeben", paid: "bezahlt", abandoned: "aufgegeben" };
-const ATTENTION_TONE = { overdue: "border-[#FF3B30]/50 text-[#FF3B30]", pdf_missing: "border-[#FFD700]/50 text-[#FFD700]", draft_old: "border-[#FFD700]/50 text-[#FFD700]" };
+const ATTENTION_TONE = { overdue: "border-warn/50 text-warn", pdf_missing: "border-[#FFD700]/50 text-[#FFD700]", draft_old: "border-[#FFD700]/50 text-[#FFD700]" };
 
 function capitalize(text) {
   return text ? text.charAt(0).toUpperCase() + text.slice(1) : "";
@@ -200,7 +200,7 @@ export default function AdminFinancePage() {
 
       {tab === "rechnungsangaben" && <InvoiceDetailsTab onSaved={load} />}
 
-      {tab === "overview" && error && <div className="mt-6 border border-[#FF3B30]/40 bg-[#FF3B30]/10 rounded-sm p-4 tls-type-small" data-testid="finance-error">{error}</div>}
+      {tab === "overview" && error && <div className="mt-6 border border-warn/40 bg-warn/10 rounded-sm p-4 tls-type-small" data-testid="finance-error">{error}</div>}
       {tab === "overview" && !data && !error && <SkeletonTable rows={4} columns={5} className="mt-6" label="Lade Finanzübersicht" />}
 
       {tab === "overview" && data && (
@@ -209,8 +209,8 @@ export default function AdminFinancePage() {
             <Stat label="Wartet auf Voraussetzungen" value={waiting} tone={waiting ? "text-[#FFD700]" : "text-white"} />
             <Stat label="Wartet auf Freigabe" value={status.held?.count || 0} tone="text-[#29B6E8]" />
             <Stat label="Bereit für Dolibarr" value={status.ready?.count || 0} tone="text-ok" />
-            <Stat label="Gescheitert" value={status.failed?.count || 0} tone={status.failed?.count ? "text-[#FF3B30]" : "text-white"} />
-            <Stat label="Prüffälle offen" value={data.cases_open || 0} tone={data.cases_open ? "text-[#FF3B30]" : "text-white"} testId="finance-cases-count" />
+            <Stat label="Gescheitert" value={status.failed?.count || 0} tone={status.failed?.count ? "text-warn" : "text-white"} />
+            <Stat label="Prüffälle offen" value={data.cases_open || 0} tone={data.cases_open ? "text-warn" : "text-white"} testId="finance-cases-count" />
           </div>
 
           <div className={`mt-4 border rounded-sm p-4 tls-type-small flex items-start gap-3 ${data.dolibarr?.write_capable ? "border-ok/30" : "border-[#FFD700]/40 bg-[#FFD700]/5"}`} data-testid="finance-dolibarr">
@@ -309,7 +309,7 @@ export default function AdminFinancePage() {
           {(!!cases.length || data.cases_resolved > 0 || caseView === "resolved") && (
             <div className="mt-8" data-testid="finance-cases">
               <div className="flex flex-wrap items-center justify-between gap-3">
-                <h2 className="tls-type-section text-[#FF3B30]">Prüffälle</h2>
+                <h2 className="tls-type-section text-warn">Prüffälle</h2>
                 <div className="flex gap-1" role="group" aria-label="Welche Prüffälle">
                   {[["open", `Offen · ${data.cases_open || 0}`], ["resolved", `Erledigt · ${data.cases_resolved || 0}`]].map(([key, label]) => (
                     <button key={key} type="button" aria-pressed={caseView === key} onClick={() => setCaseView(key)} data-testid={`finance-cases-${key}`}
@@ -324,7 +324,7 @@ export default function AdminFinancePage() {
               {!cases.length && <div className="mt-3 tls-type-small text-white/50" data-testid="finance-cases-none">Keine offenen Prüffälle in dieser Auswahl.</div>}
               <div className="mt-3 space-y-3">
                 {cases.map((item) => (
-                  <div key={item.id} className="border border-[#FF3B30]/30 bg-[#FF3B30]/5 rounded-sm p-4 tls-type-small" data-testid={`finance-case-${item.id}`}>
+                  <div key={item.id} className="border border-warn/30 bg-warn/5 rounded-sm p-4 tls-type-small" data-testid={`finance-case-${item.id}`}>
                     <div className="flex flex-wrap items-start justify-between gap-3">
                       <div>
                         <div className="font-bold text-white">{item.label} <span className="text-white/50 font-normal">· {sourceName(item)} · {item.person || item.user_id} · {item.total}</span></div>
@@ -391,7 +391,7 @@ export default function AdminFinancePage() {
                         </div>
                       )}
                       {row.status === "failed" && (
-                        <button type="button" disabled={!!busy} onClick={() => run(row.id, () => api.post(`/admin/finance/orders/${row.id}/retry`), "Auftrag neu gestartet.")} className="px-3 py-1.5 border border-[#FF3B30]/50 text-[#FF3B30] rounded-sm tls-type-label disabled:opacity-40" data-testid={`finance-retry-${row.id}`}>
+                        <button type="button" disabled={!!busy} onClick={() => run(row.id, () => api.post(`/admin/finance/orders/${row.id}/retry`), "Auftrag neu gestartet.")} className="px-3 py-1.5 border border-warn/50 text-warn rounded-sm tls-type-label disabled:opacity-40" data-testid={`finance-retry-${row.id}`}>
                           Erneut versuchen
                         </button>
                       )}
@@ -450,7 +450,7 @@ export default function AdminFinancePage() {
                         <tr key={row.id} data-testid={`finance-invoice-${row.id}`}>
                           <td className="px-4 py-3 font-mono text-white">
                             {row.invoice_ref || "–"}
-                            {row.booking_state === "cancelled" && <div className="tls-type-small text-[#FF3B30] font-sans">Buchung storniert</div>}
+                            {row.booking_state === "cancelled" && <div className="tls-type-small text-quiet font-sans">Buchung storniert</div>}
                           </td>
                           <td className="px-4 py-3 text-white/80">{sourceName(row)}</td>
                           <td className="px-4 py-3 text-white/80">{row.person || row.user_id}</td>
@@ -621,7 +621,7 @@ function OrderDetail({ detail, busy, paymentLabels, onClose, onResync, onRefund 
             {timeline.map((item, index) => (
               <li key={`${item.at}-${index}`} className="flex gap-3">
                 <span className="text-white/40 shrink-0 tabular-nums w-28" data-testid="finance-timeline-at">{timelineMoment(item.at)}</span>
-                <span className={item.kind === "error" || item.kind === "case" ? "text-[#FF3B30]" : item.kind === "payment" ? "text-ok" : "text-white/80"}>{item.text}</span>
+                <span className={item.kind === "error" || item.kind === "case" ? "text-warn" : item.kind === "payment" ? "text-ok" : "text-white/80"}>{item.text}</span>
               </li>
             ))}
             {!timeline.length && <li className="text-white/40">Noch nichts passiert.</li>}

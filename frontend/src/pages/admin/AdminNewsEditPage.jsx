@@ -423,7 +423,7 @@ function NewsForm({ post, meta, onDone, onReload }) {
                 {selectedUsers.map((user) => (
                   <span key={user.id} className="inline-flex items-center gap-1.5 px-2 py-1 border border-[#29B6E8]/30 text-[#29B6E8] rounded-sm tls-type-small">
                     <AtSign className="w-3 h-3" /> {userLabel(user)}
-                    <button type="button" onClick={() => removeMention(user.id)} className="text-white/45 hover:text-[#FF3B30]" aria-label={`${userLabel(user)} entfernen`}>
+                    <button type="button" onClick={() => removeMention(user.id)} className="text-white/45 hover:text-live" aria-label={`${userLabel(user)} entfernen`}>
                       <X className="w-3 h-3" />
                     </button>
                   </span>

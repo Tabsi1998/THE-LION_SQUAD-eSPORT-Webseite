@@ -225,7 +225,7 @@ function PackCard({ pack, onToggle, onRename, onDelete, onAdd, onDeleteSticker, 
                 <Plus className="w-3.5 h-3.5" /> Sticker
               </button>
               <button type="button" aria-label={`${pack.name} umbenennen`} onClick={() => setDraftName(pack.name)} className="p-1.5 text-white/40 hover:text-[#29B6E8]"><Pencil className="w-4 h-4" /></button>
-              <button type="button" aria-label={`${pack.name} löschen`} onClick={() => onDelete(pack)} className="p-1.5 text-white/40 hover:text-[#FF3B30]"><Trash2 className="w-4 h-4" /></button>
+              <button type="button" aria-label={`${pack.name} löschen`} onClick={() => onDelete(pack)} className="p-1.5 text-white/40 hover:text-live"><Trash2 className="w-4 h-4" /></button>
             </>
           )}
         </div>

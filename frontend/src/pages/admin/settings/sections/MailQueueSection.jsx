@@ -13,7 +13,7 @@ const STATE_STYLE = {
   pending: { color: "#FFD700", icon: Clock },
   sending: { color: "#29B6E8", icon: Send },
   sent: { color: ROLE_COLORS.ok, icon: CheckCircle2 },
-  failed: { color: "#FF3B30", icon: XCircle },
+  failed: { color: ROLE_COLORS.warn, icon: XCircle },
   skipped: { color: "#A1A1AA", icon: SkipForward },
 };
 
@@ -152,7 +152,7 @@ export function MailQueueSection({ queue, queueStats, queueFilter, setQueueFilte
       <div className="flex flex-wrap gap-2 items-center">
         <button type="button" onClick={processQueueNow} data-testid="queue-process-now" className="px-4 py-2 bg-[#29B6E8] text-black font-bold uppercase tracking-wider rounded-sm inline-flex items-center gap-2"><RefreshCw className="w-3.5 h-3.5" /> Jetzt verarbeiten</button>
         <button type="button" onClick={recoverQueue} data-testid="queue-recover" className="px-4 py-2 border border-[#FFD700]/60 text-[#FFD700] font-bold uppercase tracking-wider rounded-sm inline-flex items-center gap-2"><RefreshCw className="w-3.5 h-3.5" /> Hängende Mails neu anstoßen</button>
-        <button type="button" onClick={retryFailedQueue} data-testid="queue-retry-failed" className="px-4 py-2 border border-[#FF3B30]/60 text-[#FF3B30] font-bold uppercase tracking-wider rounded-sm inline-flex items-center gap-2"><RefreshCw className="w-3.5 h-3.5" /> Alle fehlgeschlagenen nochmal versuchen</button>
+        <button type="button" onClick={retryFailedQueue} data-testid="queue-retry-failed" className="px-4 py-2 border border-warn/60 text-warn font-bold uppercase tracking-wider rounded-sm inline-flex items-center gap-2"><RefreshCw className="w-3.5 h-3.5" /> Alle fehlgeschlagenen nochmal versuchen</button>
         <button type="button" onClick={cleanupQueue} data-testid="queue-cleanup" className="px-4 py-2 border border-white/15 text-white/70 font-bold uppercase tracking-wider rounded-sm inline-flex items-center gap-2"><Trash2 className="w-3.5 h-3.5" /> Aufräumen</button>
         <select value={queueFilter} onChange={(e) => setQueueFilter(e.target.value)} aria-label="Nach Stand filtern" data-testid="queue-filter" className="bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-sm">
           <option value="">Alle</option>

@@ -43,7 +43,7 @@ export function PrizeEditor({ value = [], onChange, format = "" }) {
           </select>
           <input value={p.label || ""} onChange={(e)=>update(i, { label: e.target.value })} className="col-span-4 sm:col-span-3 bg-[#0A0A0A] border border-white/10 px-2 py-2 rounded-sm text-sm" placeholder="Bezeichnung" />
           <input value={p.value || ""} onChange={(e)=>update(i, { value: e.target.value })} className="col-span-5 sm:col-span-3 bg-[#0A0A0A] border border-white/10 px-2 py-2 rounded-sm text-sm" placeholder="Preis" />
-          <button type="button" onClick={() => onChange(value.filter((_, j) => j !== i))} className="col-span-1 text-white/40 hover:text-[#FF3B30]">×</button>
+          <button type="button" onClick={() => onChange(value.filter((_, j) => j !== i))} className="col-span-1 text-white/40 hover:text-live">×</button>
         </div>
       ))}
     </div>

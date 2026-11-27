@@ -12,7 +12,7 @@ const STATUS = {
   pending: { label: "Wird vorbereitet", color: "text-[#FFD700]", icon: Clock },
   ready: { label: "Bereit zur Abholung", color: "text-[#29B6E8]", icon: Gift },
   picked_up: { label: "Abgeholt", color: "text-ok", icon: CheckCircle2 },
-  expired: { label: "Verfallen", color: "text-[#FF3B30]", icon: XCircle },
+  expired: { label: "Verfallen", color: "text-quiet", icon: XCircle },
 };
 
 function formatDate(value) {

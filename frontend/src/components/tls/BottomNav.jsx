@@ -109,7 +109,7 @@ export function BottomNav() {
                   strokeWidth={active ? 2.5 : 1.5}
                 />
                 {count ? (
-                  <span className="absolute -top-1.5 -right-2.5 min-w-[16px] h-4 px-1 rounded-full bg-[#FF3B30] text-white text-[9px] font-bold leading-4 text-center" data-testid="bottom-nav-community-count">
+                  <span className="absolute -top-1.5 -right-2.5 min-w-[16px] h-4 px-1 rounded-full bg-brand text-[#0A0A0A] text-[9px] font-bold leading-4 text-center" data-testid="bottom-nav-community-count">
                     {badgeText(count)}
                   </span>
                 ) : null}

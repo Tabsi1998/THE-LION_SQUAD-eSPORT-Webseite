@@ -31,7 +31,7 @@ export function FlagChips({ value = null, onChange, testId }) {
             type="button"
             aria-pressed={active}
             onClick={() => onChange(active ? null : key)}
-            className={`min-h-[36px] rounded-full border px-3 tls-type-label transition ${active ? "border-[#FF3B30]/60 bg-[#FF3B30]/15 text-[#FF6B60]" : "border-white/10 bg-white/5 text-white/60 hover:border-white/25"}`}
+            className={`min-h-[36px] rounded-full border px-3 tls-type-label transition ${active ? "border-warn/60 bg-warn/15 text-warn" : "border-white/10 bg-white/5 text-white/60 hover:border-white/25"}`}
             data-testid={testId ? `${testId}-${key}` : undefined}
           >
             {label}

@@ -282,7 +282,7 @@ function NavDropdown({ item, isClubMember, signedIn, badge = 0 }) {
   const triggerContent = (
     <>
       <span>{item.label}</span>
-      {badge ? <span className="min-w-[16px] h-4 px-1 rounded-full bg-[#FF3B30] text-white tls-type-small leading-4 text-center" data-testid={`nav-${key}-count`} aria-label={`${badge} ungelesene Chats`}>{badge > 99 ? "99+" : badge}</span> : null}
+      {badge ? <span className="min-w-[16px] h-4 px-1 rounded-full bg-brand text-[#0A0A0A] tls-type-small leading-4 text-center" data-testid={`nav-${key}-count`} aria-label={`${badge} ungelesene Chats`}>{badge > 99 ? "99+" : badge}</span> : null}
       <ChevronDown data-testid={`nav-${key}-chevron`} aria-hidden="true" className={`w-3.5 h-3.5 shrink-0 opacity-80 transition-transform ${open ? "rotate-180" : ""}`} />
     </>
   );

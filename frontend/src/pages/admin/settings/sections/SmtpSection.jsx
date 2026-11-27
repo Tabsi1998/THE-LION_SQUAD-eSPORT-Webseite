@@ -161,9 +161,9 @@ export function SmtpSection({ smtp, setSmtp, smtpTestEmail, setSmtpTestEmail, sm
           <button onClick={sendSmtpTest} data-testid="smtp-test-send" className="px-4 py-2 border border-[#29B6E8] text-[#29B6E8] font-bold uppercase tracking-wider rounded-sm inline-flex items-center justify-center gap-2"><Send className="w-3.5 h-3.5" /> Senden</button>
         </div>
         {smtpDiag && (
-          <div data-testid="smtp-diagnose-result" className={`border rounded-sm p-4 tls-type-small space-y-3 ${smtpDiag.ok ? "border-ok/25 bg-ok/5" : "border-[#FF3B30]/25 bg-[#FF3B30]/5"}`}>
+          <div data-testid="smtp-diagnose-result" className={`border rounded-sm p-4 tls-type-small space-y-3 ${smtpDiag.ok ? "border-ok/25 bg-ok/5" : "border-warn/25 bg-warn/5"}`}>
             <div className="flex items-center gap-2 font-bold uppercase tracking-widest">
-              {smtpDiag.ok ? <CheckCircle2 className="w-4 h-4 text-ok" /> : <XCircle className="w-4 h-4 text-[#FF3B30]" />}
+              {smtpDiag.ok ? <CheckCircle2 className="w-4 h-4 text-ok" /> : <XCircle className="w-4 h-4 text-warn" />}
               Verbindung: {smtpDiag.ok ? "in Ordnung" : "Problem gefunden"}
             </div>
             <div className="grid sm:grid-cols-2 gap-2 text-white/55">
@@ -175,7 +175,7 @@ export function SmtpSection({ smtp, setSmtp, smtpTestEmail, setSmtpTestEmail, sm
             <div className="space-y-1">
               {(smtpDiag.steps || []).map((s, i) => (
                 <div key={i} className="flex gap-2 text-white/70">
-                  <span className={s.ok ? "text-ok" : "text-[#FF3B30]"}>{s.ok ? "klappt" : "Fehler"}</span>
+                  <span className={s.ok ? "text-ok" : "text-warn"}>{s.ok ? "klappt" : "Fehler"}</span>
                   <span className="break-words">{s.label}</span>
                 </div>
               ))}
@@ -189,7 +189,7 @@ export function SmtpSection({ smtp, setSmtp, smtpTestEmail, setSmtpTestEmail, sm
                       <div className="font-mono text-white/80">{c.port} / {String(c.security || "").toUpperCase()}</div>
                       <div>Verbindung: {c.connect_ok ? "klappt" : "keine"}</div>
                       <div>Anmeldung: {c.auth_supported ? "angeboten" : "nicht angeboten"}</div>
-                      {c.error && <div className="text-[#FF3B30] break-words">{c.error}</div>}
+                      {c.error && <div className="text-warn break-words">{c.error}</div>}
                     </div>
                   ))}
                 </div>
@@ -216,7 +216,7 @@ export function SmtpSection({ smtp, setSmtp, smtpTestEmail, setSmtpTestEmail, sm
             <div className="space-y-1">
               {(smtpDeliverability.checks || []).map((c, i) => (
                 <div key={i} className="flex gap-2 text-white/70">
-                  <span className={c.ok ? "text-ok" : c.severity === "error" ? "text-[#FF3B30]" : "text-[#FFD700]"}>{c.ok ? "passt" : c.severity === "error" ? "Fehler" : "Hinweis"}</span>
+                  <span className={c.ok ? "text-ok" : c.severity === "error" ? "text-warn" : "text-[#FFD700]"}>{c.ok ? "passt" : c.severity === "error" ? "Fehler" : "Hinweis"}</span>
                   <span className="break-words"><strong>{c.label}:</strong> {c.detail}</span>
                 </div>
               ))}

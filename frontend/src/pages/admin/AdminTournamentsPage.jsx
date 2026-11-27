@@ -350,7 +350,7 @@ function RowActions({ tournament: t, isTournamentLead, onStatus, onDelete }) {
         </button>
       ) : null}
       {isTournamentLead && canDelete(t) ? (
-        <button type="button" onClick={() => onDelete(t)} title="Löschen" aria-label={`Löschen: ${t.title}`} className={`${ACTION_CLASS} hover:text-[#FF3B30]`}>
+        <button type="button" onClick={() => onDelete(t)} title="Löschen" aria-label={`Löschen: ${t.title}`} className={`${ACTION_CLASS} hover:text-live`}>
           <Trash2 className={ACTION_ICON} aria-hidden="true" />
         </button>
       ) : null}

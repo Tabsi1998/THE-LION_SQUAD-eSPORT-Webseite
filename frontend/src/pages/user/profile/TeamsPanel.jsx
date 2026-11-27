@@ -323,7 +323,7 @@ export function TeamsPanel() {
                         {canEditSquads && squad.can_edit !== false && (
                           <div className="flex gap-1">
                             <button type="button" onClick={() => setEditing({ ...emptySquad, ...squad })} className="p-1 text-white/45 hover:text-[#29B6E8]"><Pencil className="w-3.5 h-3.5" /></button>
-                            <button type="button" onClick={() => deleteSquad(squad)} className="p-1 text-white/45 hover:text-[#FF3B30]"><Trash2 className="w-3.5 h-3.5" /></button>
+                            <button type="button" onClick={() => deleteSquad(squad)} className="p-1 text-white/45 hover:text-live"><Trash2 className="w-3.5 h-3.5" /></button>
                           </div>
                         )}
                       </div>

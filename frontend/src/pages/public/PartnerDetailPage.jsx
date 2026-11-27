@@ -39,7 +39,7 @@ function formatDate(value) {
 
 export function channelDetail(channel, twitch, discord) {
   if (channel.key === "twitch") {
-    if (twitch?.live) return { text: `Live · ${twitch.viewer_count || 0} Zuschauer`, tone: "#FF3B30" };
+    if (twitch?.live) return { text: `Live · ${twitch.viewer_count || 0} Zuschauer`, tone: ROLE_COLORS.live };
     if (twitch?.configured) return { text: "gerade offline", tone: "" };
     return { text: channel.handle ? `twitch.tv/${channel.handle}` : "", tone: "" };
   }
@@ -124,7 +124,7 @@ export default function PartnerDetailPage() {
               <span>{partner.kind || "Partner"}</span>
               {since && <span className="text-white/40">· Partner seit {since}</span>}
               {live && (
-                <span className="inline-flex items-center gap-1 px-2 py-0.5 border border-[#FF3B30]/50 text-[#FF3B30] rounded-sm" data-testid="partner-live-pill">
+                <span className="inline-flex items-center gap-1 px-2 py-0.5 border border-live/50 text-live rounded-sm" data-testid="partner-live-pill">
                   <Radio className="w-3 h-3 animate-live" /> Live auf Twitch
                 </span>
               )}
@@ -267,7 +267,7 @@ function TwitchLiveSection({ channel, twitch, hasConsent }) {
         <h2 className="tls-type-section flex items-center gap-2">
           <ChannelIcon kind="twitch" className="w-5 h-5 text-[#9146FF]" /> Live auf Twitch
         </h2>
-        <span className="inline-flex items-center gap-1.5 px-2 py-0.5 border border-[#FF3B30]/50 text-[#FF3B30] tls-type-label rounded-sm">
+        <span className="inline-flex items-center gap-1.5 px-2 py-0.5 border border-live/50 text-live tls-type-label rounded-sm">
           <Radio className="w-3 h-3 animate-live" /> Live · {twitch.viewer_count || 0} Zuschauer
         </span>
       </div>

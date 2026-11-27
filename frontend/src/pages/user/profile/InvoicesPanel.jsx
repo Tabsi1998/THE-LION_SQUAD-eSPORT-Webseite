@@ -84,7 +84,7 @@ export function InvoicesPanel() {
 
   return (
     <div data-testid="invoices-panel">
-      {error && <div className="mt-6 border border-[#FF3B30]/40 bg-[#FF3B30]/10 rounded-sm p-4 tls-type-small" data-testid="invoices-error">{error}</div>}
+      {error && <div className="mt-6 border border-warn/40 bg-warn/10 rounded-sm p-4 tls-type-small" data-testid="invoices-error">{error}</div>}
       {!data && !error && <SkeletonTable rows={4} columns={4} className="mt-6" label="Lade Belege" />}
       {data && (
         <>

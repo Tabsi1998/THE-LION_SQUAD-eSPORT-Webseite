@@ -14,10 +14,11 @@ import { viennaDateTime } from "@/lib/vienna";
 import { showLapTime } from "@/lib/laptime";
 import { LeagueSanctionCard } from "./LeagueSanctionCard";
 
+import { ROLE_COLORS } from "@/lib/categoryColors";
 const KIND_META = {
-  lap_penalty: { icon: Clock, color: "#FF9500", label: "Strafzeit" },
-  lap_invalid: { icon: Flag, color: "#FF3B30", label: "Runde ungültig" },
-  match_forfeit: { icon: ShieldAlert, color: "#FF3B30", label: "Kampflos verloren" },
+  lap_penalty: { icon: Clock, color: ROLE_COLORS.warn, label: "Strafzeit" },
+  lap_invalid: { icon: Flag, color: ROLE_COLORS.warn, label: "Runde ungültig" },
+  match_forfeit: { icon: ShieldAlert, color: ROLE_COLORS.warn, label: "Kampflos verloren" },
   incident: { icon: AlertTriangle, color: "#FFD700", label: "Vorfall" },
 };
 
@@ -74,7 +75,7 @@ function PenaltyCard({ p }) {
   return (
     <div
       data-testid={`penalty-card-${p.ref_id}`}
-      className="border border-white/10 rounded-sm bg-[#121212] p-5 hover:border-[#FF3B30]/30 transition"
+      className="border border-white/10 rounded-sm bg-[#121212] p-5 hover:border-warn/30 transition"
     >
       <div className="flex items-start gap-4">
         <div

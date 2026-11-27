@@ -13,7 +13,7 @@ const PROVIDERS = [
   ["off", "Aus – keine Prüfung"],
 ];
 const STATE_LABEL = { pending: "wartet", safe: "unauffällig", review: "Prüfung nötig", blocked: "entfernt", failed: "Anbieter-Fehler (sichtbar)" };
-const STATE_TONE = { pending: "text-white/50", safe: "text-ok", review: "text-[#FFD700]", blocked: "text-[#FF3B30]", failed: "text-[#FF6B6B]" };
+const STATE_TONE = { pending: "text-white/50", safe: "text-ok", review: "text-[#FFD700]", blocked: "text-warn", failed: "text-warn" };
 const FILTERS = [["review", "Prüfung nötig"], ["blocked", "Entfernt"], ["failed", "Fehler"], ["safe", "Unauffällig"], ["all", "Alle"]];
 
 export function percent(value) {
@@ -185,8 +185,8 @@ export default function ImageScanTab() {
 function StatCard({ title, ok, detail, problem = "", testId }) {
   const Icon = ok ? ShieldCheck : ShieldAlert;
   return (
-    <div className={`border rounded-sm p-3 ${ok ? "border-ok/25 bg-ok/5" : "border-[#FF3B30]/30 bg-[#FF3B30]/5"}`} data-testid={testId}>
-      <div className="flex items-center gap-2 tls-type-label text-white/50"><Icon className={`w-3.5 h-3.5 ${ok ? "text-ok" : "text-[#FF3B30]"}`} /> {title}</div>
+    <div className={`border rounded-sm p-3 ${ok ? "border-ok/25 bg-ok/5" : "border-warn/30 bg-warn/5"}`} data-testid={testId}>
+      <div className="flex items-center gap-2 tls-type-label text-white/50"><Icon className={`w-3.5 h-3.5 ${ok ? "text-ok" : "text-warn"}`} /> {title}</div>
       <div className="mt-1 tls-type-small text-white/85">{detail}</div>
       {problem && <div className="mt-1 tls-type-small text-[#FF6B6B]">{problem}</div>}
     </div>
@@ -236,7 +236,7 @@ function ScanRow({ row, note, onNote, onDecide, busy }) {
             <button type="button" onClick={() => onDecide("approve")} disabled={Boolean(busy)} data-testid={`image-scan-approve-${row.id}`} className="inline-flex items-center justify-center gap-1.5 px-4 py-2 border border-ok/50 text-ok rounded-sm tls-type-label hover:bg-ok/10 disabled:opacity-50"><Eye className="w-3.5 h-3.5" /> Freigeben</button>
           )}
           {row.state !== "blocked" && (
-            <button type="button" onClick={() => onDecide("remove")} disabled={Boolean(busy)} data-testid={`image-scan-remove-${row.id}`} className="inline-flex items-center justify-center gap-1.5 px-4 py-2 border border-[#FF3B30]/50 text-[#FF3B30] rounded-sm tls-type-label hover:bg-[#FF3B30]/10 disabled:opacity-50"><ShieldAlert className="w-3.5 h-3.5" /> Entfernen</button>
+            <button type="button" onClick={() => onDecide("remove")} disabled={Boolean(busy)} data-testid={`image-scan-remove-${row.id}`} className="inline-flex items-center justify-center gap-1.5 px-4 py-2 border border-live/50 text-live rounded-sm tls-type-label hover:bg-live/10 disabled:opacity-50"><ShieldAlert className="w-3.5 h-3.5" /> Entfernen</button>
           )}
         </div>
       </div>

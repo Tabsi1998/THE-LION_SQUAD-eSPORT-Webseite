@@ -624,7 +624,7 @@ export default function PublicProfilePage() {
                 <AccountLevelPill level={level.level} />
                 <ClubProfileHint profile={profile} />
                 {liveStream && (
-                  <span className="inline-flex items-center gap-1 px-2 py-0.5 border border-[#FF3B30]/50 text-[#FF3B30] tls-type-label rounded-sm" data-testid="profile-live-pill">
+                  <span className="inline-flex items-center gap-1 px-2 py-0.5 border border-live/50 text-live tls-type-label rounded-sm" data-testid="profile-live-pill">
                     <Radio className="w-3 h-3 animate-live" /> Live
                   </span>
                 )}
@@ -1039,7 +1039,7 @@ function TwitchLiveCard({ channel, url, stream, hasConsent }) {
         <h2 className="tls-type-section flex items-center gap-2">
           <SocialIcon kind="twitch" className="w-5 h-5 text-[#9146FF]" /> Live auf Twitch
         </h2>
-        <span className="inline-flex items-center gap-1.5 px-2 py-0.5 border border-[#FF3B30]/50 text-[#FF3B30] tls-type-label rounded-sm">
+        <span className="inline-flex items-center gap-1.5 px-2 py-0.5 border border-live/50 text-live tls-type-label rounded-sm">
           <Radio className="w-3 h-3 animate-live" /> Live{stream.viewer_count ? ` · ${stream.viewer_count} Zuschauer` : ""}
         </span>
       </div>

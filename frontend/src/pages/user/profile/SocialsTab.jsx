@@ -112,7 +112,7 @@ function LinkRow({ platformKey, link, available, form, set, onLink, onUnlink, in
           </a>
         )}
         {link && (
-          <button type="button" onClick={() => onUnlink(platformKey)} data-testid={`${testId}-unlink`} className="inline-flex items-center gap-1 px-2.5 py-1.5 border border-white/15 rounded-sm tls-type-label text-white/60 hover:text-[#FF3B30] hover:border-[#FF3B30]/50">
+          <button type="button" onClick={() => onUnlink(platformKey)} data-testid={`${testId}-unlink`} className="inline-flex items-center gap-1 px-2.5 py-1.5 border border-white/15 rounded-sm tls-type-label text-white/60 hover:text-live hover:border-live/50">
             <Unlink className="w-3.5 h-3.5" aria-hidden="true" /> Verknüpfung lösen
           </button>
         )}

@@ -467,8 +467,8 @@ export default function AdminMediaPage() {
             ["Ungenutzt", mediaAudit.unused || 0, mediaAudit.unused ? "text-[#FFD700]" : "text-white"],
             ["Nicht erfasst", mediaAudit.untracked || 0, mediaAudit.untracked ? "text-[#FFD700]" : "text-white"],
             ["Duplikate", mediaAudit.duplicate_files || 0, mediaAudit.duplicate_files ? "text-[#FFD700]" : "text-white"],
-            ["Einträge ohne Datei", mediaAudit.metadata_missing_files || 0, mediaAudit.metadata_missing_files ? "text-[#FF3B30]" : "text-white"],
-            ["Verweise ins Leere", mediaAudit.reference_summary?.missing_file || 0, mediaAudit.reference_summary?.missing_file ? "text-[#FF3B30]" : "text-white"],
+            ["Einträge ohne Datei", mediaAudit.metadata_missing_files || 0, mediaAudit.metadata_missing_files ? "text-warn" : "text-white"],
+            ["Verweise ins Leere", mediaAudit.reference_summary?.missing_file || 0, mediaAudit.reference_summary?.missing_file ? "text-warn" : "text-white"],
           ].map(([label, value, color]) => (
             <button
               key={label}
@@ -559,7 +559,7 @@ export default function AdminMediaPage() {
           <div className="mt-4 grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
             {qualityChecks.map((check) => {
               const ok = Number(check.value || 0) === 0;
-              const color = ok ? ROLE_COLORS.ok : check.tone === "danger" ? "#FF3B30" : "#FFD700";
+              const color = ok ? ROLE_COLORS.ok : check.tone === "danger" ? ROLE_COLORS.warn : "#FFD700";
               const clickable = !!check.filter && !ok;
               return (
                 <button
@@ -665,7 +665,7 @@ export default function AdminMediaPage() {
                     <span id={`${infoId}-tags`} className="mt-1 flex flex-wrap gap-1">
                       <span className="tls-type-label border border-white/10 px-1.5 py-0.5 text-white/45">{MEDIA_SCOPE_LABELS[it.media_scope] || MEDIA_SCOPE_LABELS.legacy}</span>
                       {it.is_unused && <span className="tls-type-label border border-[#FFD700]/30 px-1.5 py-0.5 text-[#FFD700]">ungenutzt</span>}
-                      {!it.tracked && <span className="tls-type-label border border-[#FF3B30]/30 px-1.5 py-0.5 text-[#FF3B30]">nicht erfasst</span>}
+                      {!it.tracked && <span className="tls-type-label border border-warn/30 px-1.5 py-0.5 text-warn">nicht erfasst</span>}
                       {it.duplicate_count > 1 && <span className="tls-type-label border border-[#FFD700]/30 px-1.5 py-0.5 text-[#FFD700]">duplikat</span>}
                     </span>
                     <span id={`${infoId}-size`} className="block tls-type-small text-quiet mt-1">{fmtBytes(it.size)} · {it.usage_count || 0}x genutzt</span>

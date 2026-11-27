@@ -22,7 +22,7 @@ export function SystemCard({ title, ok, detail, problem, testId }) {
         </span>
       </div>
       <div className="mt-3 tls-type-small text-white/55 break-words">{detail || "-"}</div>
-      {problem && <div className="mt-2 tls-type-small text-[#FF3B30] break-words">{problem}</div>}
+      {problem && <div className="mt-2 tls-type-small text-warn break-words">{problem}</div>}
     </div>
   );
 }

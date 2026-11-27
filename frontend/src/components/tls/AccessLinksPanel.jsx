@@ -27,7 +27,7 @@ function linkStateLabel(link) {
 
 function linkStateClass(link) {
   if (link.is_active === false) return "text-white/40";
-  if (link.is_expired || link.is_exhausted) return "text-[#FF3B30]";
+  if (link.is_expired || link.is_exhausted) return "text-quiet";
   return "text-ok";
 }
 
@@ -291,7 +291,7 @@ export function AccessLinksPanel({ targetType, targetId, allowRegister = false, 
                 type="button"
                 onClick={() => revoke(link)}
                 disabled={busy || link.is_active === false}
-                className="p-2 border border-[#FF3B30]/35 text-[#FF3B30] rounded-sm hover:bg-[#FF3B30]/10 disabled:opacity-50"
+                className="p-2 border border-live/35 text-live rounded-sm hover:bg-live/10 disabled:opacity-50"
                 title="Deaktivieren"
               >
                 <Trash2 className="w-3.5 h-3.5" />

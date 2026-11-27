@@ -3145,7 +3145,7 @@ html[data-season-still-cards] .tls-card[data-season-perch="card"]:focus-visible 
   }
   .tls-btn--danger:hover:not(:disabled) {
     color: #FFFFFF;
-    border-color: #FF3B30;
+    border-color: var(--tls-live);
     background-color: rgba(255, 59, 48, 0.16);
   }
   .tls-btn--honor:hover:not(:disabled) {

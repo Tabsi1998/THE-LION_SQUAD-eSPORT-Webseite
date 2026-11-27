@@ -333,7 +333,7 @@ export default function AdminDolibarrPage() {
                     <div className="font-bold tls-wrap">{link.display_name || link.username}</div>
                     <div className="tls-type-small text-white/45">{link.member_ref ? `Mitglied Nr. ${link.member_ref}` : "ohne Mitglied"}</div>
                   </div>
-                  <span className={`tls-type-label ${link.status === "verified" ? "text-ok" : link.status === "conflict" ? "text-[#FF3B30]" : "text-[#FFD700]"}`}>{LINK_STATUS_LABELS[link.status] || link.status}</span>
+                  <span className={`tls-type-label ${link.status === "verified" ? "text-ok" : link.status === "conflict" ? "text-warn" : "text-[#FFD700]"}`}>{LINK_STATUS_LABELS[link.status] || link.status}</span>
                   <div className="tls-type-small text-white/50 flex-1 min-w-0">{link.note || (link.verified_at ? `seit ${formatDate(link.verified_at)}` : "")}</div>
                   {link.status === "verified" && (
                     <button type="button" onClick={() => removeLink(link)} className="tls-type-label text-[#FF6B6B] inline-flex items-center gap-1"><Unlink className="w-3 h-3" /> Lösen</button>
@@ -543,7 +543,7 @@ export default function AdminDolibarrPage() {
                 <div className="border border-white/10 rounded-sm p-3 tls-type-small text-white/65" data-testid="dolibarr-invoice-details-pointer">
                   Zahlungsziel, Zahlungsart, Bankkonto, Sprache der PDFs, „Steuersätze geprüft“ und „Rechnungen gleich freigeben“ pflegt der Kassier unter{" "}
                   <Link to="/admin/finance?tab=rechnungsangaben" className="text-[#29B6E8] hover:underline">Finanzübersicht → Rechnungsangaben</Link>
-                  {status?.invoice_terms ? <> – Stand: <span className={status.invoice_terms.complete ? "text-ok" : "text-[#FF9500]"}>{status.invoice_terms.complete ? "vollständig" : "unvollständig, Belege bleiben Entwurf"}</span></> : null}.
+                  {status?.invoice_terms ? <> – Stand: <span className={status.invoice_terms.complete ? "text-ok" : "text-warn"}>{status.invoice_terms.complete ? "vollständig" : "unvollständig, Belege bleiben Entwurf"}</span></> : null}.
                 </div>
                 <details className="tls-type-small text-white/55 border border-white/10 rounded-sm p-3">
                   <summary className="cursor-pointer font-bold uppercase tracking-wider text-white/70">Rechte des Website-Benutzers dafür</summary>

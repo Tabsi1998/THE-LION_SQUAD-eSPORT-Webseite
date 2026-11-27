@@ -280,7 +280,7 @@ function StationRow({ station }) {
         {/* Notizen sind Vorschau-Text (#1314): eine Zeile, der volle Text im title. */}
         <div className="tls-type-small text-quiet truncate" title={station.notes || undefined}>{station.notes || station.device_type || "Station"}</div>
       </div>
-      <span className={`shrink-0 rounded-sm border px-2 py-1 tls-type-label ${broken ? "border-[#FF3B30]/40 text-[#FF3B30]" : busy ? "border-[#29B6E8]/40 text-[#29B6E8]" : "border-ok/35 text-ok"}`}>
+      <span className={`shrink-0 rounded-sm border px-2 py-1 tls-type-label ${broken ? "border-warn/40 text-warn" : busy ? "border-[#29B6E8]/40 text-[#29B6E8]" : "border-ok/35 text-ok"}`}>
         {broken ? "Defekt" : busy ? "Belegt" : "Frei"}
       </span>
     </div>

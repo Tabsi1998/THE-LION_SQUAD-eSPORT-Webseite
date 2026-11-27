@@ -44,11 +44,11 @@ export default function MemberCardVerifyPage() {
           </div>
         ) : (
           <div
-            className={`mt-8 border rounded-sm p-6 text-center ${verdict.tone === "ok" ? "border-ok/50 bg-ok/5" : verdict.tone === "warn" ? "border-[#FF3B30]/50 bg-[#FF3B30]/5" : "border-white/10 bg-[#121212]"}`}
+            className={`mt-8 border rounded-sm p-6 text-center ${verdict.tone === "ok" ? "border-ok/50 bg-ok/5" : verdict.tone === "warn" ? "border-warn/50 bg-warn/5" : "border-white/10 bg-[#121212]"}`}
             data-testid="card-verify-result"
             data-valid={result ? String(Boolean(result.valid)) : "pending"}
           >
-            {verdict.tone === "ok" ? <CheckCircle2 className="w-12 h-12 mx-auto text-ok" /> : verdict.tone === "warn" ? <XCircle className="w-12 h-12 mx-auto text-[#FF3B30]" /> : null}
+            {verdict.tone === "ok" ? <CheckCircle2 className="w-12 h-12 mx-auto text-ok" /> : verdict.tone === "warn" ? <XCircle className="w-12 h-12 mx-auto text-warn" /> : null}
             <div className="mt-3 tls-type-section">{verdict.title}</div>
             {result?.valid ? (
               <dl className="mt-4 space-y-2 tls-type-small">

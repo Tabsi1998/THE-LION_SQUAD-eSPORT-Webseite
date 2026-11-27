@@ -118,7 +118,7 @@ export function DiscordSettings({ initialTab = "messages" }) {
   return (
     <div className="space-y-4" data-testid="discord-settings">
       {loadError && (
-        <div className="border border-[#FF3B30]/30 bg-[#FF3B30]/10 rounded-sm p-3 tls-type-small text-white/70" data-testid="discord-load-error">
+        <div className="border border-warn/30 bg-warn/10 rounded-sm p-3 tls-type-small text-white/70" data-testid="discord-load-error">
           Die Discord-Einstellungen konnten nicht geladen werden. Die Felder zeigen deshalb nicht den gespeicherten Stand.
         </div>
       )}
@@ -150,10 +150,10 @@ export function DiscordSettings({ initialTab = "messages" }) {
         </div>
         <p className="tls-type-small text-white/50">Alles geht über den Bot – ist er aus oder nicht verbunden, wird nichts gesendet; einen anderen Weg gibt es nicht. Der Versand-Log steht unter System → Betrieb &amp; Logs.</p>
         {discord.last_status && (
-          <div className={`border rounded-sm p-3 tls-type-small ${discord.last_status === "sent" ? "border-ok/25 bg-ok/5 text-white/60" : "border-[#FF3B30]/25 bg-[#FF3B30]/5 text-white/60"}`} data-testid="discord-last-status">
+          <div className={`border rounded-sm p-3 tls-type-small ${discord.last_status === "sent" ? "border-ok/25 bg-ok/5 text-white/60" : "border-warn/25 bg-warn/5 text-white/60"}`} data-testid="discord-last-status">
             <div className="font-bold uppercase tracking-widest mb-1">Letzte Meldung: {discord.last_status}</div>
             <div>{discord.last_checked_at ? viennaDateTime(discord.last_checked_at) : ""}{discord.last_event_key ? ` - ${discord.last_event_key}` : ""}</div>
-            {discord.last_error && <div className="mt-1 text-[#FF3B30] break-words">{discord.last_error}</div>}
+            {discord.last_error && <div className="mt-1 text-warn break-words">{discord.last_error}</div>}
           </div>
         )}
       </div>

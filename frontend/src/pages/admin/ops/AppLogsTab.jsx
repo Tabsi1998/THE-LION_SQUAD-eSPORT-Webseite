@@ -20,7 +20,7 @@ function formatTime(value) {
 }
 
 function badgeClass(level) {
-  if (level === "fatal" || level === "error") return "border-[#FF3B30]/40 bg-[#FF3B30]/10 text-[#FF6B61]";
+  if (level === "fatal" || level === "error") return "border-warn/40 bg-warn/10 text-warn";
   if (level === "warn") return "border-[#FFCC00]/40 bg-[#FFCC00]/10 text-[#FFD95A]";
   return "border-white/10 bg-white/5 text-white/60";
 }
@@ -93,7 +93,7 @@ export function AppLogsTab() {
           <div className="tls-type-label text-quiet">Offen</div>
           <div className="tls-type-section tls-type-num">{summary.open}</div>
         </div>
-        <div className="border border-[#FF3B30]/30 bg-[#FF3B30]/10 rounded-sm p-3">
+        <div className="border border-warn/30 bg-warn/10 rounded-sm p-3">
           <div className="tls-type-label text-[#FF6B61]">Kritisch</div>
           <div className="tls-type-section tls-type-num">{summary.critical}</div>
         </div>

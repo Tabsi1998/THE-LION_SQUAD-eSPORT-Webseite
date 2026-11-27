@@ -347,7 +347,7 @@ export default function AdminReferencesPage() {
                   {item.medal && <span className="text-[#FFD700]">{medalLabel[item.medal]}</span>}
                   <span>{formatDate(item.start_date)}</span>
                   {item.visibility !== "public" && <span className="text-[#29B6E8]">{visibilityLabel[item.visibility] || item.visibility}</span>}
-                  {item.is_active === false && <span className="text-[#FF3B30]">Archiviert</span>}
+                  {item.is_active === false && <span className="text-quiet">Archiviert</span>}
                 </div>
                 <h2 className="mt-1 tls-type-section leading-tight">{item.display_title || item.title}</h2>
                 <div className="mt-1 flex flex-wrap gap-1.5">
@@ -383,7 +383,7 @@ export default function AdminReferencesPage() {
                 ) : (
                   <button onClick={() => setArchived(item, true)} title="Archivieren" aria-label="Referenz archivieren" data-testid={`reference-archive-${item.id}`} className="p-1.5 text-white/40 hover:text-brand"><Archive className="w-4 h-4" /></button>
                 )}
-                <button onClick={() => remove(item.id)} title="Löschen" aria-label="Referenz löschen" data-testid={`reference-delete-${item.id}`} className="p-1.5 text-white/40 hover:text-[#FF3B30]"><Trash2 className="w-4 h-4" /></button>
+                <button onClick={() => remove(item.id)} title="Löschen" aria-label="Referenz löschen" data-testid={`reference-delete-${item.id}`} className="p-1.5 text-white/40 hover:text-live"><Trash2 className="w-4 h-4" /></button>
               </div>
             </div>
           </div>
@@ -950,7 +950,7 @@ function QuickEntry({ entry, index, profiles, suggestions, onChange, onRemove, w
         <div className="flex items-center gap-2 tls-type-label text-[#29B6E8]">
           {isSolo ? <User className="w-3.5 h-3.5" /> : <Users className="w-3.5 h-3.5" />} Eintrag {index + 1} · {isSolo ? "Einzelstarter" : "Team"}
         </div>
-        <button type="button" onClick={onRemove} aria-label="Eintrag entfernen" data-testid={`reference-entry-${index}-remove`} className="p-1 text-white/40 hover:text-[#FF3B30]"><Trash2 className="w-4 h-4" /></button>
+        <button type="button" onClick={onRemove} aria-label="Eintrag entfernen" data-testid={`reference-entry-${index}-remove`} className="p-1 text-white/40 hover:text-live"><Trash2 className="w-4 h-4" /></button>
       </div>
       <FormGrid cols={3}>
         <SelectField label="Art" value={entry.kind} onChange={setKind} options={KIND_OPTIONS} testId={`reference-entry-${index}-kind`} />

@@ -89,10 +89,10 @@ export function LiveStreamSlider() {
           <div>
             <div className="flex items-center gap-2">
               <span className="relative flex h-2.5 w-2.5">
-                <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-[#FF3B30] opacity-75" />
-                <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-[#FF3B30]" />
+                <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-live opacity-75" />
+                <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-live" />
               </span>
-              <span className="tls-type-label text-[#FF3B30]">Live aus dem Rudel</span>
+              <span className="tls-type-label text-live">Live aus dem Rudel</span>
               <Radio className="h-4 w-4 text-[#9146FF]" />
             </div>
             <h2 className="mt-2 tls-type-section text-white">
@@ -192,7 +192,7 @@ export function LiveStreamSlider() {
                 >
                   <div className="tls-type-small font-bold text-white">{stream.member_profile?.gamertag || stream.display_name || stream.username}</div>
                   <div className="mt-1 truncate tls-type-small text-white/50" title={stream.title || undefined}>{stream.title || "Live-Stream"}</div>
-                  <div className="mt-2 tls-type-label text-[#FF3B30]">Live</div>
+                  <div className="mt-2 tls-type-label text-live">Live</div>
                 </button>
               );
             })}

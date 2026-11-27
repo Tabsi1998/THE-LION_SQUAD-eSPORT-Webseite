@@ -168,7 +168,7 @@ export default function AdminGamesPage() {
                       title={isArchivedGame(g) ? "Spiel zurückholen" : "Spiel archivieren"} aria-label={isArchivedGame(g) ? `${gameLabel(g)} zurückholen` : `${gameLabel(g)} archivieren`} data-testid={`game-archive-${g.slug}`}>
                       {isArchivedGame(g) ? <ArchiveRestore className="w-4 h-4" aria-hidden="true" /> : <Archive className="w-4 h-4" aria-hidden="true" />}
                     </button>
-                    <button type="button" onClick={() => del(g)} className={`${ICON} hover:text-[#FF3B30]`} title="Spiel löschen" aria-label={`${gameLabel(g)} löschen`} data-testid={`game-delete-${g.slug}`}>
+                    <button type="button" onClick={() => del(g)} className={`${ICON} hover:text-live`} title="Spiel löschen" aria-label={`${gameLabel(g)} löschen`} data-testid={`game-delete-${g.slug}`}>
                       <Trash2 className="w-4 h-4" aria-hidden="true" />
                     </button>
                   </div>

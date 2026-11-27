@@ -370,7 +370,7 @@ export default function AdminTournamentNewPage() {
               </select>
               <input value={p.label || ""} onChange={(e) => updatePrize(i, { label: e.target.value })} data-testid={`new-tr-prize-label-${i}`} className="col-span-4 sm:col-span-3 bg-[#0A0A0A] border border-white/10 px-2 py-2 rounded-sm text-sm" placeholder="Bezeichnung (z.B. Champion)" />
               <input value={p.value || ""} onChange={(e) => updatePrize(i, { value: e.target.value })} data-testid={`new-tr-prize-value-${i}`} className="col-span-5 sm:col-span-3 bg-[#0A0A0A] border border-white/10 px-2 py-2 rounded-sm text-sm" placeholder="Preis (z.B. 100 €)" />
-              <button type="button" onClick={() => set("prize_places", form.prize_places.filter((_, j) => j !== i))} data-testid={`new-tr-prize-remove-${i}`} className="col-span-1 text-white/40 hover:text-[#FF3B30] text-center py-2">✕</button>
+              <button type="button" onClick={() => set("prize_places", form.prize_places.filter((_, j) => j !== i))} data-testid={`new-tr-prize-remove-${i}`} className="col-span-1 text-white/40 hover:text-live text-center py-2">✕</button>
             </div>
           ))}
           <MarkdownField label="Freier Preistext (wenn die Plätze oben nicht reichen)" value={form.prize_pool} onChange={(v) => set("prize_pool", v)} testId="new-tr-prizes" />

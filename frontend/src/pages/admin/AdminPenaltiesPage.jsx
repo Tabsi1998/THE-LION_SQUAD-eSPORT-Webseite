@@ -14,10 +14,11 @@ import { viennaDateTime } from "@/lib/vienna";
 import { toast } from "sonner";
 import { ShortCaps } from "@/components/tls/ShortCaps";
 
+import { ROLE_COLORS } from "@/lib/categoryColors";
 const KIND_META = {
-  lap_penalty: { icon: Clock, color: "#FF9500", label: "Strafzeit" },
-  lap_invalid: { icon: Flag, color: "#FF3B30", label: "Runde ungültig" },
-  match_forfeit: { icon: ShieldAlert, color: "#FF3B30", label: "Kampflos verloren" },
+  lap_penalty: { icon: Clock, color: ROLE_COLORS.warn, label: "Strafzeit" },
+  lap_invalid: { icon: Flag, color: ROLE_COLORS.warn, label: "Runde ungültig" },
+  match_forfeit: { icon: ShieldAlert, color: ROLE_COLORS.warn, label: "Kampflos verloren" },
   incident: { icon: AlertTriangle, color: "#FFD700", label: "Vorfall" },
   // Strafen der Liga (E.3): verhängt und verwaltet im Reiter „Strafen“ der Season - „Öffnen“ führt dorthin.
   league_sanction: { icon: Gavel, color: "#FF6B60", label: "Strafe der Liga" },
@@ -82,7 +83,7 @@ export default function AdminPenaltiesPage() {
 
   return (
     <AdminLayout>
-      <span className="tls-type-label text-[#FF3B30]">eSports</span>
+      <span className="tls-type-label text-brand">eSports</span>
       <h1 className="tls-type-title mt-1"><ShortCaps>Strafen</ShortCaps></h1>
       <p className="mt-2 text-white/55 tls-type-body max-w-2xl">
         Alle Strafzeiten, ungültigen Runden, kampflosen Niederlagen, Vorfälle und Strafen der Liga – sortiert nach Datum. Spieler sehen ihre eigenen Einträge unter „Meine Strafen“.
@@ -103,7 +104,7 @@ export default function AdminPenaltiesPage() {
             data-testid={`pen-filter-${k}`}
             className={`px-3 py-1.5 tls-type-label rounded-sm border ${
               filter === k
-                ? "bg-[#FF3B30] text-white border-[#FF3B30]"
+                ? "bg-brand text-[#0A0A0A] border-brand"
                 : "border-white/10 text-white/60 hover:text-white hover:border-white/20"
             }`}
           >
@@ -185,7 +186,7 @@ function Row({ p, onTakeBack }) {
             </Link>
           )}
           {LAP_KINDS.has(p.kind) && (
-            <button type="button" onClick={() => onTakeBack(p)} data-testid={`pen-take-back-${p.ref_id}`} className="inline-flex items-center gap-1 px-2 py-1 border border-white/15 rounded-sm tls-type-label text-white/70 hover:text-[#FF3B30] hover:border-[#FF3B30]/50">
+            <button type="button" onClick={() => onTakeBack(p)} data-testid={`pen-take-back-${p.ref_id}`} className="inline-flex items-center gap-1 px-2 py-1 border border-white/15 rounded-sm tls-type-label text-white/70 hover:text-live hover:border-live/50">
               <Undo2 className="w-3 h-3" aria-hidden="true" /> Zurücknehmen
             </button>
           )}

@@ -1,6 +1,7 @@
 import { Download, Eye, FileText, Pin } from "lucide-react";
 import { API } from "@/lib/api";
 
+import { ROLE_COLORS } from "@/lib/categoryColors";
 // Eine Zeile je Dokument - gemeinsam für die Vereinsdokumente im Mitgliederbereich und „Deine Unterlagen“ im Profil
 // (#1255). PDFs öffnen im gemeinsamen Betrachter (#325), alles andere in einem neuen Tab.
 
@@ -16,9 +17,9 @@ export const CATEGORY_LABELS = {
 
 const CATEGORY_COLORS = {
   statutes: "#FFD700", minutes: "#9F7AEA", form: "#29B6E8",
-  regulations: "#FF3B30", guideline: "#10B981", download: "#29B6E8",
+  regulations: ROLE_COLORS.quiet, guideline: "#10B981", download: "#29B6E8",
   media_kit: "#FFD700", presentation: "#9F7AEA", template: "#10B981", other: "#6B7280",
-  resolution: "#9F7AEA", audit_report: "#FF3B30", account: "#10B981", payout: "#10B981", letter: "#29B6E8", ballot: "#FFD700",
+  resolution: "#9F7AEA", audit_report: ROLE_COLORS.quiet, account: "#10B981", payout: "#10B981", letter: "#29B6E8", ballot: "#FFD700",
 };
 
 function fmtSize(bytes) {

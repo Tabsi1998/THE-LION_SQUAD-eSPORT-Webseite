@@ -35,13 +35,13 @@ export function InvoiceDetailsTab({ onSaved }) {
     }
   };
 
-  if (error) return <div className="mt-6 border border-[#FF3B30]/40 bg-[#FF3B30]/10 rounded-sm p-4 tls-type-small" data-testid="invoice-details-error">{error}</div>;
+  if (error) return <div className="mt-6 border border-warn/40 bg-warn/10 rounded-sm p-4 tls-type-small" data-testid="invoice-details-error">{error}</div>;
   if (!details) return <div className="mt-6 tls-type-small text-white/45" role="status">Lade Rechnungsangaben …</div>;
 
   const ready = Boolean(details.terms?.complete && details.tax_confirmed);
   return (
     <div className="mt-6 space-y-4 max-w-4xl" data-testid="invoice-details">
-      <div className={`border rounded-sm p-4 tls-type-small ${details.write_capable ? "border-ok/30" : "border-[#FF9500]/40 bg-[#FF9500]/5"}`} data-testid="invoice-details-write">
+      <div className={`border rounded-sm p-4 tls-type-small ${details.write_capable ? "border-ok/30" : "border-warn/40 bg-warn/5"}`} data-testid="invoice-details-write">
         {details.write_capable
           ? "Rechnungen schreiben ist an: die Website legt Belege in Dolibarr an."
           : details.connected
@@ -71,7 +71,7 @@ export function InvoiceDetailsTab({ onSaved }) {
             data-testid="invoice-details-auto-validate" />
           <span>
             Rechnungen gleich freigeben (sonst Entwurf zur Prüfung in Dolibarr)
-            {!ready && <span className="block tls-type-small text-[#FF9500]">erst mit vollständigen Angaben unten und geprüften Steuersätzen</span>}
+            {!ready && <span className="block tls-type-small text-warn">erst mit vollständigen Angaben unten und geprüften Steuersätzen</span>}
           </span>
         </label>
       </section>

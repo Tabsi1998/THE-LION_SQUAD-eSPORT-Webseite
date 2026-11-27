@@ -137,7 +137,7 @@ function PersonAwards({ person, tick, onDone }) {
   };
 
   return (
-    <Panel title="Erfolge der Person · Rücknahme" icon={Undo2} accent="#FF3B30" hint={person ? `${rows.length} Erfolg${rows.length === 1 ? "" : "e"} von ${personName(person)}` : "Links eine Person wählen."} testId="award-person-list">
+    <Panel title="Erfolge der Person · Rücknahme" icon={Undo2} accent={ROLE_COLORS.live} hint={person ? `${rows.length} Erfolg${rows.length === 1 ? "" : "e"} von ${personName(person)}` : "Links eine Person wählen."} testId="award-person-list">
       <ul className="divide-y divide-white/5 max-h-[28rem] overflow-y-auto">
         {rows.map((row) => (
           <li key={row.tier_code} className="py-2" data-testid={`person-award-${row.tier_code}`}>
@@ -147,13 +147,13 @@ function PersonAwards({ person, tick, onDone }) {
                 <div className="tls-type-small text-white/45">{row.group_name} · {formatWhen(row.earned_at)}{row.silent ? " · still" : ""}{row.is_negative ? " · negativ" : ""}{row.note ? ` · „${row.note}“` : ""}</div>
               </div>
               {revoking !== row.tier_code && (
-                <button type="button" onClick={() => { setRevoking(row.tier_code); setReason(""); }} data-testid={`revoke-${row.tier_code}`} className="text-[#FF3B30] hover:underline tls-type-small shrink-0">Zurücknehmen</button>
+                <button type="button" onClick={() => { setRevoking(row.tier_code); setReason(""); }} data-testid={`revoke-${row.tier_code}`} className="text-live hover:underline tls-type-small shrink-0">Zurücknehmen</button>
               )}
             </div>
             {revoking === row.tier_code && (
               <div className="mt-2 flex flex-wrap items-center gap-2">
                 <input value={reason} onChange={(e) => setReason(e.target.value)} placeholder="Grund der Rücknahme" aria-label="Grund der Rücknahme" data-testid={`revoke-reason-${row.tier_code}`} className={`${INPUT_CLASS} flex-1 min-w-[12rem]`} />
-                <button type="button" onClick={() => revoke(row)} data-testid={`revoke-confirm-${row.tier_code}`} className="px-3 py-2 bg-[#FF3B30] text-white tls-type-label rounded-sm">Zurücknehmen</button>
+                <button type="button" onClick={() => revoke(row)} data-testid={`revoke-confirm-${row.tier_code}`} className="px-3 py-2 bg-live text-white tls-type-label rounded-sm">Zurücknehmen</button>
                 <button type="button" onClick={() => setRevoking(null)} className="tls-type-label text-white/50">Abbrechen</button>
               </div>
             )}
@@ -165,7 +165,7 @@ function PersonAwards({ person, tick, onDone }) {
   );
 }
 
-const STATE_LABELS = { new: ["bekommt es", ROLE_COLORS.ok], already: ["hat es schon", "rgba(255,255,255,0.45)"], skipped: ["darf nicht (nur Mitglieder)", "#FF3B30"] };
+const STATE_LABELS = { new: ["bekommt es", ROLE_COLORS.ok], already: ["hat es schon", "rgba(255,255,255,0.45)"], skipped: ["darf nicht (nur Mitglieder)", ROLE_COLORS.quiet] };
 
 function BulkAward({ catalog, board, onDone }) {
   const [tierCode, setTierCode] = useState("");
@@ -256,7 +256,7 @@ function BulkAward({ catalog, board, onDone }) {
                 <div className="flex flex-wrap gap-x-4 gap-y-1">
                   <span className="text-ok" data-testid="bulk-would">{preview.would_award} bekommen es</span>
                   <span className="text-white/55">{preview.already} haben es schon</span>
-                  {preview.skipped > 0 && <span className="text-[#FF3B30]">{preview.skipped} dürfen nicht</span>}
+                  {preview.skipped > 0 && <span className="text-warn">{preview.skipped} dürfen nicht</span>}
                   {preview.unknown?.length > 0 && <span className="text-[#FFD700]" data-testid="bulk-unknown">{preview.unknown.length} nicht gefunden</span>}
                 </div>
                 {preview.unknown?.length > 0 && <div className="text-[#FFD700]/80 break-words">Nicht gefunden: {preview.unknown.join(", ")}</div>}

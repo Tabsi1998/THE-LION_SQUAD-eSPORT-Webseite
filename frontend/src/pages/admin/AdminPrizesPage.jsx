@@ -15,7 +15,7 @@ const STATUS_LABEL = {
   pending: { label: "Offen", icon: Clock, color: "text-[#FFD700] bg-[#FFD700]/10 border-[#FFD700]/30" },
   ready: { label: "Bereit zur Abholung", icon: Gift, color: "text-[#29B6E8] bg-[#29B6E8]/10 border-[#29B6E8]/30" },
   picked_up: { label: "Abgeholt", icon: CheckCircle2, color: "text-ok bg-ok/10 border-ok/30" },
-  expired: { label: "Verfallen", icon: XCircle, color: "text-[#FF3B30] bg-[#FF3B30]/10 border-[#FF3B30]/30" },
+  expired: { label: "Verfallen", icon: XCircle, color: "text-quiet bg-quiet/10 border-quiet/30" },
 };
 
 function statusToast(status, from) {
@@ -338,7 +338,7 @@ export default function AdminPrizesPage() {
                         <button onClick={() => updateStatus(p.id, "ready", "", "expired")} data-testid={`prize-reopen-${p.id}`} className="text-[#29B6E8] hover:underline mr-3 tls-type-small font-semibold"><RefreshCw className="w-3 h-3 inline mr-1" />Wieder öffnen</button>
                       )}
                       <button onClick={() => setSheet(p)} data-testid={`prize-edit-${p.id}`} className="text-white/70 hover:text-white hover:underline mr-3 tls-type-small">Bearbeiten</button>
-                      <button onClick={() => remove(p.id)} className="text-[#FF3B30] hover:underline tls-type-small">Löschen</button>
+                      <button onClick={() => remove(p.id)} className="text-live hover:underline tls-type-small">Löschen</button>
                     </td>
                   </tr>
                 );
@@ -439,7 +439,7 @@ function PrizeMobileCard({ p, updateStatus, markPickedUp, remove, edit }) {
           <button onClick={() => updateStatus(p.id, "ready", "", "expired")} data-testid={`prize-mobile-reopen-${p.id}`} className="px-3 py-2 border border-[#29B6E8]/40 text-[#29B6E8] rounded-sm tls-type-label">Wieder öffnen</button>
         )}
         <button onClick={() => edit(p)} data-testid={`prize-mobile-edit-${p.id}`} className="px-3 py-2 border border-white/15 text-white/70 rounded-sm tls-type-label">Bearbeiten</button>
-        <button onClick={() => remove(p.id)} className="px-3 py-2 border border-[#FF3B30]/35 text-[#FF3B30] rounded-sm tls-type-label">Löschen</button>
+        <button onClick={() => remove(p.id)} className="px-3 py-2 border border-live/35 text-live rounded-sm tls-type-label">Löschen</button>
       </div>
     </article>
   );

@@ -339,18 +339,18 @@ export default function DashboardPage() {
             data-testid="dashboard-penalties-link"
             className={`border rounded-sm p-5 transition ${
               penaltyCount > 0
-                ? "border-[#FF3B30]/50 hover:border-[#FF3B30] bg-gradient-to-br from-[#FF3B30]/10 to-transparent"
+                ? "border-warn/50 hover:border-warn bg-gradient-to-br from-warn/10 to-transparent"
                 : "border-white/10 hover:border-white/30 bg-[#121212]"
             }`}
           >
             <div className="flex items-center justify-between">
-              <div className={`tls-type-label ${penaltyCount > 0 ? "text-[#FF3B30]" : "text-white/50"}`}>
+              <div className={`tls-type-label ${penaltyCount > 0 ? "text-warn" : "text-white/50"}`}>
                 Transparenz
               </div>
-              <AlertTriangle className={`w-4 h-4 ${penaltyCount > 0 ? "text-[#FF3B30]" : "text-white/40"}`} />
+              <AlertTriangle className={`w-4 h-4 ${penaltyCount > 0 ? "text-warn" : "text-white/40"}`} />
             </div>
             <div className="mt-2 tls-type-card">
-              Meine Strafen {penaltyCount > 0 && <span className="text-[#FF3B30]">({penaltyCount})</span>}
+              Meine Strafen {penaltyCount > 0 && <span className="text-warn">({penaltyCount})</span>}
             </div>
           </Link>
         </div>
@@ -378,7 +378,7 @@ function DashboardMatchCard({ match, staff = false, testId }) {
         ? "Ergebnis öffnen"
         : "Match öffnen";
   const tone = disputed
-    ? "border-[#FF3B30]/50 bg-[#FF3B30]/5 hover:border-[#FF3B30]"
+    ? "border-warn/50 bg-warn/5 hover:border-warn"
     : attention ? "border-[#FFD700]/45 bg-[#FFD700]/5 hover:border-[#FFD700]" : "border-white/10 hover:border-[#29B6E8]/60";
   return (
     <Link

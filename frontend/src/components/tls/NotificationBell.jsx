@@ -183,7 +183,7 @@ export function NotificationBell() {
             <motion.span
               key={unread}
               data-testid="notification-unread-badge"
-              className="absolute -top-1 -right-1 min-w-5 h-5 px-1 rounded-sm bg-[#FF3B30] text-white tls-type-small font-black inline-flex items-center justify-center"
+              className="absolute -top-1 -right-1 min-w-5 h-5 px-1 rounded-sm bg-brand text-[#0A0A0A] tls-type-small font-black inline-flex items-center justify-center"
               aria-label={`${unread > 99 ? "99+" : unread} ungelesene Benachrichtigungen`}
               initial={{ scale: 0, rotate: -18 }}
               animate={{ scale: 1, rotate: 0 }}
@@ -217,7 +217,7 @@ export function NotificationBell() {
                   </button>
                 )}
                 {read > 0 && (
-                  <button type="button" onClick={deleteRead} className="p-2 text-white/45 hover:text-[#FF3B30]" title="Gelesene löschen" aria-label="Gelesene löschen">
+                  <button type="button" onClick={deleteRead} className="p-2 text-white/45 hover:text-live" title="Gelesene löschen" aria-label="Gelesene löschen">
                     <Trash2 className="w-4 h-4" />
                   </button>
                 )}

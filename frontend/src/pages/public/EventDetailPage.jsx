@@ -97,12 +97,12 @@ function EventDaysBlock({ schedule }) {
       {schedule.now?.text && <p className="tls-type-body text-white/60 mb-4" data-testid="event-days-now">{schedule.now.text}</p>}
       <ol className={`grid gap-4 ${columns}`}>
         {days.map((day) => {
-          const frame = day.state === "running" ? "border-[#FF3B30]/60 bg-[#FF3B30]/5" : day.state === "next" ? "border-[#9F7AEA]/60 bg-[#9F7AEA]/5" : "border-white/10 bg-[#121212]";
+          const frame = day.state === "running" ? "border-live/60 bg-live/5" : day.state === "next" ? "border-[#9F7AEA]/60 bg-[#9F7AEA]/5" : "border-white/10 bg-[#121212]";
           return (
             <li key={day.index} className={`tls-card border rounded-sm p-5 min-w-0 ${frame} ${day.state === "past" ? "opacity-60" : ""}`} data-testid={`event-day-${day.index}`} data-state={day.state}>
               <div className="flex items-center justify-between gap-2 tls-type-label text-[#9F7AEA]">
                 <span>Tag {day.index}/{schedule.count}</span>
-                {day.state === "running" && <span className="inline-flex items-center gap-1.5 text-[#FF3B30]"><span className="tls-live-dot" aria-hidden="true" /> Läuft</span>}
+                {day.state === "running" && <span className="inline-flex items-center gap-1.5 text-live"><span className="tls-live-dot" aria-hidden="true" /> Läuft</span>}
                 {day.state === "next" && <span className="text-white/60">Als Nächstes</span>}
                 {day.state === "past" && <span className="text-white/40">Vorbei</span>}
               </div>
@@ -326,7 +326,7 @@ function EventTabs({ tabs, value, onChange }) {
           data-testid={`event-tab-${entry.key}`}
           className={`-mb-px min-h-11 border-b-2 px-4 py-2.5 tls-type-label transition ${value === entry.key ? "border-[#9F7AEA] text-white" : "border-transparent text-white/50 hover:text-white"}`}
         >
-          {entry.key === "live" ? <Radio className="inline w-3.5 h-3.5 mr-1.5 -mt-0.5 text-[#FF3B30]" aria-hidden="true" /> : null}{entry.label}
+          {entry.key === "live" ? <Radio className="inline w-3.5 h-3.5 mr-1.5 -mt-0.5 text-live" aria-hidden="true" /> : null}{entry.label}
         </button>
       ))}
     </div>

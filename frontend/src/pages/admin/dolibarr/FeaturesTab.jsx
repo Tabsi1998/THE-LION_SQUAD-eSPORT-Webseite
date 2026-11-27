@@ -26,7 +26,7 @@ function ParticipationsDetails({ info, busy, onBackfill }) {
           Letzter Abgleich {shortMoment(last.at)}:{" "}
           {last.skipped ? <span className="text-[#FFD700]">{last.text}</span>
             : `${last.sent || 0} gemeldet, ${last.replaced || 0} ersetzt, ${last.retracted || 0} zurückgenommen${last.failed ? `, ${last.failed} abgelehnt` : ""}${last.pending ? `, ${last.pending} folgen` : ""}.`}
-          {last.error ? <span className="block text-[#FF3B30]">{last.text}</span> : null}
+          {last.error ? <span className="block text-warn">{last.text}</span> : null}
         </p>
       ) : <p className="text-white/45">Noch kein Abgleich – er läuft alle zehn Minuten.</p>}
       {info?.backfill_from ? <p className="text-[#FFD700]">Nachzug ab {germanDay(info.backfill_from)} läuft – der Rest folgt mit den nächsten Abgleichen.</p> : null}
@@ -154,7 +154,7 @@ export function FeaturesTab({ status, busy, run, consentTexts = [], consentError
                     <div className="flex flex-wrap items-center gap-3 tls-type-small" data-testid="dolibarr-source-state">
                       {source.fetched_at ? <span className="text-white/60">Stand {viennaDateTime(source.fetched_at, { dateStyle: "short", timeStyle: "short" })}: <span className="text-white">{source.counts?.sponsors ?? 0} Sponsoren, {source.counts?.partners ?? 0} Partner</span></span>
                         : <span className="text-[#FFD700]">Noch nichts aus Dolibarr gelesen.</span>}
-                      {source.error && <span className="text-[#FF3B30]">Letzter Abgleich fehlgeschlagen ({source.error_text || source.error}) – alter Stand bleibt.</span>}
+                      {source.error && <span className="text-warn">Letzter Abgleich fehlgeschlagen ({source.error_text || source.error}) – alter Stand bleibt.</span>}
                       <button type="button" onClick={refreshSponsors} disabled={!!busy} data-testid="dolibarr-source-refresh" className="px-3 py-1 border border-white/20 text-white/80 rounded-sm tls-type-label inline-flex items-center gap-1 disabled:opacity-40">
                         <RefreshCw className={`w-3 h-3 ${busy === "sponsors" ? "animate-spin" : ""}`} /> Jetzt nachlesen
                       </button>

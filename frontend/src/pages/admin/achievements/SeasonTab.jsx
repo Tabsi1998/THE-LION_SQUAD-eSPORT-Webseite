@@ -6,6 +6,7 @@ import { api } from "@/lib/api";
 import { useConfirm } from "@/components/tls/ConfirmDialog";
 import { MaterialChip, Panel, errorText, personName } from "./shared";
 
+import { ROLE_COLORS } from "@/lib/categoryColors";
 const STATUS_LABELS = { active: "läuft", completed: "abgeschlossen", archived: "archiviert", planned: "geplant", draft: "Entwurf" };
 
 /**
@@ -142,7 +143,7 @@ export function SeasonTab() {
                       {preview.mvp && (
                         <td className="py-2 text-center">
                           {holders.has(row.user_id)
-                            ? <Crown className="inline w-4 h-4 text-[#FF3B30]" aria-label="schon Saison-MVP" />
+                            ? <Crown className="inline w-4 h-4 text-honor" aria-label="schon Saison-MVP" />
                             : <input type="radio" name="season-mvp" checked={mvp === row.user_id} onChange={() => setMvp(row.user_id)} aria-label={`${personName(row)} als MVP`} data-testid={`season-mvp-${row.rank}`} />}
                         </td>
                       )}
@@ -155,10 +156,10 @@ export function SeasonTab() {
           </Panel>
 
           {preview.mvp && (
-            <Panel title="Saison-MVP" icon={Star} accent="#FF3B30" hint="Die Spielerin oder der Spieler der Saison – von der Vereinsleitung gewählt. In der Tabelle auswählen, dann auszeichnen." testId="season-mvp">
+            <Panel title="Saison-MVP" icon={Star} accent={ROLE_COLORS.honor} hint="Die Spielerin oder der Spieler der Saison – von der Vereinsleitung gewählt. In der Tabelle auswählen, dann auszeichnen." testId="season-mvp">
               <div className="flex flex-wrap items-center gap-3">
                 <span className="tls-type-small text-white/70">{mvp ? `Ausgewählt: ${personName(preview.standings.find((r) => r.user_id === mvp))}` : "Noch niemand ausgewählt."}</span>
-                <button type="button" onClick={awardMvp} disabled={busy || !mvp} data-testid="season-mvp-award" className="px-3 py-1.5 bg-[#FF3B30] text-white tls-type-label rounded-sm disabled:opacity-40">
+                <button type="button" onClick={awardMvp} disabled={busy || !mvp} data-testid="season-mvp-award" className="px-3 py-1.5 bg-honor text-[#0A0A0A] tls-type-label rounded-sm disabled:opacity-40">
                   Als Saison-MVP auszeichnen
                 </button>
               </div>

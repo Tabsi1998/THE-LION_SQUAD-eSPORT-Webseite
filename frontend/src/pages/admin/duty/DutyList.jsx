@@ -66,9 +66,9 @@ export function DutyList({ rows, testId = "duty-list" }) {
 export function ModerationDuty({ moderation }) {
   const open = Number(moderation?.open_reports || 0);
   return (
-    <div className={`rounded-sm border bg-[#121212] p-4 md:flex md:items-center md:gap-4 ${open ? "border-[#FF3B30]/40" : "border-white/10"}`} data-testid="duty-moderation">
+    <div className={`rounded-sm border bg-[#121212] p-4 md:flex md:items-center md:gap-4 ${open ? "border-warn/40" : "border-white/10"}`} data-testid="duty-moderation">
       <div className="flex min-w-0 flex-1 items-center gap-3">
-        <MessageCircleWarning className="w-5 h-5 shrink-0" style={{ color: open ? "#FF3B30" : ROLE_COLORS.ok }} aria-hidden="true" />
+        <MessageCircleWarning className="w-5 h-5 shrink-0" style={{ color: open ? ROLE_COLORS.warn : ROLE_COLORS.ok }} aria-hidden="true" />
         <div className="min-w-0">
           <div className="font-bold text-white">Moderation</div>
           <div className="tls-type-small text-white/60" data-testid="duty-moderation-count">

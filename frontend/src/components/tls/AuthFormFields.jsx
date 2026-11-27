@@ -27,7 +27,7 @@ function labelContent(label, required) {
 
 function borderClass(error) {
   return error
-    ? "border-[#FF3B30] focus:border-[#FF3B30]"
+    ? "border-warn focus:border-warn"
     : "border-white/10 focus:border-[#29B6E8]";
 }
 
@@ -190,7 +190,7 @@ export function AuthFormAlert({ id, tone = "error", children }) {
     ? "text-white/75 bg-ok/10 border-ok/30"
     : tone === "info"
       ? "text-white/75 bg-[#29B6E8]/10 border-[#29B6E8]/30"
-    : "text-[#FF8A80] bg-[#FF3B30]/10 border-[#FF3B30]/35";
+    : "text-warn bg-warn/10 border-warn/35";
 
   return (
     <div id={id} role={tone === "error" ? "alert" : "status"} className={`tls-type-small border p-3 rounded-sm ${cls}`}>

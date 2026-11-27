@@ -282,7 +282,7 @@ function StatusPill({ status }) {
     pending: "bg-[#29B6E8]/15 text-[#29B6E8] border-[#29B6E8]/40",
     inactive: "bg-white/5 text-white/50 border-white/15",
     former: "bg-white/5 text-white/40 border-white/10",
-    blocked: "bg-[#FF3B30]/15 text-[#FF3B30] border-[#FF3B30]/40",
+    blocked: "bg-warn/15 text-warn border-warn/40",
     none: "bg-white/5 text-white/40 border-white/10",
   };
   return (

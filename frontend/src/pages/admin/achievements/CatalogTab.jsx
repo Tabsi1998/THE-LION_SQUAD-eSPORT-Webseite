@@ -46,7 +46,7 @@ export function slugFrom(text) {
 }
 
 function conditionText(tier) {
-  if (tier.manual_only) return { text: "von Hand", tone: "text-[#FF3B30]" };
+  if (tier.manual_only) return { text: "von Hand", tone: "text-quiet" };
   if (!tier.condition_key) return { text: "—", tone: "text-white/40" };
   return { text: `Automatik · Ziel ${Number(tier.progress_target || 0).toLocaleString("de-DE")}`, tone: "text-white/60" };
 }
@@ -273,13 +273,13 @@ export function CatalogTab({ board = false }) {
                       <span className="text-white/40">{groupTiers.length} Stufe{groupTiers.length === 1 ? "" : "n"}</span>
                       {hidden && <span className="inline-flex items-center gap-1 text-[#A855F7]" title="Name und Stufen erscheinen erst nach der Freischaltung" data-testid={`group-hidden-${g.code}`}><EyeOff className="w-3 h-3" /> versteckt</span>}
                       {g.is_special && <span className="text-[#FFD700]">Sonder</span>}
-                      {g.is_negative && <span className="text-[#FF3B30]">Negativ</span>}
+                      {g.is_negative && <span className="text-warn">Negativ</span>}
                       {g.is_admin_created && <span className="text-[#29B6E8]">Eigen</span>}
                       {g.staff_only && <span className="text-white/45" title="Sieht nur die Leitung - und wer sie schon hat">nur Leitung</span>}
                       <RetiredChip doc={g} testId={`group-retired-${g.code}`} />
                       <button type="button" onClick={() => togglePublic(g)} data-testid={`group-public-${g.code}`} className={`font-bold ${g.public ? "text-ok" : "text-white/40"}`}>{g.public ? "Öffentlich" : "Intern"}</button>
                       <button type="button" onClick={() => setEditingGroup(g)} data-testid={`group-edit-${g.code}`} className="text-[#29B6E8] hover:underline tls-type-small">Bearbeiten</button>
-                      {g.is_admin_created && <button type="button" onClick={() => deleteGroup(g)} className="text-[#FF3B30] hover:underline tls-type-small">Löschen</button>}
+                      {g.is_admin_created && <button type="button" onClick={() => deleteGroup(g)} className="text-live hover:underline tls-type-small">Löschen</button>}
                     </div>
                   </div>
                   {isOpen && (
@@ -319,7 +319,7 @@ export function CatalogTab({ board = false }) {
                                   <td className="px-3 py-2 text-right tabular-nums">+{t.points}</td>
                                   <td className="px-3 py-2 text-right whitespace-nowrap">
                                     <button type="button" onClick={() => setEditingTier({ tier: t, group: g })} data-testid={`tier-edit-${t.code}`} className="text-[#29B6E8] hover:underline mr-3 tls-type-small">Bearbeiten</button>
-                                    <button type="button" onClick={() => deleteTier(t)} className="text-[#FF3B30] hover:underline tls-type-small">Löschen</button>
+                                    <button type="button" onClick={() => deleteTier(t)} className="text-live hover:underline tls-type-small">Löschen</button>
                                   </td>
                                 </tr>
                               );
@@ -359,7 +359,7 @@ function CheckReport({ report, groupsByCode, onJump, onClose }) {
     <Panel
       title={report.ok ? "Katalog-Prüfung: keine Fehler" : `Katalog-Prüfung: ${report.counts.errors} Fehler`}
       icon={report.ok ? CheckCircle2 : AlertTriangle}
-      accent={report.ok ? ROLE_COLORS.ok : "#FF3B30"}
+      accent={report.ok ? ROLE_COLORS.ok : ROLE_COLORS.warn}
       hint={`${report.counts.groups} Gruppen und ${report.counts.tiers} Stufen geprüft – dieselben Regeln wie im automatischen Test. ${report.counts.warnings} Hinweis${report.counts.warnings === 1 ? "" : "e"}.`}
       actions={<button type="button" onClick={onClose} className="tls-type-label text-white/50 hover:text-white">Schließen</button>}
       testId="catalog-report"
@@ -368,7 +368,7 @@ function CheckReport({ report, groupsByCode, onJump, onClose }) {
         <ul className="divide-y divide-white/5 max-h-80 overflow-y-auto">
           {rows.map((f, i) => (
             <li key={`${f.code}-${f.group || ""}-${f.tier || ""}-${i}`} className="py-2 flex items-start gap-3 tls-type-small" data-testid={`finding-${f.level}`}>
-              <span className={`mt-0.5 shrink-0 tls-type-label ${f.level === "error" ? "text-[#FF3B30]" : "text-[#FFD700]"}`}>{f.level === "error" ? "Fehler" : "Hinweis"}</span>
+              <span className={`mt-0.5 shrink-0 tls-type-label ${f.level === "error" ? "text-warn" : "text-[#FFD700]"}`}>{f.level === "error" ? "Fehler" : "Hinweis"}</span>
               <span className="flex-1 text-white/75">{f.message}</span>
               {f.group && groupsByCode[f.group] && <button type="button" onClick={() => onJump(f.group)} className="shrink-0 text-[#29B6E8] hover:underline">zur Gruppe</button>}
             </li>
@@ -424,7 +424,7 @@ function ImportBox({ onApplied }) {
       <FilePick label="Exportdatei wählen" accept="application/json,.json" onFile={onFile} testId="catalog-import-file" />
       {result && (
         <div className="tls-type-small border border-white/10 rounded-sm p-3 space-y-2" data-testid="catalog-import-result">
-          <div>{result.groups} Gruppen und {result.tiers} Stufen in der Datei · {result.check.ok ? <span className="text-ok">Prüfung ohne Fehler</span> : <span className="text-[#FF3B30]">{result.check.counts.errors} Fehler – nichts eingespielt</span>}</div>
+          <div>{result.groups} Gruppen und {result.tiers} Stufen in der Datei · {result.check.ok ? <span className="text-ok">Prüfung ohne Fehler</span> : <span className="text-warn">{result.check.counts.errors} Fehler – nichts eingespielt</span>}</div>
           {!result.check.ok && (
             <ul className="list-disc pl-5 text-white/70 max-h-40 overflow-y-auto">
               {result.check.errors.slice(0, 30).map((f, i) => <li key={`${f.code}-${i}`}>{f.message}</li>)}
@@ -517,7 +517,7 @@ function GroupForm({ group, onClose, onSaved }) {
       <CheckField label="Öffentlich sichtbar" checked={form.public} onChange={(v) => set("public", v)} testId="group-public" accent="#FFD700" />
       <CheckField label="Versteckt bis zur Freischaltung" checked={form.hidden} onChange={(v) => set("hidden", v)} testId="group-hidden" accent="#A855F7" />
       <CheckField label="Sonderauszeichnung (von Hand kuratiert)" checked={form.is_special} onChange={(v) => set("is_special", v)} accent="#FFD700" />
-      <CheckField label="Negativ/Fun (bis zur Freischaltung geheim)" checked={form.is_negative} onChange={(v) => set("is_negative", v)} testId="group-negative" accent="#FF3B30" />
+      <CheckField label="Negativ/Fun (bis zur Freischaltung geheim)" checked={form.is_negative} onChange={(v) => set("is_negative", v)} testId="group-negative" accent={ROLE_COLORS.warn} />
       <RetiredFields form={form} set={set} prefix="group" what="die Gruppe" />
       {isNew && (
         <FormSection title="Kennung" hint="Wird aus dem Namen gebildet und lässt sich später nicht mehr ändern." collapsible>

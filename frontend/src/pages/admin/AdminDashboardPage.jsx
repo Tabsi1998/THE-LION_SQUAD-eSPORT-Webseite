@@ -19,7 +19,7 @@ import { ShortCaps } from "@/components/tls/ShortCaps";
 
 import { ROLE_COLORS } from "@/lib/categoryColors";
 function StatusDot({ ok }) {
-  const color = ok === true ? ROLE_COLORS.ok : ok === false ? "#FF3B30" : "#FFD700";
+  const color = ok === true ? ROLE_COLORS.ok : ok === false ? ROLE_COLORS.warn : "#FFD700";
   return <span className="inline-block w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: color, boxShadow: `0 0 8px ${color}` }} />;
 }
 
@@ -101,7 +101,7 @@ export default function AdminDashboardPage() {
     { label: "Spieler", value: data?.player_count, icon: UsersIcon, color: "#29B6E8" },
     // Die Kachel führt zur Teamverwaltung (#2128, TM7) - sofern die Person sie öffnen darf.
     { label: "Teams", value: data?.team_count, icon: UsersIcon, color: "#29B6E8", to: may("/admin/teams") ? "/admin/teams" : null },
-    { label: "Aktive Turniere", value: data?.active_tournaments, icon: Trophy, color: "#FF3B30" },
+    { label: "Aktive Turniere", value: data?.active_tournaments, icon: Trophy, color: ROLE_COLORS.live },
     { label: "Anmeldung offen", value: data?.registration_open, icon: GamepadIcon, color: ROLE_COLORS.ok },
     { label: "Spiele heute", value: data?.today_matches, icon: Radio, color: "#FFD700" },
     { label: "Fast Lap Live", value: data?.active_f1, icon: Flag, color: "#29B6E8" },
@@ -143,14 +143,14 @@ export default function AdminDashboardPage() {
       detail: countWord(data?.open_disputes, "offener Streitfall", "offene Streitfälle"),
       to: "/admin/tournaments?status=live",
       icon: AlertTriangle,
-      tone: (data?.open_disputes || 0) > 0 ? "#FF3B30" : ROLE_COLORS.ok,
+      tone: (data?.open_disputes || 0) > 0 ? ROLE_COLORS.warn : ROLE_COLORS.ok,
     },
     ...(leagueDisputes ? [{
       label: "Liga-Streitfälle",
       detail: `${countWord(leagueDisputeCount, "offener Streitfall", "offene Streitfälle")} – im Leitstand unter „Verfahren“`,
       to: leagueDisputes.season_id ? seasonAnchorUrl(leagueDisputes.season_id, "leitstand") : "/admin/leagues",
       icon: AlertTriangle,
-      tone: leagueDisputeCount > 0 ? "#FF3B30" : ROLE_COLORS.ok,
+      tone: leagueDisputeCount > 0 ? ROLE_COLORS.warn : ROLE_COLORS.ok,
       key: "league-disputes",
     }] : []),
     {
@@ -174,7 +174,7 @@ export default function AdminDashboardPage() {
       detail: countWord(moderationReports, "offene Meldung", "offene Meldungen"),
       to: "/admin/moderation",
       icon: MessageCircleWarning,
-      tone: moderationReports > 0 ? "#FF3B30" : ROLE_COLORS.ok,
+      tone: moderationReports > 0 ? ROLE_COLORS.warn : ROLE_COLORS.ok,
     },
     {
       label: "Kontaktanfragen",
@@ -189,7 +189,7 @@ export default function AdminDashboardPage() {
       detail: `${countWord(billingCases, "Prüffall", "Prüffälle")} (Storno mit Beleg, Überzahlung, Abweichung)`,
       to: "/admin/finance",
       icon: Wallet,
-      tone: billingCases > 0 ? "#FF3B30" : ROLE_COLORS.ok,
+      tone: billingCases > 0 ? ROLE_COLORS.warn : ROLE_COLORS.ok,
       key: "billing-cases",
     }] : []),
     ...(canFinance && financeAttention ? [{
@@ -197,7 +197,7 @@ export default function AdminDashboardPage() {
       detail: attentionLine(financeAttention),
       to: financeFirst ? `/admin/finance?attention=${financeFirst}` : "/admin/finance",
       icon: Wallet,
-      tone: Number(financeAttention.overdue || 0) > 0 ? "#FF3B30" : financeFirst ? "#FFD700" : ROLE_COLORS.ok,
+      tone: Number(financeAttention.overdue || 0) > 0 ? ROLE_COLORS.warn : financeFirst ? "#FFD700" : ROLE_COLORS.ok,
       key: "finance-attention",
     }] : []),
     // Sponsoring läuft aus (#405): 30 Tage vorher, damit verlängert oder verabschiedet wird - nur für die Redaktion.
@@ -235,7 +235,7 @@ export default function AdminDashboardPage() {
       detail: `${countWord(data?.mobile_push?.active_tokens, "aktives Token", "aktive Tokens")}, ${pushErrors} Fehler`,
       to: "/admin/mobile-push",
       icon: BellRing,
-      tone: pushErrors > 0 ? "#FF3B30" : (data?.mobile_push?.active_tokens || 0) > 0 ? ROLE_COLORS.ok : "#FFD700",
+      tone: pushErrors > 0 ? ROLE_COLORS.warn : (data?.mobile_push?.active_tokens || 0) > 0 ? ROLE_COLORS.ok : "#FFD700",
     },
     {
       label: "Betrieb",
@@ -251,7 +251,7 @@ export default function AdminDashboardPage() {
         : "Alle Kanäle in Ordnung",
       to: "/admin/integrations/discord",
       icon: AlertTriangle,
-      tone: (data?.discord_broken || []).length ? "#FF3B30" : ROLE_COLORS.ok,
+      tone: (data?.discord_broken || []).length ? ROLE_COLORS.warn : ROLE_COLORS.ok,
     },
     {
       // Seit #1657 nur noch die App - Fehler der Website stehen unter Betrieb & Logs → Fehler.
@@ -259,7 +259,7 @@ export default function AdminDashboardPage() {
       detail: `${data?.client_logs?.critical_open ?? 0} kritisch, ${data?.client_logs?.high_open ?? 0} hoch offen`,
       to: "/admin/ops?tab=app",
       icon: Bug,
-      tone: (data?.client_logs?.critical_open || 0) > 0 ? "#FF3B30" : (data?.client_logs?.open || 0) > 0 ? "#FFD700" : ROLE_COLORS.ok,
+      tone: (data?.client_logs?.critical_open || 0) > 0 ? ROLE_COLORS.warn : (data?.client_logs?.open || 0) > 0 ? "#FFD700" : ROLE_COLORS.ok,
     },
     {
       label: "Medien-Check",

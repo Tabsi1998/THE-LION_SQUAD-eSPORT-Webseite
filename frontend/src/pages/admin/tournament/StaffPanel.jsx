@@ -154,7 +154,7 @@ export function TournamentStaffPanel({ tournamentId, staff, staffError = "", onC
                 <button type="button" onClick={() => toggleActive(a)} className="min-h-[44px] px-3 py-2 border border-white/15 text-white/70 rounded-sm tls-type-label">
                   {a.is_active === false ? "Aktivieren" : "Pausieren"}
                 </button>
-                <button type="button" onClick={() => remove(a)} className="min-h-[44px] px-3 py-2 border border-[#FF3B30]/40 text-[#FF3B30] rounded-sm tls-type-label">
+                <button type="button" onClick={() => remove(a)} className="min-h-[44px] px-3 py-2 border border-live/40 text-live rounded-sm tls-type-label">
                   Entfernen
                 </button>
               </div>
@@ -198,7 +198,7 @@ export function TournamentStaffPanel({ tournamentId, staff, staffError = "", onC
                       <button type="button" onClick={() => toggleActive(a)} className="px-2 py-1 border border-white/15 text-white/70 rounded-sm tls-type-label">
                         {a.is_active === false ? "Aktivieren" : "Pausieren"}
                       </button>
-                      <button type="button" onClick={() => remove(a)} className="px-2 py-1 border border-[#FF3B30]/40 text-[#FF3B30] rounded-sm tls-type-label">
+                      <button type="button" onClick={() => remove(a)} className="px-2 py-1 border border-live/40 text-live rounded-sm tls-type-label">
                         Entfernen
                       </button>
                     </div>

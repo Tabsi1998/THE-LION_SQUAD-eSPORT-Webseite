@@ -553,7 +553,7 @@ function TvKeyList() {
               <div className="tls-type-small font-bold text-white/90">{row.label}</div>
               <div className="tls-type-small text-white/50">{row.target_type === "event" ? `Event ${row.target_title}` : row.target_title || row.tournament_title} · erstellt {row.created_at ? viennaDateTime(row.created_at, { dateStyle: "short", timeStyle: "short" }) : "–"} · {row.last_used_at ? `zuletzt da ${viennaDateTime(row.last_used_at, { dateStyle: "short", timeStyle: "short" })}` : "noch nie geöffnet"} · <span data-testid={`tv-key-until-${row.id}`} className={row.expired ? "text-[#FF6B6B]" : undefined}>{row.expired ? `abgelaufen (eine Woche nach dem ${row.target_type === "event" ? "Event" : "Turnier"})` : row.expires_at ? `gilt bis ${viennaDateTime(row.expires_at, { dateStyle: "short" })}` : "gilt bis zum Widerruf"}</span></div>
             </div>
-            <button type="button" onClick={() => revoke(row)} className="inline-flex items-center gap-2 px-3 py-2 border border-[#FF3B30]/40 text-[#FF6B6B] rounded-sm tls-type-label hover:bg-[#FF3B30]/10" data-testid={`tv-key-revoke-${row.id}`}>
+            <button type="button" onClick={() => revoke(row)} className="inline-flex items-center gap-2 px-3 py-2 border border-live/40 text-[#FF6B6B] rounded-sm tls-type-label hover:bg-live/10" data-testid={`tv-key-revoke-${row.id}`}>
               <Trash2 className="w-3.5 h-3.5" /> Widerrufen
             </button>
           </div>

@@ -118,10 +118,10 @@ export function DiscordBotPanel({ canSystem = false }) {
         </button>
       </div>
       {(data.last_action || data.last_error || data.last_sync_at) && (
-        <div className={`border rounded-sm p-3 tls-type-small ${data.last_error ? "border-[#FF3B30]/25 bg-[#FF3B30]/5" : "border-white/10"} text-white/60`} data-testid="discord-bot-log">
+        <div className={`border rounded-sm p-3 tls-type-small ${data.last_error ? "border-warn/25 bg-warn/5" : "border-white/10"} text-white/60`} data-testid="discord-bot-log">
           {data.last_action && <div>Letzte Aktion: {data.last_action}</div>}
           {data.last_sync_at && <div>Letzter Rollenabgleich: {viennaDateTime(data.last_sync_at)} · {data.last_sync_changes || 0} Änderungen{data.last_sync_errors ? ` · ${data.last_sync_errors} Fehler` : ""}</div>}
-          {data.last_error && <div className="text-[#FF3B30] break-words">Letzter Fehler: {data.last_error}</div>}
+          {data.last_error && <div className="text-warn break-words">Letzter Fehler: {data.last_error}</div>}
           {data.enabled && !online && <div className="text-white/45" data-testid="discord-bot-retry">Der Bot versucht es alle fünf Minuten von selbst wieder – nach dem Speichern hier sofort.</div>}
         </div>
       )}

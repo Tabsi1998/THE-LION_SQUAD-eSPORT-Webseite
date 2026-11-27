@@ -220,7 +220,7 @@ function Tools({ tournament, onReload }) {
               <>
                 <p className="mt-1 tls-type-small text-white/60">Nur vor dem Start. Zugeteilte Co-Teams werden dabei aus der Staffel genommen, der Grund steht im Protokoll.</p>
                 <button type="button" onClick={() => setDeleting(true)} data-testid="staffel-delete"
-                  className={`${BUTTON} mt-2 border border-[#FF3B30]/40 text-[#FF6B60] hover:bg-[#FF3B30]/10`}>
+                  className={`${BUTTON} mt-2 border border-live/40 text-[#FF6B60] hover:bg-live/10`}>
                   <Trash2 className="h-4 w-4" aria-hidden="true" /> Staffel löschen
                 </button>
               </>

@@ -27,7 +27,7 @@ export function formatEventTime(value) {
 
 function severityClass(severity) {
   if (severity === "success") return "border-ok/35 bg-ok/10 text-ok";
-  if (severity === "error") return "border-[#FF3B30]/40 bg-[#FF3B30]/10 text-[#FF6B61]";
+  if (severity === "error") return "border-warn/40 bg-warn/10 text-warn";
   if (severity === "warn") return "border-[#FFD700]/40 bg-[#FFD700]/10 text-[#FFD700]";
   return "border-white/10 bg-white/5 text-white/60";
 }

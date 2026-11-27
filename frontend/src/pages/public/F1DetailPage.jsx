@@ -301,14 +301,14 @@ export default function F1DetailPage() {
                               <span
                                 title={`+${e.penalty_seconds}s Strafzeit · ${e.penalty_note || "ohne Begründung"}`}
                                 data-testid={`f1-penalty-${key}`}
-                                className="inline-flex items-center gap-1 tls-type-small font-bold text-[#FF3B30] bg-[#FF3B30]/10 px-1.5 py-0.5 rounded-sm"
+                                className="inline-flex items-center gap-1 tls-type-small font-bold text-warn bg-warn/10 px-1.5 py-0.5 rounded-sm"
                               >
                                 +{e.penalty_seconds}s ⓘ
                               </span>
                             )}
                           </span>
                           {e.penalty_note && (
-                            <div className="tls-type-small font-normal text-[#FF3B30]/80 italic mt-0.5 text-right max-w-[260px] ml-auto">
+                            <div className="tls-type-small font-normal text-warn/80 italic mt-0.5 text-right max-w-[260px] ml-auto">
                               „{e.penalty_note}"
                             </div>
                           )}
@@ -663,13 +663,13 @@ function InlineFastLapTimeEntry({ challenge, trackId, currentUser, onSaved }) {
         </div>
         <div className="grid md:grid-cols-2 gap-2">
           {times.slice(0, 8).map((time) => (
-            <div key={time.id} className={`border rounded-sm px-3 py-2 flex items-center justify-between gap-3 ${time.is_invalid ? "border-[#FF3B30]/35 bg-[#FF3B30]/5" : "border-white/10 bg-[#0A0A0A]/70"}`}>
+            <div key={time.id} className={`border rounded-sm px-3 py-2 flex items-center justify-between gap-3 ${time.is_invalid ? "border-warn/35 bg-warn/5" : "border-white/10 bg-[#0A0A0A]/70"}`}>
               <div className="min-w-0">
                 <div className="font-bold tls-type-small truncate">{time.user?.display_name || time.user?.username || "Unbekannt"}</div>
                 <div className="mt-0.5 flex flex-wrap items-center gap-2 tls-type-label text-quiet">
                   <span>#{time.attempt_number || "-"}</span>
                   {(time.score_scope || "official") === "club_reference" && <span className="text-[#FFD700]">Referenz</span>}
-                  {time.penalty_seconds > 0 && <span className="text-[#FF3B30]">+{time.penalty_seconds}s</span>}
+                  {time.penalty_seconds > 0 && <span className="text-warn">+{time.penalty_seconds}s</span>}
                   {safeHttpUrl(time.proof_url) && <a href={safeHttpUrl(time.proof_url)} target="_blank" rel="noreferrer" className="text-[#29B6E8] hover:underline">Nachweis</a>}
                 </div>
               </div>
@@ -679,7 +679,7 @@ function InlineFastLapTimeEntry({ challenge, trackId, currentUser, onSaved }) {
                   type="button"
                   onClick={() => deleteTime(time)}
                   disabled={saving}
-                  className="p-1.5 text-white/45 hover:text-[#FF3B30] disabled:opacity-40"
+                  className="p-1.5 text-white/45 hover:text-live disabled:opacity-40"
                   title="Zeit löschen"
                 >
                   <Trash2 className="w-3.5 h-3.5" />

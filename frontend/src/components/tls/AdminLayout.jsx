@@ -679,7 +679,7 @@ export function AdminLayout({ children }) {
             <button
               onClick={async () => { if (await logout()) nav("/"); }}
               data-testid="admin-logout"
-              className="inline-flex items-center gap-1.5 px-2 py-2 text-[#FF3B30] border border-[#FF3B30]/30 hover:bg-[#FF3B30]/10 rounded-sm tls-type-label shrink-0"
+              className="inline-flex items-center gap-1.5 px-2 py-2 text-quiet border border-quiet/30 hover:bg-quiet/10 rounded-sm tls-type-label shrink-0"
               aria-label="Logout"
             >
               <LogOut className="w-4 h-4" />

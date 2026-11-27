@@ -551,7 +551,7 @@ export default function AdminGameServersPage() {
                 <button onClick={() => syncOne(server)} disabled={syncing === server.id || server.sync_provider === "manual"} title="Live-Daten jetzt abrufen" className="min-h-10 inline-flex items-center justify-center p-2 border border-white/10 sm:border-transparent rounded-sm text-white/45 hover:text-[#29B6E8] disabled:opacity-30"><RefreshCw className={`w-4 h-4 ${syncing === server.id ? "animate-spin" : ""}`} /></button>
                 <button onClick={() => diagnose(server)} disabled={syncing === `${server.id}:diagnose`} title="Verbindung testen" className="min-h-10 inline-flex items-center justify-center p-2 border border-white/10 sm:border-transparent rounded-sm text-white/45 hover:text-[#FFD700] disabled:opacity-30"><Network className={`w-4 h-4 ${syncing === `${server.id}:diagnose` ? "animate-pulse" : ""}`} /></button>
                 <button onClick={() => startEdit(server)} title="Bearbeiten" className="min-h-10 inline-flex items-center justify-center p-2 border border-white/10 sm:border-transparent rounded-sm text-white/45 hover:text-[#29B6E8]"><Pencil className="w-4 h-4" /></button>
-                <button onClick={() => remove(server)} title="Löschen" className="min-h-10 inline-flex items-center justify-center p-2 border border-white/10 sm:border-transparent rounded-sm text-white/45 hover:text-[#FF3B30]"><Trash2 className="w-4 h-4" /></button>
+                <button onClick={() => remove(server)} title="Löschen" className="min-h-10 inline-flex items-center justify-center p-2 border border-white/10 sm:border-transparent rounded-sm text-white/45 hover:text-live"><Trash2 className="w-4 h-4" /></button>
               </div>
             </div>
             <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-2 tls-type-small">
@@ -574,7 +574,7 @@ export default function AdminGameServersPage() {
               ))}
             </div>
             {server.last_sync_note && <div className="mt-3 border border-[#FFD700]/25 bg-[#FFD700]/10 text-[#FFD700] rounded-sm px-3 py-2 tls-type-small">{server.last_sync_note}</div>}
-            {server.last_sync_error && <div role="alert" data-testid={`server-sync-error-${server.slug || server.id}`} className="mt-3 border border-[#FF3B30]/30 bg-[#FF3B30]/10 text-[#FF8A80] rounded-sm px-3 py-2 tls-type-small break-words">Letzter Abruf fehlgeschlagen: {server.last_sync_error}</div>}
+            {server.last_sync_error && <div role="alert" data-testid={`server-sync-error-${server.slug || server.id}`} className="mt-3 border border-warn/30 bg-warn/10 text-warn rounded-sm px-3 py-2 tls-type-small break-words">Letzter Abruf fehlgeschlagen: {server.last_sync_error}</div>}
             {diagnostics[server.id] && <DiagnosticsPanel data={diagnostics[server.id]} />}
             {server.description && <p className="mt-3 tls-type-body text-white/55 line-clamp-2">{server.description}</p>}
           </article>
@@ -631,7 +631,7 @@ function Badge({ label, tone }) {
     green: "bg-ok/10 text-ok",
     cyan: "bg-[#29B6E8]/10 text-[#29B6E8]",
     gold: "bg-[#FFD700]/10 text-[#FFD700]",
-    red: "bg-[#FF3B30]/10 text-[#FF3B30]",
+    red: "bg-warn/10 text-warn",
     muted: "bg-white/10 text-white/55",
   };
   return <span className={`px-2 py-1 rounded-sm tls-type-label ${classes[tone] || classes.muted}`}>{label}</span>;
