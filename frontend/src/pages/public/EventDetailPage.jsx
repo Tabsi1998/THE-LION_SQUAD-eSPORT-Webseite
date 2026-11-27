@@ -7,6 +7,7 @@ import { PublicLoadingState } from "@/components/tls/PublicLoadingState";
 import { Breadcrumbs } from "@/components/tls/Breadcrumbs";
 import { StepBar, eventStep, eventSteps } from "@/components/tls/StepBar";
 import { PhaseBadge } from "@/components/tls/PhaseBadge";
+import { StatusChip } from "@/components/tls/StatusChip";
 import { RichContent } from "@/components/tls/RichContent";
 import { useCookieConsent } from "@/components/tls/CookieConsent";
 import { ExternalMediaNotice } from "@/components/tls/ExternalMediaNotice";
@@ -55,6 +56,9 @@ import { ShareButton } from "@/components/tls/ShareButton";
 // dem Titel, am PC rechts und bleibt beim Scrollen stehen. „Live“ ist ein Reiter; /events/<slug>/live führt dorthin.
 
 // Der Standardtyp "general" sagt nichts; im Kopf steht dann schlicht "Event".
+// Ein Tag mehrtägiger Events (#884) als Zustands-Schild (#1306): [Art, Wort].
+const DAY_KINDS = { running: ["live", "Läuft"], next: ["soon", "Als Nächstes"], past: ["done", "Vorbei"] };
+
 function eventKindLabel(value) {
   const key = normalizeEventType(value);
   return key && key !== "general" ? eventTypeLabel(key) : "Event";
@@ -102,9 +106,8 @@ function EventDaysBlock({ schedule }) {
             <li key={day.index} className={`tls-card border rounded-sm p-5 min-w-0 ${frame} ${day.state === "past" ? "opacity-60" : ""}`} data-testid={`event-day-${day.index}`} data-state={day.state}>
               <div className="flex items-center justify-between gap-2 tls-type-label text-[#9F7AEA]">
                 <span>Tag {day.index}/{schedule.count}</span>
-                {day.state === "running" && <span className="inline-flex items-center gap-1.5 text-live"><span className="tls-live-dot" aria-hidden="true" /> Läuft</span>}
-                {day.state === "next" && <span className="text-white/60">Als Nächstes</span>}
-                {day.state === "past" && <span className="text-white/40">Vorbei</span>}
+                {/* Zustand des Tags als Zustands-Schild (#1306): läuft, als Nächstes, vorbei. */}
+                {DAY_KINDS[day.state] ? <StatusChip kind={DAY_KINDS[day.state][0]} label={DAY_KINDS[day.state][1]} testId={`event-day-state-${day.index}`} /> : null}
               </div>
               <div className="mt-1 tls-type-card">{day.label}</div>
               <div className="tls-type-small text-white/80 inline-flex items-center gap-2"><Clock className="w-4 h-4 text-[#9F7AEA] shrink-0" /> {day.time_label}{day.ends_next_day ? " (bis in den nächsten Morgen)" : ""}</div>
