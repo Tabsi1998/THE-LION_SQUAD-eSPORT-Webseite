@@ -342,7 +342,7 @@ der aktiven Jahreswertung. Ausschließen heißt beim Turnier bzw. der Challenge 
 **Status:** **Entwurf** (so startet jede neue Saison), **Aktiv**, **Abgeschlossen**, **Archiv**. **Punkte werden immer in die Saison mit
 dem Status Aktiv geschrieben.** Aktiv kann nur eine sein – wer eine zweite aktiviert, bekommt den Hinweis, welche schon läuft. Ist keine
 Saison aktiv, bekommen Ergebnisse keine Jahrespunkte, und die Startseite zeigt keine Jahreswertung. Ein Zeitraum am Ende (Ende-Datum)
-schaltet den Status nicht um. Stehen aus der Zeit davor noch mehrere auf **Aktiv**, warnt die Seite rot („Mehrere aktive Wertungen“);
+schaltet den Status nicht um. Stehen aus der Zeit davor noch mehrere auf **Aktiv**, warnt die Seite orange („Mehrere aktive Wertungen“);
 die Punkte gehen weiter dorthin, wo sie bisher hingingen – schließt alle bis auf eine ab. Abgeschlossene und archivierte Wertungen
 ändert nichts mehr: weder ein erneutes Veröffentlichen noch die Bereinigung doppelter Einträge (die meldet solche Fälle nur).
 

@@ -921,7 +921,7 @@ Zuerst den **Kalender** der Saison anlegen (etwa mit **Termine einfügen**), dam
 <td><img src="../assets/serien/serien-saisontabelle-handy.png" alt="Eine Runde mit Abweichungen am Handy" width="220"></td>
 </tr>
 <tr>
-<td><img src="../assets/serien/serien-saisontabelle-klaeren.png" alt="Drei gelbe Zellen zum Klären mit Vorschlägen und Punkte laut Veranstalter" width="560"></td>
+<td><img src="../assets/serien/serien-saisontabelle-klaeren.png" alt="Drei markierte Zellen zum Klären mit Vorschlägen und Punkte laut Veranstalter" width="560"></td>
 <td><img src="../assets/serien/serien-saisontabelle-abgleich-handy.png" alt="Abgleich mit Gesamt am Handy: eine Abweichung, eine erklärt durch Anpassungen" width="220"></td>
 </tr>
 </table>
@@ -964,12 +964,12 @@ das Bild wird nicht gespeichert.
 
 <table>
 <tr>
-<td><img src="../assets/serien/serien-saisontabelle-bild-unsicher.png" alt="Aus dem Bild unsicher: je Zeile die gelben Zellen mit dem, was sonst gelesen wurde, und Passt so" width="560"></td>
+<td><img src="../assets/serien/serien-saisontabelle-bild-unsicher.png" alt="Aus dem Bild unsicher: je Zeile die markierten Zellen mit dem, was sonst gelesen wurde, und Passt so" width="560"></td>
 <td><img src="../assets/serien/serien-saisontabelle-bild-team-handy.png" alt="Team-Tabelle am Handy: Runde, Team und Punkte, Vergleich mit der eigenen Rechnung" width="220"></td>
 </tr>
 </table>
 
-<img src="../assets/serien/serien-saisontabelle-bild-team.png" alt="Team-Tabelle erkannt: Teamwertung laut Veranstalter nach Runde 3, eine gelbe Zeile, Vergleich laut Bild und eigene Rechnung" width="560">
+<img src="../assets/serien/serien-saisontabelle-bild-team.png" alt="Team-Tabelle erkannt: Teamwertung laut Veranstalter nach Runde 3, eine markierte Zeile, Vergleich laut Bild und eigene Rechnung" width="560">
 
 **Seite Team-Liga:** Bei einer Spur vom Typ Team-Liga zeigt dieselbe Adresse statt der Gesamtwertung die Liga aus
 Sicht der eigenen Teams (Liste **Eigene Teams** der Saison; spielen mehrere, steht im Spielplan, welches gespielt
@@ -1410,7 +1410,7 @@ einem gewerteten Termin **Ergebnis ändern**. Das öffnet das Blatt des Termins.
   **Alle Namen bestätigen:** Stehen vorbelegte Namen oder Teams orange da (etwa **wie in Saison …**), bestätigt der Knopf
   über der Liste sie alle auf einmal – andere orange Felder bleiben orange. Danach steht da, wie viele bestätigt sind, mit
   **Rückgängig**.
-  <img src="../assets/serien/serien-ergebnis-namen-bestaetigen.png" alt="Ergebnisblatt nach Bild auslesen: Leiste „3 Namen bzw. Teams aus dem Bild vorbelegt, aber gelb“ mit dem Knopf „Alle Namen bestätigen (3)“" width="560"> Kennt eine andere Saison derselben Spur den Namen oder das Team,
+  <img src="../assets/serien/serien-ergebnis-namen-bestaetigen.png" alt="Ergebnisblatt nach Bild auslesen: Leiste „3 Namen bzw. Teams aus dem Bild vorbelegt, aber zum Prüfen markiert“ mit dem Knopf „Alle Namen bestätigen (3)“" width="560"> Kennt eine andere Saison derselben Spur den Namen oder das Team,
   steht es so vorbelegt da – orange, mit **wie in Saison …**; beim Übernehmen entsteht der Teilnehmer in dieser Saison
   (ein bestätigter Alias ordnet ihn gleich derselben Person zu). Steht im Bild eine andere Startnummer als beim
   Teilnehmer, zeigt die Zeile die aus dem Bild (orange, **bisher …**). **Korrekturen lernen:** Ändert der Vorstand einen
@@ -1443,7 +1443,7 @@ einem gewerteten Termin **Ergebnis ändern**. Das öffnet das Blatt des Termins.
   Map-Pool“) und bleibt als Freitext; fehlt die Map, in der Bibliothek anlegen oder die Schreibweise dort eintragen.
   Beim Speichern merkt sich das Spiel Name und Bild der Map: spätere Änderungen in der Bibliothek ändern alte Spiele
   nicht, auch eine archivierte Map bleibt bei ihnen sichtbar. Eine Map aus einem anderen Spiel lehnt die Prüfung ab.
-  <img src="../assets/serien/serien-ergebnis-map-pool.png" alt="Ergebnisblatt der Team-Liga: Map-Pool der Saison je Modus mit Bild über den Maps, drei Maps aus dem Pool mit Bild, eine unbekannte Map gelb markiert" width="460"> Eine **gespielte** Map braucht beide Stände; **Wahl** und
+  <img src="../assets/serien/serien-ergebnis-map-pool.png" alt="Ergebnisblatt der Team-Liga: Map-Pool der Saison je Modus mit Bild über den Maps, drei Maps aus dem Pool mit Bild, eine unbekannte Map markiert markiert" width="460"> Eine **gespielte** Map braucht beide Stände; **Wahl** und
   **Decider** dürfen leer bleiben, wenn sie nicht gespielt wurden (etwa der Decider bei 2:0) – sie zählen dann nicht.
   Ein leerer Stand wird nie zu 0:0. Die **Aufstellung** ist eine Ankreuzliste aus dem **Kader**
   des Teams; mit **je Map** bekommt jede gespielte Map ihre eigene (wer eine Map gespielt hat, hat das Spiel gespielt).
@@ -1480,12 +1480,12 @@ einem gewerteten Termin **Ergebnis ändern**. Das öffnet das Blatt des Termins.
 
 <table>
 <tr>
-<td><img src="../assets/serien/serien-ergebnis-bild.png" alt="Ergebnis-Blatt nach Bild auslesen: Übersicht Aus dem Bild gelesen mit Strecke, schnellster Rennrunde und Fahrer des Tages, darunter gelbe Felder mit dem Gelesenen und Passt so" width="420"></td>
+<td><img src="../assets/serien/serien-ergebnis-bild.png" alt="Ergebnis-Blatt nach Bild auslesen: Übersicht Aus dem Bild gelesen mit Strecke, schnellster Rennrunde und Fahrer des Tages, darunter markierte Felder mit dem Gelesenen und Passt so" width="420"></td>
 <td><img src="../assets/serien/serien-ergebnis-bild-handy.png" alt="Dasselbe am Handy mit vergrößertem Bild zum Vergleichen" width="200"></td>
 <td><img src="../assets/serien/serien-spur-vorlage-bild.png" alt="Spur bearbeiten mit dem Feld Vorlage für Ergebnis-Bilder" width="200"></td>
 </tr>
 <tr>
-<td><img src="../assets/serien/serien-bild-wie-in-saison.png" alt="Gelbe Zeilen aus dem Bild: Name und Team mit dem Hinweis wie in Saison 1/2025, eine Startnummer mit bisher 15" width="200"></td>
+<td><img src="../assets/serien/serien-bild-wie-in-saison.png" alt="Markierte Zeilen aus dem Bild: Name und Team mit dem Hinweis wie in Saison 1/2025, eine Startnummer mit bisher 15" width="200"></td>
 <td><img src="../assets/serien/serien-bild-gelernt.png" alt="Teilnehmer bearbeiten am Handy: unter der Zuordnung Aus Bildern gelernt mit zwei Schreibweisen zum Entfernen" width="200"></td>
 <td></td>
 </tr>

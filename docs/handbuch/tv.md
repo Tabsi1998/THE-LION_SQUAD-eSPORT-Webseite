@@ -318,7 +318,7 @@ QR-Code zum Mitfahren. Mehr dazu im [Fast-Lap-Kapitel](fastlap.md).
 | „Sponsoren am TV sind ausgeschaltet“ | Alle drei Sponsor-Schalter sind aus | In den Grundwerten **Sponsor-Moment**, **Runde präsentiert von** oder **Laufband unten** einschalten |
 | Am Rand fehlt etwas | Der Fernseher schneidet den Rand ab | **Sicherer Bereich** auf 3 % oder 5 % stellen |
 | Der Bildschirm wird dunkel | Das Gerät schaltet in den Energiesparmodus | Bildschirmschoner und Energiesparen am Gerät ausschalten (siehe 2.1) |
-| Unten steht rot „… konnten nicht aktualisiert werden“ mit dem Knopf **Neu laden** | Das Nachladen hakt (Internet weg oder Server nicht erreichbar). Der Bildschirm zeigt solange den letzten Stand („Stand 14:20:03“) | Internet am Gerät prüfen, auf **Neu laden** klicken oder `F5` drücken |
+| Unten steht orange „… konnten nicht aktualisiert werden“ mit dem Knopf **Neu laden** | Das Nachladen hakt (Internet weg oder Server nicht erreichbar). Der Bildschirm zeigt solange den letzten Stand („Stand 14:20:03“) | Internet am Gerät prüfen, auf **Neu laden** klicken oder `F5` drücken |
 | Kein Cookie-Hinweis auf dem TV | Gewollt: Auf Anzeige-Seiten läuft nur das Nötige, dort klickt niemand | Nichts zu tun |
 
 ---

@@ -10,7 +10,7 @@ import { Check, ClipboardList, Plus, X } from "lucide-react";
 // Teamwertung laut Veranstalter (#1960) im Ergebnisblatt einer Rennliga: nach dieser Runde die offiziellen Teampunkte
 // eintragen oder einfügen (`official_team_totals`). Ist sie da, gilt sie für Platz und Punkte der Teamwertung; die eigene
 // Rechnung steht auf der Serienseite nur noch als Vergleich bzw. Prüfhinweis. Eine Zeile ohne gültige Zahl geht nicht
-// mit - sie ist rot markiert, bis sie stimmt.
+// mit - sie ist orange markiert, bis sie stimmt.
 // Bild auslesen (#1999): `imageBase` (nur Vorstand) liest die Team-Tabelle des Veranstalters - Team und Punkte. Gelbe
 // Zeilen sind unsicher, bis jemand sie ändert oder „Passt so“ drückt; `onOpenChange` meldet, wie viele noch gelb sind.
 

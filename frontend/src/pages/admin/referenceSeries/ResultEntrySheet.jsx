@@ -652,7 +652,7 @@ export function ResultEntrySheet({ series, round, onClose, onSaved }) {
     event.preventDefault();
     if (stale) return;
     if (invalidCount) {
-      toast.error("Bitte zuerst die rot markierten Eingaben korrigieren.");
+      toast.error("Bitte zuerst die orange markierten Eingaben korrigieren.");
       return;
     }
     if (ready) {
@@ -814,7 +814,7 @@ export function ResultEntrySheet({ series, round, onClose, onSaved }) {
 
           {invalidCount > 0 && (
             <p className="border border-warn/40 bg-warn/10 rounded-sm px-3 py-2 tls-type-small text-white/85" role="alert" data-testid="result-invalid">
-              {invalidCount === 1 ? "Eine Eingabe ist ungültig" : `${invalidCount} Eingaben sind ungültig`} – rot markiert. Geprüft und gespeichert wird erst, wenn alles stimmt.
+              {invalidCount === 1 ? "Eine Eingabe ist ungültig" : `${invalidCount} Eingaben sind ungültig`} – orange markiert. Geprüft und gespeichert wird erst, wenn alles stimmt.
             </p>
           )}
           {imageOpen > 0 && (

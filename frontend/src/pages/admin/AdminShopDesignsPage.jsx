@@ -873,9 +873,9 @@ function MotifCard({ design, busy, maxExceptions, onColors, onExceptions, onNewF
 // Schwellen der Paar-Prüfung (#2084) - im Server Anteile (0,02), hier in Prozent.
 const PAIR_SETTINGS = [
   { name: "pair_aspect_tolerance", label: "Seitenverhältnis darf abweichen um (%)", hint: "Mehr Abweichung ist Rot: das Paar wird abgelehnt." },
-  { name: "pair_min_overlap", label: "Umrisse decken sich mindestens zu (%)", hint: "Weniger ist Gelb: „Sind das wirklich zwei Fassungen desselben Logos?“" },
-  { name: "pair_contrast_share", label: "Höchstens sehr helle bzw. dunkle Fläche (%)", hint: "Mehr Weiß in der Hell- bzw. Schwarz in der Dunkel-Fassung ist Gelb." },
-  { name: "pair_position_tolerance", label: "Logo darf verschoben sein um (%)", hint: "Sitzt das Logo in den Dateien weiter auseinander, ist es Gelb: Rand oder Position prüfen." },
+  { name: "pair_min_overlap", label: "Umrisse decken sich mindestens zu (%)", hint: "Weniger wird zum Prüfen markiert: „Sind das wirklich zwei Fassungen desselben Logos?“" },
+  { name: "pair_contrast_share", label: "Höchstens sehr helle bzw. dunkle Fläche (%)", hint: "Mehr Weiß in der Hell- bzw. Schwarz in der Dunkel-Fassung wird zum Prüfen markiert." },
+  { name: "pair_position_tolerance", label: "Logo darf verschoben sein um (%)", hint: "Sitzt das Logo in den Dateien weiter auseinander, wird es zum Prüfen markiert: Rand oder Position prüfen." },
 ];
 
 function percent(share) {
