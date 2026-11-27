@@ -74,6 +74,7 @@ SQUAD_ROLE_LABELS = {"captain_id": "Captain", "vice_captain_id": "Vertreter"}
 ROLES_ON_WEBSITE = "Captain und Vertreter vergibst du auf der Website unter Teams → Deine Teams (Co-Team bearbeiten)."
 RESIGN_ON_WEBSITE = "Deine Rolle gibst du auf der Website unter Teams → Deine Teams mit „Rolle abgeben“ ab."
 TAG_TAKEN = "Dieses Kürzel ist schon vergeben."
+NOT_IN_TEAM = "Du gehörst nicht zu diesem Team."
 LEADER_CANNOT_LEAVE = ("Als Teamleitung kannst du das Team nicht verlassen. Übergib zuerst die Leitung (auf der Teamseite "
                        "unter „Mitglieder verwalten“ → „Zur Teamleitung machen“) oder löse das Team unter „Bearbeiten“ auf.")
 
@@ -1197,6 +1198,9 @@ async def leave_team(team_id: str, me: dict = Depends(get_current_user)):
     team = await db.teams.find_one({"id": team_id})
     if not team:
         raise HTTPException(status_code=404, detail="Team nicht gefunden")
+    if me["id"] not in (team.get("member_ids") or []):
+        # Rechte-Audit für Gäste (#1665, P8): Wer nicht im Team ist, verlässt es nicht - sonst hörte die Teamleitung „hat verlassen“.
+        raise HTTPException(status_code=400, detail=NOT_IN_TEAM)
     if team["leader_id"] == me["id"]:
         # Geführt statt Sackgasse (#2113, L-C6): der Weg steht in der Meldung - auch für die App.
         raise HTTPException(status_code=400, detail=LEADER_CANNOT_LEAVE)
