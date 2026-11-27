@@ -76,18 +76,27 @@ function OwnTeamNote({ row }) {
   return <p className="text-sm font-semibold text-white/80" data-testid={`application-own-team-${row.id}`}>{OWN_TEAM}</p>;
 }
 
-function RowActions({ row, options, busy, act, superadmin }) {
+// Offene Anmeldungen (Entscheidung B, #1665): Nur hier steht das Kennzeichen „Gast“ - abgelehnt oder zurückgezogen gibt kein Recht daran.
+const OPEN_STATUSES = ["submitted", "in_review", "waitlist", "accepted"];
+
+/** Hat die Anmeldung noch Knöpfe der Entscheidung? Prüfen, annehmen, zuteilen oder eine automatische Zuteilung zurücknehmen. */
+export function hasRowActions(row) {
+  const unassigned = row.status === "accepted" && !row.assignment;
+  const autoSeated = row.status === "accepted" && Boolean(row.assignment?.auto) && !row.assignment?.left;
+  return ["submitted", "in_review", "waitlist"].includes(row.status) || unassigned || autoSeated;
+}
+
+function RowActions({ row, options, busy, act, superadmin, conflictReason = "", setConflictReason = () => {} }) {
   const [staffel, setStaffel] = useState("");
   // Welcher Grund gerade offen ist: Ablehnen, oder Warteliste bei einer automatisch angenommenen Anmeldung (#2348).
   const [mode, setMode] = useState(null);
   const [reason, setReason] = useState("");
-  const [conflictReason, setConflictReason] = useState("");
   const [deviation, setDeviation] = useState("");
   const unassigned = row.status === "accepted" && !row.assignment;
   // Eine automatische Zuteilung (#2348) nehmen Ablehnen und Warteliste wieder aus der Staffel; jede andere bleibt der Teilnehmerliste.
   const autoSeated = row.status === "accepted" && Boolean(row.assignment?.auto) && !row.assignment?.left;
   const deciding = ["submitted", "in_review", "waitlist"].includes(row.status);
-  if (!deciding && !unassigned && !autoSeated) return null;
+  if (!hasRowActions(row)) return null;
   if (row.own_team && !superadmin) return <div className="mt-3"><OwnTeamNote row={row} /></div>;
   // Nur der Superadmin darf beim eigenen Team, als Notausnahme: Jeder Knopf schickt den Grund mit und geht erst mit fünf Zeichen.
   const override = row.own_team ? conflictReason.trim() : "";
@@ -153,6 +162,9 @@ function historyLine(step) {
 }
 
 function ApplicationRow({ row, options, busy, act, superadmin, seasonId = null, reload = null }) {
+  // Ein Grund für die Notausnahme je Anmeldung (#1665): Er gilt für die Entscheidung und fürs Kennzeichen - ein Feld, nicht zwei.
+  const [conflictReason, setConflictReason] = useState("");
+  const guestControl = Boolean(seasonId) && OPEN_STATUSES.includes(row.status);
   return (
     <li className="rounded-sm border border-white/10 bg-[#0A0A0A] p-3" data-testid={`application-${row.id}`}>
       <div className="flex flex-wrap items-center gap-2">
@@ -161,7 +173,10 @@ function ApplicationRow({ row, options, busy, act, superadmin, seasonId = null, 
         {row.guest_badge ? <GuestBadge badge={row.guest_badge} testId={`application-guest-mark-${row.id}`} /> : null}
       </div>
       {/* Gastteam (#1665): Angabe der Teamleitung und Kennzeichen - nur bei offenen Anmeldungen zum Bestätigen. */}
-      {seasonId ? <GuestTeamControl row={row} seasonId={seasonId} superadmin={superadmin} onChanged={reload} /> : null}
+      {guestControl ? (
+        <GuestTeamControl row={row} seasonId={seasonId} superadmin={superadmin} onChanged={reload} conflictReason={conflictReason}
+          onConflictReason={hasRowActions(row) ? null : setConflictReason} />
+      ) : null}
       {row.carry_over ? (
         <p className="mt-1 text-sm text-white/85 [overflow-wrap:anywhere]" data-testid={`application-carry-${row.id}`}>{carryLine(row.carry_over)}</p>
       ) : null}
@@ -202,7 +217,7 @@ function ApplicationRow({ row, options, busy, act, superadmin, seasonId = null, 
       ) : null}
       {row.decision_reason ? <p className="mt-1 text-sm text-white/75 [overflow-wrap:anywhere]">Grund: {row.decision_reason}{row.decided_by_name ? ` (${row.decided_by_name})` : ""}</p> : null}
       <Notes row={row} />
-      <RowActions row={row} options={options} busy={busy} act={act} superadmin={superadmin} />
+      <RowActions row={row} options={options} busy={busy} act={act} superadmin={superadmin} conflictReason={conflictReason} setConflictReason={setConflictReason} />
       {row.history?.length > 1 ? (
         <details className="mt-2 text-xs text-white/55">
           <summary className="cursor-pointer">Verlauf</summary>

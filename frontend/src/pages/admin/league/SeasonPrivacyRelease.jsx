@@ -3,7 +3,7 @@
 // die Freigabe nicht mehr - der Server vergleicht den Wortlaut (``league_applications.privacy_text_for``).
 import { useState } from "react";
 import { toast } from "sonner";
-import { api, formatApiError } from "@/lib/api";
+import { api, formatRequestError } from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
 import { viennaDateTime } from "@/lib/vienna";
 
@@ -32,7 +32,7 @@ export function SeasonPrivacyRelease({ season, seasonId, formText = "", onReload
       toast.success(released ? "Hinweis für Gäste freigegeben." : "Freigabe für Gäste zurückgenommen.");
       await onReload?.();
     } catch (error) {
-      toast.error(formatApiError(error, "Die Freigabe ließ sich nicht speichern."));
+      toast.error(formatRequestError(error, "Die Freigabe ließ sich nicht speichern."));
     } finally {
       setBusy(false);
     }

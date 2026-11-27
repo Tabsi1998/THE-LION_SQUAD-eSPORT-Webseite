@@ -4,7 +4,7 @@
 // Ein Team ohne Kennzeichen und ohne Angabe bekommt nur den leisen Knopf - der Eingang bleibt so ruhig wie vorher.
 import { useState } from "react";
 import { toast } from "sonner";
-import { api, formatApiError } from "@/lib/api";
+import { api, formatRequestError } from "@/lib/api";
 import { TextField } from "@/components/tls/FormFields";
 import { GuestBadge } from "@/components/tls/league/GuestBadge";
 
@@ -20,10 +20,11 @@ export function guestInfoLine(info) {
   return what;
 }
 
-export function GuestTeamControl({ row, seasonId, superadmin, onChanged }) {
+/** ``conflictReason``: der Grund der Notausnahme aus dem Feld der Anmeldung (eins je Anmeldung). ``onConflictReason``: Hat die Anmeldung
+ * keine Knöpfe mehr (schon zugeteilt), steht das Feld hier - sonst bleibt es beim Feld der Entscheidung darunter. */
+export function GuestTeamControl({ row, seasonId, superadmin, onChanged, conflictReason = "", onConflictReason = null }) {
   const info = row.guest_team || null;
   const [busy, setBusy] = useState(false);
-  const [conflictReason, setConflictReason] = useState("");
   const confirmed = Boolean(info?.confirmed);
   const own = Boolean(row.own_team);
   const override = own ? conflictReason.trim() : "";
@@ -38,15 +39,15 @@ export function GuestTeamControl({ row, seasonId, superadmin, onChanged }) {
       toast.success(next ? "Als Gastteam bestätigt." : "Kennzeichen „Gast“ zurückgenommen.");
       onChanged?.();
     } catch (error) {
-      toast.error(formatApiError(error, "Das Kennzeichen ließ sich nicht speichern."));
+      toast.error(formatRequestError(error, "Das Kennzeichen ließ sich nicht speichern."));
     } finally {
       setBusy(false);
     }
   };
 
-  const overrideField = own && superadmin ? (
-    <TextField label="Grund für die Notausnahme" value={conflictReason} onChange={setConflictReason} maxLength={500} className="mt-2 max-w-md"
-      testId={`application-guest-conflict-${row.id}`} hint="Euer eigenes Team: Als Superadmin geht es nur mit Grund, er steht im Protokoll." />
+  const overrideField = own && superadmin && onConflictReason ? (
+    <TextField label="Grund für die Notausnahme" value={conflictReason} onChange={onConflictReason} maxLength={500} className="mt-2 max-w-md"
+      testId={`application-conflict-reason-${row.id}`} hint="Als Superadmin geht es trotzdem, mit mindestens fünf Zeichen. Der Grund steht im Protokoll." />
   ) : null;
   const may = !own || superadmin;
 

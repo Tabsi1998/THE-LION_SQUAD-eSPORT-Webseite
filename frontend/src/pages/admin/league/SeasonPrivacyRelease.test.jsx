@@ -2,8 +2,9 @@ import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 
 // Datenschutzhinweis für Gäste (#1665, Nr. 1): bis zur Freigabe durch den Superadmin sehen Gäste den Platzhalter.
 const apiMock = { put: vi.fn() };
-vi.mock("@/lib/api", () => ({ api: apiMock, formatApiError: (error, fallback) => fallback }));
-vi.mock("sonner", () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
+vi.mock("@/lib/api", async (importOriginal) => ({ ...(await importOriginal()), api: apiMock }));
+const toastMock = { success: vi.fn(), error: vi.fn() };
+vi.mock("sonner", () => ({ toast: toastMock }));
 const auth = { user: { id: "u1", role: "superadmin" } };
 vi.mock("@/context/AuthContext", () => ({ useAuth: () => auth }));
 
@@ -43,3 +44,19 @@ test("andere sehen den Stand, aber keinen Knopf", () => {
   expect(screen.getByTestId("season-privacy-release")).toHaveTextContent("Für Gäste freigegeben am 27.11.2026");
   expect(screen.queryByTestId("season-privacy-release-toggle")).toBeNull();
 });
+
+/** Ein Fehler wie von axios: Status und deutscher Satz des Servers im Inhalt, die Nachricht ist die englische von axios. */
+function serverRefusal(status, detail) {
+  const error = new Error(`Request failed with status code ${status}`);
+  error.response = { status, data: { detail } };
+  return error;
+}
+
+test("eine Absage des Servers steht mit seinem deutschen Satz da", async () => {
+  apiMock.put.mockRejectedValue(serverRefusal(403, "Den Hinweis zum Datenschutz für Gäste gibt nur der Superadmin frei, nach der rechtlichen Prüfung."));
+  render(<SeasonPrivacyRelease season={{ application_privacy_text: TEXT }} seasonId="s1" formText={TEXT} />);
+  fireEvent.click(screen.getByTestId("season-privacy-release-toggle"));
+  await waitFor(() => expect(toastMock.error).toHaveBeenCalledWith(
+    "Den Hinweis zum Datenschutz für Gäste gibt nur der Superadmin frei, nach der rechtlichen Prüfung."));
+});
+
