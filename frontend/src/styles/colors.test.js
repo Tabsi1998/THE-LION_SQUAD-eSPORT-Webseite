@@ -19,11 +19,14 @@ const BASELINE = JSON.parse(readFileSync(path.join(SRC, "styles/colors.baseline.
 export const FAMILIES = {
   gold: { hex: ["FFD700"], rgb: ["255,215,0"] },
   red: { hex: ["FF3B30", "FF6B6B", "FF6B60", "FF6B61", "FF6B62", "FF8A80", "FFB4AE"], rgb: ["255,59,48"] },
-  neon: { hex: ["00FF88", "00D26A"], rgb: ["0,255,136"] },
-  orange: { hex: ["FF9500", "FFD95A", "FFCC00"], rgb: ["255,149,0"] },
+  neon: { hex: ["00FF88", "00D26A", "10B981"], rgb: ["0,255,136"] },
+  orange: { hex: ["FF9500", "FFD95A", "FFCC00", "FFD21A"], rgb: ["255,149,0"] },
 };
 
-/** Anzahl der Rohwerte je Familie in einem Text. */
+// Tailwind-Palette statt Rolle (#1305): text-red-300, border-amber-400/50, bg-emerald-400/15 … - jede Stufe zählt.
+const PALETTE = /(?<![\w-])(?:[\w-]+(?:\[[^\]\s]*\])?:)*!?-?(?:text|bg|border(?:-[trblxyse])?|from|via|to|ring|fill|stroke|accent|divide|outline|decoration|placeholder|shadow|caret)-(?:red|rose|amber|yellow|orange|green|emerald|lime)-\d{2,3}(?![\w-])/g;
+
+/** Anzahl der Rohwerte je Familie in einem Text (dazu „palette“: Tailwind-Farbstufen statt Rollen). */
 export function countFamilies(text) {
   const counts = {};
   for (const [family, { hex, rgb }] of Object.entries(FAMILIES)) {
@@ -33,6 +36,8 @@ export function countFamilies(text) {
     const total = hexHits.length + rgbHits.length;
     if (total) counts[family] = total;
   }
+  const palette = (text.match(PALETTE) || []).length;
+  if (palette) counts.palette = palette;
   return counts;
 }
 
@@ -59,7 +64,9 @@ export function countAll() {
 test("Gegenprobe: Hexwerte, Nebentöne und rgb()/rgba() zählen je Familie, Rollen nicht", () => {
   expect(countFamilies('className="text-[#FFD700] bg-[#ffd700]/10" style={{ color: "rgba(255, 215, 0, 0.5)" }}')).toEqual({ gold: 3 });
   expect(countFamilies("text-[#FF6B60] border-[#FF3B30]/40 rgb(255 59 48 / 0.2) rgba(255,59,48,0.1)")).toEqual({ red: 4 });
-  expect(countFamilies("#00D26A #00ff88 #FF9500 #FFCC00 #FFD95A")).toEqual({ neon: 2, orange: 3 });
+  expect(countFamilies("#00D26A #00ff88 #10b981 #FF9500 #FFCC00 #FFD95A #ffd21a")).toEqual({ neon: 3, orange: 4 });
+  expect(countFamilies('className="text-red-300 hover:border-amber-400/50 bg-emerald-400/[0.06] !border-red-400/80 group-[.x]:text-lime-200"')).toEqual({ palette: 5 });
+  expect(countFamilies('className="text-warn border-ok/40 bg-white/5 text-red text-sm/6"')).toEqual({});
   expect(countFamilies("text-honor bg-live/15 border-ok/50 var(--tls-warn) rgb(var(--tls-live-rgb) / 0.2) #FF3B3")).toEqual({});
 });
 

@@ -86,13 +86,13 @@
     "components/tv/tv.css": {
       "grund": "TV: Gold-Glanz der Ehren-Momente (Pokal, Sieger, Platz 1) - Zustände nehmen Rollen.",
       "zahlen": {
-        "gold": 6
+        "gold": 1
       }
     },
     "index.css": {
       "grund": "Level-Rahmen, Kronen-, Profil- und Ehren-Glanz (Sammel-Optik, Ehre); dazu der Knopf Gefahr (tls-btn--danger), der bis zum App-Paket gleich mit mobile/src/theme.ts bleibt. Die Zustände nehmen Rollen.",
       "zahlen": {
-        "gold": 46,
+        "gold": 12,
         "red": 17
       }
     },
@@ -108,6 +108,12 @@
       "zahlen": {
         "red": 4,
         "orange": 4
+      }
+    },
+    "pages/admin/AdminPrizesPage.jsx": {
+      "grund": "Art-Farbe „Team“ (Grün) neben Person (Cyan) - Unterscheidung der Empfänger bzw. verknüpften Teams, kein Zustand.",
+      "zahlen": {
+        "neon": 2
       }
     },
     "pages/admin/achievements/CatalogTab.jsx": {
@@ -155,10 +161,22 @@
         "gold": 1
       }
     },
+    "pages/public/NewsDetailPage.jsx": {
+      "grund": "Art-Farbe „Team“ (Grün) neben Person (Cyan) - Unterscheidung der Empfänger bzw. verknüpften Teams, kein Zustand.",
+      "zahlen": {
+        "neon": 1
+      }
+    },
     "pages/user/DashboardPage.jsx": {
       "grund": "Glanz hinter Vereinsmitgliedern (Ehre, Mitgliedschaft) als rgba im Verlauf.",
       "zahlen": {
         "gold": 1
+      }
+    },
+    "pages/user/DocumentRows.jsx": {
+      "grund": "Farben je Dokument-Art (Satzung, Protokoll, Leitfaden, Vorlage, Konto …) - reine Unterscheidung der Arten, kein Zustand.",
+      "zahlen": {
+        "neon": 4
       }
     },
     "pages/user/YearReviewPage.jsx": {
