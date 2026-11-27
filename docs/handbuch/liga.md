@@ -718,8 +718,9 @@ neue Liga an. Spielt eine Solo-Liga das Spiel, lässt sich **Einzelspieler erlau
 4. **Entfernen** nimmt die Person wieder heraus, solange der Spielplan nicht fest ist. Selbst abmelden kann sich die Person nicht – das
    macht die Leitung, wie beim Co-Team.
 
-**Dich selbst** teilst du nicht zu – das macht eine andere Person aus der Leitung. Nur der **Superadmin** darf als Notausnahme mit einem
-Grund (mindestens fünf Zeichen); er steht im Protokoll.
+**Dich selbst** teilst du nicht zu – das macht eine andere Person aus der Leitung. Im Dialog steht dein eigenes Konto darum gleich grau
+mit „Dich selbst teilt nur der Superadmin mit Grund zu“. Nur der **Superadmin** darf als Notausnahme mit einem Grund (mindestens fünf
+Zeichen) über den Weg für Notausnahmen; er steht im Protokoll.
 
 **Was noch folgt** (die Seite sagt es an der Stelle):
 

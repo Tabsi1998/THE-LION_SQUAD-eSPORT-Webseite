@@ -15,7 +15,7 @@ daraus die Antwort.
 from __future__ import annotations
 
 import copy
-from contextlib import AsyncExitStack
+from contextlib import AsyncExitStack, nullcontext
 from dataclasses import dataclass
 from datetime import date, datetime, timedelta, timezone
 
@@ -688,10 +688,20 @@ async def update_league(db, league: dict, body: dict) -> tuple[dict, list[str]]:
     changed = sorted(key for key, value in updates.items() if league.get(key) != value)
     if changed:
         updates["updated_at"] = _now()
+        # Solo-Liga wechselt das Spiel (#1629): unter der Sperre des neuen Spiels frisch geprüft und geschrieben - gegen gleichzeitiges
+        # Ausschalten von „Einzelspieler erlaubt“ (``game_routes.update_game``, dieselbe Sperre).
+        solo_switch = "game_id" in updates and league_participants.is_solo(league)
         try:
-            await db.leagues.update_one({"id": league["id"]}, {"$set": updates})
+            async with (mutation_lock(db, game_solo_resource(updates["game_id"])) if solo_switch else nullcontext()):
+                if solo_switch:
+                    problem = league_participants.game_problem(await _game(db, updates["game_id"]), league_participants.SOLO)
+                    if problem:
+                        raise LeagueProblem(problem)
+                await db.leagues.update_one({"id": league["id"]}, {"$set": updates})
         except DuplicateKeyError:
             raise LeagueProblem("Diese Kurzadresse ist schon vergeben.", 409) from None
+        except MutationLockBusy:
+            raise LeagueProblem(GAME_SOLO_BUSY, 409) from None
     if clear_mode_order:
         # Die Modi gehören zum alten Spiel; den Map-Pool zeigt die Season danach als „anderes Spiel“ (``stale``).
         await db.league_seasons.update_many({"league_id": league["id"], "game_mode_order.0": {"$exists": True}},

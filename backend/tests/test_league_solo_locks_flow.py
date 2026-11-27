@@ -145,6 +145,28 @@ async def test_no_staff_check_in_in_a_solo_staffel_either(flow):
 
 
 @pytest.mark.asyncio
+async def test_no_check_in_through_the_status_of_the_registration(flow):
+    """Zweite Nachprüfung: Der Statuswechsel der Anmeldung war der dritte Weg zum Check-in - ``checked_in`` und ``no_show`` gibt es in der
+    Solo-Staffel erst mit dem Spielbetrieb. Freigeben, Ablehnen und Warteliste bleiben."""
+    world = await solo_world(flow)
+    player = await flow.add_user(name="Duellant Eins")
+    reg = (await assign_person(flow, world["tournament"], player)).json()["registration"]
+    url = f"/api/tournaments/{world['tournament']['id']}/registrations/{reg['id']}"
+
+    checked = await flow.patch(url, json={"status": "checked_in"})
+    missing = await flow.patch(url, json={"status": "no_show"})
+    stored = await flow.db.tournament_registrations.find_one({"id": reg["id"]}, {"_id": 0, "status": 1})
+    waiting = await flow.patch(url, json={"status": "waitlist"})
+    back = await flow.patch(url, json={"status": "approved"})
+
+    assert checked.status_code == 409 and checked.json()["detail"] == league_participants.OPERATIONS_FOLLOW
+    assert missing.status_code == 409 and missing.json()["detail"] == league_participants.OPERATIONS_FOLLOW
+    assert stored["status"] == "approved"
+    assert waiting.status_code == 200, waiting.text
+    assert back.status_code == 200, back.text
+
+
+@pytest.mark.asyncio
 async def test_gegenprobe_team_staffel_check_in_is_untouched(flow):
     world = await solo_world(flow)
     team = await team_world(flow, world)
@@ -188,6 +210,16 @@ async def test_the_lead_assigns_herself_only_as_an_emergency_with_a_reason(flow)
     assert reasoned.status_code == 200, reasoned.text
     logged = await flow.db.audit_logs.find_one({"action": "league.conflict.override"}, {"_id": 0})
     assert logged["data"]["action"] == "league.player.assign" and logged["data"]["reason"].startswith("Probe-Spiel")
+
+
+@pytest.mark.asyncio
+async def test_the_dialog_marks_the_own_account_before_the_click(flow):
+    world = await solo_world(flow)
+
+    found = (await flow.get(f"/api/tournaments/{world['tournament']['id']}/squad-candidates", params={"q": "Turnierleitung"})).json()
+
+    own = [row for row in found["people"] if row["id"] == world["admin"]["id"]]
+    assert own and own[0]["problems"] == ["Dich selbst teilt nur der Superadmin mit Grund zu – über den Weg für Notausnahmen."]
 
 
 def squad_self_detail() -> str:
@@ -235,4 +267,23 @@ async def test_switching_off_and_creating_a_solo_league_at_once_never_both_pass(
     stored = await flow.db.games.find_one({"id": game["id"]})
     solo = await flow.db.leagues.count_documents({"game_id": game["id"], "participant_kind": "solo"})
     assert not (off.status_code == 200 and league.status_code == 200), (off.text, league.text)
+    assert not (stored.get("supports_solo") is False and solo), "Spiel ohne Einzelspieler mit Solo-Liga"
+
+
+@pytest.mark.asyncio
+async def test_switching_off_and_moving_a_solo_league_onto_the_game_never_both_pass(flow):
+    """Spielwechsel einer Solo-Liga (``update_league``) unter derselben Sperre wie das Ausschalten am Ziel-Spiel."""
+    flow.act_as(await flow.add_staff())
+    game = await make_game(flow)
+    target = await make_game(flow, name="Ziel Duell", slug="ziel-duell")
+    league = await make_league(flow, game, "solo", "Duell Liga")
+
+    off, moved = await asyncio.gather(
+        flow.patch(f"/api/games/{target['id']}", json={"supports_solo": False}),
+        flow.patch(f"{ADMIN}/{league['id']}", json={"game_id": target["id"]}),
+    )
+
+    stored = await flow.db.games.find_one({"id": target["id"]})
+    solo = await flow.db.leagues.count_documents({"game_id": target["id"], "participant_kind": "solo"})
+    assert not (off.status_code == 200 and moved.status_code == 200), (off.text, moved.text)
     assert not (stored.get("supports_solo") is False and solo), "Spiel ohne Einzelspieler mit Solo-Liga"

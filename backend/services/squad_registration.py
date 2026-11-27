@@ -504,6 +504,10 @@ PERSON_FIELDS = {"_id": 0, "id": 1, "username": 1, "display_name": 1, "avatar_ur
 PERSON_SEARCH_LIMIT = 30
 
 
+# Im Dialog vorab (#1629): Die eigene Zeile ist gesperrt - die Notausnahme läuft wie beim Team-Weg nur über die API mit Grund.
+SELF_ASSIGN_ROW = "Dich selbst teilt nur der Superadmin mit Grund zu – über den Weg für Notausnahmen."
+
+
 def person_name(person: dict | None) -> str:
     return str((person or {}).get("display_name") or (person or {}).get("username") or "Diese Person").strip()
 
@@ -568,7 +572,7 @@ def _check_solo_staffel(tournament: dict) -> None:
         raise SquadAssignError(409, POSTSEASON_ASSIGN)
 
 
-async def person_candidates(db, tournament: dict, query: str | None) -> dict:
+async def person_candidates(db, tournament: dict, query: str | None, actor: dict | None = None) -> dict:
     """Für den Dialog „Spieler zuteilen“: Konten nach Name (ohne E-Mail), je Person die Gründe, warum sie (noch) nicht geht, dazu
     Alter, Plattform und Spiel-ID als Hinweis - wie beim Co-Team, nur für eine Person. Ohne Suchtext keine Liste."""
     from services.query_filters import safe_regex
@@ -591,6 +595,8 @@ async def person_candidates(db, tournament: dict, query: str | None) -> dict:
     rows = []
     for person in people:
         problems = person_problems(person, tournament, taken=taken, seats_taken=seats, other_staffel=other)
+        if actor and person.get("id") == actor.get("id"):
+            problems.append((403, SELF_ASSIGN_ROW))
         alone = {"id": None, "name": person_name(person), "member_ids": [person["id"]]}
         rows.append({
             "id": person["id"], "username": person.get("username"), "display_name": person_name(person), "avatar_url": person.get("avatar_url"),

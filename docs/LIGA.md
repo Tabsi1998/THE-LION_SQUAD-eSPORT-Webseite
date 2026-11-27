@@ -5425,7 +5425,8 @@ je Liga N, auch nach der ersten Staffel.
   neu mischen, Nachricht an die Person, Spiel-ID für die Season festhalten (`league_roster.after_assign` mit der Person als Kader). Ein
   Co-Team in einer Solo-Staffel oder eine Person in einer Team-Staffel: 400 mit Satz. **Sich selbst** teilt die Leitung nicht zu (403);
   der Superadmin nur als Notausnahme mit `conflict_reason` (mindestens fünf Zeichen), im Protokoll `league.conflict.override` - wie bei
-  der eigenen Anmeldung (#2245).
+  der eigenen Anmeldung (#2245). Die Suche sperrt die eigene Zeile vorab mit „Dich selbst teilt nur der Superadmin mit Grund zu …“.
+  Wechselt eine Solo-Liga das Spiel, laufen Prüfung und Schreiben unter der Sperre des neuen Spiels (`game_solo_resource`).
 - `DELETE …/squad-registrations/{id}` nimmt auch eine Person zurück, solange sie in keinem festen Spiel steht (`league.player.remove`).
   Selbst abmelden (`DELETE …/registrations/{id}`) kann sich die Person nicht: 403 „Eine zugeteilte Person nimmt nur die Leitung aus der
   Staffel.“ (wie beim Co-Team).
@@ -5436,7 +5437,7 @@ je Liga N, auch nach der ersten Staffel.
 | Weg | Sperre | folgt in |
 | --- | --- | --- |
 | Selbstanmeldung als Spieler, Eingang, Los, Nachmeldung | kein Anmeldefenster, kein Antrag; die Verwaltung zeigt den Satz statt der Abschnitte | P2 (S7, S8) |
-| Spielbetrieb: Check-in, Veto, Melden, Vorfälle, Strafen | Status `live`, `paused`, `completed`, `results_published` einer Solo-Staffel: 400 (`staffel_guard.staffel_status_problem`); „Liga starten“ gesperrt mit Satz. Ein **fester Spielplan** entsteht auf keinem Weg (`stages/{id}/generate` ohne `preview`, `bracket/from-format` mit `preview=false`, `bracket/apply`: 400, `staffel_guard.solo_fixed_plan_problem`), die Vorschau bleibt. **Check-in** selbst (`POST …/checkin`) und durch die Leitung (`…/registrations/{id}/checkin`): 409 | P3 |
+| Spielbetrieb: Check-in, Veto, Melden, Vorfälle, Strafen | Status `live`, `paused`, `completed`, `results_published` einer Solo-Staffel: 400 (`staffel_guard.staffel_status_problem`); „Liga starten“ gesperrt mit Satz. Ein **fester Spielplan** entsteht auf keinem Weg (`stages/{id}/generate` ohne `preview`, `bracket/from-format` mit `preview=false`, `bracket/apply`: 400, `staffel_guard.solo_fixed_plan_problem`), die Vorschau bleibt. **Check-in** selbst (`POST …/checkin`), durch die Leitung (`…/registrations/{id}/checkin`) und über den Status der Anmeldung (`PATCH …/registrations/{id}` mit `checked_in` oder `no_show`): 409; Freigeben, Ablehnen und Warteliste bleiben | P3 |
 | Folge-Season, Startrechte, Auf- und Abstieg je Person | Vorschau und Anlegen nennen den Satz als ersten Grund (`league_successor.plan`); `PUT …/start-rights`: 409; der Knopf „Neue Season aus …“ ist gesperrt mit Satz | P4 (S9) |
 | App | unverändert | A9 |
 

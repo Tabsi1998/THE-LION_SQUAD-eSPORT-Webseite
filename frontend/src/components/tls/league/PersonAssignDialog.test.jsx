@@ -78,6 +78,21 @@ test("ein Fehler des Servers steht im Dialog, die Suche läuft neu", async () =>
   expect(screen.getByTestId("person-assign-dialog")).toBeInTheDocument();
 });
 
+test("das eigene Konto der Leitung ist vorab gesperrt und sagt warum - kein 403 erst nach dem Klick", async () => {
+  const own = "Dich selbst teilt nur der Superadmin mit Grund zu – über den Weg für Notausnahmen.";
+  apiMock.get.mockResolvedValue({ data: { ...PEOPLE, people: [
+    { id: "lead", display_name: "Ligaleitung", username: "leitung", problems: [own], notes: [], players: [] },
+  ] } });
+  render(<PersonAssignDialog tournament={TOURNAMENT} />);
+
+  fireEvent.click(screen.getByTestId("person-assign-open"));
+  fireEvent.change(screen.getByTestId("person-assign-search"), { target: { value: "Ligaleitung" } });
+
+  expect(await screen.findByTestId("person-assign-person-lead")).toBeDisabled();
+  expect(screen.getByText(own)).toBeInTheDocument();
+  expect(screen.getByTestId("person-assign-confirm")).toBeDisabled();
+});
+
 test("ohne Treffer ein klarer Satz", async () => {
   apiMock.get.mockResolvedValue({ data: { ...PEOPLE, people: [] } });
   render(<PersonAssignDialog tournament={TOURNAMENT} />);

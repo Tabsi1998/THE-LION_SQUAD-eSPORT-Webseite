@@ -72,6 +72,8 @@ from routes.tournament_router import router
 
 
 REGISTRATION_CHECKIN_STATUSES = {"approved", "checked_in", "no_show"}
+# Solo-Staffel (#1629): Status, die es erst mit dem Spielbetrieb für Spieler gibt (P3).
+SOLO_OPERATING_REGISTRATION_STATUSES = frozenset({"checked_in", "no_show"})
 logger = logging.getLogger("tls.tournament_registration")
 
 
@@ -1148,6 +1150,9 @@ async def update_registration(tid: str, reg_id: str, body: RegistrationUpdate,
     # Setzplatz (#2111, TA15): leer heißt „kein Setzplatz“ - deshalb darf er ausdrücklich null sein.
     if "seed" in requested:
         updates["seed"] = requested["seed"]
+    if updates.get("status") in SOLO_OPERATING_REGISTRATION_STATUSES and league_participants.is_solo_staffel(tournament_doc):
+        # Solo-Staffel (#1629, P1): Check-in und „nicht erschienen“ gehören zum Spielbetrieb für Spieler (P3) - auch über den Status.
+        raise HTTPException(status_code=409, detail=league_participants.OPERATIONS_FOLLOW)
     if updates.get("status") in REMOVAL_KINDS:
         # Austritt und Disqualifikation (#1553) bauen den Baum um - das geht nur über den Umbauplan mit Bestätigung.
         raise HTTPException(
@@ -1476,7 +1481,7 @@ async def list_squad_candidates(tid: str, q: str | None = None, me: dict = Depen
         raise HTTPException(status_code=404, detail="Turnier nicht gefunden")
     if league_participants.is_solo_staffel(tournament):
         try:
-            return await squad_registration.person_candidates(db, tournament, q)
+            return await squad_registration.person_candidates(db, tournament, q, me)
         except squad_registration.SquadAssignError as refusal:
             raise HTTPException(status_code=refusal.status_code, detail=refusal.detail)
     if not squad_registration.is_league_tournament(tournament):
