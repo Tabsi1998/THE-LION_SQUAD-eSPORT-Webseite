@@ -5,6 +5,7 @@ import { countdown } from "@/lib/tvCalls";
 import { clockText, packLane } from "@/lib/tvDayPlan";
 import { STATION_STATES, pageOf, stationCounts, stationGrid } from "@/lib/tvStationGrid";
 import { spotlightParts } from "@/lib/tvLive";
+import { TvPill } from "./TvParts";
 import { useTv, useTvArea } from "./TvScreen";
 import { useServerTick } from "./TvTreeNode";
 
@@ -98,7 +99,7 @@ function StationCell({ entry, now }) {
     <div className={`tv-hall-station tv-hall-station--${entry.state}`} data-testid="tv-station" data-state={entry.state} data-station={entry.station.id}>
       <div className="tv-hall-station__top">
         <b className="tv-hall-station__name font-heading">{entry.station.name || entry.station.label || entry.station.id}</b>
-        <span className={`tv-pill tv-t-meta tv-pill--${state.tone}`}>{state.label}</span>
+        <TvPill kind={state.kind} testId="tv-station-state">{state.label}</TvPill>
       </div>
       {entry.detail ? (
         <>
