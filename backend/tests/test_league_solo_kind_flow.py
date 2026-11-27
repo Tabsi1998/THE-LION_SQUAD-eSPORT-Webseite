@@ -146,3 +146,36 @@ async def test_a_solo_season_has_no_self_registration_yet(flow):
 
     assert refused.status_code == 422 and refused.json()["detail"] == league_participants.APPLICATIONS_FOLLOW
     assert later.status_code == 422 and later.json()["detail"] == league_participants.APPLICATIONS_FOLLOW
+
+
+@pytest.mark.asyncio
+async def test_the_readiness_of_a_solo_season_warns_that_the_match_flow_follows(flow):
+    """Veröffentlichen bleibt erlaubt (Nr. 297) - „Was fehlt noch?“ warnt aber deutlich, bis der Spielbetrieb für Spieler steht."""
+    flow.act_as(await flow.add_staff())
+    game = await make_game(flow)
+    solo = await make_league(flow, game, "solo", "Duell Liga")
+    team = await make_league(flow, game, None, "Team Liga")
+    solo_season = (await flow.post(f"{ADMIN}/{solo['id']}/seasons", json=SEASON)).json()
+    team_season = (await flow.post(f"{ADMIN}/{team['id']}/seasons", json=SEASON)).json()
+
+    solo_check = (await flow.get(f"{ADMIN}/seasons/{solo_season['id']}/readiness")).json()
+    team_check = (await flow.get(f"{ADMIN}/seasons/{team_season['id']}/readiness")).json()
+
+    assert solo_check["warnings"][0] == {"code": "solo_operations_follow", "text": league_participants.READINESS_FOLLOWS}
+    assert solo_check["warnings"][0]["text"].startswith("Solo-Liga: Spielbetrieb folgt – Spiele lassen sich noch nicht austragen.")
+    # Keine Sperre: ein Hinweis, kein Problem - die Probleme sind dieselben wie in der Team-Liga.
+    assert [row["code"] for row in solo_check["problems"]] == [row["code"] for row in team_check["problems"]]
+    assert "solo_operations_follow" not in [row["code"] for row in team_check["warnings"]]
+
+
+@pytest.mark.asyncio
+async def test_a_solo_season_can_still_be_published(flow):
+    flow.act_as(await flow.add_staff())
+    game = await make_game(flow)
+    solo = await make_league(flow, game, "solo", "Duell Liga")
+    season = (await flow.post(f"{ADMIN}/{solo['id']}/seasons", json=SEASON)).json()
+    # Was eine Team-Season genauso bräuchte (Pool, Regelwerk, Staffel), umgeht hier der Superadmin mit Grund - die Solo-Warnung hält nichts auf.
+    published = await flow.patch(f"{ADMIN}/seasons/{season['id']}", json={"visibility": "members", "readiness_override_reason": "Probe ohne Pool"})
+
+    assert published.status_code == 200, published.text
+    assert published.json()["visibility"] == "members"

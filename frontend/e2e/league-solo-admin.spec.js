@@ -87,6 +87,9 @@ async function mockServer(page, { staffel = {} } = {}) {
     return route.fulfill({ contentType: "application/json", body: JSON.stringify(LIST) });
   });
   await page.route("**/api/admin/leagues/seasons/s1", json(SEASON_PAGE));
+  // „Was fehlt noch?“ einer Solo-Season (Nr. 297): Veröffentlichen geht, die Warnung steht deutlich da.
+  await page.route("**/api/admin/leagues/seasons/s1/readiness", json({ ok: true, superadmin: true, max_maps: 3, total: null, requirements: [], problems: [],
+    warnings: [{ code: "solo_operations_follow", text: "Solo-Liga: Spielbetrieb folgt – Spiele lassen sich noch nicht austragen. Veröffentlichen geht, die Staffeln starten aber erst, wenn Check-in, Veto und Melden für Spieler fertig sind." }] }));
   await page.route("**/api/tournaments/t1/registrations", json(PERSONS));
   await page.route("**/api/tournaments/t1/matches-v2", json([]));
   await page.route("**/api/tournaments/t1/squad-candidates**", json(PEOPLE));
@@ -146,10 +149,15 @@ for (const [width, height] of [[390, 844], [1440, 900]]) {
     await expect.poll(() => calls.find((row) => row.url.endsWith("/admin/leagues"))?.body).toEqual({ name: "Team-Liga Zwei", game_id: "g2", description: null });
   });
 
-  test(`Solo-Season (${width} px): Art im Kopf, Teamgröße fest, Anmeldung folgt`, async ({ page }) => {
+  test(`Solo-Season (${width} px): Art im Kopf, Warnung in „Was fehlt noch?“, Teamgröße fest, Anmeldung folgt`, async ({ page }) => {
     await page.setViewportSize({ width, height });
     await mockServer(page);
-    await page.goto("/admin/leagues/seasons/s1#spielbetrieb");
+    await page.goto("/admin/leagues/seasons/s1");
+    await expect(page.getByTestId("season-readiness-loud-solo_operations_follow")).toContainText("Solo-Liga: Spielbetrieb folgt");
+    await expect(page.getByTestId("season-readiness-state")).toContainText("Bereit zur Veröffentlichung");
+    await noSideScroll(page);
+    await shot(page, `season-ueberblick-solo-${width}`);
+    await page.getByTestId("season-tab-spielbetrieb").click();
     await expect(page.getByTestId("season-head")).toContainText("Probe Duell · Spieler (1 gegen 1)");
     await expect(page.getByTestId("season-form-team-size")).toBeDisabled();
     await noSideScroll(page);

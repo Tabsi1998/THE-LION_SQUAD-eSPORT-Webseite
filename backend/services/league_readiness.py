@@ -9,7 +9,7 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 
-from services import game_maps, game_modes, league_late, league_pool_check, league_veto_fit, league_veto_rules, map_pools
+from services import game_maps, game_modes, league_late, league_participants, league_pool_check, league_veto_fit, league_veto_rules, map_pools
 from services.league_scope import ONLY_LEAGUE
 from services.log_safe import log_safe
 from services.permissions import is_superadmin
@@ -169,6 +169,9 @@ async def _veto_preset_items(db, season: dict, divisions: list[dict], pool: dict
 async def season_readiness(db, league: dict, season: dict, user: dict | None = None) -> dict:
     """Die Prüfung für ``season`` (auch mit ungespeicherten Änderungen). Siehe Modulkopf und docs/LIGA.md."""
     items: list[tuple[str, dict]] = []
+    if league_participants.is_solo(league):
+        # Solo-Liga (#1629, Nr. 297): ganz oben, damit niemand eine Liga veröffentlicht, ohne zu wissen, dass sie noch nicht spielt.
+        items.append(("warning", _item("solo_operations_follow", league_participants.READINESS_FOLLOWS)))
     game = await db.games.find_one({"id": league.get("game_id")}, {"_id": 0}) if league.get("game_id") else None
     divisions = await league_pool_check.divisions_of(db, season["id"])
     raw = await map_pools.current(db, "league_season", season["id"])
