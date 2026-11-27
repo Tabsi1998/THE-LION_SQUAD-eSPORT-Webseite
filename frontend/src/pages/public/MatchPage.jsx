@@ -829,7 +829,7 @@ function Pill({ children }) {
 
 function ResultSide({ participant, match, score, isWinner }) {
   return (
-    <div className={`border rounded-sm bg-[#0A0A0A] p-4 ${isWinner ? "border-[#29B6E8]/70 shadow-[0_0_18px_rgba(41,182,232,0.18)]" : "border-white/10"}`}>
+    <div className={`min-w-0 border rounded-sm bg-[#0A0A0A] p-4 ${isWinner ? "border-[#29B6E8]/70 shadow-[0_0_18px_rgba(41,182,232,0.18)]" : "border-white/10"}`}>
       <div className="font-heading text-lg font-bold uppercase truncate">{slotName(participant?.display_name, participant, match)}</div>
       {participant?.team && <div className="mt-1 text-xs text-[#29B6E8] truncate">[{participant.team.tag}] {participant.team.name}</div>}
       {/* Gastteam (#1665): „Gast · Verein/Schule“ - der Name bricht um, statt abgeschnitten zu werden. */}
