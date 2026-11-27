@@ -152,6 +152,15 @@ test.describe("Schrift-Treppe", () => {
   // rechts daneben - der Name hat so Platz und bricht nur zwischen Wörtern, nie Buchstabe für Buchstabe. Nur ein Wort,
   // das allein breiter ist als die Spalte („xX_Nebelwolf_Xx.Rudel“), darf brechen.
   const UNBREAKABLE = ["xX_Nebelwolf_Xx.Rudel"];
+  // Toleranzen der Wortmessung - gemessen wird im selben Browser in derselben Schrift, nur zwei Dinge schwanken:
+  // - Zeichen außerhalb der Teilmenge der Web-Schrift (das „ś“ in „Wiśniewska“, fonts.css: unicode-range) kommen aus der
+  //   Ersatzschrift des Systems. Die ist unter Linux (CI) ein paar Pixel breiter als unter Windows: „Wiśniewska-“ hat
+  //   bei 320 px unter Windows 94,3 px in einer Spalte von 94,6 px, unter Linux etwas mehr. „Breiter als die Spalte“ heißt
+  //   darum: mehr als FALLBACK_PX darüber. Gesucht sind Spalten, die viel zu schmal sind (vorher 35 px für Wörter mit 90 px).
+  // - Ein Wort, das nur um Bruchteile eines Pixels passt, kann durch Rundung im Zeilenumbruch doch brechen. „Passt allein
+  //   in die Spalte“ heißt darum: mindestens SUBPIXEL_PX Luft. Jedes solche Wort darf nicht gebrochen werden.
+  const FALLBACK_PX = 4;
+  const SUBPIXEL_PX = 1;
   for (const width of [320, 390, 767]) {
     test(`Jahreswertung bei ${width} px: Namen in ganzen Wörtern, Etiketten unter dem Namen`, async ({ page }) => {
       await page.setViewportSize({ width, height: 844 });
@@ -160,7 +169,7 @@ test.describe("Schrift-Treppe", () => {
       await page.goto(`/seasons/${SEASON.slug}`);
       await expect(page.getByTestId("season-item-u-5")).toBeVisible();
       await page.evaluate(() => document.fonts.ready);
-      const rows = await page.evaluate((ids) => ids.map((id) => {
+      const rows = await page.evaluate(({ ids, fallback, subpixel }) => ids.map((id) => {
         const row = document.querySelector(`[data-testid="season-item-${id}"]`);
         const name = row.querySelector(".tls-wrap--name");
         const facts = row.querySelector(`[data-testid="season-item-facts-${id}"]`);
@@ -185,8 +194,8 @@ test.describe("Schrift-Treppe", () => {
           const alone = probe.getBoundingClientRect().width;
           probe.remove();
           const lines = new Set([...range.getClientRects()].map((rect) => Math.round(rect.top))).size;
-          if (alone <= nameBox.width && lines > 1) broken.push(word.trim());
-          if (alone > nameBox.width + 1) tooWide.push(word.trim());
+          if (alone <= nameBox.width - subpixel && lines > 1) broken.push(word.trim());
+          if (alone > nameBox.width + fallback) tooWide.push(word.trim());
         }
         return {
           id,
@@ -196,7 +205,7 @@ test.describe("Schrift-Treppe", () => {
           below: factsBox ? factsBox.top >= nameBox.bottom - 1 : null,
           right: factsBox ? factsBox.left >= nameBox.right - 1 : null,
         };
-      }), STANDINGS.map((row) => row.user_id));
+      }), { ids: STANDINGS.map((row) => row.user_id), fallback: FALLBACK_PX, subpixel: SUBPIXEL_PX });
       for (const row of rows) {
         expect(row.broken, `${row.id}: Wörter mitten im Wort gebrochen`).toEqual([]);
         expect(row.tooWide.filter((word) => !UNBREAKABLE.includes(word)), `${row.id}: Wörter breiter als die Namensspalte (${row.nameWidth} px)`).toEqual([]);
@@ -229,7 +238,7 @@ test.describe("Schrift-Treppe", () => {
     expect(await badge.evaluate((node) => getComputedStyle(node).fontSize)).toBe("12px");
     await page.evaluate(() => document.fonts.ready);
     for (const [index, player] of PLAYERS.entries()) {
-      const facts = await page.getByTestId(`tournament-participant-r${index + 1}`).evaluate((row, name) => {
+      const facts = await page.getByTestId(`tournament-participant-r${index + 1}`).evaluate((row, { name, subpixel }) => {
         const node = [...row.querySelectorAll("span")].find((span) => span.textContent === name);
         const linesOf = (range) => new Set([...range.getClientRects()].map((rect) => Math.round(rect.top))).size;
         const all = document.createRange();
@@ -249,10 +258,10 @@ test.describe("Schrift-Treppe", () => {
           node.parentElement.append(probe);
           const alone = probe.getBoundingClientRect().width;
           probe.remove();
-          if (alone <= width && linesOf(range) > 1) broken.push(word.trim());
+          if (alone <= width - subpixel && linesOf(range) > 1) broken.push(word.trim());
         }
         return { cut: node.scrollWidth > node.clientWidth + 1 || getComputedStyle(node).textOverflow === "ellipsis", lines: linesOf(all), broken };
-      }, player);
+      }, { name: player, subpixel: SUBPIXEL_PX });
       expect(facts.cut, `Name „${player}“ abgeschnitten`).toBe(false);
       expect(facts.broken, `„${player}“ mitten im Wort gebrochen`).toEqual([]);
       if (["NeonFalke", "LuckyLion", "TurboTom"].includes(player)) expect(facts.lines, `„${player}“ in einer Zeile`).toBe(1);
