@@ -1309,7 +1309,7 @@ export default function LayoutStep({ view, busy, run, ReasonedButton, ChoiceGrou
       <TemplateStatus view={view} busy={busy} run={run} />
       {view.layout_converted && <p className="tls-type-small text-warn" data-testid="shop-layout-converted">Aus den alten Zoll-Positionen umgerechnet - bitte prüfen und speichern.</p>}
       {view.layout_blocked?.length > 0 && (
-        <div className="border border-live/50 bg-live/10 text-live rounded-sm p-2 tls-type-small" role="alert" data-testid="shop-layout-blocked">
+        <div className="border border-warn/50 bg-warn/10 text-warn rounded-sm p-2 tls-type-small" role="alert" data-testid="shop-layout-blocked">
           <div className="font-bold">Nicht bestellbar: diese alten Platzierungen lassen sich nicht abbilden. Bitte die Flächen hier neu setzen und speichern.</div>
           <ul className="mt-1 space-y-0.5">{view.layout_blocked.map((line) => <li key={line}>{line}</li>)}</ul>
         </div>

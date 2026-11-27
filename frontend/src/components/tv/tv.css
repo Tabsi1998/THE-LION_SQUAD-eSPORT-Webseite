@@ -734,8 +734,8 @@
 }
 .tv-gold-path[data-drawn="1"] { stroke-dashoffset: 0; }
 .tv-trail { fill: none; stroke: #c8f1ff; stroke-width: 5px; stroke-linecap: round; filter: drop-shadow(0 0 5px rgba(41, 182, 232, 1)); }
-.tv-trail--drop { stroke: #ffa3a8; filter: drop-shadow(0 0 5px rgb(var(--tls-live-rgb, 255 59 48) / 0.9)); }
-.tv-drop-line { fill: none; stroke: rgb(var(--tls-live-rgb, 255 59 48) / 0.6); stroke-width: 3px; stroke-dasharray: 9 9; opacity: 0; transition: opacity 0.4s; }
+.tv-trail--drop { stroke: rgb(var(--tls-quiet-rgb)); filter: drop-shadow(0 0 5px rgb(255 255 255 / 0.35)); }
+.tv-drop-line { fill: none; stroke: rgb(255 255 255 / 0.5); stroke-width: 3px; stroke-dasharray: 9 9; opacity: 0; transition: opacity 0.4s; }
 .tv-rider { position: absolute; left: 0; top: 0; z-index: 3; pointer-events: none; will-change: transform, opacity; }
 .tv-rider__face {
   position: absolute;

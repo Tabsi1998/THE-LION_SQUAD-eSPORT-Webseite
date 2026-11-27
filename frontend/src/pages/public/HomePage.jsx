@@ -492,7 +492,7 @@ function LiveBanner({ state }) {
   return (
     <div className="relative bg-gradient-to-r from-live via-live/80 to-live border-b border-live/40">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3 flex items-center gap-4 flex-wrap">
-        <div className="flex items-center gap-2 text-white">
+        <div className="flex items-center gap-2 text-[#0A0A0A]">
           <Radio className="w-4 h-4 animate-pulse" />
           <span className="tls-type-label">LIVE JETZT</span>
         </div>

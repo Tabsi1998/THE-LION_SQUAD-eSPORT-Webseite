@@ -84,6 +84,36 @@ test("die alten Farben stehen nur noch an den begründeten Ausnahmen - je Datei 
   expect(problems).toEqual([]);
 }, 30_000);
 
+// Rot heißt nur „läuft gerade“ und Löschen: Ein Fehler- oder Problemzweig, der `live` nimmt, ist falsch - das ist `warn`.
+// Erkannt wird nur der eindeutige Fall `failed ? "… text-live …"` bzw. `error: "… border-live …"`, damit der Wächter nicht
+// bei jedem Lösch-Knopf neben einem `toast.error` anschlägt.
+const LIVE_FOR_PROBLEM = /\b(?:\w*[Ee]rrors?|failed|fail|problems?|invalid|short|overdue|conflict)\b[\w.?)\]"'\s=!<>]{0,24}?(?:\?|:|&&)\s*(?:<[^>"]*className=)?["'`][^"'`]*\b(?:text|bg|border)-live\b/g;
+
+/** Stellen, an denen ein Fehler- oder Problemzweig die Rolle `live` (Rot) nimmt. */
+export function liveForProblems(text) {
+  return (text.match(LIVE_FOR_PROBLEM) || []).map((hit) => hit.replace(/\s+/g, " ").slice(0, 80));
+}
+
+test("Gegenprobe: Fehlerzweige mit Rot fallen auf, Löschen, Live und Fehler in Orange nicht", () => {
+  expect(liveForProblems('{failed && <p className="text-live">x</p>}')).toHaveLength(1);
+  expect(liveForProblems('const TONE = { error: "border-live/50 text-live", ok: "text-ok" };')).toHaveLength(1);
+  expect(liveForProblems('${short ? "text-live" : "text-white/55"}')).toHaveLength(1);
+  expect(liveForProblems('${tone === "problem" ? "border-live/40 bg-live/10" : ""}')).toHaveLength(1);
+  expect(liveForProblems('{consentError ? <div className="text-live">')).toHaveLength(1);
+  expect(liveForProblems('{error ? <span className="text-warn">x</span> : null}')).toEqual([]);
+  expect(liveForProblems('onClick={() => remove(x).catch((e) => toast.error(e))} className="text-live">Entfernen')).toEqual([]);
+  expect(liveForProblems('${running ? "border-live/40 text-live" : "border-white/10"}')).toEqual([]);
+});
+
+test("kein Fehler- oder Problemzweig nimmt Rot (live) - dafür gibt es warn", () => {
+  const problems = [];
+  for (const file of sourceFiles(SRC)) {
+    const rel = path.relative(SRC, file).split(path.sep).join("/");
+    for (const hit of liveForProblems(readFileSync(file, "utf8"))) problems.push(`${rel}: ${hit}`);
+  }
+  expect(problems).toEqual([]);
+}, 30_000);
+
 test("die Grundlinie ist knapp: keine veralteten Einträge, jede Ausnahme mit Grund", () => {
   const found = countAll();
   for (const [file, entry] of Object.entries(BASELINE.dateien)) {

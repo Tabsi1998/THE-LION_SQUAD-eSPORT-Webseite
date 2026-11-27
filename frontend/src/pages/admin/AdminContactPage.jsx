@@ -67,7 +67,7 @@ function SpamCounter({ stats }) {
 const REPLY_DELIVERY = {
   waiting: { text: "wartet auf den Versand", tone: "text-white/60" },
   sent: { text: "versendet", tone: "text-ok" },
-  failed: { text: "Versand gescheitert – die Person hat nichts bekommen", tone: "text-live" },
+  failed: { text: "Versand gescheitert – die Person hat nichts bekommen", tone: "text-warn" },
   skipped: { text: "nicht versendet – der Mailversand ist aus", tone: "text-warn" },
 };
 
@@ -370,7 +370,7 @@ export default function AdminContactPage() {
         </select>
       </div>
 
-      {loadError && <div className="mb-4 border border-live/40 bg-live/10 rounded-sm p-3 tls-type-small" data-testid="contact-load-error">{loadError}</div>}
+      {loadError && <div className="mb-4 border border-warn/40 bg-warn/10 rounded-sm p-3 tls-type-small" data-testid="contact-load-error">{loadError}</div>}
 
       <div className="border border-white/10 bg-[#121212] rounded-sm overflow-hidden">
         <div className="tls-swipe pb-0">

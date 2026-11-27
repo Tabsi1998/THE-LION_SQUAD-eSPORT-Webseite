@@ -39,7 +39,7 @@ function Items({ items, tone, onJump, testId }) {
         const anchor = onJump ? readinessAnchor(item.code) : "";
         return (
           <li key={`${item.code}-${index}`} data-code={item.code}
-            className={`flex flex-wrap items-center justify-between gap-x-3 gap-y-1.5 rounded-sm border px-3 py-2 tls-type-small ${tone === "problem" ? "border-live/40 bg-live/10 text-white" : "border-white/15 bg-white/[0.03] text-white/75"}`}>
+            className={`flex flex-wrap items-center justify-between gap-x-3 gap-y-1.5 rounded-sm border px-3 py-2 tls-type-small ${tone === "problem" ? "border-warn/40 bg-warn/10 text-white" : "border-white/15 bg-white/[0.03] text-white/75"}`}>
             <span className="min-w-[min(100%,14rem)] flex-1 [overflow-wrap:anywhere]">{item.text}</span>
             {anchor ? (
               <button type="button" onClick={() => onJump(anchor)} data-testid={`${testId}-go-${item.code}`}
@@ -62,10 +62,10 @@ export function SeasonReadinessPanel({ readiness, visibility = "off", overrideRe
   const clean = result && result.ok && !result.warnings.length;
   return (
     <FormSection title="Was fehlt noch?" testId={testId}
-      hint="Prüfung vor der Veröffentlichung. Probleme (rot) halten das Veröffentlichen auf, Warnungen nicht. Jeder Punkt führt dorthin, wo du ihn erledigst.">
+      hint="Prüfung vor der Veröffentlichung. Probleme (orange) halten das Veröffentlichen auf, Warnungen nicht. Jeder Punkt führt dorthin, wo du ihn erledigst.">
       <div className="flex flex-wrap items-center justify-between gap-3">
         {result ? (
-          <p className={`inline-flex items-center gap-2 tls-type-small font-semibold ${result.ok ? "text-[#29B6E8]" : "text-live"}`} data-testid={`${testId}-state`} role="status">
+          <p className={`inline-flex items-center gap-2 tls-type-small font-semibold ${result.ok ? "text-[#29B6E8]" : "text-warn"}`} data-testid={`${testId}-state`} role="status">
             {result.ok ? <CheckCircle2 className="w-4 h-4" aria-hidden="true" /> : <ClipboardCheck className="w-4 h-4" aria-hidden="true" />}
             {result.ok ? "Bereit zur Veröffentlichung" : `${result.problems.length === 1 ? "1 Problem" : `${result.problems.length} Probleme`} vor der Veröffentlichung`}
             {result.warnings.length ? <span className="font-normal text-white/55">· {result.warnings.length === 1 ? "1 Warnung" : `${result.warnings.length} Warnungen`}</span> : null}
@@ -138,7 +138,7 @@ export function SeasonPoolMinimum({ seasonId, readiness, canEdit = true, onSaved
             <li key={key || "alle"} className="grid grid-cols-[1fr_auto] items-end gap-2 rounded-sm border border-white/10 bg-[#0A0A0A] px-3 py-2" data-testid={`${testId}-row-${key || "alle"}`}>
               <div className="min-w-0 tls-type-small">
                 <div className="truncate font-semibold text-white">{row.label}</div>
-                <div className={`tls-type-small tabular-nums ${short ? "text-live" : "text-white/55"}`}>{row.have} von mindestens {row.needed} {row.needed === 1 ? "Map" : "Maps"}</div>
+                <div className={`tls-type-small tabular-nums ${short ? "text-warn" : "text-white/55"}`}>{row.have} von mindestens {row.needed} {row.needed === 1 ? "Map" : "Maps"}</div>
               </div>
               {canEdit ? (
                 <TextField label="Mindestens" type="number" min={1} max={50} value={form[key] ?? ""} placeholder={String(row.derived)}
@@ -149,7 +149,7 @@ export function SeasonPoolMinimum({ seasonId, readiness, canEdit = true, onSaved
         })}
       </ul>
       {result.total ? (
-        <p className={`tls-type-small tabular-nums ${result.total.have < result.total.needed ? "text-live" : "text-white/55"}`} data-testid={`${testId}-total`}>
+        <p className={`tls-type-small tabular-nums ${result.total.have < result.total.needed ? "text-warn" : "text-white/55"}`} data-testid={`${testId}-total`}>
           Über alle Modi: {result.total.have} von mindestens {result.total.needed} {result.total.kind === "maps" ? "verschiedenen Maps" : "Maps"}.
         </p>
       ) : null}
