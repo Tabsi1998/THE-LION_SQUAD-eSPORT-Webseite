@@ -67,3 +67,11 @@ test("das Impressum zeigt die gelieferten Werte und den Hinweis, wenn die Kontak
   expect(screen.getAllByText("Otto Obmann").length).toBe(2);
   expect(screen.getByTestId("legal-data-incomplete")).toBeInTheDocument();
 });
+
+test("der Titel kann aus der Verwaltung kommen - er steht, wie er eingetippt wurde, nie GROSS (#1303)", async () => {
+  apiMock.get.mockImplementation(async () => ({ data: { ...PRIVACY, title: "Datenschutz bei Jo" } }));
+  render(<MemoryRouter><PrivacyPage /></MemoryRouter>);
+  const heading = await screen.findByRole("heading", { level: 1, name: "Datenschutz bei Jo" });
+  expect(heading.querySelector(".uppercase")).toBeNull();
+  expect(heading).not.toHaveClass("uppercase");
+});

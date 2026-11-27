@@ -7,7 +7,6 @@ import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { api } from "@/lib/api";
 import { asInstant, viennaDate } from "@/lib/vienna";
 import { SkeletonLines } from "@/components/tls/Skeleton";
-import { ShortCaps } from "@/components/tls/ShortCaps";
 
 // Rechtstexte kommen fertig als Abschnitte vom Backend (#545, eine Quelle für Website und Crawler-Vorschau):
 // Datenschutz aus den Schaltern, die wirklich an sind, Impressum aus den öffentlichen Vereinsdaten. Hier wird
@@ -56,7 +55,7 @@ function LegalArticle({ title, intro, updatedAt, children }) {
       <article className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
         <Breadcrumbs items={[{ label: title }]} />
         <p className="mt-4 tls-type-label text-[#29B6E8]">Rechtliches</p>
-        <h1 className="tls-type-title mt-2"><ShortCaps>{title}</ShortCaps></h1>
+        <h1 className="tls-type-title mt-2">{title}</h1>
         <p className="mt-3 text-white/60 max-w-2xl">{intro}</p>
         {formattedUpdatedAt && <p className="mt-2 tls-type-small text-quiet">Stand: {formattedUpdatedAt}</p>}
         <div className="mt-10 space-y-8 tls-type-body leading-relaxed text-white/75">{children}</div>
