@@ -1,5 +1,19 @@
 # Changelog
 
+## 1.100.1 (26.11.2026)
+
+### Fehlerbehebungen
+
+* Matchseite – „Captains“ in der Liga, sonst „Teamleitungen“ statt „Team-Captains“ (#2591)
+* Mein Bereich – kein Rahmen mehr um den Titel nach einem Gruppenwechsel
+* Mein Bereich → Verein zeigt die Mitgliedskarte nicht mehr doppelt – sie steht unter Mitgliedschaft
+* Saisonende-Moment – korrigierter Moment kommt trotz alter „fertig“-Marke im Browser (#2591)
+
+### Dokumentation
+
+* Backup und Restore – Probelauf, frisches Ziel mit eigenen Containernamen, Hilfsbild alpine (#1632)
+* Liga-Abschlussbericht – Stand, abgenommen, offen, Checkliste für den Server (#1632)
+
 ## 1.100.0 (26.11.2026)
 
 ### Neu
