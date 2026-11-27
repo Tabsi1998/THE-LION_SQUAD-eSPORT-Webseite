@@ -1,6 +1,9 @@
 import { readFileSync } from "node:fs";
 import path from "node:path";
-import { KIND_COLORS, KIND_COLORS_DARK, NEWS_CATEGORY_COLORS, ROLE_COLORS, SURFACE_COLORS, contrastRatio, newsCategoryColor } from "./categoryColors";
+import {
+  KIND_COLORS, KIND_COLORS_DARK, NEWS_CATEGORY_COLORS, NEWS_CATEGORY_COLORS_DARK, NEWS_CATEGORY_DARK_FALLBACK, ROLE_COLORS, SURFACE_COLORS,
+  contrastRatio, newsCategoryColor,
+} from "./categoryColors";
 import { KIND_COLORS as CALENDAR_COLORS } from "./calendar";
 
 // Bausteine wie im Web (#1151, #1305): Farb-Rollen, Farben je Art, Eckradien und die vier Knöpfe stehen in der Website
@@ -29,6 +32,22 @@ function cssRule(selector) {
 const hexToRgb = (hex) => [1, 3, 5].map((index) => parseInt(hex.slice(index, index + 2), 16)).join(" ");
 // CSS-Namen der Rollen: „muted“ heißt dort --tls-text-muted, weil --tls-muted (#1232) schon vergeben ist.
 const CSS_NAME = { muted: "text-muted" };
+
+// Gemeinsame Quelle für Web und App (#1305): docs/category-colors.json hält die Werte, die App liest sie später.
+const shared = JSON.parse(readFileSync(path.join(root, "../docs/category-colors.json"), "utf8"));
+
+test("docs/category-colors.json nennt genau die Werte der Website (Rollen, Flächen, Arten, News)", () => {
+  expect(shared.roles).toEqual(ROLE_COLORS);
+  expect(shared.surfaces).toEqual(SURFACE_COLORS);
+  expect(shared.kinds).toEqual(KIND_COLORS);
+  expect(shared.kindsDark).toEqual(KIND_COLORS_DARK);
+  const { other, ...news } = shared.newsCategories;
+  expect(news).toEqual(NEWS_CATEGORY_COLORS);
+  expect(other).toBe(newsCategoryColor("general"));
+  const { other: otherDark, ...newsDark } = shared.newsCategoriesDark;
+  expect(newsDark).toEqual(NEWS_CATEGORY_COLORS_DARK);
+  expect(otherDark).toBe(NEWS_CATEGORY_DARK_FALLBACK);
+});
 
 describe("Farb-Rollen (#1305)", () => {
   test("die Rollen und ihre Werte, wie Fabian sie gewählt hat", () => {

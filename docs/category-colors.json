@@ -1,0 +1,20 @@
+{
+  "_info": "Farb-Rollen und Farben je Art (#1305, #1151): eine Quelle für Website und App. Die Website hält frontend/src/lib/categoryColors.js gleich (lib/categoryColors.test.js), die App liest dieselben Werte für mobile/src/theme.ts. Jede Farbe hat eine Aufgabe: brand Cyan (Knöpfe, Links, „du“), live Rot (nur „läuft gerade“ und Löschen), warn Orange (Achtung), ok Grün (offen und frei), honor Gold (Platz 1, Pokal, Mitgliedschaft, Verein), event Violett (Art Event), muted und quiet Grau (Nebentext, vorbei und ruhig), silver und bronze nur für Platz 2 und 3.",
+  "roles": {
+    "brand": "#29B6E8",
+    "live": "#FF3B30",
+    "warn": "#FF9F43",
+    "ok": "#1FD08E",
+    "honor": "#FFD700",
+    "event": "#9F7AEA",
+    "muted": "#B4B4BD",
+    "quiet": "#8E8E99",
+    "silver": "#C9CED6",
+    "bronze": "#D08A4E"
+  },
+  "surfaces": { "base": "#0A0A0A", "1": "#121214", "2": "#18181C", "3": "#1F1F24" },
+  "kinds": { "event": "#9F7AEA", "tournament": "#29B6E8", "fastlap": "#2DD4BF", "club": "#FFD700" },
+  "kindsDark": { "event": "#7655CC", "tournament": "#1A7AA3", "fastlap": "#0E7F73", "club": "#85690A" },
+  "newsCategories": { "tournaments": "#29B6E8", "events": "#9F7AEA", "club": "#FFD700", "members": "#FFD700", "other": "#8E8E99" },
+  "newsCategoriesDark": { "tournaments": "#1A7AA3", "events": "#7655CC", "club": "#85690A", "members": "#85690A", "other": "#3A3A44" }
+}

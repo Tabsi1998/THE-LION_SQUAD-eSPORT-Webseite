@@ -63,6 +63,36 @@ Die Seite trägt `color-scheme: dark` und eine dunkle Seiten-Scrollleiste; das P
 `.tls-run-pulse` nimmt die Farbe aus `--tls-pulse-rgb` (Vorgabe Gold). Varianten: `tls-run-pulse--brand` (Cyan),
 `--live` (Rot, „läuft gerade“), `--ok` (Grün).
 
+## Farb-Rollen (#1305)
+
+Jede Farbe hat genau eine Aufgabe. Neue Stellen nehmen die Rolle, nie den Hexwert: als Tailwind-Farbe (`text-warn`,
+`bg-ok/10`, `border-live/40`), in CSS als Variable (`var(--tls-honor)`, `rgb(var(--tls-brand-rgb) / 0.3)`), in JS über
+`ROLE_COLORS` aus `lib/categoryColors.js`.
+
+| Rolle | Farbe | Wofür | Nicht für |
+|---|---|---|---|
+| `brand` | Cyan #29B6E8 | Knöpfe, Links, aktiv, „du“, Aufgaben für dich, Hinweise | Zustände |
+| `live` | Rot #FF3B30 | nur „läuft gerade“ – und Löschen/Entfernen (`tls-btn--danger`) | Fehler, Abgelehnt, Zähler |
+| `warn` | Orange #FF9F43 | Achtung: Problem, Klärung, defekt, Fehler im Formular, fehlt noch, nicht gespeichert | Wartet |
+| `ok` | Grün #1FD08E | offen und frei: Anmeldung/Check-in offen, frei, bereit, erledigt | – |
+| `honor` | Gold #FFD700 | Platz 1, Pokal, Preise, Auszeichnung, Mitgliedschaft und Verein | Knöpfe, Warnungen, Turniere |
+| `event` | Violett #9F7AEA | die Art „Event“ | – |
+| `quiet` | Grau #8E8E99 | vorbei, wartet, Warteliste, abgesagt, abgelehnt, aus | – |
+
+Farben je Art (Kalender, Karten, Datums-Kachel) stehen in `KIND_COLORS`: Event Violett, Turnier Cyan, Fast Lap Türkis,
+Verein Gold. Die Werte hält `docs/category-colors.json` für Web und App gleich.
+
+Bewusst ausgenommen (Sammel-Optik oder fremde Marken): Level-Rahmen und Erfolgs-Stufen samt Zeremonie, Saison-Deko,
+YouTube-Rot, die Ampel im Betrieb (grün/gelb/rot), Medaillen-Farben. Der Wächter `styles/colors.test.js` zählt die
+Rohwerte Gold, Rot und Neon-Grün in `src/` und lässt sie nur sinken (Ratschen-Prinzip).
+
+Weiße Schrift auf vollen Flächen braucht 4,5 : 1 – auf Cyan, Orange, Gold und Grün steht deshalb dunkle Schrift.
+
+## Deckkraft (#2598)
+
+Tailwind baut nur Deckkraft-Werte aus seiner Skala: 0, 5, 10 … 95, 100. `border-white/8` oder `bg-ok/12` wirken nicht –
+die Klasse fehlt im CSS. Gemeinte Zwischenwerte stehen als `/[0.12]` da. Wächter: `styles/opacity.test.js`.
+
 ## Farben für Rennserien
 
 Pole (`--tls-pole`, Pink) und schnellste Runde (`--tls-fastest`, Violett) stehen als Rollen in `styles/system.css` –

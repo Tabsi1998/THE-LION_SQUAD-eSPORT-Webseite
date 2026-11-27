@@ -43,7 +43,7 @@ Kapitel ist der Einstieg: Alle anderen Kapitel setzen voraus, dass ihr hier einm
 ### 2.1 Zwei-Faktor einrichten (alle mit einem Adminbereich)
 
 Ohne bestätigte Zwei-Faktor-Anmeldung zeigt das Benutzermenü statt „Admin“ den Eintrag **2FA einrichten**, und im
-Admin-Menü steht oben ein gelber Kasten **2FA einrichten**. Beide führen an dieselbe Stelle.
+Admin-Menü steht oben ein oranger Kasten **2FA einrichten**. Beide führen an dieselbe Stelle.
 
 1. Du brauchst eine **Authenticator-App** auf dem Handy (zum Beispiel Google Authenticator, Aegis oder 2FAS).
 2. **Benutzermenü (dein Name oben rechts) → Konto & Sicherheit**. Dort steht der Kasten
@@ -342,7 +342,7 @@ Löscht ihr einen Entwurf in Dolibarr, verschwindet er aus den Rechnungen. Der A
 
 **Game-Server pflegen:** **Live-Daten von** sagt, woher Status und Spielerzahl kommen; **Automatisch erkennen** reicht
 meistens. **Technik** (eingeklappt) braucht ihr nur, wenn das Abrufen nicht klappt: eigene Abfrage-Adresse, Abfrage-Port,
-RCON-Port. Schlägt ein Abruf fehl, steht der echte Fehler rot am Server (nur in der Verwaltung), darunter gelb, was er
+RCON-Port. Schlägt ein Abruf fehl, steht der echte Fehler orange am Server (nur in der Verwaltung), darunter, ebenfalls orange, was er
 bedeutet; der Erfolg beim nächsten Abruf räumt beides weg. Das **Symbol** eines Servers kommt per Hochladen oder aus der
 Mediathek; ohne eigenes gilt das Logo des Spiels. Der Knopf **Demo-Startliste** erscheint nur in Testumgebungen.
 
@@ -410,7 +410,7 @@ meldet sie nichts. Dafür braucht es eine Prüfung von außen ([Betrieb](../BETR
 
 | Fehlerbild | Ursache | Lösung |
 | --- | --- | --- |
-| Im Benutzermenü steht „2FA einrichten“ statt „Admin“, im Admin-Menü ein gelber Kasten | Du hast einen Adminbereich, aber noch keine bestätigte Zwei-Faktor-Anmeldung | 2.1 durchgehen, danach neu anmelden |
+| Im Benutzermenü steht „2FA einrichten“ statt „Admin“, im Admin-Menü ein oranger Kasten | Du hast einen Adminbereich, aber noch keine bestätigte Zwei-Faktor-Anmeldung | 2.1 durchgehen, danach neu anmelden |
 | 2FA ist eingerichtet, das Menü zeigt trotzdem „2FA einrichten“ | Die laufende Sitzung ist noch nicht bestätigt | Ab- und neu anmelden |
 | „Für den Adminbereich ist eine bestätigte Zwei-Faktor-Anmeldung erforderlich.“ | Dasselbe, die Meldung kommt vom Server | wie oben |
 | „Bitte zuerst ein eigenes Passwort über Passwort vergessen setzen.“ | Das Konto läuft nur über Google, die Einrichtung braucht ein Passwort | „Passwort vergessen“ auf der Anmeldeseite nutzen, dann 2.1 |
