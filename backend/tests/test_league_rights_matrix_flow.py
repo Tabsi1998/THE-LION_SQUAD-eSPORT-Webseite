@@ -98,6 +98,8 @@ ROUTES = [
     route("POST", "/api/admin/leagues/seasons/{season}/applications/nix/reject", "applications", {"reason": "Grund genug"}),
     route("POST", "/api/admin/leagues/seasons/{season}/applications/nix/waitlist", "applications", {}),
     route("POST", "/api/admin/leagues/seasons/{season}/applications/nix/assign", "applications", {"tournament_id": "{tid}"}),
+    # Gastteams (#1665, Nr. 286): das Kennzeichen setzt „Teams freigeben“ einer Liga, in der das Team spielt.
+    route("PUT", "/api/admin/leagues/teams/{team}/guest-team", "applications", {"confirmed": True}),
     # Regelwerk (#1646): je Season und liga-weit
     *[entry for target in ("league_season/{season}", "league/{league}") for entry in (
         route("GET", f"/api/admin/league-rules/{target}", "rules"),
@@ -323,7 +325,7 @@ def allowed(kind: str, needs) -> bool:
 def fill(text: str, w: dict) -> str:
     return (text.replace("{league}", w["league_id"]).replace("{season}", w["season_id"]).replace("{division}", "liga-1")
             .replace("{tid}", w["tournament"]["id"]).replace("{match}", w["match"]["id"]).replace("{reg}", w["reg_a"]["id"])
-            .replace("{user}", w["target"]["id"]))
+            .replace("{user}", w["target"]["id"]).replace("{team}", w["lions"]["id"]))
 
 
 def fill_body(body, w: dict):

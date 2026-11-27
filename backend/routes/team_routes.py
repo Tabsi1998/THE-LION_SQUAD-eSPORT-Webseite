@@ -428,7 +428,7 @@ def _viewer_rights(team: dict, user: dict | None) -> dict:
     Zwei-Faktor-Anmeldung fehlt - dann zeigen sie „2FA einrichten“ statt der Verwaltung."""
     if not user:
         return {"can_manage": False, "can_edit_team": False, "can_remove_members": False, "can_dissolve": False,
-                "can_change_roles": False, "admin_needs_second_factor": False}
+                "can_change_roles": False, "admin_needs_second_factor": False, "can_edit_guest_team": False}
     leads = team.get("leader_id") == user.get("id") or user.get("id") in (team.get("co_leader_ids") or [])
     owns = team.get("leader_id") == user.get("id") or _team_admin(user, TEAM_OWNER_ADMIN_ROLES)
     return {
@@ -442,7 +442,23 @@ def _viewer_rights(team: dict, user: dict | None) -> dict:
         "can_change_roles": owns,
         "admin_needs_second_factor": not leads and (admin_role_without_second_factor(user, TEAM_ADMIN_ROLES)
                                                     or _grant_lacks_second_factor(team, user)),
+        # Gastteam (#1665): Verein oder Schule und die Freigabe des Schulnamens gibt nur die Teamleitung an.
+        "can_edit_guest_team": leads,
     }
+
+
+def _with_guest(out: dict, team: dict, insider: bool) -> dict:
+    """Gastteam (#1665): alle sehen die Plakette, nur das Team und seine Verwaltung die Angaben dahinter - auch einen Schulnamen ohne
+    Freigabe. Ohne Kennzeichen und Angabe kommt kein Feld dazu."""
+    from services import league_guests
+
+    out.pop(league_guests.FIELD, None)
+    mark = league_guests.badge(team)
+    if mark:
+        out[league_guests.BADGE] = mark
+    if insider and league_guests.state_of(team):
+        out[league_guests.FIELD] = league_guests.details(team)
+    return out
 
 
 def _team_response(team: dict, user: dict | None = None) -> dict:
@@ -450,7 +466,7 @@ def _team_response(team: dict, user: dict | None = None) -> dict:
     can_manage = rights["can_manage"]
     is_member = _is_member(team, user)
     if not is_member and not can_manage:
-        out = _team_summary(team)
+        out = _with_guest(_team_summary(team), team, False)
         out["members"] = [_public_user(m) for m in team.get("members", [])]
         out["leader"] = _public_user(team.get("leader"))
         out["leader_id"] = team.get("leader_id")
@@ -468,7 +484,7 @@ def _team_response(team: dict, user: dict | None = None) -> dict:
     team.update(rights)
     if not can_manage:
         team.pop("join_code", None)
-    return team
+    return _with_guest(team, dict(team), True)
 
 
 def _validate_squad_members(team: dict, member_ids: list[str]) -> list[str]:
@@ -632,6 +648,7 @@ async def my_teams(me: dict = Depends(get_current_user)):
         # Wie GET /teams/{id}: der Code gehört zur Teamleitung (#2126).
         if not _can_manage(team, me):
             team.pop("join_code", None)
+        _with_guest(team, dict(team), True)
     return teams
 
 
@@ -1132,7 +1149,7 @@ async def update_team(team_id: str, body: TeamUpdate, me: dict = Depends(get_cur
     await _queue_team_leads(team, "team_update")
     if not _can_manage(team, me):
         team.pop("join_code", None)
-    return team
+    return _with_guest(team, dict(team), True)
 
 
 async def _queue_team_leads(team: dict | None, reason: str, user_ids=None) -> None:

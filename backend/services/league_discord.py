@@ -175,10 +175,15 @@ def _fit(lines: list[str], limit: int, more: str) -> str:
     return "\n".join(out)
 
 
+def _guest(row: dict | None) -> str:
+    """Gastteam (#1665, Nr. 286): im Discord nur „(Gast)“ hinter dem Namen - nie Verein oder Schule."""
+    return " (Gast)" if (row or {}).get("guest_badge") else ""
+
+
 def result_line(match: dict) -> str:
     """Ein Spiel als Zeile: „Lions **2 : 0** Tigers“ - kampflos, abgesagt oder offen mit Wort."""
-    home = _esc((match.get("home") or {}).get("name") or "offen")
-    away = _esc((match.get("away") or {}).get("name") or "offen")
+    home = _esc((match.get("home") or {}).get("name") or "offen") + _guest(match.get("home"))
+    away = _esc((match.get("away") or {}).get("name") or "offen") + _guest(match.get("away"))
     status = match.get("status")
     if status == "cancelled":
         return f"{home} – {away} · abgesagt"
@@ -209,7 +214,7 @@ def table_lines(rows: list[dict], limit: int) -> list[str]:
         sign = {"promotion": " ▲", "relegation": " ▼", "out": " ✕"}.get(row.get("zone") or "", "")
         points = row.get("points")
         tail = f" · {_score(points)} Pkt." if isinstance(points, (int, float)) and not isinstance(points, bool) else ""
-        out.append(f"{row.get('rank') or '–'}. {_esc(row.get('display_name') or 'Team')}{tail}{sign}")
+        out.append(f"{row.get('rank') or '–'}. {_esc(row.get('display_name') or 'Team')}{_guest(row)}{tail}{sign}")
     return out
 
 
@@ -458,7 +463,11 @@ async def _names(db, tournament_id: str) -> dict:
     registrations = await db.tournament_registrations.find(
         {"tournament_id": tournament_id, "status": {"$in": [*league_page.PUBLIC_REGISTRATION_STATUSES, "withdrawn", "disqualified"]}},
         {"_id": 0, "id": 1, "display_name": 1, "team_name": 1, "squad_name": 1, "team_id": 1}).to_list(500)
-    return {row["id"]: league_page.registration_view(row) for row in registrations if row.get("id")}
+    names = {row["id"]: league_page.registration_view(row) for row in registrations if row.get("id")}
+    from services import league_guests
+
+    await league_guests.mark(db, names.values(), short=True)
+    return names
 
 
 async def _table(db, tournament: dict) -> list[dict]:
@@ -469,7 +478,9 @@ async def _table(db, tournament: dict) -> list[dict]:
     except Exception:  # noqa: BLE001 - ohne Tabelle geht die Zusammenfassung trotzdem hinaus
         logger.warning("[league_discord] Tabelle %s nicht lesbar", log_safe(tournament.get("id")), exc_info=True)
         return []
-    return [row for row in rows if row.get("registration_id")]
+    from services import league_guests
+
+    return await league_guests.mark(db, [row for row in rows if row.get("registration_id")], short=True)
 
 
 def season_url(league: dict | None, season: dict | None, page: str = "") -> str | None:

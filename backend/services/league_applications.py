@@ -48,6 +48,20 @@ LOCK_WAIT_SECONDS = 10.0
 PRIVACY_URL = "/privacy"
 # Platzhalter, bis der Wortlaut freigegeben ist (Entscheidung Nr. 1): Die Leitung ersetzt ihn je Season, er ist kein Rechtstext.
 PRIVACY_PLACEHOLDER = "Für die Anmeldung speichert der Verein die Angaben deines Co-Teams. Mehr dazu steht in der Datenschutzerklärung."
+# Freigabe für Gäste (#1665, Nr. 1): der Wortlaut, den der Superadmin nach der rechtlichen Prüfung freigegeben hat - ``{text, at, by}``.
+PRIVACY_RELEASE = "application_privacy_release"
+
+
+def privacy_text_for(season: dict, user: dict | None) -> str:
+    """Der Hinweis zum Datenschutz, den die Person sieht und dem sie zustimmt. Gäste (Konten ohne Mitgliedschaft, #1665) sehen den Text der
+    Season erst, wenn genau dieser Wortlaut für Gäste freigegeben ist (Nr. 1) - bis dahin den Platzhalter. Ändert die Leitung den Text,
+    gilt die Freigabe nicht mehr."""
+    text = season.get("application_privacy_text") or ""
+    if not text:
+        return PRIVACY_PLACEHOLDER
+    if (user or {}).get("is_club_member"):
+        return text
+    return text if (season.get(PRIVACY_RELEASE) or {}).get("text") == text else PRIVACY_PLACEHOLDER
 
 NO_WINDOW = "Für diese Season gibt es keine Selbstanmeldung."
 NO_RULES = "Für diese Season ist noch kein gültiges Regelwerk veröffentlicht. Ohne Regelwerk geht keine Anmeldung, die Liga-Leitung veröffentlicht es zuerst."
@@ -397,7 +411,7 @@ async def _write(db, league: dict, season: dict, version: dict, team: dict, squa
         "id": application_id, "league_id": league["id"], "season_id": season["id"], "team_id": team["id"], "squad_id": squad["id"],
         "team_name": team.get("name"), "squad_name": squad.get("name"), "display_name": squad_registration.display_name(team, squad),
         "status": SUBMITTED, "active_key": f"{season['id']}:{squad['id']}", "applied_by": user["id"], "submitted_at": now,
-        "privacy_consent": {"text": season.get("application_privacy_text") or PRIVACY_PLACEHOLDER, "user_id": user["id"], "at": now},
+        "privacy_consent": {"text": privacy_text_for(season, user), "user_id": user["id"], "at": now},
         "history": [{"status": SUBMITTED, "by": user["id"], "at": now}], "created_at": now, "updated_at": now,
     }
     try:
@@ -1115,6 +1129,11 @@ async def _tell_status(db, league: dict, season: dict, application: dict, status
         if not lead:
             return
         lead_title, lead_text = lead
+        if status == SUBMITTED or auto:
+            # Gastteam (#1665): Die Leitung hört, ob das Team als Gast bestätigt ist oder eine Angabe dazu auf sie wartet.
+            from services import league_guests
+
+            lead_text += league_guests.lead_hint(await db.teams.find_one({"id": application.get("team_id")}, league_guests.PROJECTION))
         inbox = f"/admin/leagues/seasons/{season['id']}#anmeldungen"
         for user_id in sorted(await staff_user_ids(db, league["id"], ("applications",)) - team_ids):
             key = f"league-application:{application['id']}:{status}:{step}:{user_id}"
@@ -1244,7 +1263,7 @@ async def my_view(db, league: dict, season: dict, user: dict) -> dict:
         # Plattform je Season (#2270): was gilt, bevor die Liga N feststeht - je Liga N, wenn sie abweicht.
         "platform": await league_platform.season_block(db, season),
         "rules": league_rules.version_view(league, season, version) if version else None,
-        "privacy": {"text": season.get("application_privacy_text") or PRIVACY_PLACEHOLDER, "url": PRIVACY_URL},
+        "privacy": {"text": privacy_text_for(season, user), "url": PRIVACY_URL},
         "season_problems": blocked if state else [],
         "squads": rows,
         "hint": hint,
@@ -1299,6 +1318,8 @@ def _shared_players(application: dict, squad: dict | None, others: list[tuple[di
 
 async def inbox(db, league: dict, season: dict, user: dict) -> dict:
     """Der Eingang: alle Anträge der Season mit Prüfung, Plätzen und den Staffeln zum Zuteilen."""
+    from services import league_guests
+
     rows = await db.league_applications.find({"season_id": season["id"]}, {"_id": 0}).sort("created_at", 1).to_list(500)
     squad_ids = sorted({row["squad_id"] for row in rows})
     squads = {row["id"]: row for row in await db.team_squads.find({"id": {"$in": squad_ids}}, {"_id": 0}).to_list(len(squad_ids) + 1)} if squad_ids else {}
@@ -1352,6 +1373,9 @@ async def inbox(db, league: dict, season: dict, user: dict) -> dict:
             "problems": [text for _code, text in check["problems"]], "warnings": check["warnings"], "shortfall": check.get("shortfall"),
             "shared_with": shared,
             "own_team": belongs_to_side(user, sides[row["id"]], side_teams.get(row["team_id"])),
+            # Gastteam (#1665): Kennzeichen und Angabe der Teamleitung - die Leitung bestätigt hier (``PUT …/teams/{id}/guest-team``).
+            **({"guest_team": league_guests.details(team), "guest_badge": league_guests.badge(team)}
+               if league_guests.state_of(team) else {}),
             "history": [{"status": step.get("status"), "at": step.get("at"), "by_name": AUTO_NAME if step.get("auto") else names.get(step.get("by")) or "Gelöschter User",
                          "reason": step.get("reason"), "conflict_reason": step.get("conflict_reason"), "auto": bool(step.get("auto"))}
                         for step in row.get("history") or []],
