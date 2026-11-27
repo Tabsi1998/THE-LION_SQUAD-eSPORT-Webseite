@@ -20,6 +20,7 @@ import { ModeIcon } from "@/components/tls/ModeIcon";
 import { byMaps, hidesDraws, pointsNote, tiebreakOrder } from "@/lib/leagueTable";
 import { finalNote } from "@/lib/leagueFinal";
 import { StaffelRewards } from "@/components/tls/rewards/StaffelRewards";
+import { GuestBadge } from "@/components/tls/league/GuestBadge";
 import { notPlayedText } from "../leagueResultRules";
 import {
   SOURCE_LABELS,
@@ -73,6 +74,8 @@ function TeamName({ side, won, logo, align = "left" }) {
       <span className="tls-league-match__name">
         {club ? <span className="tls-league-match__club" data-redundant={redundant ? "true" : undefined}>{club} · </span> : null}
         {squad}
+        {/* Gastteam (#1665): eine eigene Zeile unter dem Namen. */}
+        {side.guest_badge ? <span className="tls-guest-badge-line"><GuestBadge badge={side.guest_badge} compact testId={`match-side-guest-${side.registration_id}`} /></span> : null}
       </span>
       {align === "right" ? <TeamMark name={side.name} logo={logo} /> : null}
     </>

@@ -88,6 +88,8 @@ async def test_the_window_entered_without_zone_counts_as_vienna_time(flow):
 async def test_captain_submits_and_consent_is_proven(flow):
     w = await application_world(flow, application_privacy_text="Probe-Hinweis zum Datenschutz.")
     side = w["teams"][0]
+    # Ein Mitglied sieht den Text der Season; Gäste sehen bis zur Freigabe den Platzhalter (#1665, test_league_guests_flow).
+    side["captain"]["is_club_member"] = True
 
     application = await submitted(flow, w, side)
 

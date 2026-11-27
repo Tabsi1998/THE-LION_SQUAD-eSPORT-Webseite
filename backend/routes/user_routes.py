@@ -787,6 +787,10 @@ async def get_public_profile(username: str, view_as: str | None = None, viewer: 
         # derselben Regel (Gäste nur Öffentliches, Mitglieder bei eingeschaltetem Schalter dazu Internes mit Etikett).
         from services import league_current as current_service
         league_current = await current_service.for_player(db, user_id, viewer, scope=profile_scope)
+        # Gastteams (#1665): die Plakette am Co-Team, wie in Tabelle und Spielplan.
+        from services import league_guests
+
+        await league_guests.mark(db, league_current)
         # Saisonende-Moment (#1639): je Co-Team der jüngste bestätigte Ausgang (Aufstieg, Abstieg, Meister) als Hinweis.
         from services import league_moments as moment_service
         league_moments = await moment_service.for_player(db, user_id, viewer, scope=profile_scope)

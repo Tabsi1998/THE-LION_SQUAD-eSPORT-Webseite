@@ -106,6 +106,10 @@ async def overview(db, tournament: dict, user: dict | None = None) -> dict:
     from services import league_final_read, league_permissions, league_ties
 
     rows = await table_rows(db, tournament)
+    # Gastteams (#1665): dieselbe Plakette wie öffentlich.
+    from services import league_guests
+
+    await league_guests.mark(db, rows)
     open_ties, decisions = ties(rows), decisions_view(tournament, rows)
     wanted = {item for entry in (*open_ties, *decisions) for item in entry["registration_ids"]}
     registrations = await db.tournament_registrations.find(

@@ -901,6 +901,10 @@ async def public_staffel(league_slug: str, season_slug: str, staffel_ref: str,
          "status": {"$in": [*league_page.PUBLIC_REGISTRATION_STATUSES, "withdrawn", "disqualified"]}},
         {"_id": 0, "id": 1, "display_name": 1, "team_name": 1, "squad_name": 1, "team_id": 1, "squad_id": 1, "status": 1}).to_list(REGISTRATION_LIMIT)
     names = {row["id"]: league_page.registration_view(row) for row in registrations if row.get("id")}
+    # Gastteams (#1665): „Gast · Verein/Schule“ an Teams und Spielen - aus dem Kennzeichen am Hauptteam, nie aus der Mitgliedschaft.
+    from services import league_guests
+
+    await league_guests.mark(db, names.values())
     active_ids = {row["id"] for row in registrations
                   if row.get("id") and row.get("status") in league_page.PUBLIC_REGISTRATION_STATUSES}
     matches = await db.matches_v2.find({"tournament_id": tournament["id"], "is_preview": {"$ne": True}},

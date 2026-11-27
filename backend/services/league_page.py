@@ -52,8 +52,12 @@ def _side(match: dict, index: int, names: dict, results: dict) -> dict | None:
     result = results.get(registration_id) or {}
     score = result.get("score")
     info = names.get(registration_id) or {}
-    return {"registration_id": registration_id, "name": info.get("display_name") or "Team",
+    side = {"registration_id": registration_id, "name": info.get("display_name") or "Team",
             "team_id": info.get("team_id"), "score": score if isinstance(score, (int, float)) else None}
+    # Gastteam (#1665): die Plakette, wenn die Route sie an die Anmeldung gehängt hat (``league_guests.mark``).
+    if info.get("guest_badge"):
+        side["guest_badge"] = info["guest_badge"]
+    return side
 
 
 def public_match(match: dict, names: dict, scheduled: dict | None = None, best_of: int | None = None) -> dict:

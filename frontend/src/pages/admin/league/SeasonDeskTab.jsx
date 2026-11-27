@@ -20,6 +20,7 @@ import { DESK_FILTERS, deskResponsible, deskWhen, filterGroups, scopeOptions, st
 import { viennaDateTime } from "@/lib/vienna";
 import { incidentReviewText, rulesPendingText } from "@/pages/admin/duty/DutyAttention";
 import { SeasonBroadcastSheet } from "./SeasonBroadcastSheet";
+import { GuestBadge } from "@/components/tls/league/GuestBadge";
 
 // Stand einer Rundnachricht im Protokoll (M-1): „hängt“ heißt, im Dialog der Rundnachricht lässt sie sich fortsetzen.
 const BROADCAST_STATE = { sent: "verschickt", sending: "wird verschickt", interrupted: "Versand hängt", failed: "abgebrochen" };
@@ -43,7 +44,12 @@ function DeskItem({ item, group, now }) {
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div className="min-w-0 flex-1">
           <div className="font-bold text-white [overflow-wrap:anywhere]">{item.title}</div>
+          {/* Gastteam (#1665): die Plakette, und ob eine Angabe der Teamleitung auf die Bestätigung im Eingang wartet. */}
+          {item.guest_badge ? <span className="tls-guest-badge-line"><GuestBadge badge={item.guest_badge} testId={`desk-item-guest-${item.id}`} /></span> : null}
           <p className="mt-1 tls-type-small text-white/70 [overflow-wrap:anywhere]">{deskText(item)}</p>
+          {item.guest_pending ? (
+            <p className="mt-1 text-xs font-semibold text-warn" data-testid={`desk-item-guest-pending-${item.id}`}>Angabe als Gastteam wartet auf die Bestätigung im Eingang.</p>
+          ) : null}
           <dl className="mt-2 flex flex-wrap gap-x-4 gap-y-1 tls-type-small text-white/55">
             {when ? (
               <div className={when.over ? "text-[#FF6B60]" : when.kind === "due" ? "text-white/75" : ""}>

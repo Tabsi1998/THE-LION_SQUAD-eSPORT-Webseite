@@ -2,7 +2,7 @@ import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 
 // Eingang der Leitung (docs/LIGA.md, B.4, #2205): prüfen, annehmen, ablehnen mit Pflichtgrund, Warteliste, Zuteilung. Nur erfundene Namen.
-const apiMock = { get: vi.fn(), post: vi.fn() };
+const apiMock = { get: vi.fn(), post: vi.fn(), put: vi.fn() };
 vi.mock("@/lib/api", () => ({ api: apiMock, formatApiError: (detail) => String(detail || "Fehler") }));
 vi.mock("@/hooks/useApiInvalidation", () => ({ useApiInvalidation: () => {} }));
 const toastMock = { success: vi.fn(), error: vi.fn() };
@@ -335,3 +335,56 @@ test("ohne Vorgabe der Season (ältere Seasons) stehen alle Staffeln gleich da, 
   fireEvent.change(select, { target: { value: "t1" } });
   expect(screen.queryByTestId("application-deviation-a1")).toBeNull();
 });
+
+// Gastteam (#1665): Kennzeichen nur bei offenen Anmeldungen (Entscheidung B) - und beim eigenen Team ein Feld für die Notausnahme.
+const GUEST = { confirmed: false, kind: "school", kind_label: "Schule", name: "Probeschule Nord", school_name_public: false, pending: true, badge: null };
+
+test("Gastteam: das Kennzeichen steht nur bei offenen Anmeldungen, nie bei abgelehnten oder zurückgezogenen", async () => {
+  apiMock.get.mockResolvedValue({ data: { ...BODY, items: [
+    { ...ROW, guest_team: GUEST },
+    { ...ROW, id: "a2", squad_id: "s2", status: "rejected", decision_reason: "Kader zu klein", guest_team: GUEST },
+    { ...ROW, id: "a3", squad_id: "s3", status: "withdrawn" },
+  ] } });
+  renderPanel();
+
+  expect(await screen.findByTestId("application-guest-a1")).toBeInTheDocument();
+  expect(screen.queryByTestId("application-guest-a2")).toBeNull();
+  expect(screen.queryByTestId("application-guest-a3")).toBeNull();
+});
+
+test("Superadmin beim eigenen Team: ein einziges Feld für die Notausnahme, es gilt auch fürs Kennzeichen", async () => {
+  apiMock.put.mockResolvedValue({ data: {} });
+  apiMock.get.mockResolvedValue({ data: { ...BODY, superadmin: true, items: [{ ...ROW, own_team: true, guest_team: GUEST }] } });
+  renderPanel();
+
+  const field = await screen.findByTestId("application-conflict-reason-a1");
+  expect(screen.getAllByText("Grund für die Notausnahme")).toHaveLength(1);
+  fireEvent.change(field, { target: { value: "Sonst niemand da" } });
+  fireEvent.click(screen.getByTestId("application-guest-confirm-a1"));
+  await waitFor(() => expect(apiMock.put).toHaveBeenCalledWith("/admin/leagues/teams/t1/guest-team",
+    { confirmed: true, season_id: "s1", conflict_reason: "Sonst niemand da" }));
+});
+
+test("Superadmin beim eigenen, schon zugeteilten Team: das Feld steht für das Kennzeichen allein da", async () => {
+  apiMock.get.mockResolvedValue({ data: { ...BODY, superadmin: true, items: [{ ...ROW, status: "accepted", own_team: true, guest_team: GUEST,
+    assignment: { tournament_id: "t1", label: "Liga 1 · Staffel A" } }] } });
+  renderPanel();
+
+  expect(await screen.findByTestId("application-conflict-reason-a1")).toBeInTheDocument();
+  expect(screen.getAllByText("Grund für die Notausnahme")).toHaveLength(1);
+  expect(screen.queryByTestId("application-accept-a1")).toBeNull();
+});
+
+test("Gastteam: in einer beendeten oder archivierten Season steht der Kasten nicht mehr (Entscheidung B)", async () => {
+  for (const status of ["completed", "archived"]) {
+    apiMock.get.mockResolvedValue({ data: { ...BODY, items: [{ ...ROW, status: "accepted", guest_team: GUEST }] } });
+    const { unmount } = render(<MemoryRouter><SeasonApplicationsPanel seasonId="s1" seasonStatus={status} /></MemoryRouter>);
+    expect(await screen.findByTestId("application-a1")).toBeInTheDocument();
+    expect(screen.queryByTestId("application-guest-a1")).toBeNull();
+    unmount();
+  }
+  apiMock.get.mockResolvedValue({ data: { ...BODY, items: [{ ...ROW, guest_team: GUEST }] } });
+  render(<MemoryRouter><SeasonApplicationsPanel seasonId="s1" seasonStatus="active" /></MemoryRouter>);
+  expect(await screen.findByTestId("application-guest-a1")).toBeInTheDocument();
+});
+

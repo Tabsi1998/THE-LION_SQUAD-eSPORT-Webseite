@@ -74,6 +74,7 @@ SQUAD_ROLE_LABELS = {"captain_id": "Captain", "vice_captain_id": "Vertreter"}
 ROLES_ON_WEBSITE = "Captain und Vertreter vergibst du auf der Website unter Teams → Deine Teams (Co-Team bearbeiten)."
 RESIGN_ON_WEBSITE = "Deine Rolle gibst du auf der Website unter Teams → Deine Teams mit „Rolle abgeben“ ab."
 TAG_TAKEN = "Dieses Kürzel ist schon vergeben."
+NOT_IN_TEAM = "Du gehörst nicht zu diesem Team."
 LEADER_CANNOT_LEAVE = ("Als Teamleitung kannst du das Team nicht verlassen. Übergib zuerst die Leitung (auf der Teamseite "
                        "unter „Mitglieder verwalten“ → „Zur Teamleitung machen“) oder löse das Team unter „Bearbeiten“ auf.")
 
@@ -445,12 +446,36 @@ def _viewer_rights(team: dict, user: dict | None) -> dict:
     }
 
 
+async def _guest_editing(db, out: dict, team: dict, user: dict | None) -> dict:
+    """Gastteam (#1665, Entscheidung C): ``can_edit_guest_team`` nur in den Antworten des eigenen Teams - wahr für Leitung und Co-Leitung
+    eines Liga-Teams (Liga-Antrag, Liga-Staffel oder schon eine Angabe)."""
+    if user and (_is_member(team, user) or _can_manage(team, user)):
+        from services import league_guests
+
+        out["can_edit_guest_team"] = _leads_team(team, user) and await league_guests.is_league_team(db, team)
+    return out
+
+
+def _with_guest(out: dict, team: dict, insider: bool) -> dict:
+    """Gastteam (#1665): alle sehen die Plakette, nur das Team und seine Verwaltung die Angaben dahinter - auch einen Schulnamen ohne
+    Freigabe. Ohne Kennzeichen und Angabe kommt kein Feld dazu."""
+    from services import league_guests
+
+    out.pop(league_guests.FIELD, None)
+    mark = league_guests.badge(team)
+    if mark:
+        out[league_guests.BADGE] = mark
+    if insider and league_guests.state_of(team):
+        out[league_guests.FIELD] = league_guests.details(team)
+    return out
+
+
 def _team_response(team: dict, user: dict | None = None) -> dict:
     rights = _viewer_rights(team, user)
     can_manage = rights["can_manage"]
     is_member = _is_member(team, user)
     if not is_member and not can_manage:
-        out = _team_summary(team)
+        out = _with_guest(_team_summary(team), team, False)
         out["members"] = [_public_user(m) for m in team.get("members", [])]
         out["leader"] = _public_user(team.get("leader"))
         out["leader_id"] = team.get("leader_id")
@@ -468,7 +493,7 @@ def _team_response(team: dict, user: dict | None = None) -> dict:
     team.update(rights)
     if not can_manage:
         team.pop("join_code", None)
-    return team
+    return _with_guest(team, dict(team), True)
 
 
 def _validate_squad_members(team: dict, member_ids: list[str]) -> list[str]:
@@ -632,6 +657,9 @@ async def my_teams(me: dict = Depends(get_current_user)):
         # Wie GET /teams/{id}: der Code gehört zur Teamleitung (#2126).
         if not _can_manage(team, me):
             team.pop("join_code", None)
+        raw = dict(team)
+        _with_guest(team, raw, True)
+        await _guest_editing(db, team, raw, me)
     return teams
 
 
@@ -659,7 +687,9 @@ async def get_team(team_id: str, user: dict | None = Depends(get_optional_user))
     if team.get("is_public") is False and not (_is_member(team, user) or _is_staff(user)):
         raise HTTPException(status_code=404, detail="Team nicht gefunden")
     await _hydrate_team(team)
+    raw = dict(team)
     out = _team_response(team, user)
+    await _guest_editing(db, out, raw, user)
     # Auszeichnungen (#230): Team-Banner und -Trophäen; das Team selbst sieht alles, Vereinsmitglieder dazu Internes, das
     # sie selbst sehen dürfen (#2516, dieselbe Regel wie im Profil), alle anderen nur öffentliche Turniere.
     from services.awards import awards_for_team
@@ -1132,7 +1162,7 @@ async def update_team(team_id: str, body: TeamUpdate, me: dict = Depends(get_cur
     await _queue_team_leads(team, "team_update")
     if not _can_manage(team, me):
         team.pop("join_code", None)
-    return team
+    return _with_guest(team, dict(team), True)
 
 
 async def _queue_team_leads(team: dict | None, reason: str, user_ids=None) -> None:
@@ -1180,6 +1210,11 @@ async def leave_team(team_id: str, me: dict = Depends(get_current_user)):
     team = await db.teams.find_one({"id": team_id})
     if not team:
         raise HTTPException(status_code=404, detail="Team nicht gefunden")
+    if me["id"] not in (team.get("member_ids") or []) and not await db.team_squads.find_one(
+            {"team_id": team_id, "member_ids": me["id"]}, {"_id": 1}):
+        # Rechte-Audit für Gäste (#1665, P8): Wer weder im Team noch in einem Kader steht, verlässt es nicht - sonst hörte die Teamleitung
+        # „hat verlassen“. Wer nur noch im Kader steht, nimmt sich so weiter aus ihm heraus (wie vorher).
+        raise HTTPException(status_code=400, detail=NOT_IN_TEAM)
     if team["leader_id"] == me["id"]:
         # Geführt statt Sackgasse (#2113, L-C6): der Weg steht in der Meldung - auch für die App.
         raise HTTPException(status_code=400, detail=LEADER_CANNOT_LEAVE)
