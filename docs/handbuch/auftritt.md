@@ -352,25 +352,28 @@ Entwickler in [docs/entwicklung/design-system.md](../entwicklung/design-system.m
 ### 3.11 Zustands-Schilder
 
 Jeder Zustand – eines Turniers, Events, Spiels, einer Anmeldung oder Station – steht überall im selben Schild: auf
-der Startseite, im Dashboard, auf Karten, Turnier- und Event-Seite, im Kalender, in Teilnehmerlisten, bei den
-Stationen und am TV. Es gibt neun Arten, jede mit Symbol und Wort:
+der Startseite, im Dashboard, auf Karten, Turnier- und Event-Seite, im Kalender und in „Mein Kalender“, in
+Teilnehmerlisten, auf der Matchseite, bei Rennserien und Liga-Anmeldung, bei den Stationen und am TV. Es gibt zehn
+Arten, jede mit Symbol und Wort:
 
 | Schild | Aussehen | Beispiele |
 |---|---|---|
-| **Bald** | Rahmen, Uhr | Angekündigt, Anmeldung öffnet, Anmeldung geschlossen, Bereit |
+| **Bald** | Rahmen, Uhr | Angekündigt, Anmeldung öffnet, Anmeldung geschlossen, Bereit, Aufgerufen, Geplant |
 | **Anmeldung offen** | grün gefüllt | Anmeldung offen |
 | **Check-in offen** | grün gefüllt, Haken | Check-in offen |
-| **Läuft** | rot, Punkt pulsiert leise | Läuft, Belegt (Station) |
-| **Du bist dabei** | Cyan-Rahmen, Haken | Du bist dabei, Eingecheckt, Bestätigt |
-| **Wartet** | gestrichelter Rahmen, Sanduhr | Warteliste, Wartet auf Ergebnis, Pausiert, Entwurf, Frei (Station) |
+| **Frei** | grüner Rahmen, Stecker | eine freie Station |
+| **Läuft** | rot, Punkt pulsiert leise | Läuft, Belegt (Station); eine laufende Saison ohne Puls |
+| **Du bist dabei** | Cyan-Rahmen, Haken | Du bist dabei, Eingecheckt, Bestätigt, Zugesagt |
+| **Wartet** | gestrichelter Rahmen, Sanduhr | Warteliste, Wartet auf Ergebnis, Pausiert, Entwurf, Ergebnis folgt |
 | **Problem** | Orange, Warnzeichen | Klärung, Defekt |
-| **Beendet** | graue Fläche, Fahne | Beendet, Ergebnisse da, Archiviert, Wertung |
+| **Beendet** | graue Fläche, Fahne | Beendet, Ergebnisse da, Archiviert, Wertung, Gewertet |
 | **Abgesagt** | grau, durchgestrichen | Abgesagt, Abgelehnt, Nicht erschienen, Disqualifiziert |
 
-Nur die zwei grünen Schilder sind gefüllt – sie sollen auffallen, denn dort kann man gerade etwas tun. Rot ist nur
-„Läuft“. Ein Countdown („endet in 2 Tagen“) steht als kleiner Text neben dem Schild, am Handy darunter, wenn der
-Platz nicht reicht. Mit „Bewegung reduzieren“ steht der Punkt bei „Läuft“ still. Einstellen muss im Admin dafür
-nichts werden.
+Nur die zwei grünen Schilder „Anmeldung offen“ und „Check-in offen“ sind gefüllt – sie sollen auffallen, denn dort
+kann man gerade etwas tun. Rot ist nur „Läuft“. Bei einer laufenden Saison steht der Punkt still, denn eine Saison
+läuft Monate. Ein Countdown („endet in 2 Tagen“) oder das eigene Team („mit Lions Rocket“) steht als kleiner Text
+neben dem Schild, am Handy darunter, wenn der Platz nicht reicht. Mit „Bewegung reduzieren“ steht der Punkt bei
+„Läuft“ überall still. Einstellen muss im Admin dafür nichts werden.
 
 ---
 

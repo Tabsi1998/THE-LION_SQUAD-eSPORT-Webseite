@@ -104,14 +104,22 @@ nur für diese beiden Auszeichnungen.
 Ein Baustein für jeden Zustand: `components/tls/StatusChip.jsx`. `StatusBadge` (Rohstatus) und `PhaseBadge`
 (öffentliche Phase mit Countdown) sind dünne Hüllen darum; neue Stellen nehmen eine der drei, nie ein eigenes Schild.
 
-- **Neun Arten** (Fabians Variante C – gefüllt fürs Wichtige): `soon` Bald, `registration` Anmeldung offen,
-  `checkin` Check-in offen, `live` Läuft, `joined` Du bist dabei, `waiting` Wartet, `problem` Problem, `done` Beendet,
-  `cancelled` Abgesagt. Jede hat ein Symbol (Lucide) und ein Wort; die Farbe ist nie die einzige Information.
-- **Gefüllt** sind nur Anmeldung offen und Check-in offen (Grün `ok`, Schrift `--tls-on-ok`). **Rot** (`live`) ist nur
-  „Läuft“ – der Punkt (`.tls-live-dot`) pulsiert leise, bei „Bewegung reduzieren“ steht er still mit ruhigem Hof.
+- **Zehn Arten** (Fabians Variante C – gefüllt fürs Wichtige, „Frei“ seit 27.11.): `soon` Bald, `registration`
+  Anmeldung offen, `checkin` Check-in offen, `free` Frei (Station), `live` Läuft, `joined` Du bist dabei, `waiting`
+  Wartet, `problem` Problem, `done` Beendet, `cancelled` Abgesagt. Jede hat ein Symbol (Lucide) und ein Wort; die
+  Farbe ist nie die einzige Information.
+- **Gefüllt** sind nur Anmeldung offen und Check-in offen (Grün `ok`, Schrift `--tls-on-ok`); „Frei“ hat einen grünen
+  Rahmen ohne Füllung. **Rot** (`live`) ist nur „Läuft“ – der Punkt (`.tls-live-dot`) pulsiert leise, bei „Bewegung
+  reduzieren“ steht er still mit ruhigem Hof. Eine laufende Saison (`active`) steht immer still: `STILL_STATES` in
+  `lib/statusKinds.js` („still“ in der JSON-Datei), von Hand `pulse={false}`.
 - **Zuordnung** in `lib/statusKinds.js`: jeder bekannte Zustand → `[Art, Wort]`, dazu die Du-Form der eigenen Anmeldung
   (`own`: „Du bist dabei“, „Wartet auf Freigabe“). Unbekanntes zeigt das Wort der Stelle oder „Unbekannt“, nie den
   Rohwert. Ein neuer Zustand bekommt hier eine Zeile – und in `docs/status-kinds.json`, die die App liest.
+- **Eigener Stand** mit Wort vom Server („Mein Kalender“, Eventliste, Event-Programm): `ownBadgeKind(state)` gibt die
+  Art (Warteliste wartet, Gefahrenes ist vorbei, sonst „Du bist dabei“), das Team steht als `meta` daneben.
+- **Eigene Status-Listen** anderer Bereiche bilden ihre Werte auf die Arten ab, statt eigene Farben zu setzen: Runden
+  der Rennserien `ROUND_STATE_KINDS` (lib/referenceCalendar.js), Liga-Anmeldung `APPLICATION_KINDS`
+  (LeagueApplicationPanel), Stationen der Hallen-Tafel `STATION_STATES` (lib/tvStationGrid.js).
 - **Aussehen** in `styles/system.css` (`.tls-status-chip[data-kind]`): Outfit 600, 12,5 px (`--tls-chip-size`),
   groß 14 px (`size="lg"`), Symbol 13 px, normal geschrieben, bricht nie um. Auf Bildern `onMedia` (dunkle Unterlage).
 - **Countdown** nie im Schild: `meta` setzt ihn als `tls-type-small` daneben (`.tls-status`, bricht am Handy darunter
@@ -123,4 +131,5 @@ Ein Baustein für jeden Zustand: `components/tls/StatusChip.jsx`. `StatusBadge` 
 
 Wächter: `lib/statusKinds.test.js` hält JS, JSON und CSS gleich und prüft, dass jeder Zustand aus StatusBadge,
 PhaseBadge, Server (`models.py`, `public_phase.py`) und Aufrufern eine Art und ein Wort hat. `scripts/check-contrast.js`
-rechnet jede Art auf Grund und Fläche 1 bis 3 nach (mindestens 4,5 : 1). Playwright: `e2e/zustands-schilder.spec.js`.
+rechnet jede Art auf Grund und Fläche 1 bis 3 nach (mindestens 4,5 : 1). Playwright: `e2e/zustands-schilder.spec.js`
+(alle zehn Arten auf Startseite, Dashboard und den Stationen der Turnierleitung).
