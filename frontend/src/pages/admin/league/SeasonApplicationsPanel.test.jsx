@@ -375,3 +375,16 @@ test("Superadmin beim eigenen, schon zugeteilten Team: das Feld steht für das K
   expect(screen.queryByTestId("application-accept-a1")).toBeNull();
 });
 
+test("Gastteam: in einer beendeten oder archivierten Season steht der Kasten nicht mehr (Entscheidung B)", async () => {
+  for (const status of ["completed", "archived"]) {
+    apiMock.get.mockResolvedValue({ data: { ...BODY, items: [{ ...ROW, status: "accepted", guest_team: GUEST }] } });
+    const { unmount } = render(<MemoryRouter><SeasonApplicationsPanel seasonId="s1" seasonStatus={status} /></MemoryRouter>);
+    expect(await screen.findByTestId("application-a1")).toBeInTheDocument();
+    expect(screen.queryByTestId("application-guest-a1")).toBeNull();
+    unmount();
+  }
+  apiMock.get.mockResolvedValue({ data: { ...BODY, items: [{ ...ROW, guest_team: GUEST }] } });
+  render(<MemoryRouter><SeasonApplicationsPanel seasonId="s1" seasonStatus="active" /></MemoryRouter>);
+  expect(await screen.findByTestId("application-guest-a1")).toBeInTheDocument();
+});
+

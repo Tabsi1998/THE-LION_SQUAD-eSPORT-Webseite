@@ -75,6 +75,8 @@ async function mockServer(page) {
   await page.route("**/api/leagues/probe-liga/season-1/staffeln/**", json(STAFFEL));
   await page.route("**/api/teams/team-1", json(TEAM));
   await page.route("**/api/teams/team-1/overview", json({ upcoming: [], recent: [], league: [] }));
+  await page.route("**/api/teams/team-1/level", json({ level: 4, points: 120, progress: 40, current_level_points: 100, next_level_points: 200,
+    member_points: 80, tournament_points: 40, tournaments: 2, wins: 1, achievements: [] }));
   await page.route("**/api/matches/m1/page", json(MATCH));
   await page.route("**/api/matches/m1/chat", json([]));
 }
@@ -166,6 +168,7 @@ for (const [width, height] of SIZES) {
     test("Teamseite", async ({ page }) => {
       await page.goto("/teams/team-1");
       await whole(page.getByTestId("team-guest-badge"), SCHOOL);
+      await expect(page.getByTestId("team-header-level")).toHaveText("Level 4");
       await noSideScroll(page);
       await shot(page, page.getByTestId("team-header-line").locator("xpath=.."), `teamseite-${width}.png`);
     });

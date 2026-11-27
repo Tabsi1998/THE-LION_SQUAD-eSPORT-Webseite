@@ -82,3 +82,19 @@ test("eine Absage des Servers steht mit seinem deutschen Satz da - nicht „Requ
   await waitFor(() => expect(toastMock.error).toHaveBeenCalledWith("Über dein eigenes Team entscheidet eine andere Person."));
 });
 
+test("eigenes Team als Superadmin, Grund steht im Feld darunter: der gesperrte Knopf sagt, warum", () => {
+  render(<GuestTeamControl row={{ id: "a1", team_id: "t1", own_team: true, guest_team: SCHOOL }} seasonId="s1" superadmin />);
+  const button = screen.getByTestId("application-guest-confirm-a1");
+  expect(button).toBeDisabled();
+  const hint = document.getElementById(button.getAttribute("aria-describedby"));
+  expect(hint).toHaveTextContent("Zuerst unten den Grund für die Notausnahme eintragen.");
+});
+
+test("mit Grund oder ohne Befangenheit kein Hinweis am Knopf", () => {
+  const { rerender } = render(<GuestTeamControl row={{ id: "a1", team_id: "t1", own_team: true, guest_team: SCHOOL }} seasonId="s1" superadmin
+    conflictReason="Sonst niemand da" />);
+  expect(screen.getByTestId("application-guest-confirm-a1")).not.toHaveAttribute("aria-describedby");
+  rerender(<GuestTeamControl row={{ id: "a1", team_id: "t1", guest_team: SCHOOL }} seasonId="s1" />);
+  expect(screen.getByTestId("application-guest-confirm-a1")).not.toHaveAttribute("aria-describedby");
+});
+

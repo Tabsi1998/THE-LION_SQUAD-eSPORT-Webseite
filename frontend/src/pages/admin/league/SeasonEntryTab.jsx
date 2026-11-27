@@ -48,7 +48,7 @@ export function SeasonEntryTab({ seasonId, season, form, set, canSeason, canAppl
           <SeasonPlatformSection seasonId={seasonId} form={form} set={set} id="plattform" version={season.updated_at} />
         </SeasonTabForm>
       ) : null}
-      {canApplications ? <SeasonApplicationsPanel seasonId={seasonId} version={season.updated_at} /> : null}
+      {canApplications ? <SeasonApplicationsPanel seasonId={seasonId} version={season.updated_at} seasonStatus={season.status} /> : null}
       {canSeason || canApplications ? <SeasonStartRightsPanel seasonId={seasonId} canSeason={canSeason} canApplications={canApplications} version={season.updated_at} /> : null}
       {canApplications ? <SeasonDrawPanel seasonId={seasonId} version={season.updated_at} /> : null}
       {canApplications ? <SeasonLateEntriesPanel seasonId={seasonId} version={season.updated_at} /> : null}

@@ -161,10 +161,12 @@ function historyLine(step) {
   return `${when(step.at)}: ${APPLICATION_STATES[step.status]?.label || step.status}, ${step.by_name}${step.reason ? `, ${step.reason}` : ""}${step.conflict_reason ? ` (Notausnahme: ${step.conflict_reason})` : ""}`;
 }
 
-function ApplicationRow({ row, options, busy, act, superadmin, seasonId = null, reload = null }) {
+function ApplicationRow({ row, options, busy, act, superadmin, seasonId = null, reload = null, seasonClosed = false }) {
   // Ein Grund für die Notausnahme je Anmeldung (#1665): Er gilt für die Entscheidung und fürs Kennzeichen - ein Feld, nicht zwei.
   const [conflictReason, setConflictReason] = useState("");
-  const guestControl = Boolean(seasonId) && OPEN_STATUSES.includes(row.status);
+  // Beendete oder archivierte Season: kein Recht mehr am Kennzeichen (Entscheidung B) - der Kasten fällt weg, statt mit 403 zu antworten.
+  // Auch der Bereich Ligen setzt es dann über eine laufende Season des Teams.
+  const guestControl = Boolean(seasonId) && !seasonClosed && OPEN_STATUSES.includes(row.status);
   return (
     <li className="rounded-sm border border-white/10 bg-[#0A0A0A] p-3" data-testid={`application-${row.id}`}>
       <div className="flex flex-wrap items-center gap-2">
@@ -229,7 +231,10 @@ function ApplicationRow({ row, options, busy, act, superadmin, seasonId = null, 
 }
 
 // ``version``: ändert sich mit den Einstellungen der Season. Wer das Fenster gerade gesetzt hat, sieht den Eingang gleich.
-export function SeasonApplicationsPanel({ seasonId, version }) {
+const CLOSED_SEASONS = ["completed", "archived"];
+
+// ``seasonStatus``: der Stand der Season - beendet oder archiviert, gibt es dort kein Kennzeichen „Gast“ mehr zu setzen.
+export function SeasonApplicationsPanel({ seasonId, version, seasonStatus = null }) {
   const [data, setData] = useState(null);
   const [busy, setBusy] = useState(false);
   const scrolled = useRef(false);
@@ -282,7 +287,8 @@ export function SeasonApplicationsPanel({ seasonId, version }) {
             <div key={group.key} className="space-y-2">
               <h3 className="text-[11px] font-bold uppercase tracking-widest text-white/60">{group.title} ({rows.length})</h3>
               <ul className="space-y-2">{rows.map((row) => (
-                <ApplicationRow key={row.id} row={row} options={options(row)} busy={busy} act={act} superadmin={Boolean(data.superadmin)} seasonId={seasonId} reload={load} />
+                <ApplicationRow key={row.id} row={row} options={options(row)} busy={busy} act={act} superadmin={Boolean(data.superadmin)} seasonId={seasonId} reload={load}
+                  seasonClosed={CLOSED_SEASONS.includes(seasonStatus)} />
               ))}</ul>
             </div>
           );

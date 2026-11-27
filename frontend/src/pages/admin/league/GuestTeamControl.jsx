@@ -29,6 +29,15 @@ export function GuestTeamControl({ row, seasonId, superadmin, onChanged, conflic
   const own = Boolean(row.own_team);
   const override = own ? conflictReason.trim() : "";
   const blocked = busy || (own && override.length < REASON_MIN);
+  // Gesperrt nur wegen des fehlenden Grundes: Der Knopf sagt, wo er hingehört - das Feld steht hier oder unten bei der Entscheidung.
+  const waitsForReason = own && superadmin && override.length < REASON_MIN;
+  const hintId = `application-guest-reason-hint-${row.id}`;
+  const described = waitsForReason ? { "aria-describedby": hintId } : {};
+  const reasonHint = waitsForReason ? (
+    <p id={hintId} className="w-full text-xs text-white/60" data-testid={hintId}>
+      {onConflictReason ? "Zuerst den Grund für die Notausnahme eintragen." : "Zuerst unten den Grund für die Notausnahme eintragen."}
+    </p>
+  ) : null;
 
   const send = async (next) => {
     setBusy(true);
@@ -56,8 +65,9 @@ export function GuestTeamControl({ row, seasonId, superadmin, onChanged, conflic
     return (
       <div className="mt-2" data-testid={`application-guest-${row.id}`}>
         {overrideField}
-        <button type="button" disabled={blocked} onClick={() => send(true)} className={`tls-btn tls-btn--quiet ${BUTTON} mt-1`}
+        <button type="button" disabled={blocked} onClick={() => send(true)} className={`tls-btn tls-btn--quiet ${BUTTON} mt-1`} {...described}
           data-testid={`application-guest-confirm-${row.id}`}>Als Gastteam kennzeichnen</button>
+        {reasonHint}
       </div>
     );
   }
@@ -79,13 +89,14 @@ export function GuestTeamControl({ row, seasonId, superadmin, onChanged, conflic
       {may ? (
         <div className="mt-2 flex flex-wrap gap-2">
           {!confirmed || info.pending ? (
-            <button type="button" disabled={blocked} onClick={() => send(true)} className={`tls-btn tls-btn--secondary ${BUTTON}`}
+            <button type="button" disabled={blocked} onClick={() => send(true)} className={`tls-btn tls-btn--secondary ${BUTTON}`} {...described}
               data-testid={`application-guest-confirm-${row.id}`}>{confirmed ? "Neu bestätigen" : "Als Gastteam bestätigen"}</button>
           ) : null}
           {confirmed ? (
-            <button type="button" disabled={blocked} onClick={() => send(false)} className={`tls-btn tls-btn--quiet ${BUTTON}`}
+            <button type="button" disabled={blocked} onClick={() => send(false)} className={`tls-btn tls-btn--quiet ${BUTTON}`} {...described}
               data-testid={`application-guest-revoke-${row.id}`}>Kennzeichen zurücknehmen</button>
           ) : null}
+          {reasonHint}
         </div>
       ) : null}
     </div>
