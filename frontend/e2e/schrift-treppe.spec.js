@@ -159,6 +159,7 @@ test.describe("Schrift-Treppe", () => {
       await page.route(`**/api/seasons/${SEASON.slug}/standings**`, (route) => route.fulfill(json({ season: SEASON, standings: STANDINGS })));
       await page.goto(`/seasons/${SEASON.slug}`);
       await expect(page.getByTestId("season-item-u-5")).toBeVisible();
+      await page.evaluate(() => document.fonts.ready);
       const rows = await page.evaluate((ids) => ids.map((id) => {
         const row = document.querySelector(`[data-testid="season-item-${id}"]`);
         const name = row.querySelector(".tls-wrap--name");
@@ -175,10 +176,12 @@ test.describe("Schrift-Treppe", () => {
           range.setStart(text, offset);
           range.setEnd(text, offset + word.trimEnd().length);
           offset += word.length;
-          const probe = document.createElement("span");
-          probe.style.whiteSpace = "nowrap";
+          // Messhilfe in genau der Schrift des Namens: ein Klon des Knotens (Klassen, Stärke) im selben Eltern-Element.
+          const probe = name.cloneNode(false);
+          probe.removeAttribute("data-testid");
+          probe.style.cssText = "position:absolute;left:0;top:0;visibility:hidden;white-space:nowrap;width:max-content;max-width:none";
           probe.textContent = word.trimEnd();
-          name.after(probe);
+          name.parentElement.append(probe);
           const alone = probe.getBoundingClientRect().width;
           probe.remove();
           const lines = new Set([...range.getClientRects()].map((rect) => Math.round(rect.top))).size;
@@ -224,6 +227,7 @@ test.describe("Schrift-Treppe", () => {
     await expect(first).toBeVisible();
     const badge = first.getByTestId("status-approved");
     expect(await badge.evaluate((node) => getComputedStyle(node).fontSize)).toBe("12px");
+    await page.evaluate(() => document.fonts.ready);
     for (const [index, player] of PLAYERS.entries()) {
       const facts = await page.getByTestId(`tournament-participant-r${index + 1}`).evaluate((row, name) => {
         const node = [...row.querySelectorAll("span")].find((span) => span.textContent === name);
@@ -238,10 +242,11 @@ test.describe("Schrift-Treppe", () => {
           range.setStart(node.firstChild, offset);
           range.setEnd(node.firstChild, offset + word.trimEnd().length);
           offset += word.length;
-          const probe = document.createElement("span");
-          probe.style.whiteSpace = "nowrap";
+          // Messhilfe in genau der Schrift des Namens: ein Klon des Knotens im selben Eltern-Element.
+          const probe = node.cloneNode(false);
+          probe.style.cssText = "position:absolute;left:0;top:0;visibility:hidden;white-space:nowrap;width:max-content;max-width:none";
           probe.textContent = word.trimEnd();
-          node.after(probe);
+          node.parentElement.append(probe);
           const alone = probe.getBoundingClientRect().width;
           probe.remove();
           if (alone <= width && linesOf(range) > 1) broken.push(word.trim());
