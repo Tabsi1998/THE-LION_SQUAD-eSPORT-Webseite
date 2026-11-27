@@ -418,7 +418,7 @@ table tr.tls-you > :last-child { background-position: top right, top right, bott
 
 /* Still (#1306, laufende Saison): „Läuft“ ohne Puls - der Ring fällt weg, der ruhige Hof bleibt. */
 .tls-status-chip .tls-live-dot--still { box-shadow: 0 0 0 2px rgb(var(--tls-live-rgb) / 0.3); }
-.tls-status-chip .tls-live-dot--still::after { animation: none; opacity: 0; }
+.tls-status-chip .tls-live-dot--still::after { display: none; }
 
 @media (prefers-reduced-motion: reduce) {
   .tls-status-chip .tls-live-dot { box-shadow: 0 0 0 2px rgb(var(--tls-live-rgb) / 0.3); }
