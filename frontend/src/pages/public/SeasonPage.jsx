@@ -197,8 +197,9 @@ export default function SeasonPage() {
                 </div>
                 <div className="text-right tls-type-section tls-type-num text-[#29B6E8]">{formatPoints(r.points)}</div>
                 <div className="col-span-2 col-start-2 pl-[52px] pt-1" data-testid={`season-item-facts-${r.user_id}`}>
-                  <div className="tls-type-label text-quiet">{r.events_count} Wertungen · {r.wins} Siege</div>
-                  <div className="tls-type-label text-quiet">{r.achievement_count || 0} Achievements</div>
+                  {/* Geschütztes Leerzeichen: die Zahl bleibt bei ihrem Wort („3 Siege“ bricht nicht zwischen 3 und Siege). */}
+                  <div className="tls-type-label text-quiet">{r.events_count}{"\u00a0"}Wertungen · {r.wins}{"\u00a0"}Siege</div>
+                  <div className="tls-type-label text-quiet">{r.achievement_count || 0}{"\u00a0"}Achievements</div>
                 </div>
               </div>
             ))}
