@@ -13,6 +13,7 @@ import { documentVisibility, timesDone } from "@/lib/adminWords";
 import { tooLargeMessage, useUploadLimits } from "@/lib/uploadLimits";
 import { ShortCaps } from "@/components/tls/ShortCaps";
 
+import { ROLE_COLORS } from "@/lib/categoryColors";
 const CATEGORY_LABELS = {
   statutes: "Statuten", minutes: "Protokolle", form: "Formular",
   regulations: "Regelwerk", guideline: "Leitlinie", download: "Download",
@@ -43,7 +44,7 @@ function DocActions({ doc, onEdit, onRemove, testPrefix = "doc" }) {
     <>
       <a href={`${API}/documents/${doc.id}/view`} target="_blank" rel="noreferrer" className="tls-type-label px-3 py-1 rounded-sm border border-white/15 text-white/70 hover:text-white inline-flex items-center gap-1"><Eye className="w-3 h-3" /> Ansicht</a>
       <a href={`${API}/documents/${doc.id}/download`} target="_blank" rel="noreferrer" className="tls-type-label px-3 py-1 rounded-sm border border-white/15 text-white/70 hover:text-white inline-flex items-center gap-1"><Download className="w-3 h-3" /> Datei</a>
-      <button onClick={onEdit} data-testid={`${testPrefix}-edit-${doc.id}`} className="tls-type-label px-3 py-1 rounded-sm border border-[#FFD700]/40 text-[#FFD700] hover:bg-[#FFD700]/10">Bearbeiten</button>
+      <button onClick={onEdit} data-testid={`${testPrefix}-edit-${doc.id}`} className="tls-type-label px-3 py-1 rounded-sm border border-brand/40 text-brand hover:bg-brand/10">Bearbeiten</button>
       <button onClick={onRemove} data-testid={`${testPrefix}-delete-${doc.id}`} aria-label={`„${doc.title}“ löschen`} className="tls-type-label px-3 py-1 rounded-sm border border-live/40 text-live hover:bg-live/10 inline-flex items-center"><Trash2 className="w-3 h-3" /></button>
     </>
   );
@@ -87,10 +88,10 @@ export default function AdminDocumentsPage() {
       <div className="flex items-center justify-between mb-6 flex-wrap gap-3">
         <div>
           {/* Augenbraue = Menügruppe (#1363). */}
-          <span className="tls-type-label text-[#FFD700]">Mitglieder</span>
+          <span className="tls-type-label text-honor">Mitglieder</span>
           <h1 className="tls-type-title mt-1"><ShortCaps>Dokumente</ShortCaps></h1>
         </div>
-        <button onClick={() => setEditing({})} data-testid="docs-new" className="inline-flex items-center gap-2 px-4 py-2 bg-[#FFD700] text-black tls-type-label rounded-sm hover:bg-[#e8c200] transition">
+        <button onClick={() => setEditing({})} data-testid="docs-new" className="inline-flex items-center gap-2 px-4 py-2 bg-brand text-black tls-type-label rounded-sm hover:bg-brand/90 transition">
           <Plus className="w-3.5 h-3.5" /> Neues Dokument
         </button>
       </div>
@@ -144,12 +145,12 @@ export default function AdminDocumentsPage() {
                   <tr key={d.id} data-testid={`doc-row-${d.id}`}>
                     <td className="px-4 py-3">
                       <div className="font-bold text-white flex items-center gap-1.5">
-                        {d.pinned && <Pin className="w-3 h-3 text-[#FFD700]" />}
+                        {d.pinned && <Pin className="w-3 h-3 text-white" />}
                         {d.title}
                       </div>
                       <div className="tls-type-small text-white/50 tls-wrap max-w-xs">{d.original_filename}</div>
                     </td>
-                    <td className="px-4 py-3 tls-type-label text-[#FFD700]">{CATEGORY_LABELS[d.category] || "Sonstiges"}</td>
+                    <td className="px-4 py-3 tls-type-label text-brand">{CATEGORY_LABELS[d.category] || "Sonstiges"}</td>
                     <td className="px-4 py-3"><VisibilityBadge value={d.visibility} /></td>
                     <td className="px-4 py-3 tls-type-small text-white/65">{fmtSize(d.file_size)}</td>
                     <td className="px-4 py-3 tls-type-small text-white/55">{usageLine(d)}</td>
@@ -251,20 +252,20 @@ function DocModal({ doc, meta, onClose, onSaved }) {
 
   // Seitenblatt statt Fenster (#435).
   return (
-    <AdminSheet title={isNew ? "Neues Dokument" : "Dokument bearbeiten"} eyebrow="Dokumente" accent="#FFD700" onClose={onClose} onSubmit={submit} saving={saving} submitTestId="doc-save" testId="doc-sheet">
+    <AdminSheet title={isNew ? "Neues Dokument" : "Dokument bearbeiten"} eyebrow="Dokumente" accent={ROLE_COLORS.brand} onClose={onClose} onSubmit={submit} saving={saving} submitTestId="doc-save" testId="doc-sheet">
       {/* File upload */}
-      <div className="border border-dashed border-[#FFD700]/40 rounded-sm p-5 bg-[#0A0A0A] text-center">
+      <div className="border border-dashed border-brand/40 rounded-sm p-5 bg-[#0A0A0A] text-center">
         <input ref={fileRef} type="file" onChange={upload} className="hidden" accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.zip,.txt,.csv,.md,.png,.jpg,.jpeg" data-testid="doc-file" />
         {(form.storage_key || form.file_url) ? (
           <div className="tls-type-small">
             <div className="font-mono tls-type-small text-white/60 break-all">{form.original_filename || form.file_url}</div>
-            <div className="tls-type-label text-[#FFD700] mt-1">{fmtSize(form.file_size)} · {form.mime || "Datei"}</div>
+            <div className="tls-type-label text-brand mt-1">{fmtSize(form.file_size)} · {form.mime || "Datei"}</div>
             <button type="button" onClick={() => fileRef.current.click()} disabled={uploading} className="mt-3 inline-flex items-center gap-2 px-3 py-1.5 tls-type-label border border-white/20 text-white/70 rounded-sm">
               <UploadCloud className="w-3 h-3" /> Datei ersetzen
             </button>
           </div>
         ) : (
-          <button type="button" onClick={() => fileRef.current.click()} disabled={uploading} data-testid="doc-upload-btn" className="inline-flex items-center gap-2 tls-type-small text-[#FFD700] font-bold uppercase tracking-wider">
+          <button type="button" onClick={() => fileRef.current.click()} disabled={uploading} data-testid="doc-upload-btn" className="inline-flex items-center gap-2 tls-type-small text-brand font-bold uppercase tracking-wider">
             <UploadCloud className="w-4 h-4" /> {uploading ? "Lade hoch…" : `Datei auswählen (bis ${documentMb} MB)`}
           </button>
         )}
@@ -279,9 +280,9 @@ function DocModal({ doc, meta, onClose, onSaved }) {
       <TextField label="Tags (Komma-getrennt)" value={form.tags} onChange={(v) => set("tags", v)} placeholder="2026, Vorstand, GV" testId="doc-tags" />
       <FormGrid>
         <TextField label="Sortierung" value={form.order_index} onChange={(v) => set("order_index", v)} testId="doc-order" />
-        <CheckField label="Anpinnen" checked={form.pinned} onChange={(v) => set("pinned", v)} accent="#FFD700" className="self-end pb-2" testId="doc-pinned" />
+        <CheckField label="Anpinnen" checked={form.pinned} onChange={(v) => set("pinned", v)} accent={ROLE_COLORS.brand} className="self-end pb-2" testId="doc-pinned" />
       </FormGrid>
-      <CheckField label="Download erlauben" hint="Standard ist „nur ansehen“ im Browser. Aktivieren, wenn Mitglieder die Datei bewusst herunterladen sollen." checked={form.allow_download} onChange={(v) => set("allow_download", v)} accent="#FFD700" testId="doc-allow-download" />
+      <CheckField label="Download erlauben" hint="Standard ist „nur ansehen“ im Browser. Aktivieren, wenn Mitglieder die Datei bewusst herunterladen sollen." checked={form.allow_download} onChange={(v) => set("allow_download", v)} accent={ROLE_COLORS.brand} testId="doc-allow-download" />
     </AdminSheet>
   );
 }

@@ -78,7 +78,7 @@ export function Basket({ me, total, reduced }) {
         ))}
       </ul>
       {me?.completed_at ? (
-        <p className="mt-4 text-[#ffd700] font-bold" data-testid="easter-basket-done">Korb voll – Platz {me.rank}! Du bist in der Verlosung.</p>
+        <p className="mt-4 text-honor font-bold" data-testid="easter-basket-done">Korb voll – Platz {me.rank}! Du bist in der Verlosung.</p>
       ) : (
         <p className="mt-4 tls-type-body text-white/60">Die Eier liegen auf der Website und in der App – an Karten, Bildern, beim Löwen, oben und unten. Ein Klick sammelt ein.</p>
       )}
@@ -153,7 +153,7 @@ export default function EasterHuntPage() {
             ) : null}
 
             <section className="rounded-sm border border-white/10 bg-[#111] p-5" data-testid="easter-fastest">
-              <h2 className="flex items-center gap-2 tls-type-section text-white"><Trophy className="w-4 h-4 text-[#ffd700]" /> Die Schnellsten mit vollem Korb</h2>
+              <h2 className="flex items-center gap-2 tls-type-section text-white"><Trophy className="w-4 h-4 text-honor" /> Die Schnellsten mit vollem Korb</h2>
               {page.fastest?.length ? (
                 <ol className="mt-3 divide-y divide-white/5">
                   {page.fastest.map((row) => (

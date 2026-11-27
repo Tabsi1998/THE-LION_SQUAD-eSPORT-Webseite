@@ -36,7 +36,7 @@ function getPasswordStrength(pw) {
   if (/[0-9]/.test(pw)) score++;
   if (/[^A-Za-z0-9]/.test(pw)) score++;
   if (score <= 1) return { score, label: "Schwach", color: ROLE_COLORS.warn };
-  if (score <= 2) return { score, label: "Mittel", color: "#FFD700" };
+  if (score <= 2) return { score, label: "Mittel", color: ROLE_COLORS.brand };
   if (score <= 3) return { score, label: "Gut", color: "#29B6E8" };
   return { score, label: "Stark", color: ROLE_COLORS.ok };
 }

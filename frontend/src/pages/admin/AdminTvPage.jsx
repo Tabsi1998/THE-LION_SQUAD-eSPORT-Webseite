@@ -210,7 +210,7 @@ function SettingField({ field, value, defaultValue, onChange, disabled }) {
     <div className={`${FIELD_BOX} ${field.type === "playlist" ? "md:col-span-2" : ""}`} data-testid={`tv-setting-${field.key}`}>
       <div className="flex items-start justify-between gap-3">
         <div className="tls-type-small font-bold text-white/90">{field.label}</div>
-        <span className={`tls-type-label text-right ${isDefault ? "text-quiet" : "text-[#FFD700]"}`}>
+        <span className={`tls-type-label text-right ${isDefault ? "text-quiet" : "text-brand"}`}>
           {isDefault ? "Standard" : `Standard: ${tvValueLabel(field.key, defaultValue)}`}
         </span>
       </div>
@@ -452,7 +452,7 @@ function LinkBuilder({ defaults }) {
           </div>
           {takesTvKey(meta) ? (
             <div className={FIELD_BOX} data-testid="tv-key-box">
-              <div className="tls-type-small font-bold text-white/90 inline-flex items-center gap-2"><KeyRound className="w-4 h-4 text-[#FFD700]" /> Anzeige-Schlüssel{meta.needsKey ? "" : " (freiwillig)"}</div>
+              <div className="tls-type-small font-bold text-white/90 inline-flex items-center gap-2"><KeyRound className="w-4 h-4 text-brand" /> Anzeige-Schlüssel{meta.needsKey ? "" : " (freiwillig)"}</div>
               {meta.keyFor === "event" ? (
                 <p className="mt-1 tls-type-small text-white/50" data-testid="tv-key-hint">Für Turniere „Nur Mitglieder“ braucht der Bildschirm einen TV-Zugang: Mit Schlüssel zeigen Hallen- und Aufruf-Tafel am Hallen-PC ohne Anmeldung alle Turniere dieses Events, ohne Schlüssel nur die öffentlichen. Der Schlüssel erlaubt nur das Anschauen dieses einen Events und lässt sich unten widerrufen.</p>
               ) : (
@@ -461,7 +461,7 @@ function LinkBuilder({ defaults }) {
               <div className="mt-3 flex flex-wrap gap-2">
                 <input value={label} onChange={(event) => setLabel(event.target.value)} maxLength={80} placeholder="Name des Bildschirms, z. B. Beamer Halle"
                   className={`flex-1 min-w-[12rem] ${INPUT}`} data-testid="tv-key-label" />
-                <button type="button" onClick={createKey} disabled={!targetId || busy} className="inline-flex items-center gap-2 px-4 py-2 bg-[#FFD700] text-black rounded-sm tls-type-label disabled:opacity-40" data-testid="tv-key-create">
+                <button type="button" onClick={createKey} disabled={!targetId || busy} className="inline-flex items-center gap-2 px-4 py-2 bg-brand text-black rounded-sm tls-type-label disabled:opacity-40" data-testid="tv-key-create">
                   <KeyRound className="w-3.5 h-3.5" /> {key ? "Neuen Schlüssel" : meta.needsKey ? "Link erstellen" : "Link mit Schlüssel"}
                 </button>
               </div>
@@ -542,7 +542,7 @@ function TvKeyList() {
 
   return (
     <section className="mt-6 border border-white/10 bg-[#121212] rounded-sm p-5" data-testid="tv-keys">
-      <h2 className="tls-type-section inline-flex items-center gap-2"><KeyRound className="w-5 h-5 text-[#FFD700]" /> Aktive Anzeige-Schlüssel</h2>
+      <h2 className="tls-type-section inline-flex items-center gap-2"><KeyRound className="w-5 h-5 text-brand" /> Aktive Anzeige-Schlüssel</h2>
       <p className="mt-1 tls-type-small text-white/50 max-w-3xl">Jeder Link mit Schlüssel steht hier – mit Bildschirm, Turnier oder Event und wann er zuletzt da war. Widerrufen beendet ihn sofort.</p>
       {error && <div className="mt-3 tls-type-small text-[#FF6B6B]">Die Schlüssel konnten nicht geladen werden.</div>}
       {!keys.length && !error ? <div className="mt-4 border border-dashed border-white/15 rounded-sm p-5 tls-type-small text-white/45" data-testid="tv-keys-empty">Noch keine Links mit Schlüssel.</div> : null}

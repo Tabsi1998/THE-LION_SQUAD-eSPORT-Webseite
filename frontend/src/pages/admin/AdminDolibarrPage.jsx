@@ -278,11 +278,11 @@ export default function AdminDolibarrPage() {
                   {status.features.map((feature) => (
                     <li key={feature.key} className="py-2.5 flex flex-col sm:flex-row sm:items-start gap-1 sm:gap-3 tls-type-small" data-testid={`dolibarr-feature-${feature.key}`}>
                       <span className="flex items-center gap-2 sm:w-80 shrink-0">
-                        {feature.enabled ? <CheckCircle2 className="w-4 h-4 text-ok shrink-0" /> : <XCircle className="w-4 h-4 text-[#FFD700] shrink-0" />}
+                        {feature.enabled ? <CheckCircle2 className="w-4 h-4 text-ok shrink-0" /> : <XCircle className="w-4 h-4 text-quiet shrink-0" />}
                         <span className="font-bold">{feature.label}</span>
                       </span>
                       <span className="flex-1 min-w-0 tls-type-small text-white/60">
-                        <span className={feature.enabled ? "text-ok" : "text-[#FFD700]"}>{feature.state}</span>
+                        <span className={feature.enabled ? "text-ok" : "text-quiet"}>{feature.state}</span>
                         {feature.hint ? <span> · {feature.hint}</span> : null}
                       </span>
                       {feature.where && (
@@ -333,7 +333,7 @@ export default function AdminDolibarrPage() {
                     <div className="font-bold tls-wrap">{link.display_name || link.username}</div>
                     <div className="tls-type-small text-white/45">{link.member_ref ? `Mitglied Nr. ${link.member_ref}` : "ohne Mitglied"}</div>
                   </div>
-                  <span className={`tls-type-label ${link.status === "verified" ? "text-ok" : link.status === "conflict" ? "text-warn" : "text-[#FFD700]"}`}>{LINK_STATUS_LABELS[link.status] || link.status}</span>
+                  <span className={`tls-type-label ${link.status === "verified" ? "text-ok" : link.status === "conflict" ? "text-warn" : "text-warn"}`}>{LINK_STATUS_LABELS[link.status] || link.status}</span>
                   <div className="tls-type-small text-white/50 flex-1 min-w-0">{link.note || (link.verified_at ? `seit ${formatDate(link.verified_at)}` : "")}</div>
                   {link.status === "verified" && (
                     <button type="button" onClick={() => removeLink(link)} className="tls-type-label text-[#FF6B6B] inline-flex items-center gap-1"><Unlink className="w-3 h-3" /> Lösen</button>
@@ -373,7 +373,7 @@ export default function AdminDolibarrPage() {
                         <div className="tls-type-small text-white/70 flex-1 min-w-0">
                           {PREVIEW_STATE_LABELS[row.state] || row.state}
                           {row.member_id ? ` → ${row.member_name} (Nr. ${row.member_ref}, ${DOLIBARR_STATUS_LABELS[row.dolibarr_status] || row.dolibarr_status})` : ""}
-                          {row.would_change_status && <span className="text-[#FFD700]"> · Status ändert sich</span>}
+                          {row.would_change_status && <span className="text-warn"> · Status ändert sich</span>}
                         </div>
                         {(row.state === "match" || row.state === "match_unverified_email") && (
                           <button type="button" onClick={() => confirmLink(row)} disabled={!!busy} className="px-3 py-1.5 border border-ok/50 text-ok tls-type-label rounded-sm inline-flex items-center gap-1 disabled:opacity-40">
@@ -608,7 +608,7 @@ export default function AdminDolibarrPage() {
             <Panel title="Alter Webhook-Weg (Token in der Adresse)">
               <p className="tls-type-small text-white/45 mb-3">Bleibt nur bis zur Umstellung auf den signierten Webhook; abschalten unter <button type="button" onClick={() => setTab("features")} className="text-[#29B6E8] hover:underline">Funktionen</button>. {status?.webhook_configured ? "Ein Token ist eingerichtet." : "Noch kein Token."}</p>
               <button type="button" onClick={newWebhook} disabled={!!busy} data-testid="dolibarr-webhook-new" className="px-4 py-2 border border-white/20 text-white/80 tls-type-label rounded-sm disabled:opacity-40">Neue Adresse erzeugen</button>
-              {webhookPath && <div className="mt-3 tls-type-small font-mono break-all border border-[#FFD700]/30 rounded-sm p-2" data-testid="dolibarr-webhook-path">{window.location.origin}{webhookPath}</div>}
+              {webhookPath && <div className="mt-3 tls-type-small font-mono break-all border border-brand/30 rounded-sm p-2" data-testid="dolibarr-webhook-path">{window.location.origin}{webhookPath}</div>}
             </Panel>
           </div>
         </div>

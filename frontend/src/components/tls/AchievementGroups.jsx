@@ -25,14 +25,14 @@ import { ROLE_COLORS } from "@/lib/categoryColors";
 const LEVEL_META = {
   1: { name: "Bronze",   color: "#CD7F32" },
   2: { name: "Silber",   color: "#C0C0C0" },
-  3: { name: "Gold",     color: "#FFD700" },
+  3: { name: "Gold",     color: ROLE_COLORS.honor },
   4: { name: "Platin",   color: "#29B6E8" },
   5: { name: "Legendär", color: "#FF3B30" },
 };
 
 export const CATEGORY_META = {
   match:      { label: "Spielen",   icon: "swords",        accent: "#29B6E8", order: 1 },
-  tournament: { label: "Turnier",   icon: "trophy",        accent: "#FFD700", order: 2 },
+  tournament: { label: "Turnier",   icon: "trophy",        accent: ROLE_COLORS.honor, order: 2 },
   fastlap:    { label: "Fast Lap",  icon: "flag",          accent: "#A855F7", order: 3 },
   season:     { label: "Saison",    icon: "calendar-check", accent: "#29B6E8", order: 3.5 },
   team:       { label: "Team",      icon: "users",         accent: ROLE_COLORS.ok, order: 4 },
@@ -42,7 +42,7 @@ export const CATEGORY_META = {
   creator:    { label: "Streaming & Creator", icon: "radio", accent: "#9146FF", order: 6 },
   progression:{ label: "Profil & Konto", icon: "user-check",  accent: ROLE_COLORS.ok, order: 7 },
   profile:    { label: "Profil & Konto", icon: "user-check",  accent: ROLE_COLORS.ok, order: 7 },
-  club:       { label: "Verein",    icon: "crown",         accent: "#FFD700", order: 8 },
+  club:       { label: "Verein",    icon: "crown",         accent: ROLE_COLORS.honor, order: 8 },
   special:    { label: "Besonders", icon: "sparkles",  accent: "#FF3B30", order: 9 },
   hidden:     { label: "Geheim",    icon: "ghost",   accent: "#A855F7", order: 9.5 },
   negative:   { label: "Geheim / Fun", icon: "alert-triangle", accent: "#FF3B30", order: 10 },
@@ -241,7 +241,7 @@ export function AchievementGroupsView({
                 <AchievementIcon name={meta.icon} fallback="trophy" className="w-4 h-4" style={{ color: meta.accent }} />
                 <h2 className="tls-type-section">{meta.label}</h2>
                 {isClub && clubTeaser && (
-                  <span className="tls-type-label px-1.5 py-0.5 rounded-sm border border-[#FFD700]/40 text-[#FFD700]/90" data-testid="club-showcase-badge">
+                  <span className="tls-type-label px-1.5 py-0.5 rounded-sm border border-honor/40 text-honor/90" data-testid="club-showcase-badge">
                     Für Vereinsmitglieder
                   </span>
                 )}
@@ -265,7 +265,7 @@ export function AchievementGroupsView({
 // Die Vereins-Vitrine (#619) für alle, die (noch) nicht Mitglied sind.
 function ClubShowcaseNote({ className = "" }) {
   return (
-    <div className={`border border-[#FFD700]/25 bg-[#FFD700]/5 rounded-sm px-4 py-3 tls-type-small text-white/70 flex items-center gap-3 flex-wrap ${className}`} data-testid="club-showcase-note">
+    <div className={`border border-honor/25 bg-honor/5 rounded-sm px-4 py-3 tls-type-small text-white/70 flex items-center gap-3 flex-wrap ${className}`} data-testid="club-showcase-note">
       <span className="flex-1 min-w-[16rem]">
         Diese Vitrine gehört dem Verein: die Stufen gibt es nur für Mitglieder – für Jahre im Rudel, die Mitgliedskarte, Vereinsabende und Ehrenamt.
       </span>
@@ -422,7 +422,7 @@ function GroupCard({ group, earnedOnly = false, rarity = null, pins = null, shar
               </span>
             )}
             {group.member_only && !isNegative && (
-              <span className="tls-type-label px-1.5 py-0.5 rounded-sm border border-[#FFD700]/35 text-[#FFD700]/85">
+              <span className="tls-type-label px-1.5 py-0.5 rounded-sm border border-honor/35 text-honor/85">
                 Verein
               </span>
             )}
@@ -510,7 +510,7 @@ function TierRow({ tier, group, accent, isNegative = false, rarityPercent, pins 
           </span>
           <span className={`tls-type-small font-semibold truncate ${tier.earned ? "text-white" : "text-white/55"}`}>{tier.name}</span>
           {tier.member_only && (
-            <span className="tls-type-label px-1.5 py-0.5 rounded-sm border border-[#FFD700]/35 text-[#FFD700]/85">
+            <span className="tls-type-label px-1.5 py-0.5 rounded-sm border border-honor/35 text-honor/85">
               Verein
             </span>
           )}
@@ -566,7 +566,7 @@ function TierRow({ tier, group, accent, isNegative = false, rarityPercent, pins 
             aria-label={pinned ? `${tier.name} lösen` : `${tier.name} anheften`}
             title={pinned ? "Vom Profil lösen" : pinFull ? `Höchstens ${pins.max || 6} angeheftet` : "Im Profil anheften"}
             data-testid={`achievement-pin-${tier.code}`}
-            className={`mt-1.5 inline-flex items-center gap-1 tls-type-label px-1.5 py-1 rounded-sm border transition ${pinned ? "border-[#FFD700]/60 text-[#FFD700] bg-[#FFD700]/10" : "border-white/15 text-white/50 hover:text-white hover:border-white/40"} disabled:opacity-35 disabled:cursor-not-allowed`}
+            className={`mt-1.5 inline-flex items-center gap-1 tls-type-label px-1.5 py-1 rounded-sm border transition ${pinned ? "border-honor/60 text-honor bg-honor/10" : "border-white/15 text-white/50 hover:text-white hover:border-white/40"} disabled:opacity-35 disabled:cursor-not-allowed`}
           >
             {pinned ? <PinOff className="w-3 h-3" /> : <Pin className="w-3 h-3" />}
             {pinned ? "Angeheftet" : "Anheften"}

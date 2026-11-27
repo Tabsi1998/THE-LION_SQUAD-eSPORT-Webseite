@@ -18,13 +18,13 @@ export function YearReviewBanner() {
   if (!status?.available) return null;
   return (
     <section
-      className="mb-8 border border-[#FFD700]/40 rounded-sm p-5 flex flex-wrap items-center gap-4 bg-[#08090B]"
+      className="mb-8 border border-brand/40 rounded-sm p-5 flex flex-wrap items-center gap-4 bg-[#08090B]"
       style={{ backgroundImage: "radial-gradient(120% 140% at 100% 0%, rgba(255,215,0,0.18), transparent 60%), radial-gradient(120% 140% at 0% 100%, rgba(41,182,232,0.14), transparent 60%)" }}
       data-testid="year-review-banner"
     >
-      <span className="w-11 h-11 rounded-sm border border-[#FFD700]/40 bg-[#FFD700]/10 text-[#FFD700] inline-flex items-center justify-center shrink-0"><Sparkles className="w-5 h-5" /></span>
+      <span className="w-11 h-11 rounded-sm border border-brand/40 bg-brand/10 text-brand inline-flex items-center justify-center shrink-0"><Sparkles className="w-5 h-5" /></span>
       <div className="flex-1 min-w-[180px]">
-        <div className="tls-type-label text-[#FFD700]">Jahresrückblick</div>
+        <div className="tls-type-label text-brand">Jahresrückblick</div>
         <h2 className="tls-type-section mt-0.5">Dein Jahr {status.year} ist da</h2>
         <p className="tls-type-small text-white/55 mt-1">Turniere, Siege, Events und Bestzeiten zum Durchtippen – nur für dich.</p>
       </div>

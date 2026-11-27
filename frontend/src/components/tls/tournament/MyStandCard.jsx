@@ -40,7 +40,7 @@ export function MyStandCard({ tournament: t, registration: myReg, team = null, i
   const steps = tournamentSteps(t, myReg);
   const step = tournamentStep(steps, myReg);
   return (
-    <section className="border border-[#FFD700]/40 rounded-sm bg-[#FFD700]/5 p-4" data-testid="tournament-my-stand">
+    <section className="border border-brand/40 rounded-sm bg-brand/5 p-4" data-testid="tournament-my-stand">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="tls-type-label">Dein Stand</div>
         <StatusBadge status={myReg.status} size="lg" />

@@ -93,7 +93,7 @@ export default function AdminGalleryPage() {
                   <span className="tls-type-label text-quiet">{albumMediaCount(a)} Medien</span>
                 </div>
                 {/* Leere Alben (#1224) sehen Besucher nicht - sie erscheinen von selbst, sobald Medien da sind. */}
-                {albumMediaCount(a) === 0 && <div className="mt-1 tls-type-label text-[#FFD700]" data-testid={`admin-album-empty-${a.id}`}>leer – für Besucher unsichtbar</div>}
+                {albumMediaCount(a) === 0 && <div className="mt-1 tls-type-label text-quiet" data-testid={`admin-album-empty-${a.id}`}>leer – für Besucher unsichtbar</div>}
                 <div className="tls-type-label text-[#29B6E8]/80 mt-1">
                   {ALBUM_VISIBILITY[a.visibility] || a.visibility} · {a.published ? "Veröffentlicht" : "Entwurf"}{a.section_count ? ` · ${a.section_count} Abschnitte` : ""}{a.video_count ? ` · ${a.video_count} Videos` : ""}
                 </div>

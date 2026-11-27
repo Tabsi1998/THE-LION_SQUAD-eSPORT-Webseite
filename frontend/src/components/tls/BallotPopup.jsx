@@ -141,7 +141,7 @@ export function BallotPopup({ quietPrefixes = QUIET_PREFIXES }) {
               </button>
             </div>
             {ballot.secret ? (
-              <p className="tls-type-body text-white/75 border border-[#FFD700]/40 bg-[#FFD700]/10 rounded-sm p-3" data-testid="ballot-popup-secret">
+              <p className="tls-type-body text-white/75 border border-brand/40 bg-brand/10 rounded-sm p-3" data-testid="ballot-popup-secret">
                 Geheime Wahl auf Papier: Den Stimmzettel bekommst du im Saal. Über die Website wird hier nicht abgestimmt.
               </p>
             ) : (

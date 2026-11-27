@@ -20,7 +20,7 @@ function labelContent(label, required) {
   return (
     <span className="flex items-center justify-between gap-3">
       <span>{label}</span>
-      {required && <span className="tls-type-small text-[#FFD700]">Pflichtfeld</span>}
+      {required && <span className="tls-type-small text-quiet">Pflichtfeld</span>}
     </span>
   );
 }
@@ -177,7 +177,7 @@ export function AuthCheckboxField({ id, checked, onChange, required = false, err
         />
         <span className="min-w-0">
           {children}
-          {required && <span className="ml-1 text-[#FFD700]" aria-label="Pflichtfeld">*</span>}
+          {required && <span className="ml-1 text-quiet" aria-label="Pflichtfeld">*</span>}
         </span>
       </label>
       <FieldHelp ids={ids} error={error} />

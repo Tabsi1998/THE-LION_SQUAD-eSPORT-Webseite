@@ -143,7 +143,7 @@ function PeopleTab() {
                 <button type="button" onClick={() => setSelected(row.user_id)} data-testid={`people-row-${row.user.username}`} className={`w-full text-left py-2 px-2 rounded-sm ${selected === row.user_id ? "bg-[#29B6E8]/10" : "hover:bg-white/[0.03]"}`}>
                   <div className="flex items-center justify-between gap-2">
                     <span className="font-bold tls-type-small tls-wrap">{row.user.display_name || row.user.username}</span>
-                    {row.open_appeal && <span className="tls-type-label text-[#FFD700]">Einspruch</span>}
+                    {row.open_appeal && <span className="tls-type-label text-warn">Einspruch</span>}
                     {row.protected && !row.open_appeal && <span className="tls-type-label text-white/45" data-testid={`people-protected-${row.user.username}`}>Admin-Konto</span>}
                   </div>
                   <div className="tls-type-small text-white/50">{row.active_strikes} Treffer{row.active ? ` · ${row.active.label}` : ""}</div>
@@ -171,8 +171,8 @@ function PeopleTab() {
               ) : <div className="tls-type-small text-white/45">keine laufende Maßnahme</div>}
             </div>
             {active?.appeal && (
-              <div className="mt-3 border border-[#FFD700]/30 bg-[#FFD700]/5 rounded-sm p-3 tls-type-small" data-testid="people-appeal">
-                <div className="tls-type-label text-[#FFD700]">Einspruch vom {formatMoment(active.appeal.created_at)} · {active.appeal.status === "open" ? "offen" : `entschieden: ${active.appeal.decision === "lift" ? "aufgehoben" : "bleibt"}`}</div>
+              <div className="mt-3 border border-warn/30 bg-warn/5 rounded-sm p-3 tls-type-small" data-testid="people-appeal">
+                <div className="tls-type-label text-warn">Einspruch vom {formatMoment(active.appeal.created_at)} · {active.appeal.status === "open" ? "offen" : `entschieden: ${active.appeal.decision === "lift" ? "aufgehoben" : "bleibt"}`}</div>
                 <p className="mt-1 whitespace-pre-wrap text-white/80">{active.appeal.message}</p>
                 {active.appeal.status === "open" && !locked && (
                   <div className="mt-2 flex flex-wrap gap-2">
@@ -190,7 +190,7 @@ function PeopleTab() {
               <div className="border border-white/10 rounded-sm p-3">
                 <div className="tls-type-label text-white/60 mb-2">Treffer eintragen</div>
                 <input value={strikeNote} onChange={(e) => setStrikeNote(e.target.value)} placeholder="Was ist passiert? (steht im Hinweis an die Person)" data-testid="people-strike-note" className="w-full bg-black/40 border border-white/10 px-3 py-2 rounded-sm text-sm" />
-                <button type="button" disabled={!!busy} onClick={() => run("strike", () => api.post(`/moderation/people/${detail.user.id}/strikes`, { note: strikeNote || null }).then(() => setStrikeNote("")), "Treffer eingetragen – die Stufe wurde neu bestimmt.")} data-testid="people-strike-add" className="mt-2 px-3 py-1.5 border border-[#FFD700]/50 text-[#FFD700] rounded-sm tls-type-label disabled:opacity-40">Treffer eintragen</button>
+                <button type="button" disabled={!!busy} onClick={() => run("strike", () => api.post(`/moderation/people/${detail.user.id}/strikes`, { note: strikeNote || null }).then(() => setStrikeNote("")), "Treffer eingetragen – die Stufe wurde neu bestimmt.")} data-testid="people-strike-add" className="mt-2 px-3 py-1.5 border border-warn/50 text-warn rounded-sm tls-type-label disabled:opacity-40">Treffer eintragen</button>
               </div>
               <div className="border border-white/10 rounded-sm p-3">
                 <div className="tls-type-label text-white/60 mb-2">Stufe von Hand setzen</div>
@@ -377,7 +377,7 @@ function ReportCard({ report, onSaved }) {
 
   return (
     <article className="border border-white/10 bg-[#121212] rounded-sm p-4" data-testid={`report-${report.id}`}>
-      <div className="tls-type-label text-[#FFD700]">{categoryLabel(report.category)} · {STATUS_LABEL[reportStatusOf(report.status)]}</div>
+      <div className="tls-type-label text-warn">{categoryLabel(report.category)} · {STATUS_LABEL[reportStatusOf(report.status)]}</div>
       <div className="mt-1 font-bold tls-type-small text-white">Gegen {personName(report.target_user, "ein gelöschtes Konto")}</div>
       <div className="mt-1 tls-type-small text-white/80 whitespace-pre-wrap break-words">{report.details}</div>
       {report.message_excerpt && (
@@ -454,7 +454,7 @@ function ItemsTab() {
           <article key={item.id} className="border border-white/10 bg-[#121212] rounded-sm p-4" data-testid={`moderation-item-${item.id}`}>
             <div className="flex flex-wrap justify-between gap-3">
               <div className="min-w-0">
-                <div className="tls-type-label text-[#FFD700]">{item.kind_label || item.kind} · {ITEM_STATE_LABEL[item.state] || item.state} · {item.action === "hold" ? "zurückgehalten" : "markiert"}</div>
+                <div className="tls-type-label text-warn">{item.kind_label || item.kind} · {ITEM_STATE_LABEL[item.state] || item.state} · {item.action === "hold" ? "zurückgehalten" : "markiert"}</div>
                 <div className="mt-1 tls-type-small text-white/80 whitespace-pre-wrap break-words">{item.excerpt}</div>
                 <div className="mt-2 tls-type-small text-quiet">
                   {item.user?.display_name || item.user?.username || item.user_id}{item.user?.username ? ` (@${item.user.username})` : ""} · Treffer: {(item.matched || []).join(", ")} · {item.created_at && viennaDateTime(item.created_at)}

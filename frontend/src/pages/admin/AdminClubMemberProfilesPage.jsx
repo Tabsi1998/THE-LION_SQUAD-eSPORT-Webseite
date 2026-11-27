@@ -121,7 +121,7 @@ export function ClubMemberProfilesAdminContent() {
             Ein Profil ist kein Konto und keine Mitgliedschaft: „Profil erstellen“ legt nur das Vereinsprofil an – das Website-Konto verknüpfst du im Profil unter „Konto“ (optional).
           </p>
         </div>
-        <button onClick={() => setEditing({ profile: null, form: toForm(null) })} className="inline-flex items-center gap-2 px-4 py-2 bg-[#FFD700] text-black rounded-sm tls-type-label hover:bg-[#e8c200]">
+        <button onClick={() => setEditing({ profile: null, form: toForm(null) })} className="inline-flex items-center gap-2 px-4 py-2 bg-honor text-black rounded-sm tls-type-label hover:bg-[#e8c200]">
           <Plus className="w-4 h-4" /> Profil erstellen
         </button>
       </div>
@@ -153,7 +153,7 @@ export function ClubMemberProfilesAdminContent() {
                   <div className="min-w-0">
                     <h2 className="tls-type-section truncate">{profile.gamertag || profile.display_name}</h2>
                     {profile.real_name && <p className="tls-type-small text-quiet truncate">{profile.real_name}</p>}
-                    <p className="tls-type-label text-[#FFD700]">{profile.board_title || profile.role_title || "Mitglied"}</p>
+                    <p className="tls-type-label text-honor">{profile.board_title || profile.role_title || "Mitglied"}</p>
                     {profile.board_title && profile.role_title && profile.board_title !== profile.role_title && (
                       <p className="tls-type-label text-quiet">Profil: {profile.role_title}</p>
                     )}
@@ -166,7 +166,7 @@ export function ClubMemberProfilesAdminContent() {
                     {profile.source === "dolibarr" && <p className="mt-1 tls-type-label text-[#29B6E8]" data-testid={`club-member-dolibarr-${profile.id}`}>aus der Dolibarr-Einwilligung{profile.consent?.moment ? ` (${viennaDate(profile.consent.moment)})` : ""}</p>}
                     {/* Mitgliedsnummer aus Dolibarr (#504): darüber findet der Abgleich die Karte wieder - ohne Konto heißt: Konto noch nicht verknüpft */}
                     {profile.dolibarr_member_id && <p className="tls-type-small text-quiet" data-testid={`club-member-number-${profile.id}`}>Mitglied Nr. {profile.dolibarr_member_id}{!profile.user_id ? " · ohne Konto" : ""}</p>}
-                    {profile.deactivated_reason === "consent_withdrawn" && <p className="tls-type-small font-bold text-[#FFD700]" data-testid={`club-member-withdrawn-${profile.id}`}>Einwilligung widerrufen – offline</p>}
+                    {profile.deactivated_reason === "consent_withdrawn" && <p className="tls-type-small font-bold text-warn" data-testid={`club-member-withdrawn-${profile.id}`}>Einwilligung widerrufen – offline</p>}
                     {profile.directory_blocked && <p className="tls-type-label text-warn" data-testid={`club-member-blocked-${profile.id}`}>gesperrt</p>}
                   </div>
                   <span className="tls-type-small text-quiet font-mono">#{profile.order_index || 0}</span>
@@ -255,8 +255,8 @@ function ProfileModal({ entry, profiles = [], onClose, onSaved }) {
 
   // Seitenblatt statt 1152-px-Fenster (#435): Person, Biografie, Bilder und Anzeige als Abschnitte.
   return (
-    <AdminSheet title={isEdit ? "Profil bearbeiten" : "Profil erstellen"} eyebrow="Öffentliche Profile" accent="#FFD700" size="xl" onClose={onClose} onSubmit={submit} saving={saving} submitTestId="club-member-save" testId="club-member-sheet">
-      <FormSection title="Person" accent="#FFD700">
+    <AdminSheet title={isEdit ? "Profil bearbeiten" : "Profil erstellen"} eyebrow="Öffentliche Profile" accent={ROLE_COLORS.honor} size="xl" onClose={onClose} onSubmit={submit} saving={saving} submitTestId="club-member-save" testId="club-member-sheet">
+      <FormSection title="Person" accent={ROLE_COLORS.honor}>
         <FormGrid>
           <TextField label="Gamertag" value={form.gamertag} onChange={(v) => set("gamertag", v)} placeholder="z.B. Tabsi98" testId="club-member-gamertag" />
           <TextField label="Vor- und Nachname" required value={form.display_name} onChange={(v) => set("display_name", v)} placeholder="z.B. Fabian Tabelander" testId="club-member-display-name" />
@@ -270,7 +270,7 @@ function ProfileModal({ entry, profiles = [], onClose, onSaved }) {
         <AccountBox form={form} set={set} profile={entry.profile} profiles={profiles} />
         {/* Streamer oder Creator des Vereins (#2338): mit per Anmeldung verknüpftem Twitch gibt es „Verifizierter Streamer“. */}
         <CheckField label="Streamer oder Creator des Vereins" checked={form.creator} onChange={(v) => set("creator", v)} accent="var(--tls-honor)" testId="club-member-creator" hint="Zusammen mit einem per Anmeldung verknüpften Twitch-Konto bekommt die Person den Erfolg „Verifizierter Streamer“. Wird im Protokoll vermerkt." />
-        <div className="border border-[#FFD700]/20 bg-[#FFD700]/5 px-3 py-2 tls-type-small text-white/60 rounded-sm">
+        <div className="border border-honor/20 bg-honor/5 px-3 py-2 tls-type-small text-white/60 rounded-sm">
           Ohne Vorstandszuteilung ist die öffentliche Funktion automatisch <span className="text-white font-bold">Mitglied</span>. Obmann, Kassierin und Stellvertretungen steuerst du im Tab <span className="text-white font-bold">Vorstand</span>.
         </div>
         {/* Profil aus Dolibarr (#496): was dort gepflegt ist, setzt der Abgleich hier wieder - der Vorstand soll das sehen, bevor er tippt. */}
@@ -285,7 +285,7 @@ function ProfileModal({ entry, profiles = [], onClose, onSaved }) {
         </FieldLabel>
       </FormSection>
 
-      <FormSection title="Bilder und Anzeige" accent="#FFD700">
+      <FormSection title="Bilder und Anzeige" accent={ROLE_COLORS.honor}>
         <FormGrid>
           <ImageUpload value={form.photo_url} onChange={(v) => set("photo_url", v)} label="Profilbild" testId="club-member-photo" variant="wide" allowLibrary />
           <ImageUpload value={form.cover_url} onChange={(v) => set("cover_url", v)} label="Detail-Cover optional" testId="club-member-cover" variant="wide" allowLibrary />
@@ -294,7 +294,7 @@ function ProfileModal({ entry, profiles = [], onClose, onSaved }) {
         <p className="tls-type-small text-white/50" data-testid="club-member-photo-hint">Profilbild am schönsten freigestellt (ohne Hintergrund, als PNG) – der Verein legt seinen dahinter. Fotos mit Hintergrund zeigt die Vorstandsseite einheitlich in Vereinsfarben.</p>
         <FormGrid>
           <TextField label="Sortierung" type="number" value={form.order_index} onChange={(v) => set("order_index", v)} />
-          <CheckField label="Öffentlich anzeigen" checked={form.is_active} onChange={(v) => set("is_active", v)} accent="#FFD700" className="self-end pb-2" />
+          <CheckField label="Öffentlich anzeigen" checked={form.is_active} onChange={(v) => set("is_active", v)} accent={ROLE_COLORS.honor} className="self-end pb-2" />
         </FormGrid>
         <CheckField label="Für das Mitglied sperren" checked={form.directory_blocked} onChange={(v) => set("directory_blocked", v)} accent={ROLE_COLORS.warn} testId="club-member-blocked" hint="Der Eintrag geht offline, und das Mitglied kann ihn unter „Meine Mitgliedschaft“ nicht wieder einschalten, bis die Sperre weg ist." />
       </FormSection>

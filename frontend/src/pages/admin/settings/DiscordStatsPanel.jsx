@@ -63,7 +63,7 @@ export function DiscordStatsPanel() {
         </p>
       </div>
       {!data.counting && (
-        <div className="border border-[#FFD700]/30 bg-[#FFD700]/5 rounded-sm p-3 tls-type-small text-white/70" data-testid="discord-stats-off">
+        <div className="border border-brand/30 bg-brand/5 rounded-sm p-3 tls-type-small text-white/70" data-testid="discord-stats-off">
           „Nachrichten zählen“ ist aus (Reiter „Bot &amp; Aktivität“) – Nachrichten und aktive Konten werden nicht gezählt. Beitritte und Austritte zählen trotzdem.
         </div>
       )}

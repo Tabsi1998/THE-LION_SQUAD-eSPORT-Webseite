@@ -14,7 +14,7 @@ const STATE_LABEL = {
   followed: "eingerichtet", ready: "bereit", no_collector: "wartet", no_news_channel: "kein Ankündigungskanal",
   no_webhook_right: "Recht fehlt", offline: "Bot offline", unknown: "unklar",
 };
-const STATE_TONE = { followed: "border-ok/40 text-ok", ready: "border-[#FFD700]/40 text-[#FFD700]" };
+const STATE_TONE = { followed: "border-ok/40 text-ok", ready: "border-brand/40 text-brand" };
 const BOX = "border border-white/10 bg-[#121212] rounded-sm p-5 space-y-4";
 const FIELD = "w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm tls-type-small";
 const EMBED_COLOR = 0x29B6E8;
@@ -98,11 +98,11 @@ export function FollowBox() {
         </select>
       </label>
       {collector.channel_id && collector.can_webhooks === false && (
-        <div className="border border-[#FFD700]/30 bg-[#FFD700]/5 rounded-sm p-3 tls-type-small text-white/70" data-testid="discord-follow-right">
+        <div className="border border-brand/30 bg-brand/5 rounded-sm p-3 tls-type-small text-white/70" data-testid="discord-follow-right">
           In diesem Kanal fehlt dem Bot „Webhooks verwalten“ – er kann dann weder nachsehen noch einrichten. Kanal bearbeiten → Berechtigungen → Rolle des Bots → „Webhooks verwalten“.
         </div>
       )}
-      {!data.online && <p className="tls-type-small text-[#FFD700]" data-testid="discord-follow-offline">Der Bot ist nicht verbunden – der Stand kommt, sobald er online ist.</p>}
+      {!data.online && <p className="tls-type-small text-warn" data-testid="discord-follow-offline">Der Bot ist nicht verbunden – der Stand kommt, sobald er online ist.</p>}
       <div className="space-y-2">
         {servers.map((server) => (
           <div key={server.guild_id} className="border border-white/5 rounded-sm px-3 py-3 space-y-2" data-testid={`discord-follow-server-${server.guild_id}`}>
@@ -247,7 +247,7 @@ export function DistributeBox() {
           <DiscordMessagePreview embed={{ title: plan.title, description: plan.text, color: EMBED_COLOR, footer: { text: plan.footer } }} testId="discord-distribute-message" />
           <ul className="tls-type-small space-y-1">
             {(plan.servers || []).map((row) => (
-              <li key={row.guild_id} className={row.ready ? "text-white/70" : "text-[#FFD700]"} data-testid={`discord-distribute-plan-${row.guild_id}`}>
+              <li key={row.guild_id} className={row.ready ? "text-white/70" : "text-warn"} data-testid={`discord-distribute-plan-${row.guild_id}`}>
                 {row.name}: {row.ready ? (row.fallback ? "geht in Community – für dieses Ziel ist dort kein Kanal gewählt" : "Kanal gewählt") : "kein Kanal gewählt – dort kommt nichts an"}
               </li>
             ))}

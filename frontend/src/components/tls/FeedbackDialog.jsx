@@ -80,7 +80,7 @@ export function FeedbackDialog({ target, onClose, onDone }) {
               {[1, 2, 3, 4, 5].map((n) => (
                 <button key={n} type="button" role="radio" aria-checked={stars === n} aria-label={`${n} – ${STAR_LABELS[n]}`} onClick={() => setStars(n)} data-testid={`feedback-star-${n}`}
                   className="p-1 rounded-sm transition hover:scale-110">
-                  <Star className={`w-9 h-9 ${n <= stars ? "text-[#FFD700] fill-[#FFD700]" : "text-white/30"}`} />
+                  <Star className={`w-9 h-9 ${n <= stars ? "text-honor fill-honor" : "text-white/30"}`} />
                 </button>
               ))}
             </div>

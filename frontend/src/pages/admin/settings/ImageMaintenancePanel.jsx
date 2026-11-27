@@ -65,7 +65,7 @@ export function ImageMaintenancePanel() {
       <div className="font-bold uppercase mb-1">Bild-Wartung</div>
       <p className="tls-type-small text-white/50 mb-3">Gilt für alle Bilder der Website: Sponsoren, News, Events, Spiele und den Rest.</p>
       <div className="flex flex-wrap gap-2">
-        <button type="button" onClick={check} disabled={Boolean(busy)} data-testid="image-audit-btn" className={`${BUTTON} hover:border-[#FFD700] hover:text-[#FFD700]`}>{busy === "audit" ? "Prüfe…" : "Bilder prüfen"}</button>
+        <button type="button" onClick={check} disabled={Boolean(busy)} data-testid="image-audit-btn" className={`${BUTTON} hover:border-brand hover:text-brand`}>{busy === "audit" ? "Prüfe…" : "Bilder prüfen"}</button>
         <button type="button" onClick={repair} disabled={Boolean(busy)} data-testid="image-normalize-btn" className={`${BUTTON} hover:border-[#29B6E8] hover:text-[#29B6E8]`}>{busy === "repair" ? "Repariere…" : "Adressen reparieren"}</button>
         <button type="button" onClick={clearMissing} disabled={Boolean(busy)} data-testid="image-clear-missing-btn" className={`${BUTTON} hover:border-live hover:text-live`}>{busy === "clear" ? "Leere…" : "Fehlende leeren"}</button>
         <button type="button" onClick={importExternal} disabled={Boolean(busy)} data-testid="image-migrate-btn" className={`${BUTTON} hover:border-[#29B6E8] hover:text-[#29B6E8]`}><Upload className="w-4 h-4" aria-hidden="true" /> {busy === "import" ? "Speichere…" : "Externe Bilder lokal speichern"}</button>

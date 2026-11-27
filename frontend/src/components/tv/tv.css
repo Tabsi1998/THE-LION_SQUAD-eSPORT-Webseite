@@ -44,7 +44,7 @@
   --tv-card: #101010;
   --tv-bar: rgba(10, 10, 10, 0.9);
   --tv-accent: #29b6e8;
-  --tv-gold: #ffd700;
+  --tv-gold: var(--tls-honor);
   --tv-green: var(--tls-ok);
   --tv-red: var(--tls-warn);
   --tv-accent-soft: rgba(41, 182, 232, 0.12);
@@ -56,7 +56,7 @@
   --tv-vignette: rgba(1, 3, 4, 0.85);
   --tv-on-accent: #000000;
   --tv-hero-opacity: 0.25;
-  --tv-medal-1: #ffd700;
+  --tv-medal-1: var(--tls-honor);
   --tv-medal-2: #c0c0c0;
   --tv-medal-3: #cd7f32;
 

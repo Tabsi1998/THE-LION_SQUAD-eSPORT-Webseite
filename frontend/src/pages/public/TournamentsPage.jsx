@@ -26,7 +26,7 @@ const MODES = [
 
 /** Ein Chip der zweiten Filterzeile: weich und rund, aktiv gefüllt (Cyan, „Nur meine“ in Gold wie bei den Events). */
 function Chip({ testId, active, tone = "brand", onClick, children }) {
-  const on = tone === "honor" ? "bg-[#FFD700] text-black" : "bg-[#29B6E8] text-black";
+  const on = tone === "honor" ? "bg-honor text-black" : "bg-[#29B6E8] text-black";
   return (
     <button
       type="button"

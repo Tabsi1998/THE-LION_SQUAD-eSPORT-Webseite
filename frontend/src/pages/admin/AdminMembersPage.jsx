@@ -17,6 +17,7 @@ import { toast } from "sonner";
 import { Crown, Download, Search } from "lucide-react";
 import { ShortCaps } from "@/components/tls/ShortCaps";
 
+import { ROLE_COLORS } from "@/lib/categoryColors";
 const STATUS_LABELS = {
   none: "Kein Mitglied",
   // Entsteht nur aus einem Dolibarr-Entwurf; offene Bewerbungen der Website stehen unter „Bewerbungen“ (#2125).
@@ -139,7 +140,7 @@ export default function AdminMembersPage() {
     <AdminLayout>
       <div className="flex items-end justify-between flex-wrap gap-4 mb-6">
         <div>
-          <span className="tls-type-label text-[#FFD700]">VEREIN</span>
+          <span className="tls-type-label text-honor">VEREIN</span>
           <h1 className="tls-type-title mt-1"><ShortCaps>Mitglieder</ShortCaps></h1>
           <p className="tls-type-body text-white/60 mt-1">Mitgliedschaften, Mitgliedsnummern und die öffentlichen Profile an einem Ort pflegen.</p>
         </div>
@@ -161,7 +162,7 @@ export default function AdminMembersPage() {
             data-testid={`members-main-tab-${item.k}`}
             className={`shrink-0 whitespace-nowrap px-4 py-3 tls-type-label border-b-2 transition ${
               tab === item.k
-                ? "border-[#FFD700] text-[#FFD700]"
+                ? "border-brand text-brand"
                 : "border-transparent text-white/45 hover:text-white"
             }`}
           >
@@ -194,7 +195,7 @@ export default function AdminMembersPage() {
               key={t.k}
               onClick={() => setFilter(t.k)}
               data-testid={`members-filter-${t.k}`}
-              className={`px-3 py-2 tls-type-label rounded-sm transition ${activeFilter === t.k ? "bg-[#FFD700] text-black" : "border border-white/10 text-white/60 hover:text-white"}`}
+              className={`px-3 py-2 tls-type-label rounded-sm transition ${activeFilter === t.k ? "bg-brand text-black" : "border border-white/10 text-white/60 hover:text-white"}`}
             >
               {t.l}
             </button>
@@ -240,7 +241,7 @@ export default function AdminMembersPage() {
                     <td className="px-4 py-3">
                       <div className="font-bold text-white flex items-center gap-1.5">
                         {u.display_name || u.username}
-                        {u.is_club_member && <Crown className="w-3 h-3 text-[#FFD700]" />}
+                        {u.is_club_member && <Crown className="w-3 h-3 text-honor" />}
                       </div>
                       <div className="tls-type-small text-white/50">@{u.username}</div>
                     </td>
@@ -249,12 +250,12 @@ export default function AdminMembersPage() {
                       <StatusPill status={m?.member_status || "none"} />
                       {m?.exit_request && <div className="mt-1 tls-type-label text-[#FF9500]" data-testid={`member-exit-${u.username}`}>Austritt erklärt</div>}
                     </td>
-                    <td className="px-4 py-3 tls-type-small font-mono text-[#FFD700]">{m?.member_number || "—"}</td>
+                    <td className="px-4 py-3 tls-type-small font-mono text-honor">{m?.member_number || "—"}</td>
                     <td className="px-4 py-3 tls-type-small text-white/70">{m?.membership_type ? TYPE_LABELS[m.membership_type] || m.membership_type : "—"}</td>
                     <td className="px-4 py-3 tls-type-small text-white/70">{formatMemberSince(m?.member_since, m?.member_since_precision)}</td>
                     <td className="px-4 py-3 tls-type-small text-white/70">{m?.internal_role || "—"}</td>
                     <td className="px-4 py-3 text-center">
-                      <button onClick={() => setEditing({ user: u, membership: m })} data-testid={`member-edit-${u.username}`} className="tls-type-label px-3 py-1 rounded-sm border border-[#FFD700]/40 text-[#FFD700] hover:bg-[#FFD700]/10 transition">
+                      <button onClick={() => setEditing({ user: u, membership: m })} data-testid={`member-edit-${u.username}`} className="tls-type-label px-3 py-1 rounded-sm border border-honor/40 text-honor hover:bg-honor/10 transition">
                         Bearbeiten
                       </button>
                     </td>
@@ -277,7 +278,7 @@ export default function AdminMembersPage() {
 
 function StatusPill({ status }) {
   const colors = {
-    active: "bg-[#FFD700]/15 text-[#FFD700] border-[#FFD700]/40",
+    active: "bg-honor/15 text-honor border-honor/40",
     honorary: "bg-[#9F7AEA]/15 text-[#C4A0FF] border-[#9F7AEA]/40",
     pending: "bg-[#29B6E8]/15 text-[#29B6E8] border-[#29B6E8]/40",
     inactive: "bg-white/5 text-white/50 border-white/15",
@@ -345,7 +346,7 @@ function EditModal({ entry, meta, onClose, onSave }) {
 
   // Seitenblatt statt Fenster (#435); die Mitgliederliste bleibt daneben sichtbar.
   return (
-    <AdminSheet title="Mitgliedschaft bearbeiten" eyebrow={`${u.display_name || u.username} · @${u.username}`} accent="#FFD700" onClose={onClose} onSubmit={submit} saving={saving} submitTestId="edit-save" testId="member-sheet">
+    <AdminSheet title="Mitgliedschaft bearbeiten" eyebrow={`${u.display_name || u.username} · @${u.username}`} accent={ROLE_COLORS.honor} onClose={onClose} onSubmit={submit} saving={saving} submitTestId="edit-save" testId="member-sheet">
       {led && (
         <div className="border border-[#29B6E8]/30 bg-[#29B6E8]/10 rounded-sm p-3 tls-type-small text-white/75" data-testid="edit-led-by-dolibarr">
           Diese Mitgliedschaft führt <strong>Dolibarr</strong>: Status, Mitgliedsart, Nummer und Beginn kommen von dort und lassen sich hier nicht ändern. Aufgabe und Notiz bleiben hier.
@@ -361,7 +362,7 @@ function EditModal({ entry, meta, onClose, onSave }) {
         <SelectField label="Mitgliedsart" disabled={led} value={form.membership_type} onChange={(v) => set("membership_type", v)} options={[["", "— wählen —"], ...meta.types.map((t) => [t, TYPE_LABELS[t] || t])]} testId="edit-type" />
       </FormGrid>
       {statusMails && (
-        <CheckField label={`Person informieren: Mail „${STATUS_MAIL[form.member_status]}“ und Meldung`} checked={notify} onChange={setNotify} testId="edit-notify" accent="#FFD700" />
+        <CheckField label={`Person informieren: Mail „${STATUS_MAIL[form.member_status]}“ und Meldung`} checked={notify} onChange={setNotify} testId="edit-notify" accent={ROLE_COLORS.honor} />
       )}
       <TextField label={led ? "Mitgliedsnummer (aus Dolibarr)" : "Mitgliedsnummer (leer = automatisch)"} disabled={led} value={form.member_number} onChange={(v) => set("member_number", v)} placeholder="z.B. TLS-2026-0007" testId="edit-number" className="font-mono" />
       <FormGrid>

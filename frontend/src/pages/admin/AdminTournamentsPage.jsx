@@ -224,7 +224,7 @@ function TournamentList() {
         </button>
       </div>
       {list.length >= LIST_LIMIT && (
-        <p className="mb-3 tls-type-small text-[#FFD700]" data-testid="admin-tournament-list-limit">
+        <p className="mb-3 tls-type-small text-quiet" data-testid="admin-tournament-list-limit">
           Die Liste zeigt die {LIST_LIMIT} zuletzt angelegten Turniere – ältere stehen hier nicht.
         </p>
       )}
@@ -345,7 +345,7 @@ function RowActions({ tournament: t, isTournamentLead, onStatus, onDelete }) {
         </button>
       ) : null}
       {isTournamentLead && t.status === "live" ? (
-        <button type="button" onClick={() => onStatus(t.id, "paused")} title="Pause" aria-label={`Pause: ${t.title}`} className={`${ACTION_CLASS} hover:text-[#FFD700]`}>
+        <button type="button" onClick={() => onStatus(t.id, "paused")} title="Pause" aria-label={`Pause: ${t.title}`} className={`${ACTION_CLASS} hover:text-brand`}>
           <Pause className={ACTION_ICON} aria-hidden="true" />
         </button>
       ) : null}
@@ -382,7 +382,7 @@ function RulePill({ label, tone = "default" }) {
   const cls = tone === "cyan"
     ? "border-[#29B6E8]/35 bg-[#29B6E8]/10 text-[#29B6E8]"
     : tone === "gold"
-      ? "border-[#FFD700]/35 bg-[#FFD700]/10 text-[#FFD700]"
+      ? "border-white/35 bg-white/10 text-white"
       : tone === "purple"
         ? "border-[#9F7AEA]/35 bg-[#9F7AEA]/10 text-[#C4B5FD]"
         : "border-white/15 bg-white/5 text-white/60";

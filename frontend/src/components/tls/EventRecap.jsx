@@ -11,7 +11,7 @@ import { podiumRoundNote } from "@/lib/placementMoment";
 // Solange die Daten fehlen (Laden, Fehler, älterer Server), steht `fallback` da - der bisherige Satz mit den Turnieren.
 
 const PLACE_STYLE = {
-  1: { bar: "h-16 bg-[#FFD700]/20 border-[#FFD700]/50", text: "text-[#FFD700]" },
+  1: { bar: "h-16 bg-honor/20 border-honor/50", text: "text-honor" },
   2: { bar: "h-11 bg-white/10 border-white/25", text: "text-white/80" },
   3: { bar: "h-8 bg-[#CD7F32]/15 border-[#CD7F32]/45", text: "text-[#E0A36B]" },
 };
@@ -73,7 +73,7 @@ export function EventRecap({ event, accessToken = "", fallback = null }) {
   return (
     <section id="rueckblick" className="space-y-6 scroll-mt-24" data-section="recap" data-testid="event-recap">
       <h2 className="tls-type-section inline-flex items-center gap-2">
-        <Award className="w-5 h-5 text-[#FFD700]" aria-hidden="true" /> Rückblick
+        <Award className="w-5 h-5 text-honor" aria-hidden="true" /> Rückblick
       </h2>
 
       {mine && (

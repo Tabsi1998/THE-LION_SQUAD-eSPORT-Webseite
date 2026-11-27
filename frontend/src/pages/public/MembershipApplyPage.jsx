@@ -39,7 +39,7 @@ const PERSON_FIELDS = [
   ["firstname", "Vorname", "text"], ["lastname", "Nachname", "text"], ["phone", "Telefon", "tel"],
   ["address", "Straße und Hausnummer", "text"], ["zip", "PLZ", "text"], ["town", "Ort", "text"],
 ];
-const INPUT = "w-full bg-[#0A0A0A] border border-white/10 focus:border-[#FFD700] px-3 py-2.5 rounded-sm tls-type-small text-white focus:outline-none";
+const INPUT = "w-full bg-[#0A0A0A] border border-white/10 focus:border-honor px-3 py-2.5 rounded-sm tls-type-small text-white focus:outline-none";
 
 // Dieselben Zahlen wie auf „Mitglied werden“ (#1251) - eine Quelle für Betrag und Zeitraum.
 export { feeLine, formatMoney } from "@/lib/membershipFees";
@@ -176,7 +176,7 @@ export default function MembershipApplyPage() {
   return (
     <PublicLayout>
       <section className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-        <span className="tls-type-label text-[#FFD700]">Mitgliedschaft</span>
+        <span className="tls-type-label text-honor">Mitgliedschaft</span>
         <h1 className="tls-type-title mt-2"><ShortCaps>Mitglied werden</ShortCaps></h1>
         {/* Schritt-Anzeige (#1081): Konto ist da, jetzt der Antrag - danach Prüfung und Mitglied. */}
         <StepBar steps={MEMBERSHIP_STEPS} current={membershipStep(status, renew)} className="tls-steps--gold mt-5 max-w-xl" testId="apply-steps" />
@@ -185,7 +185,7 @@ export default function MembershipApplyPage() {
         {loading ? (
           <SkeletonLines lines={4} className="mt-8" label="Lade Antrag" />
         ) : setup.coupled && setup.available === false ? (
-          <StatusCard testId="apply-unavailable" icon={AlertTriangle} color="#FFD700" title="Gerade nicht möglich" body="Die Mitgliederverwaltung ist im Moment nicht erreichbar. Bitte in ein paar Minuten noch einmal versuchen – nichts ist verloren." />
+          <StatusCard testId="apply-unavailable" icon={AlertTriangle} color={ROLE_COLORS.honor} title="Gerade nicht möglich" body="Die Mitgliederverwaltung ist im Moment nicht erreichbar. Bitte in ein paar Minuten noch einmal versuchen – nichts ist verloren." />
         ) : !showForm && status === "submitting" ? (
           <StatusCard testId="apply-submitting" icon={Send} color="#29B6E8" title="Antrag wird übermittelt" body="Dein Antrag ist gespeichert und geht gerade an die Mitgliederverwaltung. Klappt das nicht sofort, versuchen wir es automatisch weiter – du musst nichts tun." action={<button type="button" onClick={withdraw} data-testid="apply-withdraw" className="tls-type-label text-white/50 hover:text-live inline-flex items-center gap-1"><Undo2 className="w-3.5 h-3.5" /> Zurückziehen</button>} />
         ) : !showForm && status === "pending" ? (
@@ -194,13 +194,13 @@ export default function MembershipApplyPage() {
             body={`Eingereicht am ${viennaDate(existing.created_at)}. ${existing.coupled ? "Der Verein prüft den Antrag in der Mitgliederverwaltung; du erhältst eine E-Mail, sobald entschieden ist." : "Du erhältst eine E-Mail sobald entschieden wurde."}`}
             action={<button type="button" onClick={withdraw} data-testid="apply-withdraw" className="tls-type-label text-white/50 hover:text-live inline-flex items-center gap-1"><Undo2 className="w-3.5 h-3.5" /> Antrag zurückziehen</button>} />
         ) : !showForm && status === "approved" ? (
-          <StatusCard testId="apply-approved" icon={Crown} color="#FFD700" title="Du bist Mitglied 🦁" body="Willkommen im Rudel! Schau in den Mitgliederbereich für Benefits und Dokumente." />
+          <StatusCard testId="apply-approved" icon={Crown} color={ROLE_COLORS.honor} title="Du bist Mitglied 🦁" body="Willkommen im Rudel! Schau in den Mitgliederbereich für Benefits und Dokumente." />
         ) : !showForm && status === "rejected" ? (
           <StatusCard testId="apply-rejected" icon={FileText} color={ROLE_COLORS.quiet} title={existing.coupled ? "Antrag abgelehnt" : "Bewerbung abgelehnt"} body={existing.decision_note || "Du kannst zu einem späteren Zeitpunkt erneut versuchen."} action={<RenewButton onClick={() => setRenew(true)} />} />
         ) : !showForm && status === "failed" ? (
           <StatusCard testId="apply-failed" icon={AlertTriangle} color={ROLE_COLORS.warn} title="Antrag nicht angenommen" body={`Die Mitgliederverwaltung hat den Antrag nicht angenommen${existing.dolibarr?.error_text ? ` (${existing.dolibarr.error_text})` : ""}. Bitte die Angaben prüfen und den Antrag neu stellen.`} action={<RenewButton onClick={() => setRenew(true)} />} />
         ) : !showForm && status === "withdrawn" ? (
-          <StatusCard testId="apply-withdrawn" icon={Undo2} color="#FFD700" title="Antrag zurückgezogen" body="Du hast deinen Antrag zurückgezogen. Wenn du magst, stell jederzeit einen neuen." action={<RenewButton onClick={() => setRenew(true)} />} />
+          <StatusCard testId="apply-withdrawn" icon={Undo2} color={ROLE_COLORS.quiet} title="Antrag zurückgezogen" body="Du hast deinen Antrag zurückgezogen. Wenn du magst, stell jederzeit einen neuen." action={<RenewButton onClick={() => setRenew(true)} />} />
         ) : (
           <form onSubmit={submit} className="mt-8 space-y-5 border border-white/10 bg-[#121212] rounded-sm p-6" data-testid="apply-form" noValidate>
             {coupled ? (
@@ -231,11 +231,11 @@ export default function MembershipApplyPage() {
             )}
             <div className="space-y-2 pt-2 border-t border-white/5">
               <label className="flex items-start gap-2 cursor-pointer">
-                <input id="apply-statutes" type="checkbox" required checked={form.accept_statutes} onChange={(e) => updateField("accept_statutes", e.target.checked)} data-testid="apply-statutes" aria-invalid={!!fieldErrors.accept_statutes} aria-describedby={fieldErrors.accept_statutes ? "apply-statutes-error" : undefined} className="mt-1 accent-[#FFD700]" />
+                <input id="apply-statutes" type="checkbox" required checked={form.accept_statutes} onChange={(e) => updateField("accept_statutes", e.target.checked)} data-testid="apply-statutes" aria-invalid={!!fieldErrors.accept_statutes} aria-describedby={fieldErrors.accept_statutes ? "apply-statutes-error" : undefined} className="mt-1 accent-honor" />
                 <span className="tls-type-small text-white/70">Ich habe die <a href={statutesHref(statutes)} target="_blank" rel="noreferrer" data-testid="apply-statutes-link" className="text-[#29B6E8] underline">Vereinsstatuten</a> gelesen und akzeptiere sie.{fieldErrors.accept_statutes && <span id="apply-statutes-error" role="alert" className="block mt-1 tls-type-small text-[#FF8A80]">{fieldErrors.accept_statutes}</span>}</span>
               </label>
               <label className="flex items-start gap-2 cursor-pointer">
-                <input id="apply-privacy" type="checkbox" required checked={form.accept_privacy} onChange={(e) => updateField("accept_privacy", e.target.checked)} data-testid="apply-privacy" aria-invalid={!!fieldErrors.accept_privacy} aria-describedby={fieldErrors.accept_privacy ? "apply-privacy-error" : undefined} className="mt-1 accent-[#FFD700]" />
+                <input id="apply-privacy" type="checkbox" required checked={form.accept_privacy} onChange={(e) => updateField("accept_privacy", e.target.checked)} data-testid="apply-privacy" aria-invalid={!!fieldErrors.accept_privacy} aria-describedby={fieldErrors.accept_privacy ? "apply-privacy-error" : undefined} className="mt-1 accent-honor" />
                 <span className="tls-type-small text-white/70">Ich akzeptiere die <a href="/privacy" className="text-[#29B6E8] underline">Datenschutzerklärung</a>.{fieldErrors.accept_privacy && <span id="apply-privacy-error" role="alert" className="block mt-1 tls-type-small text-[#FF8A80]">{fieldErrors.accept_privacy}</span>}</span>
               </label>
             </div>
@@ -259,14 +259,14 @@ function CoupledFields({ setup, form, updateField, fieldErrors, requiredPerson }
   return (
     <>
       <div>
-        <div className="tls-type-label text-[#FFD700] mb-3">Mitgliedsart</div>
+        <div className="tls-type-label text-honor mb-3">Mitgliedsart</div>
         <div className="grid sm:grid-cols-2 gap-2" data-testid="apply-fees">
           {(setup.fees || []).map((fee) => (
-            <label key={fee.id} className={`flex items-start gap-2 border rounded-sm p-3 cursor-pointer transition ${form.type_id === fee.id ? "border-[#FFD700] bg-[#FFD700]/5" : "border-white/10 hover:border-white/25"}`}>
-              <input type="radio" name="apply-fee" value={fee.id} checked={form.type_id === fee.id} onChange={() => updateField("type_id", fee.id)} data-testid={`apply-fee-${fee.id}`} className="mt-1 accent-[#FFD700]" />
+            <label key={fee.id} className={`flex items-start gap-2 border rounded-sm p-3 cursor-pointer transition ${form.type_id === fee.id ? "border-honor bg-honor/5" : "border-white/10 hover:border-white/25"}`}>
+              <input type="radio" name="apply-fee" value={fee.id} checked={form.type_id === fee.id} onChange={() => updateField("type_id", fee.id)} data-testid={`apply-fee-${fee.id}`} className="mt-1 accent-honor" />
               <span className="min-w-0">
                 <span className="block font-bold text-white">{fee.label}</span>
-                <span className="block tls-type-small text-[#FFD700]/90">{feeLine(fee)}</span>
+                <span className="block tls-type-small text-honor/90">{feeLine(fee)}</span>
                 {fee.description && <span className="block mt-1 tls-type-small text-white/50">{fee.description}</span>}
               </span>
             </label>
@@ -276,7 +276,7 @@ function CoupledFields({ setup, form, updateField, fieldErrors, requiredPerson }
       </div>
 
       <div>
-        <div className="tls-type-label text-[#FFD700] mb-3">Deine Angaben</div>
+        <div className="tls-type-label text-honor mb-3">Deine Angaben</div>
         <div className="grid sm:grid-cols-2 gap-3">
           {PERSON_FIELDS.map(([key, label, type]) => (
             (requiredPerson.has(key) || ["firstname", "lastname", "address", "zip", "town"].includes(key) || key === "phone") && (
@@ -313,7 +313,7 @@ function CoupledFields({ setup, form, updateField, fieldErrors, requiredPerson }
           <div className="tls-type-label text-white/60">Freiwillige Einwilligungen</div>
           {setup.consents.map((consent) => (
             <label key={consent.code} className="flex items-start gap-2 cursor-pointer">
-              <input type="checkbox" checked={!!form.consents[consent.code]} onChange={(e) => setConsent(consent.code, e.target.checked)} data-testid={`apply-consent-${consent.code}`} className="mt-1 accent-[#FFD700]" />
+              <input type="checkbox" checked={!!form.consents[consent.code]} onChange={(e) => setConsent(consent.code, e.target.checked)} data-testid={`apply-consent-${consent.code}`} className="mt-1 accent-honor" />
               <span className="tls-type-small text-white/70"><span className="text-white font-bold">{consent.label}:</span> {consent.text}</span>
             </label>
           ))}
@@ -325,7 +325,7 @@ function CoupledFields({ setup, form, updateField, fieldErrors, requiredPerson }
 }
 
 function RenewButton({ onClick }) {
-  return <button type="button" onClick={onClick} data-testid="apply-renew" className="tls-type-label text-[#FFD700] hover:underline">Neuen Antrag stellen</button>;
+  return <button type="button" onClick={onClick} data-testid="apply-renew" className="tls-type-label text-honor hover:underline">Neuen Antrag stellen</button>;
 }
 
 function Field({ id, label, error, className = "", children }) {

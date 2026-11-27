@@ -317,7 +317,7 @@ export function TeamsPanel() {
                     <div key={squad.id} className="border border-white/10 bg-[#0A0A0A] rounded-sm p-4">
                       <div className="flex items-start justify-between gap-2">
                         <div>
-                          <div className="tls-type-label text-[#FFD700]">{squadStatusLabel(squad.status)}</div>
+                          <div className="tls-type-label text-brand">{squadStatusLabel(squad.status)}</div>
                           <h4 className="tls-type-card">{squad.name}</h4>
                         </div>
                         {canEditSquads && squad.can_edit !== false && (
@@ -343,7 +343,7 @@ export function TeamsPanel() {
                         {(squad.members || []).map((m) => {
                           const role = roleOf(squad, m.id);
                           return (
-                            <span key={m.id} className={`px-2 py-1 border rounded-sm tls-type-small max-w-full truncate ${role ? "border-[#FFD700]/40 text-[#FFD700]" : "border-white/10 text-white/70"}`}>
+                            <span key={m.id} className={`px-2 py-1 border rounded-sm tls-type-small max-w-full truncate ${role ? "border-brand/40 text-brand" : "border-white/10 text-white/70"}`}>
                               {role && <abbr title={role.label} className="no-underline font-bold mr-1">{role.short}</abbr>}
                               {m.display_name || m.username}
                             </span>
@@ -393,7 +393,7 @@ export function TeamsPanel() {
                       <label key={m.id} className="flex items-center gap-2 border border-white/10 bg-[#0A0A0A] rounded-sm p-2 tls-type-small min-w-0">
                         <input type="checkbox" checked={checked} disabled={Boolean(role)} onChange={() => toggleMember(m.id)} className="accent-[#29B6E8]" data-testid={`team-squad-member-${m.id}`} />
                         <span className="truncate">{m.display_name || m.username}</span>
-                        {role && <span className="ml-auto shrink-0 tls-type-label text-[#FFD700]">{role.label}</span>}
+                        {role && <span className="ml-auto shrink-0 tls-type-label text-brand">{role.label}</span>}
                       </label>
                     );
                   })}

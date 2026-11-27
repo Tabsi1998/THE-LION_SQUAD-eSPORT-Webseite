@@ -84,10 +84,10 @@ export function BrandDateTimeField({ label, value, onChange, testId }) {
 
 export function SeoStatusCard({ title, ok, detail }) {
   return (
-    <div className={`rounded-sm border bg-[#121212] p-3 ${ok ? "border-[#10B981]/25" : "border-[#FFD700]/25"}`}>
+    <div className={`rounded-sm border bg-[#121212] p-3 ${ok ? "border-[#10B981]/25" : "border-warn/25"}`}>
       <div className="flex items-center justify-between gap-2">
         <div className="tls-type-label text-white/65">{title}</div>
-        {ok ? <CheckCircle2 className="h-4 w-4 text-[#10B981]" /> : <AlertTriangle className="h-4 w-4 text-[#FFD700]" />}
+        {ok ? <CheckCircle2 className="h-4 w-4 text-[#10B981]" /> : <AlertTriangle className="h-4 w-4 text-warn" />}
       </div>
       <div className="mt-2 break-words tls-type-small leading-relaxed text-white/45">{detail}</div>
     </div>

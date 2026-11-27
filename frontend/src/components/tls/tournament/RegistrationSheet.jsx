@@ -166,8 +166,8 @@ export function RegistrationSheet({ tournament, user, myTeams = [], loading, err
               </label>
             ))}
             {offer && (
-              <div className="space-y-2 rounded-sm border border-[#FFD700]/40 p-3" data-testid="tournament-register-costs">
-                <div className="tls-type-label text-[#FFD700]">Startgeld</div>
+              <div className="space-y-2 rounded-sm border border-brand/40 p-3" data-testid="tournament-register-costs">
+                <div className="tls-type-label text-brand">Startgeld</div>
                 {offer.positions.some((position) => position.optional) && (
                   <div className="space-y-1">
                     {offer.positions.filter((position) => position.optional).map((position) => (

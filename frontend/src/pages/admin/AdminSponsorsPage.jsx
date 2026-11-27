@@ -17,9 +17,10 @@ import { toast } from "sonner";
 import { Archive, ArchiveRestore, Plus, Trash2, Pencil } from "lucide-react";
 import { ShortCaps } from "@/components/tls/ShortCaps";
 
+import { ROLE_COLORS } from "@/lib/categoryColors";
 const TIERS = ["main", "platinum", "gold", "silver", "bronze"];
 const TIER_LABELS = { main: "Hauptsponsor", platinum: "Platin", gold: "Gold", silver: "Silber", bronze: "Bronze" };
-const TIER_COLORS = { main: "text-[#29B6E8]", platinum: "text-[#E5E4E2]", gold: "text-[#FFD700]", silver: "text-white/80", bronze: "text-[#CD7F32]" };
+const TIER_COLORS = { main: "text-[#29B6E8]", platinum: "text-[#E5E4E2]", gold: "text-honor", silver: "text-white/80", bronze: "text-[#CD7F32]" };
 const STATUS_LABELS = { active: "Aktiv", planned: "Geplant", expired: "Abgelaufen", inactive: "Archiviert" };
 const STATUS_CLASSES = {
   active: "bg-ok/10 text-ok",
@@ -142,7 +143,7 @@ export default function AdminSponsorsPage() {
                     </span>
                     {s.show_on_home && <span className="tls-type-label px-1.5 py-0.5 bg-[#29B6E8]/15 text-[#29B6E8] rounded-sm">Startseite</span>}
                     {s.show_on_footer && <span className="tls-type-label px-1.5 py-0.5 bg-white/10 text-white/70 rounded-sm">Fußzeile</span>}
-                    {s.show_on_events && <span className="tls-type-label px-1.5 py-0.5 bg-[#FFD700]/15 text-[#FFD700] rounded-sm">Events</span>}
+                    {s.show_on_events && <span className="tls-type-label px-1.5 py-0.5 bg-event/15 text-event rounded-sm">Events</span>}
                     {s.show_on_tv && <span className="tls-type-label px-1.5 py-0.5 bg-[#9F7AEA]/15 text-[#BFA6FF] rounded-sm">TV</span>}
                     {s.show_on_pdf && <span className="tls-type-label px-1.5 py-0.5 bg-[#29B6E8]/15 text-[#8EE6FF] rounded-sm">PDF</span>}
                     {s.show_in_emails && <span className="tls-type-label px-1.5 py-0.5 bg-[#18C29C]/15 text-[#18C29C] rounded-sm">E-Mail</span>}
@@ -302,7 +303,7 @@ function SponsorForm({ sponsor, events = [], locked = new Set(), onClose, onSave
           <CheckField label="Öffentlich zeigen" hint="Aus = archiviert: überall weg, hier noch da." checked={form.is_active !== false} onChange={(v) => set("is_active", v)} testId="sponsor-active" />
           <CheckField label="Auf der Startseite" checked={form.show_on_home === true} onChange={(v) => setPlacement("show_on_home", v)} testId="sponsor-show-home" />
           <CheckField label="In der Fußzeile" checked={form.show_on_footer === true} onChange={(v) => setPlacement("show_on_footer", v)} testId="sponsor-show-footer" />
-          <CheckField label="Events" checked={form.show_on_events === true} onChange={(v) => setPlacement("show_on_events", v)} testId="sponsor-show-events" accent="#FFD700" />
+          <CheckField label="Events" checked={form.show_on_events === true} onChange={(v) => setPlacement("show_on_events", v)} testId="sponsor-show-events" accent={ROLE_COLORS.brand} />
           <CheckField label="TV / Anzeige" checked={form.show_on_tv === true} onChange={(v) => setPlacement("show_on_tv", v)} testId="sponsor-show-tv" accent="#9F7AEA" />
           <CheckField label="PDFs" checked={form.show_on_pdf === true} onChange={(v) => setPlacement("show_on_pdf", v)} testId="sponsor-show-pdf" />
           <CheckField label="E-Mails" checked={form.show_in_emails === true} onChange={(v) => setPlacement("show_in_emails", v)} testId="sponsor-show-emails" accent="#18C29C" />
@@ -331,7 +332,7 @@ function SponsorForm({ sponsor, events = [], locked = new Set(), onClose, onSave
                   label={ev.name}
                   checked={(form.event_ids || []).includes(ev.id)}
                   onChange={(checked) => set("event_ids", checked ? [...(form.event_ids || []), ev.id] : (form.event_ids || []).filter((id) => id !== ev.id))}
-                  accent="#FFD700"
+                  accent={ROLE_COLORS.brand}
                 />
               ))}
             </div>

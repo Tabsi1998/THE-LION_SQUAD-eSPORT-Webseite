@@ -245,7 +245,7 @@ function StaffelPage({ tournamentId }) {
         <h1 className="tls-type-title break-words [overflow-wrap:anywhere]" data-testid="staffel-title">{staffelLabel(t)}</h1>
         <div className="mt-2 flex min-w-0 flex-wrap items-center gap-x-3 gap-y-2">
           <span className="inline-flex" data-testid="staffel-stand"><StaffelStand tournament={t} /></span>
-          {t.locked_at ? <span className="rounded-sm border border-[#FFD700]/40 px-2 py-[3px] tls-type-label text-[#FFD700]">Gesperrt</span> : null}
+          {t.locked_at ? <span className="rounded-sm border border-quiet/40 px-2 py-[3px] tls-type-label text-quiet">Gesperrt</span> : null}
         </div>
       </header>
 

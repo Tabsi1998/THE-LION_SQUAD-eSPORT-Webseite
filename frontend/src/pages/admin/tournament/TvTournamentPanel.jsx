@@ -42,11 +42,11 @@ export function PauseUntilControl({ tournament, onSaved }) {
     }
   };
   return (
-    <div className="mt-2 flex flex-wrap items-center gap-2 border border-[#FFD700]/30 bg-[#FFD700]/5 rounded-sm px-3 py-2" data-testid="admin-tr-pause-until">
-      <Clock className="w-4 h-4 text-[#FFD700]" />
+    <div className="mt-2 flex flex-wrap items-center gap-2 border border-brand/30 bg-brand/5 rounded-sm px-3 py-2" data-testid="admin-tr-pause-until">
+      <Clock className="w-4 h-4 text-brand" />
       <label className="tls-type-label text-white/70" htmlFor="pause-until-clock">Pause bis</label>
       <input id="pause-until-clock" type="time" value={clock} onChange={(event) => setClock(event.target.value)} className={`${INPUT} py-1`} data-testid="admin-tr-pause-until-input" />
-      <button type="button" disabled={busy || !clock} onClick={() => save(pauseUntilFromClock(clock))} className="px-3 py-1.5 bg-[#FFD700] text-black rounded-sm tls-type-label disabled:opacity-40" data-testid="admin-tr-pause-until-save">Speichern</button>
+      <button type="button" disabled={busy || !clock} onClick={() => save(pauseUntilFromClock(clock))} className="px-3 py-1.5 bg-brand text-black rounded-sm tls-type-label disabled:opacity-40" data-testid="admin-tr-pause-until-save">Speichern</button>
       <button type="button" disabled={busy || !tournament.paused_until} onClick={() => save(null)} className="px-3 py-1.5 border border-white/15 text-white/70 rounded-sm tls-type-label disabled:opacity-40" data-testid="admin-tr-pause-until-clear">Ohne Uhrzeit</button>
       <span className="tls-type-small text-white/45">Der TV zeigt „Weiter um …“ mit Countdown. Beim Weiterspielen fällt die Uhrzeit weg.</span>
     </div>
@@ -133,7 +133,7 @@ export function RoundSponsorsPanel({ tournament, matches = [], stages = [], onSa
         </button>
       </div>
       {sponsors && !sponsors.length ? (
-        <p className="mt-3 tls-type-small text-[#FFD700]" data-testid="admin-tr-round-sponsors-none">Noch kein Sponsor mit „TV / Anzeige“. Unter Sponsoren bei einem Sponsor den Haken „TV / Anzeige“ setzen.</p>
+        <p className="mt-3 tls-type-small text-quiet" data-testid="admin-tr-round-sponsors-none">Noch kein Sponsor mit „TV / Anzeige“. Unter Sponsoren bei einem Sponsor den Haken „TV / Anzeige“ setzen.</p>
       ) : (
         <div className="mt-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
           {rounds.map((round) => (

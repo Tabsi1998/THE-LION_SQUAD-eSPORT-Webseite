@@ -234,7 +234,7 @@ export default function AdminEasterHuntPage() {
               <Tile label="Stand" value={PHASE_LABELS[view.phase] || view.phase} tone={view.phase === "running" ? "text-[#5fd38d]" : "text-white"} testId="easter-admin-phase" />
               <Tile label="Eier" value={rows.length} testId="easter-admin-count" />
               <Tile label="Angefangen" value={view.started} testId="easter-admin-started" />
-              <Tile label="Voller Korb" value={view.completed} tone={view.completed ? "text-[#ffd700]" : "text-white/60"} testId="easter-admin-completed" />
+              <Tile label="Voller Korb" value={view.completed} tone={view.completed ? "text-honor" : "text-white/60"} testId="easter-admin-completed" />
             </div>
             <p className="mb-6 tls-type-body text-white/60">
               Suche von {dateText(view.starts_at)} bis {dateText(view.ends_at)} · Hinweise ab {dateText(view.hints_open_at)} · Status: {STATUS_LABELS[view.status] || view.status}
@@ -296,7 +296,7 @@ export default function AdminEasterHuntPage() {
             </section>
 
             <section className="rounded-sm border border-white/10 bg-[#121212] p-5" data-testid="easter-admin-draw">
-              <h2 className="mb-3 flex items-center gap-2 tls-type-section"><Trophy className="h-4 w-4 text-[#ffd700]" /> Auswertung</h2>
+              <h2 className="mb-3 flex items-center gap-2 tls-type-section"><Trophy className="h-4 w-4 text-honor" /> Auswertung</h2>
               {view.status === "drawn" ? (
                 <div className="space-y-2 tls-type-small">
                   {(view.fastest_awarded || []).map((row) => <p key={row.user_id}><span className="text-[#e9c46a]">{row.title}:</span> {row.name}</p>)}
@@ -310,7 +310,7 @@ export default function AdminEasterHuntPage() {
                   {view.may_draw === false ? (
                     <p className="mt-3 tls-type-small text-white/50" data-testid="easter-admin-no-draw">Ausgewertet wird von der Vereinsleitung.</p>
                   ) : (
-                    <button type="button" onClick={draw} disabled={busy || !view.can_draw} data-testid="easter-admin-run-draw" className="mt-3 rounded-sm bg-[#ffd700] px-4 py-2 tls-type-label text-black hover:opacity-90 disabled:opacity-40">Auswerten</button>
+                    <button type="button" onClick={draw} disabled={busy || !view.can_draw} data-testid="easter-admin-run-draw" className="mt-3 rounded-sm bg-honor px-4 py-2 tls-type-label text-black hover:opacity-90 disabled:opacity-40">Auswerten</button>
                   )}
                 </>
               )}

@@ -101,7 +101,7 @@ export function XpTab({ board = false }) {
                   <div className="space-y-2">
                     <input type="number" value={amount} onChange={(e) => setAmount(e.target.value)} placeholder="z. B. 50 oder -20" aria-label="XP" data-testid="xp-amount" className={INPUT_CLASS} />
                     <input value={reason} onChange={(e) => setReason(e.target.value)} placeholder="Grund" aria-label="Grund" data-testid="xp-reason" className={INPUT_CLASS} />
-                    <button type="button" onClick={correct} disabled={busy} data-testid="xp-submit" className="px-4 py-2 bg-[#FFD700] text-black tls-type-label rounded-sm disabled:opacity-40">Korrigieren</button>
+                    <button type="button" onClick={correct} disabled={busy} data-testid="xp-submit" className="px-4 py-2 bg-honor text-black tls-type-label rounded-sm disabled:opacity-40">Korrigieren</button>
                   </div>
                 </BoardOnly>
               </Panel>

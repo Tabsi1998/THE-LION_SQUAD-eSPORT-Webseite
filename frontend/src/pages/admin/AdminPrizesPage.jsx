@@ -12,7 +12,7 @@ import { PrizeFormSheet } from "./prizes/PrizeFormSheet";
 import { ShortCaps } from "@/components/tls/ShortCaps";
 
 const STATUS_LABEL = {
-  pending: { label: "Offen", icon: Clock, color: "text-[#FFD700] bg-[#FFD700]/10 border-[#FFD700]/30" },
+  pending: { label: "Offen", icon: Clock, color: "text-honor bg-honor/10 border-honor/30" },
   ready: { label: "Bereit zur Abholung", icon: Gift, color: "text-[#29B6E8] bg-[#29B6E8]/10 border-[#29B6E8]/30" },
   picked_up: { label: "Abgeholt", icon: CheckCircle2, color: "text-ok bg-ok/10 border-ok/30" },
   expired: { label: "Verfallen", icon: XCircle, color: "text-quiet bg-quiet/10 border-quiet/30" },
@@ -198,7 +198,7 @@ export default function AdminPrizesPage() {
             onClick={createMissing}
             disabled={creatingMissing}
             data-testid="prizes-create-missing"
-            className="inline-flex items-center justify-center gap-2 rounded-sm border border-[#FFD700]/40 px-4 py-2.5 tls-type-label text-[#FFD700] hover:bg-[#FFD700]/10 disabled:opacity-50"
+            className="inline-flex items-center justify-center gap-2 rounded-sm border border-honor/40 px-4 py-2.5 tls-type-label text-honor hover:bg-honor/10 disabled:opacity-50"
           >
             <RefreshCw className={`h-4 w-4 ${creatingMissing ? "animate-spin" : ""}`} />
             Gewinne neu erzeugen
@@ -244,9 +244,9 @@ export default function AdminPrizesPage() {
             placeholder="Suchen nach Turnier, Fast Lap, Empfänger oder Preis..."
           />
         </label>
-        <div className="border border-[#FFD700]/20 bg-[#FFD700]/5 rounded-sm px-4 py-2.5 flex items-center justify-between gap-3">
+        <div className="border border-honor/20 bg-honor/5 rounded-sm px-4 py-2.5 flex items-center justify-between gap-3">
           <span className="tls-type-label text-white/50">Bald fällig</span>
-          <span className="font-black text-[#FFD700]">{dueSoon}</span>
+          <span className="font-black text-honor">{dueSoon}</span>
         </div>
       </div>
 
@@ -319,10 +319,10 @@ export default function AdminPrizesPage() {
                       </span>
                     </td>
                     <td className="px-4 py-3 tls-type-small whitespace-nowrap">
-                      <div className={`inline-flex items-center gap-1.5 ${isUrgent ? "text-[#FFD700]" : "text-white/50"}`}>
+                      <div className={`inline-flex items-center gap-1.5 ${isUrgent ? "text-warn" : "text-white/50"}`}>
                         <CalendarDays className="w-3 h-3" /> {deadlineText(p)}
                       </div>
-                      {isUrgent && <div className="tls-type-label text-[#FFD700] mt-1">{due < 0 ? "überfällig" : `${due} Tage`}</div>}
+                      {isUrgent && <div className="tls-type-label text-warn mt-1">{due < 0 ? "überfällig" : `${due} Tage`}</div>}
                     </td>
                     <td className="px-4 py-3 text-right whitespace-nowrap">
                       {p.status === "pending" && (
@@ -420,7 +420,7 @@ function PrizeMobileCard({ p, updateStatus, markPickedUp, remove, edit }) {
         {p.prize_value && <div className="mt-1 tls-type-small text-white/45">{p.prize_value}</div>}
       </div>
 
-      <div className={`mt-3 tls-type-small inline-flex items-center gap-1.5 ${isUrgent ? "text-[#FFD700]" : "text-white/50"}`}>
+      <div className={`mt-3 tls-type-small inline-flex items-center gap-1.5 ${isUrgent ? "text-warn" : "text-white/50"}`}>
         <CalendarDays className="w-3 h-3" /> Frist: {deadlineText(p)}
         {isUrgent && <span className="font-bold uppercase tracking-widest">{due < 0 ? "überfällig" : `${due} Tage`}</span>}
       </div>

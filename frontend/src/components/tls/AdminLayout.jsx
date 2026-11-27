@@ -557,7 +557,7 @@ export function AdminLayout({ children }) {
               to={mfaSetupPath(location.pathname)}
               onClick={() => setOpenMobile(false)}
               data-testid="admin-nav-mfa-setup"
-              className="mb-3 flex items-start gap-3 rounded-sm border border-[#FFD700]/40 bg-[#FFD700]/5 px-3 py-2.5 tls-type-small font-semibold text-[#FFD700] hover:bg-[#FFD700]/10"
+              className="mb-3 flex items-start gap-3 rounded-sm border border-warn/40 bg-warn/5 px-3 py-2.5 tls-type-small font-semibold text-warn hover:bg-warn/10"
             >
               <ShieldCheck className="w-4 h-4 shrink-0 mt-0.5" />
               <span>

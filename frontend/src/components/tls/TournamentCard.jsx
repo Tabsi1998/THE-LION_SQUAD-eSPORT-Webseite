@@ -84,7 +84,7 @@ export function TournamentCard({ tournament, index = 0 }) {
             {t.participant_count || 0}/{t.max_participants}
           </span>
           {t.prize_pool && (
-            <span className="inline-flex items-center gap-1 text-[#FFD700]">
+            <span className="inline-flex items-center gap-1 text-honor">
               <Trophy className="w-3.5 h-3.5" />
               Preise
             </span>

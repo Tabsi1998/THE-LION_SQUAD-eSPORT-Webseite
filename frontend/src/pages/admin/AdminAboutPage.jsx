@@ -82,7 +82,7 @@ function ClubPhotoField({ value, onChange }) {
   return (
     <div className="space-y-3" data-testid="about-club-photo">
       <ImageUpload value={value.url} onChange={(url) => onChange({ ...value, url })} label="Vereinsfoto" testId="about-club-photo-upload" variant="wide" allowLibrary />
-      <p className="tls-type-small text-[#FFD700]/80">Nur ein Foto, mit dem alle Abgebildeten einverstanden sind.</p>
+      <p className="tls-type-small text-warn/80">Nur ein Foto, mit dem alle Abgebildeten einverstanden sind.</p>
       {value.url ? (
         <div>
           <div className="tls-type-small text-white/55 mb-1">Fokuspunkt: ins Bild klicken – dieser Punkt bleibt beim Zuschneiden immer sichtbar ({value.focus_x} % / {value.focus_y} %).</div>

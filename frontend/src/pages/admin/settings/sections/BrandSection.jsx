@@ -50,7 +50,7 @@ export function BrandSection({ brand, siteBanners, bannerForm, editingBannerId, 
             <p className="mt-1">
               Browser ohne Hell/Dunkel-Erkennung und der Home-Bildschirm nehmen den Standard-Favicon.{" "}
               {faviconDarkOnly
-                ? <span className="text-[#FFD700]" data-testid="brand-favicon-dark-only">Deiner ist die Fassung für dunkel – auf hellen Tableisten unsichtbar.</span>
+                ? <span className="text-warn" data-testid="brand-favicon-dark-only">Deiner ist die Fassung für dunkel – auf hellen Tableisten unsichtbar.</span>
                 : "Erzeugt wird das weiße Logo (Favicon dunkel, sonst Maskottchen) auf einem Kreis in der Akzentfarbe."}
             </p>
           </div>

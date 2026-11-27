@@ -11,7 +11,7 @@ export function SwitchRow({ label, description, hint, checked, onCheckedChange, 
       <div className="min-w-0">
         <div className="font-bold text-white">{label}</div>
         {description ? <div className="tls-type-small text-white/60 mt-1">{description}</div> : null}
-        {hint ? <div className="tls-type-small text-[#FFD700] mt-1">{hint}</div> : null}
+        {hint ? <div className="tls-type-small text-quiet mt-1">{hint}</div> : null}
       </div>
       <ProfileSwitch label={label} checked={checked} onCheckedChange={onCheckedChange} disabled={disabled} testId={testId} className="mt-1" />
     </div>

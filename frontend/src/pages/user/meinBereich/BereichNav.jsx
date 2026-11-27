@@ -60,7 +60,7 @@ export function BereichSeitenleiste({ gruppen, aktiv, offen = {} }) {
               >
                 <item.icon className="tls-mb-nav__icon w-4 h-4 shrink-0" aria-hidden="true" />
                 <span className="tls-wrap min-w-0 flex-1">{item.label}</span>
-                {count ? <span className="tls-mb-dot shrink-0 min-w-5 h-5 rounded-full bg-[#FFD700] px-1.5 tls-type-small font-black leading-5 text-center text-black" aria-hidden="true">{count}</span> : null}
+                {count ? <span className="tls-mb-dot shrink-0 min-w-5 h-5 rounded-full bg-brand px-1.5 tls-type-small font-black leading-5 text-center text-black" aria-hidden="true">{count}</span> : null}
               </Link>
             </li>
           );
@@ -92,7 +92,7 @@ export function BereichListe({ gruppen, offen = {}, testId = "mein-bereich-liste
                 <span className="tls-card__title tls-wrap block font-bold text-white">{item.label}</span>
                 <span className="tls-wrap block tls-type-small text-white/55">{GRUPPEN_TEXT[item.key]}</span>
               </span>
-              {count ? <span className="tls-mb-dot shrink-0 rounded-full bg-[#FFD700] px-2 py-0.5 tls-type-small font-black text-black" aria-hidden="true">{offenText(count)}</span> : null}
+              {count ? <span className="tls-mb-dot shrink-0 rounded-full bg-brand px-2 py-0.5 tls-type-small font-black text-black" aria-hidden="true">{offenText(count)}</span> : null}
               <ChevronRight className="tls-card__arrow w-4 h-4 shrink-0 text-white/35" aria-hidden="true" />
             </Link>
           </li>

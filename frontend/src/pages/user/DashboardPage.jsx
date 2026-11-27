@@ -44,9 +44,9 @@ function DashboardAvatar({ user, isClubMember }) {
   return (
     <div
       className={`tls-type-section w-16 h-16 md:w-20 md:h-20 shrink-0 overflow-hidden border-2 ${
-        isClubMember ? "border-[#FFD700]/70 shadow-[0_0_28px_rgba(255,215,0,0.14)]" : "border-[#29B6E8]/60 shadow-[0_0_28px_rgba(41,182,232,0.12)]"
+        isClubMember ? "border-honor/70 shadow-[0_0_28px_rgba(255,215,0,0.14)]" : "border-[#29B6E8]/60 shadow-[0_0_28px_rgba(41,182,232,0.12)]"
       } rounded-sm bg-[#0A0A0A] flex items-center justify-center ${
-        isClubMember ? "text-[#FFD700]" : "text-[#29B6E8]"
+        isClubMember ? "text-honor" : "text-[#29B6E8]"
       }`}
     >
       {avatarUrl && !imageFailed ? (
@@ -61,7 +61,7 @@ function DashboardAvatar({ user, isClubMember }) {
 function Pill({ children, tone = "cyan", testId }) {
   const tones = {
     cyan: "border-[#29B6E8]/50 text-[#29B6E8] bg-[#29B6E8]/10",
-    gold: "border-[#FFD700]/50 text-[#FFD700] bg-[#FFD700]/10",
+    gold: "border-honor/50 text-honor bg-honor/10",
     grey: "border-white/15 text-white/60 bg-white/5",
   };
   return <span data-testid={testId} className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-sm border tls-type-label ${tones[tone] || tones.cyan}`}>{children}</span>;
@@ -99,7 +99,7 @@ function TimelineRow({ item, live = false }) {
       </div>
       <div className="flex flex-col items-end gap-1 shrink-0">
         {live && item.phaseLabel ? <Pill tone="cyan">{item.phaseLabel}</Pill> : null}
-        {status ? <Pill tone={item.registrationStatus === "pending" ? "grey" : "gold"}>{status}</Pill> : null}
+        {status ? <Pill tone={["pending", "waitlist", "waitlisted"].includes(item.registrationStatus) ? "grey" : "cyan"}>{status}</Pill> : null}
       </div>
       <ChevronRight className="w-4 h-4 text-white/30 shrink-0" />
     </Link>
@@ -187,7 +187,7 @@ export default function DashboardPage() {
               {isClubMember ? <Pill tone="gold" testId="dashboard-pill-member"><Crown className="w-3 h-3" /> Vereinsmitglied</Pill> : <Pill tone="grey" testId="dashboard-pill-community">Community</Pill>}
               {isModerator ? <Pill tone="cyan" testId="dashboard-pill-staff"><Shield className="w-3 h-3" /> Staff</Pill> : null}
               {isClubMember && user?.membership?.member_number ? <span className="tls-type-small text-white/50 font-mono">{user.membership.member_number}</span> : null}
-              {!isClubMember ? <Link to="/membership/join" data-testid="dashboard-join-cta" className="tls-type-small font-bold text-[#FFD700] hover:underline">Mitglied werden</Link> : null}
+              {!isClubMember ? <Link to="/membership/join" data-testid="dashboard-join-cta" className="tls-type-small font-bold text-honor hover:underline">Mitglied werden</Link> : null}
             </div>
           </div>
           {/* „Mein Bereich“ (#2059): Profil, Mitgliedschaft, Rechnungen, Konto und Datenschutz an einem Ort - unten als Liste. */}
@@ -229,15 +229,15 @@ export default function DashboardPage() {
             {/* Nur, wenn die Moderation etwas festgehalten hat (#416) - sonst bleibt das Dashboard, wie es ist. */}
             <ModerationStandingCard compact />
             {actions.length > 0 && (
-              <section className="border border-[#FFD700]/30 rounded-sm bg-[#121212] p-5" data-testid="dashboard-actions">
-                <h2 className="tls-type-section mb-3 flex items-center gap-2"><ClipboardCheck className="w-4 h-4 text-[#FFD700]" /> Offene Aktionen</h2>
+              <section className="border border-brand/30 rounded-sm bg-[#121212] p-5" data-testid="dashboard-actions">
+                <h2 className="tls-type-section mb-3 flex items-center gap-2"><ClipboardCheck className="w-4 h-4 text-brand" /> Offene Aktionen</h2>
                 <div className="border border-white/5 rounded-sm bg-[#0F0F10] overflow-hidden">
                   {actions.map((action) => {
                     const Icon = actionIcon(action.type);
                     if (action.type === "feedback") {
                       return (
                         <button key={action.id} type="button" onClick={() => setFeedbackTarget(action.target_id)} data-testid={`dashboard-action-${action.id}`} className="w-full text-left flex items-center gap-3 px-3 py-3 border-b border-white/5 last:border-b-0 hover:bg-white/[0.03] transition">
-                          <span className="w-9 h-9 rounded-sm border border-[#FFD700]/40 bg-[#FFD700]/10 text-[#FFD700] inline-flex items-center justify-center shrink-0"><Star className="w-4 h-4" /></span>
+                          <span className="w-9 h-9 rounded-sm border border-brand/40 bg-brand/10 text-brand inline-flex items-center justify-center shrink-0"><Star className="w-4 h-4" /></span>
                           <span className="min-w-0 flex-1">
                             <span className="block font-bold tls-type-small text-white">{action.label}</span>
                             {action.detail ? <span className="block tls-type-small text-white/50 break-words">{action.detail}</span> : null}
@@ -248,7 +248,7 @@ export default function DashboardPage() {
                     }
                     return (
                       <Link key={action.id} to={action.href || "/dashboard"} data-testid={`dashboard-action-${action.id}`} className="flex items-center gap-3 px-3 py-3 border-b border-white/5 last:border-b-0 hover:bg-white/[0.03] transition">
-                        <span className="w-9 h-9 rounded-sm border border-[#FFD700]/40 bg-[#FFD700]/10 text-[#FFD700] inline-flex items-center justify-center shrink-0"><Icon className="w-4 h-4" /></span>
+                        <span className="w-9 h-9 rounded-sm border border-brand/40 bg-brand/10 text-brand inline-flex items-center justify-center shrink-0"><Icon className="w-4 h-4" /></span>
                         <span className="min-w-0 flex-1">
                           <span className="block font-bold tls-type-small text-white">{action.label}</span>
                           {action.detail ? <span className="block tls-type-small text-white/50 break-words">{action.detail}</span> : null}
@@ -294,8 +294,8 @@ export default function DashboardPage() {
             )}
 
             {staffMatches.length > 0 && (
-              <section className="border border-[#FFD700]/25 rounded-sm bg-[#121212] p-5" data-testid="dashboard-staff-matches">
-                <h2 className="tls-type-section mb-4 flex items-center gap-2"><Trophy className="w-4 h-4 text-[#FFD700]" /> Turnierleitung · Ergebnisse</h2>
+              <section className="border border-brand/25 rounded-sm bg-[#121212] p-5" data-testid="dashboard-staff-matches">
+                <h2 className="tls-type-section mb-4 flex items-center gap-2"><Trophy className="w-4 h-4 text-brand" /> Turnierleitung · Ergebnisse</h2>
                 <div className="grid md:grid-cols-2 gap-3">
                   {staffMatches.map((match) => <DashboardMatchCard key={match.id} match={match} staff />)}
                 </div>
@@ -305,10 +305,10 @@ export default function DashboardPage() {
 
           <div className="space-y-6 min-w-0">
             {season ? (
-              <Link to={`/seasons/${season.slug || "current"}`} data-testid="dashboard-season" className="block border border-[#FFD700]/30 hover:border-[#FFD700]/70 rounded-sm bg-gradient-to-br from-[#FFD700]/10 to-transparent p-5 transition">
+              <Link to={`/seasons/${season.slug || "current"}`} data-testid="dashboard-season" className="block border border-honor/30 hover:border-honor/70 rounded-sm bg-gradient-to-br from-honor/10 to-transparent p-5 transition">
                 <div className="flex items-center justify-between">
-                  <div className="tls-type-label text-[#FFD700]">Jahreswertung</div>
-                  <Award className="w-4 h-4 text-[#FFD700]" />
+                  <div className="tls-type-label text-brand">Jahreswertung</div>
+                  <Award className="w-4 h-4 text-honor" />
                 </div>
                 <div className="mt-2 tls-type-card">{season.name || "Jahreswertung"}</div>
                 <div className="mt-1 tls-type-small text-white/70">{seasonLine(season)}</div>
@@ -379,7 +379,7 @@ function DashboardMatchCard({ match, staff = false, testId }) {
         : "Match öffnen";
   const tone = disputed
     ? "border-warn/50 bg-warn/5 hover:border-warn"
-    : attention ? "border-[#FFD700]/45 bg-[#FFD700]/5 hover:border-[#FFD700]" : "border-white/10 hover:border-[#29B6E8]/60";
+    : attention ? "border-warn/45 bg-warn/5 hover:border-warn" : "border-white/10 hover:border-[#29B6E8]/60";
   return (
     <Link
       to={`/matches/${match.id}`}
@@ -393,7 +393,7 @@ function DashboardMatchCard({ match, staff = false, testId }) {
       </div>
       {details.length > 0 && <div className="tls-type-small text-white/50 mt-1">{details.join(" · ")}</div>}
       {match.scheduled_at && <div className="tls-type-small text-white/45 mt-1">{viennaDateTime(match.scheduled_at)}</div>}
-      <div className={`mt-2 tls-type-label ${disputed ? "text-[#FF6B60]" : attention ? "text-[#FFD700]" : "text-[#29B6E8]"}`}>{action}</div>
+      <div className={`mt-2 tls-type-label ${disputed ? "text-[#FF6B60]" : attention ? "text-warn" : "text-[#29B6E8]"}`}>{action}</div>
     </Link>
   );
 }

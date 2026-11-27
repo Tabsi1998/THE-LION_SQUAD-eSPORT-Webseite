@@ -1310,7 +1310,7 @@ button.tls-bracket-row:active, .tls-bracket-head:active { transform: scale(calc(
 
 .tls-site-banner--info { color: #29B6E8; }
 .tls-site-banner--live { color: var(--tls-live); }
-.tls-site-banner--warning { color: #FFD700; }
+.tls-site-banner--warning { color: var(--tls-warn); }
 .tls-site-banner--success { color: var(--tls-ok); }
 .tls-site-banner--pos-bottom_fixed {
   position: fixed;
@@ -2618,7 +2618,7 @@ html[data-season-still-cards] .tls-card[data-season-perch="card"]:focus-visible 
   border: 1px dashed rgba(255, 215, 0, 0.45);
   background: rgba(0, 0, 0, 0.35);
 }
-.tls-member-card__qr--off svg { width: 6cqw; height: 6cqw; color: #FFD700; }
+.tls-member-card__qr--off svg { width: 6cqw; height: 6cqw; color: var(--tls-honor); }
 
 /* Sprungleiste im Mitgliederbereich (#1257, #1336): am Handy und Tablet eine Zeile zum Wischen, die unter dem Kopf der
    Website stehen bleibt; am PC (ab 1280 px) links fest. Gold steht nur am Strich unter dem aktiven Eintrag, die Zahl
@@ -3053,15 +3053,15 @@ html[data-season-still-cards] .tls-card[data-season-perch="card"]:focus-visible 
   }
 }
 
-/* Ohne Netz (#1152, wie in der App): die schmale Leiste unter dem Kopf - Gold auf dunklem Gold, der Inhalt bleibt. */
+/* Ohne Netz (#1152, wie in der App): die schmale Leiste unter dem Kopf - Achtung-Orange (#1305), der Inhalt bleibt. */
 .tls-offline-bar {
   display: flex;
   align-items: center;
   gap: 0.5rem;
   padding: 0.4rem 1rem;
-  background: rgba(255, 215, 0, 0.1);
-  border-bottom: 1px solid rgba(255, 215, 0, 0.3);
-  color: #FFD700;
+  background: rgb(var(--tls-warn-rgb) / 0.1);
+  border-bottom: 1px solid rgb(var(--tls-warn-rgb) / 0.3);
+  color: var(--tls-warn);
   font-size: var(--tls-type-small-size);
   font-weight: 700;
 }

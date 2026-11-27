@@ -71,13 +71,13 @@ export function LegalTab({ brand, setBrandField, setCanonicalLegalText, saveBran
           <p className="tls-type-small text-white/50">Name, ZVR, Vereinsbehörde, Anschrift, Telefon und die vertretungsbefugte Person kommen dann aus dem Vereinsmodul (stündlich nachgelesen). Datenschutz-E-Mail, inhaltlich Verantwortlicher, Hosting, UID und Zusatztexte bleiben hier. Ändert sich der Obmann in Dolibarr, stimmt das Impressum von selbst – wenn die Person der Nennung zugestimmt hat; sonst bleibt der Eintrag von Hand.</p>
           <div className="flex flex-wrap items-center gap-3 tls-type-small" data-testid="legal-dolibarr-state">
             {!dolibarrPublic ? <span className="text-white/40">Lade Stand …</span>
-              : dolibarrPublic.unavailable ? <span className="text-[#FFD700]">Dolibarr-Stand nicht abrufbar (Anbindung fehlt oder kein Zugriff).</span>
-              : !dolibarrPublic.has_data ? <span className="text-[#FFD700]">Noch nichts aus Dolibarr gelesen – „Jetzt nachlesen“ oder auf den stündlichen Abgleich warten.</span>
+              : dolibarrPublic.unavailable ? <span className="text-warn">Dolibarr-Stand nicht abrufbar (Anbindung fehlt oder kein Zugriff).</span>
+              : !dolibarrPublic.has_data ? <span className="text-warn">Noch nichts aus Dolibarr gelesen – „Jetzt nachlesen“ oder auf den stündlichen Abgleich warten.</span>
               : (
                 <>
                   <span className="text-white/60">Stand {viennaDateTime(dolibarrPublic.fetched_at, { dateStyle: "short", timeStyle: "short" })}: <span className="text-white">{dolibarrPublic.overlay?.legal_name}</span>, ZVR {dolibarrPublic.overlay?.zvr_number || "–"}</span>
-                  <span className="text-white/60">Vertretung: {dolibarrPublic.representative ? <span className="text-white">{dolibarrPublic.representative.name} ({dolibarrPublic.representative.role})</span> : <span className="text-[#FFD700]">kein freigegebener Name – bleibt von Hand</span>}</span>
-                  {dolibarrPublic.statutes && <span className="text-white/60" data-testid="legal-dolibarr-statutes">Statuten: <span className={dolibarrPublic.statutes.state === "in_force" ? "text-white" : "text-[#FFD700]"}>{statutesSummary(dolibarrPublic.statutes)}</span></span>}
+                  <span className="text-white/60">Vertretung: {dolibarrPublic.representative ? <span className="text-white">{dolibarrPublic.representative.name} ({dolibarrPublic.representative.role})</span> : <span className="text-warn">kein freigegebener Name – bleibt von Hand</span>}</span>
+                  {dolibarrPublic.statutes && <span className="text-white/60" data-testid="legal-dolibarr-statutes">Statuten: <span className={dolibarrPublic.statutes.state === "in_force" ? "text-white" : "text-warn"}>{statutesSummary(dolibarrPublic.statutes)}</span></span>}
                   {dolibarrPublic.error && <span className="text-warn">Letzter Abgleich fehlgeschlagen ({dolibarrPublic.error_text || dolibarrPublic.error}) – alter Stand bleibt.</span>}
                 </>
               )}

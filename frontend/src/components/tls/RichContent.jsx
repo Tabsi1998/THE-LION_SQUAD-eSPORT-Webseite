@@ -43,7 +43,7 @@ function embedMeta(kind, item) {
     return { icon: Calendar, accent: "text-[#9F7AEA]", border: "hover:border-[#9F7AEA]/60", to: `/events/${item.slug || item.id}`, title: item.name, label: "Event" };
   }
   if (kind === "tournament") {
-    return { icon: Trophy, accent: "text-[#FFD700]", border: "hover:border-[#FFD700]/60", to: `/tournaments/${item.slug || item.id}`, title: item.title, label: "Turnier" };
+    return { icon: Trophy, accent: "text-brand", border: "hover:border-brand/60", to: `/tournaments/${item.slug || item.id}`, title: item.title, label: "Turnier" };
   }
   return { icon: Flag, accent: "text-[#29B6E8]", border: "hover:border-[#29B6E8]/60", to: `/fastlap/${item.slug || item.id}`, title: item.title, label: "Fast Lap" };
 }

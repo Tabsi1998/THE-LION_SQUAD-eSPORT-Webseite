@@ -15,7 +15,7 @@ import { ProofPhotoPicker } from "@/components/tls/results/ProofPhotoPicker";
 const TONE = {
   waiting: "border-[#29B6E8]/35 bg-[#29B6E8]/10 text-[#BFE9F8]",
   conflict: "border-warn/40 bg-warn/10 text-warn",
-  confirm: "border-[#FFD700]/40 bg-[#FFD700]/10 text-[#FFF2B3]",
+  confirm: "border-brand/40 bg-brand/10 text-brand",
 };
 
 /** Ohne Beschreibung vom Server: aus den Teilnehmern der Matchseite. */

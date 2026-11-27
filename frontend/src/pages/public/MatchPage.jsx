@@ -492,7 +492,7 @@ function MatchPageView() {
           ) : (
             <div className="border border-white/10 bg-[#121212] rounded-sm px-4 py-3 w-full sm:w-auto sm:min-w-[16rem]" data-testid="match-schedule">
               <div className="tls-type-label text-white/45">Terminstatus</div>
-              <div className="mt-1 font-black uppercase text-[#FFD700]" data-testid="match-schedule-headline">{scheduleHeadline(match, league, waitingForOtherSide(data.schedule_proposals, data, user?.id))}</div>
+              <div className="mt-1 font-black uppercase text-brand" data-testid="match-schedule-headline">{scheduleHeadline(match, league, waitingForOtherSide(data.schedule_proposals, data, user?.id))}</div>
               <div className="mt-1 tls-type-small text-white/65" data-testid="match-when">{scheduleWhen(match, league)}</div>
               <div className="mt-3 flex flex-wrap gap-1.5">
                 {eventModeLabels[data.event_mode] && <Pill>{eventModeLabels[data.event_mode]}</Pill>}

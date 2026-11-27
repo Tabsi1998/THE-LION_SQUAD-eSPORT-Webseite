@@ -15,7 +15,7 @@ const ADMISSION_RESOURCES = ["admission"];
 
 const TONES = {
   ok: { box: "border-ok/50 bg-ok/10", text: "text-ok", Icon: CheckCircle2 },
-  info: { box: "border-[#FFD700]/50 bg-[#FFD700]/10", text: "text-[#FFD700]", Icon: Info },
+  info: { box: "border-brand/50 bg-brand/10", text: "text-brand", Icon: Info },
   error: { box: "border-warn/50 bg-warn/10", text: "text-warn", Icon: XCircle },
 };
 
@@ -134,7 +134,7 @@ export default function AdminAdmissionPage() {
             ) : null}
             <div className="border border-white/10 rounded-sm bg-[#121212] p-4" data-testid="admission-meeting-card">
               <div className="font-bold">{meeting.title}{meeting.time ? ` · ${meeting.time}` : ""}{meeting.place ? ` · ${meeting.place}` : ""}</div>
-              <div className={`tls-type-small mt-1 ${meeting.counts?.quorum_reached ? "text-ok" : "text-[#FFD700]"}`} data-testid="admission-counts">{quorumText(meeting.counts)}</div>
+              <div className={`tls-type-small mt-1 ${meeting.counts?.quorum_reached ? "text-ok" : "text-warn"}`} data-testid="admission-counts">{quorumText(meeting.counts)}</div>
             </div>
 
             <ResultCard result={result} />

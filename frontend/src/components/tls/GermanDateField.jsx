@@ -122,7 +122,7 @@ export function GermanDateField({
         <label htmlFor={id} id={`${id}-label`} className="block tls-type-label text-white/65 mb-1.5">
           <span className="flex items-center justify-between gap-3">
             <span>{label}</span>
-            {required && <span className="tls-type-small text-[#FFD700]">Pflichtfeld</span>}
+            {required && <span className="tls-type-small text-quiet">Pflichtfeld</span>}
           </span>
         </label>
       )}

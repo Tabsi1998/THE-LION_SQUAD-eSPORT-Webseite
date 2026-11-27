@@ -120,11 +120,11 @@ function MemberHero({ profile }) {
           )}
         </div>
         <div className="pb-3 md:pb-8 min-w-0">
-          <span className="tls-type-label text-[#FFD700]">Vereinsmitglied</span>
+          <span className="tls-type-label text-honor">Vereinsmitglied</span>
           {/* Langer Name (#1218): höchstens zwei Zeilen, eine Stufe kleiner, erst dann „…“. */}
           <h1 className={`mt-2 tls-type-title ${headNameClass(name)}`} title={name} data-testid="member-head-name">{name}</h1>
           {memberRealName(profile) && <p className="mt-2 text-white/60 font-bold">{memberRealName(profile)}</p>}
-          {profile.role_title && <p className="mt-2 text-[#FFD700] font-bold uppercase tracking-wider">{profile.role_title}</p>}
+          {profile.role_title && <p className="mt-2 text-honor font-bold uppercase tracking-wider">{profile.role_title}</p>}
         </div>
       </div>
     </div>
@@ -191,7 +191,7 @@ function InfoPanel({ title, children }) {
   return (
     <div className="border border-white/10 bg-[#121212] rounded-sm p-5">
       <div className="font-black uppercase flex items-center gap-2">
-        <Crown className="w-4 h-4 text-[#FFD700]" /> {title}
+        <Crown className="w-4 h-4 text-honor" /> {title}
       </div>
       <div className="mt-4 space-y-4">{children}</div>
     </div>

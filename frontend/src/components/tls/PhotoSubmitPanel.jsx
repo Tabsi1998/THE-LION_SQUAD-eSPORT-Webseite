@@ -131,7 +131,7 @@ export function PhotoSubmitPanel({ album, info, onSent }) {
             </ul>
           ) : null}
           {skipped.length ? (
-            <ul className="space-y-1 tls-type-small text-[#FFD700]" data-testid="photo-submit-skipped">
+            <ul className="space-y-1 tls-type-small text-warn" data-testid="photo-submit-skipped">
               {skipped.map((entry) => <li key={entry.name}>{entry.name}: {entry.reason}</li>)}
             </ul>
           ) : null}

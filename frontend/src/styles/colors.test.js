@@ -11,8 +11,10 @@ const CENTRAL = new Set(["styles/system.css", "lib/categoryColors.js"]);
 const TEST_FILE = /\.(test|spec)\.[jt]sx?$/;
 const SOURCE_FILE = /\.(jsx?|tsx?|css)$/;
 
-// Grundlinie nach dem ersten Umbau aus #1305 (vorher 1170, 520 und 299 Stellen). Nur nach unten anpassen.
-const BASELINE = { "#FFD700": 1103, "#FF3B30": 27, "#00FF88": 8 };
+// Grundlinie nach dem Umbau aus #1305 (anfangs 1170, 520 und 299 Stellen): übrig sind nur die bewussten Ausnahmen -
+// Erfolgs-Stufen, Zeremonie und Level-Rahmen (Sammel-Optik), Saison-Deko, YouTube-Rot und die Ampel im Betrieb.
+// Nur nach unten anpassen.
+const BASELINE = { "#FFD700": 43, "#FF3B30": 27, "#00FF88": 8 };
 
 function sourceFiles(dir) {
   return readdirSync(dir).flatMap((name) => {

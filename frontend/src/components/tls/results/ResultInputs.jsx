@@ -171,7 +171,7 @@ export function OrderInput({ entry, state, onChange, showFlags = true }) {
         return (
           <div key={side.registration_id} className={`rounded-sm border p-2 ${place ? "border-[#29B6E8]/40 bg-[#29B6E8]/5" : "border-white/10 bg-[#0A0A0A]"}`}>
             <button type="button" onClick={() => tap(side.registration_id)} disabled={Boolean(flag)} className="w-full min-h-[44px] flex items-center gap-3 text-left disabled:opacity-60" data-testid={`result-order-${side.registration_id}`}>
-              <span className={`inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full tls-type-card tls-type-num ${place === 1 ? "bg-[#FFD700] text-black" : place ? "bg-[#29B6E8] text-black" : "bg-white/10 text-white/40"}`}>{flag ? "–" : place || ""}</span>
+              <span className={`inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full tls-type-card tls-type-num ${place === 1 ? "bg-honor text-black" : place ? "bg-[#29B6E8] text-black" : "bg-white/10 text-white/40"}`}>{flag ? "–" : place || ""}</span>
               <span className="min-w-0 flex-1 font-bold truncate">{side.name}</span>
               {flag ? <span className="tls-type-label text-[#FF6B60]">{FLAG_LABELS[flag]}</span> : null}
             </button>

@@ -23,6 +23,7 @@ import { seoTextPreview } from "@/lib/textPreview";
 import { Pin, ArrowLeft, ArrowRight, Calendar, Trophy, Users, Flag, Clock, Link2, Share2, MessageCircle, Newspaper, User, Smartphone } from "lucide-react";
 import { asInstant, viennaDate, viennaDateTime } from "@/lib/vienna";
 
+import { ROLE_COLORS } from "@/lib/categoryColors";
 // News-Detail (Rückmeldung des Betreibers, 24.09.: „sieht am PC aus wie am Handy, nichts ist
 // ausgenutzt“): am PC und Tablet ein breites Raster - links der Artikel in Lesebreite mit großem
 // Bild und größerer Schrift, rechts eine klebende Seitenleiste mit Angaben, Teilen, Verknüpftem,
@@ -197,7 +198,7 @@ export default function NewsDetailPage() {
   const others = more.filter((item) => item.slug !== post.slug && item.id !== post.id).slice(0, 4);
   const linked = [
     ...(post.linked_events || []).map((e) => ({ key: `e-${e.id}`, to: `/events/${e.slug}`, icon: Calendar, color: "#9F7AEA", title: e.name, sub: e.start_date ? formatDate(e.start_date, "medium") : "" })),
-    ...(post.linked_tournaments || []).map((t) => ({ key: `t-${t.id}`, to: `/tournaments/${t.slug}`, icon: Trophy, color: "#FFD700", title: t.title, sub: "Turnier" })),
+    ...(post.linked_tournaments || []).map((t) => ({ key: `t-${t.id}`, to: `/tournaments/${t.slug}`, icon: Trophy, color: ROLE_COLORS.brand, title: t.title, sub: "Turnier" })),
     ...(post.linked_f1_challenges || []).map((c) => ({ key: `c-${c.id}`, to: `/fastlap/${c.slug || c.id}`, icon: Flag, color: "#29B6E8", title: c.title, sub: c.start_date ? formatDate(c.start_date, "medium") : "Fast Lap" })),
     ...(post.linked_teams || []).map((t) => ({ key: `team-${t.id}`, to: "/teams", icon: Users, color: "#10B981", title: t.name, sub: "Team" })),
   ];
@@ -232,7 +233,7 @@ export default function NewsDetailPage() {
           <article className="min-w-0" data-testid="news-article">
             <div className="flex flex-wrap items-center gap-3 tls-type-label">
               <span className="text-[#29B6E8]">{newsCategoryLabel(post.category)}</span>
-              {post.pinned && <span className="inline-flex items-center gap-1 text-[#FFD700]"><Pin className="w-3 h-3" /> Angepinnt</span>}
+              {post.pinned && <span className="inline-flex items-center gap-1 text-white"><Pin className="w-3 h-3" /> Angepinnt</span>}
               <span className="text-white/40 lg:hidden ml-auto">{formatDate(post.published_at || post.created_at)}</span>
             </div>
             <h1 className="mt-3 tls-type-title leading-[1.02] break-words">{post.title}</h1>

@@ -126,7 +126,7 @@ export function DiscordTargets() {
         </p>
       </div>
       {botOff && (
-        <div className="border border-[#FFD700]/40 bg-[#FFD700]/10 rounded-sm p-3 tls-type-small text-white/80" data-testid="discord-targets-bot-off">
+        <div className="border border-warn/40 bg-warn/10 rounded-sm p-3 tls-type-small text-white/80" data-testid="discord-targets-bot-off">
           Der Bot ist aus – ohne Bot wird nichts gesendet. Unten im Bot-Kasten „Bot verbinden“ einschalten.
         </div>
       )}
@@ -145,10 +145,10 @@ export function DiscordTargets() {
           const known = list.some((channel) => channel.id === current);
           const options = !known && current ? [{ id: current, name: `Kanal-ID ${current}`, category: "", can_send: true, can_embed: true }, ...list] : list;
           return (
-            <div key={target} className={`border rounded-sm p-3 space-y-2 ${entry.private ? "border-[#FFD700]/25" : "border-white/10"}`} data-testid={`discord-target-${target}`}>
+            <div key={target} className={`border rounded-sm p-3 space-y-2 ${entry.private ? "border-brand/25" : "border-white/10"}`} data-testid={`discord-target-${target}`}>
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <div className="font-bold tls-type-small">{entry.label || target}</div>
-                <span className={`tls-type-label ${entry.configured ? "text-ok" : entry.private ? "text-[#FFD700]" : "text-white/45"}`} data-testid={`discord-target-${target}-state`}>
+                <span className={`tls-type-label ${entry.configured ? "text-ok" : entry.private ? "text-brand" : "text-white/45"}`} data-testid={`discord-target-${target}-state`}>
                   {deliveryText(target, status)}
                 </span>
               </div>

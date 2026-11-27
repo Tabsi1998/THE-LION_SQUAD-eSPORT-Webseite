@@ -13,7 +13,7 @@ import { ShortCaps } from "@/components/tls/ShortCaps";
 export const STATE_META = {
   active: { label: "aktiv", className: "border-ok/40 text-ok bg-ok/10" },
   off: { label: "aus", className: "border-white/15 text-white/50 bg-white/5" },
-  missing: { label: "fehlt", className: "border-[#FFD700]/40 text-[#FFD700] bg-[#FFD700]/10" },
+  missing: { label: "fehlt", className: "border-warn/40 text-warn bg-warn/10" },
   unreadable: { label: "nicht lesbar", className: "border-warn/50 text-warn bg-warn/10" },
   error: { label: "Fehler", className: "border-warn/50 text-warn bg-warn/10" },
 };

@@ -46,11 +46,11 @@ export function OpsOverview({ onOpenSource }) {
           return (
             <button key={item.key} type="button" onClick={() => onOpenSource(item.key, problemCount > 0 ? { state: "open" } : {})} data-testid={`ops-overview-source-${item.key}`}
               aria-label={`${item.label}: ${problemCount > 0 ? `${problemCount} auffällig – offene Einträge zeigen` : "nichts offen – Ereignisse zeigen"}`}
-              className={`min-h-[44px] min-w-0 rounded-sm border p-4 text-left transition hover:border-[#29B6E8]/55 ${problemCount > 0 ? "border-[#FFD700]/35 bg-[#FFD700]/5" : "border-white/10 bg-[#121212]"}`}>
+              className={`min-h-[44px] min-w-0 rounded-sm border p-4 text-left transition hover:border-[#29B6E8]/55 ${problemCount > 0 ? "border-warn/35 bg-warn/5" : "border-white/10 bg-[#121212]"}`}>
               <div className="flex min-h-[26px] items-start justify-between gap-2">
                 <Icon className="h-5 w-5 shrink-0 text-[#29B6E8]" />
                 {problemCount > 0 ? (
-                  <span className="rounded-sm border border-[#FFD700]/35 bg-[#FFD700]/10 px-2 py-1 tls-type-label text-[#FFD700] tabular-nums">{problemCount} auffällig</span>
+                  <span className="rounded-sm border border-warn/35 bg-warn/10 px-2 py-1 tls-type-label text-warn tabular-nums">{problemCount} auffällig</span>
                 ) : (
                   <CheckCircle2 className="h-4 w-4 text-ok" />
                 )}

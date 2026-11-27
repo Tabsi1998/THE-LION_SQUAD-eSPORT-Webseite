@@ -17,10 +17,10 @@ function ZuTunKnopf({ item }) {
     <Link
       to={item.to}
       data-testid={`mein-bereich-todo-${item.key}`}
-      className={`tls-card ${warn ? "tls-card--gold" : ""} group flex min-h-16 items-center gap-4 rounded-sm border bg-[#121212] px-4 py-3 ${warn ? "border-[#FFD700]/45" : "border-[#29B6E8]/35"}`}
+      className={`tls-card ${warn ? "tls-card--gold" : ""} group flex min-h-16 items-center gap-4 rounded-sm border bg-[#121212] px-4 py-3 ${warn ? "border-warn/45" : "border-[#29B6E8]/35"}`}
     >
       <span className="min-w-0 flex-1">
-        <span className={`tls-card__title tls-wrap block tls-type-card ${warn ? "text-[#FFD700]" : "text-white"}`}>{item.label}</span>
+        <span className={`tls-card__title tls-wrap block tls-type-card ${warn ? "text-warn" : "text-white"}`}>{item.label}</span>
         {item.detail ? <span className="tls-wrap mt-0.5 block tls-type-small text-white/60">{item.detail}</span> : null}
       </span>
       <ArrowRight className="tls-card__arrow w-5 h-5 shrink-0 text-white/40" aria-hidden="true" />

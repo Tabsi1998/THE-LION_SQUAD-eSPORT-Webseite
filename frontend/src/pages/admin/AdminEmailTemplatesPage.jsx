@@ -46,7 +46,7 @@ export default function AdminEmailTemplatesPage() {
                   <div className="min-w-0 flex-1">
                     <div className="font-bold flex flex-wrap items-center gap-2">
                       {row.name}
-                      {row.custom ? <span className="tls-type-label border border-[#FFD700]/50 text-[#FFD700] px-1.5 py-0.5 rounded-sm" data-testid={`tpl-custom-${row.key}`}>angepasst</span> : null}
+                      {row.custom ? <span className="tls-type-label border border-brand/50 text-brand px-1.5 py-0.5 rounded-sm" data-testid={`tpl-custom-${row.key}`}>angepasst</span> : null}
                       {row.sample_leaks?.length ? <span className="tls-type-label border border-warn/60 text-warn px-1.5 py-0.5 rounded-sm" data-testid={`tpl-leaks-${row.key}`} title={row.sample_leaks.join(", ")}>Beispielwerte im Text</span> : null}
                     </div>
                     <div className="tls-type-small text-white/50">{row.purpose}</div>
@@ -228,7 +228,7 @@ function TemplateEditor({ template, onClose, onSaved }) {
           <button type="button" onClick={reset} disabled={!!busy || !template.custom} data-testid="tpl-reset" className="inline-flex items-center gap-1 px-3 py-2 tls-type-label text-white/60 hover:text-live disabled:opacity-40"><RotateCcw className="w-3.5 h-3.5" /> Auf Standard zurücksetzen</button>
           <div className="flex gap-2">
             <button type="button" onClick={sendTest} disabled={!!busy || form === null} data-testid="tpl-test" className="inline-flex items-center gap-1 px-4 py-2 border border-[#29B6E8] text-[#29B6E8] tls-type-label rounded-sm disabled:opacity-50"><Send className="w-3.5 h-3.5" /> Testmail an mich</button>
-            <button type="button" onClick={save} disabled={!!busy || form === null} data-testid="tpl-save" className="inline-flex items-center gap-1 px-5 py-2 bg-[#FFD700] text-black tls-type-label rounded-sm disabled:opacity-50"><Save className="w-3.5 h-3.5" /> {busy === "save" ? "Speichere …" : "Speichern"}</button>
+            <button type="button" onClick={save} disabled={!!busy || form === null} data-testid="tpl-save" className="inline-flex items-center gap-1 px-5 py-2 bg-brand text-black tls-type-label rounded-sm disabled:opacity-50"><Save className="w-3.5 h-3.5" /> {busy === "save" ? "Speichere …" : "Speichern"}</button>
           </div>
         </div>
       </div>

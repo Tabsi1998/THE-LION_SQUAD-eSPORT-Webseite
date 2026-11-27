@@ -52,7 +52,7 @@
     color: #6EDCFF !important;
   }
 
-  [class*="text-[#FFD700]"],
+  [class*="text-honor"],
   [class*="text-[#FFD600]"] {
     color: #FFE66B !important;
   }

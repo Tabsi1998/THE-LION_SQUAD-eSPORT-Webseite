@@ -14,10 +14,10 @@ export function BrandField({ label, value, onChange, testId, placeholder = "", d
 export function SystemCard({ title, ok, detail, problem, testId }) {
   const ready = !!ok;
   return (
-    <div data-testid={testId} className={`border rounded-sm bg-[#121212] p-5 ${ready ? "border-ok/25" : "border-[#FFD700]/30"}`}>
+    <div data-testid={testId} className={`border rounded-sm bg-[#121212] p-5 ${ready ? "border-ok/25" : "border-warn/30"}`}>
       <div className="flex items-center justify-between gap-3">
         <div className="font-bold uppercase">{title}</div>
-        <span className={`tls-type-label ${ready ? "text-ok" : "text-[#FFD700]"}`}>
+        <span className={`tls-type-label ${ready ? "text-ok" : "text-warn"}`}>
           {ready ? "OK" : "Prüfen"}
         </span>
       </div>

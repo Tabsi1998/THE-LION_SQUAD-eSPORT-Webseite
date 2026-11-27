@@ -14,10 +14,10 @@ export function ResendSection({ email, setEmail, testEmail, setTestEmail, saving
         </div>
       )}
       {emailNotConfigured && (
-        <div data-testid="email-not-configured" className="flex items-start gap-3 border border-[#FFD700]/30 bg-[#FFD700]/5 rounded-sm p-4">
-          <AlertTriangle className="w-5 h-5 text-[#FFD700] shrink-0 mt-0.5" />
+        <div data-testid="email-not-configured" className="flex items-start gap-3 border border-warn/30 bg-warn/5 rounded-sm p-4">
+          <AlertTriangle className="w-5 h-5 text-warn shrink-0 mt-0.5" />
           <div className="tls-type-small">
-            <div className="font-bold text-[#FFD700] tls-type-small">Kein Resend API Key hinterlegt</div>
+            <div className="font-bold text-warn tls-type-small">Kein Resend API Key hinterlegt</div>
             <p className="text-white/70 mt-1">Alle E-Mails (Anmeldungen, Passwort-Reset, Check-in-Erinnerungen, Spiel-Nachrichten) werden aktuell übersprungen. Hole dir einen kostenlosen Key auf <a href="https://resend.com/api-keys" target="_blank" rel="noreferrer" className="text-[#29B6E8] hover:underline">resend.com/api-keys</a> und trage ihn unten ein.</p>
           </div>
         </div>

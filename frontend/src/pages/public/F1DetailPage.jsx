@@ -122,7 +122,7 @@ export default function F1DetailPage() {
           <Link to="/fastlap" className="tls-type-label text-[#29B6E8] hover:text-white">← Fast Lap Challenges</Link>
           <div className="mt-2 flex flex-wrap items-center gap-3 mb-3">
             <PhaseBadge phase={challenge.public_phase} status={challenge.status} size="lg" />
-            {challenge.is_championship && <span className="tls-type-label text-[#FFD700] border border-[#FFD700]/40 px-2 py-1 rounded-sm">Meisterschaft</span>}
+            {challenge.is_championship && <span className="tls-type-label text-honor border border-honor/40 px-2 py-1 rounded-sm">Meisterschaft</span>}
           </div>
           <div className="flex items-start justify-between gap-3">
             <h1 data-testid="f1-challenge-title" className="tls-type-title leading-tight min-w-0 break-words">{challenge.title}</h1>
@@ -180,7 +180,7 @@ export default function F1DetailPage() {
         )}
         {(challenge.prize_places?.length > 0) && (
           <section>
-            <h2 className="tls-type-section mb-3 flex items-center gap-2"><Trophy className="w-4 h-4 text-[#FFD700]" /> Preise</h2>
+            <h2 className="tls-type-section mb-3 flex items-center gap-2"><Trophy className="w-4 h-4 text-honor" /> Preise</h2>
             <PrizeList prizePlaces={challenge.prize_places} />
           </section>
         )}
@@ -282,7 +282,7 @@ export default function F1DetailPage() {
                       const own = Boolean(user?.id) && (e.user_id === user.id || key === user.id);
                       return (
                       <tr key={key} data-flip-key={key} data-testid={`f1-row-${e.rank}`} data-mine={own ? "true" : undefined} className={`tls-lap-row ${e.rank <= 3 ? `tls-lap-row--p${e.rank} bg-[#29B6E8]/5` : ""} ${record ? "tls-lap-row--record" : fresh ? "tls-lap-row--fresh" : ""}${own ? " tls-you tls-you--inset" : ""}`}>
-                        <td className={`px-4 py-3 tls-type-num ${e.rank === 1 ? "text-[#FFD700]" : e.rank === 2 ? "text-white/80" : e.rank === 3 ? "text-[#CD7F32]" : "text-[#29B6E8]"}`}><span data-rank-digit className="inline-block">{e.rank}</span></td>
+                        <td className={`px-4 py-3 tls-type-num ${e.rank === 1 ? "text-honor" : e.rank === 2 ? "text-white/80" : e.rank === 3 ? "text-[#CD7F32]" : "text-[#29B6E8]"}`}><span data-rank-digit className="inline-block">{e.rank}</span></td>
                         <td className="px-3 sm:px-4 py-3">
                           {/* Lange Namen (break-ui): die Zelle kürzt selbst, sonst schöbe ein Name die Zeit aus dem Bild. */}
                           <span className="flex items-center gap-2 min-w-0 max-w-[9.5rem] sm:max-w-[18rem]">
@@ -324,7 +324,7 @@ export default function F1DetailPage() {
                         {showCertificates && (
                           <td className="hidden sm:table-cell px-4 py-3 text-right">
                             {e.rank <= 4 ? (
-                              <a href={`${API}/exports/f1/${challenge.slug || challenge.id}/certificates/${encodeURIComponent(key)}.pdf${f1ResultQuery({ track_id: activeTrack, access: accessToken })}`} target="_blank" rel="noreferrer" data-testid={`f1-certificate-${e.rank}`} className="inline-flex items-center gap-1.5 tls-type-label text-[#FFD700] hover:text-white">
+                              <a href={`${API}/exports/f1/${challenge.slug || challenge.id}/certificates/${encodeURIComponent(key)}.pdf${f1ResultQuery({ track_id: activeTrack, access: accessToken })}`} target="_blank" rel="noreferrer" data-testid={`f1-certificate-${e.rank}`} className="inline-flex items-center gap-1.5 tls-type-label text-honor hover:text-white">
                                 <Award className="w-3 h-3" /> {showResultPdf ? "PDF" : "Drucken"}
                               </a>
                             ) : <span className="text-white/25">—</span>}
@@ -346,7 +346,7 @@ export default function F1DetailPage() {
         {tab === "championship" && championship && (
           <div className="border border-white/10 rounded-sm bg-[#121212] overflow-hidden">
             <div className="p-4 border-b border-white/10 flex items-center gap-2">
-              <Trophy className="w-4 h-4 text-[#FFD700]" />
+              <Trophy className="w-4 h-4 text-honor" />
               <h3 className="tls-type-card">Gesamtwertung der Meisterschaft</h3>
             </div>
             <table className="w-full tls-type-small">
@@ -362,8 +362,8 @@ export default function F1DetailPage() {
               </thead>
               <tbody className="divide-y divide-white/5">
                 {championship.standings.map((s) => (
-                  <tr key={s.user_id} data-testid={`f1-championship-row-${s.user_id}`} data-mine={user?.id && s.user_id === user.id ? "true" : undefined} className={`${s.rank <= 3 ? "bg-[#FFD700]/5" : ""}${user?.id && s.user_id === user.id ? " tls-you tls-you--inset" : ""}`}>
-                    <td className={`px-4 py-3 tls-type-num ${s.rank === 1 ? "text-[#FFD700]" : s.rank === 2 ? "text-white/80" : s.rank === 3 ? "text-[#CD7F32]" : "text-[#29B6E8]"}`}>{s.rank}</td>
+                  <tr key={s.user_id} data-testid={`f1-championship-row-${s.user_id}`} data-mine={user?.id && s.user_id === user.id ? "true" : undefined} className={`${s.rank <= 3 ? "bg-honor/5" : ""}${user?.id && s.user_id === user.id ? " tls-you tls-you--inset" : ""}`}>
+                    <td className={`px-4 py-3 tls-type-num ${s.rank === 1 ? "text-honor" : s.rank === 2 ? "text-white/80" : s.rank === 3 ? "text-[#CD7F32]" : "text-[#29B6E8]"}`}>{s.rank}</td>
                     <td className="px-4 py-3 text-white">
                       <span className="flex items-center gap-2 min-w-0">
                         <span className="min-w-0 break-words">{s.display_name}</span>
@@ -376,7 +376,7 @@ export default function F1DetailPage() {
                     {showResultPdf && isLead && (
                       <td className="px-4 py-3 text-right">
                         {s.rank <= 4 ? (
-                          <a href={`${API}/exports/f1/${challenge.slug || challenge.id}/championship-certificates/${s.user_id}.pdf${f1ResultQuery({ access: accessToken })}`} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1.5 tls-type-label text-[#FFD700] hover:text-white">
+                          <a href={`${API}/exports/f1/${challenge.slug || challenge.id}/championship-certificates/${s.user_id}.pdf${f1ResultQuery({ access: accessToken })}`} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1.5 tls-type-label text-honor hover:text-white">
                             <Award className="w-3 h-3" /> PDF
                           </a>
                         ) : <span className="text-white/25">—</span>}
@@ -652,7 +652,7 @@ function InlineFastLapTimeEntry({ challenge, trackId, currentUser, onSaved }) {
           <input value={form.proof_url} onChange={(e) => set("proof_url", e.target.value)} placeholder="Nachweis-Link (optional)" className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-sm" />
           <input value={form.admin_note} onChange={(e) => set("admin_note", e.target.value)} placeholder={Number(form.penalty_seconds) > 0 ? "Begründung für Strafe" : "Notiz optional"} className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-sm" />
         </div>
-        {forceReferenceScope && <div className="mt-2 tls-type-small text-[#FFD700]">Vereinsmitglied: nur Referenzzeit möglich.</div>}
+        {forceReferenceScope && <div className="mt-2 tls-type-small text-honor">Vereinsmitglied: nur Referenzzeit möglich.</div>}
         {actionError && <div className="mt-3"><AuthFormAlert id="fastlap-action-error">{actionError}</AuthFormAlert></div>}
       </form>
 
@@ -668,7 +668,7 @@ function InlineFastLapTimeEntry({ challenge, trackId, currentUser, onSaved }) {
                 <div className="font-bold tls-type-small truncate">{time.user?.display_name || time.user?.username || "Unbekannt"}</div>
                 <div className="mt-0.5 flex flex-wrap items-center gap-2 tls-type-label text-quiet">
                   <span>#{time.attempt_number || "-"}</span>
-                  {(time.score_scope || "official") === "club_reference" && <span className="text-[#FFD700]">Referenz</span>}
+                  {(time.score_scope || "official") === "club_reference" && <span className="text-honor">Referenz</span>}
                   {time.penalty_seconds > 0 && <span className="text-warn">+{time.penalty_seconds}s</span>}
                   {safeHttpUrl(time.proof_url) && <a href={safeHttpUrl(time.proof_url)} target="_blank" rel="noreferrer" className="text-[#29B6E8] hover:underline">Nachweis</a>}
                 </div>
@@ -697,19 +697,19 @@ function InlineFastLapTimeEntry({ challenge, trackId, currentUser, onSaved }) {
 function ClubReferenceTimes({ entries }) {
   if (!entries?.length) return null;
   return (
-    <div className="mt-4 border border-[#FFD700]/20 bg-[#FFD700]/5 rounded-sm p-4">
+    <div className="mt-4 border border-honor/20 bg-honor/5 rounded-sm p-4">
       <div className="flex items-center justify-between gap-3 mb-3">
         <div>
-          <div className="tls-type-label text-[#FFD700]">Vereins-Referenz</div>
+          <div className="tls-type-label text-honor">Vereins-Referenz</div>
           <div className="tls-type-small text-white/50 mt-0.5">Top 3 außer Wertung als Zielzeit zum Schlagen.</div>
         </div>
-        <Flag className="w-4 h-4 text-[#FFD700]" />
+        <Flag className="w-4 h-4 text-honor" />
       </div>
       <div className="grid sm:grid-cols-3 gap-2">
         {entries.map((entry) => (
           <div key={participantKey(entry)} className="border border-white/10 bg-[#0A0A0A]/60 rounded-sm px-3 py-2">
             <div className="flex items-center justify-between gap-2">
-              <span className="tls-type-small tls-type-num text-[#FFD700]">#{entry.rank}</span>
+              <span className="tls-type-small tls-type-num text-honor">#{entry.rank}</span>
               <span className="tls-type-num text-white">{showLapTime(entry.time_str)}</span>
             </div>
             <div className="mt-1 tls-type-small font-bold truncate">{entry.display_name}</div>

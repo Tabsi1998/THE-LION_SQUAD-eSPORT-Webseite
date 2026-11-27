@@ -19,7 +19,7 @@ const KIND_META = {
   lap_penalty: { icon: Clock, color: ROLE_COLORS.warn, label: "Strafzeit" },
   lap_invalid: { icon: Flag, color: ROLE_COLORS.warn, label: "Runde ungültig" },
   match_forfeit: { icon: ShieldAlert, color: ROLE_COLORS.warn, label: "Kampflos verloren" },
-  incident: { icon: AlertTriangle, color: "#FFD700", label: "Vorfall" },
+  incident: { icon: AlertTriangle, color: ROLE_COLORS.warn, label: "Vorfall" },
   // Strafen der Liga (E.3): verhängt und verwaltet im Reiter „Strafen“ der Season - „Öffnen“ führt dorthin.
   league_sanction: { icon: Gavel, color: "#FF6B60", label: "Strafe der Liga" },
 };

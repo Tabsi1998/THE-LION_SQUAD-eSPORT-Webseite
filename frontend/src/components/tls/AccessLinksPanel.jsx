@@ -141,7 +141,7 @@ export function AccessLinksPanel({ targetType, targetId, allowRegister = false, 
 
   const title = (
     <div>
-      <div className="inline-flex items-center gap-2 tls-type-label text-[#FFD700]">
+      <div className="inline-flex items-center gap-2 tls-type-label text-brand">
         <Link2 className="w-3.5 h-3.5" /> Speziallinks
       </div>
       <p className="mt-1 tls-type-small text-white/50">
@@ -165,7 +165,7 @@ export function AccessLinksPanel({ targetType, targetId, allowRegister = false, 
       {collapsible && <div className="flex justify-end">{createButton}</div>}
       <div className="flex flex-wrap items-center justify-between gap-2 border border-white/10 bg-[#0A0A0A]/50 rounded-sm px-3 py-2">
         <label className="inline-flex items-center gap-2 tls-type-small text-white/65">
-          <input type="checkbox" checked={includeInactive} onChange={(event) => setIncludeInactive(event.target.checked)} className="accent-[#FFD700]" />
+          <input type="checkbox" checked={includeInactive} onChange={(event) => setIncludeInactive(event.target.checked)} className="accent-brand" />
           Deaktivierte anzeigen
         </label>
         <button
@@ -234,7 +234,7 @@ export function AccessLinksPanel({ targetType, targetId, allowRegister = false, 
         </label>
         {allowRegister && (
           <label className="inline-flex items-center gap-2 tls-type-small text-white/70 pb-2">
-            <input type="checkbox" checked={includeRegister} onChange={(event) => setIncludeRegister(event.target.checked)} className="accent-[#FFD700]" />
+            <input type="checkbox" checked={includeRegister} onChange={(event) => setIncludeRegister(event.target.checked)} className="accent-brand" />
             Anmeldung freigeben
           </label>
         )}
@@ -256,7 +256,7 @@ export function AccessLinksPanel({ targetType, targetId, allowRegister = false, 
           </label>
         )}
         <label className="inline-flex items-center gap-2 tls-type-small text-white/70 pb-2">
-          <input type="checkbox" checked={notifyUser} disabled={!person} onChange={(event) => setNotifyUser(event.target.checked)} className="accent-[#FFD700] disabled:opacity-40" />
+          <input type="checkbox" checked={notifyUser} disabled={!person} onChange={(event) => setNotifyUser(event.target.checked)} className="accent-brand disabled:opacity-40" />
           Person benachrichtigen
         </label>
       </div>
@@ -312,10 +312,10 @@ export function AccessLinksPanel({ targetType, targetId, allowRegister = false, 
   // würde beim Drücken auch die Tafel zuklappen.
   if (collapsible) {
     return (
-      <details className="border border-[#FFD700]/25 bg-[#FFD700]/5 rounded-sm p-4 group" data-testid="access-links-details">
+      <details className="border border-brand/25 bg-brand/5 rounded-sm p-4 group" data-testid="access-links-details">
         <summary className="cursor-pointer list-none flex items-start justify-between gap-3">
           {title}
-          <span className="text-[#FFD700] shrink-0 transition-transform group-open:rotate-90">→</span>
+          <span className="text-brand shrink-0 transition-transform group-open:rotate-90">→</span>
         </summary>
         <div className="mt-4 space-y-4">{body}</div>
       </details>
@@ -332,7 +332,7 @@ export function AccessLinksPanel({ targetType, targetId, allowRegister = false, 
   }
 
   return (
-    <section className="border border-[#FFD700]/25 bg-[#FFD700]/5 rounded-sm p-4 space-y-4">
+    <section className="border border-brand/25 bg-brand/5 rounded-sm p-4 space-y-4">
       <div className="flex flex-wrap items-start justify-between gap-3">
         {title}
         {createButton}

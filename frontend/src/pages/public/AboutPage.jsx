@@ -346,7 +346,7 @@ export function BirthdayLine() {
   if (!birthday) return null;
   const years = Number(birthday.data?.years);
   return (
-    <p className="mt-6 inline-flex items-center gap-2 border border-[#FFD700]/40 bg-[#FFD700]/10 rounded-sm px-3 py-2 tls-type-small font-bold text-[#FFD700]" data-testid="about-birthday">
+    <p className="mt-6 inline-flex items-center gap-2 border border-honor/40 bg-honor/10 rounded-sm px-3 py-2 tls-type-small font-bold text-honor" data-testid="about-birthday">
       <Cake className="w-4 h-4 shrink-0" aria-hidden="true" />
       {years > 0 ? `Heute vor ${years} ${years === 1 ? "Jahr" : "Jahren"} gegründet – danke, dass ihr dabei seid!` : "Heute hat der Verein Geburtstag – danke, dass ihr dabei seid!"}
     </p>

@@ -26,7 +26,7 @@ export function OfflineBar() {
   return (
     <div role="status" aria-live="polite" data-modal-exempt="" data-testid="offline-bar" className="tls-offline-bar">
       {/* Der Löwe mit Stecker (#1325) - derselbe wie auf der Offline-Seite. */}
-      <LionArt art="offline" size={24} className="shrink-0 text-[#FFD700]" />
+      <LionArt art="offline" size={24} className="shrink-0 text-warn" />
       <span>{label} · neu laden, sobald das Netz wieder da ist</span>
     </div>
   );

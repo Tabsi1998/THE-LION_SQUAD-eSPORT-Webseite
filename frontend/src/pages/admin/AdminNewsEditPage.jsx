@@ -26,6 +26,7 @@ import { NEWS_CHANNEL_OPTIONS, channelChoice, channelHint, channelsFromChoice } 
 import { toast } from "sonner";
 import { AtSign, ExternalLink, Flag, Search, X } from "lucide-react";
 
+import { ROLE_COLORS } from "@/lib/categoryColors";
 // Beitrag anlegen und bearbeiten als eigene Seite (#434) - vorher ein 1024-px-Fenster über der
 // Liste. Links Titel, Text, Bild, Personen und Verknüpfungen, Checkliste und SEO-Vorschau; rechts
 // Veröffentlichung, Discord- und Teilen-Vorschau.
@@ -349,7 +350,7 @@ function NewsForm({ post, meta, onDone, onReload }) {
             {mode === "scheduled" && (
               <TextField label="Termin" type="datetime-local" value={scheduleAt} onChange={setScheduleAt} testId="news-published-at" required hint={plannedDetail} />
             )}
-            <CheckField label="Anpinnen" hint="Bleibt bis zum gewählten Tag oben in der News-Liste und auf der Startseite, danach rutscht der Beitrag normal in die Liste." checked={form.pinned} onChange={togglePinned} testId="news-pinned" accent="#FFD700" />
+            <CheckField label="Anpinnen" hint="Bleibt bis zum gewählten Tag oben in der News-Liste und auf der Startseite, danach rutscht der Beitrag normal in die Liste." checked={form.pinned} onChange={togglePinned} testId="news-pinned" accent={ROLE_COLORS.brand} />
             {form.pinned && (
               <>
                 <TextField label="Angepinnt bis" type="date" value={form.pinned_until} onChange={(v) => set("pinned_until", v)} min={pinFirstDay} required testId="news-pinned-until" hint={`Einschließlich dieses Tages. Vorschlag: ${PIN_DEFAULT_DAYS} Tage ab dem Erscheinen.`} />

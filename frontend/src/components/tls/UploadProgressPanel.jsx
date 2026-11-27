@@ -27,7 +27,7 @@ export function UploadProgressPanel({ progress, className = "" }) {
       <div className="flex items-start justify-between gap-4">
         <div className="min-w-0">
           <div className="flex items-center gap-2 tls-type-label text-[#29B6E8]">
-            <Icon className={`h-4 w-4 ${done && !hasFailures ? "text-ok" : hasFailures ? "text-[#FFD700]" : "text-[#29B6E8]"}`} />
+            <Icon className={`h-4 w-4 ${done && !hasFailures ? "text-ok" : hasFailures ? "text-warn" : "text-[#29B6E8]"}`} />
             Upload
           </div>
           <div className="tls-wrap mt-2 tls-type-card text-white">
@@ -44,7 +44,7 @@ export function UploadProgressPanel({ progress, className = "" }) {
       </div>
 
       <div className="mt-4 h-2 overflow-hidden rounded-sm bg-white/10">
-        <div className={`h-full transition-all duration-300 ${hasFailures ? "bg-[#FFD700]" : "bg-[#29B6E8]"}`} style={{ width: `${overallPercent}%` }} />
+        <div className={`h-full transition-all duration-300 ${hasFailures ? "bg-warn" : "bg-[#29B6E8]"}`} style={{ width: `${overallPercent}%` }} />
       </div>
 
       <div className="mt-3 grid gap-2 tls-type-small text-white/55 sm:grid-cols-4">
@@ -71,7 +71,7 @@ export function UploadProgressPanel({ progress, className = "" }) {
       {(progress.failed > 0 || progress.status === "uploading") && (
         <div className="mt-3 flex flex-wrap items-center gap-3 tls-type-label text-white/45">
           {progress.status === "uploading" && <span className="inline-flex items-center gap-1"><Clock className="h-3 w-3" /> Datei {Math.min((progress.currentIndex || 0) + 1, progress.total || 1)} von {progress.total || 1}</span>}
-          {progress.failed > 0 && <span className="text-[#FFD700]">{progress.failed} fehlgeschlagen</span>}
+          {progress.failed > 0 && <span className="text-warn">{progress.failed} fehlgeschlagen</span>}
           {progress.originals > 0 && <span>{progress.originals} Originaldatei(en)</span>}
         </div>
       )}

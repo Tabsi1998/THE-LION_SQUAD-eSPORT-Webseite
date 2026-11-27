@@ -45,9 +45,9 @@ export function EventBillingSection({ value, onChange, canEdit, dolibarrConnecte
   const preview = form.enabled && !error ? previewQuote({ ...formToBilling(form), currency: "EUR" }, { seats: copy.previewSeats }) : null;
 
   return (
-    <section className="border border-[#FFD700]/30 rounded-sm p-4 space-y-4" data-testid="event-billing">
+    <section className="border border-brand/30 rounded-sm p-4 space-y-4" data-testid="event-billing">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <h3 className="tls-type-card inline-flex items-center gap-2"><Wallet className="w-4 h-4 text-[#FFD700]" /> {copy.title}</h3>
+        <h3 className="tls-type-card inline-flex items-center gap-2"><Wallet className="w-4 h-4 text-brand" /> {copy.title}</h3>
         <label className="inline-flex items-center gap-2 tls-type-small">
           <input type="checkbox" checked={Boolean(form.enabled)} onChange={(ev) => set({ enabled: ev.target.checked, positions: ev.target.checked && !form.positions.length ? [{ ...emptyPosition(), label: copy.defaultLabel }] : form.positions })} data-testid="event-billing-enabled" />
           {copy.toggle}

@@ -443,7 +443,7 @@ function TournamentDetailView() {
             <div className="tls-type-label">{registration.label}</div>
             {nextStep && <div className="mt-1 text-white/55">{stepCountdown(nextStep, Date.now(), countdownDays)} – alle Termine unten in der Zeitleiste.</div>}
             {!nextStep && !t.registration_open_from && !t.registration_open_until && <div className="mt-1 text-white/55">Status wird vom Admin gesteuert.</div>}
-            {clubMemberBlocked && <div className="mt-1 text-[#FFD700]/75">Dieses Turnier ist für externe Teilnehmer vorgesehen. Vereinsmitglieder können sich hier nicht selbst anmelden.</div>}
+            {clubMemberBlocked && <div className="mt-1 text-honor/75">Dieses Turnier ist für externe Teilnehmer vorgesehen. Vereinsmitglieder können sich hier nicht selbst anmelden.</div>}
             {eventGate && !myReg && (
               <div className="mt-1 text-[#29B6E8]/90" data-testid="tournament-event-gate">
                 {isTeamTournament
@@ -457,8 +457,8 @@ function TournamentDetailView() {
           </div>
 
           {t.offer && (
-            <div className="mt-3 border border-[#FFD700]/30 bg-[#FFD700]/5 rounded-sm px-4 py-3 tls-type-small max-w-3xl" data-testid="tournament-offer">
-              <div className="tls-type-label text-[#FFD700]">Startgeld</div>
+            <div className="mt-3 border border-brand/30 bg-brand/5 rounded-sm px-4 py-3 tls-type-small max-w-3xl" data-testid="tournament-offer">
+              <div className="tls-type-label text-brand">Startgeld</div>
               <div className="mt-1 text-white">{startFeeSummary(t.offer, { teamMode: t.team_mode || "solo", teamSize: t.team_size })}</div>
               <ul className="mt-1 space-y-0.5 tls-type-small text-white/60">
                 {t.offer.positions.filter((position) => !position.optional).map((position) => (
@@ -478,7 +478,7 @@ function TournamentDetailView() {
               {primaryKey !== "standings" && <Link to={subPage("standings")} data-testid="tournament-standings-link" className="tls-hit text-white/70 hover:text-[#29B6E8]">Rangliste</Link>}
               {t.stream_link && <a href={t.stream_link} target="_blank" rel="noreferrer" data-testid="tournament-stream-link" className="inline-flex items-center gap-1 text-live hover:text-white"><Radio className="w-3.5 h-3.5" /> Stream</a>}
               {/* Turnierleitung am Handy (#1156): die Live-Werkzeuge - Ergebnisse, was fehlt, Streitfälle. */}
-              {t.can_manage_results && <Link to={`/tournaments/${t.slug || t.id}/leitung`} data-testid="tournament-result-entry-link" className="inline-flex items-center gap-1 text-[#FFD700] hover:text-white"><ExternalLink className="w-3.5 h-3.5" /> Turnierleitung</Link>}
+              {t.can_manage_results && <Link to={`/tournaments/${t.slug || t.id}/leitung`} data-testid="tournament-result-entry-link" className="inline-flex items-center gap-1 text-brand hover:text-white"><ExternalLink className="w-3.5 h-3.5" /> Turnierleitung</Link>}
             </div>
           </div>
           {!registerModal && actionError && <div className="mt-4 max-w-3xl"><AuthFormAlert id="tournament-action-error">{actionError}</AuthFormAlert></div>}
@@ -508,7 +508,7 @@ function TournamentDetailView() {
           )}
           {(t.prize_places?.length || t.prize_pool) && (
             <section>
-              <h2 className="tls-type-section mb-3 flex items-center gap-2"><Trophy className="w-4 h-4 text-[#FFD700]" /> Preise</h2>
+              <h2 className="tls-type-section mb-3 flex items-center gap-2"><Trophy className="w-4 h-4 text-honor" /> Preise</h2>
               <PrizeList prizePlaces={t.prize_places} prizePool={t.prize_pool} />
             </section>
           )}
@@ -516,7 +516,7 @@ function TournamentDetailView() {
           {t.game_id ? <TournamentMapPools tournamentId={t.id} /> : null}
           {podiumRows.length > 0 && (
             <section>
-              <h2 className="tls-type-section mb-8 flex items-center gap-2"><Trophy className="w-4 h-4 text-[#FFD700]" /> Podest</h2>
+              <h2 className="tls-type-section mb-8 flex items-center gap-2"><Trophy className="w-4 h-4 text-honor" /> Podest</h2>
               {/* Das Treppchen (#1339) - das Bild, das nach dem Sieger-Moment stehen bleibt. Vor „Ergebnisse
                   veröffentlicht“ ist der Stand noch nicht bestätigt: dann steht es als „vorläufig“ da. */}
               {t.status === "completed" && (

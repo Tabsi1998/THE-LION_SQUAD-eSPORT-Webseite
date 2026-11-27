@@ -30,7 +30,7 @@ export const UPLOAD_STATUS_LABELS = {
 
 export const uploadStatusClass = (status) => {
   if (status === "success") return "border-ok/35 bg-ok/10 text-ok";
-  if (status === "client_failed") return "border-[#FFD700]/35 bg-[#FFD700]/10 text-[#FFD700]";
+  if (status === "client_failed") return "border-warn/35 bg-warn/10 text-warn";
   return "border-warn/35 bg-warn/10 text-warn";
 };
 

@@ -93,18 +93,18 @@ export default function VereinPage() {
         </header>
 
         {member ? (
-          <div className="border border-[#FFD700]/45 bg-[#FFD700]/[0.06] rounded-sm p-5 md:p-6" data-testid="verein-member-area">
+          <div className="border border-honor/45 bg-honor/[0.06] rounded-sm p-5 md:p-6" data-testid="verein-member-area">
             <div className="flex items-center justify-between gap-3">
-              <span className="tls-type-label text-[#FFD700]">Mitgliederbereich</span>
-              {sinceYear ? <span className="border border-[#FFD700]/50 rounded-sm px-2 py-0.5 tls-type-label text-[#FFD700]" data-testid="verein-member-since">Seit {sinceYear}</span> : null}
+              <span className="tls-type-label text-honor">Mitgliederbereich</span>
+              {sinceYear ? <span className="border border-honor/50 rounded-sm px-2 py-0.5 tls-type-label text-honor" data-testid="verein-member-since">Seit {sinceYear}</span> : null}
             </div>
             {membership?.member_since ? <p className="mt-2 tls-type-small text-white/60">Mitglied seit {formatMemberSince(membership.member_since, membership.member_since_precision || "day")}</p> : null}
             <div className="mt-4 grid grid-cols-3 md:grid-cols-6 gap-2">
               {MEMBER_TILES.map((tile) => {
                 const note = tileNote(tile.key, summary);
                 return (
-                  <Link key={tile.key} to={tile.to} data-testid={`verein-tile-${tile.key}`} aria-label={note ? `${tile.label}, ${note}` : undefined} className="relative min-h-20 flex flex-col items-center justify-center gap-1.5 rounded-sm border border-[#FFD700]/30 bg-[#FFD700]/[0.04] px-2 py-3 tls-type-small font-bold text-white/85 hover:border-[#FFD700]/70 transition">
-                    <tile.icon className="w-5 h-5 text-[#FFD700]" aria-hidden="true" />
+                  <Link key={tile.key} to={tile.to} data-testid={`verein-tile-${tile.key}`} aria-label={note ? `${tile.label}, ${note}` : undefined} className="relative min-h-20 flex flex-col items-center justify-center gap-1.5 rounded-sm border border-honor/30 bg-honor/[0.04] px-2 py-3 tls-type-small font-bold text-white/85 hover:border-honor/70 transition">
+                    <tile.icon className="w-5 h-5 text-honor" aria-hidden="true" />
                     {tile.label}
                     {note ? <span className="tls-type-label text-[#29B6E8]" data-testid={`verein-tile-${tile.key}-note`}>{note}</span> : null}
                   </Link>
@@ -112,11 +112,11 @@ export default function VereinPage() {
               })}
             </div>
             {internal.length ? (
-              <div className="mt-4 border-t border-[#FFD700]/20 pt-3 space-y-1" data-testid="verein-internal-news">
-                <span className="tls-type-label text-[#FFD700]">Interne News</span>
+              <div className="mt-4 border-t border-honor/20 pt-3 space-y-1" data-testid="verein-internal-news">
+                <span className="tls-type-label text-honor">Interne News</span>
                 {internal.map((post) => (
-                  <Link key={post.id} to={`/news/${post.slug || post.id}`} className="flex items-center gap-3 min-h-11 tls-type-small hover:text-[#FFD700]">
-                    <Newspaper className="w-4 h-4 text-[#FFD700] shrink-0" />
+                  <Link key={post.id} to={`/news/${post.slug || post.id}`} className="flex items-center gap-3 min-h-11 tls-type-small hover:text-honor">
+                    <Newspaper className="w-4 h-4 text-honor shrink-0" />
                     <span className="tls-wrap flex-1 font-bold">{post.title}</span>
                     <span className="tls-type-small text-white/45 shrink-0">{newsDate(post)}</span>
                   </Link>

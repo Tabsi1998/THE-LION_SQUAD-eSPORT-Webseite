@@ -28,7 +28,7 @@ import { SkeletonCards, SkeletonDetailHeader } from "@/components/tls/Skeleton";
 import { ArrowRight, Flag, Trophy, Calendar, ListOrdered, Newspaper, Pin, Radio, Timer, Users } from "lucide-react";
 import { leagueSeatsLine, leagueSortTime, leagueTimelineItem, periodLine } from "@/lib/leagueHome";
 import { formatAgo, formatWhen } from "@/lib/datetime";
-import { KIND_COLORS } from "@/lib/categoryColors";
+import { KIND_COLORS, ROLE_COLORS } from "@/lib/categoryColors";
 import { withoutRepeatedBanners } from "@/lib/newsCards";
 import { NewsTextCard } from "@/components/tls/NewsTextCard";
 import { NewsLead } from "@/components/tls/NewsLead";
@@ -380,7 +380,7 @@ function NumberTile({ id, label, value }) {
 function BoardTeaser({ contacts }) {
   return (
     <div className="min-w-0" data-testid="home-board">
-      <SectionHeader icon={Users} accent="#FFD700" title="Ansprechpartner" actionLabel="Ganzer Vorstand" actionTo="/board" />
+      <SectionHeader icon={Users} accent={ROLE_COLORS.honor} title="Ansprechpartner" actionLabel="Ganzer Vorstand" actionTo="/board" />
       <div className="mt-8 grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
         {contacts.map((contact, index) => (
           <Link key={contact.id} to={contact.profileUrl || "/board"} data-testid={`home-board-${contact.id}`} data-season-anchor="card" style={{ "--tls-i": index + 1 }}
@@ -390,12 +390,12 @@ function BoardTeaser({ contacts }) {
                 <LazyImg src={contact.avatar} alt="" sizes="(min-width: 768px) 80px, 64px" className="w-full h-full object-cover tls-card__media" />
               </span>
             ) : (
-              <span className="w-16 h-16 md:w-20 md:h-20 rounded-sm bg-[#FFD700]/15 text-[#FFD700] tls-type-section inline-flex items-center justify-center shrink-0">{(contact.name || "?").slice(0, 1).toUpperCase()}</span>
+              <span className="w-16 h-16 md:w-20 md:h-20 rounded-sm bg-honor/15 text-honor tls-type-section inline-flex items-center justify-center shrink-0">{(contact.name || "?").slice(0, 1).toUpperCase()}</span>
             )}
             <span className="min-w-0">
               {/* Lange Rollen in Etikett und Wort (#1314, wie auf „Vorstand“): „Stellvertretung“ / „Obmann“ statt „…“. */}
               <RoleLine {...splitRole(contact.title)} />
-              <span className="block tls-type-card leading-tight break-words group-hover:text-[#FFD700] transition">{contact.name}</span>
+              <span className="block tls-type-card leading-tight break-words group-hover:text-honor transition">{contact.name}</span>
             </span>
           </Link>
         ))}
@@ -425,7 +425,7 @@ function NextUp({ items }) {
   return (
     <div className="tls-reveal-item border border-white/10 rounded-sm bg-[#111] p-5 min-w-0" style={{ "--tls-i": 1 }} data-testid="home-next-up">
       <div className="flex items-center justify-between gap-3 min-w-0">
-        <div className="tls-type-label text-[#FFD700]">Nächste Termine</div>
+        <div className="tls-type-label text-brand">Nächste Termine</div>
         <div className="shrink-0 flex items-center gap-3">
           <Link to="/calendar" data-testid="home-calendar-link" className="tls-type-label text-quiet hover:text-[#29B6E8]">Kalender</Link>
           <Link to="/events" className="tls-type-label text-quiet hover:text-[#29B6E8]">Alle Events</Link>

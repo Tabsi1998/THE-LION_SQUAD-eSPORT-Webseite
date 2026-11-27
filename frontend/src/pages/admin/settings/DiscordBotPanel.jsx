@@ -63,7 +63,7 @@ export function DiscordBotPanel({ canSystem = false }) {
           <p className="mt-1 tls-type-small text-white/50 max-w-2xl">Zählt Nachrichten verknüpfter Konten (nur die Zahl, nie den Inhalt – für die Discord-Erfolge), gleicht die Rollen Mitglied/Vorstand/Turnierleitung alle zehn Minuten ab und beantwortet <code>/naechstes-event</code>, <code>/turniere</code>, <code>/meine-erfolge</code>, <code>/status</code>. Gezählt und eingeordnet wird nur, wer sein Discord-Konto im Profil verknüpft hat.</p>
         </div>
         <div className="text-right tls-type-small font-bold space-y-1">
-          <div className={online ? "text-ok" : data.enabled ? "text-[#FFD700]" : "text-white/45"} data-testid="discord-bot-state">
+          <div className={online ? "text-ok" : data.enabled ? "text-warn" : "text-white/45"} data-testid="discord-bot-state">
             {online ? `online · ${data.guild_name || "auf keinem Server"}` : data.enabled ? "eingeschaltet, nicht verbunden" : "aus"}
           </div>
           <div className="text-white/45 normal-case tracking-normal">{data.linked_count ?? 0} verknüpfte Konten</div>
@@ -101,7 +101,7 @@ export function DiscordBotPanel({ canSystem = false }) {
         ))}
       </div>
       {Array.isArray(data.missing_roles) && data.missing_roles.length > 0 && (
-        <div className="tls-type-small text-[#FFD700]" data-testid="discord-bot-missing-roles">Im Discord fehlen diese Rollen: {data.missing_roles.join(", ")} – anlegen oder hier den Namen anpassen.</div>
+        <div className="tls-type-small text-warn" data-testid="discord-bot-missing-roles">Im Discord fehlen diese Rollen: {data.missing_roles.join(", ")} – anlegen oder hier den Namen anpassen.</div>
       )}
       <label className="inline-flex items-center gap-2 tls-type-small">
         <input type="checkbox" checked={draft.bot_count_messages} onChange={(e) => setDraft((d) => ({ ...d, bot_count_messages: e.target.checked }))} className="accent-[#29B6E8]" data-testid="discord-bot-count" />

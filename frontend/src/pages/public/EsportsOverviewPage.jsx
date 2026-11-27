@@ -253,7 +253,7 @@ function CompactList({ title, items, empty, action }) {
               ) : item.kind === "fastlap" ? (
                 <Flag className="h-6 w-6 text-[#29B6E8]/45" />
               ) : (
-                <Trophy className="h-6 w-6 text-[#FFD700]/45" />
+                <Trophy className="h-6 w-6 text-honor/45" />
               )}
             </div>
             <div className="min-w-0 flex-1">
@@ -284,7 +284,7 @@ function ActivityMeta({ item, compact = false }) {
       ) : (
         <>
           <span className="inline-flex items-center gap-1.5"><Users className="h-3.5 w-3.5 text-[#29B6E8]" />{item.participant_count || 0}/{item.max_participants || "-"}</span>
-          {item.prize_pool && <span className="inline-flex items-center gap-1.5 text-[#FFD700]"><Trophy className="h-3.5 w-3.5" />Preise</span>}
+          {item.prize_pool && <span className="inline-flex items-center gap-1.5 text-honor"><Trophy className="h-3.5 w-3.5" />Preise</span>}
         </>
       )}
     </div>

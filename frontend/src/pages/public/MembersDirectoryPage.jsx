@@ -55,7 +55,7 @@ export default function MembersDirectoryPage() {
       <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
         <div className="flex flex-col lg:flex-row lg:items-end lg:justify-between gap-4 mb-10 min-w-0">
           <div className="min-w-0">
-            <span className="tls-type-label text-[#FFD700]">DAS RUDEL</span>
+            <span className="tls-type-label text-honor">DAS RUDEL</span>
             <h1 className="tls-type-title mt-2" data-testid="members-heading"><ShortCaps>Vereins&shy;mitglieder</ShortCaps></h1>
             <p className="mt-3 text-white/60 max-w-2xl">
               Eingetragene Mitglieder von THE LION SQUAD — eSports, die hier stehen wollen: Jedes aktive Mitglied entscheidet selbst, ob es im Verzeichnis erscheint, und pflegt seinen Eintrag unter „Meine Mitgliedschaft“.
@@ -102,25 +102,25 @@ export default function MembersDirectoryPage() {
                       className="absolute inset-0 z-10 w-full h-full object-cover object-top group-hover:scale-[1.03] transition duration-500"
                     />
                   ) : (
-                    <div className="absolute inset-0 z-10 flex items-center justify-center bg-gradient-to-b from-[#FFD700]/10 via-[#121212] to-[#0A0A0A]" data-testid={`member-card-initials-${m.slug}`}>
-                      <span className="tls-type-section text-[#FFD700]/70">{memberInitials(m)}</span>
+                    <div className="absolute inset-0 z-10 flex items-center justify-center bg-gradient-to-b from-honor/10 via-[#121212] to-[#0A0A0A]" data-testid={`member-card-initials-${m.slug}`}>
+                      <span className="tls-type-section text-honor/70">{memberInitials(m)}</span>
                     </div>
                   )}
                 </div>
                 <div className="relative z-20 -mt-14 mx-3 bg-gradient-to-t from-black via-black/90 to-black/55 px-4 py-4 shadow-[0_-18px_38px_rgba(0,0,0,0.55)]">
                   <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0">
-                      <div className="tls-type-section text-white group-hover:text-[#FFD700] leading-none truncate">
+                      <div className="tls-type-section text-white group-hover:text-honor leading-none truncate">
                         {memberGamertag(m)}
                       </div>
                       {memberRealName(m) && (
                         <div className="mt-1 tls-type-small font-semibold text-white/55 truncate">{memberRealName(m)}</div>
                       )}
                     </div>
-                    <Crown className="w-4 h-4 mt-1 text-[#FFD700] shrink-0" />
+                    <Crown className="w-4 h-4 mt-1 text-honor shrink-0" />
                   </div>
                   {m.role_title && (
-                    <div className="mt-2 tls-type-label text-[#FFD700]/90">{m.role_title}</div>
+                    <div className="mt-2 tls-type-label text-honor/90">{m.role_title}</div>
                   )}
                   <div className="mt-4 space-y-2">
                     {!!m.games?.length && (
@@ -143,7 +143,7 @@ export default function MembersDirectoryPage() {
                       )}
                     </div>
                   </div>
-                  <div className="mt-4 inline-flex items-center gap-2 tls-type-label text-white/45 group-hover:text-[#FFD700] transition">
+                  <div className="mt-4 inline-flex items-center gap-2 tls-type-label text-white/45 group-hover:text-honor transition">
                     Profil ansehen <ArrowRight className="w-3.5 h-3.5" />
                   </div>
                 </div>

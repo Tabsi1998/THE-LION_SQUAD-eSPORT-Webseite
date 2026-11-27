@@ -13,7 +13,7 @@ import { Award, BarChart3, CalendarDays, CheckCircle2, CircleGauge, Flag, Medal,
 import { viennaDate } from "@/lib/vienna";
 
 function rankColor(rank) {
-  if (rank === 1) return "text-[#FFD700]";
+  if (rank === 1) return "text-honor";
   if (rank === 2) return "text-white/80";
   if (rank === 3) return "text-[#CD7F32]";
   return "text-[#29B6E8]";
@@ -59,7 +59,7 @@ const POINT_SOURCES = [
 ];
 
 const TONE = {
-  gold: "border-[#FFD700]/35 bg-[#FFD700]/10 text-[#FFD700]",
+  gold: "border-honor/35 bg-honor/10 text-honor",
   blue: "border-[#29B6E8]/35 bg-[#29B6E8]/10 text-[#29B6E8]",
   green: "border-[#10B981]/35 bg-[#10B981]/10 text-[#10B981]",
   violet: "border-[#A855F7]/35 bg-[#A855F7]/10 text-[#A855F7]",
@@ -144,7 +144,7 @@ export default function SeasonPage() {
           <section className="mb-8">
             <div className="flex items-end justify-between gap-3 flex-wrap mb-4">
               <div>
-                <div className="tls-type-label text-[#FFD700]">Rangliste</div>
+                <div className="tls-type-label text-honor">Rangliste</div>
                 <h2 className="mt-1 tls-type-section">Top Teilnehmer</h2>
               </div>
               <div className="tls-type-small text-white/45">{totalRatings} Wertungen</div>
@@ -157,7 +157,7 @@ export default function SeasonPage() {
 
         <div className="border border-white/10 bg-[#121212] rounded-sm overflow-hidden">
           <div className="px-4 py-3 border-b border-white/10 flex items-center gap-2">
-            <Trophy className="w-4 h-4 text-[#FFD700]"/><h2 className="tls-type-section">Gesamtwertung</h2>
+            <Trophy className="w-4 h-4 text-honor"/><h2 className="tls-type-section">Gesamtwertung</h2>
           </div>
           <div className="hidden md:block tls-swipe pb-0">
             <table className="w-full tls-type-small min-w-[900px]">
@@ -166,7 +166,7 @@ export default function SeasonPage() {
               </thead>
               <tbody className="divide-y divide-white/5">
                 {standings.map((r)=>(
-                  <tr key={r.user_id} data-testid={`season-row-${r.user_id}`} data-mine={isMine(r) ? "true" : undefined} className={`${r.rank<=3 ? "bg-[#FFD700]/5" : ""}${isMine(r) ? " tls-you tls-you--inset" : ""}`}>
+                  <tr key={r.user_id} data-testid={`season-row-${r.user_id}`} data-mine={isMine(r) ? "true" : undefined} className={`${r.rank<=3 ? "bg-honor/5" : ""}${isMine(r) ? " tls-you tls-you--inset" : ""}`}>
                     <td className={`px-4 py-3 tls-type-num ${rankColor(r.rank)}`}>{r.rank}</td>
                     <td className="px-4 py-3">
                       <PlayerIdentity row={r} mine={isMine(r)} />
@@ -284,7 +284,7 @@ function SourceBreakdown({ row }) {
         </span>
       ))}
       {row.dropped_events > 0 && (
-        <span className="inline-flex items-center rounded-sm border border-[#FFD700]/20 bg-[#FFD700]/10 px-2 py-1 tls-type-label text-[#FFD700]">
+        <span className="inline-flex items-center rounded-sm border border-quiet/20 bg-quiet/10 px-2 py-1 tls-type-label text-quiet">
           {row.dropped_events} gestrichen
         </span>
       )}
@@ -310,7 +310,7 @@ function PodiumCard({ row, mine = false }) {
     </>
   );
   // Die Ecken trägt deine Zeile der Tabelle bzw. Liste darunter; das Podest zeigt nur das Etikett „Du“ (#1316).
-  const className = "group border border-white/10 hover:border-[#FFD700]/50 bg-[#121212] rounded-sm p-5 transition";
+  const className = "group border border-white/10 hover:border-brand/50 bg-[#121212] rounded-sm p-5 transition";
   if (!row.username) return <div className={className}>{content}</div>;
   return (
     <Link to={`/u/${encodeURIComponent(row.username)}`} className={className}>
@@ -343,8 +343,8 @@ function PointSourceCard({ icon: Icon, title, text, tone }) {
 function InfoPanel({ icon: Icon, title, text }) {
   return (
     <div className="border border-white/10 bg-[#101010] rounded-sm p-5 flex items-start gap-4">
-      <div className="w-11 h-11 rounded-sm border border-[#FFD700]/25 bg-[#FFD700]/10 flex items-center justify-center shrink-0">
-        <Icon className="w-5 h-5 text-[#FFD700]" />
+      <div className="w-11 h-11 rounded-sm border border-brand/25 bg-brand/10 flex items-center justify-center shrink-0">
+        <Icon className="w-5 h-5 text-brand" />
       </div>
       <div>
         <h3 className="tls-type-card">{title}</h3>

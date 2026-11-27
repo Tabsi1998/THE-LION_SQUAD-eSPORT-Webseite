@@ -13,7 +13,7 @@ const PROVIDERS = [
   ["off", "Aus – keine Prüfung"],
 ];
 const STATE_LABEL = { pending: "wartet", safe: "unauffällig", review: "Prüfung nötig", blocked: "entfernt", failed: "Anbieter-Fehler (sichtbar)" };
-const STATE_TONE = { pending: "text-white/50", safe: "text-ok", review: "text-[#FFD700]", blocked: "text-warn", failed: "text-warn" };
+const STATE_TONE = { pending: "text-white/50", safe: "text-ok", review: "text-warn", blocked: "text-warn", failed: "text-warn" };
 const FILTERS = [["review", "Prüfung nötig"], ["blocked", "Entfernt"], ["failed", "Fehler"], ["safe", "Unauffällig"], ["all", "Alle"]];
 
 export function percent(value) {

@@ -14,7 +14,7 @@ export function PrizeList({ prizePlaces, prizePool, compact = false }) {
         {groups.map((group) => (
           <section key={group.key} className="space-y-2">
             {groups.length > 1 && (
-              <h3 className="tls-type-label text-[#FFD700]">{group.label}</h3>
+              <h3 className="tls-type-label text-honor">{group.label}</h3>
             )}
             <div className={compact ? "space-y-1.5" : "grid grid-cols-1 sm:grid-cols-2 gap-3"}>
               {group.prizes.map((p, i) => <PrizeRow key={`${group.key}-${p.place}-${i}`} prize={p} compact={compact} />)}
@@ -26,7 +26,7 @@ export function PrizeList({ prizePlaces, prizePool, compact = false }) {
   }
 
   return (
-    <div className="text-white/80 whitespace-pre-line border border-[#FFD700]/20 rounded-sm p-5 bg-[#FFD700]/5">
+    <div className="text-white/80 whitespace-pre-line border border-honor/20 rounded-sm p-5 bg-honor/5">
       {prizePool}
     </div>
   );
@@ -99,7 +99,7 @@ function PrizeRow({ prize, compact }) {
 }
 
 function placeStyle(place) {
-  if (place === 1) return { bg: "bg-[#FFD700]/5", border: "border-[#FFD700]/40", text: "text-[#FFD700]", Icon: Trophy };
+  if (place === 1) return { bg: "bg-honor/5", border: "border-honor/40", text: "text-honor", Icon: Trophy };
   if (place === 2) return { bg: "bg-white/5", border: "border-white/25", text: "text-white", Icon: Medal };
   if (place === 3) return { bg: "bg-[#CD7F32]/5", border: "border-[#CD7F32]/40", text: "text-[#CD7F32]", Icon: Award };
   return { bg: "bg-[#29B6E8]/5", border: "border-[#29B6E8]/25", text: "text-[#29B6E8]", Icon: Star };

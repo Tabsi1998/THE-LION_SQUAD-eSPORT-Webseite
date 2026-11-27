@@ -112,8 +112,8 @@ export function PersonalFeedCard({ origin = typeof window !== "undefined" ? wind
 
   if (!status) return null;
   return (
-    <div ref={ref} id={SUBSCRIBE_ANCHOR} className="scroll-mt-24 border border-[#FFD700]/40 bg-[#FFD700]/5 rounded-sm p-5" data-testid={testId}>
-      <div className="inline-flex items-center gap-2 tls-type-label text-[#FFD700]"><CalendarPlus className="w-3.5 h-3.5" /> Automatisch in deinen Kalender</div>
+    <div ref={ref} id={SUBSCRIBE_ANCHOR} className="scroll-mt-24 border border-brand/40 bg-brand/5 rounded-sm p-5" data-testid={testId}>
+      <div className="inline-flex items-center gap-2 tls-type-label text-brand"><CalendarPlus className="w-3.5 h-3.5" /> Automatisch in deinen Kalender</div>
       <p className="mt-2 tls-type-body text-white/65">
         Einmal abonnieren – danach erscheint jede Anmeldung von selbst im Handy- oder PC-Kalender: Events, Turniere (auch mit deinem Team), gefahrene Fast Laps, zugesagte Versammlungen und deine Schichten. Die Adresse ist privat – gib sie nicht weiter.
       </p>

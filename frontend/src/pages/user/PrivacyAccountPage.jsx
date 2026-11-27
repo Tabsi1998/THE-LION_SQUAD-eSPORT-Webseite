@@ -154,7 +154,7 @@ export function BlockierteBenutzer() {
   return (
     <div className="border border-white/10 rounded-sm p-5 bg-[#0A0A0A]" data-testid="dsgvo-blocks">
       <div className="flex items-start gap-3">
-        <ShieldOff className="w-5 h-5 text-[#FFD700] mt-1 shrink-0" aria-hidden="true" />
+        <ShieldOff className="w-5 h-5 text-brand mt-1 shrink-0" aria-hidden="true" />
         <div className="flex-1 min-w-0">
           <h3 className="tls-type-card mb-1">Blockierte Benutzer</h3>
           <p className="tls-type-small text-white/50">Blockierte Konten können dir keine Nachrichten oder Freundschaftsanfragen senden.</p>

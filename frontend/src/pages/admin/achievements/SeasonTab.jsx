@@ -127,7 +127,7 @@ export function SeasonTab() {
                 <tbody className="divide-y divide-white/5">
                   {preview.standings.map((row) => (
                     <tr key={row.user_id || row.rank} data-testid={`season-row-${row.rank}`}>
-                      <td className="py-2 pr-3 tls-type-num" style={{ color: row.rank === 1 ? "#FFD700" : undefined }}>{row.rank}</td>
+                      <td className="py-2 pr-3 tls-type-num" style={{ color: row.rank === 1 ? ROLE_COLORS.honor : undefined }}>{row.rank}</td>
                       <td className="py-2 pr-3">{personName(row)} {row.username && <span className="tls-type-small text-quiet">@{row.username}</span>}</td>
                       <td className="py-2 pr-3 text-right tabular-nums">{Number(row.points || 0).toLocaleString("de-DE")}</td>
                       <td className="py-2 pr-3">

@@ -16,7 +16,7 @@ export function GoogleLoginSection({ authConfig, setAuthConfig, savingAuth, test
             <div className="tls-type-label">Google Web Client ID</div>
             <p className="tls-type-small text-white/50 mt-1">OAuth-Client vom Typ „Webanwendung“, zum Beispiel 123….apps.googleusercontent.com.</p>
           </div>
-          <span className={`tls-type-label ${authConfig.google_configured ? "text-ok" : "text-[#FFD700]"}`}>
+          <span className={`tls-type-label ${authConfig.google_configured ? "text-ok" : "text-warn"}`}>
             {authConfig.google_configured ? "Konfiguriert" : "Nicht konfiguriert"}
           </span>
         </div>

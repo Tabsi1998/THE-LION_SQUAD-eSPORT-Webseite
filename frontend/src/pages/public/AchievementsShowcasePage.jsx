@@ -28,7 +28,7 @@ import { ROLE_COLORS } from "@/lib/categoryColors";
 // Plätze 4 bis 10, „Alle anzeigen“ lädt weiter. Vorher waren es am Handy über 30 Bildschirme und 10 MB.
 
 const RANK_STYLES = {
-  1: { color: "#FFD700", ring: "border-[#FFD700]", label: "1" },
+  1: { color: ROLE_COLORS.honor, ring: "border-honor", label: "1" },
   2: { color: "#C0C0C0", ring: "border-[#C0C0C0]", label: "2" },
   3: { color: "#CD7F32", ring: "border-[#CD7F32]", label: "3" },
 };
@@ -192,7 +192,7 @@ export default function AchievementsShowcasePage() {
                 <Sparkles className="w-4 h-4" /> Ruhmeshalle
               </div>
               <h1 className="tls-type-title mt-2 sm:mt-3 leading-none">
-                Achieve<span className="text-[#FFD700]">ments</span>
+                Achieve<span className="text-honor">ments</span>
               </h1>
               <p className="mt-4 max-w-2xl tls-type-body text-white/60">
                 Spiele Matches, gewinne Turniere, fahre Bestzeiten und engagiere dich im Verein –
@@ -203,7 +203,7 @@ export default function AchievementsShowcasePage() {
           </div>
 
           <div className="mt-6 sm:mt-8 grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-3" data-testid="achievements-stats">
-            <StatCard icon={Trophy} label="Erfolge" value={stats.tierCount} accent="#FFD700" />
+            <StatCard icon={Trophy} label="Erfolge" value={stats.tierCount} accent={ROLE_COLORS.honor} />
             <StatCard icon={Target} label="Punkte zu holen" value={stats.pointsTotal} accent="#29B6E8" />
             <StatCard icon={Flame} label="Kategorien" value={stats.categoryCount} accent={ROLE_COLORS.ok} />
             {mine ? (
@@ -217,7 +217,7 @@ export default function AchievementsShowcasePage() {
 
           {mine && (
             <div className="mt-4 tls-type-small text-white/60" data-testid="my-achievement-summary">
-              Du hast bereits <span className="text-[#FFD700] font-bold">{mine.count || 0}</span> Erfolge
+              Du hast bereits <span className="text-honor font-bold">{mine.count || 0}</span> Erfolge
               freigeschaltet · <Link to="/u/me?tab=achievements" className="text-[#29B6E8] hover:underline">Meine Erfolge ansehen</Link>
             </div>
           )}
@@ -299,7 +299,7 @@ export default function AchievementsShowcasePage() {
         <section data-testid="achievements-leaderboard">
           <div className="flex items-center justify-between gap-3 mb-3 sm:mb-6 flex-wrap">
             <div className="flex items-center gap-2">
-              <Medal className="w-5 h-5 text-[#FFD700]" />
+              <Medal className="w-5 h-5 text-honor" />
               <h2 className="tls-type-section">Bestenliste</h2>
             </div>
             <div className="flex max-w-full items-center gap-2 flex-nowrap tls-swipe tls-swipe--room pb-1 sm:flex-wrap sm:overflow-visible sm:pb-0 sm:[mask-image:none] sm:[-webkit-mask-image:none]" data-testid="leaderboard-controls">
@@ -370,10 +370,10 @@ export default function AchievementsShowcasePage() {
                         className="flex-1 min-w-0 truncate font-semibold text-white/85 hover:text-[#29B6E8]"
                       >
                         {entry.display_name}
-                        {Number(entry.prestige || 0) > 0 && <span className="ml-1 text-[#FFD700]" title={`Prestige ${entry.prestige}`}>{"★".repeat(Math.min(5, Number(entry.prestige)))}</span>}
+                        {Number(entry.prestige || 0) > 0 && <span className="ml-1 text-honor" title={`Prestige ${entry.prestige}`}>{"★".repeat(Math.min(5, Number(entry.prestige)))}</span>}
                       </Link>
                       <span className="tls-type-small text-quiet tabular-nums">{byLevel ? (entry.title || `Level ${entry.level}`) : erfolge(entry.count)}</span>
-                      <span className="tls-type-num text-[#FFD700] shrink-0">{byLevel ? `Lv ${entry.level}` : entry.points}</span>
+                      <span className="tls-type-num text-honor shrink-0">{byLevel ? `Lv ${entry.level}` : entry.points}</span>
                     </motion.div>
                   ))}
                 </div>
@@ -497,7 +497,7 @@ function CategoryRow({ category, own, progress = null, index = 0, negativeCount 
           </div>
           <div className="mt-1 hidden md:flex items-center gap-2 tls-type-small text-quiet" data-testid={`category-detail-${category.key}`}>
             <span className="truncate">{detail}</span>
-            {category.member_only && <span className="ml-auto shrink-0 text-[#FFD700]/80">Mitglieder</span>}
+            {category.member_only && <span className="ml-auto shrink-0 text-honor/80">Mitglieder</span>}
           </div>
         </div>
         <ChevronDown className={`w-4 h-4 shrink-0 text-white/40 transition-transform ${open ? "rotate-180" : ""}`} aria-hidden="true" />
@@ -568,7 +568,7 @@ function Toggle({ value, onChange, options, testId }) {
 // Der Erfolg der Woche (#619): die Freischaltung der vergangenen Woche, die am wenigsten Leute haben.
 function WeekTile({ week, loading }) {
   const award = week?.award || null;
-  const color = award?.material_color || "#FFD700";
+  const color = award?.material_color || ROLE_COLORS.honor;
   return (
     <motion.aside
       data-testid="achievement-of-week"
@@ -631,7 +631,7 @@ function UnlockTicker({ items }) {
       <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ backgroundColor: item.material_color || "#29B6E8", boxShadow: `0 0 6px ${item.material_color || "#29B6E8"}` }} aria-hidden="true" />
       <span className="font-semibold text-white/85">{item.user?.display_name || "Spieler"}</span>
       <span className="text-white/45">hat</span>
-      <span className="font-bold" style={{ color: item.material_color || "#FFD700" }}>{item.name}</span>
+      <span className="font-bold" style={{ color: item.material_color || ROLE_COLORS.honor }}>{item.name}</span>
       <span className="text-white/35">({item.material_name})</span>
     </Link>
   );
@@ -707,7 +707,7 @@ function PodiumCard({ entry, index, byLevel = false }) {
         className="block tls-type-card truncate hover:text-[#29B6E8]"
       >
         {entry.display_name}
-        {Number(entry.prestige || 0) > 0 && <span className="ml-1 text-[#FFD700]" title={`Prestige ${entry.prestige}`}>{"★".repeat(Math.min(5, Number(entry.prestige)))}</span>}
+        {Number(entry.prestige || 0) > 0 && <span className="ml-1 text-honor" title={`Prestige ${entry.prestige}`}>{"★".repeat(Math.min(5, Number(entry.prestige)))}</span>}
       </Link>
       <div className="mt-1 sm:mt-2 tls-type-section tabular-nums" style={{ color: style.color }}>
         <NumText text={byLevel ? `Level ${entry.level}` : entry.points} />

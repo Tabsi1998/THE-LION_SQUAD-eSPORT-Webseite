@@ -230,7 +230,7 @@ function MatchCard({ match, stationMap, featured = false }) {
       </div>
       <div className="mt-4 flex flex-wrap gap-3 tls-type-small text-white/55">
         <span className="inline-flex items-center gap-1.5"><CalendarClock className="w-3.5 h-3.5" />{formatWhen(match.scheduled_at, { fallback: "Termin offen" })}</span>
-        {station && <span className="inline-flex items-center gap-1.5 text-[#FFD700]"><Monitor className="w-3.5 h-3.5" />{station}</span>}
+        {station && <span className="inline-flex items-center gap-1.5 text-brand"><Monitor className="w-3.5 h-3.5" />{station}</span>}
         <span className="inline-flex items-center gap-1.5"><Users className="w-3.5 h-3.5" />{formatMatchKind(match)}</span>
       </div>
     </Link>
@@ -259,7 +259,7 @@ function ActivityRow({ item, accessToken }) {
   const suffix = item.access_link && accessToken ? `?access=${encodeURIComponent(accessToken)}` : "";
   return (
     <Link to={`${href}${suffix}`} className="flex items-center gap-3 border border-white/10 bg-black/20 rounded-sm p-3 hover:border-[#29B6E8]/40 transition min-w-0">
-      <div className={`w-10 h-10 rounded-sm border flex items-center justify-center shrink-0 ${isFastLap ? "border-[#FFD700]/35 text-[#FFD700]" : "border-[#29B6E8]/35 text-[#29B6E8]"}`}>
+      <div className={`w-10 h-10 rounded-sm border flex items-center justify-center shrink-0 ${isFastLap ? "border-[#2DD4BF]/35 text-[#2DD4BF]" : "border-[#29B6E8]/35 text-[#29B6E8]"}`}>
         <Icon className="w-5 h-5" />
       </div>
       <div className="min-w-0">
@@ -302,7 +302,7 @@ function LivePanel({ icon: Icon, title, count, children }) {
 }
 
 function LiveStat({ icon: Icon, label, value, tone }) {
-  const color = tone === "gold" ? "text-[#FFD700]" : tone === "green" ? "text-ok" : tone === "white" ? "text-white" : "text-[#29B6E8]";
+  const color = tone === "gold" ? "text-brand" : tone === "green" ? "text-ok" : tone === "white" ? "text-white" : "text-[#29B6E8]";
   return (
     <div className="border border-white/10 bg-[#121212] rounded-sm p-4">
       <div className="flex items-center justify-between gap-3">

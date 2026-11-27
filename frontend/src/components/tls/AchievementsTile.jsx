@@ -49,7 +49,7 @@ export function AchievementsTile({ className = "" }) {
             <span className="tls-type-card" data-testid="dashboard-achievements-level">Level {level?.level || 1}</span>
             <span className="tls-type-label" style={{ color: tier.color }}>{level?.title || tier.title}</span>
             {prestige > 0 && (
-              <span className="inline-flex items-center gap-0.5 text-[#FFD700]" title={`Prestige ${prestige}`} data-testid="dashboard-achievements-prestige">
+              <span className="inline-flex items-center gap-0.5 text-honor" title={`Prestige ${prestige}`} data-testid="dashboard-achievements-prestige">
                 {Array.from({ length: Math.min(5, prestige) }).map((_, i) => <Star key={i} className="w-3 h-3 fill-current" />)}
               </span>
             )}
@@ -76,7 +76,7 @@ export function AchievementsTile({ className = "" }) {
               <Badge material={last.material} rank={last.rank} art={last.art} icon={last.icon} size="xs" title={last.name} />
               <span className="text-white/45 tls-type-label shrink-0">Zuletzt</span>
               <span className="truncate font-semibold">{last.name}</span>
-              <span className="ml-auto tls-type-small shrink-0" style={{ color: last.material_color || "#FFD700" }}>{last.material_name}</span>
+              <span className="ml-auto tls-type-small shrink-0" style={{ color: last.material_color || ROLE_COLORS.honor }}>{last.material_name}</span>
             </div>
           ) : (
             <div className="mt-2 tls-type-small text-white/45" data-testid="dashboard-achievements-empty">Noch keine Freischaltung – spiel mit, dann geht es los.</div>

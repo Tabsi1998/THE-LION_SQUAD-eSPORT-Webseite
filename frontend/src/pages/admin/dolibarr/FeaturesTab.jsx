@@ -24,18 +24,18 @@ function ParticipationsDetails({ info, busy, onBackfill }) {
       {last?.at ? (
         <p className="text-white/60" data-testid="dolibarr-participations-last">
           Letzter Abgleich {shortMoment(last.at)}:{" "}
-          {last.skipped ? <span className="text-[#FFD700]">{last.text}</span>
+          {last.skipped ? <span className="text-quiet">{last.text}</span>
             : `${last.sent || 0} gemeldet, ${last.replaced || 0} ersetzt, ${last.retracted || 0} zurückgenommen${last.failed ? `, ${last.failed} abgelehnt` : ""}${last.pending ? `, ${last.pending} folgen` : ""}.`}
           {last.error ? <span className="block text-warn">{last.text}</span> : null}
         </p>
       ) : <p className="text-white/45">Noch kein Abgleich – er läuft alle zehn Minuten.</p>}
-      {info?.backfill_from ? <p className="text-[#FFD700]">Nachzug ab {germanDay(info.backfill_from)} läuft – der Rest folgt mit den nächsten Abgleichen.</p> : null}
+      {info?.backfill_from ? <p className="text-brand">Nachzug ab {germanDay(info.backfill_from)} läuft – der Rest folgt mit den nächsten Abgleichen.</p> : null}
       {info?.failed?.length ? (
         <div data-testid="dolibarr-participations-failed">
           <div className="text-white/60">Abgelehnt ({info.failed_total}) – neuer Versuch nach sechs Stunden oder mit dem Nachzug:</div>
           <ul className="mt-1 space-y-0.5">
             {info.failed.map((row) => (
-              <li key={`${row.day}-${row.kind}-${row.title}`} className="text-white/55">{germanDay(row.day)} · {row.kind} „{row.title}“: <span className="text-[#FFD700]">{row.text}</span></li>
+              <li key={`${row.day}-${row.kind}-${row.title}`} className="text-white/55">{germanDay(row.day)} · {row.kind} „{row.title}“: <span className="text-brand">{row.text}</span></li>
             ))}
           </ul>
         </div>
@@ -51,7 +51,7 @@ function FeatureTitle({ feature }) {
   return (
     <span>
       <span className="font-bold tls-type-small">{feature.label}</span>
-      <span className={`block tls-type-small ${feature.enabled ? "text-ok" : "text-[#FFD700]"}`}>{feature.state}</span>
+      <span className={`block tls-type-small ${feature.enabled ? "text-ok" : "text-quiet"}`}>{feature.state}</span>
     </span>
   );
 }
@@ -104,11 +104,11 @@ export function FeaturesTab({ status, busy, run, consentTexts = [], consentError
                     <input type="checkbox" checked={Boolean(sw.on)} disabled={!!busy || !canSwitch} onChange={(e) => toggle(feature, e.target.checked)}
                       data-testid={`dolibarr-switch-${feature.key}`} className="accent-[#29B6E8] mt-0.5" />
                     <span className="font-bold tls-type-small">{feature.label}</span>
-                    <span className={`basis-full pl-6 tls-type-small ${feature.enabled ? "text-ok" : "text-[#FFD700]"}`}>{feature.state}</span>
+                    <span className={`basis-full pl-6 tls-type-small ${feature.enabled ? "text-ok" : "text-quiet"}`}>{feature.state}</span>
                   </label>
                 ) : (
                   <div className="flex items-start gap-2 sm:w-96 shrink-0">
-                    {feature.enabled ? <CheckCircle2 className="w-4 h-4 text-ok shrink-0 mt-0.5" /> : <XCircle className="w-4 h-4 text-[#FFD700] shrink-0 mt-0.5" />}
+                    {feature.enabled ? <CheckCircle2 className="w-4 h-4 text-ok shrink-0 mt-0.5" /> : <XCircle className="w-4 h-4 text-quiet shrink-0 mt-0.5" />}
                     <FeatureTitle feature={feature} />
                   </div>
                 )}
@@ -153,7 +153,7 @@ export function FeaturesTab({ status, busy, run, consentTexts = [], consentError
                   {feature.enabled && (
                     <div className="flex flex-wrap items-center gap-3 tls-type-small" data-testid="dolibarr-source-state">
                       {source.fetched_at ? <span className="text-white/60">Stand {viennaDateTime(source.fetched_at, { dateStyle: "short", timeStyle: "short" })}: <span className="text-white">{source.counts?.sponsors ?? 0} Sponsoren, {source.counts?.partners ?? 0} Partner</span></span>
-                        : <span className="text-[#FFD700]">Noch nichts aus Dolibarr gelesen.</span>}
+                        : <span className="text-warn">Noch nichts aus Dolibarr gelesen.</span>}
                       {source.error && <span className="text-warn">Letzter Abgleich fehlgeschlagen ({source.error_text || source.error}) – alter Stand bleibt.</span>}
                       <button type="button" onClick={refreshSponsors} disabled={!!busy} data-testid="dolibarr-source-refresh" className="px-3 py-1 border border-white/20 text-white/80 rounded-sm tls-type-label inline-flex items-center gap-1 disabled:opacity-40">
                         <RefreshCw className={`w-3 h-3 ${busy === "sponsors" ? "animate-spin" : ""}`} /> Jetzt nachlesen

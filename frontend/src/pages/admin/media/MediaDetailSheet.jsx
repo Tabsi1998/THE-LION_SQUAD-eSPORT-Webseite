@@ -5,6 +5,7 @@ import { MediaImage } from "./parts";
 import { BACKEND, IMG_EXT, MEDIA_SCOPE_LABELS, VIDEO_EXT, cacheBustedMediaUrl, fmtBytes } from "./shared";
 import { viennaDateTime } from "@/lib/vienna";
 
+import { ROLE_COLORS } from "@/lib/categoryColors";
 export function MediaDetailSheet({ item, onClose, onCopy, onRotateLeft, onRotateRight, onDelete, onKeepDuplicate }) {
   const isImg = IMG_EXT.has(item.ext);
   const isVideo = VIDEO_EXT.has(item.ext);
@@ -35,7 +36,7 @@ export function MediaDetailSheet({ item, onClose, onCopy, onRotateLeft, onRotate
     </div>
   );
   return (
-    <AdminSheet title={item.filename} eyebrow={isImg ? "Medien · Bild" : isVideo ? "Medien · Video" : "Medien · Datei"} accent="#FFD700" size="xl" onClose={onClose} footer={footer} testId="media-sheet">
+    <AdminSheet title={item.filename} eyebrow={isImg ? "Medien · Bild" : isVideo ? "Medien · Video" : "Medien · Datei"} accent={ROLE_COLORS.brand} size="xl" onClose={onClose} footer={footer} testId="media-sheet">
       <div className="bg-[#0A0A0A] rounded-sm p-3 flex items-center justify-center min-h-[240px]" data-testid="media-sheet-preview">
         {isImg ? (
           <MediaImage src={previewUrl} alt={item.filename} className="max-h-[50vh] object-contain" />
@@ -89,7 +90,7 @@ export function MediaDetailSheet({ item, onClose, onCopy, onRotateLeft, onRotate
             <div className="tls-type-label text-quiet">Duplikate</div>
             <div className="mt-1 flex flex-wrap gap-1">
               {(item.duplicate_filenames || []).map((name) => (
-                <span key={name} className="rounded-sm border border-[#FFD700]/25 bg-[#FFD700]/5 px-2 py-1 font-mono tls-type-small text-[#FFD700]">{name}</span>
+                <span key={name} className="rounded-sm border border-brand/25 bg-brand/5 px-2 py-1 font-mono tls-type-small text-brand">{name}</span>
               ))}
             </div>
             {onKeepDuplicate && (

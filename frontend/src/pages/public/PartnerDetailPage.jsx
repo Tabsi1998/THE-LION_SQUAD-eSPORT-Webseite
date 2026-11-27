@@ -166,7 +166,7 @@ export default function PartnerDetailPage() {
 
             {tools.length > 0 && (
               <section data-testid="partner-tools">
-                <SectionTitle icon={Wrench} color="#FFD700" kicker="Tools & Projekte" title={`Vom Partner (${tools.length})`} />
+                <SectionTitle icon={Wrench} color={ROLE_COLORS.brand} kicker="Tools & Projekte" title={`Vom Partner (${tools.length})`} />
                 <div className="grid gap-3 md:grid-cols-2">
                   {tools.map((tool) => (
                     <ToolCard key={tool.id} tool={tool} active={openTool === tool.id} onEmbed={tool.embed ? () => setOpenTool(openTool === tool.id ? null : tool.id) : null} />
@@ -328,7 +328,7 @@ function ChannelsCard({ channels, twitch, discord }) {
 
 function ToolCard({ tool, active, onEmbed }) {
   return (
-    <div className={`border rounded-sm bg-[#121212] overflow-hidden flex flex-col ${active ? "border-[#FFD700]/60" : "border-white/10"}`} data-testid={`partner-tool-${tool.id}`}>
+    <div className={`border rounded-sm bg-[#121212] overflow-hidden flex flex-col ${active ? "border-brand/60" : "border-white/10"}`} data-testid={`partner-tool-${tool.id}`}>
       {tool.image_url && <LazyImg src={tool.image_url} alt="" sizes="(min-width: 768px) 45vw, 100vw" className="w-full h-36 object-cover border-b border-white/10" />}
       <div className="p-4 flex-1 min-w-0">
         <div className="tls-type-card leading-tight break-words">{tool.title}</div>
@@ -336,7 +336,7 @@ function ToolCard({ tool, active, onEmbed }) {
       </div>
       <div className="px-4 pb-4 flex flex-wrap gap-2">
         {onEmbed && (
-          <button type="button" onClick={onEmbed} data-testid={`partner-tool-embed-${tool.id}`} className={`inline-flex items-center gap-1.5 px-3 py-1.5 border rounded-sm tls-type-label transition ${active ? "border-[#FFD700] text-[#FFD700]" : "border-white/15 text-white/70 hover:text-[#FFD700] hover:border-[#FFD700]/60"}`}>
+          <button type="button" onClick={onEmbed} data-testid={`partner-tool-embed-${tool.id}`} className={`inline-flex items-center gap-1.5 px-3 py-1.5 border rounded-sm tls-type-label transition ${active ? "border-brand text-brand" : "border-white/15 text-white/70 hover:text-brand hover:border-brand/60"}`}>
             <Eye className="w-3.5 h-3.5" /> {active ? "Ausblenden" : "Hier ansehen"}
           </button>
         )}
@@ -351,7 +351,7 @@ function ToolCard({ tool, active, onEmbed }) {
 // Eingebettet nur nach Zustimmung zu externen Medien - die Seite des Partners lädt sonst nichts.
 function ToolEmbed({ tool, hasConsent, onClose }) {
   return (
-    <div className="mt-4 border border-[#FFD700]/40 rounded-sm bg-[#0A0A0A] overflow-hidden" data-testid="partner-tool-embed">
+    <div className="mt-4 border border-brand/40 rounded-sm bg-[#0A0A0A] overflow-hidden" data-testid="partner-tool-embed">
       <div className="flex items-center justify-between gap-3 px-4 py-2 border-b border-white/10 tls-type-small">
         <span className="font-bold text-white/80 truncate">{tool.title}</span>
         <div className="flex items-center gap-3 shrink-0">
@@ -366,7 +366,7 @@ function ToolEmbed({ tool, hasConsent, onClose }) {
         </>
       ) : (
         <div className="p-4">
-          <ExternalMediaNotice service={tool.title} reason="Die Seite des Partners wird erst nach Zustimmung zu externen Medien geladen." url={tool.url} accent="#FFD700" compact testId="partner-tool-consent-notice" />
+          <ExternalMediaNotice service={tool.title} reason="Die Seite des Partners wird erst nach Zustimmung zu externen Medien geladen." url={tool.url} accent={ROLE_COLORS.brand} compact testId="partner-tool-consent-notice" />
         </div>
       )}
     </div>

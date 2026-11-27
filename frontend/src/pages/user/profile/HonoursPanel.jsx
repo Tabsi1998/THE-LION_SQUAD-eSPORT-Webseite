@@ -32,13 +32,13 @@ export function participationsByYear(rows) {
 
 export function HonourCard({ honour, showReach = false }) {
   return (
-    <li className="relative overflow-hidden border border-[#FFD700]/35 rounded-sm bg-gradient-to-br from-[#FFD700]/10 via-[#121212] to-[#121212] p-4" data-testid="honour-card">
+    <li className="relative overflow-hidden border border-honor/35 rounded-sm bg-gradient-to-br from-honor/10 via-[#121212] to-[#121212] p-4" data-testid="honour-card">
       <div className="flex items-start gap-3">
-        <span className="shrink-0 w-10 h-10 rounded-full border border-[#FFD700]/60 bg-[#FFD700]/10 grid place-items-center text-[#FFD700]" aria-hidden="true">
+        <span className="shrink-0 w-10 h-10 rounded-full border border-honor/60 bg-honor/10 grid place-items-center text-honor" aria-hidden="true">
           <Award className="w-5 h-5" />
         </span>
         <div className="min-w-0">
-          <div className="tls-type-label text-[#FFD700]">{honour.kind_label || "Ehrung"}</div>
+          <div className="tls-type-label text-honor">{honour.kind_label || "Ehrung"}</div>
           <div className="tls-type-card leading-tight text-white">{honour.title}</div>
           {honour.label ? <div className="tls-type-small text-white/65 mt-0.5">{honour.label}</div> : null}
           <div className="tls-type-small text-white/45 mt-1">

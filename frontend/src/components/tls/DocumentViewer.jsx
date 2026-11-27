@@ -97,7 +97,7 @@ export function DocumentViewer({ path, title, subtitle, downloadPath, onClose, o
             <button type="button" onClick={() => setZoom((z) => nextZoom(z, 1))} aria-label="Vergrößern" className="p-2 text-white/70 hover:text-white"><ZoomIn className="w-4 h-4" /></button>
             <button type="button" onClick={() => setFullscreen((value) => !value)} aria-label={fullscreen ? "Vollbild beenden" : "Vollbild"} className="p-2 text-white/70 hover:text-white">{fullscreen ? <Minimize2 className="w-4 h-4" /> : <Maximize2 className="w-4 h-4" />}</button>
             {downloadPath && (
-              <a href={`${API}${downloadPath}`} download data-testid="document-viewer-download" className="p-2 text-[#FFD700] hover:text-white" aria-label="Herunterladen"><Download className="w-4 h-4" /></a>
+              <a href={`${API}${downloadPath}`} download data-testid="document-viewer-download" className="p-2 text-brand hover:text-white" aria-label="Herunterladen"><Download className="w-4 h-4" /></a>
             )}
             <button type="button" onClick={onClose} aria-label="Schließen" data-testid="document-viewer-close" className="p-2 text-white/70 hover:text-white"><X className="w-5 h-5" /></button>
           </div>
@@ -107,7 +107,7 @@ export function DocumentViewer({ path, title, subtitle, downloadPath, onClose, o
           {state.error && (
             <div className="max-w-md text-center py-16 space-y-3" data-testid="document-viewer-error">
               <div className="tls-type-small text-white/80">{state.error}</div>
-              {downloadPath && <a href={`${API}${downloadPath}`} download className="inline-flex items-center gap-2 tls-type-label text-[#FFD700]"><Download className="w-3.5 h-3.5" /> Herunterladen</a>}
+              {downloadPath && <a href={`${API}${downloadPath}`} download className="inline-flex items-center gap-2 tls-type-label text-brand"><Download className="w-3.5 h-3.5" /> Herunterladen</a>}
             </div>
           )}
           {!state.loading && !state.error && <canvas ref={canvasRef} className="bg-white shadow-lg max-w-full" data-testid="document-viewer-canvas" />}

@@ -139,7 +139,7 @@ export default function AdminMembershipApplicationsPage() {
     <AdminLayout>
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div>
-          <span className="tls-type-label text-[#FFD700]">Mitglieder</span>
+          <span className="tls-type-label text-honor">Mitglieder</span>
           <h1 className="tls-type-title mt-1 flex items-center gap-3"><Inbox className="w-6 h-6" /> <ShortCaps>Bewerbungen</ShortCaps></h1>
         </div>
         <button type="button" onClick={() => setInviting(true)} data-testid="apps-invite-open" className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-4 py-2.5 bg-[#29B6E8] text-black rounded-sm tls-type-label">
@@ -212,14 +212,14 @@ export default function AdminMembershipApplicationsPage() {
         <AdminSheet
           title="Bewerbung"
           eyebrow="Bewerbungen"
-          accent="#FFD700"
+          accent={ROLE_COLORS.honor}
           onClose={() => setSelected(null)}
           testId="application-sheet"
           footer={selectedState?.decide ? (
             <div className="ml-auto flex flex-wrap gap-2">
               <button type="button" onClick={() => withdraw(selected)} data-testid="application-sheet-withdraw" className="px-4 py-2 border border-white/15 text-white/70 hover:text-white rounded-sm tls-type-label">Zurückziehen</button>
               <button type="button" onClick={() => decide(selected, "reject")} data-testid="application-sheet-reject" className="px-4 py-2 border border-live/40 text-live hover:bg-live/10 rounded-sm tls-type-label">Ablehnen</button>
-              <button type="button" onClick={() => decide(selected, "approve")} data-testid="application-sheet-approve" className="px-4 py-2 bg-[#FFD700] text-black rounded-sm tls-type-label">Annehmen</button>
+              <button type="button" onClick={() => decide(selected, "approve")} data-testid="application-sheet-approve" className="px-4 py-2 bg-honor text-black rounded-sm tls-type-label">Annehmen</button>
             </div>
           ) : null}
         >

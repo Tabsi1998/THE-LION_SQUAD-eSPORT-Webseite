@@ -62,7 +62,7 @@ export function DiscordSamplesPanel() {
           „In den Testkanal senden“ schickt genau dieses Embed echt in den Testkanal (mit Vermerk „Test“, nie an die Community), „An mich“ als Direktnachricht an dein verknüpftes Discord-Konto.
         </p>
       </div>
-      <div className={`border rounded-sm p-3 tls-type-small ${testChannel.configured ? "border-ok/25 bg-ok/5 text-white/70" : "border-[#FFD700]/40 bg-[#FFD700]/10 text-white/80"}`} data-testid="discord-samples-test-channel">
+      <div className={`border rounded-sm p-3 tls-type-small ${testChannel.configured ? "border-ok/25 bg-ok/5 text-white/70" : "border-warn/40 bg-warn/10 text-white/80"}`} data-testid="discord-samples-test-channel">
         {testChannel.configured
           ? <>Testkanal: <strong>{testChannel.channel_name ? `#${testChannel.channel_name}` : "gewählt"}</strong> – privat, Tests zählen nicht als Meldung.</>
           : <>Kein Testkanal gewählt – oben unter „Kanäle je Zweck“ beim Ziel <strong>Test</strong> einen privaten Kanal wählen (etwa #bot-test). Bis dahin geht aus der Vorschau nichts in einen Kanal.</>}
@@ -91,8 +91,8 @@ export function DiscordSamplesPanel() {
                 <div className="flex flex-wrap items-center justify-between gap-2">
                   <div className="tls-type-small font-bold">{entry.label}</div>
                   <div className="flex flex-wrap items-center gap-2 tls-type-label text-quiet">
-                    {entry.enabled === false && <span className="text-[#FFD700]" data-testid={`discord-sample-${entry.key}-off`}>Ereignis aus</span>}
-                    {entry.only_main && <span className="text-[#FFD700]" data-testid={`discord-sample-${entry.key}-only-main`}>nur am Hauptserver</span>}
+                    {entry.enabled === false && <span className="text-quiet" data-testid={`discord-sample-${entry.key}-off`}>Ereignis aus</span>}
+                    {entry.only_main && <span className="text-quiet" data-testid={`discord-sample-${entry.key}-only-main`}>nur am Hauptserver</span>}
                     {entry.place && <span className="text-[#b8c0ff]" data-testid={`discord-sample-${entry.key}-place`}>{entry.place}</span>}
                     <span>{entry.source_text}</span>
                   </div>

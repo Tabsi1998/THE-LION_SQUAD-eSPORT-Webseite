@@ -65,7 +65,7 @@ export default function PlayersPage() {
         <div className="mt-8 flex flex-col md:flex-row gap-3 md:items-center md:justify-between">
           <div className="flex gap-2">
             <button onClick={() => setTab("all")} data-testid="players-tab-all" className={`px-4 py-2 tls-type-label rounded-sm transition ${tab === "all" ? "bg-[#29B6E8] text-black" : "border border-white/10 text-white/60 hover:text-white"}`}>Alle</button>
-            <button onClick={() => setTab("members")} data-testid="players-tab-members" className={`px-4 py-2 tls-type-label rounded-sm transition ${tab === "members" ? "bg-[#FFD700] text-black" : "border border-white/10 text-white/60 hover:text-white"}`}>Vereinsmitglieder</button>
+            <button onClick={() => setTab("members")} data-testid="players-tab-members" className={`px-4 py-2 tls-type-label rounded-sm transition ${tab === "members" ? "bg-honor text-black" : "border border-white/10 text-white/60 hover:text-white"}`}>Vereinsmitglieder</button>
           </div>
           <div className="relative w-full md:w-72">
             <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-white/40" />
@@ -139,7 +139,7 @@ function PlayerGrid({ players, memberUsernames, crowns }) {
                     <img src={resolveMediaUrl(p.avatar_url)} alt={p.display_name} className="w-full h-full object-cover" />
                   ) : (
                     <div className="w-full h-full flex items-center justify-center">
-                      <span className={`font-black ${isMember ? "text-[#FFD700]" : "text-white/40"}`}>{(p.display_name || p.username)[0]}</span>
+                      <span className={`font-black ${isMember ? "text-honor" : "text-white/40"}`}>{(p.display_name || p.username)[0]}</span>
                     </div>
                   )}
                 </LevelAvatarFrame>
@@ -152,7 +152,7 @@ function PlayerGrid({ players, memberUsernames, crowns }) {
               <div className="flex-1 min-w-0">
                 <div className="tls-card__title tls-type-card text-white truncate flex items-center gap-1.5">
                   {p.display_name || p.username}
-                  {isMember && <Crown className="w-3 h-3 text-[#FFD700] shrink-0" />}
+                  {isMember && <Crown className="w-3 h-3 text-honor shrink-0" />}
                 </div>
                 <div className="tls-type-small text-white/45 truncate">@{p.username}</div>
               </div>

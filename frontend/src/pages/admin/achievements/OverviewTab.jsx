@@ -62,7 +62,7 @@ export function OverviewTab() {
         <Stat label="Freischaltungen 7 Tage" value={data.unlocks_7d} testId="ov-unlocks-7d" />
         <Stat label="Freischaltungen 30 Tage" value={data.unlocks_30d} accent="#29B6E8" testId="ov-unlocks-30d" />
         <Stat label="Ohne Erfolg" value={data.users_without_award} hint={`von ${data.users_total} Personen`} accent={ROLE_COLORS.quiet} testId="ov-without" />
-        <Stat label="Seltenste Stufe" value={rarest ? rarest.name : "–"} hint={rarest ? `${rarest.group_name} · ${rarest.holders} Person${rarest.holders === 1 ? "" : "en"} (${rarest.percent} %)${rarest.retired ? " · nicht mehr erreichbar" : ""}` : "noch keine Vergabe"} accent={rarest ? materialColor(rarest) : "#FFD700"} testId="ov-rarest" />
+        <Stat label="Seltenste Stufe" value={rarest ? rarest.name : "–"} hint={rarest ? `${rarest.group_name} · ${rarest.holders} Person${rarest.holders === 1 ? "" : "en"} (${rarest.percent} %)${rarest.retired ? " · nicht mehr erreichbar" : ""}` : "noch keine Vergabe"} accent={rarest ? materialColor(rarest) : ROLE_COLORS.honor} testId="ov-rarest" />
         <Stat label="Aktivste Kategorie" value={active ? active.label : "–"} hint={active ? `${active.count} Freischaltungen in 30 Tagen` : "noch keine"} accent={ROLE_COLORS.ok} testId="ov-active" />
       </div>
 
@@ -81,7 +81,7 @@ export function OverviewTab() {
           icon={Activity}
           hint="Erfolge werden vergeben, sobald etwas passiert (Ergebnis, Turnierabschluss, Bestzeit …) – eine Warteschlange arbeitet die Betroffenen alle 30 Sekunden ab."
           actions={(
-            <button type="button" onClick={evaluateAll} disabled={busy} data-testid="ach-evaluate-all" className="px-3 py-1.5 border border-[#FFD700]/50 text-[#FFD700] tls-type-label rounded-sm inline-flex items-center gap-2 disabled:opacity-40">
+            <button type="button" onClick={evaluateAll} disabled={busy} data-testid="ach-evaluate-all" className="px-3 py-1.5 border border-honor/50 text-honor tls-type-label rounded-sm inline-flex items-center gap-2 disabled:opacity-40">
               <RefreshCw className={`w-3.5 h-3.5 ${busy ? "animate-spin" : ""}`} /> Alle jetzt auswerten
             </button>
           )}
@@ -99,7 +99,7 @@ export function OverviewTab() {
             <dl className="grid grid-cols-2 gap-x-4 gap-y-2 tls-type-small">
               <dt className="text-white/45">Zuletzt</dt><dd>{formatWhen(reconcile.at)}</dd>
               <dt className="text-white/45">Geprüft</dt><dd className="tabular-nums">{reconcile.checked ?? 0} Personen</dd>
-              <dt className="text-white/45">Abweichungen</dt><dd className={`tabular-nums ${reconcile.drift ? "text-[#FFD700]" : ""}`} data-testid="ov-reconcile-drift">{reconcile.drift ?? 0}</dd>
+              <dt className="text-white/45">Abweichungen</dt><dd className={`tabular-nums ${reconcile.drift ? "text-honor" : ""}`} data-testid="ov-reconcile-drift">{reconcile.drift ?? 0}</dd>
               <dt className="text-white/45">Dabei vergeben</dt><dd className="tabular-nums">{reconcile.awarded ?? 0}</dd>
             </dl>
           ) : <p className="tls-type-small text-white/45">Der Abgleich ist noch nicht gelaufen.</p>}

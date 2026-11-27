@@ -104,7 +104,7 @@ export function OpsAlertsPanel() {
       <div className="border border-white/10 bg-[#121212] rounded-sm p-4">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
-            <div className="tls-type-label inline-flex items-center gap-2"><BellRing className="w-4 h-4 text-[#FFD700]" /> Wer erfährt was</div>
+            <div className="tls-type-label inline-flex items-center gap-2"><BellRing className="w-4 h-4 text-brand" /> Wer erfährt was</div>
             <p className="tls-type-small text-white/50 mt-1 max-w-2xl">
               Discord geht über den Bot in den Betriebskanal (Verbindungen → Discord, ein privater Kanal nur für den Vorstand; Bot aus = kein Alarm). E-Mail geht über die Mail-Queue an die Empfänger unten.
               Je Schlüssel (eine Prüfung, eine Fehlergruppe, ein Job) meldet die Website höchstens einmal je Sperrfrist.

@@ -618,7 +618,7 @@ function RuleSummary({ form }) {
 
       <div className="rounded-sm border border-white/10 bg-black/20 p-3 space-y-2 tls-type-small text-white/55">
         <div className="flex items-start gap-2">
-          <Info className="w-4 h-4 text-[#FFD700] shrink-0 mt-0.5" />
+          <Info className="w-4 h-4 text-brand shrink-0 mt-0.5" />
           <div>Streichresultate: {Number(form.drop_worst || 0)}</div>
         </div>
       </div>

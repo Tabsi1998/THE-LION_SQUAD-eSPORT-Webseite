@@ -114,7 +114,7 @@ export function TeamHeader({ team, header, levelInfo, userId, actions = null, ch
                 <span aria-hidden="true">·</span>
                 <span className="inline-flex items-center gap-1" data-testid="team-header-level">
                   Level {levelInfo.level}
-                  {levelInfo.crown === "gold" ? <Crown className="w-3.5 h-3.5 text-[#FFD700]" aria-label="Punktebestes Team" data-testid="team-header-crown" /> : null}
+                  {levelInfo.crown === "gold" ? <Crown className="w-3.5 h-3.5 text-honor" aria-label="Punktebestes Team" data-testid="team-header-crown" /> : null}
                 </span>
               </>
             ) : null}

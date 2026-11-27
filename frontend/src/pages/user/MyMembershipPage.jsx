@@ -58,12 +58,12 @@ export default function MyMembershipPage() {
         <LoadStaleNotice load={membership} className="mb-6" />
 
         {/* Status: Name, Nummer, Stand - die Überschrift der Gruppe steht darüber (Mein Bereich). */}
-        <div className="border border-[#FFD700]/40 bg-gradient-to-br from-[#FFD700]/15 via-[#FFD700]/5 to-transparent rounded-sm p-6 md:p-8 relative overflow-hidden" data-testid="membership-status">
-          <div className="absolute -right-8 -top-8 opacity-10" aria-hidden="true"><Crown className="w-48 h-48 text-[#FFD700]" /></div>
+        <div className="border border-honor/40 bg-gradient-to-br from-honor/15 via-honor/5 to-transparent rounded-sm p-6 md:p-8 relative overflow-hidden" data-testid="membership-status">
+          <div className="absolute -right-8 -top-8 opacity-10" aria-hidden="true"><Crown className="w-48 h-48 text-honor" /></div>
           <div className="relative">
             <h2 className="tls-wrap tls-type-section">{user?.display_name || user?.username}</h2>
             {m?.member_number && (
-              <div className="mt-3 inline-flex items-center gap-2 text-[#FFD700] font-mono tls-type-card">
+              <div className="mt-3 inline-flex items-center gap-2 text-honor font-mono tls-type-card">
                 <Hash className="w-4 h-4" /> {m.member_number}
               </div>
             )}
@@ -88,10 +88,10 @@ export default function MyMembershipPage() {
 
         {/* Beitrag und Stand aus der Mitgliederverwaltung (#295) */}
         {fee && (
-          <div id="beitrag" className={`mt-6 scroll-mt-32 border rounded-sm bg-[#121212] p-5 ${fee.tone === "warn" ? "border-[#FFD700]/40" : "border-white/10"}`} data-testid="membership-fee-card">
+          <div id="beitrag" className={`mt-6 scroll-mt-32 border rounded-sm bg-[#121212] p-5 ${fee.tone === "warn" ? "border-honor/40" : "border-white/10"}`} data-testid="membership-fee-card">
             <div className="flex flex-wrap items-center justify-between gap-3">
-              <h2 className="tls-type-section inline-flex items-center gap-2"><Wallet className="w-4 h-4 text-[#FFD700]" /> Mitgliedsbeitrag</h2>
-              <span className={`tls-type-label ${fee.tone === "warn" ? "text-[#FFD700]" : fee.tone === "info" ? "text-[#29B6E8]" : "text-ok"}`}>{fee.label}</span>
+              <h2 className="tls-type-section inline-flex items-center gap-2"><Wallet className="w-4 h-4 text-honor" /> Mitgliedsbeitrag</h2>
+              <span className={`tls-type-label ${fee.tone === "warn" ? "text-warn" : fee.tone === "info" ? "text-[#29B6E8]" : "text-ok"}`}>{fee.label}</span>
             </div>
             {fee.amount && <div className="mt-2 tls-type-section">{fee.amount} <span className="tls-type-small text-quiet font-normal">je Beitragsperiode</span></div>}
             <ul className="mt-2 space-y-1 tls-type-small text-white/75">
@@ -100,7 +100,7 @@ export default function MyMembershipPage() {
             {!!erp.functions?.length && (
               <div className="mt-3 tls-type-small text-white/75">Funktion im Verein: {erp.functions.map((fn) => fn.label).join(", ")}</div>
             )}
-            <div className={`mt-3 tls-type-small ${fee.stale ? "text-[#FFD700]" : "text-quiet"}`}>
+            <div className={`mt-3 tls-type-small ${fee.stale ? "text-honor" : "text-quiet"}`}>
               Stand aus der Mitgliederverwaltung vom {formatDate(fee.asOf)}{fee.stale ? " – seither nicht mehr abgeglichen" : ""}. Stimmt etwas nicht, melde dich beim Vorstand.
             </div>
           </div>
@@ -143,14 +143,14 @@ export default function MyMembershipPage() {
         {/* History */}
         {!!m?.history?.length && (
           <div className="mt-6 border border-white/10 rounded-sm bg-[#121212] p-5">
-            <h2 className="tls-type-section mb-4 inline-flex items-center gap-2"><History className="w-4 h-4 text-[#FFD700]" /> Verlauf</h2>
+            <h2 className="tls-type-section mb-4 inline-flex items-center gap-2"><History className="w-4 h-4 text-honor" /> Verlauf</h2>
             <div className="space-y-3">
               {m.history.slice().reverse().map((h, idx) => (
-                <div key={idx} className="flex items-start gap-3 tls-type-small border-l-2 border-[#FFD700]/40 pl-4">
+                <div key={idx} className="flex items-start gap-3 tls-type-small border-l-2 border-honor/40 pl-4">
                   <div className="flex-1">
                     <div className="text-white">
                       Status:{" "}
-                      <strong className="text-[#FFD700]">{STATUS_LABELS[h.to_status] || h.to_status || "—"}</strong>
+                      <strong className="text-honor">{STATUS_LABELS[h.to_status] || h.to_status || "—"}</strong>
                       {h.from_status && h.from_status !== h.to_status && (
                         <span className="text-white/40"> (vorher: {STATUS_LABELS[h.from_status] || h.from_status})</span>
                       )}
@@ -285,7 +285,7 @@ function IdentityCard() {
       : "Sobald dein Konto deinem Mitgliedseintrag zugeordnet ist – von selbst über deine bestätigte E-Mail-Adresse oder durch den Vorstand –, siehst du unter Vereinsdokumente auch deine persönlichen Unterlagen aus der Vereinsakte. Alternativ geht ein Einladungscode vom Vorstand (gilt eine Stunde, genau einmal).";
   return (
     <div className="mt-6 border border-white/10 rounded-sm bg-[#121212] p-5" data-testid="membership-identity-card">
-      <h2 className="tls-type-section inline-flex items-center gap-2"><FileText className="w-4 h-4 text-[#FFD700]" /> Vereinsakte</h2>
+      <h2 className="tls-type-section inline-flex items-center gap-2"><FileText className="w-4 h-4 text-honor" /> Vereinsakte</h2>
       {bound ? (
         <div className="mt-2 tls-type-small text-white/70" data-testid="membership-identity-bound">
           {viaMember
@@ -293,7 +293,7 @@ function IdentityCard() {
             : <>Dein Konto ist seit {formatDate(state.linked_at)} mit der Vereinsakte verbunden{state.capability_labels?.length ? ` (${state.capability_labels.join(", ")})` : ""}.</>}{" "}
           <Link to={vereinPfad("dokumente")} className="tls-btn tls-btn--quiet mt-2 inline-flex min-h-11 items-center px-3 py-2 rounded-sm tls-type-label" data-testid="membership-identity-documents">Zu den Vereinsdokumenten</Link>
           {viaMember && state.right_missing ? (
-            <p className="mt-2 text-[#FFD700]/80" data-testid="membership-identity-right-missing">Die Website darf im Vereinsmodul noch nicht im Namen der Mitglieder handeln – der Vorstand richtet das Recht ein; bis dahin siehst du nur das Öffentliche.</p>
+            <p className="mt-2 text-honor/80" data-testid="membership-identity-right-missing">Die Website darf im Vereinsmodul noch nicht im Namen der Mitglieder handeln – der Vorstand richtet das Recht ein; bis dahin siehst du nur das Öffentliche.</p>
           ) : null}
         </div>
       ) : (
@@ -301,7 +301,7 @@ function IdentityCard() {
           <p className="mt-2 tls-type-body text-white/70" data-testid="membership-identity-hint">{hint}</p>
           <form onSubmit={submit} className="mt-3 flex flex-col sm:flex-row gap-2" data-testid="membership-identity-form">
             <input value={code} onChange={(e) => setCode(e.target.value)} maxLength={120} placeholder="Einladungscode" autoComplete="off" data-testid="membership-identity-code" className="flex-1 bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-sm" />
-            <button type="submit" disabled={busy || !code.trim()} data-testid="membership-identity-claim" className="px-4 py-2 bg-[#FFD700] text-black tls-type-label rounded-sm disabled:opacity-50">{busy ? "Prüfe…" : "Verbinden"}</button>
+            <button type="submit" disabled={busy || !code.trim()} data-testid="membership-identity-claim" className="px-4 py-2 bg-honor text-black tls-type-label rounded-sm disabled:opacity-50">{busy ? "Prüfe…" : "Verbinden"}</button>
           </form>
         </>
       )}
@@ -335,7 +335,7 @@ function WebsiteFieldInput({ field, value, onChange }) {
   const base = "w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm tls-type-small";
   const testId = `membership-website-${field.code}`;
   if (field.type === "textarea") return <textarea value={value ?? ""} onChange={(e) => onChange(e.target.value)} rows={3} maxLength={field.max_length || 2000} data-testid={testId} className={base} />;
-  if (field.type === "boolean") return <input type="checkbox" checked={!!value} onChange={(e) => onChange(e.target.checked)} data-testid={testId} className="w-4 h-4 accent-[#FFD700]" />;
+  if (field.type === "boolean") return <input type="checkbox" checked={!!value} onChange={(e) => onChange(e.target.checked)} data-testid={testId} className="w-4 h-4 accent-honor" />;
   if (field.type === "select") {
     return (
       <select value={value ?? ""} onChange={(e) => onChange(e.target.value || null)} data-testid={testId} className={base}>
@@ -349,7 +349,7 @@ function WebsiteFieldInput({ field, value, onChange }) {
     return (
       <div className="flex flex-wrap gap-2" data-testid={testId}>
         {(field.options || []).map((o) => (
-          <label key={o.code} className={`px-2 py-1 border rounded-sm tls-type-small cursor-pointer ${chosen.includes(o.code) ? "border-[#FFD700] text-[#FFD700]" : "border-white/15 text-white/60"}`}>
+          <label key={o.code} className={`px-2 py-1 border rounded-sm tls-type-small cursor-pointer ${chosen.includes(o.code) ? "border-honor text-honor" : "border-white/15 text-white/60"}`}>
             <input type="checkbox" className="sr-only" checked={chosen.includes(o.code)} onChange={(e) => onChange(e.target.checked ? [...chosen, o.code] : chosen.filter((c) => c !== o.code))} data-testid={`${testId}-${o.code}`} />
             {o.label}
           </label>
@@ -393,7 +393,7 @@ function WebsiteProfileCard() {
   };
   return (
     <div className="mt-6 border border-white/10 rounded-sm bg-[#121212] p-5" data-testid="membership-website-card">
-      <h2 className="tls-type-section inline-flex items-center gap-2"><Crown className="w-4 h-4 text-[#FFD700]" /> Mein Website-Profil</h2>
+      <h2 className="tls-type-section inline-flex items-center gap-2"><Crown className="w-4 h-4 text-honor" /> Mein Website-Profil</h2>
       <p className="mt-2 tls-type-small text-white/70" data-testid="membership-website-state">{websiteStateLine(view)}</p>
       {!fields.length && <p className="mt-3 tls-type-small text-white/50" data-testid="membership-website-empty">Der Verein hat noch keine Felder für das Website-Profil gewählt.</p>}
       <form onSubmit={save} className="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-3" data-testid="membership-website-form">
@@ -407,7 +407,7 @@ function WebsiteProfileCard() {
         ))}
         {fields.some((f) => f.editable) && (
           <div className="sm:col-span-2">
-            <button type="submit" disabled={busy || !Object.keys(changed).length} data-testid="membership-website-save" className="px-4 py-2 bg-[#FFD700] text-black tls-type-label rounded-sm disabled:opacity-50">{busy ? "Sende…" : "Profil speichern"}</button>
+            <button type="submit" disabled={busy || !Object.keys(changed).length} data-testid="membership-website-save" className="px-4 py-2 bg-honor text-black tls-type-label rounded-sm disabled:opacity-50">{busy ? "Sende…" : "Profil speichern"}</button>
           </div>
         )}
       </form>
@@ -483,7 +483,7 @@ function SelfServiceCard() {
   };
   return (
     <div className="mt-6 border border-white/10 rounded-sm bg-[#121212] p-5" data-testid="membership-self-card">
-      <h2 className="tls-type-section inline-flex items-center gap-2"><Users className="w-4 h-4 text-[#FFD700]" /> Meine Daten</h2>
+      <h2 className="tls-type-section inline-flex items-center gap-2"><Users className="w-4 h-4 text-honor" /> Meine Daten</h2>
       <p className="mt-2 tls-type-small text-white/70" data-testid="membership-self-identity">
         {profile.firstname} {profile.lastname} · {profile.member_type}{profile.ref ? ` · Nr. ${profile.ref}` : ""}{profile.birth ? ` · geboren ${formatDate(profile.birth)}` : ""}
       </p>
@@ -502,14 +502,14 @@ function SelfServiceCard() {
           </label>
         ))}
         <div className="sm:col-span-2">
-          <button type="submit" disabled={busy === "save" || !Object.keys(changed).length} data-testid="membership-self-save" className="px-4 py-2 bg-[#FFD700] text-black tls-type-label rounded-sm disabled:opacity-50">{busy === "save" ? "Sende…" : "Änderung senden"}</button>
+          <button type="submit" disabled={busy === "save" || !Object.keys(changed).length} data-testid="membership-self-save" className="px-4 py-2 bg-honor text-black tls-type-label rounded-sm disabled:opacity-50">{busy === "save" ? "Sende…" : "Änderung senden"}</button>
         </div>
       </form>
       {requests.length > 0 && (
         <div className="mt-5 space-y-2" data-testid="membership-self-requests">
           <div className="tls-type-label text-white/60">Eingereicht</div>
           {requests.slice().reverse().map((row) => (
-            <div key={row.external_id} className="tls-type-small border-l-2 border-[#FFD700]/40 pl-3" data-testid={`membership-self-request-${row.external_id}`}>
+            <div key={row.external_id} className="tls-type-small border-l-2 border-honor/40 pl-3" data-testid={`membership-self-request-${row.external_id}`}>
               <div className="text-white/80">{selfRequestLine(row)}</div>
               <div className="tls-type-small text-white/45">{row.status_label}{row.reason ? ` – ${row.reason}` : ""}{row.received_at ? ` · ${formatDate(row.received_at)}` : ""}</div>
             </div>
@@ -575,7 +575,7 @@ function ConsentTexts({ row }) {
         <div className="tls-type-small text-white/45" data-testid={`consent-given-missing-${row.code}`}>{missingGivenText(row)}</div>
       ))}
       <div data-testid={`consent-current-text-${row.code}`}>
-        {row.state === "given" && row.given_text && <div className="tls-type-label text-[#FFD700]">Neue Fassung {row.current_version}</div>}
+        {row.state === "given" && row.given_text && <div className="tls-type-label text-honor">Neue Fassung {row.current_version}</div>}
         <p className="mt-1 tls-type-body text-white/75 whitespace-pre-wrap">{row.text || "Der Text ist gerade nicht abrufbar – bitte später noch einmal öffnen."}</p>
       </div>
     </div>
@@ -625,10 +625,10 @@ export function ConsentsCard() {
 
   return (
     <div className="mt-6 border border-white/10 rounded-sm bg-[#121212] p-5" data-testid="membership-consents-card">
-      <h2 className="tls-type-section inline-flex items-center gap-2"><ShieldCheck className="w-4 h-4 text-[#FFD700]" /> Meine Einwilligungen</h2>
+      <h2 className="tls-type-section inline-flex items-center gap-2"><ShieldCheck className="w-4 h-4 text-honor" /> Meine Einwilligungen</h2>
       <p className="mt-1 tls-type-small text-white/45">Jederzeit widerrufbar. Der Stand kommt aus der Mitgliederverwaltung; ein Widerruf gilt dort sofort.</p>
       {problem && (
-        <div className="mt-4 border border-[#FFD700]/30 rounded-sm p-3" role="alert" data-testid="consents-error">
+        <div className="mt-4 border border-warn/30 rounded-sm p-3" role="alert" data-testid="consents-error">
           <div className="tls-type-small text-white/80">Deine Einwilligungen wurden nicht geladen.</div>
           {problem.text && <div className="mt-1 tls-type-small text-white/50">{problem.text}</div>}
           <button type="button" onClick={load} data-testid="consents-retry" className="tls-btn tls-btn--secondary mt-3 inline-flex px-3 py-1.5 rounded-sm tls-type-label">Nochmal versuchen</button>
@@ -641,12 +641,12 @@ export function ConsentsCard() {
               <div className="flex flex-wrap items-start justify-between gap-3">
                 <div className="min-w-0">
                   <div className="font-bold text-white">{row.label}</div>
-                  <div className={`tls-type-small ${row.state === "given" ? "text-ok" : row.state === "withdrawn" ? "text-[#FFD700]" : "text-white/45"}`} data-testid={`consent-state-${row.code}`}>{(CONSENT_STATE[row.state] || CONSENT_STATE.none)(row)}</div>
-                  {row.text_changed && <div className="mt-1 tls-type-small text-[#FFD700]" data-testid={`consent-changed-${row.code}`}>Text geändert – bitte die neue Fassung lesen.</div>}
+                  <div className={`tls-type-small ${row.state === "given" ? "text-ok" : row.state === "withdrawn" ? "text-quiet" : "text-white/45"}`} data-testid={`consent-state-${row.code}`}>{(CONSENT_STATE[row.state] || CONSENT_STATE.none)(row)}</div>
+                  {row.text_changed && <div className="mt-1 tls-type-small text-warn" data-testid={`consent-changed-${row.code}`}>Text geändert – bitte die neue Fassung lesen.</div>}
                 </div>
                 <div className="flex flex-wrap gap-2 shrink-0">
                   {open !== row.code && (
-                    <button type="button" onClick={() => setOpen(row.code)} disabled={busy} data-testid={`consent-open-${row.code}`} className="px-3 py-1.5 border border-[#FFD700]/40 text-[#FFD700] rounded-sm tls-type-label disabled:opacity-50">{!row.can_give ? "Text lesen" : row.state === "given" ? "Neue Fassung lesen" : "Lesen und zustimmen"}</button>
+                    <button type="button" onClick={() => setOpen(row.code)} disabled={busy} data-testid={`consent-open-${row.code}`} className="px-3 py-1.5 border border-honor/40 text-honor rounded-sm tls-type-label disabled:opacity-50">{!row.can_give ? "Text lesen" : row.state === "given" ? "Neue Fassung lesen" : "Lesen und zustimmen"}</button>
                   )}
                   {row.can_withdraw && (
                     <button type="button" onClick={() => decide(row, "withdrawn")} disabled={busy} data-testid={`consent-withdraw-${row.code}`} className="px-3 py-1.5 border border-white/15 text-white/70 hover:text-live hover:border-live/40 rounded-sm tls-type-label disabled:opacity-50">Widerrufen</button>
@@ -658,7 +658,7 @@ export function ConsentsCard() {
                   <ConsentTexts row={row} />
                   <div className="mt-3 flex flex-wrap gap-2">
                     {row.can_give && row.text && (
-                      <button type="button" onClick={() => decide(row, "given")} disabled={busy} data-testid={`consent-give-${row.code}`} className="px-4 py-2 bg-[#FFD700] text-black tls-type-label rounded-sm disabled:opacity-50">Ich stimme zu</button>
+                      <button type="button" onClick={() => decide(row, "given")} disabled={busy} data-testid={`consent-give-${row.code}`} className="px-4 py-2 bg-honor text-black tls-type-label rounded-sm disabled:opacity-50">Ich stimme zu</button>
                     )}
                     <button type="button" onClick={() => setOpen(null)} disabled={busy} className="px-4 py-2 border border-white/15 text-white/60 rounded-sm tls-type-label">{row.can_give && row.text ? "Abbrechen" : "Schließen"}</button>
                   </div>
@@ -714,16 +714,16 @@ function DirectoryCard() {
     e.preventDefault();
     save({ gamertag: form.gamertag, games: splitList(form.games), platforms: splitList(form.platforms), bio: form.bio }, "Eintrag gespeichert.");
   };
-  const inputClass = "w-full bg-[#0A0A0A] border border-white/10 focus:border-[#FFD700] px-3 py-2 rounded-sm text-white tls-type-small focus:outline-none";
+  const inputClass = "w-full bg-[#0A0A0A] border border-white/10 focus:border-honor px-3 py-2 rounded-sm text-white tls-type-small focus:outline-none";
 
   return (
     <div className="mt-6 border border-white/10 rounded-sm bg-[#121212] p-5" data-testid="membership-directory-card">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <h2 className="tls-type-section inline-flex items-center gap-2"><Users className="w-4 h-4 text-[#FFD700]" /> Mitgliederverzeichnis</h2>
+        <h2 className="tls-type-section inline-flex items-center gap-2"><Users className="w-4 h-4 text-honor" /> Mitgliederverzeichnis</h2>
         {entry.listed && entry.slug && <Link to={`/members/${entry.slug}`} data-testid="membership-directory-link" className="tls-btn tls-btn--quiet inline-flex min-h-11 items-center px-3 py-2 rounded-sm tls-type-label">Meinen Eintrag ansehen</Link>}
       </div>
       {entry.blocked ? (
-        <p className="mt-3 tls-type-body text-[#FFD700]" data-testid="membership-directory-blocked">Dein Eintrag ist von der Vereinsverwaltung gesperrt. Wenn du meinst, das stimmt nicht, melde dich beim Vorstand.</p>
+        <p className="mt-3 tls-type-body text-warn" data-testid="membership-directory-blocked">Dein Eintrag ist von der Vereinsverwaltung gesperrt. Wenn du meinst, das stimmt nicht, melde dich beim Vorstand.</p>
       ) : (
         <div className="mt-3">
           <SwitchRow
@@ -753,7 +753,7 @@ function DirectoryCard() {
             <textarea value={form.bio} onChange={(e) => set("bio", e.target.value)} rows={3} maxLength={2000} data-testid="membership-directory-bio" className={`mt-1 ${inputClass} normal-case tracking-normal font-normal`} />
           </label>
           <div className="flex flex-wrap items-center gap-3">
-            <button type="submit" disabled={busy} data-testid="membership-directory-save" className="px-4 py-2 bg-[#FFD700] text-black tls-type-label rounded-sm disabled:opacity-50">Eintrag speichern</button>
+            <button type="submit" disabled={busy} data-testid="membership-directory-save" className="px-4 py-2 bg-honor text-black tls-type-label rounded-sm disabled:opacity-50">Eintrag speichern</button>
             <span className="tls-type-small text-white/45">{entry.editorial ? "Name, Foto und Funktion pflegt die Vereinsverwaltung an deinem Profil." : "Name und Foto kommen von deinem Konto (Profil bearbeiten)."}</span>
           </div>
         </form>
@@ -783,14 +783,14 @@ function LinkRequest({ onDone }) {
       <input value={ref} onChange={(e) => setRef(e.target.value)} maxLength={40} placeholder="Mitgliedsnummer (falls bekannt)" data-testid="membership-link-ref"
         className="bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-sm sm:w-64" />
       <button type="button" onClick={send} disabled={busy} data-testid="membership-link-request"
-        className="px-4 py-2 border border-[#FFD700]/50 text-[#FFD700] tls-type-label rounded-sm disabled:opacity-40">Zuordnung anfragen</button>
+        className="px-4 py-2 border border-honor/50 text-honor tls-type-label rounded-sm disabled:opacity-40">Zuordnung anfragen</button>
     </div>
   );
 }
 
 function Pill({ icon: Icon, label, variant }) {
   const cls = variant === "gold"
-    ? "border-[#FFD700]/50 text-[#FFD700] bg-[#FFD700]/10"
+    ? "border-honor/50 text-honor bg-honor/10"
     : "border-white/15 text-white/80";
   return (
     <span className={`inline-flex items-center gap-1.5 px-3 py-1.5 tls-type-label border rounded-sm ${cls}`}>

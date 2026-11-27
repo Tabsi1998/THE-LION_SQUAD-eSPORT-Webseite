@@ -293,7 +293,7 @@ function EventHeader({ e, notices = [] }) {
             <div className="flex items-center gap-3 flex-wrap">
               <span className="tls-type-label text-[#9F7AEA]" data-testid="event-kind">{eventKindLabel(e.event_type)}</span>
               <PhaseBadge phase={e.public_phase || e.event_phase} status={e.status || "draft"} size="md" />
-              {chip && <span className={`tls-type-small font-bold ${e.visibility === "members" ? "text-[#FFD700]" : "text-white/60"}`} data-testid="event-visibility">{chip}</span>}
+              {chip && <span className={`tls-type-small font-bold ${e.visibility === "members" ? "text-honor" : "text-white/60"}`} data-testid="event-visibility">{chip}</span>}
               {/* Teilen (#1154): oben rechts; interne Events öffnen sich nur für Mitglieder. */}
               <ShareButton kind="event" id={e.slug || e.id} title={e.name} start={e.start_date} end={e.end_date} className="ml-auto" />
             </div>
@@ -404,13 +404,13 @@ function EventOverview({ e, user, over, accessToken, hasConsent, onChanged, regi
           solange seine Daten fehlen, der Satz, wo die Ergebnisse stehen. */}
       {recap && (
         <EventRecap event={e} accessToken={accessToken} fallback={(
-          <div className="border border-[#FFD700]/30 bg-[#FFD700]/5 rounded-sm px-4 py-3" data-testid="event-over">
+          <div className="border border-quiet/30 bg-quiet/5 rounded-sm px-4 py-3" data-testid="event-over">
             <div className="tls-type-small text-white/85">{e.tournaments?.length ? "Das Event ist vorbei – die Ergebnisse stehen bei den Turnieren:" : "Das Event ist vorbei."}</div>
             {!!e.tournaments?.length && (
               <div className="mt-1 flex flex-wrap gap-x-5">
                 {/* Tippfläche mindestens 44 px (#1155), auch wenn ein langer Name am Handy zweizeilig umbricht. */}
                 {e.tournaments.map((t) => (
-                  <Link key={t.id} to={`/tournaments/${t.slug || t.id}${t.access_link ? accessSuffix(accessToken) : ""}`} className="inline-flex min-h-11 items-center gap-1.5 tls-type-small font-bold text-[#FFD700] hover:text-white">
+                  <Link key={t.id} to={`/tournaments/${t.slug || t.id}${t.access_link ? accessSuffix(accessToken) : ""}`} className="inline-flex min-h-11 items-center gap-1.5 tls-type-small font-bold text-brand hover:text-white">
                     <Trophy className="w-3.5 h-3.5 shrink-0" aria-hidden="true" /> {t.title}
                   </Link>
                 ))}
@@ -475,7 +475,7 @@ function EventOverview({ e, user, over, accessToken, hasConsent, onChanged, regi
                   </div>
                   <div className="p-4">
                     <div className="font-bold">{a.title}</div>
-                    {a.is_empty && <div className="mt-1 tls-type-label text-[#FFD700]" data-testid={`event-album-empty-${a.id}`}>leer – für Besucher unsichtbar</div>}
+                    {a.is_empty && <div className="mt-1 tls-type-label text-quiet" data-testid={`event-album-empty-${a.id}`}>leer – für Besucher unsichtbar</div>}
                   </div>
                 </Link>
               ))}
@@ -764,11 +764,11 @@ function EventRegistrationPanel({ event, user, accessToken = "", onChanged, open
         </div>
       )}
       {!!summary.waitlist_count && (
-        <div className="mt-2 tls-type-small text-[#FFD700]">{countText(summary.waitlist_count, "Anmeldung", "Anmeldungen")} auf der Warteliste.</div>
+        <div className="mt-2 tls-type-small text-quiet">{countText(summary.waitlist_count, "Anmeldung", "Anmeldungen")} auf der Warteliste.</div>
       )}
       {offer && (
-        <div className="mt-4 border border-[#FFD700]/30 bg-[#FFD700]/5 rounded-sm p-3 tls-type-small" data-testid="event-offer">
-          <div className="tls-type-label text-[#FFD700]">Kosten</div>
+        <div className="mt-4 border border-brand/30 bg-brand/5 rounded-sm p-3 tls-type-small" data-testid="event-offer">
+          <div className="tls-type-label text-brand">Kosten</div>
           <div className="mt-1 text-white">{offerSummary(offer, 1 + Number(companionCount || 0))}</div>
           <ul className="mt-2 space-y-0.5 tls-type-small text-white/60">
             {offer.positions.filter((position) => !position.optional).map((position) => (
@@ -854,7 +854,7 @@ function EventRegistrationPanel({ event, user, accessToken = "", onChanged, open
             </div>
           )}
           {!waitlisted && quote && !quote.free && (
-            <div className="border border-[#FFD700]/40 rounded-sm p-3 tls-type-small flex items-baseline justify-between gap-3" data-testid="event-quote">
+            <div className="border border-brand/40 rounded-sm p-3 tls-type-small flex items-baseline justify-between gap-3" data-testid="event-quote">
               <span className="text-white/65">Summe für {1 + Number(companionCount || 0)} Person{1 + Number(companionCount || 0) === 1 ? "" : "en"}</span>
               <strong className="tls-type-card text-white">{formatCents(quote.total_cents, quote.currency)}</strong>
             </div>

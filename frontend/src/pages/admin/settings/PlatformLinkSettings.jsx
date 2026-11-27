@@ -12,7 +12,7 @@ import { PLATFORM_APPS } from "@/lib/platformLinks";
 // `PlatformAppCard` steht auf der Seite je Verbindung (Admin → Verbindungen) - und nur dort: der
 // Reiter Login & Konten zeigt seit 24.09. („muss das doppelt sein?“) nur noch die Übersicht.
 
-const CHECK_ICON = { ok: [CheckCircle2, "text-ok"], fail: [XCircle, "text-warn"], warn: [ShieldQuestion, "text-[#FFD700]"] };
+const CHECK_ICON = { ok: [CheckCircle2, "text-ok"], fail: [XCircle, "text-warn"], warn: [ShieldQuestion, "text-warn"] };
 
 function SecretInput({ label, value, masked, onChange, onClear, testId, placeholder }) {
   return (
@@ -60,7 +60,7 @@ function appStateLabel(app, ready) {
 
 function appStateClass(app, ready) {
   if (ready) return "text-ok";
-  return app.optional ? "text-white/40" : "text-[#FFD700]";
+  return app.optional ? "text-white/40" : "text-warn";
 }
 
 // `showFields` aus: Client ID und Secret stehen woanders auf derselben Seite (Twitch: bei der

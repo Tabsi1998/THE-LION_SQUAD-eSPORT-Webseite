@@ -70,7 +70,7 @@ export function AchievementsTab({ achData, achInsights, completeness, evaluateAc
       </AchievementLevelHeader>
 
       {achData && (
-        <div className={`flex items-center gap-2 tls-type-small px-4 py-2.5 border rounded-sm ${publicSwitch ? "border-[#FFD700]/40 text-[#FFD700]/90 bg-[#FFD700]/5" : "border-white/10 text-white/50"}`} data-testid="achievement-visibility-note">
+        <div className={`flex items-center gap-2 tls-type-small px-4 py-2.5 border rounded-sm ${publicSwitch ? "border-honor/40 text-honor/90 bg-honor/5" : "border-white/10 text-white/50"}`} data-testid="achievement-visibility-note">
           {publicSwitch ? <EyeOff className="w-3.5 h-3.5 shrink-0" /> : <Eye className="w-3.5 h-3.5 shrink-0" />}
           <span className="flex-1">
             {publicSwitch

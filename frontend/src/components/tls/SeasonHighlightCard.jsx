@@ -109,7 +109,7 @@ export function SeasonHighlightCard({ profile, level, stats, awards, crown, seas
           <div className="relative mt-6 grid grid-cols-4 gap-2 text-center">
             {[
               { label: "Punkte", value: level?.points ?? 0, icon: Zap, color: "#29B6E8" },
-              { label: "Siege", value: stats?.wins ?? 0, icon: Trophy, color: "#FFD700" },
+              { label: "Siege", value: stats?.wins ?? 0, icon: Trophy, color: ROLE_COLORS.honor },
               { label: "Podium", value: stats?.top3 ?? 0, icon: Medal, color: "#C0C0C0" },
               { label: "Fast Laps", value: stats?.fastlaps ?? stats?.fast_laps ?? 0, icon: Flag, color: ROLE_COLORS.ok },
             ].map((s) => (

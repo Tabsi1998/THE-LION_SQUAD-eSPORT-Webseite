@@ -10,7 +10,7 @@ import { asInstant, viennaDate } from "@/lib/vienna";
 // wie die Übersicht (MemberReferences.jsx); die alten Medaillen-Kacheln und Karten gibt es nicht mehr.
 
 export const MEDAL = {
-  gold: { label: "Gold", ring: "from-[#FFF2A8] via-[#FFD700] to-[#9A7400]", text: "text-[#FFD700]", soft: "bg-[#FFD700]/10 border-[#FFD700]/40", glow: "shadow-[0_0_48px_rgba(255,215,0,0.22)]" },
+  gold: { label: "Gold", ring: "from-[#FFF2A8] via-honor to-[#9A7400]", text: "text-honor", soft: "bg-honor/10 border-honor/40", glow: "shadow-[0_0_48px_rgba(255,215,0,0.22)]" },
   silver: { label: "Silber", ring: "from-[#FFFFFF] via-[#C9C9C9] to-[#6E6E6E]", text: "text-[#E2E2E2]", soft: "bg-white/10 border-white/40", glow: "shadow-[0_0_48px_rgba(220,220,220,0.16)]" },
   bronze: { label: "Bronze", ring: "from-[#F2C08E] via-[#CD7F32] to-[#6E3F16]", text: "text-[#E4A464]", soft: "bg-[#CD7F32]/10 border-[#CD7F32]/45", glow: "shadow-[0_0_48px_rgba(205,127,50,0.2)]" },
 };

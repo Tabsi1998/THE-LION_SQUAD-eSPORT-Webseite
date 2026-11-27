@@ -34,8 +34,8 @@ export default function MemberCardVerifyPage() {
     <PublicLayout>
       <section className="max-w-md mx-auto px-4 sm:px-6 py-16">
         <div className="text-center">
-          <span className="tls-type-small font-bold text-[#FFD700]">{result?.club_name || "Mitgliedskarte"}</span>
-          <h1 className="tls-type-title mt-2 inline-flex items-center gap-2"><ShieldCheck className="w-6 h-6 text-[#FFD700]" /> <ShortCaps>Kartenprüfung</ShortCaps></h1>
+          <span className="tls-type-small font-bold text-honor">{result?.club_name || "Mitgliedskarte"}</span>
+          <h1 className="tls-type-title mt-2 inline-flex items-center gap-2"><ShieldCheck className="w-6 h-6 text-honor" /> <ShortCaps>Kartenprüfung</ShortCaps></h1>
         </div>
 
         {failed ? (
@@ -66,7 +66,7 @@ export default function MemberCardVerifyPage() {
         )}
 
         <p className="mt-6 text-center tls-type-small text-quiet">
-          Bitte den Namen mit einem Ausweis abgleichen. Mehr als Vorname und Mitgliedsart zeigt diese Seite nicht. <Link to="/membership/join" className="text-[#FFD700] hover:underline">Selbst Mitglied werden</Link>
+          Bitte den Namen mit einem Ausweis abgleichen. Mehr als Vorname und Mitgliedsart zeigt diese Seite nicht. <Link to="/membership/join" className="text-honor hover:underline">Selbst Mitglied werden</Link>
         </p>
       </section>
     </PublicLayout>

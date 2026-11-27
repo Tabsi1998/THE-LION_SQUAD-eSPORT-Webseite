@@ -19,7 +19,7 @@ import { ShortCaps } from "@/components/tls/ShortCaps";
 
 import { ROLE_COLORS } from "@/lib/categoryColors";
 function StatusDot({ ok }) {
-  const color = ok === true ? ROLE_COLORS.ok : ok === false ? ROLE_COLORS.warn : "#FFD700";
+  const color = ok === true ? ROLE_COLORS.ok : ok === false ? ROLE_COLORS.warn : ROLE_COLORS.quiet;
   return <span className="inline-block w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: color, boxShadow: `0 0 8px ${color}` }} />;
 }
 
@@ -103,7 +103,7 @@ export default function AdminDashboardPage() {
     { label: "Teams", value: data?.team_count, icon: UsersIcon, color: "#29B6E8", to: may("/admin/teams") ? "/admin/teams" : null },
     { label: "Aktive Turniere", value: data?.active_tournaments, icon: Trophy, color: ROLE_COLORS.live },
     { label: "Anmeldung offen", value: data?.registration_open, icon: GamepadIcon, color: ROLE_COLORS.ok },
-    { label: "Spiele heute", value: data?.today_matches, icon: Radio, color: "#FFD700" },
+    { label: "Spiele heute", value: data?.today_matches, icon: Radio, color: ROLE_COLORS.brand },
     { label: "Fast Lap Live", value: data?.active_f1, icon: Flag, color: "#29B6E8" },
     { label: "Events Gesamt", value: data?.total_events, icon: CalendarDays, color: "#29B6E8" },
   ].filter((kpi) => !data || kpi.value !== undefined);
@@ -136,7 +136,7 @@ export default function AdminDashboardPage() {
         : "Grundkonfiguration sieht sauber aus",
       to: "/setup",
       icon: Sparkles,
-      tone: setupStatus && (!setupStatus.completed || (setupStatus.health_score || 0) < 100) ? "#FFD700" : ROLE_COLORS.ok,
+      tone: setupStatus && (!setupStatus.completed || (setupStatus.health_score || 0) < 100) ? ROLE_COLORS.brand : ROLE_COLORS.ok,
     },
     {
       label: "Ergebnis-Konflikte",
@@ -158,7 +158,7 @@ export default function AdminDashboardPage() {
       detail: `${reportedResults} ${reportedResults === 1 ? "wartet" : "warten"} auf Bestätigung`,
       to: "/admin/tournaments?status=live",
       icon: ClipboardCheck,
-      tone: reportedResults > 0 ? "#FFD700" : ROLE_COLORS.ok,
+      tone: reportedResults > 0 ? ROLE_COLORS.brand : ROLE_COLORS.ok,
       key: "reported-results",
     },
     {
@@ -166,7 +166,7 @@ export default function AdminDashboardPage() {
       detail: `${countWord(scheduleDeadlines, "Frist läuft", "Fristen laufen")} in 24 Stunden ab`,
       to: "/admin/tournaments?status=live",
       icon: Clock,
-      tone: scheduleDeadlines > 0 ? "#FFD700" : ROLE_COLORS.ok,
+      tone: scheduleDeadlines > 0 ? ROLE_COLORS.brand : ROLE_COLORS.ok,
       key: "schedule-deadlines",
     },
     {
@@ -181,7 +181,7 @@ export default function AdminDashboardPage() {
       detail: `${contactMessages} neu`,
       to: "/admin/contact",
       icon: Mail,
-      tone: contactMessages > 0 ? "#FFD700" : ROLE_COLORS.ok,
+      tone: contactMessages > 0 ? ROLE_COLORS.brand : ROLE_COLORS.ok,
     },
     // Prüffälle der Abrechnung (#321): nur für Finanzen - die Seite dahinter ist für andere gesperrt.
     ...(canFinance ? [{
@@ -197,7 +197,7 @@ export default function AdminDashboardPage() {
       detail: attentionLine(financeAttention),
       to: financeFirst ? `/admin/finance?attention=${financeFirst}` : "/admin/finance",
       icon: Wallet,
-      tone: Number(financeAttention.overdue || 0) > 0 ? ROLE_COLORS.warn : financeFirst ? "#FFD700" : ROLE_COLORS.ok,
+      tone: Number(financeAttention.overdue || 0) > 0 ? ROLE_COLORS.warn : financeFirst ? ROLE_COLORS.brand : ROLE_COLORS.ok,
       key: "finance-attention",
     }] : []),
     // Sponsoring läuft aus (#405): 30 Tage vorher, damit verlängert oder verabschiedet wird - nur für die Redaktion.
@@ -206,7 +206,7 @@ export default function AdminDashboardPage() {
       detail: `${countWord(sponsorsExpiring, "Vertrag endet", "Verträge enden")} in 30 Tagen`,
       to: "/admin/sponsors",
       icon: Star,
-      tone: sponsorsExpiring > 0 ? "#FFD700" : ROLE_COLORS.ok,
+      tone: sponsorsExpiring > 0 ? ROLE_COLORS.brand : ROLE_COLORS.ok,
       key: "sponsors-expiring",
     }] : []),
     {
@@ -214,28 +214,28 @@ export default function AdminDashboardPage() {
       detail: countWord(pendingApplications, "offener Antrag", "offene Anträge"),
       to: "/admin/membership-applications?status=pending",
       icon: Inbox,
-      tone: pendingApplications > 0 ? "#FFD700" : ROLE_COLORS.ok,
+      tone: pendingApplications > 0 ? ROLE_COLORS.brand : ROLE_COLORS.ok,
     },
     {
       label: "Turnier-Anmeldungen",
       detail: `${pendingRegistrations} von Hand eingetragen, noch ausstehend`,
       to: "/admin/tournaments?status=registration_open",
       icon: GamepadIcon,
-      tone: pendingRegistrations > 0 ? "#FFD700" : ROLE_COLORS.ok,
+      tone: pendingRegistrations > 0 ? ROLE_COLORS.brand : ROLE_COLORS.ok,
     },
     {
       label: "Gewinne",
       detail: `${pendingPrizes} offen, ${readyPrizes} abholbereit`,
       to: pendingPrizes > 0 ? "/admin/prizes?status=pending" : readyPrizes > 0 ? "/admin/prizes?status=ready" : "/admin/prizes",
       icon: Award,
-      tone: pendingPrizes > 0 ? "#FFD700" : readyPrizes > 0 ? "#29B6E8" : ROLE_COLORS.ok,
+      tone: pendingPrizes > 0 ? ROLE_COLORS.brand : readyPrizes > 0 ? "#29B6E8" : ROLE_COLORS.ok,
     },
     {
       label: "Push-Monitoring",
       detail: `${countWord(data?.mobile_push?.active_tokens, "aktives Token", "aktive Tokens")}, ${pushErrors} Fehler`,
       to: "/admin/mobile-push",
       icon: BellRing,
-      tone: pushErrors > 0 ? ROLE_COLORS.warn : (data?.mobile_push?.active_tokens || 0) > 0 ? ROLE_COLORS.ok : "#FFD700",
+      tone: pushErrors > 0 ? ROLE_COLORS.warn : (data?.mobile_push?.active_tokens || 0) > 0 ? ROLE_COLORS.ok : ROLE_COLORS.quiet,
     },
     {
       label: "Betrieb",
@@ -259,7 +259,7 @@ export default function AdminDashboardPage() {
       detail: `${data?.client_logs?.critical_open ?? 0} kritisch, ${data?.client_logs?.high_open ?? 0} hoch offen`,
       to: "/admin/ops?tab=app",
       icon: Bug,
-      tone: (data?.client_logs?.critical_open || 0) > 0 ? ROLE_COLORS.warn : (data?.client_logs?.open || 0) > 0 ? "#FFD700" : ROLE_COLORS.ok,
+      tone: (data?.client_logs?.critical_open || 0) > 0 ? ROLE_COLORS.warn : (data?.client_logs?.open || 0) > 0 ? ROLE_COLORS.warn : ROLE_COLORS.ok,
     },
     {
       label: "Medien-Check",
@@ -459,7 +459,7 @@ export default function AdminDashboardPage() {
               {today.map((item, index) => (
                 <li key={`${item.kind}-${item.url}-${index}`} className="py-2 flex items-center gap-3 tls-type-small">
                   <span className="w-12 shrink-0 font-mono text-white/60 tabular-nums">{item.at ? viennaTime(item.at, { timeStyle: "short" }) : "–"}</span>
-                  <span className="shrink-0 tls-type-label" style={{ color: item.kind === "event" ? "#9F7AEA" : item.kind === "check_in" ? "#FFD700" : "#29B6E8" }}>
+                  <span className="shrink-0 tls-type-label" style={{ color: item.kind === "event" ? "#9F7AEA" : item.kind === "check_in" ? ROLE_COLORS.ok : "#29B6E8" }}>
                     {item.kind === "event" ? "Event" : item.kind === "check_in" ? "Check-in" : "Match"}
                   </span>
                   {may(item.url) ? (
@@ -561,7 +561,7 @@ export default function AdminDashboardPage() {
             </div>
             <div>
               <div className="tls-type-label text-white/45">Konten gesamt</div>
-              <div className="tls-type-section tls-type-num text-[#FFD700]" data-testid="growth-total-accounts">{growthData.length ? growthData[growthData.length - 1].total_users : "—"}</div>
+              <div className="tls-type-section tls-type-num text-brand" data-testid="growth-total-accounts">{growthData.length ? growthData[growthData.length - 1].total_users : "—"}</div>
             </div>
             <div>
               <div className="tls-type-label text-white/45 hyphens-auto [overflow-wrap:anywhere]">Neue Vereinsmitglieder</div>
@@ -593,14 +593,14 @@ export default function AdminDashboardPage() {
               />
               <Area yAxisId="left" type="monotone" dataKey="logins" name="logins" stroke="#29B6E8" strokeWidth={2} fill="url(#growthLogins)" />
               <Area yAxisId="left" type="monotone" dataKey="new_users" name="new_users" stroke={ROLE_COLORS.ok} strokeWidth={1.5} fill="url(#growthUsers)" />
-              <Line yAxisId="right" type="monotone" dataKey="total_users" name="total_users" stroke="#FFD700" strokeWidth={2} dot={false} />
+              <Line yAxisId="right" type="monotone" dataKey="total_users" name="total_users" stroke={ROLE_COLORS.brand} strokeWidth={2} dot={false} />
             </ComposedChart>
           </ResponsiveContainer>
         </div>
         <div className="mt-3 flex flex-wrap gap-4 tls-type-label">
           <span className="inline-flex items-center gap-1.5 text-white/55"><span className="w-2.5 h-2.5 rounded-full bg-[#29B6E8]" /> Logins / Tag</span>
           <span className="inline-flex items-center gap-1.5 text-white/55"><span className="w-2.5 h-2.5 rounded-full bg-ok" /> Neue Konten / Tag</span>
-          <span className="inline-flex items-center gap-1.5 text-white/55"><span className="w-2.5 h-2.5 rounded-full bg-[#FFD700]" /> Konten gesamt</span>
+          <span className="inline-flex items-center gap-1.5 text-white/55"><span className="w-2.5 h-2.5 rounded-full bg-brand" /> Konten gesamt</span>
         </div>
       </div>
       )}

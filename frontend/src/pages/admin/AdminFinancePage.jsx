@@ -21,12 +21,12 @@ import { ShortCaps } from "@/components/tls/ShortCaps";
 
 const STATUS_TONE = {
   pending: "text-white/70", ready: "text-ok", invoiced: "text-ok",
-  waiting_write_access: "text-[#FFD700]", waiting_link: "text-[#FFD700]", waiting_review: "text-[#FFD700]", held: "text-[#29B6E8]",
+  waiting_write_access: "text-quiet", waiting_link: "text-quiet", waiting_review: "text-quiet", held: "text-[#29B6E8]",
   failed: "text-warn", cancelled: "text-white/40",
 };
 
 const INVOICE_STATUS = { draft: "Entwurf", validated: "freigegeben", paid: "bezahlt", abandoned: "aufgegeben" };
-const ATTENTION_TONE = { overdue: "border-warn/50 text-warn", pdf_missing: "border-[#FFD700]/50 text-[#FFD700]", draft_old: "border-[#FFD700]/50 text-[#FFD700]" };
+const ATTENTION_TONE = { overdue: "border-warn/50 text-warn", pdf_missing: "border-warn/50 text-warn", draft_old: "border-warn/50 text-warn" };
 
 function capitalize(text) {
   return text ? text.charAt(0).toUpperCase() + text.slice(1) : "";
@@ -173,7 +173,7 @@ export default function AdminFinancePage() {
     <AdminLayout>
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div>
-          <h1 className="tls-type-title inline-flex items-center gap-3"><Wallet className="w-7 h-7 text-[#FFD700]" /> <ShortCaps>Finanzübersicht</ShortCaps></h1>
+          <h1 className="tls-type-title inline-flex items-center gap-3"><Wallet className="w-7 h-7 text-brand" /> <ShortCaps>Finanzübersicht</ShortCaps></h1>
           <p className="mt-2 tls-type-body text-white/60 max-w-2xl">Rechnungsaufträge aus kostenpflichtigen Anmeldungen. Jede verbindliche Anmeldung mit Preis wird hier zu einem Auftrag; die Rechnung entsteht in Dolibarr, Zahlungen bucht ihr dort – die Website liest nach und meldet, was nicht zusammenpasst.</p>
         </div>
         {tab === "overview" && <div className="flex flex-wrap gap-2">
@@ -206,15 +206,15 @@ export default function AdminFinancePage() {
       {tab === "overview" && data && (
         <>
           <div className="mt-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-5" data-testid="finance-summary">
-            <Stat label="Wartet auf Voraussetzungen" value={waiting} tone={waiting ? "text-[#FFD700]" : "text-white"} />
+            <Stat label="Wartet auf Voraussetzungen" value={waiting} tone={waiting ? "text-quiet" : "text-white"} />
             <Stat label="Wartet auf Freigabe" value={status.held?.count || 0} tone="text-[#29B6E8]" />
             <Stat label="Bereit für Dolibarr" value={status.ready?.count || 0} tone="text-ok" />
             <Stat label="Gescheitert" value={status.failed?.count || 0} tone={status.failed?.count ? "text-warn" : "text-white"} />
             <Stat label="Prüffälle offen" value={data.cases_open || 0} tone={data.cases_open ? "text-warn" : "text-white"} testId="finance-cases-count" />
           </div>
 
-          <div className={`mt-4 border rounded-sm p-4 tls-type-small flex items-start gap-3 ${data.dolibarr?.write_capable ? "border-ok/30" : "border-[#FFD700]/40 bg-[#FFD700]/5"}`} data-testid="finance-dolibarr">
-            {data.dolibarr?.write_capable ? <CheckCircle2 className="w-4 h-4 text-ok mt-0.5" /> : <AlertTriangle className="w-4 h-4 text-[#FFD700] mt-0.5" />}
+          <div className={`mt-4 border rounded-sm p-4 tls-type-small flex items-start gap-3 ${data.dolibarr?.write_capable ? "border-ok/30" : "border-warn/40 bg-warn/5"}`} data-testid="finance-dolibarr">
+            {data.dolibarr?.write_capable ? <CheckCircle2 className="w-4 h-4 text-ok mt-0.5" /> : <AlertTriangle className="w-4 h-4 text-warn mt-0.5" />}
             <div>
               {data.dolibarr?.write_capable
                 ? "Dolibarr ist angebunden und darf Rechnungen anlegen."
@@ -224,7 +224,7 @@ export default function AdminFinancePage() {
               {data.dolibarr?.write_capable && data.pdfs?.unconfirmed > 0 && (
                 // Rechnungs-PDF (#840): Belege von vor der Umstellung einmal nachziehen - danach macht es der Abgleich.
                 <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-2 tls-type-small" data-testid="finance-pdfs">
-                  <span className={data.pdfs.failed ? "text-[#FFD700]" : "text-white/60"}>
+                  <span className={data.pdfs.failed ? "text-warn" : "text-white/60"}>
                     {data.pdfs.unconfirmed === 1 ? "1 freigegebener Beleg" : `${data.pdfs.unconfirmed} freigegebene Belege`} ohne bestätigtes PDF
                     {data.pdfs.failed ? ` – bei ${data.pdfs.failed} ist das Erzeugen gescheitert, der Grund steht am Auftrag` : ""}.
                   </span>
@@ -585,7 +585,7 @@ function OrderDetail({ detail, busy, paymentLabels, onClose, onResync, onRefund 
           </div>
           <CloseInfo order={order} />
           {order.pdf_missing && (
-            <div className="mt-2 tls-type-small text-[#FFD700]" data-testid="finance-detail-pdf-missing">
+            <div className="mt-2 tls-type-small text-warn" data-testid="finance-detail-pdf-missing">
               PDF fehlt: {order.pdf_error_text || order.pdf_error} Der Abgleich versucht es stündlich wieder, „Fehlende PDFs nachziehen“ sofort.
             </div>
           )}

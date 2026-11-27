@@ -11,7 +11,7 @@ import { ROLE_COLORS } from "@/lib/categoryColors";
 // was beim nächsten Treffer käme, und der Einspruch. `compact` (Dashboard) zeigt die Karte nur,
 // wenn es etwas gibt; die volle Karte steht unter „Meine Strafen“. Nur die Person sieht das.
 
-const ACTION_TONE = { notice: "#FFD700", warning: ROLE_COLORS.warn, suspension: ROLE_COLORS.warn };
+const ACTION_TONE = { notice: ROLE_COLORS.quiet, warning: ROLE_COLORS.warn, suspension: ROLE_COLORS.warn };
 
 export function formatMoment(value) {
   if (!value) return "";
@@ -45,7 +45,7 @@ export function ModerationStandingCard({ compact = false }) {
   const active = standing.active;
   const relevant = Boolean(active) || (standing.strike_count || 0) > 0;
   if (compact && !relevant) return null;
-  const tone = active ? ACTION_TONE[active.action] || "#FFD700" : ROLE_COLORS.ok;
+  const tone = active ? ACTION_TONE[active.action] || ROLE_COLORS.warn : ROLE_COLORS.ok;
 
   const sendAppeal = async () => {
     if (!active || message.trim().length < 10) {

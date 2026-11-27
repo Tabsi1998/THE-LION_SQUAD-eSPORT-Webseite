@@ -482,7 +482,7 @@ export default function AdminF1EditPage() {
                     <option value="official" disabled={forceReferenceScope}>Offizielle Wertung</option>
                     <option value="club_reference">Vereins-Referenz</option>
                   </select>
-                  {forceReferenceScope && <div className="mt-1 tls-type-small text-[#FFD700]">Vereinsmitglied: nur Referenzzeit.</div>}
+                  {forceReferenceScope && <div className="mt-1 tls-type-small text-honor">Vereinsmitglied: nur Referenzzeit.</div>}
                 </div>
                 <div>
                   <div className="tls-type-label text-white/60 mb-1">Strafe (s)</div>
@@ -523,7 +523,7 @@ export default function AdminF1EditPage() {
                     </div>
                     <div className="flex items-center gap-3">
                       <span className={`tls-type-card tls-type-num ${t.is_invalid ? "line-through text-white/40" : "text-white"}`}>{showLapTime(t.time_str)}</span>
-                      {(t.score_scope || "official") === "club_reference" && <span className="text-[#FFD700] border border-[#FFD700]/30 bg-[#FFD700]/10 px-2 py-1 tls-type-label rounded-sm">Referenz</span>}
+                      {(t.score_scope || "official") === "club_reference" && <span className="text-honor border border-honor/30 bg-honor/10 px-2 py-1 tls-type-label rounded-sm">Referenz</span>}
                       {t.penalty_seconds > 0 && <span className="text-warn tls-type-small">+{t.penalty_seconds}s</span>}
                       {t.is_invalid && <span className="text-warn tls-type-label">Ungültig</span>}
                       {safeHttpUrl(t.proof_url) && <a href={safeHttpUrl(t.proof_url)} target="_blank" rel="noreferrer" className="tls-type-label text-[#29B6E8] hover:underline">Nachweis</a>}
@@ -585,7 +585,7 @@ export default function AdminF1EditPage() {
                 <option value="club_reference">Vereins-Referenz</option>
               </select>
               {!!challenge?.block_club_member_results && !!editTime.user?.is_club_member && (
-                <div className="mt-1 tls-type-small text-[#FFD700]">Vereinsmitglieder sind bei dieser Challenge nur als Referenz erlaubt.</div>
+                <div className="mt-1 tls-type-small text-honor">Vereinsmitglieder sind bei dieser Challenge nur als Referenz erlaubt.</div>
               )}
             </label>
             <label className="block">

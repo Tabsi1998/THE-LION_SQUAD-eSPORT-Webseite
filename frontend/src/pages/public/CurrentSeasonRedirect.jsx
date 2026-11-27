@@ -112,7 +112,7 @@ export default function CurrentSeasonRedirect() {
           <div data-testid="season-final">
             <div className="flex flex-wrap items-end justify-between gap-3">
               <div>
-                <div className="tls-type-small font-bold text-[#FFD700]">{latest.name}</div>
+                <div className="tls-type-small font-bold text-brand">{latest.name}</div>
                 <h2 className="mt-1 tls-type-section">Die ersten zehn</h2>
               </div>
               <Link to={`/seasons/${latest.slug || latest.id}`} className="tls-btn tls-btn--secondary inline-flex items-center gap-2 px-4 py-2 rounded-sm tls-type-label">
@@ -154,7 +154,7 @@ export default function CurrentSeasonRedirect() {
 
 function FinalRow({ row }) {
   const rank = Number(row.rank) || 0;
-  const medal = rank === 1 ? "text-[#FFD700]" : rank === 2 ? "text-white/80" : rank === 3 ? "text-[#CD7F32]" : "text-white/45";
+  const medal = rank === 1 ? "text-honor" : rank === 2 ? "text-white/80" : rank === 3 ? "text-[#CD7F32]" : "text-white/45";
   const content = (
     <>
       <span className={`tls-type-card tls-type-num w-8 shrink-0 ${medal}`}>#{rank}</span>

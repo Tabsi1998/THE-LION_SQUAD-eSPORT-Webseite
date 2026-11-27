@@ -23,7 +23,7 @@ const INVOICE_QUESTION = `/contact?topic=invoice&subject=${encodeURIComponent("F
 
 const TONE_CLASSES = {
   info: "border-[#29B6E8]/50 text-[#29B6E8]",
-  warn: "border-[#FFD700]/60 text-[#FFD700]",
+  warn: "border-warn/60 text-warn",
   ok: "border-ok/40 text-ok",
   muted: "border-white/15 text-white/50",
 };
@@ -89,7 +89,7 @@ export function InvoicesPanel() {
       {data && (
         <>
           <div className="mt-6 border border-white/10 bg-[#121212] rounded-sm p-5 tls-type-small text-white/80" data-testid="invoices-summary">{summaryText(data)}</div>
-          {outage && <div className="mt-3 border border-[#FFD700]/40 bg-[#FFD700]/10 rounded-sm p-4 tls-type-small text-white/80" data-testid="invoices-outage">{outage}</div>}
+          {outage && <div className="mt-3 border border-warn/40 bg-warn/10 rounded-sm p-4 tls-type-small text-white/80" data-testid="invoices-outage">{outage}</div>}
           {(sources.length > 0 || (data.invoices || []).length > 1) && (
             <div className="mt-5 flex flex-wrap items-center gap-2" data-testid="invoices-filters">
               {sources.map((item) => <Chip key={item.key} active={source === item.key} onClick={() => setSource(item.key)} testId={`invoices-source-${item.key}`}>{item.label}</Chip>)}
@@ -150,7 +150,7 @@ function InvoiceRow({ row, currency, onView, onPay }) {
       <div className="flex gap-2 shrink-0">
         <button type="button" onClick={() => onView(row)} data-testid={`invoice-view-${row.key}`} className="inline-flex items-center gap-2 px-3 py-2 border border-white/15 text-white/80 hover:text-white tls-type-label rounded-sm"><Eye className="w-3.5 h-3.5" /> Ansehen</button>
         {row.can_pay && (
-          <button type="button" onClick={() => onPay(row)} data-testid={`invoice-pay-${row.key}`} className="inline-flex items-center gap-2 px-3 py-2 bg-[#FFD700] text-black tls-type-label rounded-sm"><CreditCard className="w-3.5 h-3.5" /> Bezahlen</button>
+          <button type="button" onClick={() => onPay(row)} data-testid={`invoice-pay-${row.key}`} className="inline-flex items-center gap-2 px-3 py-2 bg-brand text-black tls-type-label rounded-sm"><CreditCard className="w-3.5 h-3.5" /> Bezahlen</button>
         )}
       </div>
     </div>
@@ -159,7 +159,7 @@ function InvoiceRow({ row, currency, onView, onPay }) {
 
 function Chip({ active, onClick, testId, children }) {
   return (
-    <button type="button" onClick={onClick} data-testid={testId} aria-pressed={active} className={`px-3 py-1.5 border rounded-sm tls-type-label ${active ? "border-[#FFD700]/60 text-[#FFD700] bg-[#FFD700]/10" : "border-white/15 text-white/55 hover:text-white"}`}>
+    <button type="button" onClick={onClick} data-testid={testId} aria-pressed={active} className={`px-3 py-1.5 border rounded-sm tls-type-label ${active ? "border-brand/60 text-brand bg-brand/10" : "border-white/15 text-white/55 hover:text-white"}`}>
       {children}
     </button>
   );

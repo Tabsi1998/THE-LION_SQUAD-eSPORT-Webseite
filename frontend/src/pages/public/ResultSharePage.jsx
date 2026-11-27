@@ -70,7 +70,7 @@ export default function ResultSharePage() {
     data ? { image: wide, type: "article", robots: "noindex, follow", canonical: `${window.location.origin}${data.path}` } : { robots: "noindex, follow" },
   );
 
-  const rankColor = data?.rank === 1 ? "text-[#FFD700]" : data?.rank === 2 ? "text-[#D9DEE5]" : data?.rank === 3 ? "text-[#E0A06A]" : "text-white";
+  const rankColor = data?.rank === 1 ? "text-honor" : data?.rank === 2 ? "text-[#D9DEE5]" : data?.rank === 3 ? "text-[#E0A06A]" : "text-white";
   return (
     <PublicLayout>
       <div className="max-w-5xl mx-auto px-4 md:px-6 py-10 md:py-14">

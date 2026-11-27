@@ -14,6 +14,7 @@ import { LIVE_HINT } from "@/lib/fastLapStatus";
 import { streamFormValues, streamPayload } from "@/lib/tournamentStream";
 import { FastLapChampionshipFields, FastLapStreamFields } from "./f1/FastLapRulesFields";
 
+import { ROLE_COLORS } from "@/lib/categoryColors";
 const CREATE_STATUS_OPTIONS = [
   ["draft", "Entwurf"],
   ["scheduled", "Angekündigt"],
@@ -134,10 +135,10 @@ export default function AdminF1NewPage() {
               <TextField label="Start Challenge/Event" type="datetime-local" value={form.start_date} onChange={(v) => set("start_date", v)} testId="f1-new-start" />
               <TextField label="Ende Challenge/Event" type="datetime-local" value={form.end_date} onChange={(v) => set("end_date", v)} testId="f1-new-end" />
               {/* Online-Einreichen gibt es noch nicht: der Schalter kommt mit #1278 zurück (#2130). */}
-              <CheckField label="Automatisches Fast-Lap-Hinweisbanner für diese Challenge anzeigen" checked={form.site_banner_enabled} onChange={(v) => set("site_banner_enabled", v)} testId="f1-new-site-banner" accent="#FFD700" />
+              <CheckField label="Automatisches Fast-Lap-Hinweisbanner für diese Challenge anzeigen" checked={form.site_banner_enabled} onChange={(v) => set("site_banner_enabled", v)} testId="f1-new-site-banner" accent={ROLE_COLORS.brand} />
             </FormSection>
 
-            <FormSection title="Teilnahme und Vereins-Referenzzeiten" accent="#FFD700" hint="Für Challenges, die wir für externe Teilnehmer veranstalten: Vereinsmitglieder können dann nicht in die offizielle Wertung, aber optional Referenzzeiten außer Wertung setzen.">
+            <FormSection title="Teilnahme und Vereins-Referenzzeiten" accent={ROLE_COLORS.honor} hint="Für Challenges, die wir für externe Teilnehmer veranstalten: Vereinsmitglieder können dann nicht in die offizielle Wertung, aber optional Referenzzeiten außer Wertung setzen.">
               <CheckField
                 label="Vereinsmitglieder aus offizieller Wertung ausschließen"
                 hint="Wie bei externen Turnieren: Sie können nicht offiziell mitmachen."
@@ -191,7 +192,7 @@ export default function AdminF1NewPage() {
           <TextField label="Versuche je Person und Strecke" hint="Leer = unbegrenzt. Ungültige Runden zählen mit." type="number" value={form.attempts} onChange={(v) => set("attempts", v)} testId="f1-new-attempts" className="md:max-w-xs" />
         </FormSection>
 
-        <FormSection title="Preise (strukturiert)" accent="#FFD700" hint="Wird bei Ergebnisveröffentlichung als Gewinnabholung angelegt.">
+        <FormSection title="Preise (strukturiert)" accent={ROLE_COLORS.honor} hint="Wird bei Ergebnisveröffentlichung als Gewinnabholung angelegt.">
           <div className="flex justify-end">
             <button type="button" onClick={() => set("prize_places", [...(form.prize_places || []), { place: (form.prize_places?.length || 0) + 1, label: "", value: "" }])} data-testid="f1-new-prize-add" className="tls-type-label text-[#29B6E8] hover:text-white">+ Platz hinzufügen</button>
           </div>

@@ -339,7 +339,7 @@ export function DiscordDesignPanel({ initialKind = "stream_live" }) {
               className="inline-flex items-center gap-2 px-4 py-2 border border-white/15 text-white/60 tls-type-label rounded-sm disabled:opacity-40">
               <RotateCcw className="w-3.5 h-3.5" /> Standard wiederherstellen
             </button>
-            {dirty && <span className="self-center tls-type-small text-[#FFD700]">nicht gespeichert</span>}
+            {dirty && <span className="self-center tls-type-small text-warn">nicht gespeichert</span>}
           </div>
         </div>
 

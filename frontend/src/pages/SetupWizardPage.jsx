@@ -163,7 +163,7 @@ export default function SetupWizardPage() {
                   <div className="space-y-1.5">
                     {(status.checks || []).map((check) => (
                       <div key={check.key} className="flex items-center gap-2 tls-type-small">
-                        {check.ok ? <ShieldCheck className="w-3.5 h-3.5 text-ok" /> : <AlertTriangle className="w-3.5 h-3.5 text-[#FFD700]" />}
+                        {check.ok ? <ShieldCheck className="w-3.5 h-3.5 text-ok" /> : <AlertTriangle className="w-3.5 h-3.5 text-warn" />}
                         <span className={check.ok ? "text-white/65" : "text-white/90"}>{check.label}</span>
                       </div>
                     ))}

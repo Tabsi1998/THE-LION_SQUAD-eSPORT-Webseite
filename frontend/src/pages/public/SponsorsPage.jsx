@@ -11,8 +11,9 @@ import { SmartLogo } from "@/components/tls/SmartLogo";
 import { ArrowRight, Calendar, Check, FileText, Handshake, Mail, Minus, Star } from "lucide-react";
 import { ShortCaps } from "@/components/tls/ShortCaps";
 
+import { ROLE_COLORS } from "@/lib/categoryColors";
 const tierLabel = { main: "Hauptsponsor", platinum: "Platin", gold: "Gold", silver: "Silber", bronze: "Bronze" };
-const tierColor = { main: "#29B6E8", platinum: "#E5E4E2", gold: "#FFD700", silver: "#C0C0C0", bronze: "#CD7F32" };
+const tierColor = { main: "#29B6E8", platinum: "#E5E4E2", gold: ROLE_COLORS.honor, silver: "#C0C0C0", bronze: "#CD7F32" };
 const tierGrid = {
   main: "md:grid-cols-1",
   platinum: "md:grid-cols-2",
@@ -23,7 +24,7 @@ const tierGrid = {
 const tierCard = {
   main: "p-9 min-h-72 border-[#29B6E8]/25 bg-[#071114]",
   platinum: "p-8 min-h-64 border-white/15 bg-[#111111]",
-  gold: "p-7 min-h-56 border-[#FFD700]/15 bg-[#101010]",
+  gold: "p-7 min-h-56 border-honor/15 bg-[#101010]",
   silver: "p-5 min-h-44",
   bronze: "p-4 min-h-36",
 };
@@ -71,7 +72,7 @@ export default function SponsorsPage() {
   return (
     <PublicLayout>
       <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
-        <span className="tls-type-label text-[#FFD700]">UNSERE PARTNER</span>
+        <span className="tls-type-label text-brand">UNSERE PARTNER</span>
         <h1 className="mt-3 tls-type-title"><ShortCaps>Sponsoren</ShortCaps></h1>
         <p className="mt-4 text-white/70 max-w-2xl">
           Diese Marken und Unternehmen unterstützen THE LION SQUAD — eSports. Ohne sie wären viele unserer Events, Turniere und Aktionen nicht möglich. Danke!
@@ -238,7 +239,7 @@ export function SponsorOffer({ offer }) {
 function SupportLink({ to, icon: Icon, label, text, testId }) {
   return (
     <Link to={to} data-testid={testId} className="tls-card tls-card--gold tls-reveal-item group rounded-sm border border-white/10 bg-[#101010] p-4">
-      <div className="flex items-center gap-2 tls-type-label text-[#FFD700]">
+      <div className="flex items-center gap-2 tls-type-label text-brand">
         <Icon className="h-3.5 w-3.5" /> {label}
       </div>
       <p className="mt-2 tls-type-body text-white/55 line-clamp-2">{text}</p>

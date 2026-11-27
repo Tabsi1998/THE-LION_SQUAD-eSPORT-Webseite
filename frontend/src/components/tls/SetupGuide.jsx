@@ -8,7 +8,7 @@ import { SETUP_GUIDES, resolveGuideValue } from "@/lib/setupGuides";
 
 const STATE_CLASS = {
   ok: "border-ok/40 text-ok",
-  missing: "border-[#FFD700]/50 text-[#FFD700]",
+  missing: "border-warn/50 text-warn",
   optional: "border-white/15 text-white/50",
   unknown: "border-white/10 text-white/35",
 };

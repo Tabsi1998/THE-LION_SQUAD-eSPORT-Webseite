@@ -472,12 +472,12 @@ export default function AdminTournamentEditPage() {
       </button>
     ),
     t.can_use_staff_tools && (
-      <button key="planning" type="button" onClick={() => runPlanningCheck()} data-testid="admin-tr-planning-check" className="px-3 py-2 border border-[#FFD700]/50 text-[#FFD700] tls-type-label rounded-sm hover:bg-[#FFD700]/10 inline-flex items-center gap-2">
+      <button key="planning" type="button" onClick={() => runPlanningCheck()} data-testid="admin-tr-planning-check" className="px-3 py-2 border border-brand/50 text-brand tls-type-label rounded-sm hover:bg-brand/10 inline-flex items-center gap-2">
         <Eye className="w-3.5 h-3.5" /> Planung prüfen
       </button>
     ),
     canLockTournament && (
-      <button key="lock" type="button" onClick={() => setTournamentLock(!t.locked_at)} data-testid="admin-tr-lock" className={`px-3 py-2 border tls-type-label rounded-sm ${t.locked_at ? "border-ok/40 text-ok hover:bg-ok/10" : "border-[#FFD700]/50 text-[#FFD700] hover:bg-[#FFD700]/10"}`}>
+      <button key="lock" type="button" onClick={() => setTournamentLock(!t.locked_at)} data-testid="admin-tr-lock" className={`px-3 py-2 border tls-type-label rounded-sm ${t.locked_at ? "border-ok/40 text-ok hover:bg-ok/10" : "border-brand/50 text-brand hover:bg-brand/10"}`}>
         {t.locked_at ? "Entsperren" : "Sperren"}
       </button>
     ),
@@ -510,7 +510,7 @@ export default function AdminTournamentEditPage() {
             <h1 className="tls-type-title mt-1 break-words">{t.title}</h1>
             <div className="mt-2 flex items-center gap-3 flex-wrap">
               <StatusBadge status={t.status} />
-              {t.locked_at && <span className="px-2 py-1 border border-[#FFD700]/40 text-[#FFD700] tls-type-label rounded-sm">Gesperrt</span>}
+              {t.locked_at && <span className="px-2 py-1 border border-quiet/40 text-quiet tls-type-label rounded-sm">Gesperrt</span>}
               <span className="text-white/60 tls-type-small">{formatTournamentDisplay(t)}</span>
               <Link to={`/tournaments/${t.slug || t.id}`} target="_blank" className="text-[#29B6E8] tls-type-label hover:text-white inline-flex items-center gap-1"><Eye className="w-3 h-3" /> Öffentliche Seite</Link>
               {/* TV & Beamer (#1110): der Link für den Hallen-Bildschirm, Turnier schon gewählt. */}
@@ -578,7 +578,7 @@ export default function AdminTournamentEditPage() {
                 target="_blank"
                 rel="noreferrer"
                 data-testid={`admin-tr-download-${item.key}`}
-                className={`px-3 py-2 border tls-type-label rounded-sm text-center ${item.highlight ? "border-[#FFD700]/40 text-[#FFD700] hover:bg-[#FFD700]/10" : "border-white/20 text-white/80 hover:border-[#29B6E8]/40"}`}
+                className={`px-3 py-2 border tls-type-label rounded-sm text-center ${item.highlight ? "border-brand/40 text-brand hover:bg-brand/10" : "border-white/20 text-white/80 hover:border-[#29B6E8]/40"}`}
               >
                 {item.label}
               </a>
@@ -888,5 +888,5 @@ function SeedField({ registration, onSave, testId }) {
 // Turnier nur mit Event-Anmeldung (#875): ob die Event-Anmeldung (noch) reicht - nur für die Turnierleitung.
 function EventGateMark({ mark }) {
   if (!mark) return null;
-  return <div className={`mt-1 tls-type-small ${mark.ok ? "text-quiet" : "text-[#FFD700]"}`} data-testid="admin-reg-event-gate">{mark.label}</div>;
+  return <div className={`mt-1 tls-type-small ${mark.ok ? "text-quiet" : "text-warn"}`} data-testid="admin-reg-event-gate">{mark.label}</div>;
 }

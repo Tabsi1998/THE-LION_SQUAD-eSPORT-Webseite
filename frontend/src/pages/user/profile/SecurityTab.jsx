@@ -45,8 +45,8 @@ export function SecurityTab({ user, refresh, siteSettings }) {
       <KontoAngaben />
 
       {sentHereForMfa && (
-        <div className="border border-[#FFD700]/40 bg-[#FFD700]/10 rounded-sm p-4 flex items-start gap-3" data-testid="profile-mfa-required">
-          <ShieldCheck className="w-5 h-5 text-[#FFD700] mt-0.5 shrink-0" />
+        <div className="border border-warn/40 bg-warn/10 rounded-sm p-4 flex items-start gap-3" data-testid="profile-mfa-required">
+          <ShieldCheck className="w-5 h-5 text-warn mt-0.5 shrink-0" />
           <div className="tls-type-small text-white/80">
             <strong>Für den Adminbereich brauchst du die Zwei-Faktor-Anmeldung.</strong> Richte sie unten ein (dauert zwei Minuten),
             melde dich danach einmal neu an – dann geht es weiter{params.get("next") ? ` zu ${params.get("next")}` : ""}.

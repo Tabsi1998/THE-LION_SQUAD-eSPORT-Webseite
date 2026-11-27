@@ -44,7 +44,7 @@ function AwardOptions({ value, onChange, testPrefix }) {
         <span className="tls-type-small font-bold text-white/50">Datum (leer = jetzt, sonst rückwirkend)</span>
         <input type="datetime-local" max={nowLocal()} value={value.when} onChange={(e) => set("when", e.target.value)} data-testid={`${testPrefix}-date`} className={`${INPUT_CLASS} mt-1`} />
       </label>
-      <CheckField label="Ohne Zeremonie – zählt, wird aber nicht gefeiert" checked={value.silent} onChange={(v) => set("silent", v)} testId={`${testPrefix}-silent`} accent="#FFD700" />
+      <CheckField label="Ohne Zeremonie – zählt, wird aber nicht gefeiert" checked={value.silent} onChange={(v) => set("silent", v)} testId={`${testPrefix}-silent`} accent={ROLE_COLORS.honor} />
       <CheckField label="Benachrichtigung schicken (Postfach, Push, Discord)" checked={value.notify} onChange={(v) => set("notify", v)} testId={`${testPrefix}-notify`} accent="#29B6E8" />
     </div>
   );
@@ -102,10 +102,10 @@ function SingleAward({ catalog, person, setPerson, onDone }) {
         <PersonPicker value={person} onChange={setPerson} testId="award-person" />
         <TierSelect tiers={catalog.tiers} groupsByCode={catalog.groupsByCode} value={tierCode} onChange={setTierCode} testId="award-tier-select" filter={(t, g) => !g.is_negative} />
         {tier?.member_only && (
-          <p className="border border-[#FFD700]/30 bg-[#FFD700]/10 px-3 py-2 tls-type-small text-white/70">Nur für aktive oder Ehren-Mitglieder.</p>
+          <p className="border border-honor/30 bg-honor/10 px-3 py-2 tls-type-small text-white/70">Nur für aktive oder Ehren-Mitglieder.</p>
         )}
         <AwardOptions value={options} onChange={setOptions} testPrefix="award" />
-        <button type="button" onClick={award} disabled={busy || !person || !tierCode} data-testid="award-submit" className="w-full px-4 py-3 bg-[#FFD700] text-black tls-type-label rounded-sm inline-flex items-center justify-center gap-2 disabled:opacity-40">
+        <button type="button" onClick={award} disabled={busy || !person || !tierCode} data-testid="award-submit" className="w-full px-4 py-3 bg-honor text-black tls-type-label rounded-sm inline-flex items-center justify-center gap-2 disabled:opacity-40">
           <Award className="w-4 h-4" /> {busy ? "Vergebe …" : "Vergeben"}
         </button>
       </div>
@@ -244,7 +244,7 @@ function BulkAward({ catalog, board, onDone }) {
             <SelectField label="Event (angemeldet oder eingecheckt)" value={sources.event_id} onChange={(v) => update(setSources)({ ...sources, event_id: v })} options={[["", "—"], ...lists.events.map((e) => [e.id, e.name || e.title || e.slug])]} testId="bulk-event" />
             <SelectField label="Team" value={sources.team_id} onChange={(v) => update(setSources)({ ...sources, team_id: v })} options={[["", "—"], ...lists.teams.map((t) => [t.id, t.name])]} testId="bulk-team" />
             <SelectField label="Rolle" value={sources.role} onChange={(v) => update(setSources)({ ...sources, role: v })} options={[["", "—"], ...Object.entries(ROLE_LABELS)]} testId="bulk-role" />
-            <CheckField label="Alle aktiven Mitglieder (auch Ehrenmitglieder)" checked={sources.members} onChange={(v) => update(setSources)({ ...sources, members: v })} testId="bulk-members" accent="#FFD700" />
+            <CheckField label="Alle aktiven Mitglieder (auch Ehrenmitglieder)" checked={sources.members} onChange={(v) => update(setSources)({ ...sources, members: v })} testId="bulk-members" accent={ROLE_COLORS.honor} />
           </div>
           <div className="space-y-3">
             <AwardOptions value={options} onChange={setOptions} testPrefix="bulk" />
@@ -257,9 +257,9 @@ function BulkAward({ catalog, board, onDone }) {
                   <span className="text-ok" data-testid="bulk-would">{preview.would_award} bekommen es</span>
                   <span className="text-white/55">{preview.already} haben es schon</span>
                   {preview.skipped > 0 && <span className="text-warn">{preview.skipped} dürfen nicht</span>}
-                  {preview.unknown?.length > 0 && <span className="text-[#FFD700]" data-testid="bulk-unknown">{preview.unknown.length} nicht gefunden</span>}
+                  {preview.unknown?.length > 0 && <span className="text-warn" data-testid="bulk-unknown">{preview.unknown.length} nicht gefunden</span>}
                 </div>
-                {preview.unknown?.length > 0 && <div className="text-[#FFD700]/80 break-words">Nicht gefunden: {preview.unknown.join(", ")}</div>}
+                {preview.unknown?.length > 0 && <div className="text-warn/80 break-words">Nicht gefunden: {preview.unknown.join(", ")}</div>}
                 <ul className="max-h-48 overflow-y-auto divide-y divide-white/5">
                   {(preview.people || []).map((p) => (
                     <li key={p.id} className="py-1 flex justify-between gap-2">

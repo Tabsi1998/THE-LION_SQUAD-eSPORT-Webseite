@@ -22,14 +22,14 @@ export function PrizeEditor({ value = [], onChange, format = "" }) {
     onChange(next);
   };
   return (
-    <div className="border border-[#FFD700]/20 bg-[#FFD700]/5 rounded-sm p-4 space-y-3">
+    <div className="border border-honor/20 bg-honor/5 rounded-sm p-4 space-y-3">
       <div className="flex items-center justify-between gap-3">
-        <div className="tls-type-label text-[#FFD700]">Platzierungs-Preise</div>
+        <div className="tls-type-label text-honor">Platzierungs-Preise</div>
         <div className="flex flex-wrap justify-end gap-3">
           {LOSER_BRACKET_FORMATS.has(format) && <button type="button" onClick={() => addTop3("winner")} className="tls-type-label text-[#29B6E8]">+ Siegerrunde Top 3</button>}
           {LOSER_BRACKET_FORMATS.has(format) && <button type="button" onClick={() => addTop3("loser")} data-testid="tr-edit-prize-loser-top3" className="tls-type-label text-[#CD7F32]">+ Verliererrunde Top 3</button>}
           <button type="button" onClick={() => add((value?.length || 0) + 1)} className="tls-type-label text-[#29B6E8]">+ Platz</button>
-          <button type="button" onClick={() => add("last")} className="tls-type-label text-[#FFD700]">+ Letzter</button>
+          <button type="button" onClick={() => add("last")} className="tls-type-label text-honor">+ Letzter</button>
         </div>
       </div>
       {(value || []).map((p, i) => (

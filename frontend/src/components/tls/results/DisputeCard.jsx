@@ -39,10 +39,10 @@ export function DisputeCard({ item, busy = false, highlighted = false, onKeep, o
   const mayDecide = item.can_decide !== false;
   const needsReason = Boolean(item.conflict_override) && conflictReason.trim().length < 5;
   return (
-    <div tabIndex={-1} className={`outline-none rounded-sm border bg-[#121212] p-4 space-y-3 ${highlighted ? "border-[#FFD700]/70 ring-2 ring-[#FFD700]/40" : "border-warn/40"}`} data-testid={`lead-dispute-${item.id}`} id={`fall-ds-${item.id}`}>
+    <div tabIndex={-1} className={`outline-none rounded-sm border bg-[#121212] p-4 space-y-3 ${highlighted ? "border-brand/70 ring-2 ring-brand/40" : "border-warn/40"}`} data-testid={`lead-dispute-${item.id}`} id={`fall-ds-${item.id}`}>
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
-          <div className="tls-type-label text-[#FFD700]">Gemeldet von {dispute.by}{dispute.at ? ` · ${clock(dispute.at)}` : ""}</div>
+          <div className="tls-type-label text-warn">Gemeldet von {dispute.by}{dispute.at ? ` · ${clock(dispute.at)}` : ""}</div>
           <div className="mt-1 flex items-center gap-2 tls-type-card"><AlertTriangle className="w-4 h-4 text-[#FF6B60]" /> {dispute.category_label}</div>
           <div className="tls-type-small text-white/50 truncate">{item.stage_name ? `${item.stage_name} · ` : ""}{item.label}</div>
         </div>
