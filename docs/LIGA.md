@@ -711,7 +711,7 @@ Zugriff, außer „lesen“ steht in der Zeile. Prüfung: `backend/tests/test_le
 | Staffel: `GET /staff`, `/lead`, `/planning-check`, `/match-plan.csv`, `/bracket/display`, `/schedule/deadlines`, Chat, Teilnehmer intern | jede Zuständigkeit | – | lesen |
 | Staffel: `squad-candidates`, `squad-registrations`, `registrations` schreiben, `removal*`, `assignable-users` | `applications` | `POST squad-registrations` nur, wenn das Co-Team einen offenen Antrag hat | – |
 | `GET …/seasons/{id}/applications` | `applications` | – | – |
-| `PUT /api/admin/leagues/teams/{team_id}/guest-team` (Gastteam, #1665) | `applications` in einer Liga des Teams | ja, eigenes Team | – |
+| `PUT /api/admin/leagues/teams/{team_id}/guest-team` (Gastteam, #1665) | `applications` in einer Liga, in der das Team gerade angemeldet oder zugeteilt ist | ja, eigenes Team | – |
 | `PUT …/seasons/{id}/privacy-release` (Datenschutzhinweis für Gäste, #1665) | nur Superadmin | – | – |
 | `POST …/applications/{aid}/review`, `/accept`, `/reject`, `/waitlist`, `/assign` | `applications` | ja, eigenes Team | – |
 | `GET …/seasons/{id}/late-entries`, `GET …/staffeln/{tid}/late-entries/{rid}` (Nachmeldung, #2422) | `applications` | – | – |
@@ -1303,6 +1303,13 @@ ohne Mitgliedschaft, eine Gast-Rolle gibt es nicht. Logik in `services/league_gu
 Liga-Leitung setzt und bestätigt es, die Teamleitung liefert Verein bzw. Schule. **Ohne Feld wie heute:** Ein Team ohne `guest_team`
 bekommt in keiner Antwort ein Feld dazu (Gegenprobe `test_without_any_guest_team_no_answer_gets_a_new_field`).
 
+**Wer, seit der Prüfung vom 27.11. (Entscheidungen B und C):** Setzen und entfernen darf nur die Liga-Leitung („Teams freigeben“) einer
+Liga, in der das Team **gerade** angemeldet oder zugeteilt ist: ein offener oder angenommener Antrag (`submitted`, `in_review`, `waitlist`,
+`accepted`) bzw. eine Anmeldung (`pending`, `approved`, `checked_in`) in einer Staffel, die nicht beendet ist - jeweils in einer Season, die
+nicht `completed` oder `archived` ist (`league_guests.league_ids_of_team`). Ein abgelehnter oder zurückgezogener Antrag gibt kein Recht. Dazu
+der Bereich Ligen. Verein bzw. Schule gibt es nur für **Liga-Teams** (`league_guests.is_league_team`: ein Liga-Antrag gleich welchen Stands,
+eine Anmeldung in einer Liga-Staffel oder schon eine Angabe bzw. ein Kennzeichen) - sonst 409, und das Team-Blatt zeigt den Abschnitt nicht.
+
 **`teams.guest_team`** (optional, nur ein Unterdokument am Team, keine eigene Sammlung):
 
 | Feld | Typ | Wer | Bedeutung |
@@ -1314,15 +1321,17 @@ bekommt in keiner Antwort ein Feld dazu (Gegenprobe `test_without_any_guest_team
 | `confirmed_kind`, `confirmed_name` | str | Liga-Leitung | Was die Leitung beim Bestätigen gesehen hat. Ändert die Teamleitung Art oder Name danach, zeigt die Plakette bis zur neuen Bestätigung nur „Gast“, die Angabe gilt als offen (`pending`) |
 | `updated_at` | ISO | – | Letzte Änderung der Angabe |
 
-Am Feld steht **keine Person**: Wer bestätigt oder geändert hat, steht nur im Protokoll. Sind Kennzeichen und Angabe beide weg, fällt das Feld
+Am Feld steht **keine Person**: Wer bestätigt oder geändert hat, steht nur im Protokoll. Teamleitung und Liga-Leitung schreiben nur ihre
+Teilfelder (`guest_team.kind`, `.name`, `.school_name_public` bzw. `.confirmed_*`) - speichern beide gleichzeitig, überschreibt keine die
+andere. Sind Kennzeichen und Angabe beide weg, fällt das Feld
 ganz weg. Die Freigabe des Schulnamens wirkt sofort, in beide Richtungen.
 
 **Routen:**
 
 | Route | Wer | Zweck |
 | --- | --- | --- |
-| `PUT /api/teams/{team_id}/guest-team` `{kind, name, school_name_public}` | Leitung und Co-Leitung des Hauptteams (sonst 403) | Angabe der Teamleitung. 422 mit deutschem Satz bei Name ohne Art oder falscher Länge. Antwort `{guest_team, guest_badge}` |
-| `PUT /api/admin/leagues/teams/{team_id}/guest-team` `{confirmed, season_id?, conflict_reason?}` | Bereich Ligen oder „Teams freigeben“ in einer Liga, in der das Team einen Antrag hat oder in einer Staffel steht (Wächter vor dem Inhalt, 403 „Das Kennzeichen „Gast“ setzt die Liga-Leitung …“) | Setzen und bestätigen (`true`, auch neu nach einer Änderung) oder zurücknehmen (`false`, die Angabe der Teamleitung bleibt). Befangenheit wie bei der Anmeldung (Nr. 73): Wer zum Team gehört, bekommt 403, der Superadmin geht mit `conflict_reason` durch. `season_id` (nur eine Season mit Antrag des Teams) stellt den Eintrag ins Protokoll des Leitstands |
+| `PUT /api/teams/{team_id}/guest-team` `{kind, name, school_name_public}` | Leitung und Co-Leitung des Hauptteams (sonst 403), nur für Liga-Teams (sonst 409) | Angabe der Teamleitung. 422 mit deutschem Satz bei Name ohne Art oder falscher Länge. Antwort `{guest_team, guest_badge}`. Das Web schickt sie mit dem einen „Speichern“ des Team-Blatts |
+| `PUT /api/admin/leagues/teams/{team_id}/guest-team` `{confirmed, season_id?, conflict_reason?}` | Bereich Ligen oder „Teams freigeben“ in einer Liga, in der das Team gerade angemeldet oder zugeteilt ist (siehe oben; Wächter vor dem Inhalt, 403 „Das Kennzeichen „Gast“ setzt die Liga-Leitung …“). Der Eingang zeigt die Knöpfe nur bei offenen und angenommenen Anmeldungen | Setzen und bestätigen (`true`, auch neu nach einer Änderung) oder zurücknehmen (`false`, die Angabe der Teamleitung bleibt). Befangenheit wie bei der Anmeldung (Nr. 73): Wer zum Team gehört, bekommt 403, der Superadmin geht mit `conflict_reason` durch. `season_id` (nur eine Season mit Antrag des Teams) stellt den Eintrag ins Protokoll des Leitstands |
 | `PUT /api/admin/leagues/seasons/{season_id}/privacy-release` `{released}` | nur Superadmin mit Zwei-Faktor | Hinweis zum Datenschutz für Gäste freigeben (Nr. 1), siehe unten |
 
 **Plakette `guest_badge`** – `{label: "Gast", org}` mit `org` = Name, wenn bestätigt, seit der Bestätigung unverändert und bei einer Schule
@@ -1331,11 +1340,11 @@ Zeilen weg. Gesetzt erst an der Antwort, nie im Endstand: Ein eingefrorener Ends
 
 | Fläche | Antwort | Feld |
 | --- | --- | --- |
-| Tabelle (Ligaseite, Staffel, Turnier-Tabelle, App) | `GET /api/tournaments/{tid}/standings`, `standings` in `GET /api/leagues/{liga}/{season}/staffeln/{ref}` | `standings[].guest_badge` |
+| Tabelle (Ligaseite, Staffel, Turnier-Tabelle; in der App folgt) | `GET /api/tournaments/{tid}/standings`, `standings` in `GET /api/leagues/{liga}/{season}/staffeln/{ref}` | `standings[].guest_badge` |
 | Tabelle der Verwaltung | `GET /api/admin/leagues/staffeln/{tid}/table` | `standings[].guest_badge` |
 | Teams der Season, Spielplan, Spieltage | `GET /api/leagues/{liga}/{season}/staffeln/{ref}` | `teams[].guest_badge`, `weeks[].matches[].home/away.guest_badge` |
 | Matchseite | `GET /api/matches/{id}/page` (nur Staffeln) | `participants[].guest_badge` |
-| Teamseite | `GET /api/teams/{id}`, `GET /api/teams/my` | `guest_badge` für alle; `guest_team` (Angaben samt `pending`, `badge`) nur für Mitglieder und Verwaltung des Teams; `can_edit_guest_team` |
+| Teamseite | `GET /api/teams/{id}`, `GET /api/teams/my` | `guest_badge` für alle; `guest_team` (Angaben samt `pending`, `badge`) und `can_edit_guest_team` (wahr für Leitung und Co-Leitung eines Liga-Teams) nur in den Antworten des eigenen Teams. Die Link-Vorschau (`/api/seo/meta`) nennt ein Gastteam nicht als `memberOf` des Vereins |
 | Profil: aktuelle Ligen | `GET /api/users/public/{name}` | `league_current[].guest_badge` |
 | Eingang der Anmeldungen | `GET /api/admin/leagues/seasons/{id}/applications` | `items[].guest_team` (auch ein Schulname ohne Freigabe), `items[].guest_badge` |
 | Leitstand | `GET /api/admin/leagues/seasons/{id}/desk` | Aufgaben „Anmeldungen“: `guest_badge`, `guest_pending` |
@@ -1356,10 +1365,18 @@ Text, gilt die Freigabe nicht mehr. Mitglieder sehen den Text der Season wie bis
 (`privacy_consent.text`, `league_applications.privacy_text_for`). Den Wortlaut entwirft die Leitung, rechtlich prüfen lässt ihn Fabian.
 
 **Datenschutz und Rechte:** Gäste sehen und tun, was jedes Konto ohne Mitgliedschaft darf: für das eigene Team Termin, Check-in, Veto und
-Ergebnis, sonst nur Öffentliches. Prüfung: `tests/test_league_guest_rights_flow.py` liest die Routentabelle der Anwendung (Inventar) und
-prüft aus Sicht von Captain und Teamleitung eines Gastteams alle Routen der Liga-Verwaltung (403), alle schreibenden Routen fremder Spiele,
-Staffeln, Teams und Ligaseiten (nichts geht durch, die Sammlungen bleiben gleich) und alle lesenden Routen auf einen nicht freigegebenen
-Schulnamen und fremde Gründe. Auskunft: Das Team steht wie bisher unter `teams`, samt `guest_team`. Kontolöschung: Das Feld gehört dem Team
+Ergebnis, sonst nur Öffentliches. Prüfung: `tests/test_league_guest_rights_flow.py` liest die Routentabelle der Anwendung (Inventar,
+`tests/route_inventory.py` baut aus der OpenAPI-Beschreibung gültige Inhalte und Pflichtangaben) und prüft aus Sicht von Captain und
+Teamleitung eines Gastteams:
+- alle 129 Routen der Liga-Verwaltung mit gültigem Inhalt: jede 403;
+- alle 128 schreibenden Routen unter fremdem Spiel, fremder Staffel, fremdem Team und fremder Ligaseite, mit gültigem Inhalt und echten fremden
+  Kennungen (Verfahren, MOSS-Anforderung, Terminvorschlag, Antrag): 109 antworten 401 bzw. 403, 19 stehen mit Grund in `NOT_A_RIGHT` -
+  9 Verfahren (für Unbeteiligte unsichtbar, 404 ist dort die Absage), 4 Routen nur für Eigenes (eigene Anmeldung, eigene Nachweise,
+  eigenes aufgelöstes Team: 404), 4 mit 400 (Austritt nur für Mitglieder und Kader, Rolle und Übergabe prüfen den Inhalt vor dem Recht,
+  keine Einzelanmeldung in einer Staffel) und 2 mit 409 (Verschiebung in der Staffel abgeschaltet). 422 zählt als Fehler. Die Sammlungen der
+  Liga und der Teams bleiben gleich;
+- alle 574 GET-Routen der Anwendung (ohne den Ereignisstrom), dazu Suche, Teamliste und Link-Vorschau, für vier Betrachter (ohne Konto,
+  fremder Gast, Vereinsmitglied, Gegner): nirgends der nicht freigegebene Schulname, nirgends ein fremder Grund. Auskunft: Das Team steht wie bisher unter `teams`, samt `guest_team`. Kontolöschung: Das Feld gehört dem Team
 und bleibt, eine Person steht nicht daran. Gast-Daten nach der Season bleiben wie bei jedem Konto (Nr. 286: dieselbe Datenbehandlung).
 
 #### Los auf mehrere Staffeln einer Liga N (#1623)

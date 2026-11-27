@@ -1,17 +1,28 @@
 const { test, expect } = require("@playwright/test");
+const fs = require("node:fs");
+const path = require("node:path");
 const g1 = require("./g1");
 
 const {
   ADMIN, LARGE, MINUTE, SMALL, api, as, assign, buildLeague, checkIn, done, get, noSideScroll, ok, pattern, playVeto, presentOf,
-  registrationIndex, resultsOf, seriesGames, shot, staffelMatches, standings, state,
+  registrationIndex, resultsOf, seriesGames, staffelMatches, standings, state,
 } = g1;
 
-// Liga-Gesamtabnahme (#1632, docs/liga/abnahme.md), Szenario „Gastteam“ (#1665, Entscheidung Nr. 286): Die Teamleitung gibt eine Schule
-// ohne Freigabe des Namens an, der Captain (Konto ohne Mitgliedschaft) meldet an und sieht den Platzhalter beim Datenschutz, die
-// Liga-Leitung nimmt an und bestätigt das Kennzeichen. Öffentlich steht erst „Gast“, mit Freigabe „Gast · Schule“, am TV nur „Gast“.
+// Liga-Gesamtabnahme (#1632, docs/liga/abnahme.md), Szenario „Gastteam“ (#1665, Entscheidung Nr. 286): Der Captain (Konto ohne
+// Mitgliedschaft) meldet an und sieht den Platzhalter beim Datenschutz, danach gibt die Teamleitung eine Schule ohne Freigabe des Namens an
+// (erst ab dem Liga-Antrag, Entscheidung C), die Liga-Leitung nimmt an und bestätigt das Kennzeichen. Öffentlich steht erst „Gast“, mit Freigabe „Gast · Schule“, am TV nur „Gast“.
 // Das Gastteam spielt und meldet sein Ergebnis wie jedes Team; in die Verwaltung kommt es nicht. Eigene Liga mit zwei Co-Teams der
 // Testwelt (Index 14 als Gastteam, 15 als Gegner) - los-fest: Mit zwei Teams gibt es genau ein Spiel. Am Ende fallen Kennzeichen und
 // Angabe wieder weg, die anderen Specs sehen die Testwelt unverändert. Erfundene Namen.
+
+/** Bild nur vom Gezeigten: die Tabelle als Element - die ganze Seite zeigte eine noch leere, gestaffelt aufbauende Tabelle. */
+async function shotOf(page, target, name) {
+  const folder = process.env.ABNAHME_SHOTS || "";
+  if (!folder) return;
+  fs.mkdirSync(folder, { recursive: true });
+  await page.waitForTimeout(1200);
+  await target.screenshot({ path: path.join(folder, name), animations: "disabled" });
+}
 
 const GUEST = 14;
 const OTHER = 15;
@@ -50,18 +61,18 @@ test.describe("Liga-Gesamtabnahme: Gastteam einer Schule", () => {
       application_opens_at: new Date(Date.now() - 60 * MINUTE).toISOString(), application_closes_at: new Date(Date.now() + 24 * 60 * MINUTE).toISOString() });
     const base = `/api/leagues/${world.league.slug}/${world.season.slug}`;
 
+    // Captain ohne Mitgliedschaft: Datenschutz noch nicht für Gäste freigegeben - der Platzhalter. Anmelden wie jedes Team.
+    const view = await get(captain, `${base}/application`);
+    expect(view.privacy.text).toContain(PLACEHOLDER);
+    const application = await ok(captain, "POST", `${base}/applications`, { squad_id: team().squad_id, rule_version_id: world.rule.id,
+      accept_rules: true, accept_privacy: true });
+
     // Teamleitung: Schule ohne Freigabe - noch kein Kennzeichen, die Angabe wartet auf die Liga-Leitung.
     const given = await ok(leader, "PUT", orgUrl, { kind: "school", name: school, school_name_public: false });
     expect(given.guest_badge).toBeNull();
     expect(given.guest_team.pending).toBe(true);
     // Das Kennzeichen setzt nie das Team selbst.
     expect((await api(leader, "PUT", markUrl, { confirmed: true })).status).toBe(403);
-
-    // Captain ohne Mitgliedschaft: Datenschutz noch nicht für Gäste freigegeben - der Platzhalter. Anmelden wie jedes Team.
-    const view = await get(captain, `${base}/application`);
-    expect(view.privacy.text).toContain(PLACEHOLDER);
-    const application = await ok(captain, "POST", `${base}/applications`, { squad_id: team().squad_id, rule_version_id: world.rule.id,
-      accept_rules: true, accept_privacy: true });
 
     // Liga-Leitung: Eingang mit der Angabe (auch dem Namen ohne Freigabe), annehmen, Kennzeichen bestätigen.
     const inbox = await get(lead, `${seasonAdmin}/applications`);
@@ -108,12 +119,16 @@ test.describe("Liga-Gesamtabnahme: Gastteam einer Schule", () => {
     }
     expect((await api(captain, "PUT", markUrl, { confirmed: false })).status).toBe(403);
 
-    // Bilder: Tabelle und Matchseite mit Gast bei 390 und 1440 px, ohne seitliches Scrollen.
+    // Bilder: Tabelle (als Ausschnitt, nicht die ganze Seite) und Matchseite mit Gast bei 390 und 1440 px, ohne seitliches Scrollen.
     for (const person of [captain, anon]) {
       await person.page.goto(`/liga/${world.league.slug}/${world.season.slug}`);
-      await expect(person.page.getByTestId(`standing-guest-${guestReg}`).first()).toContainText(school);
+      const badge = person.page.getByTestId(`standing-guest-${guestReg}`).first();
+      await expect(badge).toContainText(school);
       await noSideScroll(person.page);
-      await shot(person.page, `g1-gast-tabelle-${person === captain ? 390 : 1440}.png`);
+      const table = badge.locator("xpath=ancestor::table[1]");
+      await table.evaluate((node) => node.scrollIntoView({ block: "center" }));
+      await expect(person.page.getByTestId(`standing-row-${guestReg}`).first()).toBeVisible();
+      await shotOf(person.page, table, `g1-gast-tabelle-${person === captain ? 390 : 1440}.png`);
       await person.page.goto(`/matches/${match.id}`);
       await expect(person.page.getByTestId(`match-guest-${guestReg}`)).toContainText(school);
       await noSideScroll(person.page);

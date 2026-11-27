@@ -46,9 +46,9 @@ habt weniger Spiele als die anderen. Termine, Terminvorschläge und Check-in lau
 
 <img src="../assets/liga/tabelle-nachgemeldet-390.png" alt="Tabelle der Staffel am Handy: ein Team mit dem Hinweis „Nachgemeldet ab Woche 3“ und weniger Spielen" width="300">
 
-**Gastteam:** Spielt ihr als Gast für einen anderen Verein oder eine Schule, trägt die **Teamleitung** das auf der Teamseite unter
-**Bearbeiten → Gastteam in der Liga** ein. Ihr meldet euch an wie jedes Team. Das Kennzeichen „Gast“ setzt die Liga-Leitung, wenn sie eure
-Anmeldung freigibt. Dann steht in Tabellen, im Spielplan und auf der Teamseite „Gast“ mit dem Namen des Vereins bzw. der Schule, am TV und
+**Gastteam:** Spielt ihr als Gast für einen anderen Verein oder eine Schule, meldet ihr euch an wie jedes Team. Danach trägt die
+**Teamleitung** auf der Teamseite unter **Bearbeiten → Gastteam in der Liga** ein, für wen ihr spielt, und speichert mit **Speichern**. Das
+Kennzeichen „Gast“ setzt die Liga-Leitung, wenn sie eure Anmeldung freigibt. Dann steht in Tabellen, im Spielplan und auf der Teamseite „Gast“ mit dem Namen des Vereins bzw. der Schule, am TV und
 im Discord nur „Gast“. Den Namen einer Schule zeigen wir nur, wenn die Teamleitung ihn freigibt. Ändert ihr den Namen später, steht bis zur
 neuen Bestätigung nur „Gast“. Rechte und Abläufe sind dieselben wie für jedes Team.
 

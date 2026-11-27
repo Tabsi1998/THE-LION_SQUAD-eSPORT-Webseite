@@ -64,7 +64,7 @@
         {
           "id": "gastteam",
           "titel": "Als Gastteam anmelden",
-          "text": "Spielt ihr als Gast für einen anderen Verein oder eine Schule? Dann trägt die Teamleitung ihn auf der Teamseite unter Bearbeiten → Gastteam in der Liga ein. Ihr meldet euch an wie jedes andere Team. Das Kennzeichen „Gast“ setzt die Liga-Leitung, wenn sie eure Anmeldung freigibt.",
+          "text": "Spielt ihr als Gast für einen anderen Verein oder eine Schule? Meldet euch an wie jedes andere Team. Danach trägt die Teamleitung auf der Teamseite unter Bearbeiten → Gastteam in der Liga ein, für wen ihr spielt. Das Kennzeichen „Gast“ setzt die Liga-Leitung, wenn sie eure Anmeldung freigibt.",
           "hinweis": "In Tabellen, im Spielplan und auf der Teamseite steht dann „Gast“ mit dem Namen des Vereins bzw. der Schule, am TV und im Discord nur „Gast“. Den Namen einer Schule zeigen wir nur, wenn die Teamleitung ihn freigibt. Rechte und Abläufe sind dieselben wie für jedes Team.",
           "link": { "to": "/teams", "label": "Zu den Teams" }
         }

@@ -540,7 +540,7 @@ Captains und Vertreter melden ihr Co-Team selbst auf der Ligaseite an, du entsch
 4. **Wer darf sich anmelden:** alle Konten (Vorgabe) oder nur Vereinsmitglieder. Bei Mitgliedern gilt das für den ganzen Kader.
 5. **Zwei Co-Teams eines Hauptteams in derselben Staffel:** Vorgabe Nein.
 5a. **Anmeldungen automatisch annehmen:** Vorgabe aus, dann prüfst du jede Anmeldung. Mehr dazu unten unter „Automatisch annehmen“.
-6. **Hinweis zum Datenschutz:** Der Text steht bei der Anmeldung über dem Link zur Datenschutzerklärung und wird mit der Zustimmung gespeichert. Leer steht dort ein vorläufiger Platzhalter-Satz. Den Wortlaut gibt der Obmann frei. Gäste ohne Mitgliedschaft sehen ihn erst, wenn der Superadmin ihn **für Gäste freigibt** (2.5c).
+6. **Hinweis zum Datenschutz:** Der Text steht bei der Anmeldung über dem Link zur Datenschutzerklärung und wird mit der Zustimmung gespeichert. Leer steht dort ein vorläufiger Platzhalter-Satz. Mitglieder sehen den Text sofort, Gäste ohne Mitgliedschaft erst, wenn der **Superadmin** ihn nach der rechtlichen Prüfung **für Gäste freigibt** (2.5c).
 7. **Regelwerk veröffentlichen** (2.11): Ohne gültige Version geht keine Anmeldung. Der alte Regeltext reicht dafür nicht, weil er keine Version hat und sich eine Zustimmung darauf nicht belegen lässt.
 
 **Nachmeldung nach dem Season-Start** (#2422):
@@ -658,12 +658,14 @@ Mitgliedschaft: Für ihr Team machen sie Termin, Check-in, Veto und Ergebnis, Ve
 **Wer was macht:**
 
 - Die **Teamleitung** des Gastteams trägt auf der Teamseite unter **Bearbeiten → Gastteam in der Liga** ein, für welchen Verein oder welche
-  Schule sie spielt. Bei einer Schule entscheidet sie auch, ob der Name öffentlich stehen darf.
-- **Du** setzt das Kennzeichen „Gast“ (Zuständigkeit „Teams freigeben“ in einer Liga, in der das Team angemeldet ist). Es kommt nie von
-  selbst aus der Mitgliedschaft – sonst könnte jeder an der Plakette ablesen, wer Mitglied ist.
+  Schule sie spielt, und speichert mit dem **Speichern** des Blatts. Bei einer Schule entscheidet sie auch, ob der Name öffentlich stehen
+  darf. Den Abschnitt gibt es erst, wenn das Team in einer Liga angemeldet ist.
+- **Du** setzt das Kennzeichen „Gast“ (Zuständigkeit „Teams freigeben“ in einer Liga, in der das Team **gerade** angemeldet oder zugeteilt
+  ist – ein abgelehnter oder zurückgezogener Antrag und eine beendete Season zählen nicht). Es kommt nie von selbst aus der Mitgliedschaft –
+  sonst könnte jeder an der Plakette ablesen, wer Mitglied ist.
 
-**Kennzeichnen** (Season-Seite, Reiter **Anmeldung und Kader** → **Anmeldungen**): Hat die Teamleitung etwas angegeben, steht bei der
-Anmeldung ein Kasten **Gastteam** mit „Angabe der Teamleitung“ – auch ein Schulname ohne Freigabe, den nur du siehst – und
+**Kennzeichnen** (Season-Seite, Reiter **Anmeldung und Kader** → **Anmeldungen**, nur bei offenen und angenommenen Anmeldungen): Hat die
+Teamleitung etwas angegeben, steht bei der Anmeldung ein Kasten **Gastteam** mit „Angabe der Teamleitung“ – auch ein Schulname ohne Freigabe, den nur du siehst – und
 „Wartet auf die Bestätigung der Liga-Leitung“. **Als Gastteam bestätigen** setzt das Kennzeichen. Ohne Angabe steht nur der leise Knopf
 **Als Gastteam kennzeichnen**, die Plakette zeigt dann nur „Gast“. Die Teamleitung bekommt eine Nachricht. Der Leitstand zeigt bei der
 Aufgabe zur Anmeldung, ob eine Angabe auf dich wartet.
@@ -677,8 +679,8 @@ Aufgabe zur Anmeldung, ob eine Angabe auf dich wartet.
 | Nicht bestätigt | nichts – das Team steht wie jedes andere da |
 
 **Wo die Plakette steht:** Tabelle, Spielplan und Spieltage, Teams der Season, Matchseite, Teamseite, Profil (aktuelle Ligen), Eingang und
-Leitstand – im Web und in der App. Am **TV** und im **Discord** steht nur „Gast“, nie der Name von Verein oder Schule, weil beides öffentlich
-und dauerhaft zu sehen ist.
+Leitstand – im Web; in der App folgt. Am **TV** und im **Discord** steht nur „Gast“, nie der Name von Verein oder Schule, weil beides
+öffentlich und dauerhaft zu sehen ist. Im Spielplan am Handy steht in der schmalen Spalte nur „Gast“, der Name ab Tablet-Breite.
 
 **Zurücknehmen:** **Kennzeichen zurücknehmen** nimmt die Plakette weg, die Angabe der Teamleitung bleibt stehen. Bestätigen und Zurücknehmen
 stehen im Protokoll der Season („Gastteam · bestätigt“). **Eigenes Team:** Gehörst du selbst zum Team, entscheidet eine andere Person; der
