@@ -248,12 +248,12 @@ test("Großbuchstaben nur für Kurzes (#1303): kein uppercase an h1-h3 und an Ka
 });
 
 // Namen werden nie umgeschrieben (#1303): <ShortCaps> um einen berechneten Wert nur, wo der Wert ein fester Seitentitel
-// aus dem Code ist - nie um Namen, Titel aus Daten (Liga, Serie, Runde) oder Eingaben („Jo gegen Max“ würde GROSS).
-const SHORT_CAPS_DYNAMIC = /<ShortCaps>\{[^}]+\}<\/ShortCaps>/g;
+// aus dem Code ist - nie um Namen, Titel aus Daten oder der Verwaltung (Liga, Serie, Runde, Rechtstexte) oder Eingaben
+// („Jo gegen Max“ würde GROSS). Gezählt wird jedes <ShortCaps> mit {…} darin - auch Vorlagen-Text und über mehrere Zeilen.
+const SHORT_CAPS_DYNAMIC = /<ShortCaps\b[^>]*>(?:(?!<\/ShortCaps>)[^{])*\{[\s\S]*?<\/ShortCaps>/g;
 const SHORT_CAPS_FIXED = {
   "advent/AdventCalendarPanel.jsx": 1, // feste Sätze („Bald ist es so weit“)
   "components/tls/AdminForm.jsx": 1, // „Neues Event“, „Event bearbeiten“ - aus den Formularen
-  "pages/public/LegalPages.jsx": 1, // „Impressum“, „Datenschutz“, „Nutzungsbedingungen“
   "pages/public/PasswordRecoveryPage.jsx": 1, // „Passwort vergessen“ und die übrigen Schritte
   "pages/user/meinBereich/BereichSeite.jsx": 1, // Gruppen von „Mein Bereich“ aus lib/meinBereich.js
 };
@@ -262,15 +262,39 @@ test("ShortCaps nie um Namen oder Titel aus Daten - nur um feste Seitentitel", (
   expect(countIn(SOURCES, SHORT_CAPS_DYNAMIC)).toEqual(SHORT_CAPS_FIXED);
 });
 
-// Zahlen bleiben in Rajdhani (#1304): Stellen mit der Zahlen-Schrift (tls-type-num, NumText, das alte font-display)
-// werden nicht weniger. Steht neben einer Zahl ein Wort, bekommt die Zahl ihr eigenes <span className="tls-type-num">
-// oder <NumText> - die Stelle verliert die Zahlen-Schrift nicht (das Umbau-Skript meldet solche Stellen).
-const NUMBER_FONT = /(?<![\w-])(?:tls-type-num|font-display)(?![\w-])|<NumText\b/g;
-const NUMBER_FONT_BASELINE = 234; // nach dem Umbau und den Nachbesserungen aus der Prüfung (vorher 225) - nur nach oben anpassen
+test("der ShortCaps-Wächter erkennt jeden berechneten Inhalt - auch Vorlagen-Text und über mehrere Zeilen", () => {
+  const hits = (code) => (code.match(SHORT_CAPS_DYNAMIC) || []).length;
+  expect(hits("<ShortCaps>{title}</ShortCaps>")).toBe(1);
+  expect(hits("<ShortCaps>{`${home} gegen ${away}`}</ShortCaps>")).toBe(1);
+  expect(hits("<ShortCaps>\n  {league.name}\n</ShortCaps>")).toBe(1);
+  expect(hits("<ShortCaps>Hallo {name}</ShortCaps>")).toBe(1);
+  expect(hits("<ShortCaps>Turniere</ShortCaps> <b>{name}</b> <ShortCaps>Saison</ShortCaps>")).toBe(0);
+});
 
-test("die Zahlen-Schrift wird nicht weniger - Zahlen neben Wörtern bekommen tls-type-num oder NumText", () => {
-  const total = Object.values(countIn(SOURCES, NUMBER_FONT)).reduce((sum, count) => sum + count, 0);
-  expect(total, `${total} Stellen mit Zahlen-Schrift, mindestens ${NUMBER_FONT_BASELINE} - neue Zahlen nehmen tls-type-num`).toBeGreaterThanOrEqual(NUMBER_FONT_BASELINE);
+// Zahlen bleiben in Rajdhani (#1304): Stellen mit der Zahlen-Schrift (tls-type-num, NumText, das alte font-display)
+// werden in keiner Datei weniger - die Grundlinie je Datei steht in numberFont.baseline.json (nach dem Umbau und den
+// Nachbesserungen aus der Prüfung). Steht neben einer Zahl ein Wort, bekommt die Zahl ihr eigenes
+// <span className="tls-type-num"> oder <NumText> - die Stelle verliert die Zahlen-Schrift nicht (das Umbau-Skript meldet
+// solche Stellen). Mehr Stellen sind erlaubt; wer eine Datei auflöst oder eine Zahl bewusst entfernt, senkt die Zahl
+// dort mit Grund im Commit.
+const NUMBER_FONT = /(?<![\w-])(?:tls-type-num|font-display)(?![\w-])|<NumText\b/g;
+const NUMBER_FONT_BASELINE = JSON.parse(readFileSync(path.join(SRC, "styles/numberFont.baseline.json"), "utf8"));
+
+/** Dateien, in denen die Zahlen-Schrift seltener vorkommt als in der Grundlinie: { Datei: "jetzt / vorher" }. */
+function numberFontLost(found, baseline) {
+  return Object.fromEntries(Object.entries(baseline)
+    .filter(([file, count]) => (found[file] || 0) < count)
+    .map(([file, count]) => [file, `${found[file] || 0} / ${count}`]));
+}
+
+test("die Zahlen-Schrift wird in keiner Datei weniger - Zahlen neben Wörtern bekommen tls-type-num oder NumText", () => {
+  expect(numberFontLost(countIn(SOURCES, NUMBER_FONT), NUMBER_FONT_BASELINE)).toEqual({});
+});
+
+test("der Zahlen-Wächter zählt je Datei: eine Stelle, die von A nach B wandert, fällt in A auf", () => {
+  expect(numberFontLost({ "a.jsx": 1, "b.jsx": 3 }, { "a.jsx": 2, "b.jsx": 2 })).toEqual({ "a.jsx": "1 / 2" });
+  expect(numberFontLost({ "b.jsx": 2, "c.jsx": 1 }, { "a.jsx": 1, "b.jsx": 2 })).toEqual({ "a.jsx": "0 / 1" });
+  expect(numberFontLost({ "a.jsx": 3 }, { "a.jsx": 2 })).toEqual({});
 });
 
 // Dauern ausgeschrieben (#1304): „154 Tage 16 Std.“, nie „154T 16h“ oder „3 T.“ - lib/datetime formatDuration.
