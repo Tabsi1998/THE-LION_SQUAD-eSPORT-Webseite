@@ -14,7 +14,7 @@ import { ShortCaps } from "@/components/tls/ShortCaps";
 const STATUS_LABEL = {
   pending: { label: "Offen", icon: Clock, color: "text-[#FFD700] bg-[#FFD700]/10 border-[#FFD700]/30" },
   ready: { label: "Bereit zur Abholung", icon: Gift, color: "text-[#29B6E8] bg-[#29B6E8]/10 border-[#29B6E8]/30" },
-  picked_up: { label: "Abgeholt", icon: CheckCircle2, color: "text-[#00FF88] bg-[#00FF88]/10 border-[#00FF88]/30" },
+  picked_up: { label: "Abgeholt", icon: CheckCircle2, color: "text-ok bg-ok/10 border-ok/30" },
   expired: { label: "Verfallen", icon: XCircle, color: "text-[#FF3B30] bg-[#FF3B30]/10 border-[#FF3B30]/30" },
 };
 
@@ -329,7 +329,7 @@ export default function AdminPrizesPage() {
                         <button onClick={() => updateStatus(p.id, "ready")} data-testid={`prize-mark-ready-${p.id}`} className="text-[#29B6E8] hover:underline mr-3 tls-type-small font-semibold">Bereit ▸</button>
                       )}
                       {p.status === "ready" && (
-                        <button onClick={() => markPickedUp(p.id)} data-testid={`prize-pickup-${p.id}`} className="text-[#00FF88] hover:underline mr-3 tls-type-small font-semibold">Abgeholt ✓</button>
+                        <button onClick={() => markPickedUp(p.id)} data-testid={`prize-pickup-${p.id}`} className="text-ok hover:underline mr-3 tls-type-small font-semibold">Abgeholt ✓</button>
                       )}
                       {p.status === "picked_up" && (
                         <button onClick={() => updateStatus(p.id, "ready", "", "picked_up")} data-testid={`prize-revert-${p.id}`} className="text-white/50 hover:text-white mr-3 tls-type-small"><RefreshCw className="w-3 h-3 inline mr-1" />Zurück</button>
@@ -430,7 +430,7 @@ function PrizeMobileCard({ p, updateStatus, markPickedUp, remove, edit }) {
           <button onClick={() => updateStatus(p.id, "ready")} data-testid={`prize-mobile-ready-${p.id}`} className="px-3 py-2 border border-[#29B6E8]/40 text-[#29B6E8] rounded-sm tls-type-label">Bereit</button>
         )}
         {p.status === "ready" && (
-          <button onClick={() => markPickedUp(p.id)} data-testid={`prize-mobile-pickup-${p.id}`} className="px-3 py-2 border border-[#00FF88]/40 text-[#00FF88] rounded-sm tls-type-label">Abgeholt</button>
+          <button onClick={() => markPickedUp(p.id)} data-testid={`prize-mobile-pickup-${p.id}`} className="px-3 py-2 border border-ok/40 text-ok rounded-sm tls-type-label">Abgeholt</button>
         )}
         {p.status === "picked_up" && (
           <button onClick={() => updateStatus(p.id, "ready", "", "picked_up")} data-testid={`prize-mobile-revert-${p.id}`} className="px-3 py-2 border border-white/15 text-white/70 rounded-sm tls-type-label">Zurück</button>

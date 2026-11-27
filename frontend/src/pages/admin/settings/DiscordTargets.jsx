@@ -148,7 +148,7 @@ export function DiscordTargets() {
             <div key={target} className={`border rounded-sm p-3 space-y-2 ${entry.private ? "border-[#FFD700]/25" : "border-white/10"}`} data-testid={`discord-target-${target}`}>
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <div className="font-bold tls-type-small">{entry.label || target}</div>
-                <span className={`tls-type-label ${entry.configured ? "text-[#00FF88]" : entry.private ? "text-[#FFD700]" : "text-white/45"}`} data-testid={`discord-target-${target}-state`}>
+                <span className={`tls-type-label ${entry.configured ? "text-ok" : entry.private ? "text-[#FFD700]" : "text-white/45"}`} data-testid={`discord-target-${target}-state`}>
                   {deliveryText(target, status)}
                 </span>
               </div>

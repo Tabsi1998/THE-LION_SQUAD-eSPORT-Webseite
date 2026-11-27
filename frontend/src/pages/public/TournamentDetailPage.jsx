@@ -435,7 +435,7 @@ function TournamentDetailView() {
 
           <div className={`mt-5 border rounded-sm px-4 py-3 tls-type-small max-w-3xl ${
             registration.canRegister
-              ? "border-[#00FF88]/30 bg-[#00FF88]/5 text-[#00FF88]"
+              ? "border-ok/30 bg-ok/5 text-ok"
               : registration.state === "scheduled"
                 ? "border-[#29B6E8]/30 bg-[#29B6E8]/5 text-[#29B6E8]"
                 : "border-white/10 bg-[#121212] text-white/60"

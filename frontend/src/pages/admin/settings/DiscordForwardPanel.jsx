@@ -14,7 +14,7 @@ const STATE_LABEL = {
   followed: "eingerichtet", ready: "bereit", no_collector: "wartet", no_news_channel: "kein Ankündigungskanal",
   no_webhook_right: "Recht fehlt", offline: "Bot offline", unknown: "unklar",
 };
-const STATE_TONE = { followed: "border-[#00FF88]/40 text-[#00FF88]", ready: "border-[#FFD700]/40 text-[#FFD700]" };
+const STATE_TONE = { followed: "border-ok/40 text-ok", ready: "border-[#FFD700]/40 text-[#FFD700]" };
 const BOX = "border border-white/10 bg-[#121212] rounded-sm p-5 space-y-4";
 const FIELD = "w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm tls-type-small";
 const EMBED_COLOR = 0x29B6E8;
@@ -261,7 +261,7 @@ export function DistributeBox() {
       {result && (
         <ul className="tls-type-small space-y-1 border-t border-white/5 pt-4" data-testid="discord-distribute-result">
           {(result.servers || []).map((row) => (
-            <li key={row.guild_id} className={row.ok ? "text-[#00FF88]" : "text-[#FF3B30]"} data-testid={`discord-distribute-result-${row.guild_id}`}>
+            <li key={row.guild_id} className={row.ok ? "text-ok" : "text-[#FF3B30]"} data-testid={`discord-distribute-result-${row.guild_id}`}>
               {row.name}: {row.ok ? "gesendet" : (row.error || "nicht angekommen")}
             </li>
           ))}

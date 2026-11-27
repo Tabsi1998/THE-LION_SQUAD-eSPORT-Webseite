@@ -62,7 +62,7 @@ export function DiscordSamplesPanel() {
           „In den Testkanal senden“ schickt genau dieses Embed echt in den Testkanal (mit Vermerk „Test“, nie an die Community), „An mich“ als Direktnachricht an dein verknüpftes Discord-Konto.
         </p>
       </div>
-      <div className={`border rounded-sm p-3 tls-type-small ${testChannel.configured ? "border-[#00FF88]/25 bg-[#00FF88]/5 text-white/70" : "border-[#FFD700]/40 bg-[#FFD700]/10 text-white/80"}`} data-testid="discord-samples-test-channel">
+      <div className={`border rounded-sm p-3 tls-type-small ${testChannel.configured ? "border-ok/25 bg-ok/5 text-white/70" : "border-[#FFD700]/40 bg-[#FFD700]/10 text-white/80"}`} data-testid="discord-samples-test-channel">
         {testChannel.configured
           ? <>Testkanal: <strong>{testChannel.channel_name ? `#${testChannel.channel_name}` : "gewählt"}</strong> – privat, Tests zählen nicht als Meldung.</>
           : <>Kein Testkanal gewählt – oben unter „Kanäle je Zweck“ beim Ziel <strong>Test</strong> einen privaten Kanal wählen (etwa #bot-test). Bis dahin geht aus der Vorschau nichts in einen Kanal.</>}

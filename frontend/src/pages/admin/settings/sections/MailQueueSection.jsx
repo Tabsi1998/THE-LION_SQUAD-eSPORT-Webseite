@@ -8,10 +8,11 @@ import { CheckCircle2, ChevronDown, Clock, Eye, EyeOff, RefreshCw, Search, Send,
 import { QUEUE_STATES, STATUS_LABELS, mailErrorKnown, mailTemplateLabel, queueActions, queueDetail } from "../shared";
 import { viennaDateTime } from "@/lib/vienna";
 
+import { ROLE_COLORS } from "@/lib/categoryColors";
 const STATE_STYLE = {
   pending: { color: "#FFD700", icon: Clock },
   sending: { color: "#29B6E8", icon: Send },
-  sent: { color: "#00FF88", icon: CheckCircle2 },
+  sent: { color: ROLE_COLORS.ok, icon: CheckCircle2 },
   failed: { color: "#FF3B30", icon: XCircle },
   skipped: { color: "#A1A1AA", icon: SkipForward },
 };

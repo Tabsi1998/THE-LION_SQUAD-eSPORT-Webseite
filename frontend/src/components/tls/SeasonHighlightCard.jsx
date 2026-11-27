@@ -8,6 +8,7 @@ import { accountLevelTier } from "@/components/tls/AccountLevel";
 import { viennaDate } from "@/lib/vienna";
 import { useModalBehavior } from "@/hooks/useModalBehavior";
 
+import { ROLE_COLORS } from "@/lib/categoryColors";
 function topAwards(awards, limit = 3) {
   return [...(awards || [])]
     .filter((a) => !a.is_negative)
@@ -110,7 +111,7 @@ export function SeasonHighlightCard({ profile, level, stats, awards, crown, seas
               { label: "Punkte", value: level?.points ?? 0, icon: Zap, color: "#29B6E8" },
               { label: "Siege", value: stats?.wins ?? 0, icon: Trophy, color: "#FFD700" },
               { label: "Podium", value: stats?.top3 ?? 0, icon: Medal, color: "#C0C0C0" },
-              { label: "Fast Laps", value: stats?.fastlaps ?? stats?.fast_laps ?? 0, icon: Flag, color: "#00FF88" },
+              { label: "Fast Laps", value: stats?.fastlaps ?? stats?.fast_laps ?? 0, icon: Flag, color: ROLE_COLORS.ok },
             ].map((s) => (
               <div key={s.label} className="border border-white/10 rounded-sm bg-white/[0.03] px-1 py-2.5">
                 <s.icon className="w-3.5 h-3.5 mx-auto" style={{ color: s.color }} />

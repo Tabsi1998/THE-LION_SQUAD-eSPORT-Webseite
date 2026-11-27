@@ -51,7 +51,7 @@ function FeatureTitle({ feature }) {
   return (
     <span>
       <span className="font-bold tls-type-small">{feature.label}</span>
-      <span className={`block tls-type-small ${feature.enabled ? "text-[#00FF88]" : "text-[#FFD700]"}`}>{feature.state}</span>
+      <span className={`block tls-type-small ${feature.enabled ? "text-ok" : "text-[#FFD700]"}`}>{feature.state}</span>
     </span>
   );
 }
@@ -104,11 +104,11 @@ export function FeaturesTab({ status, busy, run, consentTexts = [], consentError
                     <input type="checkbox" checked={Boolean(sw.on)} disabled={!!busy || !canSwitch} onChange={(e) => toggle(feature, e.target.checked)}
                       data-testid={`dolibarr-switch-${feature.key}`} className="accent-[#29B6E8] mt-0.5" />
                     <span className="font-bold tls-type-small">{feature.label}</span>
-                    <span className={`basis-full pl-6 tls-type-small ${feature.enabled ? "text-[#00FF88]" : "text-[#FFD700]"}`}>{feature.state}</span>
+                    <span className={`basis-full pl-6 tls-type-small ${feature.enabled ? "text-ok" : "text-[#FFD700]"}`}>{feature.state}</span>
                   </label>
                 ) : (
                   <div className="flex items-start gap-2 sm:w-96 shrink-0">
-                    {feature.enabled ? <CheckCircle2 className="w-4 h-4 text-[#00FF88] shrink-0 mt-0.5" /> : <XCircle className="w-4 h-4 text-[#FFD700] shrink-0 mt-0.5" />}
+                    {feature.enabled ? <CheckCircle2 className="w-4 h-4 text-ok shrink-0 mt-0.5" /> : <XCircle className="w-4 h-4 text-[#FFD700] shrink-0 mt-0.5" />}
                     <FeatureTitle feature={feature} />
                   </div>
                 )}

@@ -19,6 +19,7 @@ import { useAuth } from "@/context/AuthContext";
 import { viennaDate } from "@/lib/vienna";
 import { NumText } from "@/components/tls/NumText";
 
+import { ROLE_COLORS } from "@/lib/categoryColors";
 // Der Schaukasten (#619): Erfolg der Woche, Laufband der neuesten Freischaltungen, Kategorien mit Fortschritt und
 // Ranglisten nach Punkten oder Level (je Kategorie und Zeitraum).
 // Kürzer und leichter (#1229): die Kategorien stehen zugeklappt als je eine Zeile mit Fortschritt - angemeldet der
@@ -204,7 +205,7 @@ export default function AchievementsShowcasePage() {
           <div className="mt-6 sm:mt-8 grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-3" data-testid="achievements-stats">
             <StatCard icon={Trophy} label="Erfolge" value={stats.tierCount} accent="#FFD700" />
             <StatCard icon={Target} label="Punkte zu holen" value={stats.pointsTotal} accent="#29B6E8" />
-            <StatCard icon={Flame} label="Kategorien" value={stats.categoryCount} accent="#00FF88" />
+            <StatCard icon={Flame} label="Kategorien" value={stats.categoryCount} accent={ROLE_COLORS.ok} />
             {mine ? (
               <StatCard icon={Crown} label="Deine Punkte" value={mine.points || 0} accent="#A855F7" testId="my-points" />
             ) : (
@@ -229,7 +230,7 @@ export default function AchievementsShowcasePage() {
         {/* Kategorien: zugeklappt, je eine Zeile mit Fortschritt - Aufklappen lädt die Abzeichen */}
         <section data-testid="achievements-categories" id="achievements-catalog">
           <div className="flex items-center gap-2 mb-2">
-            <Layers className="w-5 h-5 text-[#00FF88]" />
+            <Layers className="w-5 h-5 text-ok" />
             <h2 className="tls-type-section">Kategorien</h2>
           </div>
           <p className="mb-2 sm:mb-4 tls-type-small text-quiet" data-testid="categories-caption">

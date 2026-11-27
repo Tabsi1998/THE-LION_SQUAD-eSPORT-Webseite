@@ -7,7 +7,7 @@ import { SETUP_GUIDES, resolveGuideValue } from "@/lib/setupGuides";
 // den Entwickler-Konsolen und Werte zum Kopieren (Rückrufadressen, Adresse der Website).
 
 const STATE_CLASS = {
-  ok: "border-[#00FF88]/40 text-[#00FF88]",
+  ok: "border-ok/40 text-ok",
   missing: "border-[#FFD700]/50 text-[#FFD700]",
   optional: "border-white/15 text-white/50",
   unknown: "border-white/10 text-white/35",

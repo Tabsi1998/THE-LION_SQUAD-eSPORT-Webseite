@@ -24,6 +24,7 @@ import { USERNAME_RULE_HINT, usernameProblem } from "@/lib/username";
 import { ACCOUNT_AGE_TEXT } from "@/lib/minimumAge";
 import { ShortCaps } from "@/components/tls/ShortCaps";
 
+import { ROLE_COLORS } from "@/lib/categoryColors";
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 function getPasswordStrength(pw) {
@@ -37,7 +38,7 @@ function getPasswordStrength(pw) {
   if (score <= 1) return { score, label: "Schwach", color: "#FF3B30" };
   if (score <= 2) return { score, label: "Mittel", color: "#FFD700" };
   if (score <= 3) return { score, label: "Gut", color: "#29B6E8" };
-  return { score, label: "Stark", color: "#00FF88" };
+  return { score, label: "Stark", color: ROLE_COLORS.ok };
 }
 
 export default function RegisterPage() {

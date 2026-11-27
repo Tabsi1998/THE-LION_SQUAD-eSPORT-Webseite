@@ -22,9 +22,10 @@ import { STATE_TONE_CLASS, applicationState } from "@/lib/applicationState";
 import { mailOutcome } from "@/lib/membershipMail";
 import { ShortCaps } from "@/components/tls/ShortCaps";
 
+import { ROLE_COLORS } from "@/lib/categoryColors";
 const TABS = [
   { key: "pending",  label: "Offen",      color: "#29B6E8" },
-  { key: "approved", label: "Aufgenommen", color: "#00FF88" },
+  { key: "approved", label: "Aufgenommen", color: ROLE_COLORS.ok },
   { key: "rejected", label: "Abgelehnt",  color: "#FF3B30" },
   // Anträge über Dolibarr (#328): zurückgezogen oder beim Senden hängen geblieben.
   { key: "withdrawn", label: "Zurückgezogen", color: "#FF9500" },
@@ -126,7 +127,7 @@ export default function AdminMembershipApplicationsPage() {
         <a href={a.dolibarr.member_url} target="_blank" rel="noreferrer" data-testid={`${idPrefix}-dolibarr-${a.id}`} className="text-[#29B6E8] hover:underline tls-type-small inline-flex items-center gap-1"><ExternalLink className="w-3 h-3" /> In Dolibarr öffnen</a>
       )}
       {state.decide && <>
-        <button type="button" onClick={() => decide(a, "approve")} data-testid={`${idPrefix}-approve-${a.id}`} className="text-[#00FF88] hover:underline tls-type-small inline-flex items-center gap-1"><Check className="w-3 h-3" /> Annehmen</button>
+        <button type="button" onClick={() => decide(a, "approve")} data-testid={`${idPrefix}-approve-${a.id}`} className="text-ok hover:underline tls-type-small inline-flex items-center gap-1"><Check className="w-3 h-3" /> Annehmen</button>
         <button type="button" onClick={() => decide(a, "reject")} data-testid={`${idPrefix}-reject-${a.id}`} className="text-[#FF6B6B] hover:underline tls-type-small inline-flex items-center gap-1"><XIcon className="w-3 h-3" /> Ablehnen</button>
         <button type="button" onClick={() => withdraw(a)} data-testid={`${idPrefix}-withdraw-${a.id}`} className="text-white/60 hover:text-white hover:underline tls-type-small inline-flex items-center gap-1"><Undo2 className="w-3 h-3" /> Zurückziehen</button>
       </>}

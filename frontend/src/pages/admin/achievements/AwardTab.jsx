@@ -8,6 +8,7 @@ import { useConfirm } from "@/components/tls/ConfirmDialog";
 import { ROLE_LABELS } from "@/lib/permissions";
 import { BoardOnly, EVENT_KINDS, FilePick, MaterialChip, Panel, PersonPicker, TierSelect, errorText, formatWhen, materialLabel, personName, useCatalog } from "./shared";
 
+import { ROLE_COLORS } from "@/lib/categoryColors";
 /** Namen aus einer CSV- oder Textliste: je Zeile die erste Zelle; eine Kopfzeile wird übersprungen. */
 export function parseNames(text) {
   const header = new Set(["name", "username", "benutzername", "email", "e-mail", "mail", "konto"]);
@@ -164,7 +165,7 @@ function PersonAwards({ person, tick, onDone }) {
   );
 }
 
-const STATE_LABELS = { new: ["bekommt es", "#00FF88"], already: ["hat es schon", "rgba(255,255,255,0.45)"], skipped: ["darf nicht (nur Mitglieder)", "#FF3B30"] };
+const STATE_LABELS = { new: ["bekommt es", ROLE_COLORS.ok], already: ["hat es schon", "rgba(255,255,255,0.45)"], skipped: ["darf nicht (nur Mitglieder)", "#FF3B30"] };
 
 function BulkAward({ catalog, board, onDone }) {
   const [tierCode, setTierCode] = useState("");
@@ -253,7 +254,7 @@ function BulkAward({ catalog, board, onDone }) {
             {preview && (
               <div className="border border-white/10 rounded-sm p-3 tls-type-small space-y-2" data-testid="bulk-result">
                 <div className="flex flex-wrap gap-x-4 gap-y-1">
-                  <span className="text-[#00FF88]" data-testid="bulk-would">{preview.would_award} bekommen es</span>
+                  <span className="text-ok" data-testid="bulk-would">{preview.would_award} bekommen es</span>
                   <span className="text-white/55">{preview.already} haben es schon</span>
                   {preview.skipped > 0 && <span className="text-[#FF3B30]">{preview.skipped} dürfen nicht</span>}
                   {preview.unknown?.length > 0 && <span className="text-[#FFD700]" data-testid="bulk-unknown">{preview.unknown.length} nicht gefunden</span>}

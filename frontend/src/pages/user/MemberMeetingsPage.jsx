@@ -170,7 +170,7 @@ function BallotCard({ ballot, busy, onVote }) {
               <span className="text-white/45"> · {right.reason_text}</span>
             </div>
             {right.state === "used" ? (
-              <div className="mt-1 inline-flex items-center gap-1.5 tls-type-small text-[#00FF88]" data-testid={`ballot-${id}-right-${right.right_id}-used`}>
+              <div className="mt-1 inline-flex items-center gap-1.5 tls-type-small text-ok" data-testid={`ballot-${id}-right-${right.right_id}-used`}>
                 <CheckCircle2 className="w-4 h-4" /> {ballot.secret ? "Stimmzettel erhalten" : `abgestimmt: ${right.option_label || right.option}`}
               </div>
             ) : open && right.can_use && !ballot.secret ? (

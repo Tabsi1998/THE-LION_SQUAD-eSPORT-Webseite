@@ -5,6 +5,7 @@ import { toast } from "sonner";
 import { api, formatRequestError } from "@/lib/api";
 import { asInstant, viennaDateTime } from "@/lib/vienna";
 
+import { ROLE_COLORS } from "@/lib/categoryColors";
 // Der eigene Stand bei der Moderation (#416): laufende Maßnahme (Hinweis, Verwarnung mit
 // Chat-Sperre, Sperre bis zur Entscheidung) mit Grund und Dauer, die Treffer der letzten Monate,
 // was beim nächsten Treffer käme, und der Einspruch. `compact` (Dashboard) zeigt die Karte nur,
@@ -44,7 +45,7 @@ export function ModerationStandingCard({ compact = false }) {
   const active = standing.active;
   const relevant = Boolean(active) || (standing.strike_count || 0) > 0;
   if (compact && !relevant) return null;
-  const tone = active ? ACTION_TONE[active.action] || "#FFD700" : "#00FF88";
+  const tone = active ? ACTION_TONE[active.action] || "#FFD700" : ROLE_COLORS.ok;
 
   const sendAppeal = async () => {
     if (!active || message.trim().length < 10) {
@@ -67,7 +68,7 @@ export function ModerationStandingCard({ compact = false }) {
   return (
     <section className="border rounded-sm bg-[#121212] p-5" style={{ borderColor: `${tone}55` }} data-testid="moderation-standing">
       <h2 className="tls-type-section mb-3 flex items-center gap-2">
-        {active ? <ShieldAlert className="w-4 h-4" style={{ color: tone }} /> : <ShieldCheck className="w-4 h-4 text-[#00FF88]" />} Moderation
+        {active ? <ShieldAlert className="w-4 h-4" style={{ color: tone }} /> : <ShieldCheck className="w-4 h-4 text-ok" />} Moderation
       </h2>
       {active ? (
         <div className="border rounded-sm p-4 bg-black/30" style={{ borderColor: `${tone}66` }} data-testid="standing-active">

@@ -3,7 +3,7 @@ import { asInstant, viennaDateTime } from "@/lib/vienna";
 // der CSV-Export für den Kassier (ohne Formel-Injektion) und die Summenzeile je Veranstaltung.
 
 export const PAYMENT_TONE = {
-  draft: "text-[#FFD700]", open: "text-white/80", partial: "text-[#29B6E8]", paid: "text-[#00FF88]", paid_reduced: "text-[#00FF88]",
+  draft: "text-[#FFD700]", open: "text-white/80", partial: "text-[#29B6E8]", paid: "text-ok", paid_reduced: "text-ok",
   overdue: "text-[#FF3B30]", overpaid: "text-[#FF3B30]", credited: "text-white/60", abandoned: "text-white/40",
 };
 

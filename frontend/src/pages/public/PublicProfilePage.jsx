@@ -690,7 +690,7 @@ export default function PublicProfilePage() {
             </div>
             {accounts.verifiedCount > 0 && (
               <a href="#konten" onClick={() => setTab("overview")} data-testid="profile-accounts-count"
-                className="inline-flex items-center gap-1.5 self-start lg:justify-self-end tls-type-label text-[#00FF88] hover:text-white">
+                className="inline-flex items-center gap-1.5 self-start lg:justify-self-end tls-type-label text-ok hover:text-white">
                 <BadgeCheck className="w-4 h-4" /> {accounts.verifiedCount === 1 ? "1 Konto verknüpft" : `${accounts.verifiedCount} Konten verknüpft`}
               </a>
             )}
@@ -1133,7 +1133,7 @@ export function AccountsCard({ groups }) {
     <section id="konten" className="border border-white/10 rounded-sm bg-[#121212] p-4 space-y-4 scroll-mt-24" data-testid="public-profile-accounts">
       <div>
         <h2 className="tls-type-section flex items-center gap-2"><Globe className="w-4 h-4 text-[#29B6E8]" /> Konten</h2>
-        <p className="tls-type-small text-white/45 mt-1 flex items-center gap-1"><BadgeCheck className="w-3.5 h-3.5 text-[#00FF88] shrink-0" /> per Anmeldung bei der Plattform bestätigt – der Link führt zum echten Konto.</p>
+        <p className="tls-type-small text-white/45 mt-1 flex items-center gap-1"><BadgeCheck className="w-3.5 h-3.5 text-ok shrink-0" /> per Anmeldung bei der Plattform bestätigt – der Link führt zum echten Konto.</p>
       </div>
       {groups.socials.length > 0 && <AccountGroup title="Socials" icon={Globe} color="#29B6E8" entries={groups.socials} testId="public-profile-socials" />}
       {groups.games.length > 0 && <AccountGroup title="Spielkonten" icon={Gamepad2} color="#FFD700" entries={groups.games} testId="public-profile-gaming-ids" />}
@@ -1160,7 +1160,7 @@ function AccountRow({ entry }) {
       <span className="min-w-0 flex-1">
         <span className="flex items-center gap-1.5 font-bold text-white tls-type-small">
           <span className="truncate">{entry.title}</span>
-          {entry.verified && <BadgeCheck className="w-4 h-4 text-[#00FF88] shrink-0" aria-label="verifiziert" data-testid={`profile-account-${entry.key}-verified`}><title>{verifiedTitle}</title></BadgeCheck>}
+          {entry.verified && <BadgeCheck className="w-4 h-4 text-ok shrink-0" aria-label="verifiziert" data-testid={`profile-account-${entry.key}-verified`}><title>{verifiedTitle}</title></BadgeCheck>}
         </span>
         <span className="block tls-type-small text-white/50 truncate">{entry.detail}</span>
       </span>

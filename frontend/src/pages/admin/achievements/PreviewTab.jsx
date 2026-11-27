@@ -11,6 +11,7 @@ import { readSoundPrefs } from "@/components/achievements/ceremony/sounds";
 import { MOTIONS, SEQUENCE_KEYS, SEQUENCES } from "@/components/achievements/ceremony/select";
 import { MAX_LEVEL, rankInfo } from "@/lib/loewenRang";
 
+import { ROLE_COLORS } from "@/lib/categoryColors";
 const previewQueue = createCeremonyQueue();
 const CATEGORY_LABELS = { match: "Spielen", tournament: "Turnier", fastlap: "Fast Lap", season: "Saison", team: "Team", community: "Community", creator: "Streaming & Creator", profile: "Profil & Konto", club: "Verein", special: "Besonders", hidden: "Geheim" };
 const SIZES = ["sm", "md", "lg", "xl", "hero"];
@@ -48,7 +49,7 @@ export function sampleCeremony({ material, category, sequence, art, level = 10 }
   return { tiers: [make(0)], context };
 }
 
-function Toggle({ on, onClick, testId, children, color = "#00FF88" }) {
+function Toggle({ on, onClick, testId, children, color = ROLE_COLORS.ok }) {
   return (
     <button type="button" onClick={onClick} aria-pressed={on} data-testid={testId} className="inline-flex items-center gap-1 px-2.5 py-1.5 tls-type-label border rounded-sm" style={on ? { borderColor: `${color}99`, color } : { borderColor: "rgba(255,255,255,0.15)", color: "rgba(255,255,255,0.6)" }}>
       {children}

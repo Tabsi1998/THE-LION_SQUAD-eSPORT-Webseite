@@ -45,7 +45,7 @@
   --tv-bar: rgba(10, 10, 10, 0.9);
   --tv-accent: #29b6e8;
   --tv-gold: #ffd700;
-  --tv-green: #00ff88;
+  --tv-green: var(--tls-ok);
   --tv-red: #ff3b30;
   --tv-accent-soft: rgba(41, 182, 232, 0.12);
   --tv-green-soft: rgba(0, 255, 136, 0.06);

@@ -18,7 +18,7 @@ const statusLabels = { online: "Online", offline: "Offline", maintenance: "Wartu
 const visibilityLabels = { public: "Öffentlich", community: "Community", members: "Vereinsmitglieder", internal: "Intern" };
 const secretLabels = { password: "Passwort", invite_code: "Invite-Code", whitelist: "Whitelist", discord: "Discord" };
 const statusClasses = {
-  online: "border-[#00FF88]/40 bg-[#00FF88]/10 text-[#00FF88]",
+  online: "border-ok/40 bg-ok/10 text-ok",
   offline: "border-white/15 bg-white/5 text-white/45",
   maintenance: "border-[#FFD700]/40 bg-[#FFD700]/10 text-[#FFD700]",
   planned: "border-[#29B6E8]/40 bg-[#29B6E8]/10 text-[#29B6E8]",
@@ -143,7 +143,7 @@ export default function ServersPage() {
 }
 
 function Stat({ label, value, icon: Icon, tone }) {
-  const color = tone === "green" ? "text-[#00FF88]" : tone === "gold" ? "text-[#FFD700]" : "text-[#29B6E8]";
+  const color = tone === "green" ? "text-ok" : tone === "gold" ? "text-[#FFD700]" : "text-[#29B6E8]";
   return (
     <div className="border border-white/10 bg-[#121212] rounded-sm p-4">
       <div className="flex items-center justify-between gap-2">
@@ -243,7 +243,7 @@ function ServerCard({ server }) {
 
   return (
     <article className={`group relative overflow-hidden border rounded-sm bg-[#101010] min-h-[19rem] flex flex-col transition ${status === "maintenance" ? "border-[#FFD700]/45" : "border-white/10 hover:border-white/20"}`}>
-      <div className={`h-1 ${status === "online" ? "bg-[#00FF88]" : status === "maintenance" ? "bg-[#FFD700]" : status === "planned" ? "bg-[#29B6E8]" : "bg-white/10"}`} />
+      <div className={`h-1 ${status === "online" ? "bg-ok" : status === "maintenance" ? "bg-[#FFD700]" : status === "planned" ? "bg-[#29B6E8]" : "bg-white/10"}`} />
       {status === "maintenance" && <MaintenanceTape text={maintenanceBandText} />}
 
       <div className="p-5 flex flex-col grow">
@@ -311,7 +311,7 @@ function ServerCard({ server }) {
               <span>{pct}%</span>
             </div>
             <div className="mt-2 h-1.5 bg-white/10 rounded-sm overflow-hidden">
-              <div className={`h-full ${status === "online" ? "bg-[#00FF88]" : "bg-[#29B6E8]"}`} style={{ width: `${pct}%` }} />
+              <div className={`h-full ${status === "online" ? "bg-ok" : "bg-[#29B6E8]"}`} style={{ width: `${pct}%` }} />
             </div>
           </div>
         )}

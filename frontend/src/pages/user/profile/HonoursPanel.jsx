@@ -46,7 +46,7 @@ export function HonourCard({ honour, showReach = false }) {
             {honour.years ? ` · ${honour.years} Jahre im Verein` : null}
           </div>
           {showReach ? (
-            <div className={`tls-type-small mt-2 ${honour.publishable ? "text-[#00FF88]" : "text-quiet"}`}>
+            <div className={`tls-type-small mt-2 ${honour.publishable ? "text-ok" : "text-quiet"}`}>
               {honour.publishable ? "Darf aufs Profil – mit deinem Schalter oben" : "Nur für dich – der Verein gibt sie nicht frei"}
             </div>
           ) : null}

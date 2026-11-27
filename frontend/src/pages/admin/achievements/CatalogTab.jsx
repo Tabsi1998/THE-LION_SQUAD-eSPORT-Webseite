@@ -14,6 +14,7 @@ import { Badge } from "@/components/achievements/Badge";
 import { BADGE_ART_KEYS } from "@/components/achievements/badgeArt";
 import { BoardOnly, CATEGORIES, FilePick, LADDER, MATERIALS, MaterialChip, Panel, categoryOf, download, errorText } from "./shared";
 
+import { ROLE_COLORS } from "@/lib/categoryColors";
 /**
  * Welche Materialien eine Stufe annehmen darf (E10): nur innerhalb der Leiter Holz bis Diamant und nur
  * zwischen den Nachbarstufen ihrer Gruppe - sonst stünde sie über einer anderen. Neue Stufen bekommen die
@@ -50,7 +51,7 @@ function conditionText(tier) {
   return { text: `Automatik · Ziel ${Number(tier.progress_target || 0).toLocaleString("de-DE")}`, tone: "text-white/60" };
 }
 
-const STATUS = { live: ["live", "#00FF88"], counter: ["Zähler", "#FFD700"], planned: ["geplant", "rgba(255,255,255,0.35)"] };
+const STATUS = { live: ["live", ROLE_COLORS.ok], counter: ["Zähler", "#FFD700"], planned: ["geplant", "rgba(255,255,255,0.35)"] };
 
 /**
  * Nicht mehr erreichbar (#2339): das Kennzeichen oder ein Zeitpunkt, ab dem es gilt. Gilt es heute, ist die Gruppe
@@ -235,7 +236,7 @@ export function CatalogTab({ board = false }) {
           <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Gruppe suchen …" aria-label="Gruppe suchen" data-testid="catalog-search" className={`${INPUT_CLASS} pl-9`} />
         </label>
         <div className="flex flex-wrap gap-2">
-          <button type="button" onClick={check} disabled={checking} data-testid="catalog-check" className="px-3 py-2 border border-[#00FF88]/50 text-[#00FF88] tls-type-label rounded-sm inline-flex items-center gap-2 disabled:opacity-40">
+          <button type="button" onClick={check} disabled={checking} data-testid="catalog-check" className="px-3 py-2 border border-ok/50 text-ok tls-type-label rounded-sm inline-flex items-center gap-2 disabled:opacity-40">
             <ShieldCheck className="w-3.5 h-3.5" /> {checking ? "Prüfe …" : "Katalog prüfen"}
           </button>
           <button type="button" onClick={exportJson} data-testid="catalog-export" className="px-3 py-2 border border-white/20 text-white/70 tls-type-label rounded-sm inline-flex items-center gap-2 hover:text-white">
@@ -276,7 +277,7 @@ export function CatalogTab({ board = false }) {
                       {g.is_admin_created && <span className="text-[#29B6E8]">Eigen</span>}
                       {g.staff_only && <span className="text-white/45" title="Sieht nur die Leitung - und wer sie schon hat">nur Leitung</span>}
                       <RetiredChip doc={g} testId={`group-retired-${g.code}`} />
-                      <button type="button" onClick={() => togglePublic(g)} data-testid={`group-public-${g.code}`} className={`font-bold ${g.public ? "text-[#00FF88]" : "text-white/40"}`}>{g.public ? "Öffentlich" : "Intern"}</button>
+                      <button type="button" onClick={() => togglePublic(g)} data-testid={`group-public-${g.code}`} className={`font-bold ${g.public ? "text-ok" : "text-white/40"}`}>{g.public ? "Öffentlich" : "Intern"}</button>
                       <button type="button" onClick={() => setEditingGroup(g)} data-testid={`group-edit-${g.code}`} className="text-[#29B6E8] hover:underline tls-type-small">Bearbeiten</button>
                       {g.is_admin_created && <button type="button" onClick={() => deleteGroup(g)} className="text-[#FF3B30] hover:underline tls-type-small">Löschen</button>}
                     </div>
@@ -358,7 +359,7 @@ function CheckReport({ report, groupsByCode, onJump, onClose }) {
     <Panel
       title={report.ok ? "Katalog-Prüfung: keine Fehler" : `Katalog-Prüfung: ${report.counts.errors} Fehler`}
       icon={report.ok ? CheckCircle2 : AlertTriangle}
-      accent={report.ok ? "#00FF88" : "#FF3B30"}
+      accent={report.ok ? ROLE_COLORS.ok : "#FF3B30"}
       hint={`${report.counts.groups} Gruppen und ${report.counts.tiers} Stufen geprüft – dieselben Regeln wie im automatischen Test. ${report.counts.warnings} Hinweis${report.counts.warnings === 1 ? "" : "e"}.`}
       actions={<button type="button" onClick={onClose} className="tls-type-label text-white/50 hover:text-white">Schließen</button>}
       testId="catalog-report"
@@ -423,7 +424,7 @@ function ImportBox({ onApplied }) {
       <FilePick label="Exportdatei wählen" accept="application/json,.json" onFile={onFile} testId="catalog-import-file" />
       {result && (
         <div className="tls-type-small border border-white/10 rounded-sm p-3 space-y-2" data-testid="catalog-import-result">
-          <div>{result.groups} Gruppen und {result.tiers} Stufen in der Datei · {result.check.ok ? <span className="text-[#00FF88]">Prüfung ohne Fehler</span> : <span className="text-[#FF3B30]">{result.check.counts.errors} Fehler – nichts eingespielt</span>}</div>
+          <div>{result.groups} Gruppen und {result.tiers} Stufen in der Datei · {result.check.ok ? <span className="text-ok">Prüfung ohne Fehler</span> : <span className="text-[#FF3B30]">{result.check.counts.errors} Fehler – nichts eingespielt</span>}</div>
           {!result.check.ok && (
             <ul className="list-disc pl-5 text-white/70 max-h-40 overflow-y-auto">
               {result.check.errors.slice(0, 30).map((f, i) => <li key={`${f.code}-${i}`}>{f.message}</li>)}

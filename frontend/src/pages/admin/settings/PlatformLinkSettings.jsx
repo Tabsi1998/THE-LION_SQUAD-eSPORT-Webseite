@@ -12,7 +12,7 @@ import { PLATFORM_APPS } from "@/lib/platformLinks";
 // `PlatformAppCard` steht auf der Seite je Verbindung (Admin → Verbindungen) - und nur dort: der
 // Reiter Login & Konten zeigt seit 24.09. („muss das doppelt sein?“) nur noch die Übersicht.
 
-const CHECK_ICON = { ok: [CheckCircle2, "text-[#00FF88]"], fail: [XCircle, "text-[#FF3B30]"], warn: [ShieldQuestion, "text-[#FFD700]"] };
+const CHECK_ICON = { ok: [CheckCircle2, "text-ok"], fail: [XCircle, "text-[#FF3B30]"], warn: [ShieldQuestion, "text-[#FFD700]"] };
 
 function SecretInput({ label, value, masked, onChange, onClear, testId, placeholder }) {
   return (
@@ -59,7 +59,7 @@ function appStateLabel(app, ready) {
 }
 
 function appStateClass(app, ready) {
-  if (ready) return "text-[#00FF88]";
+  if (ready) return "text-ok";
   return app.optional ? "text-white/40" : "text-[#FFD700]";
 }
 
@@ -139,7 +139,7 @@ export function PlatformLinkOverview({ brand }) {
           <p className="tls-type-small text-white/50 mt-1">Mitglieder melden sich im Profil einmal bei der Plattform an – der Eintrag wird befüllt und als „verifiziert“ markiert. Client ID, Secret, Rückrufadresse, „prüfen“ und die Anleitung stehen je Plattform auf ihrer Seite unter <Link to="/admin/integrations/discord" className="text-[#29B6E8] hover:text-white">Admin → Verbindungen</Link>. PlayStation, Nintendo und EA bieten keine Anmeldung für Websites, Instagram nur für Business-Konten über eine geprüfte Meta-App.</p>
         </div>
         <div className="tls-type-label text-right shrink-0" data-testid="platform-link-ready-count">
-          <span className="text-[#00FF88]">{readyCount}</span><span className="text-white/40"> / {PLATFORM_APPS.length} bereit</span>
+          <span className="text-ok">{readyCount}</span><span className="text-white/40"> / {PLATFORM_APPS.length} bereit</span>
         </div>
       </div>
       <div className="grid sm:grid-cols-2 gap-2">

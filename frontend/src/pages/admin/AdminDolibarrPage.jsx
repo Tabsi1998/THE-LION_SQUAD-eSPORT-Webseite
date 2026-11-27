@@ -278,11 +278,11 @@ export default function AdminDolibarrPage() {
                   {status.features.map((feature) => (
                     <li key={feature.key} className="py-2.5 flex flex-col sm:flex-row sm:items-start gap-1 sm:gap-3 tls-type-small" data-testid={`dolibarr-feature-${feature.key}`}>
                       <span className="flex items-center gap-2 sm:w-80 shrink-0">
-                        {feature.enabled ? <CheckCircle2 className="w-4 h-4 text-[#00FF88] shrink-0" /> : <XCircle className="w-4 h-4 text-[#FFD700] shrink-0" />}
+                        {feature.enabled ? <CheckCircle2 className="w-4 h-4 text-ok shrink-0" /> : <XCircle className="w-4 h-4 text-[#FFD700] shrink-0" />}
                         <span className="font-bold">{feature.label}</span>
                       </span>
                       <span className="flex-1 min-w-0 tls-type-small text-white/60">
-                        <span className={feature.enabled ? "text-[#00FF88]" : "text-[#FFD700]"}>{feature.state}</span>
+                        <span className={feature.enabled ? "text-ok" : "text-[#FFD700]"}>{feature.state}</span>
                         {feature.hint ? <span> · {feature.hint}</span> : null}
                       </span>
                       {feature.where && (
@@ -303,7 +303,7 @@ export default function AdminDolibarrPage() {
                 const has = status?.sync?.capabilities?.[key];
                 return (
                   <li key={key} className="flex items-center gap-2">
-                    {has ? <CheckCircle2 className="w-4 h-4 text-[#00FF88] shrink-0" /> : <XCircle className="w-4 h-4 text-white/25 shrink-0" />}
+                    {has ? <CheckCircle2 className="w-4 h-4 text-ok shrink-0" /> : <XCircle className="w-4 h-4 text-white/25 shrink-0" />}
                     <span className={has ? "text-white/85" : "text-white/40"}>{label}</span>
                   </li>
                 );
@@ -333,7 +333,7 @@ export default function AdminDolibarrPage() {
                     <div className="font-bold tls-wrap">{link.display_name || link.username}</div>
                     <div className="tls-type-small text-white/45">{link.member_ref ? `Mitglied Nr. ${link.member_ref}` : "ohne Mitglied"}</div>
                   </div>
-                  <span className={`tls-type-label ${link.status === "verified" ? "text-[#00FF88]" : link.status === "conflict" ? "text-[#FF3B30]" : "text-[#FFD700]"}`}>{LINK_STATUS_LABELS[link.status] || link.status}</span>
+                  <span className={`tls-type-label ${link.status === "verified" ? "text-ok" : link.status === "conflict" ? "text-[#FF3B30]" : "text-[#FFD700]"}`}>{LINK_STATUS_LABELS[link.status] || link.status}</span>
                   <div className="tls-type-small text-white/50 flex-1 min-w-0">{link.note || (link.verified_at ? `seit ${formatDate(link.verified_at)}` : "")}</div>
                   {link.status === "verified" && (
                     <button type="button" onClick={() => removeLink(link)} className="tls-type-label text-[#FF6B6B] inline-flex items-center gap-1"><Unlink className="w-3 h-3" /> Lösen</button>
@@ -376,7 +376,7 @@ export default function AdminDolibarrPage() {
                           {row.would_change_status && <span className="text-[#FFD700]"> · Status ändert sich</span>}
                         </div>
                         {(row.state === "match" || row.state === "match_unverified_email") && (
-                          <button type="button" onClick={() => confirmLink(row)} disabled={!!busy} className="px-3 py-1.5 border border-[#00FF88]/50 text-[#00FF88] tls-type-label rounded-sm inline-flex items-center gap-1 disabled:opacity-40">
+                          <button type="button" onClick={() => confirmLink(row)} disabled={!!busy} className="px-3 py-1.5 border border-ok/50 text-ok tls-type-label rounded-sm inline-flex items-center gap-1 disabled:opacity-40">
                             <Link2 className="w-3 h-3" /> Bestätigen
                           </button>
                         )}
@@ -527,7 +527,7 @@ export default function AdminDolibarrPage() {
                 )}
               </div>
               {testResult && (
-                <div className={`tls-type-small ${testResult.ok ? "text-[#00FF88]" : "text-[#FF6B6B]"}`} data-testid="dolibarr-test-result">
+                <div className={`tls-type-small ${testResult.ok ? "text-ok" : "text-[#FF6B6B]"}`} data-testid="dolibarr-test-result">
                   {testResult.ok ? `Verbunden: Modul ${testResult.module_version}, API-Version ${testResult.api_version}.` : `Keine Verbindung: ${testResult.text}`}
                 </div>
               )}
@@ -543,7 +543,7 @@ export default function AdminDolibarrPage() {
                 <div className="border border-white/10 rounded-sm p-3 tls-type-small text-white/65" data-testid="dolibarr-invoice-details-pointer">
                   Zahlungsziel, Zahlungsart, Bankkonto, Sprache der PDFs, „Steuersätze geprüft“ und „Rechnungen gleich freigeben“ pflegt der Kassier unter{" "}
                   <Link to="/admin/finance?tab=rechnungsangaben" className="text-[#29B6E8] hover:underline">Finanzübersicht → Rechnungsangaben</Link>
-                  {status?.invoice_terms ? <> – Stand: <span className={status.invoice_terms.complete ? "text-[#00FF88]" : "text-[#FF9500]"}>{status.invoice_terms.complete ? "vollständig" : "unvollständig, Belege bleiben Entwurf"}</span></> : null}.
+                  {status?.invoice_terms ? <> – Stand: <span className={status.invoice_terms.complete ? "text-ok" : "text-[#FF9500]"}>{status.invoice_terms.complete ? "vollständig" : "unvollständig, Belege bleiben Entwurf"}</span></> : null}.
                 </div>
                 <details className="tls-type-small text-white/55 border border-white/10 rounded-sm p-3">
                   <summary className="cursor-pointer font-bold uppercase tracking-wider text-white/70">Rechte des Website-Benutzers dafür</summary>

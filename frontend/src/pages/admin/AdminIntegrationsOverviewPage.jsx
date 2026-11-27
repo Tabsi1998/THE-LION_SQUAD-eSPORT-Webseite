@@ -11,7 +11,7 @@ import { ShortCaps } from "@/components/tls/ShortCaps";
 // Backend, hier stehen nur Zeilen mit einem Satz dazu und dem Weg zur Seite, auf der man es ändert.
 
 export const STATE_META = {
-  active: { label: "aktiv", className: "border-[#00FF88]/40 text-[#00FF88] bg-[#00FF88]/10" },
+  active: { label: "aktiv", className: "border-ok/40 text-ok bg-ok/10" },
   off: { label: "aus", className: "border-white/15 text-white/50 bg-white/5" },
   missing: { label: "fehlt", className: "border-[#FFD700]/40 text-[#FFD700] bg-[#FFD700]/10" },
   unreadable: { label: "nicht lesbar", className: "border-[#FF3B30]/50 text-[#FF3B30] bg-[#FF3B30]/10" },

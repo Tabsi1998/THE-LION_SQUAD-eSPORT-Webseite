@@ -19,6 +19,7 @@ import { PublicLoadingState } from "@/components/tls/PublicLoadingState";
 import { PartnerSeries } from "@/components/tls/PartnerSeries";
 import { ShortCaps } from "@/components/tls/ShortCaps";
 
+import { ROLE_COLORS } from "@/lib/categoryColors";
 // Partnerseite (#469 Teil 1): Kopf mit Logo, Art, „Partner seit“ und Kanal-Symbolen; links der
 // laufende Twitch-Stream (nur wenn live), der Text über den Partner, seine Tools und Projekte
 // (auf Wunsch hier eingebettet, nach Zustimmung zu externen Medien) und News, in denen er genannt
@@ -43,7 +44,7 @@ export function channelDetail(channel, twitch, discord) {
     return { text: channel.handle ? `twitch.tv/${channel.handle}` : "", tone: "" };
   }
   if (channel.key === "discord") {
-    if (discord?.enabled) return { text: `${discord.online || 0} gerade online${discord.name ? ` · ${discord.name}` : ""}`, tone: "#00FF88" };
+    if (discord?.enabled) return { text: `${discord.online || 0} gerade online${discord.name ? ` · ${discord.name}` : ""}`, tone: ROLE_COLORS.ok };
     return { text: "Einladung", tone: "" };
   }
   try {

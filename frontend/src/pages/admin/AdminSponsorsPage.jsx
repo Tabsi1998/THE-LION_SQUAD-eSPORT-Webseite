@@ -22,7 +22,7 @@ const TIER_LABELS = { main: "Hauptsponsor", platinum: "Platin", gold: "Gold", si
 const TIER_COLORS = { main: "text-[#29B6E8]", platinum: "text-[#E5E4E2]", gold: "text-[#FFD700]", silver: "text-white/80", bronze: "text-[#CD7F32]" };
 const STATUS_LABELS = { active: "Aktiv", planned: "Geplant", expired: "Abgelaufen", inactive: "Archiviert" };
 const STATUS_CLASSES = {
-  active: "bg-[#00FF88]/10 text-[#00FF88]",
+  active: "bg-ok/10 text-ok",
   planned: "bg-[#29B6E8]/10 text-[#29B6E8]",
   expired: "bg-white/10 text-white/60",
   inactive: "bg-[#FF3B30]/10 text-[#FF3B30]",

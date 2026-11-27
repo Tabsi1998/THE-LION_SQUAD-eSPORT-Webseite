@@ -244,7 +244,7 @@ function ResultRow({ match }) {
         <div className="min-w-0">
           <div className="tls-wrap tls-type-small text-quiet">{match.tournament?.title || "Turnier"}</div>
           <div className="tls-wrap mt-1 font-bold uppercase">{match.labels.join(" vs. ") || match.groupLabel}</div>
-          {match.resultText && <div className="tls-wrap mt-1 tls-type-small text-[#00FF88]">{match.resultText}</div>}
+          {match.resultText && <div className="tls-wrap mt-1 tls-type-small text-ok">{match.resultText}</div>}
         </div>
         <span className="tls-type-label text-white/45">{formatMatchStatus(match.status)}</span>
       </div>
@@ -280,7 +280,7 @@ function StationRow({ station }) {
         {/* Notizen sind Vorschau-Text (#1314): eine Zeile, der volle Text im title. */}
         <div className="tls-type-small text-quiet truncate" title={station.notes || undefined}>{station.notes || station.device_type || "Station"}</div>
       </div>
-      <span className={`shrink-0 rounded-sm border px-2 py-1 tls-type-label ${broken ? "border-[#FF3B30]/40 text-[#FF3B30]" : busy ? "border-[#29B6E8]/40 text-[#29B6E8]" : "border-[#00FF88]/35 text-[#00FF88]"}`}>
+      <span className={`shrink-0 rounded-sm border px-2 py-1 tls-type-label ${broken ? "border-[#FF3B30]/40 text-[#FF3B30]" : busy ? "border-[#29B6E8]/40 text-[#29B6E8]" : "border-ok/35 text-ok"}`}>
         {broken ? "Defekt" : busy ? "Belegt" : "Frei"}
       </span>
     </div>
@@ -302,7 +302,7 @@ function LivePanel({ icon: Icon, title, count, children }) {
 }
 
 function LiveStat({ icon: Icon, label, value, tone }) {
-  const color = tone === "gold" ? "text-[#FFD700]" : tone === "green" ? "text-[#00FF88]" : tone === "white" ? "text-white" : "text-[#29B6E8]";
+  const color = tone === "gold" ? "text-[#FFD700]" : tone === "green" ? "text-ok" : tone === "white" ? "text-white" : "text-[#29B6E8]";
   return (
     <div className="border border-white/10 bg-[#121212] rounded-sm p-4">
       <div className="flex items-center justify-between gap-3">

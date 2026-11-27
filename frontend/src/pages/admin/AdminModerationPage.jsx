@@ -176,7 +176,7 @@ function PeopleTab() {
                 <p className="mt-1 whitespace-pre-wrap text-white/80">{active.appeal.message}</p>
                 {active.appeal.status === "open" && !locked && (
                   <div className="mt-2 flex flex-wrap gap-2">
-                    <button type="button" disabled={!!busy} onClick={() => run("appeal", () => api.post(`/moderation/sanctions/${active.id}/appeal-decision`, { decision: "lift", note: note || null }), "Einspruch angenommen – Maßnahme aufgehoben.")} data-testid={`appeal-lift-${active.id}`} className="px-3 py-1.5 border border-[#00FF88]/50 text-[#00FF88] rounded-sm tls-type-label disabled:opacity-40">Annehmen und aufheben</button>
+                    <button type="button" disabled={!!busy} onClick={() => run("appeal", () => api.post(`/moderation/sanctions/${active.id}/appeal-decision`, { decision: "lift", note: note || null }), "Einspruch angenommen – Maßnahme aufgehoben.")} data-testid={`appeal-lift-${active.id}`} className="px-3 py-1.5 border border-ok/50 text-ok rounded-sm tls-type-label disabled:opacity-40">Annehmen und aufheben</button>
                     <button type="button" disabled={!!busy} onClick={() => run("appeal", () => api.post(`/moderation/sanctions/${active.id}/appeal-decision`, { decision: "keep", note: note || null }), "Einspruch abgelehnt – Maßnahme bleibt.")} data-testid={`appeal-keep-${active.id}`} className="px-3 py-1.5 border border-white/20 text-white/80 rounded-sm tls-type-label disabled:opacity-40">Ablehnen</button>
                   </div>
                 )}
@@ -232,7 +232,7 @@ function PeopleTab() {
                   {detail.sanctions.map((entry) => (
                     <li key={entry.id} className="flex items-start justify-between gap-2" data-testid={`people-sanction-${entry.id}`}>
                       <span><span className="text-white/45 tls-type-small">{formatMoment(entry.created_at)}</span> · {entry.label} · {SANCTION_STATUS[entry.status] || entry.status}{entry.automatic ? "" : " · von Hand"}{entry.reason ? ` · ${entry.reason}` : ""}</span>
-                      {entry.status === "active" && !locked && <button type="button" disabled={!!busy} onClick={() => run("lift", () => api.post(`/moderation/sanctions/${entry.id}/lift`, { note: note || null }), "Maßnahme aufgehoben.")} data-testid={`sanction-lift-${entry.id}`} className="tls-type-label text-[#00FF88] shrink-0">Aufheben</button>}
+                      {entry.status === "active" && !locked && <button type="button" disabled={!!busy} onClick={() => run("lift", () => api.post(`/moderation/sanctions/${entry.id}/lift`, { note: note || null }), "Maßnahme aufgehoben.")} data-testid={`sanction-lift-${entry.id}`} className="tls-type-label text-ok shrink-0">Aufheben</button>}
                     </li>
                   ))}
                 </ul>
@@ -464,7 +464,7 @@ function ItemsTab() {
               <div className="flex flex-wrap gap-2 shrink-0 self-start">
                 {item.state === "pending" && (
                   <>
-                    <button type="button" disabled={busy === item.id} onClick={() => decide(item, "release")} data-testid={`item-release-${item.id}`} className="px-3 py-2 bg-[#00FF88] text-black rounded-sm tls-type-label disabled:opacity-50">Freigeben</button>
+                    <button type="button" disabled={busy === item.id} onClick={() => decide(item, "release")} data-testid={`item-release-${item.id}`} className="px-3 py-2 bg-ok text-black rounded-sm tls-type-label disabled:opacity-50">Freigeben</button>
                     <button type="button" disabled={busy === item.id} onClick={() => decide(item, "reject")} data-testid={`item-reject-${item.id}`} className="px-3 py-2 border border-[#FF3B30]/40 text-[#FF3B30] rounded-sm tls-type-label disabled:opacity-50">Zurückweisen</button>
                   </>
                 )}

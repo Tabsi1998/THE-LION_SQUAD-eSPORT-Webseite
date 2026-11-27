@@ -297,7 +297,7 @@ export default function AdminMobilePushPage() {
                       <div className="font-mono tls-type-small text-white/65 truncate">{token.token_preview}</div>
                       <div className="tls-type-small text-white/45 mt-1">{token.platform || "-"} · {token.enabled === false ? "inaktiv" : "aktiv"}</div>
                     </div>
-                    <span className={`tls-type-label border px-2 py-1 rounded-sm ${token.enabled === false ? "border-[#FFCC00]/40 text-[#FFD95A]" : "border-[#00FF88]/40 text-[#00FF88]"}`}>
+                    <span className={`tls-type-label border px-2 py-1 rounded-sm ${token.enabled === false ? "border-[#FFCC00]/40 text-[#FFD95A]" : "border-ok/40 text-ok"}`}>
                       {token.enabled === false ? "Aus" : "An"}
                     </span>
                   </div>

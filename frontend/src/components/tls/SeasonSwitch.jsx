@@ -60,7 +60,7 @@ export function SeasonSwitch({ seasonKey, label, className = "mb-6" }) {
     save({ channels: next }, `${label}: ${next.length ? next.map((value) => CHANNEL_LABELS[value] || value).join(" und ") : "nirgends"}.`);
   };
   return (
-    <section className={`${className} rounded-sm border p-4 ${state.enabled ? "border-[#00FF88]/35 bg-[#00FF88]/5" : "border-white/10 bg-[#121212]"}`} data-testid="season-switch">
+    <section className={`${className} rounded-sm border p-4 ${state.enabled ? "border-ok/35 bg-ok/5" : "border-white/10 bg-[#121212]"}`} data-testid="season-switch">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="min-w-0">
           <div className="font-bold uppercase" data-testid="season-switch-title">{label} ist {state.enabled ? "an" : "aus"}</div>
@@ -69,7 +69,7 @@ export function SeasonSwitch({ seasonKey, label, className = "mb-6" }) {
         <label className="inline-flex items-center gap-2 tls-type-small font-bold shrink-0 cursor-pointer">
           <input type="checkbox" role="switch" aria-checked={Boolean(state.enabled)} checked={Boolean(state.enabled)} disabled={busy}
             onChange={(event) => save({ enabled: event.target.checked }, event.target.checked ? `${label} ist an.` : `${label} ist aus.`)}
-            className="h-5 w-5 accent-[#00FF88]" data-testid="season-switch-enabled" />
+            className="h-5 w-5 accent-ok" data-testid="season-switch-enabled" />
           {state.enabled ? "An" : "Aus"}
         </label>
       </div>

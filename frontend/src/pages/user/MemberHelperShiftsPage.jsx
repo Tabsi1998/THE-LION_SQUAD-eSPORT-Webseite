@@ -30,7 +30,7 @@ function MineBadge({ shift }) {
   if (!shift.mine) return null;
   const done = shift.mine === "done" || shift.mine === "confirmed";
   return (
-    <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-sm border tls-type-label ${done ? "border-[#00FF88]/40 text-[#00FF88]" : shift.mine === "requested" ? "border-[#FFD700]/40 text-[#FFD700]" : "border-white/15 text-white/50"}`} data-testid={`shift-${shift.id}-mine`}>
+    <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-sm border tls-type-label ${done ? "border-ok/40 text-ok" : shift.mine === "requested" ? "border-[#FFD700]/40 text-[#FFD700]" : "border-white/15 text-white/50"}`} data-testid={`shift-${shift.id}-mine`}>
       {done ? <CheckCircle2 className="w-3 h-3" /> : null} {shift.mine_label}
     </span>
   );

@@ -250,7 +250,7 @@ export default function AdminNavPage() {
                     onClick={() => toggleVisible(idx)}
                     data-testid={`nav-toggle-${it.key}`}
                     className={`px-3 py-1.5 tls-type-label rounded-sm inline-flex items-center gap-1 ${
-                      visible ? "text-[#00FF88] bg-[#00FF88]/10" : "text-white/40 bg-white/5"
+                      visible ? "text-ok bg-ok/10" : "text-white/40 bg-white/5"
                     }`}
                   >
                     {visible ? <><Eye className="w-3 h-3" /> Sichtbar</> : <><EyeOff className="w-3 h-3" /> Versteckt</>}
@@ -299,7 +299,7 @@ export default function AdminNavPage() {
                           <button
                             onClick={() => toggleVisible(idx, cIdx)}
                             className={`px-2 py-1 tls-type-label rounded-sm inline-flex items-center gap-1 ${
-                              cVisible ? "text-[#00FF88] bg-[#00FF88]/10" : "text-white/40 bg-white/5"
+                              cVisible ? "text-ok bg-ok/10" : "text-white/40 bg-white/5"
                             }`}
                           >
                             {cVisible ? <><Eye className="w-2.5 h-2.5" /> Sichtbar</> : <><EyeOff className="w-2.5 h-2.5" /> Versteckt</>}

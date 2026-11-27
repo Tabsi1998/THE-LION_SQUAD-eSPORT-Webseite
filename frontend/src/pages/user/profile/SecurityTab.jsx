@@ -66,7 +66,7 @@ export function SecurityTab({ user, refresh, siteSettings }) {
             <div>
               <h3 className="tls-type-card mb-1">Google-Konto</h3>
               {googleLinked ? (
-                <p className="tls-type-small text-[#00FF88]" data-testid="profile-google-status">Verknüpft{user?.google_email ? ` · ${user.google_email}` : ""} · schnell anmelden mit einem Klick.</p>
+                <p className="tls-type-small text-ok" data-testid="profile-google-status">Verknüpft{user?.google_email ? ` · ${user.google_email}` : ""} · schnell anmelden mit einem Klick.</p>
               ) : (
                 <p className="tls-type-small text-white/50" data-testid="profile-google-status">Verbinde dein Google-Konto, um dich künftig mit einem Klick anzumelden.</p>
               )}

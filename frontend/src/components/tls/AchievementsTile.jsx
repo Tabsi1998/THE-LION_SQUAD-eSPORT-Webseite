@@ -6,6 +6,7 @@ import { Badge } from "@/components/achievements/Badge";
 import { AccountLevelProgress, accountLevelTier } from "@/components/tls/AccountLevel";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 
+import { ROLE_COLORS } from "@/lib/categoryColors";
 // Dashboard-Kachel „Deine Erfolge“ (#619): Level-Leiste, „Als Nächstes“ in einer Zeile, die letzte
 // Freischaltung - aus /achievements/me/summary, damit das Dashboard nicht den ganzen Katalog lädt.
 export function AchievementsTile({ className = "" }) {
@@ -64,7 +65,7 @@ export function AchievementsTile({ className = "" }) {
           )}
           {next ? (
             <div className="mt-3 flex items-center gap-2 tls-type-small" data-testid="dashboard-achievements-next">
-              <Target className="w-3.5 h-3.5 shrink-0" style={{ color: next.group_accent || "#00FF88" }} />
+              <Target className="w-3.5 h-3.5 shrink-0" style={{ color: next.group_accent || ROLE_COLORS.ok }} />
               <span className="text-white/45 tls-type-label shrink-0">Als Nächstes</span>
               <span className="truncate font-semibold">{next.name}</span>
               <span className="ml-auto tls-type-small text-white/50 tabular-nums shrink-0">{next.current}/{next.target}</span>

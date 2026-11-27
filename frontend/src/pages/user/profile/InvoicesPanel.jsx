@@ -24,7 +24,7 @@ const INVOICE_QUESTION = `/contact?topic=invoice&subject=${encodeURIComponent("F
 const TONE_CLASSES = {
   info: "border-[#29B6E8]/50 text-[#29B6E8]",
   warn: "border-[#FFD700]/60 text-[#FFD700]",
-  ok: "border-[#00FF88]/40 text-[#00FF88]",
+  ok: "border-ok/40 text-ok",
   muted: "border-white/15 text-white/50",
 };
 

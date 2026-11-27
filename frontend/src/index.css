@@ -1311,7 +1311,7 @@ button.tls-bracket-row:active, .tls-bracket-head:active { transform: scale(calc(
 .tls-site-banner--info { color: #29B6E8; }
 .tls-site-banner--live { color: var(--tls-live); }
 .tls-site-banner--warning { color: #FFD700; }
-.tls-site-banner--success { color: #00FF88; }
+.tls-site-banner--success { color: var(--tls-ok); }
 .tls-site-banner--pos-bottom_fixed {
   position: fixed;
   left: 0;

@@ -92,7 +92,7 @@ export function TournamentCard({ tournament, index = 0 }) {
         </div>
         {finished ? null : (
           <div className={`mt-3 tls-type-label ${
-            registration.canRegister ? "text-[#00FF88]" : registration.state === "scheduled" ? "text-[#29B6E8]" : "text-white/45"
+            registration.canRegister ? "text-ok" : registration.state === "scheduled" ? "text-[#29B6E8]" : "text-white/45"
           }`} data-testid="tournament-card-registration">
             {registration.label}
           </div>

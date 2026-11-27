@@ -163,7 +163,7 @@ export default function SetupWizardPage() {
                   <div className="space-y-1.5">
                     {(status.checks || []).map((check) => (
                       <div key={check.key} className="flex items-center gap-2 tls-type-small">
-                        {check.ok ? <ShieldCheck className="w-3.5 h-3.5 text-[#00FF88]" /> : <AlertTriangle className="w-3.5 h-3.5 text-[#FFD700]" />}
+                        {check.ok ? <ShieldCheck className="w-3.5 h-3.5 text-ok" /> : <AlertTriangle className="w-3.5 h-3.5 text-[#FFD700]" />}
                         <span className={check.ok ? "text-white/65" : "text-white/90"}>{check.label}</span>
                       </div>
                     ))}
@@ -268,8 +268,8 @@ export default function SetupWizardPage() {
 
           {step === 4 && (
             <div className="text-center py-8" data-testid="wizard-done">
-              <div className="w-16 h-16 rounded-full bg-[#00FF88]/10 border-2 border-[#00FF88] flex items-center justify-center mx-auto mb-4">
-                <Check className="w-8 h-8 text-[#00FF88]" />
+              <div className="w-16 h-16 rounded-full bg-ok/10 border-2 border-ok flex items-center justify-center mx-auto mb-4">
+                <Check className="w-8 h-8 text-ok" />
               </div>
               <h2 className="tls-type-section mb-3">Setup abgeschlossen!</h2>
               <p className="text-white/70 mb-6">Deine TLS-Plattform ist startklar. Du wirst weitergeleitet …</p>

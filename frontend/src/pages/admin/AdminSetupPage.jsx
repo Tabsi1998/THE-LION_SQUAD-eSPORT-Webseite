@@ -52,7 +52,7 @@ export default function AdminSetupPage() {
         Der Stand der Dienste kommt aus den Einstellungen; was fehlt, steht offen.
       </p>
       <div className="mt-4 mb-6 flex flex-wrap gap-3 tls-type-small" data-testid="setup-summary">
-        <span className="border border-[#00FF88]/40 text-[#00FF88] rounded-sm px-3 py-1.5 font-bold uppercase tracking-wider">{done} eingerichtet</span>
+        <span className="border border-ok/40 text-ok rounded-sm px-3 py-1.5 font-bold uppercase tracking-wider">{done} eingerichtet</span>
         <span className="border border-[#FFD700]/50 text-[#FFD700] rounded-sm px-3 py-1.5 font-bold uppercase tracking-wider">{missing} fehlen</span>
         <span className="border border-white/15 text-white/50 rounded-sm px-3 py-1.5 font-bold uppercase tracking-wider">{SETUP_GUIDE_ORDER.length - done - missing} optional oder offen</span>
       </div>

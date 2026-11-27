@@ -1,9 +1,10 @@
 import { countWord } from "@/lib/adminWords";
 import { viennaDateTime } from "@/lib/vienna";
+import { ROLE_COLORS } from "@/lib/categoryColors";
 // Betrieb (#233, #265): Ampeln, Farben und Sätze für die Tageszentrale und
 // Admin → Betrieb, damit Seite und Kachel dieselbe Sprache sprechen.
 
-export const TONE_COLORS = { ok: "#00FF88", warn: "#FFD700", crit: "#FF3B30" };
+export const TONE_COLORS = { ok: ROLE_COLORS.ok, warn: "#FFD700", crit: "#FF3B30" };
 export const STATUS_LABELS = { ok: "grün", warn: "gelb", crit: "rot" };
 export const RATING_LABELS = { good: "gut", "needs-improvement": "mäßig", poor: "schlecht" };
 export const RATING_TONES = { good: "ok", "needs-improvement": "warn", poor: "crit" };

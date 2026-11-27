@@ -99,7 +99,7 @@ export function MfaSetupPanel({ onChanged, highlight = false }) {
         </div>
       ) : status?.enabled ? (
         <div className="space-y-3">
-          <p className="tls-type-small text-[#00FF88]">MFA ist aktiviert · {status.recovery_codes_remaining} Wiederherstellungscodes verbleiben.</p>
+          <p className="tls-type-small text-ok">MFA ist aktiviert · {status.recovery_codes_remaining} Wiederherstellungscodes verbleiben.</p>
           {required && !status.session_verified && <p className="tls-type-small text-[#FFD700]">Melde dich einmal neu an, um den Adminbereich freizuschalten.</p>}
           <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="Aktuelles Passwort" autoComplete="current-password" className="w-full bg-black/40 border border-white/10 px-3 py-2.5" />
           <input value={code} onChange={(e) => setCode(e.target.value)} placeholder="MFA- oder Wiederherstellungscode" autoComplete="one-time-code" className="w-full bg-black/40 border border-white/10 px-3 py-2.5" />

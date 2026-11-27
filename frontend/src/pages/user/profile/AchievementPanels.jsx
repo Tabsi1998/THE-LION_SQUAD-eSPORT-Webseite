@@ -171,10 +171,10 @@ export function NextUpPanel({ items = [] }) {
     <div className="border border-white/10 bg-[#121212] rounded-sm p-5" data-testid="achievement-next-up">
       <div className="flex items-center justify-between gap-3 mb-4">
         <div>
-          <div className="tls-type-label text-[#00FF88]">Als Nächstes</div>
+          <div className="tls-type-label text-ok">Als Nächstes</div>
           <h3 className="tls-type-card mt-1">Was dem Ziel am nächsten ist</h3>
         </div>
-        <Target className="w-5 h-5 text-[#00FF88]" />
+        <Target className="w-5 h-5 text-ok" />
       </div>
       {items.length ? (
         <div className="grid md:grid-cols-3 gap-3">

@@ -63,7 +63,7 @@ export function DiscordBotPanel({ canSystem = false }) {
           <p className="mt-1 tls-type-small text-white/50 max-w-2xl">Zählt Nachrichten verknüpfter Konten (nur die Zahl, nie den Inhalt – für die Discord-Erfolge), gleicht die Rollen Mitglied/Vorstand/Turnierleitung alle zehn Minuten ab und beantwortet <code>/naechstes-event</code>, <code>/turniere</code>, <code>/meine-erfolge</code>, <code>/status</code>. Gezählt und eingeordnet wird nur, wer sein Discord-Konto im Profil verknüpft hat.</p>
         </div>
         <div className="text-right tls-type-small font-bold space-y-1">
-          <div className={online ? "text-[#00FF88]" : data.enabled ? "text-[#FFD700]" : "text-white/45"} data-testid="discord-bot-state">
+          <div className={online ? "text-ok" : data.enabled ? "text-[#FFD700]" : "text-white/45"} data-testid="discord-bot-state">
             {online ? `online · ${data.guild_name || "auf keinem Server"}` : data.enabled ? "eingeschaltet, nicht verbunden" : "aus"}
           </div>
           <div className="text-white/45 normal-case tracking-normal">{data.linked_count ?? 0} verknüpfte Konten</div>
@@ -110,7 +110,7 @@ export function DiscordBotPanel({ canSystem = false }) {
       <div className="flex flex-wrap items-center gap-2">
         <button type="button" onClick={save} disabled={!!busy} data-testid="discord-bot-save" className="px-5 py-2 bg-[#5865F2] text-white tls-type-label rounded-sm disabled:opacity-50">{busy === "save" ? "Speichere..." : "Speichern"}</button>
         <label className="inline-flex items-center gap-2 tls-type-small">
-          <input type="checkbox" checked={Boolean(data.enabled)} disabled={!!busy || (!data.configured && !data.enabled)} onChange={(e) => toggle(e.target.checked)} className="accent-[#00FF88]" data-testid="discord-bot-enabled" />
+          <input type="checkbox" checked={Boolean(data.enabled)} disabled={!!busy || (!data.configured && !data.enabled)} onChange={(e) => toggle(e.target.checked)} className="accent-ok" data-testid="discord-bot-enabled" />
           Bot verbinden
         </label>
         <button type="button" onClick={() => run("sync", () => api.post("/settings/discord/bot/sync"), ({ data: res }) => (res?.ok ? `Rollen abgeglichen: ${res.changes} Änderungen bei ${res.linked} verknüpften Konten.` : `Nicht abgeglichen: ${res?.text || res?.reason || "Bot offline"}`))} disabled={!!busy || !online} data-testid="discord-bot-sync" className="px-4 py-2 border border-white/20 text-white/80 tls-type-label rounded-sm inline-flex items-center gap-2 disabled:opacity-40">

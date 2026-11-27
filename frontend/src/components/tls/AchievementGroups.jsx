@@ -21,6 +21,7 @@ import { AchievementIcon } from "@/components/tls/AchievementIcon";
 import { Badge } from "@/components/achievements/Badge";
 import { viennaDate } from "@/lib/vienna";
 
+import { ROLE_COLORS } from "@/lib/categoryColors";
 const LEVEL_META = {
   1: { name: "Bronze",   color: "#CD7F32" },
   2: { name: "Silber",   color: "#C0C0C0" },
@@ -34,13 +35,13 @@ export const CATEGORY_META = {
   tournament: { label: "Turnier",   icon: "trophy",        accent: "#FFD700", order: 2 },
   fastlap:    { label: "Fast Lap",  icon: "flag",          accent: "#A855F7", order: 3 },
   season:     { label: "Saison",    icon: "calendar-check", accent: "#29B6E8", order: 3.5 },
-  team:       { label: "Team",      icon: "users",         accent: "#00FF88", order: 4 },
+  team:       { label: "Team",      icon: "users",         accent: ROLE_COLORS.ok, order: 4 },
   community:  { label: "Community", icon: "messages-square", accent: "#29B6E8", order: 5 },
   // Erfolge II (#611): Streaming & Content heißt jetzt Streaming & Creator, Fortschritt Profil & Konto.
   content:    { label: "Streaming & Creator", icon: "radio", accent: "#9146FF", order: 6 },
   creator:    { label: "Streaming & Creator", icon: "radio", accent: "#9146FF", order: 6 },
-  progression:{ label: "Profil & Konto", icon: "user-check",  accent: "#00FF88", order: 7 },
-  profile:    { label: "Profil & Konto", icon: "user-check",  accent: "#00FF88", order: 7 },
+  progression:{ label: "Profil & Konto", icon: "user-check",  accent: ROLE_COLORS.ok, order: 7 },
+  profile:    { label: "Profil & Konto", icon: "user-check",  accent: ROLE_COLORS.ok, order: 7 },
   club:       { label: "Verein",    icon: "crown",         accent: "#FFD700", order: 8 },
   special:    { label: "Besonders", icon: "sparkles",  accent: "#FF3B30", order: 9 },
   hidden:     { label: "Geheim",    icon: "ghost",   accent: "#A855F7", order: 9.5 },

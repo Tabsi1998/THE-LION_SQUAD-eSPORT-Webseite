@@ -7,6 +7,7 @@ import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { Bars, CATEGORIES, Panel, Stat, errorText, formatWhen, materialColor } from "./shared";
 import { RecountPanel } from "./RecountPanel";
 
+import { ROLE_COLORS } from "@/lib/categoryColors";
 const LEVEL_BUCKETS = ["1-9", "10-19", "20-29", "30-39", "40-49", "50-59", "60"];
 
 /** Übersicht (E10): Kennzahlen, Level-Verteilung, Warteschlange mit „alle auswerten“, nächtlicher Abgleich. */
@@ -62,15 +63,15 @@ export function OverviewTab() {
         <Stat label="Freischaltungen 30 Tage" value={data.unlocks_30d} accent="#29B6E8" testId="ov-unlocks-30d" />
         <Stat label="Ohne Erfolg" value={data.users_without_award} hint={`von ${data.users_total} Personen`} accent="#FF3B30" testId="ov-without" />
         <Stat label="Seltenste Stufe" value={rarest ? rarest.name : "–"} hint={rarest ? `${rarest.group_name} · ${rarest.holders} Person${rarest.holders === 1 ? "" : "en"} (${rarest.percent} %)${rarest.retired ? " · nicht mehr erreichbar" : ""}` : "noch keine Vergabe"} accent={rarest ? materialColor(rarest) : "#FFD700"} testId="ov-rarest" />
-        <Stat label="Aktivste Kategorie" value={active ? active.label : "–"} hint={active ? `${active.count} Freischaltungen in 30 Tagen` : "noch keine"} accent="#00FF88" testId="ov-active" />
+        <Stat label="Aktivste Kategorie" value={active ? active.label : "–"} hint={active ? `${active.count} Freischaltungen in 30 Tagen` : "noch keine"} accent={ROLE_COLORS.ok} testId="ov-active" />
       </div>
 
       <div className="grid lg:grid-cols-2 gap-6">
         <Panel title="Level-Verteilung" icon={BarChart3} accent="#29B6E8" hint={`${data.prestige_holders} Person${data.prestige_holders === 1 ? " hat" : "en haben"} mindestens einen Prestige-Stern.`} testId="ov-levels">
           <Bars testId="ov-level-bars" rows={LEVEL_BUCKETS.map((key) => ({ key, label: key === "60" ? "Level 60" : `Level ${key}`, value: data.levels?.[key] || 0 }))} />
         </Panel>
-        <Panel title="Freischaltungen je Kategorie (30 Tage)" icon={Users} accent="#00FF88" testId="ov-categories">
-          {perCategory.length ? <Bars rows={perCategory} accent="#00FF88" testId="ov-category-bars" /> : <p className="tls-type-small text-white/45">In den letzten 30 Tagen wurde nichts freigeschaltet.</p>}
+        <Panel title="Freischaltungen je Kategorie (30 Tage)" icon={Users} accent={ROLE_COLORS.ok} testId="ov-categories">
+          {perCategory.length ? <Bars rows={perCategory} accent={ROLE_COLORS.ok} testId="ov-category-bars" /> : <p className="tls-type-small text-white/45">In den letzten 30 Tagen wurde nichts freigeschaltet.</p>}
         </Panel>
       </div>
 

@@ -199,7 +199,7 @@ export function FriendsPanel({ onChanged }) {
                     <div key={candidate.id} data-testid={`friends-candidate-${candidate.id}`} className="p-3 flex flex-wrap items-center gap-3">
                       <Person user={candidate} />
                       {relation.kind === "friend" ? (
-                        <span className="tls-type-label text-[#00FF88]">Befreundet</span>
+                        <span className="tls-type-label text-ok">Befreundet</span>
                       ) : relation.kind === "sent" ? (
                         <span className="tls-type-label text-white/50">Anfrage gesendet</span>
                       ) : relation.kind === "incoming" ? (

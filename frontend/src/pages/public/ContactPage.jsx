@@ -152,8 +152,8 @@ export default function ContactPage() {
         <div className="mt-10 border border-white/10 rounded-sm bg-[#121212] p-6 md:p-8">
           {done ? (
             <div className="text-center py-12" data-testid="contact-success" role="status" aria-live="polite">
-              <div className="w-14 h-14 rounded-full bg-[#00FF88]/10 border-2 border-[#00FF88] flex items-center justify-center mx-auto mb-4">
-                <Check className="w-7 h-7 text-[#00FF88]" />
+              <div className="w-14 h-14 rounded-full bg-ok/10 border-2 border-ok flex items-center justify-center mx-auto mb-4">
+                <Check className="w-7 h-7 text-ok" />
               </div>
               <h2 className="tls-type-section">Nachricht gesendet</h2>
               <p className="mt-2 text-white/70">Eine Bestätigungsmail ist unterwegs. Wir melden uns so bald wie möglich.</p>

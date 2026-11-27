@@ -315,7 +315,7 @@ export function DiscordDesignPanel({ initialKind = "stream_live" }) {
                 <div className="flex flex-wrap gap-1.5">
                   {rowPlaceholders.map((entry) => (
                     <button key={entry.name} type="button" onClick={() => insert(entry.name)} title={`${entry.text}${entry.sample ? ` – z. B. ${entry.sample}` : ""}`} data-testid={`discord-design-placeholder-${entry.name}`}
-                      className="px-2 py-1 rounded-sm bg-white/5 border border-white/10 tls-type-small font-mono text-[#00FF88]/80 hover:border-[#00FF88]/50">{`{${entry.name}}`}</button>
+                      className="px-2 py-1 rounded-sm bg-white/5 border border-white/10 tls-type-small font-mono text-ok/80 hover:border-ok/50">{`{${entry.name}}`}</button>
                   ))}
                 </div>
               </>

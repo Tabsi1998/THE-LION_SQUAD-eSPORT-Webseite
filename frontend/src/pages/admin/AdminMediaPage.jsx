@@ -17,6 +17,7 @@ import { MediaPreview, UploadEventsPanel } from "./media/parts";
 import { BACKEND, IMG_EXT, MEDIA_SCOPE_LABELS, VIDEO_EXT, cacheBustedMediaUrl, fmtBytes } from "./media/shared";
 import { ShortCaps } from "@/components/tls/ShortCaps";
 
+import { ROLE_COLORS } from "@/lib/categoryColors";
 const ORIGINAL_EXT = ORIGINAL_MEDIA_EXTENSIONS;
 
 const parseUploadMb = (value, fallback) => {
@@ -558,7 +559,7 @@ export default function AdminMediaPage() {
           <div className="mt-4 grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
             {qualityChecks.map((check) => {
               const ok = Number(check.value || 0) === 0;
-              const color = ok ? "#00FF88" : check.tone === "danger" ? "#FF3B30" : "#FFD700";
+              const color = ok ? ROLE_COLORS.ok : check.tone === "danger" ? "#FF3B30" : "#FFD700";
               const clickable = !!check.filter && !ok;
               return (
                 <button
@@ -571,7 +572,7 @@ export default function AdminMediaPage() {
                 >
                   <div className="flex items-center justify-between gap-3">
                     <span className="tls-type-label text-white/50">{check.label}</span>
-                    {ok ? <CheckCircle2 className="h-4 w-4 text-[#00FF88]" /> : <AlertTriangle className="h-4 w-4" style={{ color }} />}
+                    {ok ? <CheckCircle2 className="h-4 w-4 text-ok" /> : <AlertTriangle className="h-4 w-4" style={{ color }} />}
                   </div>
                   <div className="mt-2 tls-type-section tls-type-num" style={{ color }}>{check.value || 0}</div>
                   <div className="mt-1 tls-type-small text-white/45">{ok ? "Sauber." : check.detail}</div>
@@ -589,7 +590,7 @@ export default function AdminMediaPage() {
               <div className="tls-type-label text-white/50">Medien-Einsortierung</div>
               <p className="mt-1 tls-type-small text-white/45">Zeigt, wie viele Uploads persönliche Profilbilder, Medien der Redaktion oder aus anderen Bereichen sind.</p>
             </div>
-            {scopeAudit.repair && <span className="tls-type-label text-[#00FF88]">Einsortiert</span>}
+            {scopeAudit.repair && <span className="tls-type-label text-ok">Einsortiert</span>}
           </div>
           <div className="mt-3 grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-2 tls-type-small">
             {[

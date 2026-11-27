@@ -608,7 +608,7 @@ function DiagnosticsPanel({ data }) {
 }
 
 function Stat({ label, value, tone }) {
-  const color = tone === "green" ? "text-[#00FF88]" : tone === "gold" ? "text-[#FFD700]" : "text-[#29B6E8]";
+  const color = tone === "green" ? "text-ok" : tone === "gold" ? "text-[#FFD700]" : "text-[#29B6E8]";
   return (
     <div className="border border-white/10 bg-[#121212] rounded-sm p-3 sm:p-4 min-w-0">
       <div className="tls-type-label text-white/45 break-words">{label}</div>
@@ -628,7 +628,7 @@ function Field({ label, value, onChange, type = "text", placeholder = "", requir
 
 function Badge({ label, tone }) {
   const classes = {
-    green: "bg-[#00FF88]/10 text-[#00FF88]",
+    green: "bg-ok/10 text-ok",
     cyan: "bg-[#29B6E8]/10 text-[#29B6E8]",
     gold: "bg-[#FFD700]/10 text-[#FFD700]",
     red: "bg-[#FF3B30]/10 text-[#FF3B30]",

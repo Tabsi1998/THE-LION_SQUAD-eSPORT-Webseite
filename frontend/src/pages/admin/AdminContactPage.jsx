@@ -12,7 +12,7 @@ import { ShortCaps } from "@/components/tls/ShortCaps";
 const STATUS_LABEL = {
   new: { l: "Neu", c: "text-[#29B6E8] bg-[#29B6E8]/10 border-[#29B6E8]/30" },
   in_progress: { l: "In Bearbeitung", c: "text-[#FFD700] bg-[#FFD700]/10 border-[#FFD700]/30" },
-  answered: { l: "Beantwortet", c: "text-[#00FF88] bg-[#00FF88]/10 border-[#00FF88]/30" },
+  answered: { l: "Beantwortet", c: "text-ok bg-ok/10 border-ok/30" },
   closed: { l: "Geschlossen", c: "text-white/50 bg-white/5 border-white/10" },
   spam: { l: "Spam", c: "text-[#FF3B30] bg-[#FF3B30]/10 border-[#FF3B30]/30" },
 };

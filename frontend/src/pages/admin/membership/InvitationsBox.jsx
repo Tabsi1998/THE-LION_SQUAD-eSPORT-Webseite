@@ -52,7 +52,7 @@ export function InvitationsBox({ reloadKey = 0 }) {
               <span className="font-bold">{row.user?.display_name || row.user?.username || row.user_id}</span>
               <span className="tls-type-small text-white/45">@{row.user?.username}</span>
               <span className="tls-type-small text-white/45">eingeladen am {formatDay(row.created_at)}{row.invited_by_name ? ` von ${row.invited_by_name}` : ""}</span>
-              <span className={`tls-type-label px-2 py-0.5 rounded-sm border ${row.status === "open" ? "border-[#FFD700]/50 text-[#FFD700]" : row.status === "applied" ? "border-[#00FF88]/40 text-[#00FF88]" : "border-white/15 text-white/45"}`}>{STATUS_LABEL[row.status] || row.status}</span>
+              <span className={`tls-type-label px-2 py-0.5 rounded-sm border ${row.status === "open" ? "border-[#FFD700]/50 text-[#FFD700]" : row.status === "applied" ? "border-ok/40 text-ok" : "border-white/15 text-white/45"}`}>{STATUS_LABEL[row.status] || row.status}</span>
               {row.note ? <span className="basis-full tls-type-small text-white/50 italic">„{row.note}“</span> : null}
               {row.status === "open" ? (
                 <button type="button" onClick={() => withdraw(row)} data-testid={`invitation-withdraw-${row.id}`} className="ml-auto inline-flex items-center gap-1 tls-type-small text-white/60 hover:text-[#FF3B30]"><XIcon className="w-3.5 h-3.5" /> zurückziehen</button>

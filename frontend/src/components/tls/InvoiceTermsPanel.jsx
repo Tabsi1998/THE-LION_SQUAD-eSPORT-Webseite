@@ -49,7 +49,7 @@ export function InvoiceTermsPanel({ terms, connected, busy, onSave, optionsUrl =
     <div className="border border-white/10 rounded-sm p-3 space-y-3" data-testid="invoice-terms">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div className="tls-type-label text-white/70">Rechnungskonditionen</div>
-        <span className={`tls-type-label ${terms?.complete ? "text-[#00FF88]" : "text-[#FFD700]"}`} data-testid="invoice-terms-state">
+        <span className={`tls-type-label ${terms?.complete ? "text-ok" : "text-[#FFD700]"}`} data-testid="invoice-terms-state">
           {terms?.complete ? "vollständig" : "unvollständig – Belege bleiben Entwurf"}
         </span>
       </div>

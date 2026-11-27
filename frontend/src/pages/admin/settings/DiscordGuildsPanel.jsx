@@ -246,7 +246,7 @@ export function DiscordGuildsPanel() {
                     {guild.role !== "main" && !guild.left_at && (
                       <>
                         <label className="inline-flex items-center gap-2 tls-type-small">
-                          <input type="checkbox" checked={!!guild.enabled} disabled={!!busy} className="accent-[#00FF88]" data-testid={`discord-guild-${guild.guild_id}-enabled`}
+                          <input type="checkbox" checked={!!guild.enabled} disabled={!!busy} className="accent-ok" data-testid={`discord-guild-${guild.guild_id}-enabled`}
                             onChange={(event) => patch(guild, { enabled: event.target.checked }, event.target.checked ? `„${guild.name}“ ist an.` : `„${guild.name}“ ist aus – dorthin geht nichts mehr.`)} />
                           an
                         </label>
@@ -305,7 +305,7 @@ export function DiscordGuildsPanel() {
                   <ul className="space-y-1 tls-type-small" data-testid={`discord-guild-${guild.guild_id}-report`}>
                     {report.checks.map((entry) => (
                       <li key={entry.key} className={`flex items-start gap-2 ${entry.ok ? "text-white/60" : "text-[#FFD700]"}`}>
-                        {entry.ok ? <CheckCircle2 className="w-3.5 h-3.5 text-[#00FF88] shrink-0 mt-0.5" /> : <XCircle className="w-3.5 h-3.5 shrink-0 mt-0.5" />}
+                        {entry.ok ? <CheckCircle2 className="w-3.5 h-3.5 text-ok shrink-0 mt-0.5" /> : <XCircle className="w-3.5 h-3.5 shrink-0 mt-0.5" />}
                         <span>{entry.text}</span>
                       </li>
                     ))}

@@ -28,7 +28,7 @@ function linkStateLabel(link) {
 function linkStateClass(link) {
   if (link.is_active === false) return "text-white/40";
   if (link.is_expired || link.is_exhausted) return "text-[#FF3B30]";
-  return "text-[#00FF88]";
+  return "text-ok";
 }
 
 function absoluteUrl(path) {
@@ -179,9 +179,9 @@ export function AccessLinksPanel({ targetType, targetId, allowRegister = false, 
       </div>
 
       {createdUrl && (
-        <div className="flex flex-wrap items-center gap-2 border border-[#00FF88]/25 bg-[#00FF88]/10 rounded-sm p-3">
+        <div className="flex flex-wrap items-center gap-2 border border-ok/25 bg-ok/10 rounded-sm p-3">
           <div className="min-w-0 flex-1">
-            <div className="tls-type-label text-[#00FF88]">Gerade erstellt</div>
+            <div className="tls-type-label text-ok">Gerade erstellt</div>
             <div className="mt-1 tls-type-small text-white/75 break-all">{createdUrl}</div>
           </div>
           <button

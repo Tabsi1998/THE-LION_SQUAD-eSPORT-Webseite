@@ -6,6 +6,7 @@ import { INPUT_CLASS } from "@/components/tls/FormFields";
 import { useConfirm } from "@/components/tls/ConfirmDialog";
 import { BoardOnly, Panel, PersonPicker, Stat, XP_SOURCES, errorText, personName } from "./shared";
 
+import { ROLE_COLORS } from "@/lib/categoryColors";
 /** XP (E10): Stand einer Person, Tagesdeckel je Quelle, Korrektur mit Grund, Prestige zurücksetzen. */
 export function XpTab({ board = false }) {
   const [person, setPerson] = useState(null);
@@ -69,7 +70,7 @@ export function XpTab({ board = false }) {
               <Stat label="Level" value={view.level} hint={view.title} testId="xp-level" />
               <Stat label="XP" value={Number(view.xp || 0).toLocaleString("de-DE")} hint={`nächstes Level ab ${Number(view.next_level_xp || 0).toLocaleString("de-DE")}`} accent="#29B6E8" testId="xp-total" />
               <Stat label="Prestige" value={"★".repeat(view.prestige || 0) || "–"} hint={view.prestige_available ? "Prestige möglich" : `${view.prestige || 0} Stern${view.prestige === 1 ? "" : "e"}`} accent="#FF3B30" testId="xp-prestige" />
-              <Stat label="Login-Serie" value={view.login_streak || 0} hint="Tage in Folge" accent="#00FF88" />
+              <Stat label="Login-Serie" value={view.login_streak || 0} hint="Tage in Folge" accent={ROLE_COLORS.ok} />
             </div>
             <Panel title={`Tagesdeckel heute (${caps.day})`} icon={Gauge} accent="#29B6E8" hint="Wie oft eine Quelle heute schon XP gebracht hat – volle Deckel bringen bis Mitternacht nichts mehr." testId="xp-caps">
               <div className="tls-swipe pb-0">

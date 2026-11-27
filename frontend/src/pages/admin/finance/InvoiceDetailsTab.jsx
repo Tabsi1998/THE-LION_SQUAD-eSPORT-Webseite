@@ -41,7 +41,7 @@ export function InvoiceDetailsTab({ onSaved }) {
   const ready = Boolean(details.terms?.complete && details.tax_confirmed);
   return (
     <div className="mt-6 space-y-4 max-w-4xl" data-testid="invoice-details">
-      <div className={`border rounded-sm p-4 tls-type-small ${details.write_capable ? "border-[#00FF88]/30" : "border-[#FF9500]/40 bg-[#FF9500]/5"}`} data-testid="invoice-details-write">
+      <div className={`border rounded-sm p-4 tls-type-small ${details.write_capable ? "border-ok/30" : "border-[#FF9500]/40 bg-[#FF9500]/5"}`} data-testid="invoice-details-write">
         {details.write_capable
           ? "Rechnungen schreiben ist an: die Website legt Belege in Dolibarr an."
           : details.connected

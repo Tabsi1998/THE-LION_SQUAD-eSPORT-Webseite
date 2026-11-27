@@ -29,7 +29,7 @@ export function channelLabel(channel) {
 function ChannelBadge({ channel }) {
   const beta = channel === "beta";
   return (
-    <span className={`inline-flex items-center px-2 py-0.5 rounded-sm border tls-type-label ${beta ? "border-[#FFD95A]/50 text-[#FFD95A] bg-[#FFD95A]/10" : "border-[#00FF88]/40 text-[#00FF88] bg-[#00FF88]/10"}`}>
+    <span className={`inline-flex items-center px-2 py-0.5 rounded-sm border tls-type-label ${beta ? "border-[#FFD95A]/50 text-[#FFD95A] bg-[#FFD95A]/10" : "border-ok/40 text-ok bg-ok/10"}`}>
       {channelLabel(channel)}
     </span>
   );
@@ -182,9 +182,9 @@ export default function AdminAppReleasesPage() {
       {tokenStatus ? (
         <div
           data-testid="app-release-token-status"
-          className={`mb-6 flex items-start gap-3 rounded-sm border px-4 py-3 tls-type-small ${tokenStatus.configured ? "border-[#00FF88]/25 bg-[#00FF88]/5" : "border-[#FFD95A]/30 bg-[#FFD95A]/10"}`}
+          className={`mb-6 flex items-start gap-3 rounded-sm border px-4 py-3 tls-type-small ${tokenStatus.configured ? "border-ok/25 bg-ok/5" : "border-[#FFD95A]/30 bg-[#FFD95A]/10"}`}
         >
-          {tokenStatus.configured ? <CheckCircle2 className="w-4 h-4 text-[#00FF88] mt-0.5" /> : <Smartphone className="w-4 h-4 text-[#FFD95A] mt-0.5" />}
+          {tokenStatus.configured ? <CheckCircle2 className="w-4 h-4 text-ok mt-0.5" /> : <Smartphone className="w-4 h-4 text-[#FFD95A] mt-0.5" />}
           <div>
             <div className="font-bold">
               Upload-Token am Server: {tokenStatus.configured ? `eingerichtet (${tokenStatus.length} Zeichen)` : "fehlt"}
@@ -270,7 +270,7 @@ export default function AdminAppReleasesPage() {
                 <td className="p-3">{row.min_build ? `Build ${row.min_build}` : "–"}</td>
                 <td className="p-3">
                   {row.is_current ? (
-                    <span className="inline-flex items-center gap-1 tls-type-label text-[#00FF88]"><CheckCircle2 className="w-3 h-3" /> aktuell</span>
+                    <span className="inline-flex items-center gap-1 tls-type-label text-ok"><CheckCircle2 className="w-3 h-3" /> aktuell</span>
                   ) : (
                     <button type="button" onClick={() => patch(row, { is_current: true }, `Build ${row.build} ist jetzt das aktuelle Release.`)} className="tls-type-label text-white/50 hover:text-[#29B6E8]">
                       als aktuell setzen

@@ -91,7 +91,7 @@ export default function MyMembershipPage() {
           <div id="beitrag" className={`mt-6 scroll-mt-32 border rounded-sm bg-[#121212] p-5 ${fee.tone === "warn" ? "border-[#FFD700]/40" : "border-white/10"}`} data-testid="membership-fee-card">
             <div className="flex flex-wrap items-center justify-between gap-3">
               <h2 className="tls-type-section inline-flex items-center gap-2"><Wallet className="w-4 h-4 text-[#FFD700]" /> Mitgliedsbeitrag</h2>
-              <span className={`tls-type-label ${fee.tone === "warn" ? "text-[#FFD700]" : fee.tone === "info" ? "text-[#29B6E8]" : "text-[#00FF88]"}`}>{fee.label}</span>
+              <span className={`tls-type-label ${fee.tone === "warn" ? "text-[#FFD700]" : fee.tone === "info" ? "text-[#29B6E8]" : "text-ok"}`}>{fee.label}</span>
             </div>
             {fee.amount && <div className="mt-2 tls-type-section">{fee.amount} <span className="tls-type-small text-quiet font-normal">je Beitragsperiode</span></div>}
             <ul className="mt-2 space-y-1 tls-type-small text-white/75">
@@ -489,7 +489,7 @@ function SelfServiceCard() {
       </p>
       {/* Einmalige Freigabe (#329, Vereine 1.8.0): der Vorstand gibt das Mitglied in Dolibarr für eine direkte Änderung frei. */}
       {profile.direct_once ? (
-        <p className="mt-3 tls-type-body border border-[#00FF88]/40 bg-[#00FF88]/10 text-[#00FF88] rounded-sm p-3" data-testid="membership-self-once">
+        <p className="mt-3 tls-type-body border border-ok/40 bg-ok/10 text-ok rounded-sm p-3" data-testid="membership-self-once">
           Der Vorstand hat dich für eine Änderung freigegeben: Deine nächste Änderung gilt sofort – auch eine neue E-Mail-Adresse.
         </p>
       ) : null}
@@ -641,7 +641,7 @@ export function ConsentsCard() {
               <div className="flex flex-wrap items-start justify-between gap-3">
                 <div className="min-w-0">
                   <div className="font-bold text-white">{row.label}</div>
-                  <div className={`tls-type-small ${row.state === "given" ? "text-[#00FF88]" : row.state === "withdrawn" ? "text-[#FFD700]" : "text-white/45"}`} data-testid={`consent-state-${row.code}`}>{(CONSENT_STATE[row.state] || CONSENT_STATE.none)(row)}</div>
+                  <div className={`tls-type-small ${row.state === "given" ? "text-ok" : row.state === "withdrawn" ? "text-[#FFD700]" : "text-white/45"}`} data-testid={`consent-state-${row.code}`}>{(CONSENT_STATE[row.state] || CONSENT_STATE.none)(row)}</div>
                   {row.text_changed && <div className="mt-1 tls-type-small text-[#FFD700]" data-testid={`consent-changed-${row.code}`}>Text geändert – bitte die neue Fassung lesen.</div>}
                 </div>
                 <div className="flex flex-wrap gap-2 shrink-0">

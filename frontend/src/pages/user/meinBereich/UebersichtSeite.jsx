@@ -46,7 +46,7 @@ export default function UebersichtSeite() {
           </StaggerIn>
         ) : (
           <p className="mt-3 flex items-center gap-2 rounded-sm border border-white/10 bg-[#121212] px-4 py-4 tls-type-small text-white/70" data-testid="mein-bereich-todo-empty">
-            <CheckCircle2 className="w-4 h-4 shrink-0 text-[#00FF88]" aria-hidden="true" /> Alles erledigt – gerade ist nichts offen.
+            <CheckCircle2 className="w-4 h-4 shrink-0 text-ok" aria-hidden="true" /> Alles erledigt – gerade ist nichts offen.
           </p>
         )}
       </section>

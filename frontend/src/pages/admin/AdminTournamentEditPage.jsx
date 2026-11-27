@@ -477,7 +477,7 @@ export default function AdminTournamentEditPage() {
       </button>
     ),
     canLockTournament && (
-      <button key="lock" type="button" onClick={() => setTournamentLock(!t.locked_at)} data-testid="admin-tr-lock" className={`px-3 py-2 border tls-type-label rounded-sm ${t.locked_at ? "border-[#00FF88]/40 text-[#00FF88] hover:bg-[#00FF88]/10" : "border-[#FFD700]/50 text-[#FFD700] hover:bg-[#FFD700]/10"}`}>
+      <button key="lock" type="button" onClick={() => setTournamentLock(!t.locked_at)} data-testid="admin-tr-lock" className={`px-3 py-2 border tls-type-label rounded-sm ${t.locked_at ? "border-ok/40 text-ok hover:bg-ok/10" : "border-[#FFD700]/50 text-[#FFD700] hover:bg-[#FFD700]/10"}`}>
         {t.locked_at ? "Entsperren" : "Sperren"}
       </button>
     ),

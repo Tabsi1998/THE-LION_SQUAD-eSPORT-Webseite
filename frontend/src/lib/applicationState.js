@@ -37,7 +37,7 @@ export function applicationState(app, formatDay = (value) => value) {
 export const STATE_TONE_CLASS = {
   open: "border-[#29B6E8]/45 text-[#29B6E8]",
   wait: "border-[#FF9500]/45 text-[#FF9500]",
-  done: "border-[#00FF88]/40 text-[#00FF88]",
+  done: "border-ok/40 text-ok",
   stop: "border-white/20 text-white/55",
   unknown: "border-[#FF9500]/45 text-[#FF9500]",
 };

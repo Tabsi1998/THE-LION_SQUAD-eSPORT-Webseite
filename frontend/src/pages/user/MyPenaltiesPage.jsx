@@ -44,7 +44,7 @@ export default function MyPenaltiesPage() {
             errorTitle="Deine Strafen konnten nicht geladen werden"
             empty={(
               <div className="border border-dashed border-white/15 rounded-sm p-12 text-center">
-                <ShieldAlert className="w-10 h-10 text-[#00FF88] mx-auto mb-3" />
+                <ShieldAlert className="w-10 h-10 text-ok mx-auto mb-3" />
                 <div className="tls-type-card">Saubere Weste</div>
                 <p className="mt-2 text-white/60 tls-type-body">Keine Strafen, keine ungültigen Runden, keine kampflosen Niederlagen – weiter so!</p>
               </div>

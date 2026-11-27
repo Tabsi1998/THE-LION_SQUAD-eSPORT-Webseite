@@ -187,7 +187,7 @@ export function AuthCheckboxField({ id, checked, onChange, required = false, err
 
 export function AuthFormAlert({ id, tone = "error", children }) {
   const cls = tone === "success"
-    ? "text-white/75 bg-[#00FF88]/10 border-[#00FF88]/30"
+    ? "text-white/75 bg-ok/10 border-ok/30"
     : tone === "info"
       ? "text-white/75 bg-[#29B6E8]/10 border-[#29B6E8]/30"
     : "text-[#FF8A80] bg-[#FF3B30]/10 border-[#FF3B30]/35";

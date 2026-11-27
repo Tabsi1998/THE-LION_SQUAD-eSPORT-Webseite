@@ -7,10 +7,11 @@ import { Award, Download, Gift, CheckCircle2, Clock, XCircle, MapPin, Trophy, Us
 import { Link } from "react-router-dom";
 import { asInstant, viennaDate } from "@/lib/vienna";
 
+import { ROLE_COLORS } from "@/lib/categoryColors";
 const STATUS = {
   pending: { label: "Wird vorbereitet", color: "text-[#FFD700]", icon: Clock },
   ready: { label: "Bereit zur Abholung", color: "text-[#29B6E8]", icon: Gift },
-  picked_up: { label: "Abgeholt", color: "text-[#00FF88]", icon: CheckCircle2 },
+  picked_up: { label: "Abgeholt", color: "text-ok", icon: CheckCircle2 },
   expired: { label: "Verfallen", color: "text-[#FF3B30]", icon: XCircle },
 };
 
@@ -97,7 +98,7 @@ function PrizesView({ data, onRetry }) {
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-8">
           <PrizeStat icon={Gift} label="Offen" value={open.length} color="#FFD700" />
           <PrizeStat icon={MapPin} label="Abholbereit" value={ready.length} color="#29B6E8" />
-          <PrizeStat icon={CheckCircle2} label="Abgeholt" value={closed.filter((p) => p.status === "picked_up").length} color="#00FF88" />
+          <PrizeStat icon={CheckCircle2} label="Abgeholt" value={closed.filter((p) => p.status === "picked_up").length} color={ROLE_COLORS.ok} />
           <PrizeStat icon={Award} label="Urkunden" value={certificates.length} color="#A855F7" />
         </div>
       )}

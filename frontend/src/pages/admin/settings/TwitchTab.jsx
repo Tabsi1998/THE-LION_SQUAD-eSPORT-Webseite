@@ -120,7 +120,7 @@ export function TwitchTab({ brand, setBrandField, status, saving, refreshing, on
                   <div className="font-bold tls-wrap">{channel.display_name || channel.username}</div>
                   <div className="tls-type-small text-white/45 tls-wrap">twitch.tv/{channel.twitch_login}{channel.is_live ? " · live" : ""}</div>
                 </div>
-                <span className={`tls-type-label shrink-0 ${channel.homepage_visible ? "text-[#00FF88]" : "text-[#FFD700]"}`}>
+                <span className={`tls-type-label shrink-0 ${channel.homepage_visible ? "text-ok" : "text-[#FFD700]"}`}>
                   {channel.homepage_visible ? "Startseite" : "nicht sichtbar"}
                 </span>
                 <div className="tls-type-small text-white/55 min-w-0 flex-1">{channel.reason_text}</div>

@@ -20,7 +20,7 @@ import { ShortCaps } from "@/components/tls/ShortCaps";
 // der Auswahl, jeder Beleg öffnet sich in Dolibarr. Die Tageszentrale verlinkt mit `?attention=`.
 
 const STATUS_TONE = {
-  pending: "text-white/70", ready: "text-[#00FF88]", invoiced: "text-[#00FF88]",
+  pending: "text-white/70", ready: "text-ok", invoiced: "text-ok",
   waiting_write_access: "text-[#FFD700]", waiting_link: "text-[#FFD700]", waiting_review: "text-[#FFD700]", held: "text-[#29B6E8]",
   failed: "text-[#FF3B30]", cancelled: "text-white/40",
 };
@@ -50,7 +50,7 @@ function AttentionBar({ counts, labels, active, onPick }) {
           </button>
         );
       })}
-      {total === 0 && <span className="text-[#00FF88]" data-testid="finance-attention-ok">Alles in Ordnung – kein Beleg hängt.</span>}
+      {total === 0 && <span className="text-ok" data-testid="finance-attention-ok">Alles in Ordnung – kein Beleg hängt.</span>}
     </div>
   );
 }
@@ -208,13 +208,13 @@ export default function AdminFinancePage() {
           <div className="mt-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-5" data-testid="finance-summary">
             <Stat label="Wartet auf Voraussetzungen" value={waiting} tone={waiting ? "text-[#FFD700]" : "text-white"} />
             <Stat label="Wartet auf Freigabe" value={status.held?.count || 0} tone="text-[#29B6E8]" />
-            <Stat label="Bereit für Dolibarr" value={status.ready?.count || 0} tone="text-[#00FF88]" />
+            <Stat label="Bereit für Dolibarr" value={status.ready?.count || 0} tone="text-ok" />
             <Stat label="Gescheitert" value={status.failed?.count || 0} tone={status.failed?.count ? "text-[#FF3B30]" : "text-white"} />
             <Stat label="Prüffälle offen" value={data.cases_open || 0} tone={data.cases_open ? "text-[#FF3B30]" : "text-white"} testId="finance-cases-count" />
           </div>
 
-          <div className={`mt-4 border rounded-sm p-4 tls-type-small flex items-start gap-3 ${data.dolibarr?.write_capable ? "border-[#00FF88]/30" : "border-[#FFD700]/40 bg-[#FFD700]/5"}`} data-testid="finance-dolibarr">
-            {data.dolibarr?.write_capable ? <CheckCircle2 className="w-4 h-4 text-[#00FF88] mt-0.5" /> : <AlertTriangle className="w-4 h-4 text-[#FFD700] mt-0.5" />}
+          <div className={`mt-4 border rounded-sm p-4 tls-type-small flex items-start gap-3 ${data.dolibarr?.write_capable ? "border-ok/30" : "border-[#FFD700]/40 bg-[#FFD700]/5"}`} data-testid="finance-dolibarr">
+            {data.dolibarr?.write_capable ? <CheckCircle2 className="w-4 h-4 text-ok mt-0.5" /> : <AlertTriangle className="w-4 h-4 text-[#FFD700] mt-0.5" />}
             <div>
               {data.dolibarr?.write_capable
                 ? "Dolibarr ist angebunden und darf Rechnungen anlegen."
@@ -335,7 +335,7 @@ export default function AdminFinancePage() {
                     </div>
                     <div className="mt-3 flex flex-wrap items-center gap-2">
                       <input value={caseReason[item.id] || ""} onChange={(ev) => setCaseReason((c) => ({ ...c, [item.id]: ev.target.value }))} placeholder="Grund, z. B. „Gutschrift GA2026-0003 angelegt, 20 € am 24.09. überwiesen“" className="flex-1 min-w-[min(16rem,100%)] bg-[#0A0A0A] border border-white/10 px-2 py-1.5 rounded-sm text-xs" aria-label="Grund für die Erledigung" data-testid={`finance-case-reason-${item.id}`} />
-                      <button type="button" disabled={!!busy || (caseReason[item.id] || "").trim().length < 3} onClick={() => run(`case-${item.id}`, () => api.post(`/admin/finance/cases/${item.id}/resolve`, { reason: caseReason[item.id].trim() }), "Prüffall erledigt.")} className="px-3 py-1.5 border border-[#00FF88]/50 text-[#00FF88] rounded-sm tls-type-label disabled:opacity-40" data-testid={`finance-case-resolve-${item.id}`}>
+                      <button type="button" disabled={!!busy || (caseReason[item.id] || "").trim().length < 3} onClick={() => run(`case-${item.id}`, () => api.post(`/admin/finance/cases/${item.id}/resolve`, { reason: caseReason[item.id].trim() }), "Prüffall erledigt.")} className="px-3 py-1.5 border border-ok/50 text-ok rounded-sm tls-type-label disabled:opacity-40" data-testid={`finance-case-resolve-${item.id}`}>
                         Erledigt
                       </button>
                     </div>
@@ -621,7 +621,7 @@ function OrderDetail({ detail, busy, paymentLabels, onClose, onResync, onRefund 
             {timeline.map((item, index) => (
               <li key={`${item.at}-${index}`} className="flex gap-3">
                 <span className="text-white/40 shrink-0 tabular-nums w-28" data-testid="finance-timeline-at">{timelineMoment(item.at)}</span>
-                <span className={item.kind === "error" || item.kind === "case" ? "text-[#FF3B30]" : item.kind === "payment" ? "text-[#00FF88]" : "text-white/80"}>{item.text}</span>
+                <span className={item.kind === "error" || item.kind === "case" ? "text-[#FF3B30]" : item.kind === "payment" ? "text-ok" : "text-white/80"}>{item.text}</span>
               </li>
             ))}
             {!timeline.length && <li className="text-white/40">Noch nichts passiert.</li>}
@@ -645,7 +645,7 @@ function OrderDetail({ detail, busy, paymentLabels, onClose, onResync, onRefund 
               </select>
             ) : <span />}
           </div>
-          <button type="button" disabled={!!busy || !refundOk} onClick={saveRefund} className="mt-2 px-3 py-1.5 border border-[#00FF88]/50 text-[#00FF88] rounded-sm tls-type-label disabled:opacity-40" data-testid="finance-refund-save">
+          <button type="button" disabled={!!busy || !refundOk} onClick={saveRefund} className="mt-2 px-3 py-1.5 border border-ok/50 text-ok rounded-sm tls-type-label disabled:opacity-40" data-testid="finance-refund-save">
             Erstattung eintragen
           </button>
         </div>

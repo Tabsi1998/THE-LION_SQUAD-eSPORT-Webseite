@@ -7,6 +7,7 @@ import { STAFF_ROLE_LABELS } from "@/lib/tournamentLabels";
 import { staffRolesSentence } from "@/lib/staffRoles";
 import { viennaDate, viennaTime } from "@/lib/vienna";
 
+import { ROLE_COLORS } from "@/lib/categoryColors";
 const KIND = {
   tournament: { label: "Turnier", icon: Trophy, open: "Turnierleitung öffnen" },
   fastlap: { label: "Fast Lap", icon: Flag, open: "Fast Lap öffnen" },
@@ -67,7 +68,7 @@ export function ModerationDuty({ moderation }) {
   return (
     <div className={`rounded-sm border bg-[#121212] p-4 md:flex md:items-center md:gap-4 ${open ? "border-[#FF3B30]/40" : "border-white/10"}`} data-testid="duty-moderation">
       <div className="flex min-w-0 flex-1 items-center gap-3">
-        <MessageCircleWarning className="w-5 h-5 shrink-0" style={{ color: open ? "#FF3B30" : "#00FF88" }} aria-hidden="true" />
+        <MessageCircleWarning className="w-5 h-5 shrink-0" style={{ color: open ? "#FF3B30" : ROLE_COLORS.ok }} aria-hidden="true" />
         <div className="min-w-0">
           <div className="font-bold text-white">Moderation</div>
           <div className="tls-type-small text-white/60" data-testid="duty-moderation-count">

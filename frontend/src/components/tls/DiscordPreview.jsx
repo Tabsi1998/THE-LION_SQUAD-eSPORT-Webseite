@@ -67,12 +67,12 @@ export function DiscordPreview({ kind, item, skip, onSkipChange }) {
       {error && <div className="tls-type-small text-[#FF6B6B]">{error}</div>}
       {preview && (
         <>
-          <div className={`tls-type-small ${preview.would_send ? "text-[#00FF88]" : "text-[#FFD700]"}`} data-testid="discord-preview-verdict">
+          <div className={`tls-type-small ${preview.would_send ? "text-ok" : "text-[#FFD700]"}`} data-testid="discord-preview-verdict">
             {preview.would_send ? `Geht beim Veröffentlichen an: ${TARGET_NAMES[preview.target] || preview.target}.` : (SKIP_REASONS[preview.reason] || "Wird nicht gesendet.")}
           </div>
           <DiscordMessagePreview embed={embed} buttons={preview.buttons} testId="discord-preview-message" embedTestId="discord-preview-embed" />
           {preview.scheduled_event && (
-            <div className={`tls-type-small ${preview.scheduled_event.would_create ? "text-[#00FF88]" : "text-white/50"}`} data-testid="discord-preview-scheduled">
+            <div className={`tls-type-small ${preview.scheduled_event.would_create ? "text-ok" : "text-white/50"}`} data-testid="discord-preview-scheduled">
               {scheduledEventText(preview.scheduled_event)}
             </div>
           )}
