@@ -189,14 +189,14 @@ export default function SeasonPage() {
           </div>
           <div className="md:hidden divide-y divide-white/5">
             {standings.map((r) => (
-              // Unter 360 px stehen die Etiketten unter dem Namen statt rechts daneben - der Name hat so Platz für ganze Wörter.
+              // Am Handy stehen die Etiketten unter dem Namen statt rechts daneben - der Name hat so Platz für ganze Wörter.
               <div key={r.user_id} data-testid={`season-item-${r.user_id}`} className={`p-4 grid grid-cols-[2.5rem_minmax(0,1fr)_auto] items-center gap-x-3${isMine(r) ? " tls-you tls-you--inset" : ""}`}>
                 <div className={`row-span-2 tls-type-section tls-type-num ${rankColor(r.rank)}`}>#{r.rank}</div>
-                <div className="row-span-2 min-w-0 max-[359px]:row-span-1">
+                <div className="min-w-0">
                   <PlayerIdentity row={r} mine={isMine(r)} />
                 </div>
-                <div className="self-end text-right tls-type-section tls-type-num text-[#29B6E8] max-[359px]:self-center">{formatPoints(r.points)}</div>
-                <div className="self-start text-right max-[359px]:col-span-2 max-[359px]:col-start-2 max-[359px]:pl-[52px] max-[359px]:pt-1 max-[359px]:text-left" data-testid={`season-item-facts-${r.user_id}`}>
+                <div className="text-right tls-type-section tls-type-num text-[#29B6E8]">{formatPoints(r.points)}</div>
+                <div className="col-span-2 col-start-2 pl-[52px] pt-1" data-testid={`season-item-facts-${r.user_id}`}>
                   <div className="tls-type-label text-quiet">{r.events_count} Wertungen · {r.wins} Siege</div>
                   <div className="tls-type-label text-quiet">{r.achievement_count || 0} Achievements</div>
                 </div>

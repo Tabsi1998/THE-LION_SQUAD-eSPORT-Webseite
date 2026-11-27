@@ -148,11 +148,12 @@ test.describe("Schrift-Treppe", () => {
     });
   }
 
-  // Jahreswertung am Handy: Unter 360 px stehen „Wertungen · Siege“ und „Achievements“ unter dem Namen statt rechts
-  // daneben - der Name hat so Platz und bricht nur zwischen Wörtern (ein Wort, das allein breiter ist als die Spalte,
-  // darf brechen). Ab 360 px bleibt alles, wie es war: die Etiketten rechts unter den Punkten.
-  for (const [width, below] of [[320, true], [390, false]]) {
-    test(`Jahreswertung bei ${width} px: Namen in ganzen Wörtern, Etiketten ${below ? "unter dem Namen" : "rechts"}`, async ({ page }) => {
+  // Jahreswertung am Handy (Liste unter 768 px): „Wertungen · Siege“ und „Achievements“ stehen unter dem Namen statt
+  // rechts daneben - der Name hat so Platz und bricht nur zwischen Wörtern, nie Buchstabe für Buchstabe. Nur ein Wort,
+  // das allein breiter ist als die Spalte („xX_Nebelwolf_Xx.Rudel“), darf brechen.
+  const UNBREAKABLE = ["xX_Nebelwolf_Xx.Rudel"];
+  for (const width of [320, 390, 767]) {
+    test(`Jahreswertung bei ${width} px: Namen in ganzen Wörtern, Etiketten unter dem Namen`, async ({ page }) => {
       await page.setViewportSize({ width, height: 844 });
       await mockLongApi(page);
       await page.route(`**/api/seasons/${SEASON.slug}/standings**`, (route) => route.fulfill(json({ season: SEASON, standings: STANDINGS })));
@@ -166,6 +167,7 @@ test.describe("Schrift-Treppe", () => {
         const factsBox = facts?.getBoundingClientRect();
         // Jedes Wort, das allein in die Spalte passt, steht auf einer Zeile.
         const broken = [];
+        const tooWide = [];
         const text = name.firstChild;
         let offset = 0;
         for (const word of name.textContent.split(/(?<=[\s-])/)) {
@@ -181,19 +183,22 @@ test.describe("Schrift-Treppe", () => {
           probe.remove();
           const lines = new Set([...range.getClientRects()].map((rect) => Math.round(rect.top))).size;
           if (alone <= nameBox.width && lines > 1) broken.push(word.trim());
+          if (alone > nameBox.width + 1) tooWide.push(word.trim());
         }
         return {
           id,
           nameWidth: Math.round(nameBox.width),
           broken,
+          tooWide,
           below: factsBox ? factsBox.top >= nameBox.bottom - 1 : null,
           right: factsBox ? factsBox.left >= nameBox.right - 1 : null,
         };
       }), STANDINGS.map((row) => row.user_id));
       for (const row of rows) {
         expect(row.broken, `${row.id}: Wörter mitten im Wort gebrochen`).toEqual([]);
-        expect(row.right, `${row.id}: Etiketten rechts neben dem Namen`).toBe(!below);
-        if (below) expect(row.below, `${row.id}: Etiketten unter dem Namen`).toBe(true);
+        expect(row.tooWide.filter((word) => !UNBREAKABLE.includes(word)), `${row.id}: Wörter breiter als die Namensspalte (${row.nameWidth} px)`).toEqual([]);
+        expect(row.right, `${row.id}: Etiketten rechts neben dem Namen`).toBe(false);
+        expect(row.below, `${row.id}: Etiketten unter dem Namen`).toBe(true);
       }
       const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
       expect(overflow).toBeLessThanOrEqual(1);
