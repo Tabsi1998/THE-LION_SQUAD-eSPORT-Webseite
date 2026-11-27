@@ -1,7 +1,7 @@
 // Saisonende-Moment (#1639): Pakete für die Zeremonie-Schlange. Eigenes Modul, das ``RewardWatcher`` erst nachlädt, wenn es wirklich
 // einen Moment gibt - der Start der Website bleibt so schlank (check:bundle).
 
-import { claimKey, doneKey, readMark, writeMark } from "@/lib/momentMarks";
+import { claimKey, doneKey, momentVersion, readMark, writeMark } from "@/lib/momentMarks";
 
 // Der Schlüssel dieses Geräts je Person und Moment (``lib/momentMarks``). Er überlebt das Neuladen - geht die Antwort auf das Holen
 // verloren, bekommt dasselbe Gerät den Moment beim nächsten Besuch wieder, ein anderes nicht.
@@ -13,13 +13,17 @@ function deviceToken(userId, id) {
   return fresh;
 }
 
-/** Schon geschlossen, aber „fertig“ kam beim Server nicht an: still nachmelden, nicht noch einmal zeigen - nur für diese Person. */
-export function finishedHere(userId, id) {
-  return readMark(doneKey(userId, id)) === "1";
+/**
+ * Schon geschlossen, aber „fertig“ kam beim Server nicht an: still nachmelden, nicht noch einmal zeigen - nur für diese Person und nur
+ * für denselben Stand (``momentVersion``). Nach einer Korrektur ist die Marke veraltet, ebenso eine ältere Marke ohne Stand („1“).
+ */
+export function finishedHere(userId, moment) {
+  return readMark(doneKey(userId, moment.id)) === momentVersion(moment);
 }
 
-export function reportDone(userId, id, client) {
-  writeMark(doneKey(userId, id), "1");
+export function reportDone(userId, moment, client) {
+  const id = moment.id;
+  writeMark(doneKey(userId, id), momentVersion(moment));
   client.post("/me/league-moments/done", { ids: [id] })
     .then(() => { writeMark(doneKey(userId, id), null); writeMark(claimKey(userId, id), null); })
     // Bewusst still: Die Marke bleibt, der nächste Besuch meldet nach.
@@ -54,7 +58,7 @@ export function momentPackage(moment, client, userId) {
     },
     onRewardsShown: () => { rewardsShown = true; },
     onDone: () => {
-      if (claimed) reportDone(userId, moment.id, client);
+      if (claimed) reportDone(userId, moment, client);
       // Ohne Moment kamen die Belohnungen als eigener Ablauf - dann sind sie gesehen; mit Moment nur, wenn die zweite Karte kam.
       if (rewards.length && (rewardsShown || !claimed)) {
         // Bewusst still: nur die Gesehen-Marke - schlimmstenfalls kommen die Belohnungen noch einmal.
@@ -70,10 +74,12 @@ export function enqueueMoments(rows, { queue, client, queued, userId }) {
     const key = `moment:${moment?.id}`;
     if (!moment?.id || !moment.texts || queued.has(key)) continue;
     queued.add(key);
-    if (finishedHere(userId, moment.id)) {
-      reportDone(userId, moment.id, client);
+    if (finishedHere(userId, moment)) {
+      reportDone(userId, moment, client);
       continue;
     }
+    // Eine Marke eines älteren Stands (oder ohne Stand) gilt nicht - weg damit, der Moment kommt wieder (Nr. 277).
+    if (readMark(doneKey(userId, moment.id)) !== null) writeMark(doneKey(userId, moment.id), null);
     const pkg = momentPackage(moment, client, userId);
     pkg.rewards.forEach((award) => queued.add(award.id));
     queue.enqueue(pkg);

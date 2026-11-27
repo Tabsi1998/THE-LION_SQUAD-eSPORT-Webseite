@@ -1,5 +1,5 @@
 import { describe, expect, test } from "vitest";
-import { AVOID, WORDS, nameWithSubtitle } from "./words";
+import { AVOID, WORDS, nameWithSubtitle, teamLeadsWord } from "./words";
 
 const fs = require("fs");
 const path = require("path");
@@ -80,5 +80,13 @@ describe("nameWithSubtitle (#1238)", () => {
   test("ohne Untertitel oder ohne Namen bleibt nur das, was da ist", () => {
     expect(nameWithSubtitle("THE LION SQUAD", "")).toBe("THE LION SQUAD");
     expect(nameWithSubtitle("", "eSports")).toBe("eSports");
+  });
+});
+
+describe("teamLeadsWord (#2542, #2591)", () => {
+  test("in der Liga Captains, sonst Teamleitungen - wie die App, nie Team-Captains", () => {
+    expect(teamLeadsWord(true)).toBe("Captains");
+    expect(teamLeadsWord(false)).toBe("Teamleitungen");
+    expect(AVOID["Team-Captains"]).toMatch(/Teamleitungen/);
   });
 });

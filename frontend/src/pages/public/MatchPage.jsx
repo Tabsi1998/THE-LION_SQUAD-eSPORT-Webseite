@@ -51,6 +51,7 @@ import { tournamentCrumbs } from "@/lib/leagueTrail";
 import { LeagueEmblem } from "@/components/tls/league/public/LeagueLook";
 import { noteOwnMatches } from "@/lib/liveQueue";
 import { GuestBadge } from "@/components/tls/league/GuestBadge";
+import { teamLeadsWord } from "@/lib/words";
 
 const DECISION_TOASTS = {
   accept: "Termin bestätigt.",
@@ -742,7 +743,7 @@ function MatchPageView() {
               ) : showFixedScheduleNotice ? (
                 <p className="mt-3 text-sm text-white/55">Termin und Station werden durch die Turnierleitung festgelegt. Rückfragen bitte im Matchchat mit <button type="button" onClick={addStaffMention} className="text-[#29B6E8] font-bold hover:text-white">@leitung</button> markieren.</p>
               ) : data.schedule_block?.fixed ? null : (
-                <p className="mt-3 text-sm text-white/50">Termine können Teilnehmer, Team-Captains und Turnierleitung vorschlagen, sofern die Terminabstimmung aktiv ist.</p>
+                <p className="mt-3 text-sm text-white/50">Termine können Teilnehmer, {teamLeadsWord(Boolean(data.league))} und Turnierleitung vorschlagen, sofern die Terminabstimmung aktiv ist.</p>
               )}
 
               <div className="mt-5 space-y-3">
@@ -811,7 +812,7 @@ function MatchPageView() {
                 </div>
               </form>
             ) : (
-              <p className="mt-4 text-xs text-white/45">Schreiben können Teilnehmer, Team-Captains und Turnierleitung.</p>
+              <p className="mt-4 text-xs text-white/45">Schreiben können Teilnehmer, {teamLeadsWord(Boolean(data.league))} und Turnierleitung.</p>
             )}
           </aside>
           )}
