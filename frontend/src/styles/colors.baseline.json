@@ -1,0 +1,250 @@
+{
+  "beschreibung": "Grundlinie für styles/colors.test.js (#1305): wo die alten Rohfarben (Gold, Rot, Neon-Grün samt Nebentönen und rgba) noch stehen dürfen, je Datei mit Grund. Nur senken, nie erhöhen; neue Dateien kommen nicht dazu.",
+  "dateien": {
+    "components/achievements/badge.css": {
+      "grund": "Sammel-Optik der Erfolge und Level-Rahmen (Stufen Gold bis Legendär, Konfetti, Kronen) - bewusst ausgenommen.",
+      "zahlen": {
+        "red": 1
+      }
+    },
+    "components/achievements/ceremony/ceremony.css": {
+      "grund": "Sammel-Optik der Erfolge und Level-Rahmen (Stufen Gold bis Legendär, Konfetti, Kronen) - bewusst ausgenommen.",
+      "zahlen": {
+        "gold": 6,
+        "red": 2,
+        "neon": 4
+      }
+    },
+    "components/achievements/ceremony/particles.js": {
+      "grund": "Sammel-Optik der Erfolge und Level-Rahmen (Stufen Gold bis Legendär, Konfetti, Kronen) - bewusst ausgenommen.",
+      "zahlen": {
+        "gold": 2,
+        "red": 1,
+        "neon": 1
+      }
+    },
+    "components/achievements/materials.js": {
+      "grund": "Sammel-Optik der Erfolge und Level-Rahmen (Stufen Gold bis Legendär, Konfetti, Kronen) - bewusst ausgenommen.",
+      "zahlen": {
+        "gold": 3,
+        "red": 2
+      }
+    },
+    "components/tls/AchievementGroups.jsx": {
+      "grund": "Erfolgs-Stufen und Farbwähler bzw. Vorgabefarbe der Erfolgs-Gruppen (Daten, Sammel-Optik).",
+      "zahlen": {
+        "gold": 1,
+        "red": 5,
+        "neon": 1
+      }
+    },
+    "components/tls/CrownCelebrationCard.jsx": {
+      "grund": "Sammel-Optik der Erfolge und Level-Rahmen (Stufen Gold bis Legendär, Konfetti, Kronen) - bewusst ausgenommen.",
+      "zahlen": {
+        "gold": 2,
+        "red": 1,
+        "neon": 1
+      }
+    },
+    "components/tls/LevelAvatarFrame.jsx": {
+      "grund": "Sammel-Optik der Erfolge und Level-Rahmen (Stufen Gold bis Legendär, Konfetti, Kronen) - bewusst ausgenommen.",
+      "zahlen": {
+        "gold": 1
+      }
+    },
+    "components/tls/VideoEmbed.jsx": {
+      "grund": "Marke eines fremden Dienstes (YouTube-Rot).",
+      "zahlen": {
+        "red": 2
+      }
+    },
+    "components/tls/YearReviewBanner.jsx": {
+      "grund": "Jahresrückblick: Hintergrund-Glanz in den Vereinsfarben (Deko).",
+      "zahlen": {
+        "gold": 1
+      }
+    },
+    "components/tls/loewenSignaturEngine.js": {
+      "grund": "Löwen-Signatur der Erfolge (Sammel-Optik).",
+      "zahlen": {
+        "gold": 1
+      }
+    },
+    "components/tls/references/referenceParts.jsx": {
+      "grund": "Medaille Gold (Ehre) als Schein im Schatten.",
+      "zahlen": {
+        "gold": 1
+      }
+    },
+    "components/tv/TvSeasonDeco.jsx": {
+      "grund": "Saison-Deko am TV (Konfetti).",
+      "zahlen": {
+        "gold": 1,
+        "neon": 1
+      }
+    },
+    "components/tv/tv.css": {
+      "grund": "TV: Gold-Glanz der Ehren-Momente (Pokal, Sieger, Platz 1) - Zustände nehmen Rollen.",
+      "zahlen": {
+        "gold": 6
+      }
+    },
+    "index.css": {
+      "grund": "Level-Rahmen, Kronen-, Profil- und Ehren-Glanz (Sammel-Optik, Ehre); dazu der Knopf Gefahr (tls-btn--danger), der bis zum App-Paket gleich mit mobile/src/theme.ts bleibt. Die Zustände nehmen Rollen.",
+      "zahlen": {
+        "gold": 46,
+        "red": 17
+      }
+    },
+    "lib/ops.js": {
+      "grund": "Ampel im Betrieb (grün/gelb/rot) - Fabians Entscheidung vom 27.11.2026: bleibt als eigene Bildsprache.",
+      "zahlen": {
+        "gold": 1,
+        "red": 1
+      }
+    },
+    "pages/admin/AdminOpsPage.jsx": {
+      "grund": "Ampel im Betrieb (grün/gelb/rot) - Fabians Entscheidung vom 27.11.2026: bleibt als eigene Bildsprache.",
+      "zahlen": {
+        "red": 4,
+        "orange": 4
+      }
+    },
+    "pages/admin/achievements/CatalogTab.jsx": {
+      "grund": "Erfolgs-Stufen und Farbwähler bzw. Vorgabefarbe der Erfolgs-Gruppen (Daten, Sammel-Optik).",
+      "zahlen": {
+        "red": 1
+      }
+    },
+    "pages/admin/achievements/shared.jsx": {
+      "grund": "Erfolgs-Stufen und Farbwähler bzw. Vorgabefarbe der Erfolgs-Gruppen (Daten, Sammel-Optik).",
+      "zahlen": {
+        "gold": 1,
+        "red": 1
+      }
+    },
+    "pages/admin/ops/AppLogsTab.jsx": {
+      "grund": "Ampel im Betrieb (grün/gelb/rot) - Fabians Entscheidung vom 27.11.2026: bleibt als eigene Bildsprache.",
+      "zahlen": {
+        "red": 1,
+        "orange": 6
+      }
+    },
+    "pages/admin/ops/FileCleanupsPanel.jsx": {
+      "grund": "Ampel im Betrieb (grün/gelb/rot) - Fabians Entscheidung vom 27.11.2026: bleibt als eigene Bildsprache.",
+      "zahlen": {
+        "red": 1,
+        "orange": 1
+      }
+    },
+    "pages/admin/settings/YoutubeSettings.jsx": {
+      "grund": "Marke eines fremden Dienstes (YouTube-Rot).",
+      "zahlen": {
+        "red": 5
+      }
+    },
+    "pages/public/MemberProfilePage.jsx": {
+      "grund": "Glanz hinter Vereinsmitgliedern (Ehre, Mitgliedschaft) als rgba im Verlauf.",
+      "zahlen": {
+        "gold": 1
+      }
+    },
+    "pages/public/MembersDirectoryPage.jsx": {
+      "grund": "Glanz hinter Vereinsmitgliedern (Ehre, Mitgliedschaft) als rgba im Verlauf.",
+      "zahlen": {
+        "gold": 1
+      }
+    },
+    "pages/user/DashboardPage.jsx": {
+      "grund": "Glanz hinter Vereinsmitgliedern (Ehre, Mitgliedschaft) als rgba im Verlauf.",
+      "zahlen": {
+        "gold": 1
+      }
+    },
+    "pages/user/YearReviewPage.jsx": {
+      "grund": "Jahresrückblick: Hintergrund-Glanz in den Vereinsfarben (Deko).",
+      "zahlen": {
+        "gold": 1
+      }
+    },
+    "seasons/birthday/balloons.js": {
+      "grund": "Saison-Deko (Geburtstag, Fasching, Ostern, Maskottchen): eigene Festfarben, kein Zustand.",
+      "zahlen": {
+        "gold": 1
+      }
+    },
+    "seasons/birthday/birthday.css": {
+      "grund": "Saison-Deko (Geburtstag, Fasching, Ostern, Maskottchen): eigene Festfarben, kein Zustand.",
+      "zahlen": {
+        "gold": 4
+      }
+    },
+    "seasons/birthday/cake.js": {
+      "grund": "Saison-Deko (Geburtstag, Fasching, Ostern, Maskottchen): eigene Festfarben, kein Zustand.",
+      "zahlen": {
+        "gold": 1
+      }
+    },
+    "seasons/birthday/garland.js": {
+      "grund": "Saison-Deko (Geburtstag, Fasching, Ostern, Maskottchen): eigene Festfarben, kein Zustand.",
+      "zahlen": {
+        "gold": 1
+      }
+    },
+    "seasons/birthday/hat.jsx": {
+      "grund": "Saison-Deko (Geburtstag, Fasching, Ostern, Maskottchen): eigene Festfarben, kein Zustand.",
+      "zahlen": {
+        "gold": 1
+      }
+    },
+    "seasons/carnival/cardStreamer.js": {
+      "grund": "Saison-Deko (Geburtstag, Fasching, Ostern, Maskottchen): eigene Festfarben, kein Zustand.",
+      "zahlen": {
+        "gold": 1
+      }
+    },
+    "seasons/carnival/carnival.css": {
+      "grund": "Saison-Deko (Geburtstag, Fasching, Ostern, Maskottchen): eigene Festfarben, kein Zustand.",
+      "zahlen": {
+        "gold": 1
+      }
+    },
+    "seasons/carnival/confetti.js": {
+      "grund": "Saison-Deko (Geburtstag, Fasching, Ostern, Maskottchen): eigene Festfarben, kein Zustand.",
+      "zahlen": {
+        "gold": 1
+      }
+    },
+    "seasons/carnival/geometry.js": {
+      "grund": "Saison-Deko (Geburtstag, Fasching, Ostern, Maskottchen): eigene Festfarben, kein Zustand.",
+      "zahlen": {
+        "gold": 1
+      }
+    },
+    "seasons/carnival/index.jsx": {
+      "grund": "Saison-Deko (Geburtstag, Fasching, Ostern, Maskottchen): eigene Festfarben, kein Zustand.",
+      "zahlen": {
+        "gold": 1
+      }
+    },
+    "seasons/easterHunt/EggShape.jsx": {
+      "grund": "Saison-Deko (Geburtstag, Fasching, Ostern, Maskottchen): eigene Festfarben, kein Zustand.",
+      "zahlen": {
+        "gold": 1
+      }
+    },
+    "seasons/easterHunt/easter-hunt.css": {
+      "grund": "Saison-Deko (Geburtstag, Fasching, Ostern, Maskottchen): eigene Festfarben, kein Zustand.",
+      "zahlen": {
+        "gold": 5,
+        "red": 1
+      }
+    },
+    "seasons/mascot/mascot.css": {
+      "grund": "Saison-Deko (Geburtstag, Fasching, Ostern, Maskottchen): eigene Festfarben, kein Zustand.",
+      "zahlen": {
+        "gold": 1
+      }
+    }
+  }
+}

@@ -16,8 +16,8 @@ const SRC = path.resolve(__dirname, "..");
 const UTILITY = "(?:bg|text|border(?:-[trblxyse])?|from|via|to|ring|ring-offset|outline|divide|placeholder|fill|stroke|shadow|decoration|accent|caret)";
 // Farbe mit Deckkraft: `hover:bg-[#FFD700]/12`, `border-t-white/8`, `text-honor/42`.
 const COLOR_ALPHA = new RegExp(`(?<![\\w-])((?:[\\w-]+(?:\\[[^\\]\\s]*\\])?:)*!?${UTILITY}-(\\[[^\\]\\s]+\\]|[a-z]+(?:-[a-z0-9]+)*))\\/(\\d+)(?![\\w.\\]])`, "g");
-// Eigene Deckkraft-Klassen: `opacity-32`, `bg-opacity-12`.
-const OPACITY = /(?<![\w-])((?:[\w-]+(?:\[[^\]\s]*\])?:)*!?(?:bg-|text-|border-|ring-|divide-|placeholder-)?opacity)-(\d+)(?![\w.\]])/g;
+// Eigene Deckkraft-Klassen: `opacity-32`, `bg-opacity-12`, `backdrop-opacity-12`.
+const OPACITY = /(?<![\w-])((?:[\w-]+(?:\[[^\]\s]*\])?:)*!?(?:bg-|text-|border-|ring-|divide-|placeholder-|backdrop-)?opacity)-(\d+)(?![\w.\]])/g;
 // Schriftgröße mit Zeilenhöhe (`text-sm/6`) ist keine Deckkraft.
 const TEXT_SIZE = /^(xs|sm|base|lg|xl|[2-9]xl)$/;
 
@@ -47,7 +47,7 @@ test("die Skala kommt aus der Tailwind-Einstellung (0 bis 100 in Fünferschritte
 test("Gegenprobe: Werte außerhalb der Skala schlagen an, Skala, [0.xx] und Zeilenhöhe nicht", () => {
   expect(offScale('className="border border-white/8 bg-[#29B6E8]/12 hover:text-white/42 opacity-32"'))
     .toEqual(["border-white/8", "bg-[#29B6E8]/12", "hover:text-white/42", "opacity-32"]);
-  expect(offScale("from-[#FFD700]/12 via-[#0A0A0A]/78 border-t-white/44 md:bg-honor/96")).toEqual(["from-[#FFD700]/12", "via-[#0A0A0A]/78", "border-t-white/44", "md:bg-honor/96"]);
+  expect(offScale("from-[#FFD700]/12 via-[#0A0A0A]/78 border-t-white/44 md:bg-honor/96 backdrop-opacity-12")).toEqual(["from-[#FFD700]/12", "via-[#0A0A0A]/78", "border-t-white/44", "md:bg-honor/96", "backdrop-opacity-12"]);
   expect(offScale('className="border-white/10 bg-[#0A0A0A]/[0.96] text-white/45 opacity-30 bg-live/15 text-sm/6 w-1/2 aspect-[16/8]"')).toEqual([]);
 });
 
