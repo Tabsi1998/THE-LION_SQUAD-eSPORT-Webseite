@@ -245,6 +245,7 @@ async def get_bracket_display(tid: str, key: str | None = None, table: bool = Fa
             raise HTTPException(status_code=403, detail=KEY_EXPIRED)
         await touch_access_link(db, link)
         full = await _build_bracket_payload(db, t, None, False, with_table=table)
+        await _guest_marks_for_tv(db, t, full)
         return await _with_league_podium(db, t, await _with_onsite_path(db, t, _with_table(display_bracket_payload(full), full)))
     if not me:
         raise HTTPException(status_code=401, detail="Nicht angemeldet")
@@ -253,9 +254,18 @@ async def get_bracket_display(tid: str, key: str | None = None, table: bool = Fa
     if not t:
         raise HTTPException(status_code=404, detail="Turnier nicht gefunden")
     payload = await _build_bracket_payload(db, t, me, True, with_table=table)
+    await _guest_marks_for_tv(db, t, payload)
     # Wie mit Schlüssel: die belegten Plätze für den Anmelde-Bildschirm (#1123).
     payload["seats"] = seat_summary(t, payload.get("registrations"))
     return await _with_league_podium(db, t, await _with_onsite_path(db, t, _with_table(payload, payload)))
+
+
+async def _guest_marks_for_tv(db, t: dict, payload: dict) -> None:
+    """Gastteams am TV (#1665, Nr. 286): nur „Gast“, nie Verein oder Schule - die Tabelle ist öffentlich und dauerhaft zu sehen."""
+    if t.get("league_context") and payload.get("standings"):
+        from services import league_guests
+
+        await league_guests.mark(db, payload["standings"], short=True)
 
 
 def _with_table(payload: dict, full: dict) -> dict:
@@ -333,7 +343,13 @@ async def standings(tid: str, access: str | None = None, user=Depends(get_option
     else:
         t = await _get_visible_tournament(tid, user)
     is_staff = await _is_tournament_staff(tid, user)
-    return await _standing_rows(db, t, user, is_staff)
+    rows = await _standing_rows(db, t, user, is_staff)
+    if t.get("league_context"):
+        # Gastteams (#1665): die Plakette je Zeile - erst hier, damit kein Endstand sie mit einfriert.
+        from services import league_guests
+
+        await league_guests.mark(db, rows)
+    return rows
 
 
 # Ohne vorgeladene Zonen fragt ``_standing_rows`` sie selbst ab (#1630).

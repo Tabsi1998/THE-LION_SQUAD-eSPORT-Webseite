@@ -200,7 +200,7 @@ test("Anleitung: Inhalt, nummerierte Schritte mit Anker, Hinweis und Bild für H
 
   const step = screen.getByTestId("help-step-check-in");
   expect(step).toHaveAttribute("id", "check-in");
-  expect(step).toHaveTextContent("Schritt 14: Einchecken");
+  expect(step).toHaveTextContent("Schritt 15: Einchecken");
   expect(screen.getByTestId("help-hint-check-in")).toHaveTextContent("Grau heißt");
   const image = screen.getByTestId("help-step-image-check-in");
   expect(image).toHaveAttribute("alt", "Bildschirmfoto: Einchecken");

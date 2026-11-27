@@ -59,10 +59,9 @@ Selbstanmeldung, Veto, Check-in, Strafen und Saisonabschluss. Dazu kamen 20 Fund
 | | G.2 LionsAPP 1.7.10: Check-in, Veto live, Anmeldestatus, Zonen, Historie, Belohnungen | #2419 | #2173 (Teil) |
 | | G.3 Handbücher, Regelwerksabgleich, Feature-Matrix, dieser Bericht, D-20 | Branch `docs/liga-g3-abschluss` | #2211 |
 | Nach G.3 | Nachmeldung nach dem Start mit Spielen in offenen Wochen | – | #2422 |
-| | Eigene Staffel-Seite, Edition je Season, Partien ohne Maps, Veto-Seitenwahl, Vorfallarten schaltbar, freier Name je Liga N | – | #2262, #2400, #2401, #2402, #2403, #2405 |
+| | Eigene Staffel-Seite | – | #2262 |
 | | Playoffs und Relegation aus dem Endstand (F.6) | #2568 | #2404 |
 | | Auf- und Abstieg bei mehreren Staffeln, Startrechte mit Zusage, Frist und Nachrücken (F.2a) | #2573 | #1627 |
-| | Unterbesetzte Divisionen zusammenlegen | – | #1628 |
 | | Saisonende-Moment für Auf- und Abstieg und Meister (F.8), TV-Sieger-Moment | #2581 | #1639, #2410 |
 | G Freigabe | Gesamtabnahme erweitert (Saisonende, Betrieb), Backup-Probelauf, dieser Bericht fortgeschrieben | Branch `test/liga-abnahme-erweitern` | #1632 |
 
@@ -148,9 +147,17 @@ Saisonende-Moment je Person mit „Meister sofort“ und Einmaligkeit (#1639), V
 (E.4), Erinnerungen (E.5) sowie Backup und Restore mit Liga-Daten (lokal, Backup-Probelauf).
 
 **Getestet, aber nicht in der Gesamtabnahme** (Flow-, Unit- und Browser-Tests in der CI jedes PRs): Ausrüstung (C.4), Punkte nach
-gewonnenen Maps, Plattform, Transfers, Startseite, eigene Staffel-Seite (#2262), Edition je Season (#2400), Partien ohne Maps (#2401),
-Veto-Seitenwahl (#2402), Vorfallarten schaltbar (#2403), freier Name je Liga N (#2405), TV-Sieger-Moment (#2410), Zusammenlegen
-unterbesetzter Divisionen (#1628). Sie hängen nicht am Ablauf einer Tiroler-Liga-Season und sind darum kein Freigabe-Hindernis.
+gewonnenen Maps, Plattform, Transfers, Startseite, eigene Staffel-Seite (#2262), TV-Sieger-Moment (#2410). Sie hängen nicht am
+Ablauf einer Tiroler-Liga-Season und sind darum kein Freigabe-Hindernis.
+
+**Nicht gebaut** (Korrektur vom 27.11.: Der Stand vom 26.11. führte sie in Abschnitt 1 und hier als gebaut und getestet):
+
+| Punkt | Issue | Stand |
+| --- | --- | --- |
+| Edition je Season, Partien ohne Maps, Veto-Seitenwahl, Vorfallarten schaltbar, freier Name je Liga N | #2400, #2401, #2402, #2403, #2405 | „nicht geplant“ geschlossen, zusammengelegt in #2456 (16.11.) |
+| Unterbesetzte Divisionen zusammenlegen | #1628 | „nicht geplant“ geschlossen, auf der Merkliste #2455 (23.11.) |
+
+Season 1 braucht keinen davon.
 
 Noch offen:
 

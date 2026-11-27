@@ -267,6 +267,10 @@ async def _applications(db, me, season, staffeln) -> list[dict]:
     if not rows:
         return []
     teams = await teams_by_id(db, [side_of(row) for row in rows])
+    # Gastteams (#1665): die Plakette und ob eine Angabe der Teamleitung auf die Bestätigung wartet.
+    from services import league_guests
+
+    guests = await league_guests.teams_with_marks(db, [row.get("team_id") for row in rows])
     start = season.get("start_date")
     out = []
     for row in rows:
@@ -285,6 +289,10 @@ async def _applications(db, me, season, staffeln) -> list[dict]:
             action="Startrechte ansehen" if open_right else "Zuteilen" if accepted else "Entscheiden",
             due_at=until.isoformat() if until else start if start and str(start) > now_utc().isoformat() else None, since=row.get("created_at"),
             conflict=SIDE_CONFLICT_DETAIL if own else None, me_id=me.get("id")))
+        guest = guests.get(row.get("team_id") or "")
+        if guest:
+            out[-1].update({key: value for key, value in (("guest_badge", league_guests.badge(guest)),
+                                                          ("guest_pending", league_guests.pending(guest))) if value})
     return out
 
 
@@ -410,7 +418,7 @@ LOG_GROUPS = {
     "league.application": "Anmeldung", "league.sanction": "Strafe", "league.rules": "Regelwerk", "league.season": "Season",
     "league.roster": "Kader", "league.transfer": "Transfer", "league.squad": "Co-Team", "league.player": "Spieler", "league.staffel": "Staffel",
     "league.table": "Tabelle", "league.conflict": "Notausnahme bei Befangenheit", "league.broadcast": "Rundnachricht",
-    "league.division": "Liga N", "match.procedure": "Verfahren", "match.reschedule": "Verschiebung", "match.incident": "Vorfall",
+    "league.division": "Liga N", "league.guest_team": "Gastteam", "match.procedure": "Verfahren", "match.reschedule": "Verschiebung", "match.incident": "Vorfall",
     "match.result": "Ergebnis", "match.lineup": "Teilnehmerliste", "match.no_show": "Nicht erschienen", "match.checkin": "Check-in",
     "match.schedule": "Termin", "match.veto": "Veto", "match.dispute": "Streitfall",
     # Was ein Austritt oder Ausschluss an den Spielen ändert (``tournament_events.AUDIT_ACTIONS``).

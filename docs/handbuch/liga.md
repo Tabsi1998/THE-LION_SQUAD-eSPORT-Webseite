@@ -265,7 +265,7 @@ Turnierleitung), Sperrliste mit **Season konfigurieren** (lesen: jede Zuständig
 ### 2.2 Liga und Season anlegen
 
 1. **Admin → eSports → Liga → Liga anlegen**: Name (etwa „CoD-Liga“), Spiel und **Teilnehmer**: **Co-Teams** (Vorgabe) oder
-   **Spieler (1 gegen 1)** für eine Solo-Liga (2.5c). Die Teilnehmer stehen ab dem Anlegen fest.
+   **Spieler (1 gegen 1)** für eine Solo-Liga (2.5d). Die Teilnehmer stehen ab dem Anlegen fest.
 2. In der Liga **Season anlegen**: nur der **Beginn der ersten Spielwoche** (00:00 Uhr Wiener Zeit). Die übrigen Vorgaben
    kommen als Startwerte mit. Gibt es schon eine abgeschlossene Season, legst du die nächste besser aus ihr an (3.11).
 3. Die Season öffnen. Die Season-Seite hat zwölf **Reiter**; jede Angabe steht an genau einer Stelle. Am Handy wischst du die
@@ -541,7 +541,7 @@ Captains und Vertreter melden ihr Co-Team selbst auf der Ligaseite an, du entsch
 4. **Wer darf sich anmelden:** alle Konten (Vorgabe) oder nur Vereinsmitglieder. Bei Mitgliedern gilt das für den ganzen Kader.
 5. **Zwei Co-Teams eines Hauptteams in derselben Staffel:** Vorgabe Nein.
 5a. **Anmeldungen automatisch annehmen:** Vorgabe aus, dann prüfst du jede Anmeldung. Mehr dazu unten unter „Automatisch annehmen“.
-6. **Hinweis zum Datenschutz:** Der Text steht bei der Anmeldung über dem Link zur Datenschutzerklärung und wird mit der Zustimmung gespeichert. Leer steht dort ein vorläufiger Platzhalter-Satz. Den Wortlaut gibt der Obmann frei.
+6. **Hinweis zum Datenschutz:** Der Text steht bei der Anmeldung über dem Link zur Datenschutzerklärung und wird mit der Zustimmung gespeichert. Leer steht dort ein vorläufiger Platzhalter-Satz. Mitglieder sehen den Text sofort, Gäste ohne Mitgliedschaft erst, wenn der **Superadmin** ihn nach der rechtlichen Prüfung **für Gäste freigibt** (2.5c).
 7. **Regelwerk veröffentlichen** (2.11): Ohne gültige Version geht keine Anmeldung. Der alte Regeltext reicht dafür nicht, weil er keine Version hat und sich eine Zustimmung darauf nicht belegen lässt.
 
 **Nachmeldung nach dem Season-Start** (#2422):
@@ -650,7 +650,48 @@ steht: Dann teilst du von Hand zu (Nachmeldung, siehe 2.5a).
 
 **Eigenes Team:** Steht dein eigenes Team im Los, lost, tauscht und teilt eine andere Person zu (wie in 2.5a).
 
-### 2.5c Solo-Liga: Spieler statt Co-Teams
+### 2.5c Gastteams anderer Vereine und Schulen
+
+Ein **Gastteam** spielt als Gast für einen anderen Verein oder eine Schule: eigene Konten, keine Mitgliedschaft. Es meldet sich an wie jedes
+Team (2.5a), du lässt es über den **Eingang** zu. Eine eigene Einladung gibt es nicht. Gäste haben dieselben Rechte wie jedes Konto ohne
+Mitgliedschaft: Für ihr Team machen sie Termin, Check-in, Veto und Ergebnis, Vereinsinternes sehen sie nicht.
+
+**Wer was macht:**
+
+- Die **Teamleitung** des Gastteams trägt auf der Teamseite unter **Bearbeiten → Gastteam in der Liga** ein, für welchen Verein oder welche
+  Schule sie spielt, und speichert mit dem **Speichern** des Blatts. Bei einer Schule entscheidet sie auch, ob der Name öffentlich stehen
+  darf. Den Abschnitt gibt es erst, wenn das Team in einer Liga angemeldet ist.
+- **Du** setzt das Kennzeichen „Gast“ (Zuständigkeit „Teams freigeben“ in einer Liga, in der das Team **gerade** angemeldet oder zugeteilt
+  ist – ein abgelehnter oder zurückgezogener Antrag und eine beendete Season zählen nicht). Es kommt nie von selbst aus der Mitgliedschaft –
+  sonst könnte jeder an der Plakette ablesen, wer Mitglied ist.
+
+**Kennzeichnen** (Season-Seite, Reiter **Anmeldung und Kader** → **Anmeldungen**, nur bei offenen und angenommenen Anmeldungen): Hat die
+Teamleitung etwas angegeben, steht bei der Anmeldung ein Kasten **Gastteam** mit „Angabe der Teamleitung“ – auch ein Schulname ohne Freigabe, den nur du siehst – und
+„Wartet auf die Bestätigung der Liga-Leitung“. **Als Gastteam bestätigen** setzt das Kennzeichen. Ohne Angabe steht nur der leise Knopf
+**Als Gastteam kennzeichnen**, die Plakette zeigt dann nur „Gast“. Die Teamleitung bekommt eine Nachricht. Der Leitstand zeigt bei der
+Aufgabe zur Anmeldung, ob eine Angabe auf dich wartet.
+
+| Fall | Was öffentlich steht |
+| --- | --- |
+| Verein angegeben, bestätigt | „Gast · Name des Vereins“ |
+| Schule angegeben, Name freigegeben, bestätigt | „Gast · Name der Schule“ |
+| Schule ohne Freigabe, oder nichts angegeben | „Gast“ |
+| Teamleitung ändert Verein oder Schule nach der Bestätigung | „Gast“, bis du **Neu bestätigen** drückst |
+| Nicht bestätigt | nichts – das Team steht wie jedes andere da |
+
+**Wo die Plakette steht:** Tabelle, Spielplan und Spieltage, Teams der Season, Matchseite, Teamseite, Profil (aktuelle Ligen), Eingang und
+Leitstand – im Web; in der App folgt. Am **TV** und im **Discord** steht nur „Gast“, nie der Name von Verein oder Schule, weil beides
+öffentlich und dauerhaft zu sehen ist. Im Spielplan am Handy steht in der schmalen Spalte nur „Gast“, der Name ab Tablet-Breite.
+
+**Zurücknehmen:** **Kennzeichen zurücknehmen** nimmt die Plakette weg, die Angabe der Teamleitung bleibt stehen. Bestätigen und Zurücknehmen
+stehen im Protokoll der Season („Gastteam · bestätigt“). **Eigenes Team:** Gehörst du selbst zum Team, entscheidet eine andere Person; der
+Superadmin nur mit Grund für die Notausnahme.
+
+**Datenschutzhinweis für Gäste:** Konten ohne Mitgliedschaft sehen bei der Anmeldung den Platzhalter-Satz, bis der **Superadmin** den
+**Hinweis zum Datenschutz** (2.5a, Schritt 6) nach der rechtlichen Prüfung **für Gäste freigibt**. Die Freigabe gilt nur für genau diesen
+Wortlaut: Änderst du den Text, sehen Gäste wieder den Platzhalter. Mitglieder sehen den Text sofort.
+
+### 2.5d Solo-Liga: Spieler statt Co-Teams
 
 In einer Solo-Liga spielt jede Person für sich, 1 gegen 1 (etwa eine CoD-1v1-Liga mit Maps). Du wählst das beim Anlegen der Liga unter
 **Teilnehmer → Spieler (1 gegen 1)**. Die Wahl gibt es nur bei Spielen, die Einzelspieler erlauben (Spielseite, Reiter **Allgemein** →
@@ -2361,10 +2402,10 @@ die Wertung unter **Gesamtwertung** (mit PDF), Profil und Teamseite den Platz.
 | „Turnier kann ohne spielbares Match nicht gestartet werden.“ | Eine ältere Staffel steht noch im Check-in | Status oben auf **Entwurf**, dann **Liga starten** |
 | „Best of: Kommt aus der Season – dort ändern und übertragen.“ (ebenso andere Felder, auch die Antwortfrist) | Wert gibt die Season vor | In der Season ändern, dann **Vorgaben übertragen** |
 | „In einer Liga-Staffel spielen nur Co-Teams …“ | Teilnehmer ohne Co-Team eingetragen | **Co-Team zuteilen** |
-| „Die Teilnehmerart steht ab dem Anlegen fest …“ | Eine Liga soll von Co-Teams auf Spieler wechseln (oder umgekehrt) | Neue Liga anlegen (2.5c) |
+| „Die Teilnehmerart steht ab dem Anlegen fest …“ | Eine Liga soll von Co-Teams auf Spieler wechseln (oder umgekehrt) | Neue Liga anlegen (2.5d) |
 | „… ist nicht für Einzelspieler eingestellt – eine Solo-Liga geht nur mit einem Spiel, das Einzelspieler erlaubt.“ | Solo-Liga für ein Spiel nur mit Teams | Anderes Spiel wählen oder eine Team-Liga anlegen |
 | „In einer Solo-Liga spielt jede Person für sich – die Teamgröße ist dort immer 1.“ (ebenso der Mindestkader) | Teamgröße in einer Solo-Liga geändert | Teamgröße 1 lassen; für 2 gegen 2 eine Team-Liga anlegen |
-| „Die Selbstanmeldung als Spieler folgt in einem späteren Ausbau …“ | Anmeldefenster in einer Solo-Liga | Spieler auf der Staffel-Seite zuteilen (2.5c) |
+| „Die Selbstanmeldung als Spieler folgt in einem späteren Ausbau …“ | Anmeldefenster in einer Solo-Liga | Spieler auf der Staffel-Seite zuteilen (2.5d) |
 | „Der Spielbetrieb einer Solo-Liga … folgt in einem späteren Ausbau …“ | **Liga starten** in einer Solo-Staffel | Die Staffel bleibt vor dem Start, bis der Spielbetrieb für Spieler kommt |
 | „In dieser Staffel spielen Spieler, keine Co-Teams – bitte eine Person zuteilen.“ | Co-Team in eine Solo-Staffel | **Spieler zuteilen** |
 | „… spielt in dieser Season schon in einer anderen Staffel.“ bei einer Person | Eine Person spielt je Season nur eine Staffel | Andere Staffel wählen oder dort entfernen |

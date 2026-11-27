@@ -63,14 +63,14 @@ export function SeasonEntryTab({ seasonId, season, form, set, canSeason, canAppl
         <SeasonTabForm {...formProps}>
           {solo ? <SoloEntryNotice id="selbstanmeldung" deadlineField={deadline} /> : (
             <SeasonApplicationSection form={form} set={set} id="selbstanmeldung" deadlineField={deadline} waiting={applicationsWaiting}
-              late={lateRegistration} seasonId={seasonId} onReload={onReload} />
+              late={lateRegistration} seasonId={seasonId} onReload={onReload} season={season} />
           )}
           <SeasonEligibilitySection form={form} set={set} id="spielberechtigung" solo={solo} />
           <SeasonPlatformSection seasonId={seasonId} form={form} set={set} id="plattform" version={season.updated_at} />
         </SeasonTabForm>
       ) : null}
       {solo && !canSeason && (canApplications || canRoster) ? <SoloEntryNotice id="selbstanmeldung" deadlineField={null} /> : null}
-      {teamPanels && canApplications ? <SeasonApplicationsPanel seasonId={seasonId} version={season.updated_at} /> : null}
+      {teamPanels && canApplications ? <SeasonApplicationsPanel seasonId={seasonId} version={season.updated_at} seasonStatus={season.status} /> : null}
       {teamPanels && (canSeason || canApplications) ? <SeasonStartRightsPanel seasonId={seasonId} canSeason={canSeason} canApplications={canApplications} version={season.updated_at} /> : null}
       {teamPanels && canApplications ? <SeasonDrawPanel seasonId={seasonId} version={season.updated_at} /> : null}
       {teamPanels && canApplications ? <SeasonLateEntriesPanel seasonId={seasonId} version={season.updated_at} /> : null}

@@ -3,6 +3,7 @@ import { SelectField, TextAreaField, TextField } from "@/components/tls/FormFiel
 import { ENTRY_POLICY_OPTIONS, LATE_DAYS_DEFAULT, afterStartLine, effectiveCloses, lateCapLine, waitingLine } from "@/lib/leagueApplications";
 import { fromViennaInput } from "@/lib/vienna";
 import { SeasonLateExtension } from "./SeasonLateExtension";
+import { SeasonPrivacyRelease } from "./SeasonPrivacyRelease";
 
 // Selbstanmeldung je Season (docs/LIGA.md, B.4, #2205): Alles sind Vorgaben, nichts ist fest. Ohne Beginn und Ende gibt es keine Selbstanmeldung, und alles bleibt wie vorher.
 
@@ -20,7 +21,7 @@ function Toggle({ label, hint, checked, onChange, testId }) {
 
 // ``waiting``: offene Anmeldungen (eingereicht, in Prüfung). Beim Einschalten von „automatisch annehmen“ (#2348) bleiben sie bei der Leitung.
 // ``late``: Nachmeldefrist vom Server (#2422, ``late_registration``), mit ``seasonId`` und ``onReload`` für „Mit Grund verlängern“.
-export function SeasonApplicationSection({ form, set, id, deadlineField = null, waiting = 0, late = null, seasonId = null, onReload = null }) {
+export function SeasonApplicationSection({ form, set, id, deadlineField = null, waiting = 0, late = null, seasonId = null, onReload = null, season = null }) {
   const waitingText = form.application_auto_accept ? waitingLine(waiting) : "";
   // Nachmeldung (Entscheidung Nr. 180, #1632): erlaubt. Seit #2422 (Nr. 184) schließt sie spätestens nach der Frist - der Satz nennt das wirksame Ende.
   const closes = fromViennaInput(form.application_closes);
@@ -71,7 +72,8 @@ export function SeasonApplicationSection({ form, set, id, deadlineField = null, 
         hint="Der Eingang bietet beim Zuteilen zuerst die Staffeln der untersten Liga an, und das Los setzt neue Co-Teams dorthin. Eine höhere Liga geht nur mit Grund, er steht im Protokoll. Co-Teams aus der Vorgänger-Season behalten ihre Liga aus Auf- und Abstieg. Aus: Du teilst frei zu."
         checked={form.new_squads_lowest_division} onChange={(value) => set("new_squads_lowest_division", value)} testId="season-form-new-lowest" />
       <TextAreaField label="Hinweis zum Datenschutz" rows={3} value={form.application_privacy_text} onChange={(value) => set("application_privacy_text", value)}
-        hint="Steht bei der Anmeldung über dem Link zur Datenschutzerklärung und wird mit der Zustimmung gespeichert. Leer: ein vorläufiger Platzhalter-Satz. Den Wortlaut gibt der Obmann frei." testId="season-form-application-privacy" />
+        hint="Steht bei der Anmeldung über dem Link zur Datenschutzerklärung und wird mit der Zustimmung gespeichert. Leer: ein vorläufiger Platzhalter-Satz. Mitglieder sehen den Text sofort, Gäste erst, wenn der Superadmin ihn nach der rechtlichen Prüfung freigibt." testId="season-form-application-privacy" />
+      {season && seasonId ? <SeasonPrivacyRelease season={season} seasonId={seasonId} formText={form.application_privacy_text} onReload={onReload} /> : null}
     </FormSection>
   );
 }

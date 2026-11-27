@@ -634,6 +634,15 @@ def _public_registration(reg: dict | None, user: dict | None, is_staff: bool) ->
     return out
 
 
+async def _guest_marks(db, tournament: dict | None, participants: list[dict]) -> list[dict]:
+    """Gastteams (#1665): die Plakette je Seite - nur in einer Liga-Staffel, aus dem Kennzeichen am Hauptteam."""
+    if (tournament or {}).get("league_context"):
+        from services import league_guests
+
+        await league_guests.mark(db, participants, team_of=lambda row: (row.get("team") or {}).get("id"))
+    return participants
+
+
 async def _match_participants(match: dict, user: dict | None) -> list[dict]:
     db = get_db()
     regs = await _registrations_for_match(match)
@@ -882,7 +891,7 @@ async def _match_page_payload(match: dict, collection: str, user: dict | None = 
         "canonical_match": canonical_match,
         "tournament": public_tournament_view(tournament),
         "stage": stage,
-        "participants": await _match_participants(match, user),
+        "participants": await _guest_marks(db, tournament, await _match_participants(match, user)),
         "schedule_proposals": proposals,
         "can_act": bool(user and await _can_act_for_match(match, user)),
         "can_report_score": can_player_report,

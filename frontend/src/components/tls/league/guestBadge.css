@@ -1,0 +1,53 @@
+/* Gast-Plakette (#1665): ein ruhiges Etikett im Stil von „Vereinsintern“ - feiner Rand, gedämpfte Schrift, kein Effekt. „Gast“ als
+   Etikett (12 px, groß, leicht gesperrt), der Name von Verein oder Schule normal geschrieben dahinter. Der Text fließt wie ein Satz:
+   Ein langer Name bricht an seinen Wortgrenzen um und steht ganz da, nie über den Rand der Plakette hinaus. Zwischen „Gast“ und dem
+   ersten Wort gibt es keine Umbruchstelle - der Punkt hängt nie allein am Zeilenende oder -anfang. */
+.tls-guest-badge {
+  display: inline-block;
+  max-width: 100%;
+  padding: 0.125rem 0.375rem;
+  border: 1px solid rgb(255 255 255 / 0.16);
+  border-radius: 3px;
+  background: rgb(255 255 255 / 0.04);
+  color: var(--tls-text-muted);
+  font-size: 0.75rem;
+  font-weight: 500;
+  line-height: 1.4;
+  letter-spacing: normal;
+  text-align: inherit;
+  text-transform: none;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  vertical-align: middle;
+}
+.tls-guest-badge__label {
+  /* „Gast“ bricht nie: Ein Etikett ist ein Wort, kein „GAS/T“ in einer schmalen Spalte. */
+  white-space: nowrap;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: rgb(255 255 255 / 0.85);
+}
+.tls-guest-badge__org {
+  hyphens: auto;
+}
+.tls-guest-badge__org::before {
+  content: "·";
+  margin: 0 0.375rem 0 0.25rem;
+  color: var(--tls-quiet);
+}
+/* Schmale Spalten (Spielplan, Spieltage) am Handy: nur „Gast“ - der Name von Verein oder Schule steht dort im title und für
+   Screenreader, sichtbar ab 640 px und in Tabelle, Teams, Team- und Matchseite. Sonst würde ein langer Name eine Spielzeile
+   zwanzig Zeilen hoch machen. */
+@media (max-width: 639px) {
+  .tls-guest-badge--compact .tls-guest-badge__org { display: none; }
+  /* Eine Spielzeile bei 320 px lässt dem Namen gut 40 px: „Gast“ etwas enger, damit es ganz in die Spalte passt. */
+  .tls-guest-badge--compact { padding-inline: 0.25rem; }
+  .tls-guest-badge--compact .tls-guest-badge__label { letter-spacing: 0.06em; }
+}
+/* Unter einem Namen (Tabelle, Spielplan, Karten): eine eigene Zeile, die Plakette so breit wie ihr Inhalt. */
+.tls-guest-badge-line {
+  display: block;
+  margin-top: 0.25rem;
+  line-height: 1;
+}

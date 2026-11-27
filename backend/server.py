@@ -45,6 +45,7 @@ from routes.map_pool_routes import router as map_pool_router
 from routes.league_routes import admin_router as league_admin_router, router as league_router
 from routes.league_roster_routes import admin_router as league_roster_admin_router, me_router as league_roster_me_router
 from routes.league_application_routes import admin_router as league_application_admin_router, me_router as league_application_me_router, router as league_application_router
+from routes.league_guest_routes import admin_router as league_guest_admin_router, release_router as league_guest_release_router, router as league_guest_router
 from routes.league_rules_routes import admin_router as league_rules_admin_router, router as league_rules_router
 from routes.league_table_routes import admin_router as league_table_admin_router
 from routes.league_late_routes import admin_router as league_late_admin_router
@@ -437,6 +438,9 @@ app.include_router(league_roster_me_router)  # eigene Spiel-ID je laufender Seas
 app.include_router(league_application_admin_router)  # Selbstanmeldung: Eingang der Leitung (#2205)
 app.include_router(league_application_me_router)  # Stand der eigenen Co-Teams (#2205)
 app.include_router(league_application_router)  # Selbstanmeldung: einreichen, zurückziehen (#2205)
+app.include_router(league_guest_admin_router)  # Gastteams: Kennzeichen der Liga-Leitung (#1665)
+app.include_router(league_guest_router)  # Gastteams: Verein oder Schule der Teamleitung (#1665)
+app.include_router(league_guest_release_router)  # Gastteams: Datenschutzhinweis für Gäste freigeben (#1665, Nr. 1)
 app.include_router(league_rules_admin_router)  # Regelwerk pflegen (docs/LIGA.md, #1646)
 app.include_router(league_rules_router)  # Regelwerk lesen, PDF, Zustimmung (#1646)
 app.include_router(league_table_admin_router)  # Tabelle: Entscheid der Leitung, beide nicht erschienen (#1625)

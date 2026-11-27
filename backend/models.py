@@ -3041,3 +3041,31 @@ class LeagueApplicationDecision(BaseModel):
     conflict_reason: Optional[str] = Field(default=None, max_length=500)
     # Übernommenes Co-Team (F.2, #1627) in eine andere Liga N, neues Co-Team in eine höhere als die unterste (#1623): Pflichtgrund.
     deviation_reason: Optional[str] = Field(default=None, max_length=500)
+
+
+class GuestTeamOrg(BaseModel):
+    """Gastteam (#1665): Verein oder Schule, wie die Teamleitung sie angibt. ``kind`` leer nimmt die Angabe weg; geprüft in
+    ``services/league_guests.org_fields``."""
+    model_config = ConfigDict(extra="forbid")
+
+    kind: Optional[Literal["club", "school"]] = None
+    name: Optional[str] = Field(default=None, max_length=200)
+    school_name_public: bool = False
+
+
+class LeaguePrivacyRelease(BaseModel):
+    """Hinweis zum Datenschutz der Season für Gäste freigeben (#1665, Nr. 1) - nur der Superadmin, nach der rechtlichen Prüfung."""
+    model_config = ConfigDict(extra="forbid")
+
+    released: bool
+
+
+class GuestTeamConfirm(BaseModel):
+    """Gastteam (#1665): Die Liga-Leitung setzt bzw. bestätigt das Kennzeichen oder nimmt es zurück. ``season_id``: die Season, aus der sie
+    es tut (Protokoll des Leitstands)."""
+    model_config = ConfigDict(extra="forbid")
+
+    confirmed: bool
+    season_id: Optional[str] = Field(default=None, max_length=64)
+    # Notausnahme des Superadmins beim eigenen Team (Nr. 73).
+    conflict_reason: Optional[str] = Field(default=None, max_length=500)

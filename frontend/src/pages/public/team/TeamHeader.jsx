@@ -4,6 +4,7 @@ import { resolveMediaUrl } from "@/lib/api";
 import { MascotBadge } from "@/components/tls/Logo";
 import { bandBackground, teamColorHex, TEAM_COLORS } from "@/lib/teamColors";
 import { initials, orderedFaces } from "@/lib/teamPage";
+import { GuestBadge } from "@/components/tls/league/GuestBadge";
 
 // Wappen-Kopf der Team-Seite (#1347, Design-Idee 34): oben ein Band in der Team-Farbe als dunkler Verlauf mit
 // Löwen-Anschnitt, mittig das Team-Logo, darunter Name, Kürzel, Spiel und Level in einer Zeile. Die Mitglieder stehen
@@ -98,6 +99,8 @@ export function TeamHeader({ team, header, levelInfo, userId, actions = null, ch
           <h1 className="mt-3 tls-type-title leading-tight break-words max-w-full" data-testid="team-name">{team.name}</h1>
           <div className="mt-2 flex flex-wrap items-center justify-center gap-x-2 gap-y-1 tls-type-small text-white/65" data-testid="team-header-line">
             {team.tag ? <span className="font-bold tracking-wider">{team.tag}</span> : null}
+            {/* Gastteam (#1665): von der Liga-Leitung bestätigt, nie aus der Mitgliedschaft. */}
+            {team.guest_badge ? <GuestBadge badge={team.guest_badge} testId="team-guest-badge" /> : null}
             {team.is_public === false ? (
               <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-sm border border-white/15 bg-white/[0.06] tls-type-small font-bold text-white/85" data-testid="team-private-chip">
                 <Lock className="w-3 h-3" aria-hidden="true" /> Privat

@@ -7,6 +7,7 @@ import { InternalTag } from "@/components/tls/InternalTag";
 import { ZoneMark } from "@/components/tls/league/ZoneMark";
 import { LeagueBadge } from "@/components/tls/league/LeagueBadge";
 import { LeagueEmblem } from "@/components/tls/league/public/LeagueLook";
+import { GuestBadge } from "@/components/tls/league/GuestBadge";
 import { badgeLabel, currentPlace, nextMatchText } from "@/lib/leagueBadge";
 import "./leagueBadge.css";
 
@@ -25,6 +26,7 @@ function Row({ row, index, nameOf, testId }) {
           {row.internal ? <InternalTag testId={`${id}-internal`} /> : null}
         </div>
         <div className="tls-league-now__name tls-wrap tls-wrap--name tls-type-card" data-testid={`${id}-name`}>{nameOf(row)}</div>
+        {row.guest_badge ? <span className="tls-guest-badge-line"><GuestBadge badge={row.guest_badge} testId={`${id}-guest`} /></span> : null}
         <div className="tls-league-now__meta flex items-center gap-1.5">
           {/* Emblem der Season bzw. Liga (#2107) klein vor dem Namen - ohne Bild das Liga-Zeichen. */}
           <LeagueEmblem src={row.emblem_url} size={18} testId={`${testId}-emblem-${row.registration_id}`} />

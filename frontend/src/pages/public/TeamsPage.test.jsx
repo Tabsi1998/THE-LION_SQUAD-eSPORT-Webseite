@@ -741,3 +741,44 @@ test("Embleme: ein Doppelklick speichert nur einmal", async () => {
   await waitFor(() => expect(screen.getByTestId("trophy-emblem-aw-emb")).not.toBeDisabled());
   expect(apiMock.put).toHaveBeenCalledTimes(1);
 });
+
+// Gastteam (#1665): Verein oder Schule speichert dasselbe „Speichern“ wie der Rest des Blatts - nichts geht beim Schließen verloren.
+test("Team-Blatt: Gastteam-Angaben speichert das eine „Speichern“ mit, ohne Änderung bleibt es beim Team", async () => {
+  authState.user = { id: "u-cap", username: "neonfalke" };
+  serve({ ...TEAM, can_edit_guest_team: true,
+    guest_team: { kind: null, name: null, school_name_public: false, confirmed: false, pending: false, badge: null } });
+  apiMock.patch.mockResolvedValue({ data: {} });
+  apiMock.put.mockResolvedValue({ data: { guest_team: { kind: "school", name: "Probeschule Nord" }, guest_badge: null } });
+  renderAt("/teams/t-1");
+  fireEvent.click(await screen.findByTestId("team-edit-open"));
+  expect(await screen.findByTestId("team-guest-section")).toBeInTheDocument();
+  expect(screen.queryByTestId("team-guest-save")).toBeNull();
+  fireEvent.change(screen.getByTestId("team-guest-kind"), { target: { value: "school" } });
+  fireEvent.change(screen.getByTestId("team-guest-name"), { target: { value: "Probeschule Nord" } });
+  fireEvent.click(screen.getByTestId("team-save"));
+  await waitFor(() => expect(apiMock.put).toHaveBeenCalledWith("/teams/t-1/guest-team",
+    { kind: "school", name: "Probeschule Nord", school_name_public: false }));
+  expect(apiMock.patch).toHaveBeenCalledWith("/teams/t-1", expect.any(Object));
+});
+
+test("Team-Blatt: ohne Liga-Team kein Gastteam-Abschnitt, und unverändert schickt „Speichern“ nichts dorthin", async () => {
+  authState.user = { id: "u-cap", username: "neonfalke" };
+  serve({ ...TEAM, can_edit_guest_team: false });
+  apiMock.patch.mockResolvedValue({ data: {} });
+  apiMock.put.mockClear();
+  const { unmount } = renderAt("/teams/t-1");
+  fireEvent.click(await screen.findByTestId("team-edit-open"));
+  await screen.findByTestId("team-edit-sheet");
+  expect(screen.queryByTestId("team-guest-section")).toBeNull();
+  unmount();
+
+  serve({ ...TEAM, can_edit_guest_team: true, guest_team: { kind: "club", name: "SV Probedorf", confirmed: true, pending: false,
+    badge: { label: "Gast", org: "SV Probedorf" } } });
+  renderAt("/teams/t-1");
+  fireEvent.click(await screen.findByTestId("team-edit-open"));
+  await screen.findByTestId("team-guest-section");
+  fireEvent.click(screen.getByTestId("team-save"));
+  await waitFor(() => expect(apiMock.patch).toHaveBeenCalled());
+  expect(apiMock.put).not.toHaveBeenCalled();
+});
+

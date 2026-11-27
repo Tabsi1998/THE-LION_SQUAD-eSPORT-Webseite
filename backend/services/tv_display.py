@@ -282,7 +282,9 @@ STANDING_FIELDS = ("registration_id", "display_name", "rank", "previous_rank", "
                    # Zone für Auf- und Abstieg (F.2, #1627): Strich am Platz wie auf der Website.
                    "zone",
                    # Nachmeldung (#2422): „Nachgemeldet ab Woche X“ wie auf der Website.
-                   "late_entry", "late_from_week")
+                   "late_entry", "late_from_week",
+                   # Gastteam (#1665): am TV nur „Gast“ (``league_guests.mark`` mit ``short``).
+                   "guest_badge")
 STANDING_GROUP_FIELDS = ("id", "group_key", "name")
 
 

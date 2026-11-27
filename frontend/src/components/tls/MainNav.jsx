@@ -31,8 +31,7 @@ export const NAV_STRUCTURE = [
       { to: "/membership/join", label: "Mitglied werden" },
       { to: "/galerie", label: "Galerie" },
       { to: "/references", label: "Referenzen" },
-      // Vereinsinhalte wohnen seit #2059 in „Mein Bereich“ - hier steht für Mitglieder nur der Weg dorthin.
-      { to: "/mein-bereich/verein", label: "Mein Bereich", memberOnly: true },
+      // Kein „Mein Bereich“ hier (Fabian 27.11.): Vereinsinhalte erreicht man über das Profil-Menü rechts oben.
     ],
   },
   {

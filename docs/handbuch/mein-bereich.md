@@ -27,7 +27,8 @@ Gruppe öffnet sich als eigene Seite mit dem Knopf **Mein Bereich** zurück.
   oben im Menü öffnet das öffentliche Profil („So sehen andere mich“).
 - **Untere Leiste am Handy**: **Profil** führt nach Mein Bereich.
 - **Dashboard**: Knopf **Mein Bereich** oben und die Liste der Gruppen unten.
-- **Hauptmenü Verein** und die Seite **Verein** (`/verein`): für Mitglieder nur der Weg nach Mein Bereich → Verein.
+- Die Seite **Verein** (`/verein`): für Mitglieder ein Knopf nach Mein Bereich → Verein. Im Hauptmenü Verein und in der
+  Fußzeile steht Mein Bereich nicht (Fabian 27.11.) – dafür gibt es das Benutzermenü.
 
 Ab dem Start (Dashboard, „Start“ in der unteren Leiste) ist jede Funktion mit höchstens zwei Klicks erreichbar: die
 Gruppe, dann – wo nötig – der Reiter. Jede Gruppe ist von jeder Seite aus mit zwei Klicks erreichbar (Benutzermenü bzw.

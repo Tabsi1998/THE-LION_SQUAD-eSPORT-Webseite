@@ -98,3 +98,21 @@ test("Schweizer System (#1559): Median-Buchholz als Spalte, „weiter“ und „
   expect(screen.queryByTestId("tv-swiss-status-r2")).toBeNull();
   expect(screen.getByTestId("tv-swiss-status-r4")).toHaveTextContent("Gleichstand");
 });
+
+// Gastteam (#1665): Am TV steht „Gast“ hinter dem Namen und bleibt sichtbar - gekürzt („…“) wird nur der Name selbst.
+test("ein langer Name wird gekürzt, „· Gast“ bleibt außerhalb der Kürzung stehen", async () => {
+  const long = "Höhere Technische Bundeslehranstalt Probeberg · Klasse 4B mit sehr langem Namen";
+  render(
+    <MemoryRouter initialEntries={["/display/bracket/t1"]}>
+      <TvScreen><TvStandingsSlide standings={[{ registration_id: "r-g", display_name: long, rank: 1, played: 1, won: 1, drawn: 0, lost: 0,
+        score_diff: 1, points: 3, guest_badge: { label: "Gast" } }]} turn={0} /></TvScreen>
+    </MemoryRouter>,
+  );
+  const guest = await screen.findByTestId("tv-guest-r-g");
+  expect(guest).toHaveTextContent("Gast");
+  const name = guest.closest("td").querySelector(".tv-standings__nametext");
+  expect(name).not.toBeNull();
+  expect(name).toHaveTextContent(long);
+  expect(name.contains(guest)).toBe(false);
+});
+
