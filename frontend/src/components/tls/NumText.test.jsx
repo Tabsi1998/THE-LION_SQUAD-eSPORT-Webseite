@@ -21,3 +21,9 @@ test("ohne Zahl und ohne Text: nichts Zusätzliches", () => {
   expect(container.querySelectorAll(".tls-type-num")).toHaveLength(1);
   expect(container.textContent).toBe("vorbei42");
 });
+
+test("Ziffern in Namen bleiben in der Schrift der Stelle - nur Zahlen mit Wortgrenze", () => {
+  const { container } = render(<p><NumText text="Lion2024 holt 3 Siege, R2D2 und Team_7 nicht, 12. Platz, #4" /></p>);
+  expect([...container.querySelectorAll(".tls-type-num")].map((node) => node.textContent)).toEqual(["3", "12", "4"]);
+  expect(container.textContent).toBe("Lion2024 holt 3 Siege, R2D2 und Team_7 nicht, 12. Platz, #4");
+});
