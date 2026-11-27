@@ -550,8 +550,8 @@ export default function AdminSettingsPage() {
       {rows.map(([key, label, hint]) => (
         <label key={key} className="flex items-start justify-between gap-4 p-5 cursor-pointer group" data-testid={`auth-toggle-${key}`}>
           <div>
-            <div className="font-heading font-bold uppercase text-sm group-hover:text-[#29B6E8] transition">{label}</div>
-            <p className="text-xs text-white/50 mt-1">{hint}</p>
+            <div className="tls-type-label group-hover:text-[#29B6E8] transition">{label}</div>
+            <p className="tls-type-small text-white/50 mt-1">{hint}</p>
           </div>
           <button
             type="button"
@@ -571,8 +571,8 @@ export default function AdminSettingsPage() {
 
   return (
     <AdminLayout>
-      <span className="text-[11px] font-bold uppercase tracking-[0.3em] text-[#29B6E8]" data-testid="settings-eyebrow">{sectionMeta.group}</span>
-      <h1 className="font-heading text-3xl md:text-4xl font-black uppercase mt-1 mb-6" data-testid="settings-title">{sectionMeta.label}</h1>
+      <span className="tls-type-label text-[#29B6E8]" data-testid="settings-eyebrow">{sectionMeta.group}</span>
+      <h1 className="tls-type-title mt-1 mb-6" data-testid="settings-title">{sectionMeta.label}</h1>
 
       {tab === "auth" && section === "google" && <GoogleLoginSection authConfig={authConfig} setAuthConfig={setAuthConfig} savingAuth={savingAuth} testingGoogle={testingGoogle} saveAuth={saveAuth} testGoogleConfig={testGoogleConfig} authSwitches={authSwitches} />}
 

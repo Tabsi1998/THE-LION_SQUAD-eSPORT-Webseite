@@ -1,5 +1,6 @@
 import { Link } from "react-router-dom";
 import { ArrowLeft, Save } from "lucide-react";
+import { ShortCaps } from "@/components/tls/ShortCaps";
 
 // Formular-Rahmen für Anlegen und Bearbeiten im Admin (#434). Vorher sah jedes Formular anders
 // aus: Turnier als schmale Seite, Fast Lap noch schmaler, Event und News als Fenster in der
@@ -19,13 +20,13 @@ export function AdminFormPage({ eyebrow, accent = "#29B6E8", title, intro, backT
     <form onSubmit={onSubmit} data-testid={testId} className="min-w-0">
       <div className="mb-6 min-w-0">
         {backTo && (
-          <Link to={backTo} data-testid="admin-form-back" className="inline-flex items-center gap-1.5 mb-3 text-[11px] font-bold uppercase tracking-[0.3em] text-white/45 hover:text-white transition">
+          <Link to={backTo} data-testid="admin-form-back" className="inline-flex items-center gap-1.5 mb-3 tls-type-label text-white/45 hover:text-white transition">
             <ArrowLeft className="w-3.5 h-3.5" /> {backLabel}
           </Link>
         )}
-        <div className="text-[11px] font-bold uppercase tracking-[0.3em]" style={{ color: accent }}>{eyebrow}</div>
-        <h1 className="font-heading text-3xl md:text-4xl font-black uppercase mt-1 break-words">{title}</h1>
-        {intro && <p className="mt-2 text-sm text-white/50 max-w-2xl">{intro}</p>}
+        <div className="tls-type-label" style={{ color: accent }}>{eyebrow}</div>
+        <h1 className="tls-type-title mt-1 break-words"><ShortCaps>{title}</ShortCaps></h1>
+        {intro && <p className="mt-2 tls-type-body text-white/50 max-w-2xl">{intro}</p>}
         {headerExtra}
       </div>
       <FormColumns aside={aside}>{children}</FormColumns>
@@ -49,17 +50,17 @@ export function FormColumns({ aside, children }) {
 // Speichern-Leiste: klebt am unteren Rand, solange das Formular im Bild ist - kein Scrollen bis
 // zum Knopf mehr. Abbrechen führt zurück zur Liste. Mit `onSubmitClick` ist der Knopf kein
 // Submit-Knopf, sondern ruft direkt die Funktion (für Seiten ohne eigenes <form>).
-const CANCEL_CLASS = "inline-flex items-center px-4 py-2.5 border border-white/10 text-white/60 hover:text-white text-xs uppercase tracking-wider font-bold rounded-sm transition";
+const CANCEL_CLASS = "inline-flex items-center px-4 py-2.5 border border-white/10 text-white/60 hover:text-white tls-type-label rounded-sm transition";
 
 export function FormActions({ accent = "#29B6E8", submitLabel = "Speichern", savingLabel = "Speichere …", saving = false, submitTestId, onSubmitClick, cancelTo, onCancel, cancelLabel = "Abbrechen", icon: Icon = Save, hint, children }) {
   return (
     <div data-testid="admin-form-actions" className="sticky bottom-0 z-20 mt-6 -mx-4 md:-mx-8 border-t border-white/10 bg-[#0A0A0A]/95 backdrop-blur px-4 md:px-8 py-3 flex flex-wrap items-center gap-3">
       {cancelTo && <Link to={cancelTo} data-testid="admin-form-cancel" className={CANCEL_CLASS}>{cancelLabel}</Link>}
       {!cancelTo && onCancel && <button type="button" onClick={onCancel} data-testid="admin-form-cancel" className={CANCEL_CLASS}>{cancelLabel}</button>}
-      {hint && <span className="text-xs text-white/45">{hint}</span>}
+      {hint && <span className="tls-type-small text-white/45">{hint}</span>}
       <div className="ml-auto flex flex-wrap items-center gap-3">
         {children}
-        <button type={onSubmitClick ? "button" : "submit"} onClick={onSubmitClick} disabled={saving} data-testid={submitTestId} style={{ backgroundColor: accent }} className="inline-flex items-center gap-2 px-5 py-2.5 text-black text-xs uppercase tracking-wider font-bold rounded-sm hover:opacity-90 disabled:opacity-50 transition">
+        <button type={onSubmitClick ? "button" : "submit"} onClick={onSubmitClick} disabled={saving} data-testid={submitTestId} style={{ backgroundColor: accent }} className="inline-flex items-center gap-2 px-5 py-2.5 text-black tls-type-label rounded-sm hover:opacity-90 disabled:opacity-50 transition">
           {Icon && <Icon className="w-3.5 h-3.5" />} {saving ? savingLabel : submitLabel}
         </button>
       </div>
@@ -74,8 +75,8 @@ export function FormSection({ title, hint, accent = "#29B6E8", collapsible = fal
   const shell = plain ? "" : "border border-white/10 bg-[#121212] rounded-sm p-4 md:p-5";
   const head = (
     <>
-      <span className="text-[11px] font-bold uppercase tracking-widest" style={{ color: accent }}>{title}</span>
-      {hint && <span className="block mt-1 text-xs text-white/45 normal-case tracking-normal font-normal">{hint}</span>}
+      <span className="tls-type-label" style={{ color: accent }}>{title}</span>
+      {hint && <span className="block mt-1 tls-type-small text-white/45 font-normal">{hint}</span>}
     </>
   );
   if (collapsible) {

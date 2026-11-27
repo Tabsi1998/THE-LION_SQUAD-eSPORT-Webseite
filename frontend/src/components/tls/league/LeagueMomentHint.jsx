@@ -21,7 +21,7 @@ export function LeagueMomentHint({ rows, canReplay = false, testId = "league-mom
   if (!list.length) return null;
   return (
     <section data-testid={testId} aria-labelledby={`${testId}-title`}>
-      <h2 id={`${testId}-title`} className="mb-4 flex items-center gap-2 font-heading text-2xl font-bold uppercase">
+      <h2 id={`${testId}-title`} className="mb-4 flex items-center gap-2 tls-type-section">
         <Flag className="h-5 w-5 text-[#29B6E8]" aria-hidden="true" /> Saisonende
       </h2>
       <ul className="grid gap-2">
@@ -31,19 +31,19 @@ export function LeagueMomentHint({ rows, canReplay = false, testId = "league-mom
             <li key={row.id} className="tls-moment-hint" data-outcome={row.outcome} data-testid={`${testId}-${row.id}`}>
               {row.badge_to ? <LeagueBadge badge={row.badge_to} size="card" label={false} decorative index={index} /> : null}
               <div className="min-w-0">
-                <p className={`flex flex-wrap items-center gap-x-2 text-xs font-bold uppercase tracking-widest ${TONES[row.outcome] || "text-white/70"}`}>
+                <p className={`flex flex-wrap items-center gap-x-2 tls-type-label ${TONES[row.outcome] || "text-white/70"}`}>
                   <span className="inline-flex items-center gap-1"><Icon className="h-3.5 w-3.5" aria-hidden="true" /> {row.texts.label || row.texts.kicker}</span>
                   {row.corrected ? <span className="font-semibold normal-case tracking-normal text-white/50">· Endstand korrigiert</span> : null}
                 </p>
                 <p className="mt-0.5 font-semibold text-white [overflow-wrap:anywhere]">{row.texts.summary || row.texts.line}</p>
-                <p className="mt-0.5 text-xs text-white/60 [overflow-wrap:anywhere]">
+                <p className="mt-0.5 tls-type-small text-white/60 [overflow-wrap:anywhere]">
                   {row.title}
                   {row.url ? <> · <Link to={row.url} className="underline-offset-2 hover:text-[#29B6E8] hover:underline">Endstand</Link></> : null}
                 </p>
               </div>
               {canReplay ? (
                 <button type="button" onClick={() => replayMoment(row, queue)} data-testid={`${testId}-${row.id}-replay`}
-                  className="tls-moment-hint__replay tls-btn tls-btn--secondary inline-flex min-h-[44px] items-center gap-1.5 rounded-sm px-3 text-[11px] font-bold uppercase tracking-wider">
+                  className="tls-moment-hint__replay tls-btn tls-btn--secondary inline-flex min-h-[44px] items-center gap-1.5 rounded-sm px-3 tls-type-label">
                   <Play className="h-3.5 w-3.5" aria-hidden="true" /> Moment ansehen
                 </button>
               ) : null}

@@ -61,7 +61,7 @@ export function AdminTabBar({ tabs, active, dirty = {}, onSelect, idBase, label,
           return (
             <button key={tab.key} type="button" role="tab" id={`${idBase}-tab-${tab.key}`} aria-selected={selected} aria-controls={`${idBase}-panel-${tab.key}`}
               tabIndex={selected ? 0 : -1} data-tab={tab.key} onKeyDown={onKeyDown} onClick={() => onSelect(tab.key)} data-testid={`${testPrefix}-tab-${tab.key}`}
-              className={`inline-flex min-h-[44px] shrink-0 items-center gap-1.5 whitespace-nowrap border-b-2 px-2.5 sm:px-3 text-xs font-bold uppercase tracking-wider focus-visible:outline focus-visible:outline-1 focus-visible:outline-[#29B6E8] rounded-t-sm ${selected ? "border-[#29B6E8] text-white" : "border-transparent text-white/50 hover:text-white"}`}>
+              className={`inline-flex min-h-[44px] shrink-0 items-center gap-1.5 whitespace-nowrap border-b-2 px-2.5 sm:px-3 tls-type-label focus-visible:outline focus-visible:outline-1 focus-visible:outline-[#29B6E8] rounded-t-sm ${selected ? "border-[#29B6E8] text-white" : "border-transparent text-white/50 hover:text-white"}`}>
               {tab.label}
               {dirty[tab.key] ? (
                 <span className="h-1.5 w-1.5 rounded-full bg-warn" data-testid={`${testPrefix}-tab-dirty-${tab.key}`}>
@@ -72,7 +72,7 @@ export function AdminTabBar({ tabs, active, dirty = {}, onSelect, idBase, label,
           );
         })}
       </div>
-      {hint ? <p className="mt-1.5 text-[11px] text-white/60" data-testid={`${testPrefix}-tabs-hint`}>{hint}</p> : null}
+      {hint ? <p className="mt-1.5 tls-type-small text-white/60" data-testid={`${testPrefix}-tabs-hint`}>{hint}</p> : null}
     </div>
   );
 }

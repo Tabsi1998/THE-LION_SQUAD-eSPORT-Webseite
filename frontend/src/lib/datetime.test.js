@@ -4,6 +4,7 @@ import {
   formatAgo,
   formatDate,
   formatDateTime,
+  formatDuration,
   formatRange,
   formatWhen,
   fromDateTimeLocal,
@@ -197,5 +198,26 @@ describe("gemeinsame Datumsfälle (docs/date-cases.json)", () => {
 
   test("weit in der Zukunft sagt formatAgo das Datum statt „gerade eben“", () => {
     expect(formatAgo("2026-05-23T16:00:00Z", { now: new Date(CASES.now) })).toBe("Sa 23. Mai · 18:00");
+  });
+});
+
+// Dauern (#1304): „154 Tage 16 Std.“ statt „154T 16H“ - dieselben Fälle für Website und App (docs/duration-cases.json).
+const DURATIONS = JSON.parse(readFileSync(path.join(process.cwd(), "../docs/duration-cases.json"), "utf8"));
+
+describe("formatDuration", () => {
+  test.each(DURATIONS.cases)("$note", (row) => {
+    expect(formatDuration(row.ms, row.round ? { round: row.round } : undefined)).toBe(row.expected);
+  });
+
+  test("ohne gültigen Wert: leer", () => {
+    expect(formatDuration(null)).toBe("");
+    expect(formatDuration(undefined)).toBe("");
+    expect(formatDuration("")).toBe("");
+    expect(formatDuration("bald")).toBe("");
+    expect(formatDuration(Number.NaN)).toBe("");
+  });
+
+  test("keine Abkürzungen wie „154T“ oder „16h“", () => {
+    for (const row of DURATIONS.cases) expect(formatDuration(row.ms)).not.toMatch(/\d\s?(?:T|h|H|d|m|s)\b/);
   });
 });

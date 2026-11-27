@@ -11,6 +11,7 @@ import { toast } from "sonner";
 import { Plus, Trash2, FileText, Pin, UploadCloud, Eye, Download } from "lucide-react";
 import { documentVisibility, timesDone } from "@/lib/adminWords";
 import { tooLargeMessage, useUploadLimits } from "@/lib/uploadLimits";
+import { ShortCaps } from "@/components/tls/ShortCaps";
 
 const CATEGORY_LABELS = {
   statutes: "Statuten", minutes: "Protokolle", form: "Formular",
@@ -23,7 +24,7 @@ const CATEGORY_LABELS = {
 function VisibilityBadge({ value }) {
   const { label, cls } = documentVisibility(value);
   return (
-    <span data-testid="doc-visibility-badge" className={`inline-flex items-center rounded-sm border px-2 py-0.5 text-[10px] font-bold uppercase tracking-widest ${cls}`}>
+    <span data-testid="doc-visibility-badge" className={`inline-flex items-center rounded-sm border px-2 py-0.5 tls-type-label ${cls}`}>
       {label}
     </span>
   );
@@ -40,10 +41,10 @@ function DownloadRule({ allowed }) {
 function DocActions({ doc, onEdit, onRemove, testPrefix = "doc" }) {
   return (
     <>
-      <a href={`${API}/documents/${doc.id}/view`} target="_blank" rel="noreferrer" className="text-xs font-bold uppercase px-3 py-1 rounded-sm border border-white/15 text-white/70 hover:text-white inline-flex items-center gap-1"><Eye className="w-3 h-3" /> Ansicht</a>
-      <a href={`${API}/documents/${doc.id}/download`} target="_blank" rel="noreferrer" className="text-xs font-bold uppercase px-3 py-1 rounded-sm border border-white/15 text-white/70 hover:text-white inline-flex items-center gap-1"><Download className="w-3 h-3" /> Datei</a>
-      <button onClick={onEdit} data-testid={`${testPrefix}-edit-${doc.id}`} className="text-xs font-bold uppercase px-3 py-1 rounded-sm border border-[#FFD700]/40 text-[#FFD700] hover:bg-[#FFD700]/10">Bearbeiten</button>
-      <button onClick={onRemove} data-testid={`${testPrefix}-delete-${doc.id}`} aria-label={`„${doc.title}“ löschen`} className="text-xs font-bold uppercase px-3 py-1 rounded-sm border border-[#FF3B30]/40 text-[#FF3B30] hover:bg-[#FF3B30]/10 inline-flex items-center"><Trash2 className="w-3 h-3" /></button>
+      <a href={`${API}/documents/${doc.id}/view`} target="_blank" rel="noreferrer" className="tls-type-label px-3 py-1 rounded-sm border border-white/15 text-white/70 hover:text-white inline-flex items-center gap-1"><Eye className="w-3 h-3" /> Ansicht</a>
+      <a href={`${API}/documents/${doc.id}/download`} target="_blank" rel="noreferrer" className="tls-type-label px-3 py-1 rounded-sm border border-white/15 text-white/70 hover:text-white inline-flex items-center gap-1"><Download className="w-3 h-3" /> Datei</a>
+      <button onClick={onEdit} data-testid={`${testPrefix}-edit-${doc.id}`} className="tls-type-label px-3 py-1 rounded-sm border border-[#FFD700]/40 text-[#FFD700] hover:bg-[#FFD700]/10">Bearbeiten</button>
+      <button onClick={onRemove} data-testid={`${testPrefix}-delete-${doc.id}`} aria-label={`„${doc.title}“ löschen`} className="tls-type-label px-3 py-1 rounded-sm border border-[#FF3B30]/40 text-[#FF3B30] hover:bg-[#FF3B30]/10 inline-flex items-center"><Trash2 className="w-3 h-3" /></button>
     </>
   );
 }
@@ -86,10 +87,10 @@ export default function AdminDocumentsPage() {
       <div className="flex items-center justify-between mb-6 flex-wrap gap-3">
         <div>
           {/* Augenbraue = Menügruppe (#1363). */}
-          <span className="text-[11px] font-bold uppercase tracking-[0.3em] text-[#FFD700]">Mitglieder</span>
-          <h1 className="font-heading text-3xl md:text-4xl font-black uppercase mt-1">Dokumente</h1>
+          <span className="tls-type-label text-[#FFD700]">Mitglieder</span>
+          <h1 className="tls-type-title mt-1"><ShortCaps>Dokumente</ShortCaps></h1>
         </div>
-        <button onClick={() => setEditing({})} data-testid="docs-new" className="inline-flex items-center gap-2 px-4 py-2 bg-[#FFD700] text-black font-bold uppercase tracking-wider text-xs rounded-sm hover:bg-[#e8c200] transition">
+        <button onClick={() => setEditing({})} data-testid="docs-new" className="inline-flex items-center gap-2 px-4 py-2 bg-[#FFD700] text-black tls-type-label rounded-sm hover:bg-[#e8c200] transition">
           <Plus className="w-3.5 h-3.5" /> Neues Dokument
         </button>
       </div>
@@ -97,7 +98,7 @@ export default function AdminDocumentsPage() {
       {list.length === 0 ? (
         <div className="border border-dashed border-white/15 rounded-sm p-12 text-center text-white/50">
           <FileText className="w-10 h-10 mx-auto opacity-40 mb-3" />
-          <div className="font-heading font-bold">Noch keine Dokumente</div>
+          <div className="font-bold">Noch keine Dokumente</div>
         </div>
       ) : (
         <>
@@ -111,13 +112,13 @@ export default function AdminDocumentsPage() {
                     {d.pinned && <Pin className="w-3 h-3 shrink-0 text-honor" />}
                     <span className="break-words">{d.title}</span>
                   </div>
-                  <div className="text-[11px] text-white/50 tls-wrap">{d.original_filename}</div>
+                  <div className="tls-type-small text-white/50 tls-wrap">{d.original_filename}</div>
                 </div>
                 <VisibilityBadge value={d.visibility} />
               </div>
-              <div className="mt-2 text-[10px] uppercase tracking-widest text-honor font-bold">{CATEGORY_LABELS[d.category] || "Sonstiges"} · <span className="text-white/60">{fmtSize(d.file_size)}</span></div>
-              <div className="mt-1 text-xs text-white/55">{usageLine(d)}</div>
-              <div className="mt-1 text-xs font-semibold"><DownloadRule allowed={d.allow_download} /></div>
+              <div className="mt-2 tls-type-label text-honor">{CATEGORY_LABELS[d.category] || "Sonstiges"} · <span className="text-white/60">{fmtSize(d.file_size)}</span></div>
+              <div className="mt-1 tls-type-small text-white/55">{usageLine(d)}</div>
+              <div className="mt-1 tls-type-small font-semibold"><DownloadRule allowed={d.allow_download} /></div>
               <div className="mt-3 flex flex-wrap gap-1.5">
                 <DocActions doc={d} onEdit={() => setEditing(d)} onRemove={() => remove(d.id)} testPrefix="doc-card" />
               </div>
@@ -126,8 +127,8 @@ export default function AdminDocumentsPage() {
         </ul>
         <div className="hidden md:block border border-white/10 rounded-sm bg-[#121212] overflow-hidden">
           <div className="tls-swipe pb-0">
-            <table className="w-full text-sm min-w-[800px]">
-              <thead className="bg-[#0A0A0A] text-[11px] uppercase tracking-widest text-white/50">
+            <table className="w-full tls-type-small min-w-[800px]">
+              <thead className="bg-[#0A0A0A] tls-type-label text-white/50">
                 <tr>
                   <th className="text-left px-4 py-3">Titel</th>
                   <th className="text-left px-4 py-3">Kategorie</th>
@@ -146,13 +147,13 @@ export default function AdminDocumentsPage() {
                         {d.pinned && <Pin className="w-3 h-3 text-[#FFD700]" />}
                         {d.title}
                       </div>
-                      <div className="text-[11px] text-white/50 tls-wrap max-w-xs">{d.original_filename}</div>
+                      <div className="tls-type-small text-white/50 tls-wrap max-w-xs">{d.original_filename}</div>
                     </td>
-                    <td className="px-4 py-3 text-[10px] uppercase tracking-widest text-[#FFD700] font-bold">{CATEGORY_LABELS[d.category] || "Sonstiges"}</td>
+                    <td className="px-4 py-3 tls-type-label text-[#FFD700]">{CATEGORY_LABELS[d.category] || "Sonstiges"}</td>
                     <td className="px-4 py-3"><VisibilityBadge value={d.visibility} /></td>
-                    <td className="px-4 py-3 text-xs text-white/65">{fmtSize(d.file_size)}</td>
-                    <td className="px-4 py-3 text-xs text-white/55">{usageLine(d)}</td>
-                    <td className="px-4 py-3 text-xs font-semibold">
+                    <td className="px-4 py-3 tls-type-small text-white/65">{fmtSize(d.file_size)}</td>
+                    <td className="px-4 py-3 tls-type-small text-white/55">{usageLine(d)}</td>
+                    <td className="px-4 py-3 tls-type-small font-semibold">
                       <DownloadRule allowed={d.allow_download} />
                     </td>
                     <td className="px-4 py-3 text-center space-x-1 whitespace-nowrap">
@@ -255,15 +256,15 @@ function DocModal({ doc, meta, onClose, onSaved }) {
       <div className="border border-dashed border-[#FFD700]/40 rounded-sm p-5 bg-[#0A0A0A] text-center">
         <input ref={fileRef} type="file" onChange={upload} className="hidden" accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.zip,.txt,.csv,.md,.png,.jpg,.jpeg" data-testid="doc-file" />
         {(form.storage_key || form.file_url) ? (
-          <div className="text-sm">
-            <div className="font-mono text-xs text-white/60 break-all">{form.original_filename || form.file_url}</div>
-            <div className="text-[10px] uppercase tracking-widest text-[#FFD700] mt-1">{fmtSize(form.file_size)} · {form.mime || "Datei"}</div>
-            <button type="button" onClick={() => fileRef.current.click()} disabled={uploading} className="mt-3 inline-flex items-center gap-2 px-3 py-1.5 text-[10px] uppercase tracking-widest font-bold border border-white/20 text-white/70 rounded-sm">
+          <div className="tls-type-small">
+            <div className="font-mono tls-type-small text-white/60 break-all">{form.original_filename || form.file_url}</div>
+            <div className="tls-type-label text-[#FFD700] mt-1">{fmtSize(form.file_size)} · {form.mime || "Datei"}</div>
+            <button type="button" onClick={() => fileRef.current.click()} disabled={uploading} className="mt-3 inline-flex items-center gap-2 px-3 py-1.5 tls-type-label border border-white/20 text-white/70 rounded-sm">
               <UploadCloud className="w-3 h-3" /> Datei ersetzen
             </button>
           </div>
         ) : (
-          <button type="button" onClick={() => fileRef.current.click()} disabled={uploading} data-testid="doc-upload-btn" className="inline-flex items-center gap-2 text-sm text-[#FFD700] font-bold uppercase tracking-wider">
+          <button type="button" onClick={() => fileRef.current.click()} disabled={uploading} data-testid="doc-upload-btn" className="inline-flex items-center gap-2 tls-type-small text-[#FFD700] font-bold uppercase tracking-wider">
             <UploadCloud className="w-4 h-4" /> {uploading ? "Lade hoch…" : `Datei auswählen (bis ${documentMb} MB)`}
           </button>
         )}

@@ -31,7 +31,7 @@ export function OwnTeamsField({ teams, onChange }) {
         ))}
       </ol>
       <button type="button" onClick={() => onChange([...teams, emptyOwnTeam()])} data-testid="series-own-team-add"
-        className="mt-2 tls-btn tls-btn--quiet px-3 py-2 rounded-sm text-[11px] font-bold uppercase tracking-wider inline-flex items-center gap-1.5">
+        className="mt-2 tls-btn tls-btn--quiet px-3 py-2 rounded-sm tls-type-label inline-flex items-center gap-1.5">
         <Plus className="w-3.5 h-3.5" /> Team
       </button>
     </FieldLabel>

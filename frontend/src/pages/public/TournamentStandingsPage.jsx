@@ -19,6 +19,7 @@ import { nameHead, standingSections, tableKind } from "@/lib/standingsTable";
 import { isHeatSchedule } from "@/lib/tournamentLabels";
 import { TOURNAMENT_TIEBREAK_LABELS, tableRuleLines } from "@/lib/tournamentTableSettings";
 import { PrintLink } from "@/components/tls/print/PrintLink";
+import { ShortCaps } from "@/components/tls/ShortCaps";
 
 const PUBLIC_RESULT_STATUSES = new Set(["completed", "results_published", "archived"]);
 
@@ -88,16 +89,16 @@ export default function TournamentStandingsPage() {
         <Breadcrumbs items={tournamentCrumbs(t, trail, { tournamentUrl, current: { label: "Rangliste" } })} className="mb-3" />
         <TournamentTabs tournament={t} accessToken={accessToken} className="mt-3 mb-4" />
         <div className="mt-2 flex flex-wrap items-end justify-between gap-3">
-          <h1 className="font-heading text-3xl md:text-5xl font-black uppercase">Rangliste</h1>
+          <h1 className="tls-type-title"><ShortCaps>Rangliste</ShortCaps></h1>
           <div className="flex flex-wrap gap-2">
             <PrintLink slug={t.slug || t.id} parts="tabelle" from="rangliste" accessToken={accessToken} testId="standings-print-link" className="!text-xs !py-2" />
             {PUBLIC_RESULT_STATUSES.has(t.status) && (
               <>
-                <a href={resultPdfUrl} target="_blank" rel="noreferrer" className="tls-btn tls-btn--secondary inline-flex items-center gap-2 px-4 py-2 rounded-sm text-xs font-bold uppercase tracking-wider">
+                <a href={resultPdfUrl} target="_blank" rel="noreferrer" className="tls-btn tls-btn--secondary inline-flex items-center gap-2 px-4 py-2 rounded-sm tls-type-label">
                   <FileDown className="w-3.5 h-3.5" /> Ergebnis-PDF
                 </a>
                 {hasCertificates && (
-                  <a href={certificatePdfUrl} target="_blank" rel="noreferrer" data-testid="standings-certificates" className="tls-btn tls-btn--secondary inline-flex items-center gap-2 px-4 py-2 rounded-sm text-xs font-bold uppercase tracking-wider">
+                  <a href={certificatePdfUrl} target="_blank" rel="noreferrer" data-testid="standings-certificates" className="tls-btn tls-btn--secondary inline-flex items-center gap-2 px-4 py-2 rounded-sm tls-type-label">
                     <Award className="w-3.5 h-3.5" /> Urkunden
                   </a>
                 )}
@@ -108,7 +109,7 @@ export default function TournamentStandingsPage() {
         {sections.length > 2 && (
           <nav className="mt-6 flex flex-wrap gap-2" aria-label="Gruppen" data-testid="standings-group-nav">
             {sections.map((section) => (
-              <a key={section.key} href={`#gruppe-${section.key}`} className={`tls-btn ${section.mine ? "tls-btn--secondary" : "tls-btn--quiet"} px-3 py-1.5 rounded-sm text-xs font-bold uppercase tracking-wider`}>
+              <a key={section.key} href={`#gruppe-${section.key}`} className={`tls-type-label tls-btn ${section.mine ? "tls-btn--secondary" : "tls-btn--quiet"} px-3 py-1.5 rounded-sm`}>
                 {section.label}
               </a>
             ))}
@@ -118,9 +119,9 @@ export default function TournamentStandingsPage() {
           {sections.map((section) => (
             <section key={section.key} id={section.label ? `gruppe-${section.key}` : undefined} aria-labelledby={section.label ? `gruppe-${section.key}-titel` : undefined} className="scroll-mt-24">
               {section.label && (
-                <h2 id={`gruppe-${section.key}-titel`} className="mb-3 flex flex-wrap items-center gap-x-3 gap-y-1 font-heading text-xl md:text-2xl font-black uppercase">
+                <h2 id={`gruppe-${section.key}-titel`} className="mb-3 flex flex-wrap items-center gap-x-3 gap-y-1 tls-type-section">
                   {section.label}
-                  {section.mine && <span className="tls-standing-me text-[11px] font-body normal-case tracking-normal">Deine Gruppe</span>}
+                  {section.mine && <span className="tls-standing-me tls-type-small">Deine Gruppe</span>}
                 </h2>
               )}
               <StandingsTable
@@ -137,7 +138,7 @@ export default function TournamentStandingsPage() {
           ))}
         </div>
         {ruleLines.length > 0 && (
-          <div className="mt-4 space-y-1 text-xs text-white/55" data-testid="standings-rules">
+          <div className="mt-4 space-y-1 tls-type-small text-white/55" data-testid="standings-rules">
             {ruleLines.map((line) => <p key={line.key} data-rule={line.key}>{line.text}</p>)}
           </div>
         )}

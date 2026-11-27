@@ -44,16 +44,16 @@ function Find({ item, active }) {
   return (
     <li className={`tls-find${empty ? " tls-find--empty" : ""}`} data-testid={`season-find-${item.signal}`}>
       <FindIcon icon={item.icon} />
-      <span className="tls-find__count font-heading font-black text-xl leading-none">{number(item.count)}</span>
+      <span className="tls-find__count tls-type-card tls-type-num leading-none">{number(item.count)}</span>
       <span className="min-w-0 flex-1">
-        <span className="block text-sm text-white/80 leading-snug">{item.label}</span>
+        <span className="block tls-type-small text-white/80 leading-snug">{item.label}</span>
         {capped ? (
           <span className="mt-1.5 flex items-center gap-2" title={full ? "Für heute ist alles gesammelt - morgen geht es weiter." : `Heute zählen noch ${number(item.per_day - item.today)}.`}>
             <span className={`tls-find__today flex-1${full ? " tls-find__today--full" : ""}`}><span style={{ width: `${percent}%` }} /></span>
-            <span className="text-[10px] text-white/45 tabular-nums whitespace-nowrap" data-testid={`season-find-${item.signal}-today`}>heute {number(item.today)} von {number(item.per_day)}</span>
+            <span className="tls-type-small text-white/45 tabular-nums whitespace-nowrap" data-testid={`season-find-${item.signal}-today`}>heute {number(item.today)} von {number(item.per_day)}</span>
           </span>
         ) : (
-          item.season_count > 0 && item.season_count !== item.count && <span className="block text-[10px] text-white/40">zuletzt {number(item.season_count)}</span>
+          item.season_count > 0 && item.season_count !== item.count && <span className="block tls-type-small text-quiet">zuletzt {number(item.season_count)}</span>
         )}
       </span>
     </li>
@@ -69,11 +69,11 @@ function Season({ season }) {
       aria-label={season.label}
     >
       <header className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-0.5 px-3 pt-1 pb-2">
-        <span className="font-heading font-bold uppercase text-sm tracking-wide inline-flex items-center gap-2">
+        <span className="tls-type-label inline-flex items-center gap-2">
           {season.label}
-          {season.active && <span className="text-[9px] px-1.5 py-0.5 rounded-sm bg-[#00FF88]/15 text-[#00FF88] tracking-wider">läuft</span>}
+          {season.active && <span className="tls-type-label px-1.5 py-0.5 rounded-sm bg-[#00FF88]/15 text-[#00FF88]">läuft</span>}
         </span>
-        <span className="text-[10px] uppercase tracking-widest text-white/40 whitespace-nowrap" data-testid={`season-finds-${season.key}-hint`}>{seasonHint(season)}</span>
+        <span className="tls-type-label text-quiet whitespace-nowrap" data-testid={`season-finds-${season.key}-hint`}>{seasonHint(season)}</span>
       </header>
       <ul className={season.active && season.items.length > 1 ? "grid sm:grid-cols-2 gap-x-4 gap-y-0.5" : "space-y-0.5"}>
         {season.items.map((item) => <Find key={item.signal} item={item} active={season.active} />)}
@@ -111,7 +111,7 @@ export function SeasonFindsPanel() {
   }, [load]);
 
   if (!data) {
-    return failed ? <div className="border border-white/10 bg-[#121212] rounded-sm p-5 text-xs text-white/45" data-testid="season-finds-error">Die Saison-Fundstücke konnten gerade nicht geladen werden.</div> : null;
+    return failed ? <div className="border border-white/10 bg-[#121212] rounded-sm p-5 tls-type-small text-white/45" data-testid="season-finds-error">Die Saison-Fundstücke konnten gerade nicht geladen werden.</div> : null;
   }
   const seasons = orderSeasons(data.seasons);
   const running = seasons.filter((season) => season.active);
@@ -120,16 +120,16 @@ export function SeasonFindsPanel() {
     <div className="border border-white/10 bg-[#121212] rounded-sm p-5" data-testid="season-finds">
       <div className="flex items-start justify-between gap-3 mb-4">
         <div className="min-w-0">
-          <div className="text-[11px] font-bold uppercase tracking-[0.3em] text-[#29B6E8]">Saison-Fundstücke</div>
-          <h3 className="font-heading text-xl font-black uppercase mt-1">Was du über das Jahr gesammelt hast</h3>
+          <div className="tls-type-label text-[#29B6E8]">Saison-Fundstücke</div>
+          <h3 className="tls-type-card mt-1">Was du über das Jahr gesammelt hast</h3>
         </div>
         <div className="text-right shrink-0">
-          <div className="font-heading text-2xl font-black leading-none tabular-nums" data-testid="season-finds-total">{number(data.total)}</div>
-          <div className="text-[10px] uppercase tracking-widest text-white/40 mt-1 inline-flex items-center gap-1"><Sparkles className="w-3 h-3" /> insgesamt</div>
+          <div className="tls-type-section tls-type-num leading-none" data-testid="season-finds-total">{number(data.total)}</div>
+          <div className="tls-type-label text-quiet mt-1 inline-flex items-center gap-1"><Sparkles className="w-3 h-3" /> insgesamt</div>
         </div>
       </div>
       {data.total === 0 && (
-        <p className="mb-4 text-xs text-white/55 max-w-2xl" data-testid="season-finds-empty">
+        <p className="mb-4 tls-type-small text-white/55 max-w-2xl" data-testid="season-finds-empty">
           Noch nichts gesammelt. In jeder Jahreszeit versteckt die Seite etwas zum Anklicken – Fledermäuse zu Halloween, die Schneeflocke neben dem Logo im Winter. Was du findest, zählt hier und für deine Erfolge.
         </p>
       )}
@@ -143,7 +143,7 @@ export function SeasonFindsPanel() {
           {others.map((season) => <Season key={season.key} season={season} />)}
         </div>
       )}
-      <p className="mt-4 text-[11px] text-white/35">Nur du siehst diese Karte. Je Tag zählt eine Höchstzahl – was darüber hinausgeht, ist Spaß an der Freude.</p>
+      <p className="mt-4 tls-type-small text-quiet">Nur du siehst diese Karte. Je Tag zählt eine Höchstzahl – was darüber hinausgeht, ist Spaß an der Freude.</p>
     </div>
   );
 }

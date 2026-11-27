@@ -12,6 +12,7 @@ import { ALBUM_VISIBILITY, albumMediaCount } from "./gallery/shared";
 import { SubmissionQueue } from "./gallery/SubmissionQueue";
 import { useAuth } from "@/context/AuthContext";
 import { hasArea } from "@/lib/permissions";
+import { ShortCaps } from "@/components/tls/ShortCaps";
 
 export default function AdminGalleryPage() {
   const { user } = useAuth();
@@ -64,10 +65,10 @@ export default function AdminGalleryPage() {
     <AdminLayout>
       <div className="flex items-center justify-between mb-6 flex-wrap gap-3">
         <div>
-          <span className="text-[11px] font-bold uppercase tracking-[0.3em] text-[#29B6E8]">VEREINS-CMS</span>
-          <h1 className="font-heading text-3xl md:text-4xl font-black uppercase mt-1">Galerie</h1>
+          <span className="tls-type-label text-[#29B6E8]">VEREINS-CMS</span>
+          <h1 className="tls-type-title mt-1"><ShortCaps>Galerie</ShortCaps></h1>
         </div>
-        {editsAlbums && <button onClick={() => setEditingAlbum({})} data-testid="album-new" className="inline-flex items-center gap-2 px-4 py-2 bg-[#29B6E8] text-black font-bold uppercase tracking-wider text-xs rounded-sm hover:bg-[#1E95C2] transition">
+        {editsAlbums && <button onClick={() => setEditingAlbum({})} data-testid="album-new" className="inline-flex items-center gap-2 px-4 py-2 bg-[#29B6E8] text-black tls-type-label rounded-sm hover:bg-[#1E95C2] transition">
           <Plus className="w-3.5 h-3.5" /> Neues Album
         </button>}
       </div>
@@ -77,7 +78,7 @@ export default function AdminGalleryPage() {
       {!editsAlbums ? null : albums.length === 0 ? (
         <div className="border border-dashed border-white/15 rounded-sm p-12 text-center text-white/50">
           <ImageIcon className="w-10 h-10 mx-auto opacity-40 mb-3" />
-          <div className="font-heading font-bold">Noch keine Alben</div>
+          <div className="font-bold">Noch keine Alben</div>
         </div>
       ) : (
         <div className="grid sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-5">
@@ -88,18 +89,18 @@ export default function AdminGalleryPage() {
               </div>
               <div className="p-4">
                 <div className="flex items-center justify-between gap-2">
-                  <div className="font-heading font-black uppercase tls-wrap">{a.title}</div>
-                  <span className="text-[10px] uppercase tracking-widest text-white/40">{albumMediaCount(a)} Medien</span>
+                  <div className="font-black uppercase tls-wrap">{a.title}</div>
+                  <span className="tls-type-label text-quiet">{albumMediaCount(a)} Medien</span>
                 </div>
                 {/* Leere Alben (#1224) sehen Besucher nicht - sie erscheinen von selbst, sobald Medien da sind. */}
-                {albumMediaCount(a) === 0 && <div className="mt-1 text-[10px] uppercase tracking-widest font-bold text-[#FFD700]" data-testid={`admin-album-empty-${a.id}`}>leer – für Besucher unsichtbar</div>}
-                <div className="text-[10px] uppercase tracking-widest text-[#29B6E8]/80 mt-1">
+                {albumMediaCount(a) === 0 && <div className="mt-1 tls-type-label text-[#FFD700]" data-testid={`admin-album-empty-${a.id}`}>leer – für Besucher unsichtbar</div>}
+                <div className="tls-type-label text-[#29B6E8]/80 mt-1">
                   {ALBUM_VISIBILITY[a.visibility] || a.visibility} · {a.published ? "Veröffentlicht" : "Entwurf"}{a.section_count ? ` · ${a.section_count} Abschnitte` : ""}{a.video_count ? ` · ${a.video_count} Videos` : ""}
                 </div>
                 <div className="mt-3 flex gap-2">
-                  <button onClick={() => setActiveAlbum(a)} data-testid={`album-open-${a.id}`} className="flex-1 text-xs font-bold uppercase px-3 py-1 rounded-sm border border-[#29B6E8]/40 text-[#29B6E8] hover:bg-[#29B6E8]/10">Medien</button>
-                  <button onClick={() => setEditingAlbum(a)} className="text-xs font-bold uppercase px-3 py-1 rounded-sm border border-white/15 text-white/70 hover:text-white">Bearb.</button>
-                  <button onClick={() => remove(a.id)} className="text-xs font-bold uppercase px-3 py-1 rounded-sm border border-[#FF3B30]/40 text-[#FF3B30] hover:bg-[#FF3B30]/10"><Trash2 className="w-3 h-3" /></button>
+                  <button onClick={() => setActiveAlbum(a)} data-testid={`album-open-${a.id}`} className="flex-1 tls-type-label px-3 py-1 rounded-sm border border-[#29B6E8]/40 text-[#29B6E8] hover:bg-[#29B6E8]/10">Medien</button>
+                  <button onClick={() => setEditingAlbum(a)} className="tls-type-label px-3 py-1 rounded-sm border border-white/15 text-white/70 hover:text-white">Bearb.</button>
+                  <button onClick={() => remove(a.id)} className="tls-type-label px-3 py-1 rounded-sm border border-[#FF3B30]/40 text-[#FF3B30] hover:bg-[#FF3B30]/10"><Trash2 className="w-3 h-3" /></button>
                 </div>
               </div>
             </div>

@@ -50,11 +50,11 @@ function RosterPasteSheet({ series, team, onClose, onSaved }) {
         placeholder={"Seasonteam-Mitglieder\tWarorga\nName A\nName B"}
         hint="Ein Name je Zeile, so wie beim Veranstalter – gern die Liste „Seasonteam-Mitglieder“ von der Match-Seite. Häkchen-Spalten und die Kopfzeile stören nicht. Neue Namen kommen gleich in den Kader, vorhandene werden zugeordnet." />
       {parsed.errors.length > 0 && (
-        <ul className="text-xs text-red-200 space-y-0.5" role="alert" data-testid="roster-paste-errors">
+        <ul className="tls-type-small text-red-200 space-y-0.5" role="alert" data-testid="roster-paste-errors">
           {parsed.errors.map((error, index) => <li key={index}>{error.line ? `Zeile ${error.line}: ` : ""}{error.message}</li>)}
         </ul>
       )}
-      {parsed.rows.length > 0 && <p className="text-xs text-white/55" data-testid="roster-paste-count">{parsed.rows.map((row) => row.name).join(", ")}</p>}
+      {parsed.rows.length > 0 && <p className="tls-type-small text-white/55" data-testid="roster-paste-count">{parsed.rows.map((row) => row.name).join(", ")}</p>}
     </AdminSheet>
   );
 }
@@ -93,8 +93,8 @@ export function SeriesRosterSection({ series }) {
 
   return (
     <section className="border border-white/10 rounded-sm bg-[#121212] p-4" data-testid="series-roster" aria-labelledby="series-roster-title">
-      <h2 id="series-roster-title" className="text-[11px] font-bold uppercase tracking-widest text-[#29B6E8]">Kader</h2>
-      <p className="mt-1 max-w-[75ch] text-xs text-white/55">
+      <h2 id="series-roster-title" className="tls-type-label text-[#29B6E8]">Kader</h2>
+      <p className="mt-1 max-w-[75ch] tls-type-small text-white/55">
         Wer für ein eigenes Team spielt. Im Ergebnis wird die Aufstellung aus dem Kader angekreuzt; wer im Kader steht und nicht aufgestellt ist, gilt an dem Spieltag als Ersatz.
       </p>
       <div className="mt-3 grid gap-3 md:grid-cols-2">
@@ -105,25 +105,25 @@ export function SeriesRosterSection({ series }) {
               <div className="flex items-center justify-between gap-2">
                 <div className="min-w-0">
                   <div className="font-bold text-white break-words">{team.name}</div>
-                  <div className="text-[10px] uppercase tracking-widest font-bold text-white/45">{roster.length} Spieler</div>
+                  <div className="tls-type-label text-white/45">{roster.length} Spieler</div>
                 </div>
                 <button type="button" onClick={() => setPasting(team.name)} data-testid="roster-paste-open"
-                  className="tls-btn tls-btn--secondary px-3 py-1.5 rounded-sm text-[10px] font-bold uppercase tracking-wider inline-flex items-center gap-1.5 shrink-0">
+                  className="tls-btn tls-btn--secondary px-3 py-1.5 rounded-sm tls-type-label inline-flex items-center gap-1.5 shrink-0">
                   <ClipboardList className="w-3.5 h-3.5" /> Kader einfügen
                 </button>
               </div>
               {roster.length ? (
                 <ul className="mt-2 flex flex-wrap gap-1.5" data-testid="roster-players">
                   {roster.map((row) => (
-                    <li key={row.id} className="inline-flex items-center gap-1.5 pl-2.5 pr-1 min-h-[32px] border border-white/10 rounded-sm text-xs text-white/85" data-testid="roster-player">
+                    <li key={row.id} className="inline-flex items-center gap-1.5 pl-2.5 pr-1 min-h-[32px] border border-white/10 rounded-sm tls-type-small text-white/85" data-testid="roster-player">
                       {row.name}
-                      <span className={`text-[9px] font-bold uppercase tracking-widest ${row.link === "member" && row.link_status !== "open" ? "text-[#29B6E8]" : "text-white/40"}`}>{linkLabel(row)}</span>
+                      <span className={`tls-type-label ${row.link === "member" && row.link_status !== "open" ? "text-[#29B6E8]" : "text-quiet"}`}>{linkLabel(row)}</span>
                       <button type="button" disabled={busy} onClick={() => remove(row)} aria-label={`${row.name} aus dem Kader nehmen`} data-testid="roster-remove"
                         className="tls-hit p-1 text-white/40 hover:text-white disabled:opacity-40"><X className="w-3.5 h-3.5" /></button>
                     </li>
                   ))}
                 </ul>
-              ) : <p className="mt-2 text-sm text-white/45" data-testid="roster-empty">Noch niemand im Kader.</p>}
+              ) : <p className="mt-2 tls-type-small text-white/45" data-testid="roster-empty">Noch niemand im Kader.</p>}
             </div>
           );
         })}

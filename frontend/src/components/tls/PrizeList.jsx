@@ -14,7 +14,7 @@ export function PrizeList({ prizePlaces, prizePool, compact = false }) {
         {groups.map((group) => (
           <section key={group.key} className="space-y-2">
             {groups.length > 1 && (
-              <h3 className="text-[11px] uppercase tracking-[0.25em] font-bold text-[#FFD700]">{group.label}</h3>
+              <h3 className="tls-type-label text-[#FFD700]">{group.label}</h3>
             )}
             <div className={compact ? "space-y-1.5" : "grid grid-cols-1 sm:grid-cols-2 gap-3"}>
               {group.prizes.map((p, i) => <PrizeRow key={`${group.key}-${p.place}-${i}`} prize={p} compact={compact} />)}
@@ -75,8 +75,8 @@ function PrizeRow({ prize, compact }) {
           <Icon className="w-4 h-4" />
         </div>
         <div className="min-w-0 flex-1">
-          <div className={`text-[10px] uppercase tracking-widest font-bold ${text}`}>{prize.label || `Platz ${place}`}</div>
-          <div className="text-sm text-white truncate">{prize.value}</div>
+          <div className={`tls-type-label ${text}`}>{prize.label || `Platz ${place}`}</div>
+          <div className="tls-type-small text-white truncate">{prize.value}</div>
         </div>
       </div>
     );
@@ -87,10 +87,10 @@ function PrizeRow({ prize, compact }) {
         <Icon className="w-24 h-24" />
       </div>
       <div className="relative">
-        <div className={`inline-flex items-center gap-1.5 text-[10px] uppercase tracking-[0.25em] font-bold ${text}`}>
+        <div className={`inline-flex items-center gap-1.5 tls-type-label ${text}`}>
           <Icon className="w-3 h-3" /> {prize.label || `Platz ${place}`}
         </div>
-        <div className="mt-2 font-heading text-lg md:text-xl font-bold text-white leading-tight">
+        <div className="mt-2 tls-type-card tls-type-num text-white leading-tight">
           {prize.value}
         </div>
       </div>

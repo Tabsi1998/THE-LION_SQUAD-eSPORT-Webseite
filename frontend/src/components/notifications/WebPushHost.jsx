@@ -105,12 +105,12 @@ export function WebPushHost() {
         <div className="min-w-0 flex-1">
           {ios ? (
             <>
-              <h2 id="web-push-hint-title" className="text-sm font-bold">Aufrufe auch aufs iPhone?</h2>
-              <p className="mt-1 text-xs text-white/60">
+              <h2 id="web-push-hint-title" className="tls-type-small font-bold">Aufrufe auch aufs iPhone?</h2>
+              <p className="mt-1 tls-type-small text-white/60">
                 Tippe in Safari auf <strong className="text-white/80">Teilen</strong> und dann auf <strong className="text-white/80">„Zum Home-Bildschirm“</strong>.
                 Öffne die Website von dort – dann kann sie dir Aufrufe, Check-in und Turnier-Meldungen schicken.
               </p>
-              <div className="mt-3 flex flex-wrap gap-2 text-xs">
+              <div className="mt-3 flex flex-wrap gap-2 tls-type-small">
                 <button type="button" onClick={decline} data-testid="web-push-hint-ok" className="tls-btn tls-btn--quiet min-h-[44px] px-4 py-2 rounded-sm font-bold uppercase tracking-wider">
                   Verstanden
                 </button>
@@ -118,9 +118,9 @@ export function WebPushHost() {
             </>
           ) : (
             <>
-              <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-[#FFD700]" data-testid="web-push-hint-eyebrow">{WEB_PUSH_EYEBROW[request.reason] || WEB_PUSH_EYEBROW.own}</p>
-              <h2 id="web-push-hint-title" className="mt-0.5 text-sm font-bold">{WEB_PUSH_TITLE}</h2>
-              <StaggerIn as="ul" className="mt-2 space-y-1.5 text-xs" data-testid="web-push-hint-lines">
+              <p className="tls-type-label text-[#FFD700]" data-testid="web-push-hint-eyebrow">{WEB_PUSH_EYEBROW[request.reason] || WEB_PUSH_EYEBROW.own}</p>
+              <h2 id="web-push-hint-title" className="mt-0.5 tls-type-small font-bold">{WEB_PUSH_TITLE}</h2>
+              <StaggerIn as="ul" className="mt-2 space-y-1.5 tls-type-small" data-testid="web-push-hint-lines">
                 {WEB_PUSH_LINES.map(({ icon: Icon, title, text }) => (
                   <li key={title} className="flex items-center gap-2 text-white/70" data-testid={`web-push-hint-line-${title}`}>
                     <Icon className="w-4 h-4 shrink-0 text-[#FFD700]" aria-hidden="true" />
@@ -128,10 +128,10 @@ export function WebPushHost() {
                   </li>
                 ))}
               </StaggerIn>
-              <p className="mt-2 text-[11px] text-white/50">
+              <p className="mt-2 tls-type-small text-white/50">
                 Bei „Ja“ fragt dein Browser einmal nach der Erlaubnis. Was genau kommt, stellst du unter Einstellungen → Benachrichtigungen ein.
               </p>
-              <div className="mt-3 flex flex-wrap gap-2 text-xs">
+              <div className="mt-3 flex flex-wrap gap-2 tls-type-small">
                 <button type="button" onClick={allow} disabled={busy} data-testid="web-push-hint-allow" className="tls-btn tls-btn--primary min-h-[44px] px-4 py-2 rounded-sm font-bold uppercase tracking-wider disabled:opacity-60">
                   {busy ? "Einen Moment …" : "Ja, rufen"}
                 </button>

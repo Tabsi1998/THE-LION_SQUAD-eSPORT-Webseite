@@ -19,7 +19,7 @@ function Choice({ options, value, onChange, testId }) {
           onClick={() => onChange(key)}
           aria-pressed={value === key}
           data-testid={`${testId}-${key}`}
-          className={`min-h-11 px-4 py-2 rounded-sm border text-xs font-bold uppercase tracking-wider transition ${value === key ? "border-[#29B6E8]/60 bg-[#29B6E8]/15 text-[#29B6E8]" : "border-white/10 bg-[#121212] text-white/60 hover:text-white hover:border-white/25"}`}
+          className={`min-h-11 px-4 py-2 rounded-sm border tls-type-label transition ${value === key ? "border-[#29B6E8]/60 bg-[#29B6E8]/15 text-[#29B6E8]" : "border-white/10 bg-[#121212] text-white/60 hover:text-white hover:border-white/25"}`}
         >
           {label}
         </button>
@@ -46,16 +46,16 @@ export function AppearanceTab() {
   return (
     <div className="space-y-5" data-testid="settings-appearance">
       <section className="border border-white/10 rounded-sm bg-[#0A0A0A] p-5 space-y-3">
-        <h2 className="font-heading font-black uppercase">Saisonale Deko</h2>
-        <p className="text-sm text-white/60">
+        <h2 className="tls-type-section">Saisonale Deko</h2>
+        <p className="tls-type-small text-white/60">
           {running ? `Gerade läuft: ${running}.` : "Halloween, Advent, Silvester, Fasching und Ostern schmücken Website und App zur passenden Zeit."}
           {" "}Die Wahl gilt für dein Konto – auch in der App.
         </p>
         <Choice options={DECO_OPTIONS.map(([key]) => [key, LABELS[key]])} value={preference} onChange={(value) => setPreference(value)} testId="settings-deco" />
       </section>
       <section className="border border-white/10 rounded-sm bg-[#0A0A0A] p-5 space-y-3">
-        <h2 className="font-heading font-black uppercase">Töne</h2>
-        <p className="text-sm text-white/60">Klänge der Saison-Deko, erst nach einem Klick und leise. Gilt für diesen Browser.</p>
+        <h2 className="tls-type-section">Töne</h2>
+        <p className="tls-type-body text-white/60">Klänge der Saison-Deko, erst nach einem Klick und leise. Gilt für diesen Browser.</p>
         <Choice options={[["all", "Töne und Musik"], ["sfx", "Nur Töne"], ["off", "Aus"]]} value={sound} onChange={changeSound} testId="settings-sound" />
       </section>
     </div>

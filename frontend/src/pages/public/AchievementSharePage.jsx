@@ -46,7 +46,7 @@ export default function AchievementSharePage() {
   return (
     <PublicLayout>
       <div className="max-w-4xl mx-auto px-4 md:px-6 py-10 md:py-14">
-        <Link to="/achievements" className="inline-flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-widest text-white/50 hover:text-white" data-testid="share-back">
+        <Link to="/achievements" className="inline-flex items-center gap-1.5 tls-type-label text-white/50 hover:text-white" data-testid="share-back">
           <ArrowLeft className="w-3 h-3" /> Alle Erfolge
         </Link>
 
@@ -55,13 +55,13 @@ export default function AchievementSharePage() {
         {(state === "private" || state === "error") && (
           <div className="mt-6 border border-dashed border-white/15 rounded-sm px-6 py-16 text-center" data-testid="share-private">
             <Lock className="w-8 h-8 mx-auto mb-3 text-white/25" />
-            <h1 className="font-heading text-2xl font-bold uppercase text-white/80">{state === "private" ? "Dieser Erfolg ist nicht öffentlich" : "Achievement gerade nicht erreichbar"}</h1>
-            <p className="mt-2 text-sm text-white/45 max-w-md mx-auto">
+            <h1 className="tls-type-title text-white/80">{state === "private" ? "Dieser Erfolg ist nicht öffentlich" : "Achievement gerade nicht erreichbar"}</h1>
+            <p className="mt-2 tls-type-small text-white/45 max-w-md mx-auto">
               {state === "private"
                 ? "Entweder gibt es ihn nicht, oder die Person zeigt ihre Erfolge nicht öffentlich."
                 : "Bitte versuch es gleich noch einmal."}
             </p>
-            <Link to="/achievements" className="tls-btn tls-btn--secondary mt-6 inline-flex items-center gap-2 px-4 py-2 text-xs font-bold uppercase tracking-widest rounded-sm">
+            <Link to="/achievements" className="tls-btn tls-btn--secondary mt-6 inline-flex items-center gap-2 px-4 py-2 tls-type-label rounded-sm">
               <Trophy className="w-3.5 h-3.5" /> Zum Schaukasten
             </Link>
           </div>
@@ -79,31 +79,31 @@ export default function AchievementSharePage() {
             <img src={imageUrl} alt={`${card.name} – ${card.material_name} – ${person}`} width={1200} height={630} className="w-full h-auto block bg-[#0A0A0A]" data-testid="share-image" />
             <div className="p-5 md:p-6 grid md:grid-cols-[minmax(0,1fr)_auto] gap-5 items-start">
               <div className="min-w-0">
-                <div className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-[0.35em]" style={{ color }}>
+                <div className="flex items-center gap-2 tls-type-small font-bold" style={{ color }}>
                   <Badge material={card.material} rank={card.rank} art={card.art} icon={card.icon} size="sm" title={card.name} /> {card.group_name}
                 </div>
-                <h1 className="mt-1 font-heading text-2xl md:text-4xl font-black uppercase leading-none" data-testid="share-name">{card.name}</h1>
-                <div className="mt-2 flex items-center gap-2 flex-wrap text-xs text-white/60">
-                  <span className="text-[10px] font-bold uppercase tracking-widest px-1.5 py-0.5 rounded-sm border" style={{ color, borderColor: `${color}66`, backgroundColor: `${color}12` }}>{card.material_name}</span>
+                <h1 className="mt-1 tls-type-title leading-none" data-testid="share-name">{card.name}</h1>
+                <div className="mt-2 flex items-center gap-2 flex-wrap tls-type-small text-white/60">
+                  <span className="tls-type-small font-bold px-1.5 py-0.5 rounded-sm border" style={{ color, borderColor: `${color}66`, backgroundColor: `${color}12` }}>{card.material_name}</span>
                   <span className="tabular-nums">+{card.points} Punkte</span>
                   {Number(card.holders || 0) > 0 && <span className="tabular-nums" data-testid="share-rarity">{formatPercent(card.percent)} haben das</span>}
                 </div>
-                {card.description && <p className="mt-3 text-sm text-white/65">{card.description}</p>}
-                <Link to={card.user?.username ? `/u/${encodeURIComponent(card.user.username)}` : "/players"} className="mt-4 inline-flex items-center gap-2 text-sm hover:text-[#29B6E8]" data-testid="share-person">
+                {card.description && <p className="mt-3 tls-type-body text-white/65">{card.description}</p>}
+                <Link to={card.user?.username ? `/u/${encodeURIComponent(card.user.username)}` : "/players"} className="mt-4 inline-flex items-center gap-2 tls-type-small hover:text-[#29B6E8]" data-testid="share-person">
                   {card.user?.avatar_url ? (
                     <img src={resolveMediaUrl(card.user.avatar_url)} alt="" className="w-7 h-7 rounded-sm object-cover border border-white/15" />
                   ) : (
-                    <span className="w-7 h-7 rounded-sm border border-white/15 bg-white/5 flex items-center justify-center font-bold text-white/60 text-xs">{person.trim().charAt(0).toUpperCase()}</span>
+                    <span className="w-7 h-7 rounded-sm border border-white/15 bg-white/5 flex items-center justify-center font-bold text-white/60 tls-type-small">{person.trim().charAt(0).toUpperCase()}</span>
                   )}
                   <span className="font-semibold">{person}</span>
-                  {card.earned_at && <span className="text-white/35 text-xs">{viennaDate(card.earned_at)}</span>}
+                  {card.earned_at && <span className="text-quiet tls-type-small">{viennaDate(card.earned_at)}</span>}
                 </Link>
               </div>
               <div className="flex md:flex-col gap-2 shrink-0">
-                <button type="button" onClick={share} className="tls-btn tls-btn--secondary inline-flex items-center justify-center gap-2 px-4 py-2 text-xs font-bold uppercase tracking-widest rounded-sm" data-testid="share-button">
+                <button type="button" onClick={share} className="tls-btn tls-btn--secondary inline-flex items-center justify-center gap-2 px-4 py-2 tls-type-label rounded-sm" data-testid="share-button">
                   <Share2 className="w-3.5 h-3.5" /> Teilen
                 </button>
-                <a href={imageUrl} download={`achievement-${awardId}.png`} className="tls-btn tls-btn--quiet inline-flex items-center justify-center gap-2 px-4 py-2 text-xs font-bold uppercase tracking-widest rounded-sm" data-testid="share-download">
+                <a href={imageUrl} download={`achievement-${awardId}.png`} className="tls-btn tls-btn--quiet inline-flex items-center justify-center gap-2 px-4 py-2 tls-type-label rounded-sm" data-testid="share-download">
                   <Download className="w-3.5 h-3.5" /> Bild speichern
                 </a>
               </div>

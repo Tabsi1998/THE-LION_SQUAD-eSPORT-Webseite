@@ -35,8 +35,8 @@ function LineageCard({ item }) {
     <>
       <div className="flex items-start gap-3 md:gap-3.5 min-w-0">
         <div className="flex-1 flex flex-col gap-1 min-w-0">
-          <div className="text-[11px] md:text-xs font-bold uppercase tracking-[0.14em] md:tracking-[0.16em] text-quiet break-words">{kind}</div>
-          <div className="font-heading font-extrabold uppercase leading-[1.2] text-lg md:text-xl break-words [overflow-wrap:anywhere]" data-testid="references-lineage-title">{lineage.title}</div>
+          <div className="tls-type-label md:tracking-[0.16em] text-quiet break-words">{kind}</div>
+          <div className="tls-type-card leading-[1.2] break-words [overflow-wrap:anywhere]" data-testid="references-lineage-title">{lineage.title}</div>
           {/* #1934: veranstaltender Partner des Vereins */}
           <PartnerHostBadge partner={lineage.organizers?.[0]} className="mt-1" />
         </div>
@@ -45,7 +45,7 @@ function LineageCard({ item }) {
       <ol className="list-none m-0 p-0 grid grid-cols-3 gap-2 md:gap-2.5" aria-label="Liga-Weg">
         {path.steps.map((step) => <Step key={step.season_slug || `${step.season}-${step.tier}`} step={step} kind={lineage.kind} />)}
       </ol>
-      <div className="mt-auto flex flex-wrap justify-between items-center gap-2.5 text-sm">
+      <div className="mt-auto flex flex-wrap justify-between items-center gap-2.5 tls-type-small">
         <span className="text-zinc-400">{path.summary}</span>
         {path.target && <span className="text-brand font-bold whitespace-nowrap">Zur Serie →</span>}
       </div>
@@ -67,11 +67,11 @@ function Step({ step, kind }) {
       aria-current={step.current ? "step" : undefined}
       className={`min-w-0 flex flex-col gap-1 md:gap-1.5 p-2.5 md:p-3 rounded-lg border ${step.current ? "bg-brand/[0.08] border-brand/45" : "bg-surface-2 border-white/[0.07]"}`}
     >
-      <div className="text-[11px] md:text-xs text-zinc-400 break-words [overflow-wrap:anywhere]">{step.season}</div>
-      <div className="font-bold text-[13px] md:text-sm text-white break-words [overflow-wrap:anywhere]">{step.tier || (kind === "team_league" ? "Liga" : "Gesamt")}</div>
+      <div className="tls-type-small text-zinc-400 break-words [overflow-wrap:anywhere]">{step.season}</div>
+      <div className="font-bold tls-type-small text-white break-words [overflow-wrap:anywhere]">{step.tier || (kind === "team_league" ? "Liga" : "Gesamt")}</div>
       <div className="flex flex-col md:flex-row md:flex-wrap md:items-baseline gap-1 md:gap-x-1.5">
-        <span className={`font-display font-bold text-[22px] md:text-[26px] leading-none tabular-nums ${placeTone}`} title={step.club?.of ? `${place}. von ${step.club.of}` : undefined}>{place ? `${place}.` : "–"}</span>
-        {step.note && <span className={`text-[10px] md:text-xs font-bold uppercase tracking-[0.06em] md:tracking-[0.08em] break-words [overflow-wrap:anywhere] ${NOTE_TONES[step.note] || "text-zinc-400"}`}>{step.note}</span>}
+        <span className={`tls-type-section tls-type-num leading-none ${placeTone}`} title={step.club?.of ? `${place}. von ${step.club.of}` : undefined}>{place ? `${place}.` : "–"}</span>
+        {step.note && <span className={`tls-type-label md:tracking-[0.08em] break-words [overflow-wrap:anywhere] ${NOTE_TONES[step.note] || "text-zinc-400"}`}>{step.note}</span>}
       </div>
     </li>
   );

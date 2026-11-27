@@ -24,7 +24,7 @@ export function SeasonRulesTab({ seasonId, season, canSeason, canRules, rulesVie
     <div className="space-y-6">
       <FormSection title="Regelwerk" testId="season-rules" hint="Versionen, PDF und Zustimmung der Teams pflegst du auf der Seite des Regelwerks.">
         <div className="flex flex-wrap items-start justify-between gap-3">
-          <div className="min-w-0 space-y-1 text-sm" data-testid="season-rules-state">
+          <div className="min-w-0 space-y-1 tls-type-small" data-testid="season-rules-state">
             {current ? (
               <p className="text-white/85"><FileText className="mr-1.5 inline h-4 w-4 align-[-3px] text-[#29B6E8]" aria-hidden="true" />Gültig: <strong className="text-white">{versionLine(current)}</strong></p>
             ) : null}
@@ -34,21 +34,21 @@ export function SeasonRulesTab({ seasonId, season, canSeason, canRules, rulesVie
           </div>
           {canRules ? (
             <Link to={rulesLink} data-testid="season-rules-link"
-              className="tls-btn tls-btn--secondary inline-flex min-h-[40px] items-center gap-1.5 rounded-sm px-3 py-1.5 text-[11px] font-bold uppercase tracking-wider">
+              className="tls-btn tls-btn--secondary inline-flex min-h-[40px] items-center gap-1.5 rounded-sm px-3 py-1.5 tls-type-label">
               Regelwerk mit Versionen pflegen <ArrowRight className="h-3 w-3" aria-hidden="true" />
             </Link>
           ) : null}
         </div>
         {!hasRules ? (
-          <p className="rounded-sm border border-white/10 bg-[#0A0A0A] px-3 py-2 text-sm text-white/70" data-testid="season-rules-missing">
+          <p className="rounded-sm border border-white/10 bg-[#0A0A0A] px-3 py-2 tls-type-body text-white/70" data-testid="season-rules-missing">
             Regeln stehen im Regelwerk mit Versionen – ohne veröffentlichte Fassung geht keine Anmeldung und keine Veröffentlichung.
             {canRules ? " Über „Regelwerk mit Versionen pflegen“ legst du es an." : " Anlegen kann es, wer in dieser Liga „Regeln veröffentlichen“ darf."}
           </p>
         ) : null}
         {!hasRules && legacy ? (
           <details className="rounded-sm border border-white/10 bg-[#0A0A0A] p-3" data-testid="season-rules-legacy">
-            <summary className="cursor-pointer text-xs font-bold uppercase tracking-wider text-white/60">Alter Regeltext (gilt bis zum ersten Regelwerk)</summary>
-            <pre className="mt-3 whitespace-pre-wrap break-words font-sans text-sm text-white/75">{legacy}</pre>
+            <summary className="cursor-pointer tls-type-small font-bold text-white/60">Alter Regeltext (gilt bis zum ersten Regelwerk)</summary>
+            <pre className="mt-3 whitespace-pre-wrap break-words font-sans tls-type-small text-white/75">{legacy}</pre>
           </details>
         ) : null}
       </FormSection>

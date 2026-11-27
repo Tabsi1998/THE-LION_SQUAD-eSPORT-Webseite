@@ -49,13 +49,13 @@ function EmbedRow({ prefix, label, hint, entry, channels, draft, onDraft, busy, 
   return (
     <div className="border border-white/10 rounded-sm p-3 space-y-2" data-testid={prefix}>
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <label className="flex items-center gap-2 text-sm font-bold">
+        <label className="flex items-center gap-2 tls-type-small font-bold">
           <input type="checkbox" checked={!!entry.enabled} disabled={!!busy} onChange={(e) => onToggle(e.target.checked)} className="accent-[#5865F2]" data-testid={`${prefix}-enabled`} />
           <span>{label}</span>
         </label>
-        <span className={`text-[11px] ${entry.error ? "text-[#FF6B6B]" : "text-white/45"}`} data-testid={`${prefix}-state`}>{stateText(entry)}</span>
+        <span className={`tls-type-small ${entry.error ? "text-[#FF6B6B]" : "text-white/45"}`} data-testid={`${prefix}-state`}>{stateText(entry)}</span>
       </div>
-      {hint ? <p className="text-xs text-white/45">{hint}</p> : null}
+      {hint ? <p className="tls-type-small text-white/45">{hint}</p> : null}
       <div className="grid sm:grid-cols-[minmax(0,1fr)_auto] gap-2 items-start">
         {channels.ok ? (
           <select aria-label={`Kanal für ${label}`} value={current} onChange={(e) => onDraft(e.target.value)}
@@ -70,9 +70,9 @@ function EmbedRow({ prefix, label, hint, entry, channels, draft, onDraft, busy, 
         )}
         <div className="flex flex-wrap items-center gap-2">
           <button type="button" onClick={() => onSave(String(current).trim())} disabled={!!busy || draft === undefined} data-testid={`${prefix}-save`}
-            className="px-3 py-1.5 bg-[#29B6E8] text-black text-[10px] font-bold uppercase tracking-wider rounded-sm disabled:opacity-40">Speichern</button>
+            className="px-3 py-1.5 bg-[#29B6E8] text-black tls-type-label rounded-sm disabled:opacity-40">Speichern</button>
           <button type="button" onClick={onRefresh} disabled={!!busy || !entry.enabled || !entry.channel_id} data-testid={`${prefix}-refresh`}
-            className="px-3 py-1.5 border border-[#5865F2]/60 text-[#b8c0ff] text-[10px] font-bold uppercase tracking-wider rounded-sm inline-flex items-center gap-1 disabled:opacity-40">
+            className="px-3 py-1.5 border border-[#5865F2]/60 text-[#b8c0ff] tls-type-label rounded-sm inline-flex items-center gap-1 disabled:opacity-40">
             <RefreshCw className={`w-3 h-3 ${busy === "refresh" ? "animate-spin" : ""}`} /> Jetzt aktualisieren
           </button>
         </div>
@@ -124,8 +124,8 @@ function GuildEmbeds({ guild, labels, reload }) {
   return (
     <div className="space-y-2" data-testid={`discord-embeds-guild-${guild.guild_id}`}>
       <div className="flex flex-wrap items-baseline justify-between gap-2">
-        <div className="text-sm font-bold">{guild.name}</div>
-        <div className="text-[11px] text-white/45" data-testid={`discord-embeds-guild-${guild.guild_id}-games`}>
+        <div className="tls-type-small font-bold">{guild.name}</div>
+        <div className="tls-type-small text-white/45" data-testid={`discord-embeds-guild-${guild.guild_id}-games`}>
           {games.length ? `nur ${games.map((game) => game.name).join(", ")}` : "noch kein Spiel zugeordnet – Spiele → Spiel öffnen → Allgemein → Discord-Server"}
         </div>
       </div>
@@ -186,14 +186,14 @@ export function DiscordEmbedsPanel() {
   return (
     <div className="border border-white/10 bg-[#121212] rounded-sm p-5 space-y-4" data-testid="discord-embeds">
       <div>
-        <div className="font-heading font-bold uppercase inline-flex items-center gap-2"><Pin className="w-4 h-4 text-[#5865F2]" /> Einbettungen, die sich aktualisieren</div>
-        <p className="mt-1 text-xs text-white/50">
+        <div className="font-bold inline-flex items-center gap-2"><Pin className="w-4 h-4 text-[#5865F2]" /> Einbettungen, die sich aktualisieren</div>
+        <p className="mt-1 tls-type-small text-white/50">
           Je Einbettung postet der Bot eine Nachricht, pinnt sie und bearbeitet sie danach – bei Änderungen binnen einer Minute, dazu ein Sammler alle zehn Minuten („Stand: …“ in der Fußzeile).
           Wird die Nachricht im Discord gelöscht, postet er sie neu. Kein Nachrichten-Spam.
         </p>
       </div>
       <div className="space-y-3">
-        {guilds.length > 0 && <div className="text-[10px] font-bold uppercase tracking-widest text-white/45">Hauptserver – alle Spiele</div>}
+        {guilds.length > 0 && <div className="tls-type-label text-white/45">Hauptserver – alle Spiele</div>}
         {EMBED_ORDER.map((kind) => {
           const entry = embeds[kind] || {};
           return (
@@ -208,8 +208,8 @@ export function DiscordEmbedsPanel() {
       {guilds.length > 0 && (
         <div className="space-y-4 border-t border-white/10 pt-4" data-testid="discord-embeds-guilds">
           <div>
-            <div className="text-[10px] font-bold uppercase tracking-widest text-white/45">Spielserver</div>
-            <p className="mt-1 text-xs text-white/45">
+            <div className="tls-type-label text-white/45">Spielserver</div>
+            <p className="mt-1 tls-type-small text-white/45">
               Auf jedem Spielserver gibt es die Rangliste und die nächsten Termine noch einmal – nur mit den Spielen dieses Servers. Der Erfolg der Woche gilt für den ganzen Verein und bleibt am Hauptserver.
             </p>
           </div>

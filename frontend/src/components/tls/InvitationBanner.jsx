@@ -39,12 +39,12 @@ export function InvitationBanner({ pathname = "/" }) {
   };
   return (
     <div className="border-b border-[#FFD700]/40 bg-[#FFD700]/10" data-testid="invitation-banner">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3 flex flex-wrap items-center gap-3 text-sm">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3 flex flex-wrap items-center gap-3 tls-type-small">
         <Crown className="w-4 h-4 text-[#FFD700] shrink-0" />
-        <span className="font-bold uppercase tracking-wider text-[#FFD700] text-xs">Einladung zum Verein</span>
+        <span className="tls-type-label text-[#FFD700]">Einladung zum Verein</span>
         <span className="text-white/80">Der Vorstand lädt dich ein, Mitglied zu werden – der Antrag ist für dich freigeschaltet.</span>
         {invitation.note ? <span className="text-white/60 italic" data-testid="invitation-note">„{invitation.note}“</span> : null}
-        <Link to="/membership/apply" data-testid="invitation-apply" className="tls-btn tls-btn--primary ml-auto inline-flex items-center px-4 py-1.5 font-bold uppercase tracking-wider rounded-sm text-xs">Antrag ausfüllen</Link>
+        <Link to="/membership/apply" data-testid="invitation-apply" className="tls-btn tls-btn--primary ml-auto inline-flex items-center px-4 py-1.5 tls-type-label rounded-sm">Antrag ausfüllen</Link>
         <button type="button" onClick={dismiss} aria-label="Hinweis ausblenden" data-testid="invitation-dismiss" className="text-white/50 hover:text-white"><X className="w-4 h-4" /></button>
       </div>
     </div>

@@ -24,11 +24,11 @@ export function YearReviewBanner() {
     >
       <span className="w-11 h-11 rounded-sm border border-[#FFD700]/40 bg-[#FFD700]/10 text-[#FFD700] inline-flex items-center justify-center shrink-0"><Sparkles className="w-5 h-5" /></span>
       <div className="flex-1 min-w-[180px]">
-        <div className="text-[11px] font-bold uppercase tracking-[0.3em] text-[#FFD700]">Jahresrückblick</div>
-        <h2 className="font-heading text-lg md:text-xl font-bold uppercase mt-0.5">Dein Jahr {status.year} ist da</h2>
-        <p className="text-xs text-white/55 mt-1">Turniere, Siege, Events und Bestzeiten zum Durchtippen – nur für dich.</p>
+        <div className="tls-type-label text-[#FFD700]">Jahresrückblick</div>
+        <h2 className="tls-type-section mt-0.5">Dein Jahr {status.year} ist da</h2>
+        <p className="tls-type-small text-white/55 mt-1">Turniere, Siege, Events und Bestzeiten zum Durchtippen – nur für dich.</p>
       </div>
-      <Link to={status.path || YEAR_REVIEW_PATH} className="tls-btn tls-btn--primary inline-flex items-center gap-2 px-4 py-2.5 text-xs font-bold uppercase tracking-widest rounded-sm" data-testid="year-review-banner-open">
+      <Link to={status.path || YEAR_REVIEW_PATH} className="tls-btn tls-btn--primary inline-flex items-center gap-2 px-4 py-2.5 tls-type-label rounded-sm" data-testid="year-review-banner-open">
         Ansehen
       </Link>
     </section>

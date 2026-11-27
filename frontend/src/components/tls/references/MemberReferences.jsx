@@ -60,7 +60,7 @@ export function MemberReferences({ profile }) {
         eyebrow="Referenzen"
         title="Vereinsplatzierungen"
         hint={(
-          <Link to={allLink} data-testid="member-references-all" className="tls-btn tls-btn--quiet inline-flex items-center min-h-[44px] px-4 rounded text-[13px] font-bold uppercase tracking-[0.08em] no-underline">
+          <Link to={allLink} data-testid="member-references-all" className="tls-btn tls-btn--quiet inline-flex items-center min-h-[44px] px-4 rounded tls-type-small font-bold uppercase tracking-[0.08em] no-underline">
             Alle Referenzen
           </Link>
         )}
@@ -78,8 +78,8 @@ export function MemberReferences({ profile }) {
             <div className={`${CARD} flex flex-wrap items-center gap-x-8 gap-y-3`} data-testid="member-reference-facts">
               {facts.map((fact) => (
                 <div key={fact.key} className="flex flex-col">
-                  <span className="font-display font-bold text-[32px] md:text-4xl leading-none tabular-nums text-white">{fact.value}</span>
-                  <span className="text-[13px] text-zinc-400">{fact.label}</span>
+                  <span className="tls-type-title tls-type-num leading-none text-white">{fact.value}</span>
+                  <span className="tls-type-small text-zinc-400">{fact.label}</span>
                 </div>
               ))}
             </div>
@@ -97,8 +97,8 @@ export function MemberReferences({ profile }) {
         {groups.map((group) => (
           <div key={group.key || "none"} className="pt-5 md:pt-7" data-testid={`member-references-year-${group.key || "none"}`}>
             <div className="flex items-baseline gap-3.5 pb-2 md:pb-2.5">
-              <h3 className="m-0 font-display font-bold leading-none tabular-nums text-[34px] md:text-[40px] text-white">{group.label}</h3>
-              <span className="text-sm text-quiet">{group.items.length} {group.items.length === 1 ? "Teilnahme" : "Teilnahmen"}</span>
+              <h3 className="m-0 tls-type-title tls-type-num leading-none text-white">{group.label}</h3>
+              <span className="tls-type-small text-quiet">{group.items.length} {group.items.length === 1 ? "Teilnahme" : "Teilnahmen"}</span>
             </div>
             <ul className="list-none m-0 p-0 border-t border-white/10">
               {group.items.map((item) => (
@@ -125,8 +125,8 @@ function MedalCount({ medal, last }) {
     <div data-testid={`member-reference-medal-${medal.key}`} className={`flex items-center gap-3 ${last ? "" : "pr-4 mr-4 sm:pr-[22px] sm:mr-[22px] border-r border-white/[0.08]"}`}>
       <MedalMark placement={medal.placement} className="hidden sm:block w-[30px] h-[30px]" />
       <div className="flex flex-col">
-        <span className={`font-display font-bold text-[40px] sm:text-[44px] leading-[0.9] tabular-nums ${tone.text}`}><CountUp value={Number(medal.count) || 0} /></span>
-        <span className="text-xs font-bold uppercase tracking-[0.16em] text-zinc-300">{medal.label}</span>
+        <span className={`tls-type-title tls-type-num leading-[0.9] ${tone.text}`}><CountUp value={Number(medal.count) || 0} /></span>
+        <span className="tls-type-label text-zinc-300">{medal.label}</span>
       </div>
     </div>
   );
@@ -139,9 +139,9 @@ function BestResult({ best, link }) {
     <div className={`${CARD} flex items-center gap-4`} data-testid="member-reference-best">
       <PlaceRing placement={best.placement} size="lg" />
       <div className="flex flex-col gap-0.5 min-w-0">
-        <span className="text-xs font-bold uppercase tracking-[0.18em] text-zinc-400">Bestes Ergebnis</span>
-        <span className="font-bold text-lg leading-snug text-white break-words [overflow-wrap:anywhere]" title={full !== title ? full : undefined}>{title}</span>
-        <span className="text-sm text-quiet">{[monthOf(best.item), fieldSize(best.entry)].filter(Boolean).join(" · ")}</span>
+        <span className="tls-type-label text-zinc-400">Bestes Ergebnis</span>
+        <span className="tls-type-card leading-snug text-white break-words [overflow-wrap:anywhere]" title={full !== title ? full : undefined}>{title}</span>
+        <span className="tls-type-small text-quiet">{[monthOf(best.item), fieldSize(best.entry)].filter(Boolean).join(" · ")}</span>
       </div>
     </div>
   );
@@ -160,9 +160,9 @@ function MemberPath({ path }) {
         {/* #2014: Logo der Spur (sonst der Saison, zu der der Weg führt) vor dem Namen - ohne Logo wie bisher. */}
         <span className="inline-flex items-center gap-2.5 min-w-0">
           <SeriesLogo src={seriesLogo(lineage, null) || path.target?.logo_url} size="xs" testId="member-path-logo" />
-          <span className="text-xs font-bold uppercase tracking-[0.22em] text-zinc-400 break-words [overflow-wrap:anywhere]">Liga-Weg · {lineage.title}</span>
+          <span className="tls-type-label text-zinc-400 break-words [overflow-wrap:anywhere]">Liga-Weg · {lineage.title}</span>
         </span>
-        {path.address && <Link to={path.address} className="text-sm font-semibold text-brand hover:text-white no-underline transition-colors duration-fast">Zur Serie</Link>}
+        {path.address && <Link to={path.address} className="tls-type-small font-semibold text-brand hover:text-white no-underline transition-colors duration-fast">Zur Serie</Link>}
       </div>
       {/* Am Handy eine Reihe zum Wischen (wie in der App), breit umbrechend mit Pfeilen. */}
       <ol className="tls-ref-scroll tls-ref-snap list-none m-0 p-0 flex items-stretch gap-2 tls-swipe tls-swipe--room sm:flex-wrap sm:overflow-visible sm:[mask-image:none] sm:[-webkit-mask-image:none]" aria-label={`Liga-Weg ${lineage.title}`}>
@@ -174,9 +174,9 @@ function MemberPath({ path }) {
               aria-current={step.current ? "step" : undefined}
               className={`min-w-[112px] sm:min-w-[128px] max-w-full flex flex-col gap-0.5 px-3 sm:px-3.5 py-2.5 rounded-md bg-surface-2 border ${step.note === "Aufstieg" ? "border-ok/35" : "border-white/10"}`}
             >
-              <span className="text-xs text-quiet break-words [overflow-wrap:anywhere]">{step.season}</span>
-              <span className="font-bold text-[15px] text-white break-words [overflow-wrap:anywhere]">{step.tier || (lineage.kind === "team_league" ? "Liga" : "Gesamt")}</span>
-              <span className={`text-[13px] font-semibold ${SEASON_NOTE_TONES[step.note] || "text-zinc-400"}`}>{stepResult(step)}</span>
+              <span className="tls-type-small text-quiet break-words [overflow-wrap:anywhere]">{step.season}</span>
+              <span className="font-bold tls-type-small text-white break-words [overflow-wrap:anywhere]">{step.tier || (lineage.kind === "team_league" ? "Liga" : "Gesamt")}</span>
+              <span className={`tls-type-small font-semibold ${SEASON_NOTE_TONES[step.note] || "text-zinc-400"}`}>{stepResult(step)}</span>
             </span>
             {index < steps.length - 1 && (
               <svg width="18" height="18" viewBox="0 0 18 18" fill="none" aria-hidden="true" className="hidden sm:block shrink-0 text-zinc-600">
@@ -205,18 +205,18 @@ function ChronicleItem({ item, link, profileId, open, onToggle }) {
       <button type="button" onClick={onToggle} aria-expanded={open} aria-controls={panelId} data-testid={`member-reference-row-${item.id}`} className="tls-ref-row w-full flex items-start sm:items-center sm:flex-wrap gap-3 sm:gap-x-5 sm:gap-y-2.5 py-3.5 sm:py-4 sm:px-2 text-left text-white bg-transparent border-0 cursor-pointer">
         <PlaceRing placement={placement} />
         <span className="flex-1 sm:flex-[1_1_300px] min-w-0 flex flex-col gap-0.5">
-          <span data-testid="member-reference-title" title={full !== title ? full : undefined} className="font-bold text-base sm:text-[17px] leading-[1.3] break-words [overflow-wrap:anywhere]">{title}</span>
+          <span data-testid="member-reference-title" title={full !== title ? full : undefined} className="tls-type-card leading-[1.3] break-words [overflow-wrap:anywhere]">{title}</span>
           {/* #2014: Logo der Saison bzw. Spur wie in der Chronik der Übersicht. */}
           <SeriesLogo src={seriesLogo(link?.lineage, link?.season)} size="xs" className="mt-0.5" testId="member-reference-logo" />
-          <span className="sm:hidden text-[13px] text-zinc-400 break-words">{[game, date].filter(Boolean).join(" · ")}</span>
-          <span className="hidden sm:block text-sm text-zinc-400 break-words">{game}</span>
-          <span className="sm:hidden text-[13px] text-zinc-300 break-words [overflow-wrap:anywhere]">{[team, size].filter(Boolean).join(" · ")}</span>
+          <span className="sm:hidden tls-type-small text-zinc-400 break-words">{[game, date].filter(Boolean).join(" · ")}</span>
+          <span className="hidden sm:block tls-type-small text-zinc-400 break-words">{game}</span>
+          <span className="sm:hidden tls-type-small text-zinc-300 break-words [overflow-wrap:anywhere]">{[team, size].filter(Boolean).join(" · ")}</span>
         </span>
         <span className="hidden sm:flex sm:flex-[1_1_220px] min-w-0 flex-col gap-0.5">
-          <span className="text-sm text-zinc-200 break-words [overflow-wrap:anywhere]">{team}</span>
-          {size && <span className="text-[13px] text-quiet">{size}</span>}
+          <span className="tls-type-small text-zinc-200 break-words [overflow-wrap:anywhere]">{team}</span>
+          {size && <span className="tls-type-small text-quiet">{size}</span>}
         </span>
-        <span className="hidden sm:block sm:flex-[0_0_96px] text-sm text-quiet tabular-nums">{date}</span>
+        <span className="hidden sm:block sm:flex-[0_0_96px] tls-type-small text-quiet tabular-nums">{date}</span>
         <Chevron down className="tls-ref-chev mt-[11px] sm:mt-0" />
       </button>
       {open && <Details id={panelId} itemId={item.id} details={detailsOf(item, profileId, link)} />}
@@ -227,7 +227,7 @@ function ChronicleItem({ item, link, profileId, open, onToggle }) {
 function Details({ id, itemId, details }) {
   const blocks = [];
   if (details.fullTitle) {
-    blocks.push(<p key="title" className="m-0 text-sm text-zinc-300 break-words [overflow-wrap:anywhere]">{details.fullTitle}</p>);
+    blocks.push(<p key="title" className="m-0 tls-type-small text-zinc-300 break-words [overflow-wrap:anywhere]">{details.fullTitle}</p>);
   }
   if (details.tags.length) {
     blocks.push(<div key="tags" className="flex flex-wrap gap-1.5">{details.tags.map((tag) => <Mark key={tag}>{tag}</Mark>)}</div>);
@@ -236,7 +236,7 @@ function Details({ id, itemId, details }) {
   if (details.lineup.length) {
     blocks.push(
       <div key="lineup" className="flex flex-col gap-2">
-        <span className="text-xs font-bold uppercase tracking-[0.18em] text-zinc-400" data-testid={`member-reference-lineup-${itemId}`}>
+        <span className="tls-type-label text-zinc-400" data-testid={`member-reference-lineup-${itemId}`}>
           Aufstellung{details.played && <span className="text-zinc-300"> · {details.played}</span>}
         </span>
         <ul className="list-none m-0 p-0 flex flex-wrap gap-1.5" aria-label="Aufstellung">
@@ -246,13 +246,13 @@ function Details({ id, itemId, details }) {
     );
   } else if (details.played) {
     blocks.push(
-      <p key="played" className="m-0 text-xs font-bold uppercase tracking-[0.18em] text-zinc-400" data-testid={`member-reference-played-${itemId}`}>
+      <p key="played" className="m-0 tls-type-label text-zinc-400" data-testid={`member-reference-played-${itemId}`}>
         Einsätze<span className="text-zinc-300"> · {details.played}</span>
       </p>,
     );
   }
   // Links: Saison ansehen (nur mit Saison), Details zur Referenz (Bericht, Partner, Ort), Beim Veranstalter.
-  const button = "tls-btn inline-flex items-center min-h-[40px] px-3.5 rounded text-sm font-bold no-underline";
+  const button = "tls-btn inline-flex items-center min-h-[40px] px-3.5 rounded tls-type-small font-bold no-underline";
   blocks.push(
     <div key="links" className="flex flex-wrap gap-2.5" data-testid={`member-reference-links-${itemId}`}>
       {details.seasonUrl && <Link to={details.seasonUrl} className={`${button} tls-btn--primary`}>Saison ansehen</Link>}
@@ -268,7 +268,7 @@ function Details({ id, itemId, details }) {
 }
 
 function Person({ person }) {
-  const base = "inline-flex items-center max-w-full px-2.5 py-1 rounded-full border text-sm break-words [overflow-wrap:anywhere]";
+  const base = "inline-flex items-center max-w-full px-2.5 py-1 rounded-full border tls-type-small break-words [overflow-wrap:anywhere]";
   const tone = person.self ? "border-brand bg-brand/[0.12] text-white font-bold" : "border-white/[0.12] bg-surface-2 text-zinc-300 font-medium";
   if (person.url && !person.self) {
     return (

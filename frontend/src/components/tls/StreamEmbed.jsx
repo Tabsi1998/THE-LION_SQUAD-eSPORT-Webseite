@@ -114,10 +114,10 @@ export function StreamEmbed({ source, compact = false, showExternalLink = true }
     <div className="border border-[#FF3B30]/30 bg-[#0A0A0A] rounded-sm overflow-hidden min-w-0 max-w-full">
       <div className={`flex items-center gap-2 ${compact ? "px-3 py-1.5" : "px-4 py-2"} bg-[#FF3B30]/10 border-b border-[#FF3B30]/20`}>
         <Radio className={`${compact ? "w-3.5 h-3.5" : "w-4 h-4"} text-[#FF3B30] animate-pulse`} />
-        <span className={`${compact ? "text-xs" : "text-sm"} font-display tracking-widest font-bold text-[#FF3B30] truncate`}>{source.stream_title || "LIVE STREAM"}</span>
-        <span className="ml-auto text-[10px] uppercase tracking-widest text-white/50">{platform.toUpperCase()}</span>
+        <span className="tls-type-label text-[#FF3B30] truncate">{source.stream_title || "LIVE STREAM"}</span>
+        <span className="ml-auto tls-type-label text-white/50">{platform.toUpperCase()}</span>
         {showExternalLink && url && (
-          <a href={url} target="_blank" rel="noopener noreferrer" data-testid="stream-open-external" className="text-[10px] uppercase tracking-widest text-white/70 hover:text-white inline-flex items-center gap-1">
+          <a href={url} target="_blank" rel="noopener noreferrer" data-testid="stream-open-external" className="tls-type-label text-white/70 hover:text-white inline-flex items-center gap-1">
             <ExternalLink className="w-3 h-3" /> Öffnen
           </a>
         )}
@@ -138,8 +138,8 @@ export function StreamEmbed({ source, compact = false, showExternalLink = true }
       ) : url ? (
         <a href={url} target="_blank" rel="noopener noreferrer" data-testid="stream-fallback-link" className="block p-8 text-center">
           <Radio className="w-10 h-10 mx-auto text-[#FF3B30] mb-3" />
-          <div className="font-heading font-black uppercase">Stream auf {platform} öffnen</div>
-          <div className="text-xs text-white/50 mt-1 break-all">{url}</div>
+          <div className="font-black uppercase">Stream auf {platform} öffnen</div>
+          <div className="tls-type-small text-white/50 mt-1 break-all">{url}</div>
         </a>
       ) : null}
     </div>

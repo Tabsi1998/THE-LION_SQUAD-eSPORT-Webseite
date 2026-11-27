@@ -26,18 +26,18 @@ export function MatchCallBox({ call }) {
     <div className="mt-6 rounded-sm border border-[#FFD700]/50 bg-[#FFD700]/10 px-4 py-4 sm:px-5" role="status" data-testid="match-call">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="min-w-0">
-          <div className="text-[11px] font-bold uppercase tracking-[0.25em] text-[#FFD700] flex items-center gap-2"><BellRing className="w-4 h-4" /> Aufgerufen</div>
-          <div className="mt-1 font-heading text-2xl font-black uppercase text-white [overflow-wrap:anywhere]" data-testid="match-call-station">Bitte jetzt zu {station}</div>
-          {call.report_by && <div className="mt-1 text-sm text-white/70">Antreten bis {viennaTime(call.report_by, { hour: "2-digit", minute: "2-digit" })}</div>}
+          <div className="tls-type-label text-[#FFD700] flex items-center gap-2"><BellRing className="w-4 h-4" /> Aufgerufen</div>
+          <div className="mt-1 tls-type-section text-white [overflow-wrap:anywhere]" data-testid="match-call-station">Bitte jetzt zu {station}</div>
+          {call.report_by && <div className="mt-1 tls-type-small text-white/70">Antreten bis {viennaTime(call.report_by, { hour: "2-digit", minute: "2-digit" })}</div>}
         </div>
         {left.seconds !== null && (
           <div className="text-right" data-testid="match-call-countdown">
             {left.done ? (
-              <div className="font-heading text-xl font-black uppercase text-[#FFD700]">Jetzt geht es los</div>
+              <div className="tls-type-card text-[#FFD700]">Jetzt geht es los</div>
             ) : (
               <>
-                <div className="text-[10px] uppercase tracking-widest text-white/55">noch</div>
-                <div className="font-display text-4xl font-bold tabular-nums text-white">{left.text}</div>
+                <div className="tls-type-label text-white/55">noch</div>
+                <div className="tls-type-title tls-type-num text-white">{left.text}</div>
               </>
             )}
           </div>

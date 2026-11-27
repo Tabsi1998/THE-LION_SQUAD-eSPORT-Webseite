@@ -4,7 +4,6 @@ import { LazyImg } from "@/components/tls/LazyImg";
 import { NewsTextCard } from "@/components/tls/NewsTextCard";
 import { newsCategoryLabel } from "@/lib/newsCategories";
 import { newsCategoryColor } from "@/lib/categoryColors";
-import { isLongTitle } from "@/lib/longTitle";
 
 // Der Aufmacher (#1342, Fabians Variante A): eine News über die ganze Breite - links das Bild (16 : 9; 50 % am
 // Tablet, 55 % am PC), rechts Kategorie, Titel, Anriss und „Weiterlesen“. Der Text steht nie auf dem Bild. Am Handy
@@ -38,17 +37,17 @@ export function NewsLead({ news, testId, headingLevel = 2, priority = false, eye
         </div>
       </div>
       <div className="p-5 md:p-7 xl:p-10 flex flex-col justify-center min-w-0" data-testid="news-lead-text">
-        <div className="flex items-center gap-2 text-[11px] uppercase tracking-widest font-bold">
+        <div className="flex items-center gap-2 tls-type-label">
           {eyebrow}
           <span style={{ color }}>{newsCategoryLabel(news.category)}</span>
           {news.pinned && <Pin className="w-3 h-3 text-white" aria-label="Angepinnt" />}
         </div>
         {/* Der Titel steht ganz da (#1314); ist er lang, eine Schriftstufe kleiner. */}
-        <Heading className={`tls-card__title tls-wrap mt-3 font-heading font-black leading-[1.08] ${isLongTitle(news.title) ? "text-xl md:text-2xl xl:text-3xl" : "text-2xl md:text-[1.7rem] xl:text-4xl"}`}>
+        <Heading className="tls-card__title tls-wrap mt-3 tls-type-section leading-[1.08]">
           {news.title}
         </Heading>
-        {news.excerpt && <p className="mt-4 text-white/70 text-sm md:text-base xl:text-lg leading-relaxed line-clamp-3">{news.excerpt}</p>}
-        <span className="mt-6 inline-flex items-center gap-2 text-xs uppercase tracking-wider font-bold text-[#29B6E8]">
+        {news.excerpt && <p className="mt-4 text-white/70 tls-type-body leading-relaxed line-clamp-3">{news.excerpt}</p>}
+        <span className="mt-6 inline-flex items-center gap-2 tls-type-label text-[#29B6E8]">
           Weiterlesen <ArrowRight className="tls-card__arrow w-3.5 h-3.5" />
         </span>
       </div>

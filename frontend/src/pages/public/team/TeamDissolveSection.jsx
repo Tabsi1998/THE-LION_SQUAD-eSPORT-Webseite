@@ -42,10 +42,10 @@ export function TeamDissolveSection({ team, onDissolved }) {
 
   return (
     <section className="border border-[#FF3B30]/35 bg-[#FF3B30]/[0.04] rounded-sm p-4 space-y-3" data-testid="team-dissolve">
-      <div className="font-heading font-bold text-[#FF6B6B]">Team auflösen</div>
-      <p className="text-sm text-white/70" data-testid="team-dissolve-sentence">{preview ? dissolveSentence(preview) : "Alle Mitglieder verlieren das Team und der Team-Chat ist nicht mehr erreichbar."}</p>
+      <div className="font-bold text-[#FF6B6B]">Team auflösen</div>
+      <p className="tls-type-small text-white/70" data-testid="team-dissolve-sentence">{preview ? dissolveSentence(preview) : "Alle Mitglieder verlieren das Team und der Team-Chat ist nicht mehr erreichbar."}</p>
       {blocked.length ? (
-        <div className="text-sm text-white/70 border border-white/10 rounded-sm p-3 bg-black/30" data-testid="team-dissolve-blocked">
+        <div className="tls-type-small text-white/70 border border-white/10 rounded-sm p-3 bg-black/30" data-testid="team-dissolve-blocked">
           <div className="font-bold text-white">Gerade nicht möglich:</div>
           <ul className="mt-1 space-y-1">
             {blocked.map((row) => (
@@ -57,7 +57,7 @@ export function TeamDissolveSection({ team, onDissolved }) {
         </div>
       ) : null}
       <label className="block">
-        <span className="text-[11px] font-bold uppercase tracking-widest text-white/60">Zum Bestätigen den Teamnamen eintippen</span>
+        <span className="tls-type-small font-bold text-white/60">Zum Bestätigen den Teamnamen eintippen</span>
         <input
           value={typed}
           onChange={(event) => { setTyped(event.target.value); setError(""); }}
@@ -73,7 +73,7 @@ export function TeamDissolveSection({ team, onDissolved }) {
         onClick={dissolve}
         disabled={!matches || blocked.length > 0 || submitting}
         data-testid="team-dissolve-submit"
-        className="tls-btn tls-btn--danger inline-flex items-center gap-2 px-4 py-2 rounded-sm text-xs uppercase tracking-wider font-bold disabled:opacity-40"
+        className="tls-btn tls-btn--danger inline-flex items-center gap-2 px-4 py-2 rounded-sm tls-type-label disabled:opacity-40"
       >
         <Trash2 className="w-3.5 h-3.5" /> {submitting ? "Löse auf…" : "Team auflösen"}
       </button>

@@ -16,7 +16,7 @@ export function PrivacyTab({ form, set, setVisibility, setVisibilityGroup, autos
   return (
     <Section>
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <p className="text-sm text-white/60">Wer was von deinem Profil sieht.</p>
+        <p className="tls-type-small text-white/60">Wer was von deinem Profil sieht.</p>
         <AutosaveStatus status={autosave.status} message={autosave.message} onRetry={autosave.retry} />
       </div>
 
@@ -68,8 +68,8 @@ export function PrivacyTab({ form, set, setVisibility, setVisibilityGroup, autos
         <div className="flex items-start gap-3 mb-4">
           <MessageSquare className="w-5 h-5 text-[#29B6E8] mt-1 shrink-0" />
           <div>
-            <h3 className="font-heading font-black uppercase mb-1">Direktnachrichten</h3>
-            <p className="text-xs text-white/50">Lege fest, wer dir private Nachrichten über die Webseite senden darf. Die Moderation erreicht dich immer, etwa um eine Meldung zu klären.</p>
+            <h3 className="tls-type-card mb-1">Direktnachrichten</h3>
+            <p className="tls-type-small text-white/50">Lege fest, wer dir private Nachrichten über die Webseite senden darf. Die Moderation erreicht dich immer, etwa um eine Meldung zu klären.</p>
           </div>
         </div>
         <select
@@ -87,16 +87,16 @@ export function PrivacyTab({ form, set, setVisibility, setVisibilityGroup, autos
         <div className="flex items-start gap-3 mb-4">
           <ShieldCheck className="w-5 h-5 text-[#29B6E8] mt-1 shrink-0" />
           <div>
-            <h3 className="font-heading font-black uppercase mb-1">Sichtbarkeit der Felder</h3>
-            <p className="text-xs text-white/50">Je Gruppe eine Schnellwahl für alle Felder; darunter lässt sich jedes Feld einzeln anders stellen.</p>
+            <h3 className="tls-type-card mb-1">Sichtbarkeit der Felder</h3>
+            <p className="tls-type-small text-white/50">Je Gruppe eine Schnellwahl für alle Felder; darunter lässt sich jedes Feld einzeln anders stellen.</p>
           </div>
         </div>
         {publicProfile ? null : (
-          <p className="text-[11px] text-[#FFD700] mb-4" data-testid="profile-visibility-hint">
+          <p className="tls-type-small text-[#FFD700] mb-4" data-testid="profile-visibility-hint">
             Solange das Profil nicht öffentlich ist, sieht niemand diese Felder. Die Stufen gelten, sobald du es einschaltest.
           </p>
         )}
-        <dl className="grid sm:grid-cols-2 gap-x-6 gap-y-1 text-xs mb-5">
+        <dl className="grid sm:grid-cols-2 gap-x-6 gap-y-1 tls-type-small mb-5">
           {VISIBILITY_LEVELS.map((level) => (
             <div key={level.k} className="flex gap-2">
               <dt className="font-bold text-white/80 shrink-0">{level.l}:</dt>
@@ -112,7 +112,7 @@ export function PrivacyTab({ form, set, setVisibility, setVisibilityGroup, autos
                 <div className="flex flex-wrap items-center justify-between gap-3">
                   <div className="min-w-0">
                     <div className="font-bold text-white">{group.l}</div>
-                    <div className="text-xs text-white/50 mt-0.5">{group.fields.map((field) => field.l).join(" · ")}</div>
+                    <div className="tls-type-small text-white/50 mt-0.5">{group.fields.map((field) => field.l).join(" · ")}</div>
                   </div>
                   <div role="group" aria-label={`Alle Felder in ${group.l} auf`} className="flex flex-wrap gap-1">
                     {QUICK_VISIBILITY.map((level) => {
@@ -125,7 +125,7 @@ export function PrivacyTab({ form, set, setVisibility, setVisibilityGroup, autos
                           title={level.d}
                           onClick={() => setVisibilityGroup(group, level.k)}
                           data-testid={`profile-vis-group-${group.k}-${level.k}`}
-                          className={`min-h-11 px-3 rounded-sm border text-[11px] font-bold uppercase tracking-wider transition ${active ? "border-[#29B6E8]/55 bg-[#29B6E8]/10 text-[#29B6E8]" : "border-white/10 text-white/55 hover:text-white hover:border-white/25"}`}
+                          className={`min-h-11 px-3 rounded-sm border tls-type-label transition ${active ? "border-[#29B6E8]/55 bg-[#29B6E8]/10 text-[#29B6E8]" : "border-white/10 text-white/55 hover:text-white hover:border-white/25"}`}
                         >
                           {level.l}
                         </button>
@@ -134,17 +134,17 @@ export function PrivacyTab({ form, set, setVisibility, setVisibilityGroup, autos
                   </div>
                 </div>
                 {current === "mixed" ? (
-                  <p className="text-[11px] text-[#FFD700] mt-2" data-testid={`profile-vis-group-${group.k}-mixed`}>Gemischt: Die Felder dieser Gruppe haben unterschiedliche Stufen.</p>
+                  <p className="tls-type-small text-[#FFD700] mt-2" data-testid={`profile-vis-group-${group.k}-mixed`}>Gemischt: Die Felder dieser Gruppe haben unterschiedliche Stufen.</p>
                 ) : null}
                 {current === "admins" ? (
-                  <p className="text-[11px] text-white/50 mt-2">Alle Felder dieser Gruppe stehen auf „Nur Admins“.</p>
+                  <p className="tls-type-small text-white/50 mt-2">Alle Felder dieser Gruppe stehen auf „Nur Admins“.</p>
                 ) : null}
                 <details className="mt-3">
-                  <summary className="cursor-pointer select-none text-xs text-white/60 hover:text-white">Einzelne Felder ({group.fields.length})</summary>
+                  <summary className="cursor-pointer select-none tls-type-small text-white/60 hover:text-white">Einzelne Felder ({group.fields.length})</summary>
                   <div className="mt-3 space-y-2">
                     {group.fields.map((field) => (
                       <div key={field.k} className="flex items-center justify-between gap-3">
-                        <span className="text-sm text-white/80">{field.l}</span>
+                        <span className="tls-type-small text-white/80">{field.l}</span>
                         <select
                           value={fieldLevel(visibility, field.k)}
                           onChange={(e) => setVisibility(field.k, e.target.value)}

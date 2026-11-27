@@ -54,7 +54,7 @@ export function renderDiscordText(text, options = {}) {
     const quote = line.match(/^>\s?(.*)$/);
     let body;
     if (heading) {
-      const size = { 1: "text-xl", 2: "text-lg", 3: "text-base" }[heading[1].length];
+      const size = { 1: "tls-type-card", 2: "tls-type-card", 3: "tls-type-body" }[heading[1].length];
       body = <span className={`block font-bold text-white ${size}`}>{inline(heading[2], key, options)}</span>;
     } else if (bullet) {
       body = <span className="block pl-4 relative"><span className="absolute left-1" aria-hidden="true">•</span>{inline(bullet[1], key, options)}</span>;
@@ -89,23 +89,23 @@ export function DiscordMessagePreview({ embed, content = "", buttons = [], botNa
   const author = embed?.author?.name ? embed.author : null;
   const footerTime = embed?.timestamp ? discordTime(embed.timestamp) : "";
   return (
-    <div className="bg-[#313338] rounded-sm p-3 text-[15px] leading-snug text-[#DBDEE1]" data-testid={testId}>
+    <div className="bg-[#313338] rounded-sm p-3 tls-type-small leading-snug text-[#DBDEE1]" data-testid={testId}>
       <div className="flex gap-3">
-        <div className="w-10 h-10 rounded-full bg-[#5865F2] shrink-0 overflow-hidden flex items-center justify-center text-lg" aria-hidden="true">
+        <div className="w-10 h-10 rounded-full bg-[#5865F2] shrink-0 overflow-hidden flex items-center justify-center tls-type-card" aria-hidden="true">
           {avatarUrl ? <img src={avatarUrl} alt="" className="w-full h-full object-cover" /> : "🦁"}
         </div>
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-2">
             <span className="font-semibold text-white">{botName}</span>
-            <span className="bg-[#5865F2] text-white text-[10px] font-bold px-1 rounded-sm leading-4">APP</span>
-            <span className="text-xs text-[#949BA4]">{time}</span>
+            <span className="bg-[#5865F2] text-white tls-type-small font-bold px-1 rounded-sm leading-4">APP</span>
+            <span className="tls-type-small text-[#949BA4]">{time}</span>
           </div>
           {content && <div className="mt-0.5 break-words" data-testid={`${testId}-content`}>{renderDiscordText(content, { roles, mentions: true })}</div>}
           {embed && (
             <div className="mt-1 max-w-[520px] bg-[#2B2D31] rounded border-l-4 p-3 grid grid-cols-[minmax(0,1fr)_auto] gap-x-4" style={{ borderLeftColor: embedColor(embed?.color) }} data-testid={embedTestId || `${testId}-embed`}>
               <div className="min-w-0">
                 {author && (
-                  <div className="flex items-center gap-2 text-sm font-semibold text-white" data-testid={`${testId}-author`}>
+                  <div className="flex items-center gap-2 tls-type-small font-semibold text-white" data-testid={`${testId}-author`}>
                     {author.icon_url && <img src={author.icon_url} alt="" className="w-6 h-6 rounded-full object-cover" />}
                     {author.url ? <a href={author.url} target="_blank" rel="noreferrer" className="hover:underline break-words">{author.name}</a> : <span className="break-words">{author.name}</span>}
                   </div>
@@ -115,13 +115,13 @@ export function DiscordMessagePreview({ embed, content = "", buttons = [], botNa
                     ? <a href={embed.url} target="_blank" rel="noreferrer" className={`block font-semibold text-[#00A8FC] hover:underline break-words ${author ? "mt-1" : ""}`}>{embed.title}</a>
                     : <div className={`font-semibold text-white break-words ${author ? "mt-1" : ""}`}>{embed.title}</div>
                 )}
-                {embed?.description && <div className="mt-1 text-sm break-words">{renderDiscordText(embed.description, { roles })}</div>}
+                {embed?.description && <div className="mt-1 tls-type-small break-words">{renderDiscordText(embed.description, { roles })}</div>}
                 {fields.length > 0 && (
                   <div className="mt-2 grid grid-cols-1 sm:grid-cols-3 gap-2">
                     {fields.map((field, index) => (
                       <div key={`${field.name}-${index}`} className={field.inline === false ? "sm:col-span-3" : ""}>
-                        <div className="text-xs font-semibold text-white">{field.name}</div>
-                        <div className="text-sm break-words">{renderDiscordText(field.value, { roles })}</div>
+                        <div className="tls-type-small font-semibold text-white">{field.name}</div>
+                        <div className="tls-type-small break-words">{renderDiscordText(field.value, { roles })}</div>
                       </div>
                     ))}
                   </div>
@@ -132,7 +132,7 @@ export function DiscordMessagePreview({ embed, content = "", buttons = [], botNa
               )}
               {embed?.image?.url && <img src={embed.image.url} alt="" className="col-span-2 mt-3 rounded max-h-72 w-full object-cover" data-testid={`${testId}-image`} />}
               {(embed?.footer?.text || footerTime) && (
-                <div className="col-span-2 mt-2 flex items-center gap-2 text-xs text-[#949BA4]" data-testid={`${testId}-footer`}>
+                <div className="col-span-2 mt-2 flex items-center gap-2 tls-type-small text-[#949BA4]" data-testid={`${testId}-footer`}>
                   {embed?.footer?.icon_url && <img src={embed.footer.icon_url} alt="" className="w-5 h-5 rounded-full object-cover" />}
                   <span>{[embed?.footer?.text, footerTime].filter(Boolean).join(" • ")}</span>
                 </div>
@@ -143,13 +143,13 @@ export function DiscordMessagePreview({ embed, content = "", buttons = [], botNa
             <div className="mt-2 flex flex-wrap gap-2" data-testid={`${testId}-buttons`}>
               {links.map((button) => (button.url ? (
                 <a key={button.url} href={button.url} target="_blank" rel="noreferrer"
-                  className="inline-flex items-center gap-1.5 rounded-[3px] bg-[#4E5058] hover:bg-[#6D6F78] px-4 py-1.5 text-sm font-medium text-white">
+                  className="inline-flex items-center gap-1.5 rounded-[3px] bg-[#4E5058] hover:bg-[#6D6F78] px-4 py-1.5 tls-type-small text-white">
                   {button.label}
                   <ExternalLink className="w-3.5 h-3.5" aria-hidden="true" />
                 </a>
               ) : (
                 <span key={button.custom_id} data-testid={`${testId}-action`}
-                  className={`inline-flex items-center rounded-[3px] px-4 py-1.5 text-sm font-medium text-white ${ACTION_STYLES[button.style] || ACTION_STYLES.primary}`}>
+                  className={`inline-flex items-center rounded-[3px] px-4 py-1.5 tls-type-small text-white ${ACTION_STYLES[button.style] || ACTION_STYLES.primary}`}>
                   {button.label}
                 </span>
               )))}

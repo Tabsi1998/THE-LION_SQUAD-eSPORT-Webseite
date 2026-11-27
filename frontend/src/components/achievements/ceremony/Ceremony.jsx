@@ -52,11 +52,11 @@ function TierRow({ tier, material, index, active, onPick }) {
     >
       <Badge material={tier.material} level={tier.level} rank={tier.rank} art={tier.art} icon={tier.icon} size="md" />
       <div className="flex-1 min-w-0">
-        <div className="text-[10px] font-bold uppercase tracking-widest" style={{ color: look.rim }}>{tier.material_name || look.name}{tier.group_name ? ` · ${tier.group_name}` : ""}</div>
+        <div className="tls-type-small font-bold" style={{ color: look.rim }}>{tier.material_name || look.name}{tier.group_name ? ` · ${tier.group_name}` : ""}</div>
         <div className="font-semibold text-white truncate">{tier.name}</div>
-        {tier.description && <div className="text-xs text-white/50 truncate">{tier.description}</div>}
+        {tier.description && <div className="tls-type-small text-white/50 truncate">{tier.description}</div>}
       </div>
-      <div className="shrink-0 text-[11px] font-display font-bold" style={{ color: look.rim }}>+{tier.points}</div>
+      <div className="shrink-0 tls-type-small tls-type-num" style={{ color: look.rim }}>+{tier.points}</div>
     </motion.button>
   );
 }
@@ -160,7 +160,7 @@ function LevelExtras({ levelUp, reduced }) {
   return (
     <>
       {levelUp?.titleChanged && levelUp?.title && (
-        <motion.div className="mt-2 px-4 py-1 border rounded-sm text-[11px] font-black uppercase tracking-[0.35em]" style={{ borderColor: "var(--cer-accent)", color: "var(--cer-accent)" }} initial={{ opacity: 0, y: reduced ? 0 : 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: reduced ? 0 : 1.3 }} data-testid="ceremony-title-banner">
+        <motion.div className="mt-2 px-4 py-1 border rounded-sm tls-type-label" style={{ borderColor: "var(--cer-accent)", color: "var(--cer-accent)" }} initial={{ opacity: 0, y: reduced ? 0 : 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: reduced ? 0 : 1.3 }} data-testid="ceremony-title-banner">
           Neuer Titel: {levelUp.title}
         </motion.div>
       )}
@@ -373,14 +373,14 @@ export function Ceremony({ plan, onClose, user = null, reduced = false, autoClos
         </div>
 
         <div className="relative px-6 pb-3 text-center">
-          <motion.div className="text-[11px] font-bold uppercase tracking-[0.4em]" style={{ color: plan.accent, textShadow: `0 0 12px ${plan.accent}66` }} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: reduced ? 0 : 0.5 }} data-testid="ceremony-sub">
+          <motion.div className="tls-type-label" style={{ color: plan.accent, textShadow: `0 0 12px ${plan.accent}66` }} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: reduced ? 0 : 0.5 }} data-testid="ceremony-sub">
             {phase === "level" && !isLevelOnly ? rankText || levelTexts(plan.levelUp).phaseSub : sub}
           </motion.div>
-          <motion.h2 className="font-heading text-2xl md:text-3xl font-black uppercase mt-1" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: reduced ? 0 : 0.58 }} data-testid="ceremony-heading">
+          <motion.h2 className="tls-type-section mt-1" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: reduced ? 0 : 0.58 }} data-testid="ceremony-heading">
             {phase === "level" && !isLevelOnly ? levelTexts(plan.levelUp).phaseHeading : heading}
           </motion.h2>
           {plan.sequence === "first" && showBadge && (
-            <motion.p className="mt-2 text-sm text-white/65 max-w-md mx-auto" initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: reduced ? 0 : 0.9 }} data-testid="ceremony-first-text">
+            <motion.p className="mt-2 tls-type-small text-white/65 max-w-md mx-auto" initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: reduced ? 0 : 0.9 }} data-testid="ceremony-first-text">
               Das war dein erster Erfolg. Jeder Erfolg bringt Punkte und Erfahrung, hebt dein Level und schmückt dein Profil – alle Ziele und wie du sie schaffst stehen im Schaukasten.
             </motion.p>
           )}
@@ -397,23 +397,23 @@ export function Ceremony({ plan, onClose, user = null, reduced = false, autoClos
           {isStack && showBadge && (
             <div className="inline-flex items-center gap-1 mr-2" data-testid="ceremony-stack-nav">
               <button type="button" onClick={() => setIndex((i) => Math.max(0, i - 1))} disabled={index === 0} aria-label="Vorheriger Erfolg" data-testid="ceremony-prev" className="w-8 h-8 inline-flex items-center justify-center border border-white/15 rounded-sm text-white/70 hover:text-white disabled:opacity-30"><ChevronLeft className="w-4 h-4" /></button>
-              <span className="text-[10px] uppercase tracking-widest text-white/50 tabular-nums" data-testid="ceremony-stack-index">{index + 1} / {tiers.length}</span>
+              <span className="tls-type-label text-white/50 tabular-nums" data-testid="ceremony-stack-index">{index + 1} / {tiers.length}</span>
               <button type="button" onClick={() => setIndex((i) => Math.min(tiers.length - 1, i + 1))} disabled={index >= tiers.length - 1} aria-label="Nächster Erfolg" data-testid="ceremony-next" className="w-8 h-8 inline-flex items-center justify-center border border-white/15 rounded-sm text-white/70 hover:text-white disabled:opacity-30"><ChevronRight className="w-4 h-4" /></button>
             </div>
           )}
           {plan.points > 0 && showBadge && (
-            <span className="inline-flex items-center gap-2 px-3 py-1.5 rounded-sm border text-xs font-black uppercase tracking-widest" style={{ color: plan.accent, borderColor: `${plan.accent}44`, backgroundColor: `${plan.accent}0d` }} data-testid="ceremony-points">
+            <span className="inline-flex items-center gap-2 px-3 py-1.5 rounded-sm border tls-type-label" style={{ color: plan.accent, borderColor: `${plan.accent}44`, backgroundColor: `${plan.accent}0d` }} data-testid="ceremony-points">
               <Trophy className="w-3.5 h-3.5" /> +{plan.points} Punkte
             </span>
           )}
           {isRecount && showBadge && (
-            <Link to="/u/me?tab=achievements" onClick={onClose} className="inline-flex items-center gap-2 px-3 py-1.5 rounded-sm border border-[#29B6E8]/50 text-[#29B6E8] text-xs font-bold uppercase tracking-widest hover:bg-[#29B6E8]/10" data-testid="ceremony-recount-link">Alle ansehen</Link>
+            <Link to="/u/me?tab=achievements" onClick={onClose} className="inline-flex items-center gap-2 px-3 py-1.5 rounded-sm border border-[#29B6E8]/50 text-[#29B6E8] tls-type-label hover:bg-[#29B6E8]/10" data-testid="ceremony-recount-link">Alle ansehen</Link>
           )}
           {plan.sequence === "first" && (
-            <Link to="/achievements" onClick={onClose} className="inline-flex items-center gap-2 px-3 py-1.5 rounded-sm border border-[#29B6E8]/50 text-[#29B6E8] text-xs font-bold uppercase tracking-widest hover:bg-[#29B6E8]/10" data-testid="ceremony-showcase-link">Zum Schaukasten</Link>
+            <Link to="/achievements" onClick={onClose} className="inline-flex items-center gap-2 px-3 py-1.5 rounded-sm border border-[#29B6E8]/50 text-[#29B6E8] tls-type-label hover:bg-[#29B6E8]/10" data-testid="ceremony-showcase-link">Zum Schaukasten</Link>
           )}
           {plan.sequence === "legendary" && (
-            <Link to={shareTo} onClick={onClose} className="inline-flex items-center gap-2 px-3 py-1.5 rounded-sm border border-[#FFD700]/60 text-[#FFD700] text-xs font-bold uppercase tracking-widest hover:bg-[#FFD700]/10" data-testid="ceremony-photo-mode"><Camera className="w-3.5 h-3.5" /> Fotomodus</Link>
+            <Link to={shareTo} onClick={onClose} className="inline-flex items-center gap-2 px-3 py-1.5 rounded-sm border border-[#FFD700]/60 text-[#FFD700] tls-type-label hover:bg-[#FFD700]/10" data-testid="ceremony-photo-mode"><Camera className="w-3.5 h-3.5" /> Fotomodus</Link>
           )}
           {phase === "level" && !isLevelOnly && null}
         </div>

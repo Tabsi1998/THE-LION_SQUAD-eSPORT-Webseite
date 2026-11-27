@@ -16,13 +16,13 @@ export function SectionHead({ id, eyebrow, tone = "brand", title, hint, pulse = 
   return (
     <div className="flex flex-wrap items-end justify-between gap-3 mb-5 md:mb-6">
       <div className="flex flex-col gap-2 min-w-0">
-        <div className={`flex items-center gap-2.5 text-[11px] md:text-xs font-bold uppercase tracking-[0.26em] ${tone === "honor" ? "text-honor" : "text-brand"}`}>
+        <div className={`flex items-center gap-2.5 tls-type-label ${tone === "honor" ? "text-honor" : "text-brand"}`}>
           {pulse && <span className="tls-run-pulse" aria-hidden="true" />}
           {eyebrow}
         </div>
-        <h2 id={id} className="m-0 font-heading font-extrabold uppercase leading-none text-[26px] md:text-[clamp(28px,3.4vw,40px)] break-words">{title}</h2>
+        <h2 id={id} className="m-0 tls-type-section leading-none break-words">{title}</h2>
       </div>
-      {hint && <div className="text-[13px] md:text-sm text-quiet">{hint}</div>}
+      {hint && <div className="tls-type-small text-quiet">{hint}</div>}
     </div>
   );
 }
@@ -30,12 +30,12 @@ export function SectionHead({ id, eyebrow, tone = "brand", title, hint, pulse = 
 /** Die Platzierung im Ring: Ring und Zahl in der Medaillenfarbe, sonst neutral; ohne Platz „–“. */
 export function PlaceRing({ placement, size = "md", className = "" }) {
   const tone = medalTone(placement);
-  const dims = size === "lg" ? "w-14 h-14 text-[26px]" : size === "sm" ? "w-[38px] h-[38px] text-lg" : size === "xs" ? "w-[34px] h-[34px] text-[17px]" : "w-10 h-10 sm:w-11 sm:h-11 text-lg sm:text-xl";
+  const dims = size === "lg" ? "w-14 h-14 tls-type-section" : size === "sm" ? "w-[38px] h-[38px] tls-type-card" : size === "xs" ? "w-[34px] h-[34px] tls-type-card" : "w-10 h-10 sm:w-11 sm:h-11 tls-type-card";
   return (
     <span
       data-testid="placement-badge"
       data-medal={tone?.key || "none"}
-      className={`${dims} shrink-0 rounded-full border-2 inline-flex items-center justify-center font-display font-bold tabular-nums ${tone ? `${tone.border} ${tone.text}` : "border-white/20 text-zinc-300"} ${className}`}
+      className={`${dims} shrink-0 rounded-full border-2 inline-flex items-center justify-center tls-type-num ${tone ? `${tone.border} ${tone.text}` : "border-white/20 text-zinc-300"} ${className}`}
     >
       {placement ? `${placement}.` : "–"}
     </span>
@@ -68,7 +68,7 @@ export function TrophyMark({ className = "", label = "Pokal" }) {
 /** Kleine Marke (Spiel, Format, Saison). */
 export function Mark({ children }) {
   if (!children) return null;
-  return <span className="inline-flex items-center px-2.5 py-1 rounded bg-surface-2 border border-white/10 text-[13px] leading-tight text-zinc-300 break-words max-w-full">{children}</span>;
+  return <span className="inline-flex items-center px-2.5 py-1 rounded bg-surface-2 border border-white/10 tls-type-small leading-tight text-zinc-300 break-words max-w-full">{children}</span>;
 }
 
 /** Der Pfeil am Zeilenende - nach rechts (Link) oder nach unten (Aufklappen, #1944). */

@@ -52,8 +52,8 @@ const DIGEST_HINTS = {
 function TopicTable({ columns, newsletter, notificationEnabled, notificationTopicEnabled, setNotificationPreference, testId }) {
   return (
     <div className="tls-swipe pb-0 md:overflow-visible -mx-5 px-5 md:[mask-image:none] md:[-webkit-mask-image:none]" data-testid={testId}>
-      <table className="w-full min-w-[280px] text-sm border-separate border-spacing-0">
-        <thead className="text-[10px] uppercase tracking-widest text-white/45">
+      <table className="w-full min-w-[280px] tls-type-small border-separate border-spacing-0">
+        <thead className="tls-type-label text-white/45">
           <tr>
             <th scope="col" className="text-left px-3 py-3 border-b border-white/10">Thema</th>
             {columns.map((channel) => {
@@ -61,7 +61,7 @@ function TopicTable({ columns, newsletter, notificationEnabled, notificationTopi
               return (
                 <th key={channel.k} scope="col" className={`text-center px-3 py-3 border-b border-white/10 ${enabled ? "" : "opacity-40"}`} data-testid={`profile-notification-column-${channel.k}`}>
                   {channel.l}
-                  {enabled ? null : <span className="block normal-case tracking-normal font-normal text-[10px]">Weg aus</span>}
+                  {enabled ? null : <span className="block tls-type-small font-normal">Weg aus</span>}
                 </th>
               );
             })}
@@ -73,7 +73,7 @@ function TopicTable({ columns, newsletter, notificationEnabled, notificationTopi
               <td className="px-3 py-3 align-top border-b border-white/10">
                 <div className="font-bold text-white">{topic.l}</div>
                 {topic.requiresNewsletter && !newsletter && columns.some((channel) => channel.k === "email") ? (
-                  <div className="text-[11px] text-[#FFD700] mt-1">Per E-Mail nur mit Newsletter-Zustimmung (unten).</div>
+                  <div className="tls-type-small text-[#FFD700] mt-1">Per E-Mail nur mit Newsletter-Zustimmung (unten).</div>
                 ) : null}
               </td>
               {columns.map((channel) => {
@@ -236,7 +236,7 @@ export function NotificationsTab({
     <Section>
       <div className="tls-notify space-y-4">
         <div className="flex flex-wrap items-center justify-between gap-3">
-          <p className="text-sm text-white/60">Wähle, wie viel bei dir ankommt. Konto- und Sicherheitsmails bleiben immer aktiv.</p>
+          <p className="tls-type-body text-white/60">Wähle, wie viel bei dir ankommt. Konto- und Sicherheitsmails bleiben immer aktiv.</p>
           <AutosaveStatus status={autosave.status} message={autosave.message} onRetry={autosave.retry} />
         </div>
 
@@ -266,7 +266,7 @@ export function NotificationsTab({
           <div role="tabpanel" id="notification-section-themen" aria-labelledby="notification-section-themen-tab" className="space-y-4">
             <section className="tls-notify-card" aria-labelledby="notification-level-title" data-testid="notification-levels" data-level={level || "loading"}>
               <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
-                <h3 id="notification-level-title" className="tls-notify-card__title font-heading">Stufe</h3>
+                <h3 id="notification-level-title" className="tls-notify-card__title tls-type-card">Stufe</h3>
                 {level === CUSTOM_LEVEL ? <span className="tls-notify-chip" data-testid="notification-level-custom">Eigene Auswahl</span> : null}
               </div>
               {levels.length ? (
@@ -296,9 +296,9 @@ export function NotificationsTab({
                   })}
                 </div>
               ) : server?.failed ? (
-                <div role="alert" className="flex flex-wrap items-center justify-between gap-3 p-3 border border-warn/40 rounded-sm text-sm text-warn" data-testid="notification-load-failed">
+                <div role="alert" className="flex flex-wrap items-center justify-between gap-3 p-3 border border-warn/40 rounded-sm tls-type-small text-warn" data-testid="notification-load-failed">
                   <span>Die Stufen konnten nicht geladen werden. Deine Themen unten gelten weiter.</span>
-                  <button type="button" onClick={reload} className="tls-hit min-h-11 px-3 border border-warn/40 rounded-sm font-bold uppercase tracking-wider text-xs hover:bg-warn/10" data-testid="notification-load-retry">
+                  <button type="button" onClick={reload} className="tls-hit min-h-11 px-3 border border-warn/40 rounded-sm tls-type-label hover:bg-warn/10" data-testid="notification-load-retry">
                     Erneut versuchen
                   </button>
                 </div>
@@ -307,7 +307,7 @@ export function NotificationsTab({
                   {[0, 1, 2].map((index) => <div key={index} className="h-[5.5rem] border border-white/10 rounded-sm bg-white/[0.03] animate-pulse" />)}
                 </div>
               )}
-              <p className="text-xs text-white/55 mt-3 min-h-[2.5em]" data-testid="notification-level-description">
+              <p className="tls-type-small text-white/55 mt-3 min-h-[2.5em]" data-testid="notification-level-description">
                 {level === CUSTOM_LEVEL
                   ? "Du hast einzelne Themen selbst gestellt. Tippe eine Stufe an, dann setzt sie alle Themen neu."
                   : currentLevel?.description || ""}
@@ -315,12 +315,12 @@ export function NotificationsTab({
             </section>
 
             <section className="tls-notify-card" aria-labelledby="notification-topics-title">
-              <h3 id="notification-topics-title" className="tls-notify-card__title font-heading">Themen</h3>
-              <p className="text-xs text-white/50 mt-1 mb-2">Push heißt: aufs Handy in der LionsAPP und in den Browser, wenn du ihn angemeldet hast. „Nur App“ legt es still in die Glocke. Per E-Mail stellst du es im Reiter „E-Mail“ ein.</p>
+              <h3 id="notification-topics-title" className="tls-notify-card__title tls-type-card">Themen</h3>
+              <p className="tls-type-small text-white/50 mt-1 mb-2">Push heißt: aufs Handy in der LionsAPP und in den Browser, wenn du ihn angemeldet hast. „Nur App“ legt es still in die Glocke. Per E-Mail stellst du es im Reiter „E-Mail“ ein.</p>
               {pushOff ? (
-                <div className="flex flex-wrap items-center justify-between gap-3 my-3 p-3 border border-warn/40 rounded-sm text-sm text-warn" data-testid="notification-push-off">
+                <div className="flex flex-wrap items-center justify-between gap-3 my-3 p-3 border border-warn/40 rounded-sm tls-type-small text-warn" data-testid="notification-push-off">
                   <span>Push aufs Handy ist bei dir ganz aus – die Themen kommen nur in die Glocke.</span>
-                  <button type="button" onClick={() => setNotificationPreference("push", true)} className="tls-hit min-h-11 px-3 border border-warn/40 rounded-sm font-bold uppercase tracking-wider text-xs hover:bg-warn/10" data-testid="notification-push-on">
+                  <button type="button" onClick={() => setNotificationPreference("push", true)} className="tls-hit min-h-11 px-3 border border-warn/40 rounded-sm tls-type-label hover:bg-warn/10" data-testid="notification-push-on">
                     Push einschalten
                   </button>
                 </div>
@@ -340,7 +340,7 @@ export function NotificationsTab({
                     >
                       <div className="min-w-0">
                         <div className="font-bold text-white" id={`notification-topic-${topic.k}-label`}>{topic.l}</div>
-                        <div className="text-xs text-white/50 mt-0.5">{topic.d}</div>
+                        <div className="tls-type-small text-white/50 mt-0.5">{topic.d}</div>
                       </div>
                       <div role="radiogroup" aria-labelledby={`notification-topic-${topic.k}-label`} className="tls-seg" data-mode={mode} style={{ "--seg-i": MODE_ORDER.indexOf(mode) }}>
                         <span className="tls-seg__thumb" aria-hidden="true" />
@@ -381,8 +381,8 @@ export function NotificationsTab({
               <div className="flex items-start gap-3">
                 <Mail className="w-5 h-5 text-white/45 mt-1 shrink-0" aria-hidden="true" />
                 <div className="min-w-0 flex-1">
-                  <h3 id="notification-digest-title" className="tls-notify-card__title font-heading">Sammel-Mail</h3>
-                  <p className="text-xs text-white/50 mt-1">Statt vieler Einzelmails eine am Tag oder in der Woche. Dringendes wie „Dein Spiel startet in 10 Minuten“ kommt immer sofort, Konto-Mails auch.</p>
+                  <h3 id="notification-digest-title" className="tls-notify-card__title tls-type-card">Sammel-Mail</h3>
+                  <p className="tls-type-small text-white/50 mt-1">Statt vieler Einzelmails eine am Tag oder in der Woche. Dringendes wie „Dein Spiel startet in 10 Minuten“ kommt immer sofort, Konto-Mails auch.</p>
                 </div>
               </div>
               <div role="radiogroup" aria-labelledby="notification-digest-title" className="tls-seg mt-4 max-w-md" data-mode={rhythm} style={{ "--seg-i": rhythmIndex }}>
@@ -404,25 +404,25 @@ export function NotificationsTab({
                   </button>
                 ))}
               </div>
-              <p className="text-sm text-white/75 mt-3" data-testid="notification-digest-summary">
+              <p className="tls-type-small text-white/75 mt-3" data-testid="notification-digest-summary">
                 <span className="font-bold text-white">{rhythmOption.schedule}.</span> {DIGEST_HINTS[rhythm] || ""}
               </p>
               {!ownRhythm && defaultOption ? (
-                <p className="text-xs text-white/45 mt-1" data-testid="notification-digest-default">Vorgabe des Vereins: {defaultOption.label}.</p>
+                <p className="tls-type-small text-white/45 mt-1" data-testid="notification-digest-default">Vorgabe des Vereins: {defaultOption.label}.</p>
               ) : null}
               {ownRhythm && defaultOption ? (
-                <button type="button" onClick={() => set("mail_digest", null)} className="tls-hit mt-2 min-h-11 text-xs font-bold text-[#29B6E8] hover:underline" data-testid="notification-digest-use-default">
+                <button type="button" onClick={() => set("mail_digest", null)} className="tls-hit mt-2 min-h-11 tls-type-small font-bold text-[#29B6E8] hover:underline" data-testid="notification-digest-use-default">
                   Vorgabe des Vereins nutzen ({defaultOption.label})
                 </button>
               ) : null}
               {emailOff ? (
-                <p className="text-xs text-warn mt-2" data-testid="notification-digest-email-off">E-Mail ist bei dir unten ganz aus – dann kommt auch keine Sammel-Mail.</p>
+                <p className="tls-type-small text-warn mt-2" data-testid="notification-digest-email-off">E-Mail ist bei dir unten ganz aus – dann kommt auch keine Sammel-Mail.</p>
               ) : null}
             </section>
 
             <section className="tls-notify-card" aria-labelledby="notification-email-title">
-              <h3 id="notification-email-title" className="tls-notify-card__title font-heading">E-Mail je Thema</h3>
-              <p className="text-xs text-white/50 mt-1 mb-3">Welche Themen überhaupt per Mail kommen – einzeln oder in der Sammel-Mail.</p>
+              <h3 id="notification-email-title" className="tls-notify-card__title tls-type-card">E-Mail je Thema</h3>
+              <p className="tls-type-small text-white/50 mt-1 mb-3">Welche Themen überhaupt per Mail kommen – einzeln oder in der Sammel-Mail.</p>
               <div className="space-y-3">
                 {emailChannel.map((channel) => (
                   <SwitchRow
@@ -453,8 +453,8 @@ export function NotificationsTab({
               <div className="flex items-start gap-3">
                 <Moon className="tls-quiet__moon w-5 h-5 text-white/45 mt-1 shrink-0" aria-hidden="true" />
                 <div className="min-w-0 flex-1">
-                  <h3 id="notification-quiet-title" className="tls-notify-card__title font-heading">Ruhezeit</h3>
-                  <p className="text-xs text-white/50 mt-1">Kein Push, keine Browser-Meldung und keine Discord-Nachricht – alles wartet in der Glocke. Danach kommt eine Sammelmeldung, wenn etwas kam.</p>
+                  <h3 id="notification-quiet-title" className="tls-notify-card__title tls-type-card">Ruhezeit</h3>
+                  <p className="tls-type-small text-white/50 mt-1">Kein Push, keine Browser-Meldung und keine Discord-Nachricht – alles wartet in der Glocke. Danach kommt eine Sammelmeldung, wenn etwas kam.</p>
                 </div>
                 <ProfileSwitch
                   label="Ruhezeit"
@@ -468,25 +468,25 @@ export function NotificationsTab({
                 <div className="tls-notify-reveal__inner">
                   <div className="grid grid-cols-2 gap-3 mt-4 max-w-sm">
                     <label className="block">
-                      <span className="text-[11px] uppercase tracking-widest font-bold text-white/45">Von</span>
+                      <span className="tls-type-label text-white/45">Von</span>
                       <input type="time" step="300" value={quietRaw.start ?? ""} onChange={(event) => setQuiet({ start: event.target.value }, true)} aria-invalid={quietError ? "true" : undefined} aria-describedby={quietError ? "notification-quiet-error" : undefined} className="tls-quiet__time mt-1" data-testid="notification-quiet-start" />
                     </label>
                     <label className="block">
-                      <span className="text-[11px] uppercase tracking-widest font-bold text-white/45">Bis</span>
+                      <span className="tls-type-label text-white/45">Bis</span>
                       <input type="time" step="300" value={quietRaw.end ?? ""} onChange={(event) => setQuiet({ end: event.target.value }, true)} aria-invalid={quietError ? "true" : undefined} aria-describedby={quietError ? "notification-quiet-error" : undefined} className="tls-quiet__time mt-1" data-testid="notification-quiet-end" />
                     </label>
                   </div>
                   <div id="notification-quiet-error"><FieldError message={quietError} testId="notification-quiet-error" /></div>
                   {quietError ? null : (
-                    <p className="text-sm text-white/70 mt-3" data-testid="notification-quiet-summary">
+                    <p className="tls-type-small text-white/70 mt-3" data-testid="notification-quiet-summary">
                       Täglich {quiet.start} bis {quiet.end} Uhr, Wiener Zeit{crossesMidnight(quiet) ? " – über Mitternacht" : ""}.
                     </p>
                   )}
-                  <div className="mt-3 text-[11px] uppercase tracking-widest font-bold text-white/45">Kommt trotzdem sofort</div>
-                  <ul className="mt-1 space-y-1 text-xs text-white/60 list-disc pl-4" data-testid="notification-quiet-exceptions">
+                  <div className="mt-3 tls-type-label text-white/45">Kommt trotzdem sofort</div>
+                  <ul className="mt-1 space-y-1 tls-type-small text-white/60 list-disc pl-4" data-testid="notification-quiet-exceptions">
                     {exceptions.map((text) => <li key={text}>{text}</li>)}
                   </ul>
-                  <p className="text-xs text-white/45 mt-2">E-Mails kommen wie bisher – gesammelt, wenn du im Reiter „E-Mail“ eine Sammel-Mail gewählt hast.</p>
+                  <p className="tls-type-small text-white/45 mt-2">E-Mails kommen wie bisher – gesammelt, wenn du im Reiter „E-Mail“ eine Sammel-Mail gewählt hast.</p>
                 </div>
               </div>
             </section>
@@ -496,8 +496,8 @@ export function NotificationsTab({
         {section === "mehr" ? (
           <div role="tabpanel" id="notification-section-mehr" aria-labelledby="notification-section-mehr-tab" className="space-y-4">
             <section className="tls-notify-card" aria-labelledby="notification-channels-title" data-testid="notification-more-panel">
-              <h3 id="notification-channels-title" className="tls-notify-card__title font-heading">Kanäle ganz abschalten</h3>
-              <p className="text-xs text-white/50 mt-1 mb-3">Ein ausgeschalteter Kanal bringt gar nichts mehr – egal, wie die Themen stehen.</p>
+              <h3 id="notification-channels-title" className="tls-notify-card__title tls-type-card">Kanäle ganz abschalten</h3>
+              <p className="tls-type-small text-white/50 mt-1 mb-3">Ein ausgeschalteter Kanal bringt gar nichts mehr – egal, wie die Themen stehen.</p>
               <div className="grid sm:grid-cols-2 gap-3">
                 {otherChannels.map((channel) => (
                   <SwitchRow
@@ -511,10 +511,10 @@ export function NotificationsTab({
                 ))}
               </div>
               {discord && !discord.linked ? (
-                <p className="text-xs text-white/45 mt-3" data-testid="profile-notification-discord-unlinked">Discord als Weg: erst im Reiter Socials „Mit Discord verknüpfen“ – dann kommen Benachrichtigungen auf Wunsch als Direktnachricht vom Vereins-Bot.</p>
+                <p className="tls-type-small text-white/45 mt-3" data-testid="profile-notification-discord-unlinked">Discord als Weg: erst im Reiter Socials „Mit Discord verknüpfen“ – dann kommen Benachrichtigungen auf Wunsch als Direktnachricht vom Vereins-Bot.</p>
               ) : null}
               {discord?.linked && discord?.hint ? (
-                <p className="text-[11px] text-[#FFD700] mt-3" data-testid="profile-notification-discord-hint">{discord.hint}</p>
+                <p className="tls-type-small text-[#FFD700] mt-3" data-testid="profile-notification-discord-hint">{discord.hint}</p>
               ) : null}
               {discordChannel.length ? (
                 <div className="mt-3"><TopicTable columns={discordChannel} {...tableProps} testId="notification-discord-table" /></div>
@@ -525,8 +525,8 @@ export function NotificationsTab({
               <div className="flex items-start gap-3 mb-4">
                 <Sparkles className="w-5 h-5 text-[#FFD700] mt-1 shrink-0" />
                 <div>
-                  <h3 className="font-heading font-black uppercase mb-1">Zeremonien</h3>
-                  <p className="text-xs text-white/50">Wie ein freigeschalteter Erfolg gefeiert wird: mit Klang und voller Bewegung oder dezent, nur mit Einblenden.</p>
+                  <h3 className="tls-type-card mb-1">Zeremonien</h3>
+                  <p className="tls-type-small text-white/50">Wie ein freigeschalteter Erfolg gefeiert wird: mit Klang und voller Bewegung oder dezent, nur mit Einblenden.</p>
                 </div>
               </div>
               <div className="grid sm:grid-cols-2 gap-3">
@@ -546,7 +546,7 @@ export function NotificationsTab({
                 />
               </div>
               <label className="mt-3 block" htmlFor="profile-ceremony-volume">
-                <span className="text-[11px] uppercase tracking-widest font-bold text-white/45">Lautstärke · <span data-testid="profile-ceremony-volume-value">{Number(form.ceremony_volume ?? 80)} %</span></span>
+                <span className="tls-type-label text-white/45">Lautstärke · <span data-testid="profile-ceremony-volume-value">{Number(form.ceremony_volume ?? 80)} %</span></span>
                 <input
                   id="profile-ceremony-volume"
                   type="range"

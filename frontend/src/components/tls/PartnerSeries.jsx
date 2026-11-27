@@ -32,10 +32,10 @@ export function PartnerSeries({ items, partnerName, Title }) {
             {/* #2014: Logo der Spur (sonst der neuesten Saison) neben dem Titel - ohne Logo wie bisher. */}
             <div className="flex items-start gap-3 min-w-0">
               <div className="flex-1 min-w-0">
-                <div className="text-[10px] uppercase tracking-widest font-bold text-[#29B6E8] break-words">
+                <div className="tls-type-small font-bold text-[#29B6E8] break-words">
                   {[item.role === "organizer" ? `${PARTNER_ROLE_LABELS.organizer}: ${partnerName}` : PARTNER_ROLE_LABELS.contributor, KIND_LABELS[item.lineage.kind], item.lineage.game_name].filter(Boolean).join(" · ")}
                 </div>
-                <h3 className="mt-1 font-heading font-bold leading-tight break-words [overflow-wrap:anywhere]">{item.lineage.title}</h3>
+                <h3 className="mt-1 tls-type-card leading-tight break-words [overflow-wrap:anywhere]">{item.lineage.title}</h3>
               </div>
               <SeriesLogo src={seriesLogo(item.lineage, null) || item.seasons?.[0]?.logo_url} size="sm" testId="partner-series-logo" />
             </div>
@@ -43,11 +43,11 @@ export function PartnerSeries({ items, partnerName, Title }) {
               {item.seasons.map((season) => (
                 <li key={season.season_slug}>
                   <Link to={seriesAddress(item.lineage, season)} data-testid={`partner-season-${item.lineage.slug}-${season.season_slug}`}
-                    className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1 min-h-[44px] py-2 text-sm text-white/80 hover:text-white transition-colors">
+                    className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1 min-h-[44px] py-2 tls-type-small text-white/80 hover:text-white transition-colors">
                     <span className="min-w-0 break-words [overflow-wrap:anywhere]">{seasonName(season)}</span>
                     <span className="inline-flex items-center gap-2 shrink-0 tabular-nums text-white/60">
                       {season.running && (
-                        <span className="inline-flex items-center px-2 py-0.5 border border-[#29B6E8]/50 text-[#29B6E8] rounded-sm text-[10px] font-bold uppercase tracking-widest" data-testid="partner-season-running">Läuft gerade</span>
+                        <span className="inline-flex items-center px-2 py-0.5 border border-[#29B6E8]/50 text-[#29B6E8] rounded-sm tls-type-label" data-testid="partner-season-running">Läuft gerade</span>
                       )}
                       {clubText(season) && <span data-testid="partner-season-place">{clubText(season)}</span>}
                     </span>

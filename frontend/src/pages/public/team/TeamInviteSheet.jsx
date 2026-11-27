@@ -96,7 +96,7 @@ export function TeamInviteSheet({ team, onClose, onCodeRenewed }) {
           {link?.url ? <BrandedQRCode value={link.url} size={168} className="shrink-0" /> : <div className="w-[168px] h-[168px] bg-white/5 rounded-sm animate-pulse" />}
           <div className="min-w-0 text-center sm:text-left">
             <div className="font-bold">QR-Code zeigen oder Link teilen</div>
-            <p className="mt-1 text-xs text-white/55">Wer den Link öffnet, landet hier im Team und tippt nur noch „Beitreten“ – in der App und auf der Website.</p>
+            <p className="mt-1 tls-type-small text-white/55">Wer den Link öffnet, landet hier im Team und tippt nur noch „Beitreten“ – in der App und auf der Website.</p>
           </div>
         </div>
         <div className="flex gap-2">
@@ -104,10 +104,10 @@ export function TeamInviteSheet({ team, onClose, onCodeRenewed }) {
           <button type="button" onClick={() => copy(link?.url, "Link kopiert.")} disabled={!link} aria-label="Link kopieren" data-testid="team-invite-copy" className="tls-btn tls-btn--secondary px-3 py-2 rounded-sm"><Copy className="w-4 h-4" /></button>
         </div>
         <div className="flex flex-wrap gap-2">
-          <button type="button" onClick={share} disabled={!link} data-testid="team-invite-share" className="tls-btn tls-btn--primary inline-flex items-center gap-2 px-4 py-2 rounded-sm text-xs uppercase tracking-wider font-bold disabled:opacity-50">
+          <button type="button" onClick={share} disabled={!link} data-testid="team-invite-share" className="tls-btn tls-btn--primary inline-flex items-center gap-2 px-4 py-2 rounded-sm tls-type-label disabled:opacity-50">
             <Share2 className="w-3.5 h-3.5" /> Link teilen
           </button>
-          <button type="button" onClick={renew} disabled={!link || submitting} data-testid="team-invite-renew" className="tls-btn tls-btn--quiet inline-flex items-center gap-2 px-4 py-2 rounded-sm text-xs uppercase tracking-wider font-bold disabled:opacity-50">
+          <button type="button" onClick={renew} disabled={!link || submitting} data-testid="team-invite-renew" className="tls-btn tls-btn--quiet inline-flex items-center gap-2 px-4 py-2 rounded-sm tls-type-label disabled:opacity-50">
             <RefreshCw className="w-3.5 h-3.5" /> Neuen Link erzeugen
           </button>
         </div>
@@ -115,17 +115,17 @@ export function TeamInviteSheet({ team, onClose, onCodeRenewed }) {
 
       {joinCode ? (
         <section className="border border-[#FFD700]/25 bg-[#FFD700]/5 rounded-sm p-4" data-testid="team-join-code-box">
-          <div className="text-[11px] uppercase tracking-widest text-[#FFD700] font-bold">Beitrittscode</div>
-          <p className="mt-1 text-xs text-white/55" data-testid="team-join-code-hint">
+          <div className="tls-type-label text-[#FFD700]">Beitrittscode</div>
+          <p className="mt-1 tls-type-small text-white/55" data-testid="team-join-code-hint">
             {team.is_public === false
               ? "Das Team ist privat: Außenstehende sehen die Teamseite nicht und können den Code dort nicht eingeben. Lade über den Link oder persönlich ein."
               : "Falls der Link nicht geht: Code auf der Team-Seite unter „Team beitreten“ eingeben."}
           </p>
           <div className="mt-2 flex gap-2">
-            <code className="flex-1 min-w-0 break-all bg-black/40 border border-white/10 px-3 py-2 rounded-sm text-sm" data-testid="team-join-code-value">{joinCode}</code>
+            <code className="flex-1 min-w-0 break-all bg-black/40 border border-white/10 px-3 py-2 rounded-sm tls-type-small" data-testid="team-join-code-value">{joinCode}</code>
             <button type="button" onClick={() => copy(joinCode, "Beitrittscode kopiert.")} aria-label="Beitrittscode kopieren" className="tls-btn tls-btn--secondary px-3 py-2 rounded-sm"><Copy className="w-4 h-4" /></button>
           </div>
-          <button type="button" onClick={renewCode} disabled={submitting} data-testid="team-join-code-renew" className="tls-btn tls-btn--quiet mt-2 inline-flex items-center gap-2 px-4 py-2 rounded-sm text-xs uppercase tracking-wider font-bold disabled:opacity-50">
+          <button type="button" onClick={renewCode} disabled={submitting} data-testid="team-join-code-renew" className="tls-btn tls-btn--quiet mt-2 inline-flex items-center gap-2 px-4 py-2 rounded-sm tls-type-label disabled:opacity-50">
             <RefreshCw className="w-3.5 h-3.5" /> Beitrittscode erneuern
           </button>
         </section>
@@ -172,8 +172,8 @@ export function InviteMemberPanel({ team }) {
   return (
     <section className="border border-[#29B6E8]/25 bg-[#29B6E8]/5 rounded-sm p-4 space-y-3" data-testid="team-invite-members">
       <div>
-        <div className="text-[11px] uppercase tracking-widest text-[#29B6E8] font-bold">Persönlich einladen</div>
-        <p className="mt-1 text-xs text-white/45">Benutzer suchen – die Einladung landet bei ihnen in der Glocke.</p>
+        <div className="tls-type-label text-[#29B6E8]">Persönlich einladen</div>
+        <p className="mt-1 tls-type-small text-white/45">Benutzer suchen – die Einladung landet bei ihnen in der Glocke.</p>
       </div>
       <div className="relative">
         <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-white/35" />
@@ -185,24 +185,24 @@ export function InviteMemberPanel({ team }) {
         />
       </div>
       <div className="space-y-2">
-        {loading && <div className="text-xs text-white/40">Suche läuft...</div>}
+        {loading && <div className="tls-type-small text-quiet">Suche läuft...</div>}
         {candidates.map((candidate) => (
           <div key={candidate.id} className="flex items-center gap-2 border border-white/10 bg-[#0A0A0A] rounded-sm p-2">
             <div className="min-w-0 flex-1">
-              <div className="font-bold text-sm truncate">{candidate.display_name || candidate.username}</div>
-              <div className="text-xs text-white/40 truncate">@{candidate.username}</div>
+              <div className="font-bold tls-type-small truncate">{candidate.display_name || candidate.username}</div>
+              <div className="tls-type-small text-quiet truncate">@{candidate.username}</div>
             </div>
             <button
               type="button"
               disabled={candidate.has_pending_invite || inviting}
               onClick={() => invite(candidate)}
-              className="tls-btn tls-btn--secondary shrink-0 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-sm text-[10px] uppercase tracking-wider font-bold disabled:opacity-45 disabled:pointer-events-none"
+              className="tls-btn tls-btn--secondary shrink-0 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-sm tls-type-label disabled:opacity-45 disabled:pointer-events-none"
             >
               <UserPlus className="w-3.5 h-3.5" /> {candidate.has_pending_invite ? "Offen" : "Einladen"}
             </button>
           </div>
         ))}
-        {search.status === "empty" && <div className="text-xs text-white/35">Keine passenden Benutzer gefunden.</div>}
+        {search.status === "empty" && <div className="tls-type-small text-quiet">Keine passenden Benutzer gefunden.</div>}
         {search.status === "error" && <LoadNotice testId="team-invite-search-error" message="Die Suche hat nicht geklappt." onRetry={search.reload} />}
         {inviteError && <AuthFormAlert id="team-invite-error">{inviteError}</AuthFormAlert>}
       </div>
@@ -251,12 +251,12 @@ export function PendingInvites({ team, load, onWithdrawn }) {
   if (!rows.length) return null;
   return (
     <div className="space-y-2 border-t border-white/10 pt-3" data-testid="team-pending-invites">
-      <div className="text-[11px] uppercase tracking-widest text-white/55 font-bold">Offene Einladungen ({rows.length})</div>
+      <div className="tls-type-label text-white/55">Offene Einladungen ({rows.length})</div>
       {rows.map((invite) => (
         <div key={invite.id} className="flex items-center gap-2 border border-white/10 bg-[#0A0A0A] rounded-sm p-2" data-testid={`team-pending-invite-${invite.id}`}>
           <div className="min-w-0 flex-1">
-            <div className="font-bold text-sm truncate">{invite.user?.display_name || invite.user?.username || "Unbekannt"}</div>
-            <div className="text-xs text-white/40 truncate">
+            <div className="font-bold tls-type-small truncate">{invite.user?.display_name || invite.user?.username || "Unbekannt"}</div>
+            <div className="tls-type-small text-quiet truncate">
               {invite.inviter ? `eingeladen von ${invite.inviter.display_name || invite.inviter.username}` : "wartet auf Antwort"}
               {invite.created_at ? ` · ${viennaDate(invite.created_at)}` : ""}
             </div>
@@ -266,7 +266,7 @@ export function PendingInvites({ team, load, onWithdrawn }) {
             disabled={submitting}
             onClick={() => withdraw(invite)}
             data-testid={`team-pending-invite-withdraw-${invite.id}`}
-            className="tls-btn tls-btn--quiet shrink-0 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-sm text-[10px] uppercase tracking-wider font-bold disabled:opacity-45"
+            className="tls-btn tls-btn--quiet shrink-0 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-sm tls-type-label disabled:opacity-45"
           >
             <X className="w-3.5 h-3.5" /> Zurückziehen
           </button>

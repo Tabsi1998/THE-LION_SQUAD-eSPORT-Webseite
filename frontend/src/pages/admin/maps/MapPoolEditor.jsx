@@ -75,19 +75,19 @@ function ModeGroup({ mode, label, icon, iconChanged = false, library, selected, 
   const name = label || "Alle Maps";
   return (
     <fieldset className="border border-white/10 rounded-sm bg-[#0A0A0A] p-3" data-testid={`${testId}-mode-${mode ?? "alle"}`}>
-      <legend className="inline-flex items-center gap-2 px-1 text-[11px] font-bold uppercase tracking-widest text-white/70">
+      <legend className="inline-flex items-center gap-2 px-1 tls-type-small font-bold text-white/70">
         {/* Modus-Symbol (#2266): das des Spiels - beim Speichern kommt es als Schnappschuss in den Pool. */}
         {mode ? <ModeIcon src={icon} size="sm" testId={`${testId}-mode-${mode}-icon`} /> : null}
         {labelNode || name} <span className="ml-1 normal-case tracking-normal font-semibold text-white/45 tabular-nums">{selected.length} von {choices.length}</span>
       </legend>
       {iconChanged ? (
-        <p role="status" className="mb-2 text-xs text-white/60" data-testid={`${testId}-mode-${mode}-icon-changed`}>
+        <p role="status" className="mb-2 tls-type-small text-white/60" data-testid={`${testId}-mode-${mode}-icon-changed`}>
           Symbol geändert – mit dem nächsten Speichern übernommen.
         </p>
       ) : null}
       {aside ? <div className="mb-2">{aside}</div> : null}
       {choices.length === 0 ? (
-        <p className="text-xs text-white/45">Keine aktive Map ist für diesen Modus freigegeben.</p>
+        <p className="tls-type-small text-white/45">Keine aktive Map ist für diesen Modus freigegeben.</p>
       ) : (
         <ul className="space-y-1">
           {ordered.map((item) => {
@@ -96,13 +96,13 @@ function ModeGroup({ mode, label, icon, iconChanged = false, library, selected, 
             return (
               <li key={item.id} data-testid={`${testId}-map-${keyOf(mode) || "alle"}-${item.id}`} data-map-id={item.id}
                 className={`tls-map-pick flex items-center gap-2 rounded-sm border px-2 py-1.5 ${on ? "border-[#29B6E8]/50 bg-[#29B6E8]/[0.07]" : "border-transparent"}`}>
-                <span className={`w-5 text-right text-[11px] font-bold tabular-nums ${on ? "text-[#29B6E8]" : "text-transparent"}`} aria-hidden="true">{on ? position + 1 : "–"}</span>
-                <label className="flex min-w-0 flex-1 cursor-pointer items-center gap-2 text-sm text-white/85">
+                <span className={`w-5 text-right tls-type-small font-bold tabular-nums ${on ? "text-[#29B6E8]" : "text-transparent"}`} aria-hidden="true">{on ? position + 1 : "–"}</span>
+                <label className="flex min-w-0 flex-1 cursor-pointer items-center gap-2 tls-type-small text-white/85">
                   <input type="checkbox" checked={on} disabled={disabled} onChange={() => onToggle(mode, item.id)} aria-label={`${item.name} in ${name}`} className="accent-[#29B6E8]" />
                   <Thumb item={item} />
                   <span className="truncate">{item.name}</span>
                   {mapStatusOf(item) === "inactive" ? (
-                    <span className="shrink-0 rounded-sm bg-white/5 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wider text-white/55" data-testid={`${testId}-inactive-${item.id}`}>inaktiv</span>
+                    <span className="shrink-0 rounded-sm bg-white/5 px-1.5 py-0.5 tls-type-label text-white/55" data-testid={`${testId}-inactive-${item.id}`}>inaktiv</span>
                   ) : null}
                 </label>
                 {on ? (
@@ -212,51 +212,51 @@ export function MapPoolEditor({ title, hint = "", game, library = [], entry = nu
     <section className="border border-white/10 rounded-sm bg-[#121212] p-4 space-y-3" aria-label={title} data-testid={testId}>
       <div className="flex flex-wrap items-start justify-between gap-2">
         <div className="min-w-0">
-          <h3 className="text-[11px] font-bold uppercase tracking-widest text-[#29B6E8]">{title}</h3>
-          {hint ? <p className="mt-0.5 text-xs text-white/50">{hint}</p> : null}
+          <h3 className="tls-type-label text-[#29B6E8]">{title}</h3>
+          {hint ? <p className="mt-0.5 tls-type-small text-white/50">{hint}</p> : null}
         </div>
-        <div className="text-right text-[11px] text-white/55 tabular-nums" data-testid={`${testId}-status`}>
+        <div className="text-right tls-type-small text-white/55 tabular-nums" data-testid={`${testId}-status`}>
           {status}
           {entry && ORIGIN_TEXT[entry.origin] ? <div className="text-white/40">{ORIGIN_TEXT[entry.origin]}</div> : null}
         </div>
       </div>
 
       {!game ? (
-        <p className="text-sm text-white/55" data-testid={`${testId}-no-game`}>Ohne Spiel gibt es keinen Map-Pool. Freitext bei Maps bleibt möglich.</p>
+        <p className="tls-type-small text-white/55" data-testid={`${testId}-no-game`}>Ohne Spiel gibt es keinen Map-Pool. Freitext bei Maps bleibt möglich.</p>
       ) : library.length === 0 ? (
-        <p className="text-sm text-white/55" data-testid={`${testId}-no-maps`}>
+        <p className="tls-type-small text-white/55" data-testid={`${testId}-no-maps`}>
           Für {game.name} gibt es noch keine aktiven Maps.
           {libraryLink ? <> <Link to={gamePageUrl(game.id, "maps")} className="text-[#29B6E8] hover:text-white underline-offset-2 hover:underline">Maps anlegen</Link></> : null}
         </p>
       ) : null}
 
       {entry?.stale ? (
-        <p role="status" className="rounded-sm border border-[#FFD700]/30 bg-[#FFD700]/5 px-3 py-2 text-xs text-[#FFD700]" data-testid={`${testId}-stale`}>
+        <p role="status" className="rounded-sm border border-[#FFD700]/30 bg-[#FFD700]/5 px-3 py-2 tls-type-small text-[#FFD700]" data-testid={`${testId}-stale`}>
           Der gespeicherte Pool gehört zu einem anderen Spiel und gilt nicht mehr. Bitte neu wählen – Spiele, die ihn schon festhalten, behalten ihn.
         </p>
       ) : null}
       {outdated.length ? (
-        <p role="status" className="rounded-sm border border-white/15 bg-white/[0.03] px-3 py-2 text-xs text-white/70" data-testid={`${testId}-outdated`}>
+        <p role="status" className="rounded-sm border border-white/15 bg-white/[0.03] px-3 py-2 tls-type-small text-white/70" data-testid={`${testId}-outdated`}>
           Seit dem Speichern in der Bibliothek geändert: {outdated.map((item) => item.name).join(", ")}. Gespeichert bleibt der alte Stand, bis du neu speicherst.
         </p>
       ) : null}
       {oldGroups.length ? (
-        <p role="status" className="rounded-sm border border-warn/30 bg-warn/5 px-3 py-2 text-xs text-warn" data-testid={`${testId}-old-groups`}>
+        <p role="status" className="rounded-sm border border-warn/30 bg-warn/5 px-3 py-2 tls-type-small text-warn" data-testid={`${testId}-old-groups`}>
           Im gespeicherten Pool steht noch {oldGroups.map((group) => `„${group.label || group.mode || "Alle Maps"}“ (${(group.maps || []).length})`).join(", ")} – so hat das Spiel das nicht mehr. Der Pool gilt unverändert weiter, Spiele melden weiter daraus. Erst neues Speichern ersetzt ihn durch die Auswahl unten.
         </p>
       ) : null}
       {game && library.length > 0 && noModeLeft ? (
-        <p role="status" className="rounded-sm border border-warn/30 bg-warn/5 px-3 py-2 text-xs text-warn" data-testid={`${testId}-no-modes`}>
+        <p role="status" className="rounded-sm border border-warn/30 bg-warn/5 px-3 py-2 tls-type-small text-warn" data-testid={`${testId}-no-modes`}>
           Kein Modus von {game.name} steht für einen neuen Pool zur Wahl – alle sind inaktiv oder archiviert. Aktivieren <ModesPlace game={game} libraryLink={libraryLink} />.
         </p>
       ) : null}
       {game && hiddenInactive.length ? (
-        <p role="status" className="rounded-sm border border-white/15 bg-white/[0.03] px-3 py-2 text-xs text-white/70" data-testid={`${testId}-inactive`}>
+        <p role="status" className="rounded-sm border border-white/15 bg-white/[0.03] px-3 py-2 tls-type-small text-white/70" data-testid={`${testId}-inactive`}>
           Inaktiv und hier nicht zur Wahl: {hiddenInactive.map((mode) => `„${mode.label || mode.mode}“`).join(", ")}. Wieder aktivieren <ModesPlace game={game} libraryLink={libraryLink} />.
         </p>
       ) : null}
       {game && withoutMode.length ? (
-        <p role="status" className="rounded-sm border border-white/15 bg-white/[0.03] px-3 py-2 text-xs text-white/70" data-testid={`${testId}-without-mode`}>
+        <p role="status" className="rounded-sm border border-white/15 bg-white/[0.03] px-3 py-2 tls-type-small text-white/70" data-testid={`${testId}-without-mode`}>
           {withoutMode.length === 1 ? "1 Map hat" : `${withoutMode.length} Maps haben`} noch keinen Modus und {withoutMode.length === 1 ? "steht" : "stehen"} hier nicht zur Wahl.
           {libraryLink ? <> <Link to={gamePageUrl(game.id, "maps")} className="text-[#29B6E8] hover:text-white underline-offset-2 hover:underline">Zuordnen</Link></> : " Zuordnen auf der Spielseite im Reiter Maps."}
         </p>
@@ -267,7 +267,7 @@ export function MapPoolEditor({ title, hint = "", game, library = [], entry = nu
           <div className="flex flex-wrap items-center gap-2">
             <button type="button" disabled={disabled || noModeLeft} onClick={loadDefaults} data-testid={`${testId}-defaults`}
               title={defaultPool ? "Lädt den Standard-Pool des Spiels" : "Lädt alle aktiven Maps des Spiels"}
-              className="tls-btn tls-btn--quiet px-3 py-1.5 rounded-sm text-[11px] font-bold uppercase tracking-wider disabled:opacity-50">
+              className="tls-btn tls-btn--quiet px-3 py-1.5 rounded-sm tls-type-label disabled:opacity-50">
               {defaultsLabel}
             </button>
             {sources.length ? (
@@ -278,30 +278,30 @@ export function MapPoolEditor({ title, hint = "", game, library = [], entry = nu
               </select>
             ) : null}
             <button type="button" disabled={disabled || count === 0} onClick={() => setSelection(picking ? Object.fromEntries(Object.keys(rawSelection).filter((key) => !picked.includes(key)).map((key) => [key, rawSelection[key]])) : {})} data-testid={`${testId}-none`}
-              className="tls-btn tls-btn--quiet px-3 py-1.5 rounded-sm text-[11px] font-bold uppercase tracking-wider disabled:opacity-50">
+              className="tls-btn tls-btn--quiet px-3 py-1.5 rounded-sm tls-type-label disabled:opacity-50">
               Alle abwählen
             </button>
           </div>
           {picking ? (
             <fieldset className="space-y-2" data-testid={`${testId}-modes`}>
-              <legend className="text-[11px] font-bold uppercase tracking-widest text-white/70">Welche Modi spielt die Season?</legend>
-              <p className="text-xs text-white/50">Haken setzen – darunter wählst du je Modus die Maps. Ein Modus ohne Haken kommt nicht in den Pool.</p>
+              <legend className="tls-type-small font-bold text-white/70">Welche Modi spielt die Season?</legend>
+              <p className="tls-type-small text-white/50">Haken setzen – darunter wählst du je Modus die Maps. Ein Modus ohne Haken kommt nicht in den Pool.</p>
               <div className="flex flex-wrap gap-2">
                 {modes.map(({ mode, label, icon_url: icon }) => {
                   const key = keyOf(mode);
                   const on = picked.includes(key);
                   const maps = (rawSelection[key] || []).length;
                   return (
-                    <label key={key} className={`inline-flex min-h-[44px] cursor-pointer select-none items-center gap-2 rounded-sm border px-3 py-1.5 text-sm focus-within:outline focus-within:outline-1 focus-within:outline-[#29B6E8] ${on ? "border-[#29B6E8]/70 bg-[#29B6E8]/10 text-white" : "border-white/10 bg-[#0A0A0A] text-white/65"}`}>
+                    <label key={key} className={`inline-flex min-h-[44px] cursor-pointer select-none items-center gap-2 rounded-sm border px-3 py-1.5 tls-type-small focus-within:outline focus-within:outline-1 focus-within:outline-[#29B6E8] ${on ? "border-[#29B6E8]/70 bg-[#29B6E8]/10 text-white" : "border-white/10 bg-[#0A0A0A] text-white/65"}`}>
                       <input type="checkbox" checked={on} disabled={disabled} onChange={() => togglePicked(key)} className="accent-[#29B6E8]" data-testid={`${testId}-pick-${key}`} />
                       <ModeIcon src={icon} size="xs" testId={`${testId}-pick-${key}-icon`} />
                       {renderModeLabel ? renderModeLabel(mode, label || mode) : (label || mode)}
-                      {on ? <span className={`text-xs tabular-nums ${maps ? "text-white/55" : "text-warn"}`}>{maps ? `${maps} ${maps === 1 ? "Map" : "Maps"}` : "noch keine Map"}</span> : null}
+                      {on ? <span className={`tls-type-small tabular-nums ${maps ? "text-white/55" : "text-warn"}`}>{maps ? `${maps} ${maps === 1 ? "Map" : "Maps"}` : "noch keine Map"}</span> : null}
                     </label>
                   );
                 })}
               </div>
-              {!picked.length ? <p className="text-xs text-warn" data-testid={`${testId}-pick-none`}>Noch kein Modus angehakt – ohne Modus gibt es keinen Pool.</p> : null}
+              {!picked.length ? <p className="tls-type-small text-warn" data-testid={`${testId}-pick-none`}>Noch kein Modus angehakt – ohne Modus gibt es keinen Pool.</p> : null}
             </fieldset>
           ) : null}
           <div className="grid gap-3 lg:grid-cols-2">
@@ -322,12 +322,12 @@ export function MapPoolEditor({ title, hint = "", game, library = [], entry = nu
         <div className="flex flex-wrap items-center justify-end gap-2 pt-1">
           {entry && onClear ? (
             <button type="button" disabled={busy} onClick={clear} data-testid={`${testId}-clear`}
-              className="tls-btn tls-btn--danger px-3 py-2 rounded-sm text-xs font-bold uppercase tracking-wider inline-flex items-center gap-1.5 disabled:opacity-50">
+              className="tls-btn tls-btn--danger px-3 py-2 rounded-sm tls-type-label inline-flex items-center gap-1.5 disabled:opacity-50">
               <Trash2 className="w-3.5 h-3.5" aria-hidden="true" /> Pool entfernen
             </button>
           ) : null}
           <button type="button" disabled={busy || !(dirty || iconsOutdated) || count === 0 || noModeLeft} onClick={save} data-testid={`${testId}-save`}
-            className="tls-btn tls-btn--primary px-4 py-2 rounded-sm text-xs font-bold uppercase tracking-wider disabled:opacity-50">
+            className="tls-btn tls-btn--primary px-4 py-2 rounded-sm tls-type-label disabled:opacity-50">
             {busy ? "Speichere …" : saveLabel}
           </button>
         </div>

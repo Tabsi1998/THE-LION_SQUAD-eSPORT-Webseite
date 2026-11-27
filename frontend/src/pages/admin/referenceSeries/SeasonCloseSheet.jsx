@@ -43,26 +43,26 @@ export function SeasonCloseSheet({ series, label, preview, onClose, onDone }) {
       submitLabel={target ? "Referenz aktualisieren" : "Referenz anlegen"} savingLabel="Schließe ab …" submitTestId="season-close-save" testId="season-close"
       submitDisabled={!entries.length}>
       {!preview ? (
-        <p className="text-sm text-white/50" data-testid="season-close-loading">Lade den Endstand …</p>
+        <p className="tls-type-small text-white/50" data-testid="season-close-loading">Lade den Endstand …</p>
       ) : (
         <>
-          <p className="text-sm text-white/60 leading-relaxed">
+          <p className="tls-type-body text-white/60 leading-relaxed">
             Aus dem Endstand wird die Referenz: Team und Einzelwertungen mit Platz und Feldgröße, dazu die Vereinsspieler aus den Aufstellungen. Der Endplatz wird hier in der Saison gepflegt – erneut abschließen aktualisiert dieselbe Referenz.
           </p>
           {preview.cancelled && (
-            <p className="border border-warn/40 bg-warn/10 rounded-sm px-3 py-2 text-sm text-white/80" data-testid="season-close-cancelled">
+            <p className="border border-warn/40 bg-warn/10 rounded-sm px-3 py-2 tls-type-small text-white/80" data-testid="season-close-cancelled">
               Die Saison wurde abgebrochen – die Referenz bekommt keine Platzierung.
             </p>
           )}
           {preview.open_rounds > 0 && (
-            <p className="flex items-start gap-1.5 text-xs text-warn" role="status" data-testid="season-close-open">
+            <p className="flex items-start gap-1.5 tls-type-small text-warn" role="status" data-testid="season-close-open">
               <AlertTriangle className="w-3.5 h-3.5 mt-px shrink-0" aria-hidden="true" /> {openText(preview.open_rounds)}
             </p>
           )}
           <section aria-labelledby="season-close-entries-title">
-            <h3 id="season-close-entries-title" className="text-[11px] font-bold uppercase tracking-widest text-white/60 mb-1.5">Endstand</h3>
+            <h3 id="season-close-entries-title" className="tls-type-label text-white/60 mb-1.5">Endstand</h3>
             {entries.length === 0 ? (
-              <p className="border border-dashed border-white/15 rounded-sm p-4 text-sm text-white/45" data-testid="season-close-empty">
+              <p className="border border-dashed border-white/15 rounded-sm p-4 tls-type-body text-white/45" data-testid="season-close-empty">
                 Noch kein Endstand – erst Ergebnisse eintragen oder die Tabelle des Veranstalters einfügen.
               </p>
             ) : (
@@ -91,10 +91,10 @@ function EntryRow({ entry }) {
       <span className="min-w-0 flex-1">
         <span className="flex flex-wrap items-baseline gap-x-2">
           <span className="font-bold text-white break-words [overflow-wrap:anywhere]">{entryName(entry)}</span>
-          <span className="text-[10px] uppercase tracking-widest font-bold text-white/45">{solo ? "Einzel" : "Team"}</span>
+          <span className="tls-type-label text-white/45">{solo ? "Einzel" : "Team"}</span>
         </span>
-        <span className="block text-sm text-white/70 tabular-nums">{entryLine(entry)}</span>
-        {people.length > 0 && <span className="block text-xs text-white/45 break-words">{people.join(", ")}</span>}
+        <span className="block tls-type-small text-white/70 tabular-nums">{entryLine(entry)}</span>
+        {people.length > 0 && <span className="block tls-type-small text-white/45 break-words">{people.join(", ")}</span>}
       </span>
     </li>
   );

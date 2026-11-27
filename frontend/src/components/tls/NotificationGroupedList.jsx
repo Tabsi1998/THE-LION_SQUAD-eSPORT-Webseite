@@ -90,7 +90,7 @@ export function NotificationGroupedList({
       {groups.length === 0 ? (
         <div className="px-4 py-10 text-center text-white/40" data-testid={`${testId}-empty`}>
           <Inbox className="w-8 h-8 mx-auto mb-2 opacity-50" aria-hidden="true" />
-          <div className="text-sm">{activeTopic ? `Nichts zu „${TOPIC_LABELS[activeTopic]}“.` : emptyText || "Keine Benachrichtigungen."}</div>
+          <div className="tls-type-small">{activeTopic ? `Nichts zu „${TOPIC_LABELS[activeTopic]}“.` : emptyText || "Keine Benachrichtigungen."}</div>
         </div>
       ) : (
         groups.map((group) => (

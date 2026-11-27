@@ -72,9 +72,9 @@ export function TrophyShelf({ items, compact = false, testId = "trophy-shelf" })
           <li key={item.id} className="tls-trophy-shelf__slot">
             <Link to={referenceHref(item)} data-testid={`${testId}-${item.id}`} data-season-anchor="card" className={`tls-card tls-card--own tls-trophy tls-trophy--${medal} group flex flex-col items-center text-center gap-1.5 rounded-sm px-2 pt-2 pb-4`}>
               <TrophyCup medal={medal} className={compact ? "w-14 h-16" : "w-16 h-[4.5rem] sm:w-20 sm:h-[5.5rem]"} />
-              <span className={`text-[11px] font-bold uppercase tracking-[0.18em] ${metal.text}`}>{bestPlacement(item)}. Platz</span>
-              <span className="tls-card__title font-bold text-sm leading-tight break-words">{displayTitle(item)}</span>
-              <span className="text-xs text-white/55">{[compact ? "" : gameTitle(item), size].filter(Boolean).join(" · ")}</span>
+              <span className={`tls-type-label ${metal.text}`}>{bestPlacement(item)}. Platz</span>
+              <span className="tls-card__title font-bold tls-type-small leading-tight break-words">{displayTitle(item)}</span>
+              <span className="tls-type-small text-white/55">{[compact ? "" : gameTitle(item), size].filter(Boolean).join(" · ")}</span>
             </Link>
           </li>
         );

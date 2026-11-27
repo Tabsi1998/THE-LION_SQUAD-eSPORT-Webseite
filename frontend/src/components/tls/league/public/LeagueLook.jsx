@@ -42,7 +42,7 @@ export function LeagueHead({ look, title, eyebrow, children, testId = "league-he
         <LeagueEmblem src={look?.emblem_url} size={88} className="tls-league-head__emblem" testId={`${testId}-emblem`} />
         <div className="min-w-0 flex-1">
           {eyebrow ? <p className="tls-league-head__eyebrow">{eyebrow}</p> : null}
-          <h1 className="font-heading text-4xl md:text-6xl font-black uppercase leading-[0.95] break-words">{title}</h1>
+          <h1 className="tls-type-title leading-[0.95] break-words">{title}</h1>
         </div>
       </div>
       {children}
@@ -68,10 +68,10 @@ export function LeaguePrizes({ prizes, title = "Um was gespielt wird", hint, com
   if (!prizes?.length) return null;
   return (
     <section className={compact ? "mt-4" : "mt-12"} aria-label={title} data-testid={testId}>
-      <h2 className={compact ? "tls-league-subhead" : "flex items-center gap-2 font-heading text-2xl font-black uppercase"}>
+      <h2 className={compact ? "tls-league-subhead" : "flex items-center gap-2 tls-type-section"}>
         <Trophy className={compact ? "h-3.5 w-3.5" : "h-5 w-5 tls-league-accent"} aria-hidden="true" /> {title}
       </h2>
-      {hint ? <p className="mb-3 text-sm text-white/55">{hint}</p> : null}
+      {hint ? <p className="mb-3 tls-type-body text-white/55">{hint}</p> : null}
       <StaggerIn as="ol" className={`tls-league-prizes ${compact ? "" : "mt-4"}`}>
         {prizes.map((prize) => <Prize key={prize.place} prize={prize} />)}
       </StaggerIn>

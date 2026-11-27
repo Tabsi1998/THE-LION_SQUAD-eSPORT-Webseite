@@ -35,7 +35,7 @@ export function ModeSettingsEditor({ value, onChange, diff = {}, testPrefix = "m
   return (
     <div className="space-y-3" data-testid={testPrefix}>
       <fieldset className="space-y-2">
-        <legend className="text-[11px] font-bold uppercase tracking-widest text-white/60">Einstellungen</legend>
+        <legend className="tls-type-label text-white/60">Einstellungen</legend>
         {rows.length ? (
           <ol className="space-y-2">
             {rows.map((row, index) => {
@@ -66,16 +66,16 @@ export function ModeSettingsEditor({ value, onChange, diff = {}, testPrefix = "m
                       </button>
                     </div>
                   </div>
-                  {changed ? <p className="mt-1 text-[11px] font-bold text-warn" data-testid={`${testPrefix}-diff-${index}`}>{DIFF_WORDS[changed]}</p> : null}
+                  {changed ? <p className="mt-1 tls-type-small font-bold text-warn" data-testid={`${testPrefix}-diff-${index}`}>{DIFF_WORDS[changed]}</p> : null}
                 </li>
               );
             })}
           </ol>
         ) : (
-          <p className="text-xs text-white/45" data-testid={`${testPrefix}-empty`}>Noch keine. Etwa Lobby-Einstellungen, die für jedes Spiel gelten.</p>
+          <p className="tls-type-small text-white/45" data-testid={`${testPrefix}-empty`}>Noch keine. Etwa Lobby-Einstellungen, die für jedes Spiel gelten.</p>
         )}
         <button type="button" onClick={() => setRows([...rows, emptySetting()])} disabled={rows.length >= MODE_SETTINGS_MAX}
-          className="tls-btn tls-btn--quiet inline-flex items-center gap-1.5 rounded-sm px-3 py-1.5 text-[11px] font-bold uppercase tracking-wider disabled:opacity-40"
+          className="tls-btn tls-btn--quiet inline-flex items-center gap-1.5 rounded-sm px-3 py-1.5 tls-type-label disabled:opacity-40"
           data-testid={`${testPrefix}-add`}>
           <Plus className="h-3.5 w-3.5" aria-hidden="true" /> Einstellung hinzufügen
         </button>

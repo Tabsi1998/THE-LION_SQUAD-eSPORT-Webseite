@@ -22,7 +22,7 @@ export function TableScroll({ label, testId, className = "", children }) {
   return (
     <div className={className}>
       {overflow ? (
-        <p className="mb-2 text-[11px] text-white/45" data-testid={`${testId}-hint`}>
+        <p className="mb-2 tls-type-small text-white/45" data-testid={`${testId}-hint`}>
           Seitlich wischen: weitere Spalten und Aktionen liegen rechts.
         </p>
       ) : null}
@@ -33,7 +33,9 @@ export function TableScroll({ label, testId, className = "", children }) {
         // eslint-disable-next-line jsx-a11y/no-noninteractive-tabindex -- eine scrollbare Fläche muss per Tastatur erreichbar sein (axe: scrollable-region-focusable)
         tabIndex={0}
         data-testid={testId}
-        className="border border-white/10 rounded-sm bg-[#121212] tls-swipe pb-0 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#29B6E8]"
+        // scroll-mt-24 wie die Abschnitte der Verwaltung: Mit der Tastatur angesteuert, stehen die Fläche und ihre Knöpfe unter der
+        // klebenden Kopfleiste statt dahinter (#1302).
+        className="scroll-mt-24 [&_:is(a,button,input,select)]:scroll-mt-24 border border-white/10 rounded-sm bg-[#121212] tls-swipe pb-0 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#29B6E8]"
       >
         {children}
       </div>

@@ -99,11 +99,11 @@ export function ResultImageButton({ image, pasteHint = true, testId = "result-im
     <>
       <button type="button" onClick={() => input.current?.click()} disabled={image.busy} data-testid={testId}
         title={pasteHint ? "Screenshot des Veranstalters auslesen – oder das Bild mit Strg+V einfügen" : "Screenshot des Veranstalters auslesen"}
-        className="tls-btn tls-btn--quiet px-3 py-1.5 rounded-sm text-[11px] font-bold uppercase tracking-wider inline-flex items-center gap-1.5 disabled:opacity-50">
+        className="tls-btn tls-btn--quiet px-3 py-1.5 rounded-sm tls-type-label inline-flex items-center gap-1.5 disabled:opacity-50">
         <ScanText className="w-3.5 h-3.5" /> {image.busy ? "Liest …" : "Bild auslesen"}
       </button>
-      {pasteHint && <span className="hidden sm:inline text-[11px] text-white/40" data-testid="result-image-paste-hint">
-        oder <kbd className="px-1 py-px rounded-[3px] border border-white/15 bg-white/5 font-sans text-[10px] text-white/60">Strg</kbd>+<kbd className="px-1 py-px rounded-[3px] border border-white/15 bg-white/5 font-sans text-[10px] text-white/60">V</kbd>
+      {pasteHint && <span className="hidden sm:inline tls-type-small text-quiet" data-testid="result-image-paste-hint">
+        oder <kbd className="px-1 py-px rounded-[3px] border border-white/15 bg-white/5 font-sans tls-type-small text-white/60">Strg</kbd>+<kbd className="px-1 py-px rounded-[3px] border border-white/15 bg-white/5 font-sans tls-type-small text-white/60">V</kbd>
       </span>}
       <input ref={input} type="file" accept={ACCEPT} className="sr-only" tabIndex={-1} aria-hidden="true" data-testid={fileTestId}
         onChange={(event) => {
@@ -131,7 +131,7 @@ export function ResultImageSummary({ image, rows, raceOcr = null }) {
     return (
       <div className="flex items-center gap-3 border border-[#29B6E8]/30 bg-[#29B6E8]/5 rounded-sm p-3" data-testid="result-image-reading" role="status" aria-live="polite">
         <Picture src={image.picture} reading />
-        <p className="text-sm text-white/75">Bild wird gelesen – das dauert ein paar Sekunden.</p>
+        <p className="tls-type-small text-white/75">Bild wird gelesen – das dauert ein paar Sekunden.</p>
       </div>
     );
   }
@@ -150,15 +150,15 @@ export function ResultImageSummary({ image, rows, raceOcr = null }) {
         )}
         <div className="min-w-0 flex-1 space-y-1.5">
           <div className="flex items-start justify-between gap-2">
-            <h3 className="text-[11px] font-bold uppercase tracking-widest text-[#29B6E8]">Aus dem Bild gelesen</h3>
+            <h3 className="tls-type-label text-[#29B6E8]">Aus dem Bild gelesen</h3>
             <button type="button" onClick={image.dismiss} aria-label="Übersicht schließen" data-testid="result-image-dismiss" className="-m-1 p-1 rounded-sm text-white/45 hover:text-white transition active:scale-[0.97]"><X className="w-4 h-4" /></button>
           </div>
-          <p className="text-sm text-white/80 tabular-nums" data-testid="result-image-counts">
+          <p className="tls-type-small text-white/80 tabular-nums" data-testid="result-image-counts">
             {result.rows.length} {result.rows.length === 1 ? "Zeile" : "Zeilen"} in die Liste übernommen
             {result.template?.name ? <span className="text-white/45"> · Vorlage {result.template.name}</span> : null}
           </p>
           {header.length > 0 && (
-            <dl className="grid grid-cols-[auto_minmax(0,1fr)] gap-x-3 gap-y-0.5 text-xs" data-testid="result-image-header">
+            <dl className="grid grid-cols-[auto_minmax(0,1fr)] gap-x-3 gap-y-0.5 tls-type-small" data-testid="result-image-header">
               {header.map((item) => (
                 <div key={item.key} className="contents">
                   <dt className="text-white/45">{item.label}</dt>
@@ -174,18 +174,18 @@ export function ResultImageSummary({ image, rows, raceOcr = null }) {
       {large && (
         <div className="space-y-1.5">
           <Picture src={image.picture} large />
-          <button type="button" onClick={() => setLarge(false)} className="inline-flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wider text-white/55 hover:text-white transition" data-testid="result-image-shrink">
+          <button type="button" onClick={() => setLarge(false)} className="inline-flex items-center gap-1.5 tls-type-label text-white/55 hover:text-white transition" data-testid="result-image-shrink">
             <Minimize2 className="w-3.5 h-3.5" /> Bild klein
           </button>
         </div>
       )}
-      <p className={`text-xs ${open ? "text-amber-100" : "text-white/60"}`} data-testid="result-image-status">
+      <p className={`tls-type-small ${open ? "text-amber-100" : "text-white/60"}`} data-testid="result-image-status">
         {open
           ? `${open === 1 ? "1 Zeile ist" : `${open} Zeilen sind`} gelb: mit dem Bild vergleichen, korrigieren oder mit „Passt so“ bestätigen. Übernehmen geht erst danach.`
           : "Alles sicher gelesen – bitte trotzdem kurz mit dem Bild vergleichen, bevor ihr übernehmt."}
       </p>
       {(result.warnings || []).length > 0 && (
-        <ul className="space-y-0.5 text-xs text-amber-200" data-testid="result-image-warnings">
+        <ul className="space-y-0.5 tls-type-small text-amber-200" data-testid="result-image-warnings">
           {result.warnings.map((item) => <li key={item.code}>{item.message}</li>)}
         </ul>
       )}
@@ -197,10 +197,10 @@ export function ResultImageSummary({ image, rows, raceOcr = null }) {
 export function ResultImageRowNote({ row, onConfirm, testId = "result-row-ocr" }) {
   if (!row.ocr?.uncertain?.length) return null;
   return (
-    <div className="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-amber-200" data-testid={testId}>
+    <div className="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-1 tls-type-small text-amber-200" data-testid={testId}>
       <span className="min-w-0">Aus dem Bild unsicher: {uncertainText(row)}</span>
       <button type="button" onClick={onConfirm} data-testid={`${testId}-confirm`}
-        className="tls-btn tls-btn--quiet px-2 py-1 rounded-sm text-[10px] font-bold uppercase tracking-wider inline-flex items-center gap-1">
+        className="tls-btn tls-btn--quiet px-2 py-1 rounded-sm tls-type-label inline-flex items-center gap-1">
         <Check className="w-3 h-3" /> Passt so
       </button>
     </div>
@@ -215,10 +215,10 @@ export function ResultImageRowNote({ row, onConfirm, testId = "result-row-ocr" }
 export function ConfirmNamesBar({ count, confirmed = 0, onConfirm, onUndo, what = "Namen bzw. Teams", testId = "result-confirm-names" }) {
   if (confirmed) {
     return (
-      <div className="flex flex-wrap items-center gap-2 border border-[#29B6E8]/30 bg-[#29B6E8]/5 rounded-sm px-3 py-2 text-xs text-white/75" role="status" data-testid={`${testId}-done`}>
+      <div className="flex flex-wrap items-center gap-2 border border-[#29B6E8]/30 bg-[#29B6E8]/5 rounded-sm px-3 py-2 tls-type-small text-white/75" role="status" data-testid={`${testId}-done`}>
         <span className="flex-1 min-w-[12rem] tabular-nums">{confirmed} {what} aus dem Bild bestätigt.</span>
         <button type="button" onClick={onUndo} data-testid={`${testId}-undo`}
-          className="tls-btn tls-btn--quiet px-2.5 py-1.5 rounded-sm text-[10px] font-bold uppercase tracking-wider inline-flex items-center gap-1">
+          className="tls-btn tls-btn--quiet px-2.5 py-1.5 rounded-sm tls-type-label inline-flex items-center gap-1">
           <Undo2 className="w-3 h-3" aria-hidden="true" /> Rückgängig
         </button>
       </div>
@@ -226,10 +226,10 @@ export function ConfirmNamesBar({ count, confirmed = 0, onConfirm, onUndo, what 
   }
   if (!count) return null;
   return (
-    <div className="flex flex-wrap items-center gap-2 border border-amber-400/40 bg-amber-400/10 rounded-sm px-3 py-2 text-xs text-amber-100" data-testid={testId}>
+    <div className="flex flex-wrap items-center gap-2 border border-amber-400/40 bg-amber-400/10 rounded-sm px-3 py-2 tls-type-small text-amber-100" data-testid={testId}>
       <span className="flex-1 min-w-[12rem] tabular-nums">{count} {what} aus dem Bild vorbelegt, aber gelb – mit dem Bild vergleichen.</span>
       <button type="button" onClick={onConfirm} data-testid={`${testId}-all`}
-        className="tls-btn tls-btn--quiet px-2.5 py-1.5 rounded-sm text-[10px] font-bold uppercase tracking-wider inline-flex items-center gap-1">
+        className="tls-btn tls-btn--quiet px-2.5 py-1.5 rounded-sm tls-type-label inline-flex items-center gap-1">
         <Check className="w-3 h-3" aria-hidden="true" /> Alle Namen bestätigen ({count})
       </button>
     </div>

@@ -48,14 +48,14 @@ export function InvoiceTermsPanel({ terms, connected, busy, onSave, optionsUrl =
   return (
     <div className="border border-white/10 rounded-sm p-3 space-y-3" data-testid="invoice-terms">
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <div className="text-xs font-bold uppercase tracking-wider text-white/70">Rechnungskonditionen</div>
-        <span className={`text-[11px] uppercase tracking-wider font-bold ${terms?.complete ? "text-[#00FF88]" : "text-[#FFD700]"}`} data-testid="invoice-terms-state">
+        <div className="tls-type-label text-white/70">Rechnungskonditionen</div>
+        <span className={`tls-type-label ${terms?.complete ? "text-[#00FF88]" : "text-[#FFD700]"}`} data-testid="invoice-terms-state">
           {terms?.complete ? "vollständig" : "unvollständig – Belege bleiben Entwurf"}
         </span>
       </div>
-      <p className="text-xs text-white/55">Stehen an jedem Beleg, den die Website anlegt. Die Listen kommen aus Dolibarr.</p>
+      <p className="tls-type-small text-white/55">Stehen an jedem Beleg, den die Website anlegt. Die Listen kommen aus Dolibarr.</p>
       {options?.available && options.accounts === null && (
-        <div className="border border-[#FFD700]/40 bg-[#FFD700]/5 rounded-sm p-3 text-xs space-y-1.5" data-testid="invoice-terms-accounts-help">
+        <div className="border border-[#FFD700]/40 bg-[#FFD700]/5 rounded-sm p-3 tls-type-small space-y-1.5" data-testid="invoice-terms-accounts-help">
           <div className="font-bold text-[#FFD700]">Die Kontenliste ist nicht lesbar – dem Website-Benutzer fehlt in Dolibarr das Recht „Bankkonten einsehen“.</div>
           <div className="text-white/70"><strong>Weg 1 (empfohlen):</strong> Dolibarr → Start → Benutzer &amp; Gruppen → Website-Benutzer → Reiter „Rechte“ → Modul „Banken/Kassen“ → „Bankkonten einsehen“ anhaken. Danach diese Seite neu laden – das Konto steht dann zur Auswahl.</div>
           <div className="text-white/70"><strong>Weg 2 (Nummer von Hand):</strong> Dolibarr → Bank/Kasse → Konten → das Girokonto anklicken. In der Adresszeile des Browsers steht „card.php?id=<strong>3</strong>“ – diese Zahl unten eintragen.</div>
@@ -65,7 +65,7 @@ export function InvoiceTermsPanel({ terms, connected, busy, onSave, optionsUrl =
         {FIELDS.map((field) => {
           const list = options?.[field.list];
           return (
-            <label key={field.key} className="text-xs">
+            <label key={field.key} className="tls-type-small">
               <div className="uppercase tracking-widest text-white/45 font-bold mb-1">{field.label}</div>
               {listsLoading ? (
                 <select disabled value="" onChange={() => {}} aria-busy="true" className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-sm opacity-60" data-testid={`invoice-terms-${field.key}`}>
@@ -84,7 +84,7 @@ export function InvoiceTermsPanel({ terms, connected, busy, onSave, optionsUrl =
           );
         })}
       </div>
-      <label className="block text-xs max-w-xs">
+      <label className="block tls-type-small max-w-xs">
         <div className="uppercase tracking-widest text-white/45 font-bold mb-1">Sprache der Rechnungs-PDFs</div>
         <select value={lang} onChange={(ev) => setLang(ev.target.value)} className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-sm" data-testid="invoice-terms-pdf-lang">
           {(terms?.pdf_langs?.length ? terms.pdf_langs : FALLBACK_LANGS).map((option) => <option key={option.code || "dolibarr"} value={option.code}>{option.label}</option>)}
@@ -92,13 +92,13 @@ export function InvoiceTermsPanel({ terms, connected, busy, onSave, optionsUrl =
         <div className="mt-1 text-white/40">Dolibarr erzeugt jedes Rechnungs-PDF gleich beim Freigeben – in dieser Sprache.</div>
       </label>
       <div className="flex flex-wrap gap-2">
-        <button type="button" disabled={!!busy || !dirty} onClick={save} data-testid="invoice-terms-save" className="tls-btn tls-btn--primary px-4 py-2 font-bold uppercase tracking-wider rounded-sm text-xs disabled:opacity-40">{saveLabel}</button>
+        <button type="button" disabled={!!busy || !dirty} onClick={save} data-testid="invoice-terms-save" className="tls-btn tls-btn--primary px-4 py-2 tls-type-label rounded-sm disabled:opacity-40">{saveLabel}</button>
         {canSuggest && (
-          <button type="button" disabled={!!busy} onClick={() => setDraft((current) => Object.fromEntries(FIELDS.map((field) => [field.key, current[field.key] || (suggested[field.key] ? String(suggested[field.key]) : "")])))} data-testid="invoice-terms-suggest" className="px-4 py-2 border border-white/15 text-white/70 font-bold uppercase tracking-wider rounded-sm text-xs">
+          <button type="button" disabled={!!busy} onClick={() => setDraft((current) => Object.fromEntries(FIELDS.map((field) => [field.key, current[field.key] || (suggested[field.key] ? String(suggested[field.key]) : "")])))} data-testid="invoice-terms-suggest" className="px-4 py-2 border border-white/15 text-white/70 tls-type-label rounded-sm">
             Vorschlag übernehmen (30 Tage, Überweisung{suggested.bank_account_id ? ", Konto" : ""})
           </button>
         )}
-        {termsDirty && !complete && <span className="text-xs text-[#FFD700] self-center">Erst mit allen drei Angaben werden Belege automatisch freigegeben.</span>}
+        {termsDirty && !complete && <span className="tls-type-small text-[#FFD700] self-center">Erst mit allen drei Angaben werden Belege automatisch freigegeben.</span>}
       </div>
     </div>
   );

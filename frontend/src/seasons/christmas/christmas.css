@@ -115,9 +115,9 @@ html[data-season~="christmas"] .tls-snowcap { filter: drop-shadow(0 1px 1px rgba
 }
 .tls-xmas-toast__body { position: relative; display: flex; align-items: center; gap: 0.9rem; padding: 0.9rem 2.4rem 1.1rem 1.1rem; }
 .tls-xmas-toast__logo { height: 2.75rem; width: auto; filter: drop-shadow(0 0 8px rgba(255, 200, 140, 0.35)); }
-.tls-xmas-toast__title { font-size: 0.7rem; letter-spacing: 0.18em; text-transform: uppercase; color: #ffc857; }
+.tls-xmas-toast__title { font-size: var(--tls-type-label-size); letter-spacing: 0.18em; text-transform: uppercase; color: #ffc857; }
 .tls-xmas-toast__text { margin: 0.15rem 0 0; font-size: 1rem; line-height: 1.35; color: #fff4e6; }
-.tls-xmas-toast__link { display: inline-block; margin-top: 0.4rem; font-size: 0.85rem; color: #29B6E8; text-decoration: underline; }
+.tls-xmas-toast__link { display: inline-block; margin-top: 0.4rem; font-size: var(--tls-type-small-size); color: #29B6E8; text-decoration: underline; }
 .tls-xmas-toast__close { position: absolute; top: 0.35rem; right: 0.45rem; width: 1.8rem; height: 1.8rem; border: 0; border-radius: 50%; background: rgba(255, 255, 255, 0.06); color: #fff4e6; font-size: 1.1rem; line-height: 1; cursor: pointer; }
 .tls-xmas-toast__close:hover { background: rgba(255, 255, 255, 0.14); }
 .tls-xmas-toast__close:focus-visible { outline: 2px solid #ffc857; outline-offset: 2px; }

@@ -18,7 +18,7 @@ function Avatar({ user }) {
   const label = user?.display_name || user?.username || "";
   const initials = (label || "TL").slice(0, 2).toUpperCase();
   return (
-    <span className="w-7 h-7 shrink-0 rounded-sm border border-white/15 bg-[#121212] overflow-hidden inline-flex items-center justify-center font-heading font-black text-[11px] text-[#29B6E8]">
+    <span className="w-7 h-7 shrink-0 rounded-sm border border-white/15 bg-[#121212] overflow-hidden inline-flex items-center justify-center tls-type-small font-black text-[#29B6E8]">
       {/* Im Kopf jeder Seite (#1227): die 160er Fassung statt des Originals - das waren oft über 1000 Pixel für 28. */}
       {url && !failed ? <LazyImg src={url} widths={[160]} sizes="28px" loading="eager" alt="" className="w-full h-full object-cover" onError={() => setFailed(true)} /> : <span>{initials}</span>}
     </span>
@@ -27,7 +27,7 @@ function Avatar({ user }) {
 
 // Grundklasse ohne Textfarbe (#431): Gold für den Mitgliederbereich, Blau für Admin und Rot für
 // Abmelden kamen vorher als Zusatz zu `text-white/80` - und blieben im Browser weiß.
-const itemBase = "flex items-center gap-2.5 px-3 py-2.5 text-xs font-bold uppercase tracking-wider transition";
+const itemBase = "flex items-center gap-2.5 px-3 py-2.5 tls-type-label transition";
 const itemClass = `${itemBase} text-white/80 hover:bg-white/5 hover:text-white`;
 const adminClass = `${itemBase} text-[#29B6E8] hover:bg-[#29B6E8]/10`;
 const logoutClass = `${itemBase} w-full text-left text-[#FF3B30] hover:bg-[#FF3B30]/10 border-t border-white/10`;
@@ -76,7 +76,7 @@ export function UserMenu() {
         aria-haspopup="menu"
         aria-expanded={open}
         aria-label={`Benutzermenü ${name}`}
-        className={`inline-flex items-center gap-2 pl-1.5 pr-2.5 py-1.5 text-xs font-bold uppercase tracking-wider border rounded-sm transition ${open ? "border-[#29B6E8]/50 text-[#29B6E8] bg-[#29B6E8]/10" : "border-white/10 text-white/80 hover:border-[#29B6E8]/40 hover:text-[#29B6E8]"}`}
+        className={`inline-flex items-center gap-2 pl-1.5 pr-2.5 py-1.5 tls-type-label border rounded-sm transition ${open ? "border-[#29B6E8]/50 text-[#29B6E8] bg-[#29B6E8]/10" : "border-white/10 text-white/80 hover:border-[#29B6E8]/40 hover:text-[#29B6E8]"}`}
       >
         <Avatar user={user} />
         {/* Im Kopf bleibt der eigene Name einzeilig (#1314: die Kopfzeile behält ihre Höhe) - ganz steht er im title, im
@@ -88,8 +88,8 @@ export function UserMenu() {
         <div role="menu" data-testid="nav-user-menu" className="absolute right-0 top-full mt-2 w-60 border border-white/10 bg-[#0F0F10] rounded-sm shadow-2xl shadow-black/70 overflow-hidden z-[70]">
           {/* Der eigene Name öffnet das öffentliche Profil (#2059) - so, wie andere es sehen. */}
           <Link to={`/u/${encodeURIComponent(user.username)}`} role="menuitem" onClick={close} data-testid={userMenuTestId("profile")} className="block px-3 py-2.5 border-b border-white/10 hover:bg-white/5 transition-colors">
-            <span className="tls-wrap block font-bold text-sm text-white" data-testid="nav-user-menu-name">{name}</span>
-            <span className="tls-wrap flex items-center gap-1.5 text-[11px] text-white/45">@{user.username} · <Eye className="w-3 h-3 shrink-0" aria-hidden="true" /> So sehen andere mich</span>
+            <span className="tls-wrap block font-bold tls-type-small text-white" data-testid="nav-user-menu-name">{name}</span>
+            <span className="tls-wrap flex items-center gap-1.5 tls-type-small text-white/45">@{user.username} · <Eye className="w-3 h-3 shrink-0" aria-hidden="true" /> So sehen andere mich</span>
           </Link>
           {userMenuEntries({ mitglied: Boolean(user.is_club_member) || isAnyAdmin(user) }).map((entry, index, list) => (
             <Link key={entry.key} to={entry.to} role="menuitem" onClick={close} data-testid={userMenuTestId(entry.key)} className={`${itemClass} ${entry.bereich && !list[index - 1]?.bereich ? "border-t border-white/10" : ""}`.trim()}>

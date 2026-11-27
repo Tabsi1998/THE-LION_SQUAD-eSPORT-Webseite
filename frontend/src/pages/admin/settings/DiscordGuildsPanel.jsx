@@ -31,10 +31,10 @@ function GuildChannels({ guild, onSave, busy }) {
   const changed = SUB_TARGETS.some((target) => (draft[target.key] || "") !== ((guild.channels || {})[target.key] || ""));
   return (
     <div className="space-y-2" data-testid={`discord-guild-${guild.guild_id}-channels`}>
-      <div className="text-[10px] font-bold uppercase tracking-widest text-white/45">Kanäle auf diesem Server</div>
+      <div className="tls-type-label text-white/45">Kanäle auf diesem Server</div>
       <div className="grid sm:grid-cols-3 gap-2">
         {SUB_TARGETS.map((target) => (
-          <label key={target.key} className="text-xs text-white/60 space-y-1">
+          <label key={target.key} className="tls-type-small text-white/60 space-y-1">
             <span>{target.label}</span>
             <select value={draft[target.key] || ""} onChange={(event) => setDraft((current) => ({ ...current, [target.key]: event.target.value }))}
               data-testid={`discord-guild-${guild.guild_id}-channel-${target.key}`} className="w-full bg-[#0A0A0A] border border-white/10 px-2 py-1.5 rounded-sm text-sm">
@@ -47,11 +47,11 @@ function GuildChannels({ guild, onSave, busy }) {
           </label>
         ))}
       </div>
-      {list && !list.ok && list.text ? <div className="text-xs text-white/40">{list.text}</div> : null}
-      <p className="text-[11px] text-white/40">Vorstand, Betrieb, Test und Mitglieder gibt es nur am Hauptserver – hier kommt nie etwas Privates an.</p>
+      {list && !list.ok && list.text ? <div className="tls-type-small text-quiet">{list.text}</div> : null}
+      <p className="tls-type-small text-quiet">Vorstand, Betrieb, Test und Mitglieder gibt es nur am Hauptserver – hier kommt nie etwas Privates an.</p>
       {changed && (
         <button type="button" onClick={() => onSave(Object.fromEntries(SUB_TARGETS.map((target) => [target.key, draft[target.key] || ""])))} disabled={busy}
-          data-testid={`discord-guild-${guild.guild_id}-channels-save`} className="px-3 py-1.5 bg-[#29B6E8] text-black text-[10px] font-bold uppercase tracking-wider rounded-sm disabled:opacity-40">
+          data-testid={`discord-guild-${guild.guild_id}-channels-save`} className="px-3 py-1.5 bg-[#29B6E8] text-black tls-type-label rounded-sm disabled:opacity-40">
           Kanäle speichern
         </button>
       )}
@@ -63,8 +63,8 @@ function GuildChannels({ guild, onSave, busy }) {
 function GuildGames({ guild }) {
   const games = Array.isArray(guild.games) ? guild.games : [];
   return (
-    <div className="text-xs" data-testid={`discord-guild-${guild.guild_id}-games`}>
-      <span className="text-[10px] font-bold uppercase tracking-widest text-white/45 mr-2">Spiele auf diesem Server</span>
+    <div className="tls-type-small" data-testid={`discord-guild-${guild.guild_id}-games`}>
+      <span className="tls-type-label text-white/45 mr-2">Spiele auf diesem Server</span>
       {games.length ? games.map((game, index) => (
         <span key={game.id}>
           {index ? ", " : ""}
@@ -96,10 +96,10 @@ export function rolesSyncText(sync) {
 function GuildRoles({ guild, busy, onToggle }) {
   const sync = guild.roles_sync || {};
   return (
-    <div className="space-y-1 text-xs" data-testid={`discord-guild-${guild.guild_id}-roles`}>
+    <div className="space-y-1 tls-type-small" data-testid={`discord-guild-${guild.guild_id}-roles`}>
       <div className="flex flex-wrap items-center justify-between gap-2">
         <span>
-          <span className="text-[10px] font-bold uppercase tracking-widest text-white/45 mr-2">Rollen</span>
+          <span className="tls-type-label text-white/45 mr-2">Rollen</span>
           <span className="text-white/60" data-testid={`discord-guild-${guild.guild_id}-roles-state`}>{rolesSyncText(sync)}</span>
         </span>
         <label className="inline-flex items-center gap-2">
@@ -132,7 +132,7 @@ export function guildStatusText(guild) {
 function GuildIcon({ guild }) {
   if (guild.icon_url) return <img src={guild.icon_url} alt="" className="w-10 h-10 rounded-full object-cover shrink-0" />;
   const letters = String(guild.name || "?").split(/\s+/).filter(Boolean).slice(0, 2).map((word) => word[0]).join("").toUpperCase();
-  return <span className="w-10 h-10 rounded-full bg-[#5865F2]/20 text-[#b8c0ff] text-xs font-bold flex items-center justify-center shrink-0">{letters || "?"}</span>;
+  return <span className="w-10 h-10 rounded-full bg-[#5865F2]/20 text-[#b8c0ff] tls-type-small font-bold flex items-center justify-center shrink-0">{letters || "?"}</span>;
 }
 
 export function DiscordGuildsPanel() {
@@ -204,13 +204,13 @@ export function DiscordGuildsPanel() {
   return (
     <div className="border border-white/10 bg-[#121212] rounded-sm p-5 space-y-4" data-testid="discord-guilds">
       <div>
-        <div className="font-heading font-bold uppercase inline-flex items-center gap-2"><Server className="w-4 h-4 text-[#5865F2]" /> Server</div>
-        <p className="mt-1 text-xs text-white/50">
+        <div className="font-bold uppercase inline-flex items-center gap-2"><Server className="w-4 h-4 text-[#5865F2]" /> Server</div>
+        <p className="mt-1 tls-type-small text-white/50">
           Ein Bot, mehrere Server: Der Hauptserver bekommt alle Meldungen wie bisher. Weitere Server – etwa je Spiel – erscheinen hier, sobald der Bot
           dort ist, und bleiben aus, bis du sie einschaltest. Es gibt immer genau einen Hauptserver.
         </p>
       </div>
-      <div className="flex flex-wrap items-center gap-3 text-xs" data-testid="discord-guilds-invite-bot">
+      <div className="flex flex-wrap items-center gap-3 tls-type-small" data-testid="discord-guilds-invite-bot">
         {data.bot_invite_url ? (
           <a href={data.bot_invite_url} target="_blank" rel="noreferrer" className="inline-flex items-center gap-2 px-3 py-1.5 bg-[#5865F2] hover:bg-[#4752C4] text-white font-bold uppercase tracking-wider rounded-sm">
             <ExternalLink className="w-3.5 h-3.5" /> Bot auf einen weiteren Server holen
@@ -221,7 +221,7 @@ export function DiscordGuildsPanel() {
         {!data.connected && <span className="text-[#FFD700]">Der Bot ist gerade nicht verbunden – die Liste zeigt den zuletzt gesehenen Stand.</span>}
       </div>
       {guilds.length === 0 ? (
-        <div className="text-xs text-white/45" data-testid="discord-guilds-empty">Noch kein Server bekannt – sobald der Bot verbunden ist, steht sein Server hier.</div>
+        <div className="tls-type-small text-white/45" data-testid="discord-guilds-empty">Noch kein Server bekannt – sobald der Bot verbunden ist, steht sein Server hier.</div>
       ) : (
         <div className="space-y-3">
           {guilds.map((guild) => {
@@ -238,40 +238,40 @@ export function DiscordGuildsPanel() {
                       <span className="tls-wrap">{guild.name}</span>
                       {guild.role === "main" && <Crown className="w-3.5 h-3.5 text-[#FFD700] shrink-0" aria-label="Hauptserver" />}
                     </div>
-                    <div className="text-xs text-white/45" data-testid={`discord-guild-${guild.guild_id}-status`}>
+                    <div className="tls-type-small text-white/45" data-testid={`discord-guild-${guild.guild_id}-status`}>
                       {guildStatusText(guild)}{guild.member_count != null ? ` · ${guild.member_count} Mitglieder` : ""}
                     </div>
                   </div>
                   <div className="flex flex-wrap items-center gap-2">
                     {guild.role !== "main" && !guild.left_at && (
                       <>
-                        <label className="inline-flex items-center gap-2 text-xs">
+                        <label className="inline-flex items-center gap-2 tls-type-small">
                           <input type="checkbox" checked={!!guild.enabled} disabled={!!busy} className="accent-[#00FF88]" data-testid={`discord-guild-${guild.guild_id}-enabled`}
                             onChange={(event) => patch(guild, { enabled: event.target.checked }, event.target.checked ? `„${guild.name}“ ist an.` : `„${guild.name}“ ist aus – dorthin geht nichts mehr.`)} />
                           an
                         </label>
                         <button type="button" onClick={() => makeMain(guild)} disabled={!!busy} data-testid={`discord-guild-${guild.guild_id}-main`}
-                          className="px-3 py-1.5 border border-[#FFD700]/40 text-[#FFD700] text-[10px] font-bold uppercase tracking-wider rounded-sm disabled:opacity-40">Zum Hauptserver</button>
+                          className="px-3 py-1.5 border border-[#FFD700]/40 text-[#FFD700] tls-type-label rounded-sm disabled:opacity-40">Zum Hauptserver</button>
                       </>
                     )}
                     <button type="button" onClick={() => check(guild)} disabled={!!busy} data-testid={`discord-guild-${guild.guild_id}-health`}
-                      className="px-3 py-1.5 border border-white/20 text-white/70 text-[10px] font-bold uppercase tracking-wider rounded-sm inline-flex items-center gap-1 disabled:opacity-40">
+                      className="px-3 py-1.5 border border-white/20 text-white/70 tls-type-label rounded-sm inline-flex items-center gap-1 disabled:opacity-40">
                       <RefreshCw className={`w-3 h-3 ${busy === `health-${guild.guild_id}` ? "animate-spin" : ""}`} /> Prüfen
                     </button>
                     {!guild.left_at && (
                       <button type="button" onClick={() => test(guild)} disabled={!!busy} data-testid={`discord-guild-${guild.guild_id}-test`}
-                        className="px-3 py-1.5 border border-[#5865F2]/60 text-[#b8c0ff] text-[10px] font-bold uppercase tracking-wider rounded-sm inline-flex items-center gap-1 disabled:opacity-40">
+                        className="px-3 py-1.5 border border-[#5865F2]/60 text-[#b8c0ff] tls-type-label rounded-sm inline-flex items-center gap-1 disabled:opacity-40">
                         <Send className="w-3 h-3" /> Test
                       </button>
                     )}
                   </div>
                 </div>
                 {missing.length > 0 && (
-                  <div className="text-xs text-[#FFD700]" data-testid={`discord-guild-${guild.guild_id}-missing`}>
+                  <div className="tls-type-small text-[#FFD700]" data-testid={`discord-guild-${guild.guild_id}-missing`}>
                     Dem Bot fehlt: {missing.map((entry) => `„${entry.label}“`).join(", ")} – Discord → Servereinstellungen → Rollen → Rolle des Bots.
                   </div>
                 )}
-                <div className="grid sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] gap-2 text-xs">
+                <div className="grid sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] gap-2 tls-type-small">
                   <div className="flex items-center gap-2 min-w-0">
                     <Link2 className="w-3.5 h-3.5 text-white/40 shrink-0" />
                     {guild.invite_url
@@ -279,7 +279,7 @@ export function DiscordGuildsPanel() {
                       : <span className="text-white/40">Kein Einladungslink</span>}
                     {!guild.left_at && (
                       <button type="button" onClick={() => invite(guild)} disabled={!!busy} data-testid={`discord-guild-${guild.guild_id}-invite`}
-                        className="shrink-0 px-2 py-1 border border-white/15 text-white/60 text-[10px] font-bold uppercase tracking-wider rounded-sm disabled:opacity-40">
+                        className="shrink-0 px-2 py-1 border border-white/15 text-white/60 tls-type-label rounded-sm disabled:opacity-40">
                         {guild.invite_url ? "Neu erzeugen" : "Erzeugen"}
                       </button>
                     )}
@@ -289,7 +289,7 @@ export function DiscordGuildsPanel() {
                       aria-label={`Notiz zu ${guild.name}`} data-testid={`discord-guild-${guild.guild_id}-note`} className="flex-1 min-w-0 bg-[#0A0A0A] border border-white/10 px-2 py-1.5 rounded-sm" />
                     {note !== (guild.note || "") && (
                       <button type="button" onClick={() => patch(guild, { note }, "Notiz gespeichert.")} disabled={!!busy} data-testid={`discord-guild-${guild.guild_id}-note-save`}
-                        className="px-2 py-1 bg-[#29B6E8] text-black text-[10px] font-bold uppercase tracking-wider rounded-sm disabled:opacity-40">Speichern</button>
+                        className="px-2 py-1 bg-[#29B6E8] text-black tls-type-label rounded-sm disabled:opacity-40">Speichern</button>
                     )}
                   </div>
                 </div>
@@ -302,7 +302,7 @@ export function DiscordGuildsPanel() {
                   <GuildChannels guild={guild} busy={!!busy} onSave={(channels) => patch(guild, { channels }, "Kanäle gespeichert.")} />
                 )}
                 {report && (
-                  <ul className="space-y-1 text-xs" data-testid={`discord-guild-${guild.guild_id}-report`}>
+                  <ul className="space-y-1 tls-type-small" data-testid={`discord-guild-${guild.guild_id}-report`}>
                     {report.checks.map((entry) => (
                       <li key={entry.key} className={`flex items-start gap-2 ${entry.ok ? "text-white/60" : "text-[#FFD700]"}`}>
                         {entry.ok ? <CheckCircle2 className="w-3.5 h-3.5 text-[#00FF88] shrink-0 mt-0.5" /> : <XCircle className="w-3.5 h-3.5 shrink-0 mt-0.5" />}

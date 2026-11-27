@@ -89,18 +89,18 @@ export function ConversationView({ me, messages, hasMore, loadingOlder, onLoadOl
       >
         {hasMore ? (
           <div className="text-center py-2">
-            <button type="button" onClick={requestOlder} disabled={loadingOlder} data-testid="conversation-load-older" className="text-[11px] uppercase tracking-wider font-bold text-white/45 hover:text-white disabled:opacity-50">
+            <button type="button" onClick={requestOlder} disabled={loadingOlder} data-testid="conversation-load-older" className="tls-type-label text-white/45 hover:text-white disabled:opacity-50">
               {loadingOlder ? "Lade ältere Nachrichten …" : "Ältere Nachrichten laden"}
             </button>
           </div>
         ) : null}
-        {items.length === 0 ? <div className="text-center py-16 text-sm text-white/35">{emptyText}</div> : null}
+        {items.length === 0 ? <div className="text-center py-16 tls-type-small text-quiet">{emptyText}</div> : null}
         {items.map((item) => {
           if (item.type === "day") {
             return (
               <div key={item.key} className="flex items-center gap-3 my-3" data-testid="conversation-day">
                 <span className="h-px flex-1 bg-white/10" />
-                <span className="text-[10px] uppercase tracking-[0.25em] text-white/40 font-bold">{item.label}</span>
+                <span className="tls-type-label text-quiet">{item.label}</span>
                 <span className="h-px flex-1 bg-white/10" />
               </div>
             );
@@ -110,12 +110,12 @@ export function ConversationView({ me, messages, hasMore, loadingOlder, onLoadOl
             <div key={item.key} className={`flex ${mine ? "justify-end" : "justify-start"} ${showHeader ? "mt-3" : "mt-1"}`} data-testid={`conversation-message-${message.id}`}>
               <div className={`max-w-[85%] md:max-w-[70%] border rounded-sm px-3 py-2 ${mine ? "border-[#29B6E8]/40 bg-[#29B6E8]/10" : "border-white/10 bg-[#0A0A0A]"}`}>
                 {showHeader ? (
-                  <div className="text-[10px] uppercase tracking-widest text-white/35 flex items-center gap-2">
+                  <div className="tls-type-small text-quiet flex items-center gap-2">
                     <span className="font-bold text-white/55">{mine ? "Du" : message.sender?.display_name || message.sender?.username || ""}</span>
                     <span>{timeLabel(message.created_at)}</span>
                   </div>
                 ) : null}
-                {message.message ? <div className={`whitespace-pre-wrap break-words text-sm text-white/85 ${showHeader ? "mt-1" : ""}`}>{message.message}</div> : null}
+                {message.message ? <div className={`whitespace-pre-wrap break-words tls-type-small text-white/85 ${showHeader ? "mt-1" : ""}`}>{message.message}</div> : null}
                 <ChatMessageAttachments attachments={message.attachments} />
                 <ChatMessageSticker sticker={message.sticker} />
                 <ModerationStateBadge moderation={message.moderation} />
@@ -129,7 +129,7 @@ export function ConversationView({ me, messages, hasMore, loadingOlder, onLoadOl
           type="button"
           onClick={scrollToBottom}
           data-testid="conversation-new-messages"
-          className="tls-btn tls-btn--primary absolute bottom-3 left-1/2 -translate-x-1/2 inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-bold shadow-lg"
+          className="tls-btn tls-btn--primary absolute bottom-3 left-1/2 -translate-x-1/2 inline-flex items-center gap-2 px-3 py-1.5 rounded-full tls-type-small font-bold shadow-lg"
         >
           {newCount === 1 ? "1 neue Nachricht" : `${newCount} neue Nachrichten`} <ArrowDown className="w-3.5 h-3.5" />
         </button>

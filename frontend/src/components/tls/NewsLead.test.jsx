@@ -38,20 +38,22 @@ test("ohne Bild: links die Text-Karte", () => {
   expect(screen.getByTestId("news-lead-media").querySelector("[data-testid='news-text-card']")).not.toBeNull();
 });
 
-test("langer Titel: normal geschrieben, steht ganz da und kommt eine Stufe kleiner (#1314)", () => {
+// Schrift-Treppe (#1302): Der Aufmacher hat eine Stufe, den Abschnitt (24 / 20 px) - ein langer Titel bricht um
+// (#1314), eine kleinere Zwischenstufe gibt es nicht mehr.
+test("langer Titel: normal geschrieben, steht ganz da - im Abschnitt wie der kurze (#1314, #1302)", () => {
   const long = "Ein sehr langer Titel ".repeat(12).trim();
   renderLead({ ...NEWS, title: long });
   const title = screen.getByRole("heading");
   expect(title).toHaveTextContent(long);
   expect(title.className).not.toContain("line-clamp");
   expect(title.className).toContain("tls-wrap");
-  expect(title.className).toContain("xl:text-3xl");
+  expect(title.className).toContain("tls-type-section");
   expect(title.className).not.toContain("uppercase");
 });
 
-test("kurzer Titel: volle Größe", () => {
+test("kurzer Titel: Abschnitt", () => {
   renderLead(NEWS);
-  expect(screen.getByRole("heading").className).toContain("xl:text-4xl");
+  expect(screen.getByRole("heading").className).toContain("tls-type-section");
 });
 
 test("eigene Kennung und Überschrift für die Startseite", () => {

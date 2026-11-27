@@ -40,7 +40,7 @@ export function OnsiteTournamentView({ tournament: t, user, loading = false, err
       ) : null}
       <div className="relative max-w-xl mx-auto px-4 sm:px-6 pt-10 pb-12">
         <NoticeBanner items={notices} className="mb-6" />
-        <h1 className="font-heading text-4xl sm:text-5xl font-black uppercase leading-[0.95] break-words [text-wrap:balance]" data-testid="tournament-title">
+        <h1 className="tls-type-title leading-[0.95] break-words [text-wrap:balance]" data-testid="tournament-title">
           {t.title}
         </h1>
 
@@ -52,7 +52,7 @@ export function OnsiteTournamentView({ tournament: t, user, loading = false, err
 
         {seats.text ? (
           <div className="mt-6">
-            <div className={`font-heading text-2xl font-bold ${seats.free === 0 ? "text-warn" : "text-ok"}`} data-testid="onsite-seats">{seats.text}</div>
+            <div className={`tls-type-section ${seats.free === 0 ? "text-warn" : "text-ok"}`} data-testid="onsite-seats">{seats.text}</div>
             {boxes.length ? (
               <div className="mt-3 grid gap-1" style={{ gridTemplateColumns: `repeat(${Math.min(16, boxes.length)}, minmax(0, 1fr))` }} aria-hidden="true">
                 {boxes.map((taken, index) => (
@@ -71,11 +71,11 @@ export function OnsiteTournamentView({ tournament: t, user, loading = false, err
                 onClick={onRegister}
                 disabled={loading}
                 data-testid="onsite-register-btn"
-                className="tls-btn tls-btn--primary w-full min-h-[56px] px-6 rounded-sm font-heading text-xl font-black uppercase tracking-wider disabled:opacity-50"
+                className="tls-btn tls-btn--primary w-full min-h-[56px] px-6 rounded-sm tls-type-card disabled:opacity-50"
               >
                 {loading ? "Wird gesendet …" : team ? "Team anmelden" : "Mitspielen"}
               </button>
-              <p className="mt-3 text-sm text-white/65">
+              <p className="mt-3 tls-type-small text-white/65">
                 {user
                   ? `Du meldest dich als ${user.display_name || user.username} an. Es gelten die Turnierregeln und unsere Datenschutzerklärung.`
                   : "Zum Mitspielen brauchst du ein Konto. Melde dich an oder registriere dich – danach geht es hier weiter."}
@@ -84,13 +84,13 @@ export function OnsiteTournamentView({ tournament: t, user, loading = false, err
           ) : (
             <div className="border border-white/10 bg-[#121212] rounded-sm px-4 py-3" data-testid="onsite-closed">
               <div className="font-bold text-white">{registration.label}</div>
-              <div className="mt-1 text-sm text-white/65">Frag bei der Turnierleitung vor Ort nach.</div>
+              <div className="mt-1 tls-type-small text-white/65">Frag bei der Turnierleitung vor Ort nach.</div>
             </div>
           )}
           {error ? <div className="mt-4"><AuthFormAlert id="onsite-register-error">{error}</AuthFormAlert></div> : null}
         </div>
 
-        <p className="mt-10 text-sm text-white/50">
+        <p className="mt-10 tls-type-body text-white/50">
           Nach der Anmeldung siehst du hier das ganze Turnier: Turnierbaum, Spielplan und deine Spiele.
         </p>
       </div>
@@ -101,10 +101,10 @@ export function OnsiteTournamentView({ tournament: t, user, loading = false, err
 function Fact({ icon: Icon, label, children, testId }) {
   return (
     <div className="flex items-baseline gap-3 py-3">
-      <dt className="flex w-24 shrink-0 items-center gap-2 text-xs font-bold uppercase tracking-widest text-white/55">
+      <dt className="flex w-24 shrink-0 items-center gap-2 tls-type-label text-white/55">
         <Icon className="w-3.5 h-3.5 self-center" aria-hidden="true" /> {label}
       </dt>
-      <dd className="min-w-0 text-lg text-white break-words" data-testid={testId}>{children}</dd>
+      <dd className="min-w-0 tls-type-card text-white break-words" data-testid={testId}>{children}</dd>
     </div>
   );
 }

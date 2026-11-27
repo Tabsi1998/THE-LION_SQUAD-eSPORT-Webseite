@@ -33,7 +33,7 @@ export function TeamJoinCard({ teamId, token, user, onJoined }) {
       <section className="border border-white/15 bg-[#121212] rounded-sm p-4" data-testid="team-join-invalid">
         <div className="font-bold">Dieser Einladungs-Link gilt nicht mehr</div>
         {/* Ein privates Team zeigt sich ohne gültigen Link gar nicht - dann gibt es auch kein „Team beitreten“. */}
-        <p className="mt-1 text-sm text-white/60">{check.team ? "Frag im Team nach einem neuen Link – oder gib den Beitrittscode unter „Team beitreten“ ein." : "Frag im Team nach einem neuen Link."}</p>
+        <p className="mt-1 tls-type-small text-white/60">{check.team ? "Frag im Team nach einem neuen Link – oder gib den Beitrittscode unter „Team beitreten“ ein." : "Frag im Team nach einem neuen Link."}</p>
       </section>
     );
   }
@@ -50,22 +50,22 @@ export function TeamJoinCard({ teamId, token, user, onJoined }) {
 
   return (
     <section className="border border-[#29B6E8]/40 bg-[#29B6E8]/[0.07] rounded-sm p-4 sm:p-5" data-testid="team-join-invite">
-      <div className="text-[11px] uppercase tracking-widest text-[#29B6E8] font-bold">Einladung</div>
-      <div className="mt-1 font-heading text-xl font-bold">Du bist eingeladen: {teamName}</div>
-      <p className="mt-1 text-sm text-white/60">{check.team?.member_count ? `${check.team.member_count} Mitglieder warten schon. ` : ""}Ein Tipp, und du bist dabei.</p>
+      <div className="tls-type-label text-[#29B6E8]">Einladung</div>
+      <div className="mt-1 tls-type-card">Du bist eingeladen: {teamName}</div>
+      <p className="mt-1 tls-type-small text-white/60">{check.team?.member_count ? `${check.team.member_count} Mitglieder warten schon. ` : ""}Ein Tipp, und du bist dabei.</p>
       {error ? <div className="mt-3"><AuthFormAlert id="team-join-invite-error">{error}</AuthFormAlert></div> : null}
       <div className="mt-4 flex flex-wrap gap-2">
         {user ? (
-          <button type="button" onClick={join} disabled={submitting} data-testid="team-join-invite-submit" className="tls-btn tls-btn--primary inline-flex items-center gap-2 px-5 py-2.5 rounded-sm text-xs uppercase tracking-wider font-bold disabled:opacity-50">
+          <button type="button" onClick={join} disabled={submitting} data-testid="team-join-invite-submit" className="tls-btn tls-btn--primary inline-flex items-center gap-2 px-5 py-2.5 rounded-sm tls-type-label disabled:opacity-50">
             <UserPlus className="w-4 h-4" /> {submitting ? "Trete bei…" : "Beitreten"}
           </button>
         ) : (
-          <Link to={`/login?next=${next}`} data-testid="team-join-invite-login" className="tls-btn tls-btn--primary inline-flex items-center gap-2 px-5 py-2.5 rounded-sm text-xs uppercase tracking-wider font-bold">
+          <Link to={`/login?next=${next}`} data-testid="team-join-invite-login" className="tls-btn tls-btn--primary inline-flex items-center gap-2 px-5 py-2.5 rounded-sm tls-type-label">
             <LogIn className="w-4 h-4" /> Anmelden und beitreten
           </Link>
         )}
       </div>
-      {!user ? <p className="mt-2 text-xs text-white/45">Noch kein Konto? Erst <Link to="/register" className="text-[#29B6E8] hover:underline">registrieren</Link>, dann den Link noch einmal öffnen.</p> : null}
+      {!user ? <p className="mt-2 tls-type-small text-white/45">Noch kein Konto? Erst <Link to="/register" className="text-[#29B6E8] hover:underline">registrieren</Link>, dann den Link noch einmal öffnen.</p> : null}
     </section>
   );
 }

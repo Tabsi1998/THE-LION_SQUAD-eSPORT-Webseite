@@ -14,6 +14,7 @@ import { ChatAttachButton, ChatAttachmentDrafts, useChatAttachmentDrafts } from 
 import { ChatStickerButton, ChatStickerPicker } from "@/components/tls/ChatStickers";
 import { ConversationView } from "./messages/ConversationView";
 import { mergeMessages } from "./messages/messageGroups";
+import { ShortCaps } from "@/components/tls/ShortCaps";
 
 // Chats (#1148, vorher „Nachrichten“, #254): links alle Unterhaltungen - Direktnachrichten, Team-, Turnier- und
 // Match-Chats - das Neueste oben, mit der Zahl der Ungelesenen; rechts die Direktnachricht in fester Höhe mit eigener
@@ -269,7 +270,7 @@ export default function MessagesPage() {
             <div className="px-4 py-3 border-b border-white/10">
               <div className="flex items-center gap-2">
                 <MessageSquare className="w-4 h-4 text-[#29B6E8]" />
-                <h1 className="font-heading font-black uppercase">Chats</h1>
+                <h1 className="tls-type-title"><ShortCaps>Chats</ShortCaps></h1>
               </div>
               <div className="relative mt-3">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-white/35" />
@@ -295,12 +296,12 @@ export default function MessagesPage() {
                       data-testid={`messages-candidate-${candidate.id}`}
                       className="w-full text-left border border-white/10 hover:border-[#29B6E8]/45 bg-[#0A0A0A] rounded-sm p-3 transition"
                     >
-                      <div className="font-bold text-sm truncate">{candidate.display_name || candidate.username}</div>
-                      <div className="text-xs text-white/40 truncate">@{candidate.username}</div>
-                      {!candidate.can_message ? <div className="mt-1 text-[10px] text-[#FFD700]">{candidate.message_hint}</div> : null}
+                      <div className="font-bold tls-type-small truncate">{candidate.display_name || candidate.username}</div>
+                      <div className="tls-type-small text-quiet truncate">@{candidate.username}</div>
+                      {!candidate.can_message ? <div className="mt-1 tls-type-small text-[#FFD700]">{candidate.message_hint}</div> : null}
                     </button>
                   ))}
-                  {candidates.length === 0 ? <div className="p-3 text-xs text-white/35">Keine passenden Benutzer gefunden.</div> : null}
+                  {candidates.length === 0 ? <div className="p-3 tls-type-small text-quiet">Keine passenden Benutzer gefunden.</div> : null}
                 </div>
               ) : (
                 <>
@@ -315,12 +316,12 @@ export default function MessagesPage() {
                         </span>
                         <span className="min-w-0 flex-1">
                           <span className="flex items-center justify-between gap-2">
-                            <span className={`font-bold text-sm truncate ${unread ? "text-white" : "text-white/85"}`}>{item.title}</span>
-                            <span className={`shrink-0 text-[11px] ${unread ? "text-[#29B6E8]" : "text-white/35"}`}>{chatTime(item.updated_at)}</span>
+                            <span className={`font-bold tls-type-small truncate ${unread ? "text-white" : "text-white/85"}`}>{item.title}</span>
+                            <span className={`shrink-0 tls-type-small ${unread ? "text-[#29B6E8]" : "text-quiet"}`}>{chatTime(item.updated_at)}</span>
                           </span>
                           <span className="flex items-center justify-between gap-2">
-                            <span className="text-xs text-white/45 truncate">{chatPreview(item)}</span>
-                            {unread ? <span className="tls-btn tls-btn--primary shrink-0 min-w-5 h-5 px-1 rounded-sm text-[10px] font-black inline-flex items-center justify-center" data-testid={`chat-unread-${item.key}`}>{badgeText(unread)}</span> : null}
+                            <span className="tls-type-small text-white/45 truncate">{chatPreview(item)}</span>
+                            {unread ? <span className="tls-btn tls-btn--primary shrink-0 min-w-5 h-5 px-1 rounded-sm tls-type-small font-black inline-flex items-center justify-center" data-testid={`chat-unread-${item.key}`}>{badgeText(unread)}</span> : null}
                           </span>
                         </span>
                       </>
@@ -336,8 +337,8 @@ export default function MessagesPage() {
                       </Link>
                     );
                   })}
-                  {chatsLoading && !chats.items.length ? <div className="p-5 text-sm text-white/35">Lade Chats …</div> : null}
-                  {!chatsLoading && chats.items.length === 0 ? <div className="p-5 text-sm text-white/35">Noch keine Chats. Suche oben einen Namen für eine neue Nachricht – Team- und Turnier-Chats erscheinen hier von selbst.</div> : null}
+                  {chatsLoading && !chats.items.length ? <div className="p-5 tls-type-small text-quiet">Lade Chats …</div> : null}
+                  {!chatsLoading && chats.items.length === 0 ? <div className="p-5 tls-type-small text-quiet">Noch keine Chats. Suche oben einen Namen für eine neue Nachricht – Team- und Turnier-Chats erscheinen hier von selbst.</div> : null}
                 </>
               )}
             </div>
@@ -352,14 +353,14 @@ export default function MessagesPage() {
                       <ArrowLeft className="w-5 h-5" />
                     </button>
                     <div className="min-w-0">
-                      <div className="font-heading font-black uppercase truncate">{activeName}</div>
-                      {active.username ? <div className="text-xs text-white/45">@{active.username}</div> : null}
+                      <div className="font-black truncate" data-testid="conversation-name">{activeName}</div>
+                      {active.username ? <div className="tls-type-small text-white/45">@{active.username}</div> : null}
                     </div>
                   </div>
                   <div className="flex flex-wrap items-center justify-end gap-2">
-                    {!canSend && hint ? <div className="text-xs text-[#FFD700] max-w-xs text-right">{hint}</div> : null}
-                    <button type="button" onClick={report} className="px-2 py-1 border border-[#FFD700]/35 text-[#FFD700] text-[10px] uppercase font-bold">Melden</button>
-                    <button type="button" onClick={toggleBlock} className="px-2 py-1 border border-[#FF3B30]/35 text-[#FF6B6B] text-[10px] uppercase font-bold">{blockedByMe ? "Freigeben" : "Blockieren"}</button>
+                    {!canSend && hint ? <div className="tls-type-small text-[#FFD700] max-w-xs text-right">{hint}</div> : null}
+                    <button type="button" onClick={report} className="px-2 py-1 border border-[#FFD700]/35 text-[#FFD700] tls-type-label">Melden</button>
+                    <button type="button" onClick={toggleBlock} className="px-2 py-1 border border-[#FF3B30]/35 text-[#FF6B6B] tls-type-label">{blockedByMe ? "Freigeben" : "Blockieren"}</button>
                   </div>
                 </div>
                 <ConversationView
@@ -392,7 +393,7 @@ export default function MessagesPage() {
                     data-testid="direct-chat-input"
                     className="flex-1 min-w-0 bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-sm disabled:opacity-50"
                   />
-                  <button type="button" disabled={!canSend || sending || !dmAttachments.canSend(text)} onClick={send} data-testid="direct-chat-send" className="tls-btn tls-btn--primary inline-flex items-center gap-2 px-4 py-2 rounded-sm text-xs uppercase tracking-wider font-bold disabled:opacity-45">
+                  <button type="button" disabled={!canSend || sending || !dmAttachments.canSend(text)} onClick={send} data-testid="direct-chat-send" className="tls-btn tls-btn--primary inline-flex items-center gap-2 px-4 py-2 rounded-sm tls-type-label disabled:opacity-45">
                     <Send className="w-3.5 h-3.5" /> <span className="hidden sm:inline">Senden</span>
                   </button>
                 </div>
@@ -401,8 +402,8 @@ export default function MessagesPage() {
               <div className="flex-1 flex items-center justify-center p-8 text-center text-white/40">
                 <div>
                   <MessageSquare className="w-10 h-10 mx-auto mb-3 opacity-50" />
-                  <div className="font-heading font-bold uppercase">Chat auswählen</div>
-                  <div className="mt-1 text-sm">Wähle links einen Chat oder suche oben einen Namen für eine neue Nachricht.</div>
+                  <div className="font-bold uppercase">Chat auswählen</div>
+                  <div className="mt-1 tls-type-small">Wähle links einen Chat oder suche oben einen Namen für eine neue Nachricht.</div>
                 </div>
               </div>
             )}

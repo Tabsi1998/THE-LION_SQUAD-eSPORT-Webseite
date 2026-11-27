@@ -1,7 +1,7 @@
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link, Outlet, useLocation } from "react-router-dom";
 import { motionAllowed } from "@/lib/motion";
-import { warteAufElement } from "@/lib/warteAufElement";
+import { bleibAmZiel, warteAufElement } from "@/lib/warteAufElement";
 import { Crown } from "lucide-react";
 import { api, resolveMediaUrl } from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
@@ -72,12 +72,12 @@ function Identitaet({ user }) {
   const url = user?.avatar_url && !failed ? resolveMediaUrl(user.avatar_url) : "";
   return (
     <div className="flex items-center gap-3 min-w-0" data-testid="mein-bereich-identity">
-      <span className="w-11 h-11 shrink-0 rounded-sm border border-white/15 bg-[#121212] overflow-hidden inline-flex items-center justify-center font-heading font-black text-sm text-[#29B6E8]">
+      <span className="w-11 h-11 shrink-0 rounded-sm border border-white/15 bg-[#121212] overflow-hidden inline-flex items-center justify-center tls-type-small font-black text-[#29B6E8]">
         {url ? <LazyImg src={url} widths={[160]} sizes="44px" alt="" className="w-full h-full object-cover" onError={() => setFailed(true)} /> : (name || "TL").slice(0, 2).toUpperCase()}
       </span>
       <span className="min-w-0">
         <span className="tls-wrap block font-bold text-white" data-testid="mein-bereich-name">{name}</span>
-        <span className="tls-wrap block text-xs text-white/50">
+        <span className="tls-wrap block tls-type-small text-white/50">
           @{user?.username}
           {user?.is_club_member ? <span className="ml-2 inline-flex items-center gap-1 text-[#FFD700]"><Crown className="w-3 h-3" aria-hidden="true" /> Mitglied</span> : null}
         </span>
@@ -106,9 +106,16 @@ export default function MeinBereichLayout() {
     letzterPfad.current = pathname;
     const anker = hash ? decodeURIComponent(hash.slice(1)) : "";
     if (anker) {
-      return warteAufElement(() => document.getElementById(anker), (ziel) => {
+      let halten = () => {};
+      const warten = warteAufElement(() => document.getElementById(anker), (ziel) => {
         ziel.scrollIntoView({ block: "start", inline: "nearest", behavior: motionAllowed() ? "smooth" : "auto" });
+        // Karten darüber laden nach und werden höher - das Ziel bleibt trotzdem oben.
+        halten = bleibAmZiel(ziel, { motion: motionAllowed() });
       });
+      return () => {
+        warten();
+        halten();
+      };
     }
     if (!neueGruppe) return undefined;
     return warteAufElement(() => document.querySelector("[data-testid='mein-bereich-inhalt'] [data-mein-bereich-titel]"), (titel) => {

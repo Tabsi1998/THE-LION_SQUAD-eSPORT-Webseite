@@ -43,12 +43,12 @@ function StaffelTeams({ leagueSlug, seasonSlug, staffel }) {
   return (
     <section className="mt-10 scroll-mt-24" id={`staffel-${staffel.key}`} aria-labelledby={`teams-${staffel.key}`} data-testid={`season-teams-${staffel.key}`}>
       <div className="flex flex-wrap items-baseline justify-between gap-2 border-b border-white/10 pb-3">
-        <h2 id={`teams-${staffel.key}`} className="font-heading text-2xl font-black uppercase [overflow-wrap:anywhere] md:text-3xl">{staffel.label}</h2>
-        {data ? <span className="text-xs font-bold uppercase tracking-wider text-white/45">{teams.length} {teams.length === 1 ? "Team" : "Teams"}</span> : null}
+        <h2 id={`teams-${staffel.key}`} className="tls-type-section [overflow-wrap:anywhere]">{staffel.label}</h2>
+        {data ? <span className="tls-type-label text-white/45">{teams.length} {teams.length === 1 ? "Team" : "Teams"}</span> : null}
       </div>
-      {error && !data ? <p className="mt-4 text-sm text-white/55" role="status">Die Teams konnten gerade nicht geladen werden.</p> : null}
+      {error && !data ? <p className="mt-4 tls-type-small text-white/55" role="status">Die Teams konnten gerade nicht geladen werden.</p> : null}
       {!data && !error ? <div className="tls-league-skeleton mt-4" aria-busy="true" aria-label="Lade Teams" /> : null}
-      {data && !teams.length ? <p className="mt-4 text-sm text-white/55">Noch keine Teams zugeteilt.</p> : null}
+      {data && !teams.length ? <p className="mt-4 tls-type-small text-white/55">Noch keine Teams zugeteilt.</p> : null}
       {teams.length ? (
         <StaggerIn as="ul" className="tls-season-teams">
           {teams.map((team) => <TeamCard key={team.id} team={team} standing={standings[team.id]} />)}

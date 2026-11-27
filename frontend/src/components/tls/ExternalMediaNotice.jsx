@@ -19,13 +19,13 @@ export function ExternalMediaNotice({
       style={{ borderColor: `${accent}55` }}
     >
       <ShieldCheck className={`${compact ? "h-8 w-8" : "h-10 w-10"} mb-3`} style={{ color: accent }} />
-      <div className="font-heading font-black uppercase">{service} blockiert</div>
-      <p className="mt-2 max-w-md text-sm text-white/60">{reason}</p>
+      <div className="font-black uppercase">{service} blockiert</div>
+      <p className="mt-2 max-w-md tls-type-small text-white/60">{reason}</p>
       <div className="mt-4 flex flex-wrap items-center justify-center gap-2">
         <button
           type="button"
           onClick={openSettings}
-          className="tls-btn tls-btn--secondary px-4 py-2 text-xs uppercase tracking-wider font-bold rounded-sm"
+          className="tls-btn tls-btn--secondary px-4 py-2 tls-type-label rounded-sm"
         >
           Cookie-Einstellungen
         </button>
@@ -34,13 +34,13 @@ export function ExternalMediaNotice({
             href={url}
             target="_blank"
             rel="noopener noreferrer"
-            className="tls-btn tls-btn--quiet inline-flex items-center gap-1.5 px-4 py-2 text-xs uppercase tracking-wider font-bold rounded-sm"
+            className="tls-btn tls-btn--quiet inline-flex items-center gap-1.5 px-4 py-2 tls-type-label rounded-sm"
           >
             <ExternalLink className="h-3.5 w-3.5" /> Direkt öffnen
           </a>
         )}
       </div>
-      <Link to="/privacy" className="mt-3 text-[11px] uppercase tracking-widest text-white/45 hover:text-white">
+      <Link to="/privacy" className="mt-3 tls-type-label text-white/45 hover:text-white">
         Datenschutz ansehen
       </Link>
     </div>

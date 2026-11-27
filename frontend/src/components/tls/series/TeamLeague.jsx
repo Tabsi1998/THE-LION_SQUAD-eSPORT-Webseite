@@ -36,7 +36,7 @@ function stagger(index) {
 }
 
 function SectionTitle({ id, children }) {
-  return <h2 id={id} className="font-heading text-2xl font-black uppercase">{children}</h2>;
+  return <h2 id={id} className="tls-type-section">{children}</h2>;
 }
 
 /** Ein Feld je Spieltag (gespielt in Cyan), darunter der nächste Spieltag mit Gegner. */
@@ -46,9 +46,9 @@ function MatchdayProgress({ matchdays }) {
   return (
     <section className="mt-8" aria-labelledby="team-league-progress" data-testid="team-league-progress">
       <div className="flex items-baseline justify-between gap-3 flex-wrap">
-        <h2 id="team-league-progress" className="text-[11px] font-bold uppercase tracking-[0.3em] text-white/55">Spieltage</h2>
-        <p className="text-sm text-white/80 tabular-nums">
-          <span className="font-display text-xl font-bold text-white">{progress.played}</span>
+        <h2 id="team-league-progress" className="tls-type-label text-white/55">Spieltage</h2>
+        <p className="tls-type-small text-white/80 tabular-nums">
+          <span className="tls-type-card tls-type-num text-white">{progress.played}</span>
           <span className="text-white/50"> von {progress.total} gespielt</span>
           {progress.cancelled > 0 && <span className="text-white/40"> · {progress.cancelled} abgesagt</span>}
         </p>
@@ -61,7 +61,7 @@ function MatchdayProgress({ matchdays }) {
         </div>
       )}
       {next && (
-        <p className="mt-3 text-sm text-white/70" data-testid="team-league-next">
+        <p className="mt-3 tls-type-small text-white/70" data-testid="team-league-next">
           <span className="text-white/45">Nächster Spieltag: </span>
           <span className="text-white font-semibold">{roundLabel(next)}</span>
           <span className="tabular-nums"> · {roundWhen(next)}</span>
@@ -79,14 +79,14 @@ function Record({ record }) {
   const many = items.length > 1;
   return (
     <section className="mt-8" aria-labelledby="team-league-record" data-testid="team-league-record">
-      <h2 id="team-league-record" className="text-[11px] font-bold uppercase tracking-[0.3em] text-white/55">Bilanz</h2>
+      <h2 id="team-league-record" className="tls-type-label text-white/55">Bilanz</h2>
       <div className="mt-3 grid gap-3">
         {items.map((item) => (
           <dl key={item.team || "team"} className="tls-tl-record" data-testid="team-league-record-team">
             {many && <div className="tls-tl-record__team">{item.team}</div>}
             <div className="tls-tl-record__cell">
               <dt><span aria-hidden="true">S · U · N</span><span className="sr-only">Siege, Unentschieden, Niederlagen</span></dt>
-              <dd className="tls-tl-record__wdl font-display">
+              <dd className="tls-tl-record__wdl tls-type-num">
                 <span data-outcome="win">{item.won}</span><span aria-hidden="true">–</span>
                 <span data-outcome="draw">{item.drawn}</span><span aria-hidden="true">–</span>
                 <span data-outcome="loss">{item.lost}</span>
@@ -99,16 +99,16 @@ function Record({ record }) {
             </div>
             <div className="tls-tl-record__cell">
               <dt>Maps</dt>
-              <dd><span className="tls-tl-record__value font-display">{item.maps}</span> <span className="tls-tl-record__diff">{item.mapsDiff}</span></dd>
+              <dd><span className="tls-tl-record__value tls-type-num">{item.maps}</span> <span className="tls-tl-record__diff">{item.mapsDiff}</span></dd>
             </div>
             <div className="tls-tl-record__cell">
               <dt>Runden</dt>
               {item.rounds ? (
                 <dd>
-                  <span className="tls-tl-record__value font-display">{item.rounds}</span> <span className="tls-tl-record__diff">{item.roundsDiff}</span>
-                  {item.roundsPartial && <span className="block text-[11px] text-white/45">nur Spiele mit Maps</span>}
+                  <span className="tls-tl-record__value tls-type-num">{item.rounds}</span> <span className="tls-tl-record__diff">{item.roundsDiff}</span>
+                  {item.roundsPartial && <span className="block tls-type-small text-white/45">nur Spiele mit Maps</span>}
                 </dd>
-              ) : <dd className="text-sm text-white/45">ohne Maps</dd>}
+              ) : <dd className="tls-type-small text-white/45">ohne Maps</dd>}
             </div>
           </dl>
         ))}
@@ -124,7 +124,7 @@ function RankTrend({ history, rounds }) {
   const codeOf = (id) => roundLabel((rounds || []).find((round) => round.id === id) || {});
   return (
     <div className="mt-4" data-testid="team-league-trend">
-      <h3 className="text-[11px] font-bold uppercase tracking-[0.2em] text-white/45">Platzierungsverlauf</h3>
+      <h3 className="tls-type-label text-white/45">Platzierungsverlauf</h3>
       <ol className="mt-2 flex flex-wrap gap-1.5">
         {items.map((item, index) => {
           const label = `${codeOf(item.round_id)}: Platz ${item.rank} von ${item.teams}`;
@@ -133,7 +133,7 @@ function RankTrend({ history, rounds }) {
             <li key={item.round_id} className="tls-tl-trend" data-dir={item.direction || undefined} style={stagger(index)} title={label}>
               <span className="sr-only">{label}</span>
               <span className="text-white/45" aria-hidden="true">{codeOf(item.round_id)}</span>
-              <span className="font-display font-bold text-white tabular-nums" aria-hidden="true">{item.rank}.</span>
+              <span className="tls-type-num text-white" aria-hidden="true">{item.rank}.</span>
               {Icon && <Icon className="h-3 w-3" strokeWidth={3} aria-hidden="true" />}
             </li>
           );
@@ -148,13 +148,13 @@ function LeagueTable({ league, rounds }) {
   return (
     <section className="mt-10" aria-labelledby="team-league-table" data-testid="team-league-table">
       <SectionTitle id="team-league-table">Tabelle</SectionTitle>
-      <dl className="mt-4 grid gap-x-6 gap-y-2 sm:grid-cols-2 text-sm" data-testid="team-league-rules">
+      <dl className="mt-4 grid gap-x-6 gap-y-2 sm:grid-cols-2 tls-type-small" data-testid="team-league-rules">
         <div className="flex gap-3 min-w-0">
-          <dt className="w-24 shrink-0 text-[11px] font-bold uppercase tracking-[0.16em] text-white/45 pt-0.5">Punkte</dt>
+          <dt className="w-24 shrink-0 tls-type-label text-white/45 pt-0.5">Punkte</dt>
           <dd className="text-white/80 min-w-0">{matchPointsLabel(league.rules)}</dd>
         </div>
         <div className="flex gap-3 min-w-0">
-          <dt className="w-24 shrink-0 text-[11px] font-bold uppercase tracking-[0.16em] text-white/45 pt-0.5">Gleichstand</dt>
+          <dt className="w-24 shrink-0 tls-type-label text-white/45 pt-0.5">Gleichstand</dt>
           <dd className="text-white/80 min-w-0">{tableTiebreakLabel(league.rules)}</dd>
         </div>
       </dl>
@@ -162,7 +162,7 @@ function LeagueTable({ league, rounds }) {
         {rows.length ? (
           <StandingsTable rows={rows} kind="team_league" label="Tabelle" mineLabel="Verein" />
         ) : (
-          <p className="text-sm text-white/55">Die Tabelle steht hier nach dem ersten Spieltag.</p>
+          <p className="tls-type-small text-white/55">Die Tabelle steht hier nach dem ersten Spieltag.</p>
         )}
       </div>
       <RankTrend history={league.rank_history} rounds={rounds} />
@@ -176,7 +176,7 @@ function Score({ match }) {
   return (
     <span className="tls-tl-score" data-outcome={match.outcome} role="img" aria-label={label} title={label}>
       <span className="tls-tl-score__badge" aria-hidden="true">{outcome.letter}</span>
-      <span className="font-display text-xl font-bold tabular-nums" aria-hidden="true">{formatNumber(match.score_for)}:{formatNumber(match.score_against)}</span>
+      <span className="tls-type-card tls-type-num" aria-hidden="true">{formatNumber(match.score_for)}:{formatNumber(match.score_against)}</span>
     </span>
   );
 }
@@ -263,7 +263,7 @@ function MapStats({ stats }) {
   return (
     <section className="mt-12" aria-labelledby="team-league-map-stats" data-testid="team-league-map-stats">
       <SectionTitle id="team-league-map-stats">Maps</SectionTitle>
-      <p className="mt-2 text-sm text-white/55">Aus den eigenen Spielen der Saison: wie oft gespielt, gewonnen, gewählt und gebannt.</p>
+      <p className="mt-2 tls-type-body text-white/55">Aus den eigenen Spielen der Saison: wie oft gespielt, gewonnen, gewählt und gebannt.</p>
       <ul className="mt-4 grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
         {stats.map((stat, index) => (
           <li key={stat.map_id || stat.name} className="space-y-2" data-testid="team-league-map-stat">
@@ -319,19 +319,19 @@ function OwnMatch({ round, match, showTeam, withScore }) {
     <div className="tls-tl-card__match" data-testid="team-league-own-match" data-outcome={match?.outcome}>
       <div className="flex items-start justify-between gap-3">
         {opponent ? (
-          <p className="mt-2 text-[17px] leading-snug text-white font-semibold break-words [overflow-wrap:anywhere]">
+          <p className="mt-2 tls-type-body leading-snug text-white font-semibold break-words [overflow-wrap:anywhere]">
             {showTeam && match?.team && <span className="text-[#29B6E8]" data-testid="team-league-own-team">{match.team} </span>}
             <span className="text-white/45 font-normal">gegen </span>{opponent}
-            {side && <span className="ml-2 align-middle text-[10px] font-bold uppercase tracking-widest text-white/45">{side}</span>}
+            {side && <span className="ml-2 align-middle tls-type-label text-white/45">{side}</span>}
           </p>
-        ) : <p className="mt-2 text-sm text-white/45">Gegner offen</p>}
+        ) : <p className="mt-2 tls-type-small text-white/45">Gegner offen</p>}
         {withScore && match && <span className="mt-2"><Score match={match} /></span>}
       </div>
       {/* Mit Bildern aus der Map-Bibliothek (#1616) das Veto als Karten, sonst die Liste wie bisher. */}
       {match && hasVetoImages(match) ? <VetoCards match={match} /> : (
         <>
           {match && <Maps match={match} />}
-          {match?.bans?.length > 0 && <p className="mt-2 text-xs text-white/50" data-testid="team-league-bans"><span className="text-white/35">Bann: </span>{banText(match.bans)}</p>}
+          {match?.bans?.length > 0 && <p className="mt-2 tls-type-small text-white/50" data-testid="team-league-bans"><span className="text-white/35">Bann: </span>{banText(match.bans)}</p>}
         </>
       )}
     </div>
@@ -352,12 +352,12 @@ function MatchdayCard({ day, index, showTeam, originals }) {
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
           <span className="font-black tabular-nums text-white/85 mr-2">{roundLabel(round)}</span>
-          <span className={`text-sm tabular-nums ${round.state === "cancelled" ? "text-white/45" : "text-white/65"}`}>{matchWhen(round, single ? match : null)}</span>
-          {round.original_club_day && <span className="block text-[11px] text-white/45">ursprünglich {dayLabel(round.original_club_day)}</span>}
+          <span className={`tls-type-small tabular-nums ${round.state === "cancelled" ? "text-white/45" : "text-white/65"}`}>{matchWhen(round, single ? match : null)}</span>
+          {round.original_club_day && <span className="block tls-type-small text-white/45">ursprünglich {dayLabel(round.original_club_day)}</span>}
         </div>
         {single && match ? <Score match={match} /> : null}
         {!matches.length && (
-          <span className={`inline-flex items-center px-2 py-0.5 border rounded-sm text-[10px] font-bold uppercase tracking-widest whitespace-nowrap ${STATE_TONES[round.state] || STATE_TONES.planned}`}>
+          <span className={`inline-flex items-center px-2 py-0.5 border rounded-sm tls-type-label whitespace-nowrap ${STATE_TONES[round.state] || STATE_TONES.planned}`}>
             {PUBLIC_STATE_LABELS[round.state] || round.state}
           </span>
         )}
@@ -377,7 +377,7 @@ function Schedule({ matchdays, showTeam = false, originals = null }) {
     <section className="mt-12" aria-labelledby="team-league-schedule" data-testid="team-league-schedule">
       <SectionTitle id="team-league-schedule">Spielplan</SectionTitle>
       {matchdays.length === 0 ? (
-        <p className="mt-3 text-sm text-white/55">Noch keine Spieltage.</p>
+        <p className="mt-3 tls-type-small text-white/55">Noch keine Spieltage.</p>
       ) : (
         <ol className="mt-4 grid gap-3 sm:grid-cols-2">
           {matchdays.map((day, index) => <MatchdayCard key={day.round.id} day={day} index={index} showTeam={showTeam} originals={originals} />)}
@@ -417,7 +417,7 @@ function LineupRows({ players, roundIds, offset }) {
         <td key={id} className="hidden sm:table-cell px-1.5 py-2.5 text-center"><RoundCell state={cellState(player, id)} /></td>
       ))}
       <td className="px-2 py-2.5 text-right whitespace-nowrap" data-testid="team-league-appearances">
-        <span className="font-display text-base font-bold text-white">{player.appearances}</span>
+        <span className="tls-type-card tls-type-num text-white">{player.appearances}</span>
         {Number(player.of) > 0 && <span className="text-white/50"> von {player.of}</span>}
         <span className="sr-only">{` Einsätze (${appearanceText(player)})`}</span>
       </td>
@@ -438,14 +438,14 @@ function Lineup({ lineup, rounds, ownTeams }) {
   return (
     <section className="mt-12" aria-labelledby="team-league-lineup" data-testid="team-league-lineup">
       <SectionTitle id="team-league-lineup">Kader</SectionTitle>
-      <p className="mt-2 text-sm text-white/55">Wer an welchem Spieltag gespielt hat, „E“ heißt Ersatz. Gäste zählen nicht in die Vereinsstatistik.</p>
+      <p className="mt-2 tls-type-body text-white/55">Wer an welchem Spieltag gespielt hat, „E“ heißt Ersatz. Gäste zählen nicht in die Vereinsstatistik.</p>
       {players.length === 0 ? (
-        <p className="mt-3 text-sm text-white/55">Noch kein Kader und keine Aufstellung eingetragen.</p>
+        <p className="mt-3 tls-type-small text-white/55">Noch kein Kader und keine Aufstellung eingetragen.</p>
       ) : (
         // eslint-disable-next-line jsx-a11y/no-noninteractive-tabindex -- eine scrollbare Fläche muss per Tastatur erreichbar sein (axe: scrollable-region-focusable)
         <div role="region" aria-label="Kader" tabIndex={0} className="tls-standings mt-4 border border-white/10 rounded-md bg-[var(--tls-surface-1)] tls-swipe pb-0 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#29B6E8]">
-          <table className="w-full text-sm tabular-nums">
-            <thead className="text-[11px] uppercase tracking-[0.12em] text-white/50">
+          <table className="w-full tls-type-small tabular-nums">
+            <thead className="tls-type-label text-white/50">
               <tr className="border-b border-white/10">
                 <th scope="col" className="text-left pl-3 sm:pl-4 pr-2 py-2.5 font-semibold">Spieler</th>
                 {roundIds.map((id) => <th key={id} scope="col" className="hidden sm:table-cell px-1.5 py-2.5 font-semibold text-center">{codeOf(id)}</th>)}
@@ -460,7 +460,7 @@ function Lineup({ lineup, rounds, ownTeams }) {
                 <tbody key={group.key} data-testid={group.key === "guests" ? "team-league-guests" : "team-league-squad"}>
                   {group.label && (
                     <tr className="border-t border-white/10">
-                      <th scope="rowgroup" colSpan={span} className="text-left pl-3 sm:pl-4 pt-3 pb-1 text-[10px] font-bold uppercase tracking-[0.2em] text-white/40">{group.label}</th>
+                      <th scope="rowgroup" colSpan={span} className="text-left pl-3 sm:pl-4 pt-3 pb-1 tls-type-label text-quiet">{group.label}</th>
                     </tr>
                   )}
                   <LineupRows players={group.players} roundIds={roundIds} offset={start} />
@@ -489,11 +489,11 @@ function LeaguePath({ path, lineageSlug, tierOrder }) {
           const body = (
             <>
               <span className="block font-semibold text-white">{season.title || title}</span>
-              <span className="block text-sm text-white/65 tabular-nums">
+              <span className="block tls-type-small text-white/65 tabular-nums">
                 <span className={metal ? metal.text : undefined}>{pathRankLabel(season)}</span>
                 {season.points != null && <span> · {formatNumber(season.points)} Pkt</span>}
-                {season.status === "active" && <span className="ml-2 text-[10px] font-bold uppercase tracking-widest text-[#29B6E8]">läuft</span>}
-                {notes[index] && <span className={`ml-2 text-[10px] font-bold uppercase tracking-widest ${SEASON_NOTE_TONES[notes[index]] || "text-zinc-400"}`} data-testid="team-league-season-note">{notes[index]}</span>}
+                {season.status === "active" && <span className="ml-2 tls-type-label text-[#29B6E8]">läuft</span>}
+                {notes[index] && <span className={`ml-2 tls-type-label ${SEASON_NOTE_TONES[notes[index]] || "text-zinc-400"}`} data-testid="team-league-season-note">{notes[index]}</span>}
               </span>
             </>
           );

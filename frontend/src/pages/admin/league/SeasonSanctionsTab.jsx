@@ -23,7 +23,7 @@ const CHIP = {
   warn: "border-warn/50 text-warn", live: "border-[#FF6B60]/50 text-[#FF6B60]", calm: "border-white/15 text-white/60",
 };
 const TONE = { none: "text-white/55", calm: "text-white/70", soon: "text-warn", over: "text-white/45" };
-const BUTTON = "tls-btn inline-flex min-h-11 items-center gap-1.5 rounded-sm px-3 py-2 text-xs font-bold uppercase tracking-wider disabled:opacity-50";
+const BUTTON = "tls-btn inline-flex min-h-11 items-center gap-1.5 rounded-sm px-3 py-2 tls-type-label disabled:opacity-50";
 const OWN_MATCH = "Du bist an diesem Spiel selbst beteiligt. Das entscheidet eine zweite berechtigte Person.";
 const OWN_DECISION = "Über den Einspruch entscheidet eine andere Person: Du hast diese Strafe verhängt oder bestätigt.";
 
@@ -35,7 +35,7 @@ function ProofLinks({ proofs, count, testId }) {
   if (!count) return null;
   const hidden = count - proofs.length;
   return (
-    <div className="flex flex-wrap items-center gap-2 text-xs" data-testid={testId}>
+    <div className="flex flex-wrap items-center gap-2 tls-type-small" data-testid={testId}>
       <span className="text-white/50">Nachweise:</span>
       {proofs.map((proof, index) => (
         <a key={proof.id} href={proof.type === "link" ? proof.link : chatAttachmentSrc(proof.url)} target="_blank" rel="noopener noreferrer nofollow"
@@ -144,16 +144,16 @@ function SanctionForm({ seasonId, data, onDone, onCancel }) {
       </FormGrid>
       {form.match_id ? (
         <div className="space-y-1" data-testid="sanction-proofs">
-          <div className="text-[11px] font-bold uppercase tracking-widest text-white/60">Nachweise aus dem Spiel</div>
+          <div className="tls-type-label text-white/60">Nachweise aus dem Spiel</div>
           {proofs.length ? proofs.map((proof, index) => (
-            <label key={proof.id} className="flex min-h-11 items-center gap-2 text-sm text-white/80">
+            <label key={proof.id} className="flex min-h-11 items-center gap-2 tls-type-small text-white/80">
               <input type="checkbox" checked={form.proof_ids.includes(proof.id)} data-testid={`sanction-proof-${proof.id}`}
                 onChange={(event) => set("proof_ids", event.target.checked ? [...form.proof_ids, proof.id] : form.proof_ids.filter((id) => id !== proof.id))} />
               <span>{proof.type === "link" ? "Video-Link" : proof.type === "file" ? "MOSS-Datei" : "Bild"} {index + 1} · {viennaDateTime(proof.created_at, WHEN)}</span>
               <a href={proof.type === "link" ? proof.link : chatAttachmentSrc(proof.url)} target="_blank" rel="noopener noreferrer nofollow" className="text-[#29B6E8] hover:underline">ansehen</a>
             </label>
-          )) : <p className="text-xs text-white/50">Zu diesem Spiel liegen keine Nachweise vor, die du sehen darfst. Sie kommen über Meldung, Vorfall oder Protest am Spiel dazu.</p>}
-          <p className="text-xs text-white/45">Angehängte Nachweise bleiben, solange die Strafe läuft oder ein Einspruch offen ist.</p>
+          )) : <p className="tls-type-small text-white/50">Zu diesem Spiel liegen keine Nachweise vor, die du sehen darfst. Sie kommen über Meldung, Vorfall oder Protest am Spiel dazu.</p>}
+          <p className="tls-type-small text-white/45">Angehängte Nachweise bleiben, solange die Strafe läuft oder ein Einspruch offen ist.</p>
         </div>
       ) : null}
       <TextField label="Regelverstoß" required maxLength={200} value={form.rule_ref} onChange={(value) => set("rule_ref", value)} testId="sanction-rule"
@@ -172,19 +172,19 @@ function SanctionForm({ seasonId, data, onDone, onCancel }) {
       ) : null}
       <PeriodFields form={form} set={set} limits={data.limits} testId="sanction" />
       {form.kind === "disqualification" ? (
-        <p className="rounded-sm border border-warn/40 px-3 py-2 text-sm text-white/85" data-testid="sanction-disqualification-note">
+        <p className="rounded-sm border border-warn/40 px-3 py-2 tls-type-body text-white/85" data-testid="sanction-disqualification-note">
           Das Co-Team scheidet aus. Alle Spiele zählen nach der Regel dieser Season, offene werden kampflos gewertet, das Team steht am Tabellenende.
         </p>
       ) : null}
       {needsOverride ? <ConflictReasonField value={conflictReason} onChange={setConflictReason} testId="sanction-conflict-reason" /> : null}
-      {error ? <p className="text-sm text-warn" role="alert" data-testid="sanction-form-error">{error}</p> : null}
+      {error ? <p className="tls-type-small text-warn" role="alert" data-testid="sanction-form-error">{error}</p> : null}
       <div className="flex flex-wrap items-center gap-3">
         <button type="button" onClick={submit} disabled={saving || Boolean(problem) || overrideMissing(needsOverride, conflictReason)}
           className={`${BUTTON} tls-btn--primary`} data-testid="sanction-submit">
           <Gavel className="h-4 w-4" aria-hidden="true" /> {saving ? "Speichere …" : "Strafe verhängen"}
         </button>
         <button type="button" onClick={onCancel} className={`${BUTTON} tls-btn--quiet`} data-testid="sanction-cancel">Abbrechen</button>
-        {problem ? <span className="text-xs text-white/55" data-testid="sanction-form-hint">{problem}</span> : null}
+        {problem ? <span className="tls-type-small text-white/55" data-testid="sanction-form-hint">{problem}</span> : null}
       </div>
     </FormSection>
   );
@@ -229,16 +229,16 @@ function CardAction({ item, action, superadmin, seasonId, onDone, onCancel }) {
     <div className="mt-3 space-y-3 rounded-sm border border-white/15 bg-[#0A0A0A] p-3" data-testid={`sanction-action-${action}-${item.id}`}>
       {action === "confirm" ? (
         <>
-          <p className="text-sm text-white/80">Die vorläufige Sperre wird endgültig. Sie läuft ab ihrem Beginn weiter, die Einspruchsfrist beginnt jetzt.</p>
+          <p className="tls-type-body text-white/80">Die vorläufige Sperre wird endgültig. Sie läuft ab ihrem Beginn weiter, die Einspruchsfrist beginnt jetzt.</p>
           <PeriodFields form={period} set={(key, value) => setPeriod((current) => ({ ...current, [key]: value }))} testId={`sanction-confirm-${item.id}`} />
         </>
       ) : (
         <TextAreaField label={step.label} required rows={2} value={text} onChange={setText} testId={`sanction-action-text-${item.id}`}
           hint={action === "revoke" ? "Mindestens fünf Zeichen. Der Widerruf nimmt jede Wirkung zurück, die Betroffenen erfahren es." : "Mindestens fünf Zeichen. Die Entscheidung ist endgültig, die Betroffenen lesen die Begründung."} />
       )}
-      {needsOverride && item.conflict === "match" ? <p className="text-xs font-semibold text-white/80">{OWN_MATCH}</p> : null}
+      {needsOverride && item.conflict === "match" ? <p className="tls-type-small font-semibold text-white/80">{OWN_MATCH}</p> : null}
       {needsOverride ? <ConflictReasonField value={conflictReason} onChange={setConflictReason} testId={`sanction-action-conflict-${item.id}`} /> : null}
-      {error ? <p className="text-sm text-warn" role="alert" data-testid={`sanction-action-error-${item.id}`}>{error}</p> : null}
+      {error ? <p className="tls-type-small text-warn" role="alert" data-testid={`sanction-action-error-${item.id}`}>{error}</p> : null}
       <div className="flex flex-wrap gap-2">
         <button type="button" onClick={run} disabled={saving || missing || overrideMissing(needsOverride, conflictReason)}
           className={`${BUTTON} ${action === "revoke" || action === "granted" ? "tls-btn--danger" : "tls-btn--primary"}`} data-testid={`sanction-action-run-${item.id}`}>
@@ -252,7 +252,7 @@ function CardAction({ item, action, superadmin, seasonId, onDone, onCancel }) {
 
 /** Der Satz, warum die Knöpfe fehlen: eigenes Team oder am genannten Spiel beteiligt. */
 function ConflictNote({ item }) {
-  if (item.conflict === "match") return <p className="text-xs font-semibold text-white/80" data-testid={`sanction-own-team-${item.id}`}>{OWN_MATCH}</p>;
+  if (item.conflict === "match") return <p className="tls-type-small font-semibold text-white/80" data-testid={`sanction-own-team-${item.id}`}>{OWN_MATCH}</p>;
   return <OwnTeamNote testId={`sanction-own-team-${item.id}`} />;
 }
 
@@ -267,15 +267,15 @@ function SanctionCard({ item, superadmin, seasonId, onChanged }) {
     <li className={`rounded-sm border bg-[#0A0A0A] p-4 ${appeal?.state === "open" ? "border-honor/40" : "border-white/10"}`} data-testid={`sanction-${item.id}`}>
       <div className="flex flex-wrap items-start justify-between gap-x-3 gap-y-2">
         <div className="min-w-0">
-          <div className="font-heading text-lg font-black uppercase leading-tight text-white">{item.kind_label}</div>
-          <div className="text-sm text-white/80">
+          <div className="tls-type-card leading-tight text-white">{item.kind_label}</div>
+          <div className="tls-type-small text-white/80">
             {item.target_name || "Gelöschter User"}{item.target_type === "player" && item.squad_name ? <span className="text-white/50"> · {item.squad_name}</span> : null}
             {item.other_season ? <span className="text-white/50"> · aus einer anderen Season dieser Liga</span> : null}
           </div>
         </div>
-        <span className={`shrink-0 rounded-full border px-2.5 py-1 text-[11px] font-bold uppercase tracking-wider ${CHIP[status.tone]}`} data-testid={`sanction-status-${item.id}`}>{status.label}</span>
+        <span className={`shrink-0 rounded-full border px-2.5 py-1 tls-type-label ${CHIP[status.tone]}`} data-testid={`sanction-status-${item.id}`}>{status.label}</span>
       </div>
-      <dl className="mt-3 grid gap-x-6 gap-y-1 text-sm sm:grid-cols-[auto_1fr]">
+      <dl className="mt-3 grid gap-x-6 gap-y-1 tls-type-small sm:grid-cols-[auto_1fr]">
         <dt className="text-white/50">Regelverstoß</dt><dd className="min-w-0 break-words text-white/90">{item.rule_ref}</dd>
         <dt className="text-white/50">Begründung</dt><dd className="min-w-0 whitespace-pre-line break-words text-white/90">{item.reason}</dd>
         {item.period ? <><dt className="text-white/50">{item.points ? "Höhe" : "Zeitraum"}</dt><dd className="tabular-nums text-white/90" data-testid={`sanction-period-${item.id}`}>{item.period}</dd></> : null}
@@ -285,18 +285,18 @@ function SanctionCard({ item, superadmin, seasonId, onChanged }) {
         ) : null}
       </dl>
       <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1">
-        {item.match_id ? <Link to={`/matches/${item.match_id}`} className="inline-flex min-h-11 items-center text-xs font-bold uppercase tracking-wider text-[#29B6E8] hover:underline" data-testid={`sanction-match-${item.id}`}>Zum Spiel</Link> : null}
+        {item.match_id ? <Link to={`/matches/${item.match_id}`} className="inline-flex min-h-11 items-center tls-type-label text-[#29B6E8] hover:underline" data-testid={`sanction-match-${item.id}`}>Zum Spiel</Link> : null}
         <ProofLinks proofs={item.proofs || []} count={item.proof_count || 0} testId={`sanction-proofs-${item.id}`} />
       </div>
 
       {appeal ? (
         <div className="mt-3 rounded-sm border border-honor/30 p-3" data-testid={`sanction-appeal-${item.id}`}>
-          <div className="flex items-center gap-2 text-[11px] font-bold uppercase tracking-widest text-honor"><Scale className="h-3.5 w-3.5" aria-hidden="true" /> {APPEAL_STATE_LABELS[appeal.state]}</div>
-          <p className="mt-1 text-xs text-white/50">{appeal.by_name || "Gelöschter User"} · {viennaDateTime(appeal.at, WHEN)}</p>
-          <p className="mt-1 whitespace-pre-line break-words text-sm text-white/90">{appeal.text}</p>
-          {appeal.note ? <p className="mt-2 break-words text-sm text-white/75">Entscheidung{item.decided_by_name ? ` von ${item.decided_by_name}` : ""}: {appeal.note}</p> : null}
+          <div className="flex items-center gap-2 tls-type-label text-honor"><Scale className="h-3.5 w-3.5" aria-hidden="true" /> {APPEAL_STATE_LABELS[appeal.state]}</div>
+          <p className="mt-1 tls-type-small text-white/50">{appeal.by_name || "Gelöschter User"} · {viennaDateTime(appeal.at, WHEN)}</p>
+          <p className="mt-1 whitespace-pre-line break-words tls-type-body text-white/90">{appeal.text}</p>
+          {appeal.note ? <p className="mt-2 break-words tls-type-body text-white/75">Entscheidung{item.decided_by_name ? ` von ${item.decided_by_name}` : ""}: {appeal.note}</p> : null}
           {appeal.state === "open" && !action ? (
-            item.own_decision ? <p className="mt-2 text-xs font-semibold text-white/80" data-testid={`sanction-own-decision-${item.id}`}>{OWN_DECISION}</p>
+            item.own_decision ? <p className="mt-2 tls-type-small font-semibold text-white/80" data-testid={`sanction-own-decision-${item.id}`}>{OWN_DECISION}</p>
               : blocked ? <div className="mt-2"><ConflictNote item={item} /></div> : (
                 <div className="mt-2 flex flex-wrap gap-2">
                   <button type="button" onClick={() => setAction("upheld")} className={`${BUTTON} tls-btn--secondary`} data-testid={`sanction-appeal-uphold-${item.id}`}>Strafe bleibt</button>
@@ -306,7 +306,7 @@ function SanctionCard({ item, superadmin, seasonId, onChanged }) {
           ) : null}
         </div>
       ) : item.status !== "revoked" && item.state === "final" && item.appeal_until ? (
-        <p className={`mt-2 text-xs tabular-nums ${TONE[item.can_appeal ? deadlineTone(item.appeal_until, now) : "over"]}`} data-testid={`sanction-deadline-${item.id}`}>
+        <p className={`mt-2 tls-type-small tabular-nums ${TONE[item.can_appeal ? deadlineTone(item.appeal_until, now) : "over"]}`} data-testid={`sanction-deadline-${item.id}`}>
           {item.can_appeal ? `Einspruch möglich, Frist ${remainingText(item.appeal_until, now)}` : "Einspruchsfrist abgelaufen, kein Einspruch"}
         </p>
       ) : null}
@@ -342,8 +342,8 @@ export function SeasonSanctionsTab({ seasonId }) {
   }, [seasonId]);
   useEffect(() => { load(); }, [load]);
 
-  if (state.status === "loading") return <p className="text-sm text-white/50">Strafen werden geladen …</p>;
-  if (state.status === "error") return <p className="text-sm text-warn" role="alert" data-testid="season-sanctions-error">{state.error}</p>;
+  if (state.status === "loading") return <p className="tls-type-small text-white/50">Strafen werden geladen …</p>;
+  if (state.status === "error") return <p className="tls-type-small text-warn" role="alert" data-testid="season-sanctions-error">{state.error}</p>;
   const { data } = state;
   const current = data.items.filter((row) => ["provisional", "active"].includes(row.status) || row.appeal?.state === "open");
   const shown = filter === "current" ? current : data.items;
@@ -355,7 +355,7 @@ export function SeasonSanctionsTab({ seasonId }) {
       <FormSection title="Strafen dieser Season" testId="season-sanctions"
         hint={`Wettbewerbsstrafen nach Regelwerk § 13 und Anlage C. Einspruch einmal je Strafe, innerhalb von ${data.appeal_hours} Stunden ab der endgültigen Entscheidung (Reiter „Proteste“). Verwarnungen der Community-Moderation stehen nicht hier.`}>
         <div className="flex flex-wrap items-center justify-between gap-3">
-          <p className="text-sm text-white/75" data-testid="season-sanctions-count">
+          <p className="tls-type-small text-white/75" data-testid="season-sanctions-count">
             <strong className="text-white">{current.length}</strong> {current.length === 1 ? "Strafe läuft" : "Strafen laufen"}
             {data.open_appeals ? <span className="text-honor"> · {data.open_appeals} {data.open_appeals === 1 ? "Einspruch wartet" : "Einsprüche warten"}</span> : null}
           </p>
@@ -372,13 +372,13 @@ export function SeasonSanctionsTab({ seasonId }) {
               className={`${BUTTON} ${filter === key ? "tls-btn--secondary" : "tls-btn--quiet"}`}>{label}</button>
           ))}
         </div>
-        {!data.targets.some((row) => row.squads.length) ? <p className="text-sm text-white/60" data-testid="season-sanctions-no-teams">In dieser Season ist noch kein Co-Team einer Staffel zugeteilt.</p> : null}
+        {!data.targets.some((row) => row.squads.length) ? <p className="tls-type-small text-white/60" data-testid="season-sanctions-no-teams">In dieser Season ist noch kein Co-Team einer Staffel zugeteilt.</p> : null}
         {shown.length ? (
           <ul className="tls-stagger space-y-3" data-testid="season-sanctions-list">
             {shown.map((item) => <SanctionCard key={item.id} item={item} superadmin={data.superadmin} seasonId={seasonId} onChanged={load} />)}
           </ul>
         ) : (
-          <p className="text-sm text-white/60" data-testid="season-sanctions-empty">
+          <p className="tls-type-small text-white/60" data-testid="season-sanctions-empty">
             {filter === "current" && data.items.length ? "Gerade läuft keine Strafe. Unter „Alle“ stehen die abgelaufenen und widerrufenen." : "In dieser Season wurde noch keine Strafe verhängt."}
           </p>
         )}

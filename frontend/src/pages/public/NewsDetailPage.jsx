@@ -30,7 +30,7 @@ import { asInstant, viennaDate, viennaDateTime } from "@/lib/vienna";
 // dem Text. Eine Überschrift, die im Text den Titel wiederholt, fällt weg.
 
 const WORDS_PER_MINUTE = 200;
-const PROSE = "prose prose-invert prose-lg xl:prose-xl max-w-none text-white/85 prose-headings:font-heading prose-headings:uppercase prose-a:text-[#29B6E8]";
+const PROSE = "prose prose-invert prose-lg xl:prose-xl max-w-none text-white/85 prose-a:text-[#29B6E8]";
 
 // Tags weg, bis keine mehr übrig sind (#1408) - der Wert wird nur verglichen, nie angezeigt.
 function withoutTags(value) {
@@ -107,10 +107,10 @@ export function previewText(preview) {
 
 function PreviewBand({ preview, postId }) {
   return (
-    <div role="status" data-testid="news-preview-band" data-state={preview.state} className="mb-6 flex flex-wrap items-center gap-x-4 gap-y-2 rounded-sm border border-warn/50 bg-warn/10 px-4 py-3 text-sm">
-      <span className="font-heading font-black uppercase tracking-wider text-warn">{preview.state === "app_only" ? "Nur in der App" : "Noch nicht öffentlich"}</span>
+    <div role="status" data-testid="news-preview-band" data-state={preview.state} className="mb-6 flex flex-wrap items-center gap-x-4 gap-y-2 rounded-sm border border-warn/50 bg-warn/10 px-4 py-3 tls-type-small">
+      <span className="font-black uppercase tracking-wider text-warn">{preview.state === "app_only" ? "Nur in der App" : "Noch nicht öffentlich"}</span>
       <span className="min-w-0 flex-1 text-white/80">{previewText(preview)}</span>
-      {postId && <Link to={`/admin/news/${encodeURIComponent(postId)}`} className="text-xs font-bold uppercase tracking-wider text-[#29B6E8] hover:underline">Im Editor öffnen</Link>}
+      {postId && <Link to={`/admin/news/${encodeURIComponent(postId)}`} className="tls-type-label text-[#29B6E8] hover:underline">Im Editor öffnen</Link>}
     </div>
   );
 }
@@ -123,7 +123,7 @@ function AppOnlyStores() {
   const stores = footerButtons(branding);
   if (!stores.playStoreUrl && !stores.appStoreUrl) {
     return (
-      <p data-testid="news-app-only-soon" className="mt-5 inline-flex items-center gap-2 rounded-md border border-white/15 px-4 py-2.5 text-sm text-white/55">
+      <p data-testid="news-app-only-soon" className="mt-5 inline-flex items-center gap-2 rounded-md border border-white/15 px-4 py-2.5 tls-type-small text-white/55">
         <Smartphone className="w-4 h-4" aria-hidden="true" /> {stores.bothSoonLabel}
       </p>
     );
@@ -179,7 +179,7 @@ export default function NewsDetailPage() {
   if (error) return (
     <PublicLayout>
       <div className="max-w-2xl mx-auto px-6 py-20 text-center" data-testid="news-error">
-        <h1 className="font-heading text-3xl font-black">{error.title}</h1>
+        <h1 className="tls-type-title">{error.title}</h1>
         {error.text && <p className="mt-3 text-white/65">{error.text}</p>}
         {error.appOnly && <AppOnlyStores />}
         <Link to="/news" className={`${error.appOnly ? "mt-8" : "mt-6"} inline-flex items-center gap-2 text-[#29B6E8]`}><ArrowLeft className="w-4 h-4" /> {error.text ? "Zu den aktuellen News" : "Zurück zu News"}</Link>
@@ -224,19 +224,19 @@ export default function NewsDetailPage() {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 md:py-12">
         {post.preview && <PreviewBand preview={post.preview} postId={post.id} />}
         <Breadcrumbs items={[{ label: "Start", to: "/" }, { label: "News", to: "/news" }, { label: post.title }]} className="mb-4" />
-        <Link to="/news" data-testid="news-back" className="inline-flex items-center gap-2 text-xs uppercase tracking-wider text-white/50 hover:text-[#29B6E8]">
+        <Link to="/news" data-testid="news-back" className="inline-flex items-center gap-2 tls-type-label text-white/50 hover:text-[#29B6E8]">
           <ArrowLeft className="w-3.5 h-3.5" /> Alle News
         </Link>
 
         <div className="mt-6 grid gap-10 lg:grid-cols-[minmax(0,1fr)_20rem] xl:grid-cols-[minmax(0,1fr)_24rem] 2xl:gap-16 items-start" data-testid="news-layout">
           <article className="min-w-0" data-testid="news-article">
-            <div className="flex flex-wrap items-center gap-3 text-[11px] uppercase tracking-widest font-bold">
+            <div className="flex flex-wrap items-center gap-3 tls-type-label">
               <span className="text-[#29B6E8]">{newsCategoryLabel(post.category)}</span>
               {post.pinned && <span className="inline-flex items-center gap-1 text-[#FFD700]"><Pin className="w-3 h-3" /> Angepinnt</span>}
               <span className="text-white/40 lg:hidden ml-auto">{formatDate(post.published_at || post.created_at)}</span>
             </div>
-            <h1 className="mt-3 font-heading text-3xl md:text-5xl xl:text-6xl font-black uppercase leading-[1.02] break-words">{post.title}</h1>
-            {post.excerpt && <p className="mt-4 text-lg xl:text-xl text-white/70 max-w-4xl">{post.excerpt}</p>}
+            <h1 className="mt-3 tls-type-title leading-[1.02] break-words">{post.title}</h1>
+            {post.excerpt && <p className="mt-4 tls-type-body text-white/70 max-w-4xl">{post.excerpt}</p>}
             {post.video_url && <VideoEmbed url={post.video_url} title={post.title} className="mt-8" />}
             {post.banner_url && !post.video_url && (
               <div className="mt-8 rounded-sm overflow-hidden border border-white/10 bg-[#0A0A0A]">
@@ -256,30 +256,30 @@ export default function NewsDetailPage() {
 
           <aside className="space-y-4 lg:sticky lg:top-24" data-testid="news-sidebar">
             <div className="border border-white/10 bg-[#121212] rounded-sm p-4 space-y-3" data-testid="news-meta">
-              <div className="text-[11px] font-bold uppercase tracking-widest text-white/45">Zum Beitrag</div>
-              <div className="grid gap-2 text-sm">
+              <div className="tls-type-label text-white/45">Zum Beitrag</div>
+              <div className="grid gap-2 tls-type-small">
                 <div className="flex items-center gap-2 text-white/75"><Calendar className="w-4 h-4 text-[#29B6E8] shrink-0" /> {formatDate(post.published_at || post.created_at)}</div>
                 {post.author_name && <div className="flex items-center gap-2 text-white/75"><User className="w-4 h-4 text-[#29B6E8] shrink-0" /> Von <strong className="text-white">{post.author_name}</strong></div>}
                 <div className="flex items-center gap-2 text-white/75"><Clock className="w-4 h-4 text-[#29B6E8] shrink-0" /> {readingMinutes(content)} Min. Lesezeit</div>
                 <div className="flex items-center gap-2 text-white/75"><Newspaper className="w-4 h-4 text-[#29B6E8] shrink-0" /> {newsCategoryLabel(post.category)}</div>
               </div>
               <div className="flex flex-wrap gap-2 pt-1" data-testid="news-share">
-                <button type="button" onClick={copyLink} data-testid="news-share-copy" className="tls-btn tls-btn--quiet inline-flex items-center gap-1.5 px-3 py-1.5 rounded-sm text-[11px] font-bold uppercase tracking-wider"><Link2 className="w-3.5 h-3.5" /> Link kopieren</button>
-                <a href={`https://wa.me/?text=${encodeURIComponent(`${post.title} – ${shareUrl}`)}`} target="_blank" rel="noreferrer" data-testid="news-share-whatsapp" className="tls-btn tls-btn--quiet inline-flex items-center gap-1.5 px-3 py-1.5 rounded-sm text-[11px] font-bold uppercase tracking-wider"><MessageCircle className="w-3.5 h-3.5" /> WhatsApp</a>
-                {canNativeShare && <button type="button" onClick={nativeShare} data-testid="news-share-native" className="tls-btn tls-btn--quiet inline-flex items-center gap-1.5 px-3 py-1.5 rounded-sm text-[11px] font-bold uppercase tracking-wider"><Share2 className="w-3.5 h-3.5" /> Teilen …</button>}
+                <button type="button" onClick={copyLink} data-testid="news-share-copy" className="tls-btn tls-btn--quiet inline-flex items-center gap-1.5 px-3 py-1.5 rounded-sm tls-type-label"><Link2 className="w-3.5 h-3.5" /> Link kopieren</button>
+                <a href={`https://wa.me/?text=${encodeURIComponent(`${post.title} – ${shareUrl}`)}`} target="_blank" rel="noreferrer" data-testid="news-share-whatsapp" className="tls-btn tls-btn--quiet inline-flex items-center gap-1.5 px-3 py-1.5 rounded-sm tls-type-label"><MessageCircle className="w-3.5 h-3.5" /> WhatsApp</a>
+                {canNativeShare && <button type="button" onClick={nativeShare} data-testid="news-share-native" className="tls-btn tls-btn--quiet inline-flex items-center gap-1.5 px-3 py-1.5 rounded-sm tls-type-label"><Share2 className="w-3.5 h-3.5" /> Teilen …</button>}
               </div>
             </div>
 
             {linked.length > 0 && (
               <div className="border border-white/10 bg-[#121212] rounded-sm p-4" data-testid="news-linked">
-                <div className="text-[11px] font-bold uppercase tracking-widest text-white/45 mb-3">Verknüpft</div>
+                <div className="tls-type-label text-white/45 mb-3">Verknüpft</div>
                 <div className="grid gap-2">
                   {linked.map((item) => (
                     <Link key={item.key} to={item.to} className="flex items-center gap-3 min-w-0 overflow-hidden border border-white/10 hover:border-white/30 p-2.5 rounded-sm">
                       <item.icon className="w-4 h-4 shrink-0" style={{ color: item.color }} />
                       <div className="min-w-0">
-                        <div className="tls-wrap font-bold text-sm">{item.title}</div>
-                        {item.sub && <div className="text-xs text-white/50">{item.sub}</div>}
+                        <div className="tls-wrap font-bold tls-type-small">{item.title}</div>
+                        {item.sub && <div className="tls-type-small text-white/50">{item.sub}</div>}
                       </div>
                     </Link>
                   ))}
@@ -289,7 +289,7 @@ export default function NewsDetailPage() {
 
             {post.mentioned_users?.length > 0 && (
               <div className="border border-white/10 bg-[#121212] rounded-sm p-4" data-testid="news-mentions">
-                <div className="text-[11px] font-bold uppercase tracking-widest text-white/45 mb-3">Markierte Personen</div>
+                <div className="tls-type-label text-white/45 mb-3">Markierte Personen</div>
                 <div className="grid gap-2">
                   {post.mentioned_users.map((user) => (
                     <Link key={user.id} to={`/u/${encodeURIComponent(user.username)}`} className="inline-flex items-center gap-3 border border-white/10 hover:border-[#29B6E8]/50 bg-[#0A0A0A] rounded-sm px-3 py-2 transition">
@@ -297,8 +297,8 @@ export default function NewsDetailPage() {
                         {user.avatar_url ? <SizedImage src={user.avatar_url} size={36} alt="" className="w-full h-full" /> : <Users className="w-4 h-4 text-white/35" />}
                       </span>
                       <span className="min-w-0">
-                        <span className="tls-wrap block text-sm font-bold">{user.display_name || user.username}</span>
-                        <span className="tls-wrap block text-xs text-white/45">@{user.username}</span>
+                        <span className="tls-wrap block tls-type-small font-bold">{user.display_name || user.username}</span>
+                        <span className="tls-wrap block tls-type-small text-white/45">@{user.username}</span>
                       </span>
                     </Link>
                   ))}
@@ -309,8 +309,8 @@ export default function NewsDetailPage() {
             {others.length > 0 && (
               <div className="border border-white/10 bg-[#121212] rounded-sm p-4" data-testid="news-more">
                 <div className="flex items-center justify-between gap-3 mb-3">
-                  <div className="text-[11px] font-bold uppercase tracking-widest text-white/45">Weitere News</div>
-                  <Link to="/news" className="text-[11px] font-bold uppercase tracking-wider text-[#29B6E8] hover:text-white inline-flex items-center gap-1">Alle <ArrowRight className="w-3 h-3" /></Link>
+                  <div className="tls-type-label text-white/45">Weitere News</div>
+                  <Link to="/news" className="tls-type-label text-[#29B6E8] hover:text-white inline-flex items-center gap-1">Alle <ArrowRight className="w-3 h-3" /></Link>
                 </div>
                 <div className="grid gap-2">
                   {others.map((item) => (
@@ -319,8 +319,8 @@ export default function NewsDetailPage() {
                         {item.banner_url ? <SizedImage src={item.banner_url} width={64} height={48} alt="" className="w-full h-full" /> : <NewsTextCard news={item} size="thumb" />}
                       </span>
                       <span className="min-w-0">
-                        <span className="tls-wrap block text-sm font-bold leading-snug group-hover:text-[#29B6E8] transition">{item.title}</span>
-                        <span className="block text-[11px] text-white/45 mt-0.5">{formatDate(item.published_at || item.created_at, "medium")}</span>
+                        <span className="tls-wrap block tls-type-small font-bold leading-snug group-hover:text-[#29B6E8] transition">{item.title}</span>
+                        <span className="block tls-type-small text-white/45 mt-0.5">{formatDate(item.published_at || item.created_at, "medium")}</span>
                       </span>
                     </Link>
                   ))}

@@ -8,6 +8,7 @@ import { useSubmissionGuard } from "@/hooks/useSubmissionGuard";
 import { useSpamGuard } from "@/hooks/useSpamGuard";
 import { SpamGuardFields } from "@/components/tls/SpamGuardFields";
 import { DEFAULT_RETURN_PATH, nextQuery, safeNextPath } from "@/lib/returnPath";
+import { ShortCaps } from "@/components/tls/ShortCaps";
 
 export default function EmailVerificationPage() {
   useDocumentTitle("E-Mail bestätigen", "E-Mail-Adresse für das Community-Konto bestätigen.", { robots: "noindex, nofollow" });
@@ -58,14 +59,14 @@ export default function EmailVerificationPage() {
     <div className="min-h-screen bg-[#0A0A0A] text-white flex items-center justify-center p-6 bg-grid">
       <div className="w-full max-w-md border border-white/10 rounded-sm bg-[#121212] p-8 md:p-10">
         <div className="flex justify-center mb-8"><Logo size="xl" /></div>
-        <h1 className="font-heading text-2xl font-black uppercase text-center">E-Mail bestätigen</h1>
-        <p className="text-sm text-white/60 text-center mt-2">Auch ein bestehendes Konto kann nach einem Sicherheitsupdate eine E-Mail-Bestätigung benötigen. Dein Konto und dein Passwort bleiben erhalten.</p>
+        <h1 className="tls-type-title text-center"><ShortCaps>E-Mail bestätigen</ShortCaps></h1>
+        <p className="tls-type-body text-white/60 text-center mt-2">Auch ein bestehendes Konto kann nach einem Sicherheitsupdate eine E-Mail-Bestätigung benötigen. Dein Konto und dein Passwort bleiben erhalten.</p>
         <div className="mt-6">
           {status === "checking" && <AuthFormAlert id="verify-status" tone="info">Bestätigung wird geprüft …</AuthFormAlert>}
           {status === "success" && <AuthFormAlert id="verify-success" tone="success">{message}</AuthFormAlert>}
           {status === "error" && <AuthFormAlert id="verify-error">{message}</AuthFormAlert>}
           {status === "sent" && <AuthFormAlert id="verify-sent" tone="info">{message || "Der Versand wurde angefordert. Bitte prüfe in einigen Minuten dein Postfach und den Spam-Ordner."}</AuthFormAlert>}
-          {status === "sent" && <p className="mt-3 text-sm text-white/70">Noch keine Mail? Wiederholtes Anmelden versendet keine Bestätigung. Prüfe die Adresse unten und fordere den Link einmal erneut an. Bleibt die Mail aus, muss der Betreiber die Mail-Warteschlange und den Versand prüfen.</p>}
+          {status === "sent" && <p className="mt-3 tls-type-body text-white/70">Noch keine Mail? Wiederholtes Anmelden versendet keine Bestätigung. Prüfe die Adresse unten und fordere den Link einmal erneut an. Bleibt die Mail aus, muss der Betreiber die Mail-Warteschlange und den Versand prüfen.</p>}
         </div>
         {status !== "success" && (
           <form onSubmit={resend} className="mt-6 space-y-3">
@@ -81,7 +82,7 @@ export default function EmailVerificationPage() {
             {next !== DEFAULT_RETURN_PATH ? "Anmelden und weiter" : "Zum Anmelden"}
           </Link>
         ) : (
-          <div className="mt-6 text-sm text-center"><Link to={`/login${nextQuery(next)}`} className="text-white/50 hover:text-[#29B6E8]">Zum Anmelden</Link></div>
+          <div className="mt-6 tls-type-small text-center"><Link to={`/login${nextQuery(next)}`} className="text-white/50 hover:text-[#29B6E8]">Zum Anmelden</Link></div>
         )}
       </div>
     </div>

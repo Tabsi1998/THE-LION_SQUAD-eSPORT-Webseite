@@ -94,8 +94,8 @@ export function SessionsPanel() {
           <div className="flex items-start gap-3">
             <ShieldCheck className="w-5 h-5 text-[#29B6E8] mt-1 shrink-0" />
             <div>
-              <h3 className="font-heading font-black uppercase mb-1">Aktive Sitzungen & Geräte</h3>
-              <p className="text-xs text-white/50">
+              <h3 className="tls-type-card mb-1">Aktive Sitzungen & Geräte</h3>
+              <p className="tls-type-small text-white/50">
                 Hier siehst du, wo dein Konto angemeldet ist. Melde einzelne Geräte oder alle anderen Sitzungen mit einem Klick ab.
               </p>
             </div>
@@ -105,7 +105,7 @@ export function SessionsPanel() {
             onClick={logoutAll}
             disabled={busy || otherCount === 0}
             data-testid="sessions-logout-all"
-            className="inline-flex items-center gap-2 px-4 py-2.5 rounded-sm border border-[#FF3B30]/45 text-[#FF3B30] text-xs font-bold uppercase tracking-wider hover:bg-[#FF3B30]/10 disabled:opacity-40 disabled:cursor-not-allowed shrink-0"
+            className="inline-flex items-center gap-2 px-4 py-2.5 rounded-sm border border-[#FF3B30]/45 text-[#FF3B30] tls-type-label hover:bg-[#FF3B30]/10 disabled:opacity-40 disabled:cursor-not-allowed shrink-0"
           >
             <LogOut className="w-3.5 h-3.5" /> Überall abmelden{otherCount > 0 ? ` (${otherCount})` : ""}
           </button>
@@ -113,10 +113,10 @@ export function SessionsPanel() {
       </div>
 
       {sessions === null && (
-        <div className="text-sm text-white/45 border border-white/10 rounded-sm p-6 bg-[#0A0A0A] text-center">Lade Sitzungen …</div>
+        <div className="tls-type-small text-white/45 border border-white/10 rounded-sm p-6 bg-[#0A0A0A] text-center">Lade Sitzungen …</div>
       )}
       {sessions !== null && sessions.length === 0 && (
-        <div className="text-sm text-white/45 border border-white/10 rounded-sm p-6 bg-[#0A0A0A] text-center" data-testid="sessions-empty">
+        <div className="tls-type-small text-white/45 border border-white/10 rounded-sm p-6 bg-[#0A0A0A] text-center" data-testid="sessions-empty">
           Keine aktiven Sitzungen gefunden.
         </div>
       )}
@@ -134,14 +134,14 @@ export function SessionsPanel() {
             </div>
             <div className="flex-1 min-w-0">
               <div className="flex flex-wrap items-center gap-2">
-                <span className="font-bold text-white text-sm">{device.browser} · {device.os}</span>
+                <span className="font-bold text-white tls-type-small">{device.browser} · {device.os}</span>
                 {session.current && (
-                  <span className="text-[9px] font-bold uppercase tracking-widest px-2 py-0.5 rounded-sm border border-[#29B6E8]/50 text-[#29B6E8] bg-[#29B6E8]/10" data-testid="session-current-badge">
+                  <span className="tls-type-label px-2 py-0.5 rounded-sm border border-[#29B6E8]/50 text-[#29B6E8] bg-[#29B6E8]/10" data-testid="session-current-badge">
                     Dieses Gerät
                   </span>
                 )}
               </div>
-              <div className="mt-1 text-xs text-white/45 flex flex-wrap gap-x-4 gap-y-0.5">
+              <div className="mt-1 tls-type-small text-white/45 flex flex-wrap gap-x-4 gap-y-0.5">
                 <span>Angemeldet: {formatSessionTime(session.created_at)}</span>
                 <span>Zuletzt aktiv: {formatSessionTime(session.last_active)}</span>
                 {session.expires_at && <span data-testid="session-expires">Bleibt angemeldet bis: {formatSessionTime(session.expires_at)}</span>}
@@ -153,7 +153,7 @@ export function SessionsPanel() {
               onClick={() => revoke(session)}
               disabled={busy}
               data-testid={`session-revoke-${session.id}`}
-              className="inline-flex items-center gap-2 px-3 py-2 rounded-sm border border-white/15 text-white/60 text-[11px] font-bold uppercase tracking-wider hover:border-[#FF3B30]/50 hover:text-[#FF3B30] disabled:opacity-40 shrink-0"
+              className="inline-flex items-center gap-2 px-3 py-2 rounded-sm border border-white/15 text-white/60 tls-type-label hover:border-[#FF3B30]/50 hover:text-[#FF3B30] disabled:opacity-40 shrink-0"
             >
               <LogOut className="w-3.5 h-3.5" /> Abmelden
             </button>

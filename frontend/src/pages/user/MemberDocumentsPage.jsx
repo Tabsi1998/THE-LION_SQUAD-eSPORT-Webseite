@@ -57,12 +57,12 @@ export default function MemberDocumentsPage() {
         <p className="text-white/60 max-w-2xl">
           Statuten, Protokolle, Formulare und Vereinsleitlinien - zentral abgelegt, direkt einsehbar und immer aktuell.
         </p>
-        <p className="mt-2 text-sm text-white/55" data-testid="docs-own-hint">
+        <p className="mt-2 tls-type-body text-white/55" data-testid="docs-own-hint">
           Deine eigenen Unterlagen aus der Vereinsakte (Bestätigungen, Schreiben) stehen unter{" "}
           <Link to="/mein-bereich/rechnungen?tab=unterlagen" className="text-[#29B6E8] hover:underline">Rechnungen & Unterlagen → Unterlagen</Link>.
         </p>
         {identity && identity.status !== "bound" && (
-          <div className="mt-6 border border-[#FFD700]/30 bg-[#FFD700]/5 rounded-sm p-4 text-sm text-white/75" data-testid="docs-identity-hint">
+          <div className="mt-6 border border-[#FFD700]/30 bg-[#FFD700]/5 rounded-sm p-4 tls-type-small text-white/75" data-testid="docs-identity-hint">
             Dort erscheinen sie von selbst, sobald dein Konto deinem Mitgliedseintrag zugeordnet ist (über die bestätigte E-Mail-Adresse oder durch den Vorstand) – oder du löst einen{" "}
             <Link to="/mein-bereich/mitgliedschaft" className="text-[#FFD700] hover:underline">Einladungscode unter Mitgliedschaft</Link> ein.
           </div>
@@ -73,14 +73,14 @@ export default function MemberDocumentsPage() {
             <button
               onClick={() => setActiveCat("")}
               data-testid="docs-filter-all"
-              className={`px-3 py-1.5 text-xs uppercase tracking-wider font-bold rounded-sm transition ${!activeCat ? "bg-[#FFD700] text-black" : "border border-white/10 text-white/60 hover:text-white"}`}
+              className={`px-3 py-1.5 tls-type-label rounded-sm transition ${!activeCat ? "bg-[#FFD700] text-black" : "border border-white/10 text-white/60 hover:text-white"}`}
             >Alle</button>
             {meta.categories.map((c) => (
               <button
                 key={c.k}
                 onClick={() => setActiveCat(c.k)}
                 data-testid={`docs-filter-${c.k}`}
-                className={`px-3 py-1.5 text-xs uppercase tracking-wider font-bold rounded-sm transition ${activeCat === c.k ? "bg-[#FFD700] text-black" : "border border-white/10 text-white/60 hover:text-white"}`}
+                className={`px-3 py-1.5 tls-type-label rounded-sm transition ${activeCat === c.k ? "bg-[#FFD700] text-black" : "border border-white/10 text-white/60 hover:text-white"}`}
               >{c.l}</button>
             ))}
           </div>
@@ -97,7 +97,7 @@ export default function MemberDocumentsPage() {
         ) : filtered.length === 0 ? (
           <div className="mt-10 border border-dashed border-white/15 rounded-sm p-12 text-center text-white/50">
             <FileText className="w-10 h-10 mx-auto opacity-40 mb-3" />
-            <div className="font-heading font-bold text-lg">Keine Dokumente gefunden</div>
+            <div className="tls-type-card">Keine Dokumente gefunden</div>
           </div>
         ) : (
           <div className="mt-10 space-y-8">

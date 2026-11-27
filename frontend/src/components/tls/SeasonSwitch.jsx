@@ -52,7 +52,7 @@ export function SeasonSwitch({ seasonKey, label, className = "mb-6" }) {
     }
   };
 
-  if (error) return <div className={`${className} rounded-sm border border-white/10 bg-[#121212] p-4 text-sm text-white/55`} data-testid="season-switch-error">{error}</div>;
+  if (error) return <div className={`${className} rounded-sm border border-white/10 bg-[#121212] p-4 tls-type-small text-white/55`} data-testid="season-switch-error">{error}</div>;
   if (!state) return null;
   const channels = state.channels || [];
   const toggleChannel = (channel) => {
@@ -63,18 +63,18 @@ export function SeasonSwitch({ seasonKey, label, className = "mb-6" }) {
     <section className={`${className} rounded-sm border p-4 ${state.enabled ? "border-[#00FF88]/35 bg-[#00FF88]/5" : "border-white/10 bg-[#121212]"}`} data-testid="season-switch">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="min-w-0">
-          <div className="font-heading font-bold uppercase" data-testid="season-switch-title">{label} ist {state.enabled ? "an" : "aus"}</div>
-          <p className="mt-1 text-sm text-white/65" data-testid="season-switch-window">{switchWindowText(state)}</p>
+          <div className="font-bold uppercase" data-testid="season-switch-title">{label} ist {state.enabled ? "an" : "aus"}</div>
+          <p className="mt-1 tls-type-small text-white/65" data-testid="season-switch-window">{switchWindowText(state)}</p>
         </div>
-        <label className="inline-flex items-center gap-2 text-sm font-bold shrink-0 cursor-pointer">
+        <label className="inline-flex items-center gap-2 tls-type-small font-bold shrink-0 cursor-pointer">
           <input type="checkbox" role="switch" aria-checked={Boolean(state.enabled)} checked={Boolean(state.enabled)} disabled={busy}
             onChange={(event) => save({ enabled: event.target.checked }, event.target.checked ? `${label} ist an.` : `${label} ist aus.`)}
             className="h-5 w-5 accent-[#00FF88]" data-testid="season-switch-enabled" />
           {state.enabled ? "An" : "Aus"}
         </label>
       </div>
-      <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-2 text-sm" data-testid="season-switch-channels">
-        <span className="text-xs uppercase tracking-wider text-white/45 font-bold">Erscheint auf</span>
+      <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-2 tls-type-small" data-testid="season-switch-channels">
+        <span className="tls-type-label text-white/45">Erscheint auf</span>
         {(state.supported_channels || ["web", "app"]).map((channel) => (
           <label key={channel} className="inline-flex items-center gap-2">
             <input type="checkbox" checked={channels.includes(channel)} disabled={busy} onChange={() => toggleChannel(channel)} className="accent-[#29B6E8]" data-testid={`season-switch-channel-${channel}`} />
@@ -82,9 +82,9 @@ export function SeasonSwitch({ seasonKey, label, className = "mb-6" }) {
           </label>
         ))}
       </div>
-      {!state.seasons_enabled && <p className="mt-3 text-xs text-[#FF9500]" data-testid="season-switch-global-off">Die Jahreszeiten sind gerade insgesamt aus – einschalten kann das System unter Auftritt → Jahreszeiten.</p>}
+      {!state.seasons_enabled && <p className="mt-3 tls-type-small text-[#FF9500]" data-testid="season-switch-global-off">Die Jahreszeiten sind gerade insgesamt aus – einschalten kann das System unter Auftritt → Jahreszeiten.</p>}
       {state.mode && state.mode !== "auto" && (
-        <p className="mt-2 text-xs text-white/50" data-testid="season-switch-forced">System hat das gerade {state.mode === "force_on" ? "fest eingeschaltet" : "fest ausgeschaltet"}{state.until ? ` bis ${when(state.until)}` : ""}.</p>
+        <p className="mt-2 tls-type-small text-white/50" data-testid="season-switch-forced">System hat das gerade {state.mode === "force_on" ? "fest eingeschaltet" : "fest ausgeschaltet"}{state.until ? ` bis ${when(state.until)}` : ""}.</p>
       )}
     </section>
   );

@@ -26,7 +26,7 @@ export function MultiSelect({ options = [], value = [], onChange, testId = "ms" 
             type="button"
             data-testid={`${testId}-${o.value}`}
             onClick={() => toggle(o.value)}
-            className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-sm border text-xs font-bold uppercase tracking-wider transition ${
+            className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-sm border tls-type-label transition ${
               on
                 ? "border-[#29B6E8] bg-[#29B6E8]/15 text-[#29B6E8]"
                 : "border-white/10 text-white/60 hover:border-white/30 hover:text-white"

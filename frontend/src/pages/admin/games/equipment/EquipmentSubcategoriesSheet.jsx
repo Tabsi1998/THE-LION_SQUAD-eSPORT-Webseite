@@ -55,17 +55,17 @@ export function EquipmentSubcategoriesSheet({ game, category, counts = {}, sugge
   return (
     <AdminSheet title={`Unterkategorien · ${category.label}`} eyebrow={game.name} onClose={onClose} onSubmit={submit} saving={saving} size="lg"
       submitTestId="equipment-subcategories-save" testId="equipment-subcategories-sheet">
-      <p className="text-sm text-white/65">
+      <p className="tls-type-body text-white/65">
         Ordne die Einträge in Klassen ({ROLE_EXAMPLES[category.role] || ROLE_EXAMPLES.item}). Die Sperrliste einer Season kann eine ganze
         Klasse sperren – auch Einträge, die später dazukommen. {category.role === "weapon" ? "Aufsätze lassen sich ganzen Waffenklassen zuordnen." : ""}
       </p>
       {missing.length ? (
         <div className="flex flex-wrap items-center gap-2 rounded-sm border border-[#29B6E8]/30 bg-[#29B6E8]/5 px-3 py-2" data-testid="equipment-subcategories-suggestion">
-          <p className="min-w-0 flex-1 basis-56 text-xs text-white/75">
+          <p className="min-w-0 flex-1 basis-56 tls-type-small text-white/75">
             Vorschlag: {missing.join(", ")}. Passe Namen danach an oder entferne, was das Spiel nicht hat.
           </p>
           <button type="button" onClick={addSuggestions} disabled={full} data-testid="equipment-subcategories-suggest"
-            className="tls-btn tls-btn--quiet inline-flex shrink-0 items-center gap-1.5 rounded-sm px-2.5 py-1 text-[11px] font-bold uppercase tracking-wider disabled:opacity-50">
+            className="tls-btn tls-btn--quiet inline-flex shrink-0 items-center gap-1.5 rounded-sm px-2.5 py-1 tls-type-label disabled:opacity-50">
             <Sparkles className="h-3.5 w-3.5" aria-hidden="true" /> Vorschlag einfügen
           </button>
         </div>
@@ -85,7 +85,7 @@ export function EquipmentSubcategoriesSheet({ game, category, counts = {}, sugge
                   </button>
                   <input value={row.label} maxLength={40} onChange={(event) => set(index, { label: event.target.value })} aria-label={`Name der Unterkategorie ${index + 1}`}
                     className="min-w-0 flex-1 basis-40 rounded-sm border border-white/15 bg-[#121212] px-2.5 py-1.5 text-sm text-white focus-visible:outline focus-visible:outline-1 focus-visible:outline-[#29B6E8]" />
-                  <span className="w-20 shrink-0 text-right text-[11px] tabular-nums text-white/55">{count ? `${count} Eintr.` : "leer"}</span>
+                  <span className="w-20 shrink-0 text-right tls-type-small tabular-nums text-white/55">{count ? `${count} Eintr.` : "leer"}</span>
                   <span className="flex shrink-0 items-center">
                     <button type="button" className={ICON_BUTTON} onClick={() => move(index, -1)} disabled={index === 0} aria-label={`${name} nach oben`}><ArrowUp className="h-4 w-4" /></button>
                     <button type="button" className={ICON_BUTTON} onClick={() => move(index, 1)} disabled={index === rows.length - 1} aria-label={`${name} nach unten`}><ArrowDown className="h-4 w-4" /></button>
@@ -100,7 +100,7 @@ export function EquipmentSubcategoriesSheet({ game, category, counts = {}, sugge
                   <div className="mt-2 border-t border-white/10 pt-2">
                     <ImageUpload value={row.icon_url} onChange={(value) => set(index, { icon_url: value || "" })} label="Symbol (quadratisch, optional)"
                       variant="square" crop="square" allowLibrary testId={`equipment-subcategory-icon-${index}`} {...mediaPropsFor(user)} />
-                    <p className="mt-1 text-xs text-white/45">Steht vor dem Namen in der Sperrliste und im Regelwerk.</p>
+                    <p className="mt-1 tls-type-small text-white/45">Steht vor dem Namen in der Sperrliste und im Regelwerk.</p>
                   </div>
                 ) : null}
               </li>
@@ -108,17 +108,17 @@ export function EquipmentSubcategoriesSheet({ game, category, counts = {}, sugge
           })}
         </ol>
       ) : (
-        <p className="rounded-sm border border-dashed border-white/15 px-3 py-4 text-sm text-white/60" data-testid="equipment-subcategories-empty">
+        <p className="rounded-sm border border-dashed border-white/15 px-3 py-4 tls-type-body text-white/60" data-testid="equipment-subcategories-empty">
           Noch keine Unterkategorie. Ohne bleibt die Liste wie bisher – alle Einträge stehen direkt unter „{category.label}“.
         </p>
       )}
-      {problem ? <p className="text-sm text-warn" role="alert">{problem}</p> : null}
+      {problem ? <p className="tls-type-small text-warn" role="alert">{problem}</p> : null}
       <div className="flex flex-wrap items-center gap-3">
         <button type="button" onClick={() => setRows((list) => [...list, { label: "", icon_url: "" }])} disabled={full}
-          data-testid="equipment-subcategory-add" className="tls-btn tls-btn--quiet inline-flex items-center gap-2 rounded-sm px-3 py-1.5 text-[11px] font-bold uppercase tracking-wider disabled:opacity-50">
+          data-testid="equipment-subcategory-add" className="tls-btn tls-btn--quiet inline-flex items-center gap-2 rounded-sm px-3 py-1.5 tls-type-label disabled:opacity-50">
           <Plus className="h-3.5 w-3.5" /> Unterkategorie
         </button>
-        <span className="text-[11px] text-white/50 tabular-nums">{rows.length} von höchstens {limit}</span>
+        <span className="tls-type-small text-white/50 tabular-nums">{rows.length} von höchstens {limit}</span>
       </div>
     </AdminSheet>
   );

@@ -14,6 +14,7 @@ import { formatWhen } from "@/lib/datetime";
 import { compareByNearestDate, sortByNearestDate } from "@/lib/contentSort";
 import { ArrowRight, CalendarDays, Flag, Medal, Radio, Shield, Trophy, Users } from "lucide-react";
 import { viennaDate } from "@/lib/vienna";
+import { ShortCaps } from "@/components/tls/ShortCaps";
 
 const ACTIVE_PHASES = new Set(["registration", "check_in", "live", "upcoming"]);
 const ACTIVE_STATUSES = new Set(["scheduled", "registration_open", "registration_closed", "check_in", "live"]);
@@ -83,21 +84,21 @@ export default function EsportsOverviewPage() {
         <div className="absolute inset-0 bg-gradient-to-b from-[#0A0A0A]/55 via-[#0A0A0A]/78 to-[#0A0A0A]" />
         <div className="relative mx-auto grid max-w-7xl gap-8 px-4 py-16 sm:px-6 md:grid-cols-[minmax(0,1fr)_360px] md:py-20 lg:px-8">
           <div className="max-w-3xl self-end">
-            <span className="text-[11px] font-bold uppercase tracking-[0.3em] text-[#29B6E8]">THE LION SQUAD</span>
-            <h1 className="mt-3 font-heading text-5xl font-black uppercase leading-none md:text-7xl">eSports</h1>
-            <p className="mt-5 max-w-2xl text-base leading-relaxed text-white/70">
+            <span className="tls-type-label text-[#29B6E8]">THE LION SQUAD</span>
+            <h1 className="mt-3 tls-type-title leading-none"><ShortCaps>eSports</ShortCaps></h1>
+            <p className="mt-5 max-w-2xl tls-type-body leading-relaxed text-white/70">
               {league ? "Turniere, Liga, Fast-Lap-Challenges und Jahreswertung an einem Ort." : "Turniere, Fast-Lap-Challenges und Jahreswertung an einem Ort."} Alles, was aktiv ist oder als Nächstes kommt, findest du hier.
             </p>
             <div className="mt-7 flex flex-wrap gap-3">
-              <Link to="/tournaments" className="tls-btn tls-btn--primary inline-flex items-center gap-2 rounded-sm px-5 py-3 text-xs font-bold uppercase tracking-wider">
+              <Link to="/tournaments" className="tls-btn tls-btn--primary inline-flex items-center gap-2 rounded-sm px-5 py-3 tls-type-label">
                 Turniere <ArrowRight className="h-4 w-4" />
               </Link>
               {league && (
-                <Link to="/liga" data-testid="esports-hero-league" className="tls-btn tls-btn--quiet inline-flex items-center gap-2 rounded-sm px-5 py-3 text-xs font-bold uppercase tracking-wider">
+                <Link to="/liga" data-testid="esports-hero-league" className="tls-btn tls-btn--quiet inline-flex items-center gap-2 rounded-sm px-5 py-3 tls-type-label">
                   Liga <ArrowRight className="h-4 w-4" />
                 </Link>
               )}
-              <Link to="/fastlap" className="tls-btn tls-btn--quiet inline-flex items-center gap-2 rounded-sm px-5 py-3 text-xs font-bold uppercase tracking-wider">
+              <Link to="/fastlap" className="tls-btn tls-btn--quiet inline-flex items-center gap-2 rounded-sm px-5 py-3 tls-type-label">
                 Fast Lap <ArrowRight className="h-4 w-4" />
               </Link>
             </div>
@@ -169,8 +170,8 @@ function StatCard({ icon: Icon, label, value }) {
   return (
     <div className="rounded-sm border border-white/10 bg-[#0A0A0A]/75 p-4 backdrop-blur">
       <Icon className="h-5 w-5 text-[#29B6E8]" />
-      <div className="mt-3 font-heading text-3xl font-black text-white">{value}</div>
-      <div className="mt-1 text-[10px] font-bold uppercase tracking-widest text-white/45">{label}</div>
+      <div className="mt-3 tls-type-title tls-type-num text-white">{value}</div>
+      <div className="mt-1 tls-type-label text-white/45">{label}</div>
     </div>
   );
 }
@@ -199,9 +200,9 @@ function HubLink({ to, icon: Icon, title, text, badge = "", testId }) {
         <Icon className="h-6 w-6 text-[#29B6E8]" />
         <ArrowRight className="h-4 w-4 text-white/25 transition group-hover:text-[#29B6E8] group-hover:translate-x-0.5" />
       </div>
-      <h2 className="mt-5 font-heading text-2xl font-black uppercase text-white">{title}</h2>
-      <p className="mt-2 text-sm leading-relaxed text-white/55">{text}</p>
-      {badge && <p className="mt-3 inline-flex rounded-sm border border-honor/40 bg-honor/10 px-2 py-0.5 text-[11px] font-bold uppercase tracking-wider text-honor" data-testid={testId ? `${testId}-badge` : undefined}>{badge}</p>}
+      <h2 className="mt-5 tls-type-section text-white">{title}</h2>
+      <p className="mt-2 tls-type-body leading-relaxed text-white/55">{text}</p>
+      {badge && <p className="mt-3 inline-flex rounded-sm border border-honor/40 bg-honor/10 px-2 py-0.5 tls-type-label text-honor" data-testid={testId ? `${testId}-badge` : undefined}>{badge}</p>}
     </Link>
   );
 }
@@ -210,10 +211,10 @@ function SectionHeader({ eyebrow, title, action }) {
   return (
     <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
       <div>
-        <div className="text-[10px] font-bold uppercase tracking-[0.28em] text-[#29B6E8]">{eyebrow}</div>
-        <h2 className="mt-1 font-heading text-3xl font-black uppercase">{title}</h2>
+        <div className="tls-type-label text-[#29B6E8]">{eyebrow}</div>
+        <h2 className="mt-1 tls-type-section">{title}</h2>
       </div>
-      {action && <Link to={action.to} className="text-xs font-bold uppercase tracking-wider text-white/50 hover:text-[#29B6E8]">{action.label}</Link>}
+      {action && <Link to={action.to} className="tls-type-label text-white/50 hover:text-[#29B6E8]">{action.label}</Link>}
     </div>
   );
 }
@@ -226,13 +227,13 @@ function ActivityCard({ item, index = 0 }) {
         <LazyImg src={image} priority={index < 2} alt={item.title} sizes="(min-width: 1024px) 33vw, 100vw" className="absolute inset-0 h-full w-full object-cover opacity-45 tls-card__media group-hover:opacity-65" />
         <div className="absolute inset-0 bg-gradient-to-t from-[#0A0A0A] via-[#0A0A0A]/45 to-transparent" />
         <div className="absolute left-3 top-3 flex flex-wrap gap-2">
-          <span className="rounded-sm border border-white/15 bg-black/45 px-2 py-1 text-[10px] font-bold uppercase tracking-wider text-white/75">{item.label}</span>
+          <span className="rounded-sm border border-white/15 bg-black/45 px-2 py-1 tls-type-label text-white/75">{item.label}</span>
           <PhaseBadge phase={item.public_phase} status={item.status} />
         </div>
       </div>
       <div className="p-5">
-        <h3 className="tls-card__title font-heading text-2xl font-bold leading-tight text-white">{item.title}</h3>
-        {item.description && <p className="mt-2 line-clamp-2 text-sm leading-relaxed text-white/55">{item.description}</p>}
+        <h3 className="tls-card__title tls-type-section leading-tight text-white">{item.title}</h3>
+        {item.description && <p className="mt-2 line-clamp-2 tls-type-body leading-relaxed text-white/55">{item.description}</p>}
         <ActivityMeta item={item} />
       </div>
     </Link>
@@ -256,14 +257,14 @@ function CompactList({ title, items, empty, action }) {
               )}
             </div>
             <div className="min-w-0 flex-1">
-              <div className="text-[10px] font-bold uppercase tracking-widest text-[#29B6E8]">{item.label}</div>
+              <div className="tls-type-label text-[#29B6E8]">{item.label}</div>
               <div className="mt-1 truncate font-semibold text-white group-hover:text-[#29B6E8]">{item.title}</div>
               <ActivityMeta item={item} compact />
             </div>
             <ArrowRight className="h-4 w-4 shrink-0 text-white/25 group-hover:text-[#29B6E8]" />
           </Link>
         )) : (
-          <div className="p-6 text-sm text-white/45">{empty}</div>
+          <div className="p-6 tls-type-small text-white/45">{empty}</div>
         )}
       </div>
     </section>
@@ -271,7 +272,7 @@ function CompactList({ title, items, empty, action }) {
 }
 
 function ActivityMeta({ item, compact = false }) {
-  const classes = compact ? "mt-1 gap-3 text-[11px]" : "mt-4 gap-4 text-xs";
+  const classes = compact ? "mt-1 gap-3 tls-type-small" : "mt-4 gap-4 tls-type-small";
   return (
     <div className={`flex flex-wrap items-center ${classes} text-white/55`}>
       {item.start_date && <span className="inline-flex items-center gap-1.5"><CalendarDays className="h-3.5 w-3.5 text-[#29B6E8]" />{formatWhen(item.start_date)}</span>}

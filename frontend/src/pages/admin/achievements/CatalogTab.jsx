@@ -82,7 +82,7 @@ function RetiredReason({ doc, testId }) {
   const state = retiredState(doc);
   if ((!state.active && !state.upcoming) || !doc?.retired_reason) return null;
   return (
-    <p className="mb-2 text-[11px] text-[#FF8A3D]/85 normal-case tracking-normal" data-testid={testId}>
+    <p className="mb-2 tls-type-small text-[#FF8A3D]/85" data-testid={testId}>
       {state.active ? "Nicht mehr erreichbar" : "Erreichbar bis zum Datum"} – Grund: {doc.retired_reason}
     </p>
   );
@@ -235,13 +235,13 @@ export function CatalogTab({ board = false }) {
           <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Gruppe suchen …" aria-label="Gruppe suchen" data-testid="catalog-search" className={`${INPUT_CLASS} pl-9`} />
         </label>
         <div className="flex flex-wrap gap-2">
-          <button type="button" onClick={check} disabled={checking} data-testid="catalog-check" className="px-3 py-2 border border-[#00FF88]/50 text-[#00FF88] text-[10px] font-bold uppercase tracking-wider rounded-sm inline-flex items-center gap-2 disabled:opacity-40">
+          <button type="button" onClick={check} disabled={checking} data-testid="catalog-check" className="px-3 py-2 border border-[#00FF88]/50 text-[#00FF88] tls-type-label rounded-sm inline-flex items-center gap-2 disabled:opacity-40">
             <ShieldCheck className="w-3.5 h-3.5" /> {checking ? "Prüfe …" : "Katalog prüfen"}
           </button>
-          <button type="button" onClick={exportJson} data-testid="catalog-export" className="px-3 py-2 border border-white/20 text-white/70 text-[10px] font-bold uppercase tracking-wider rounded-sm inline-flex items-center gap-2 hover:text-white">
+          <button type="button" onClick={exportJson} data-testid="catalog-export" className="px-3 py-2 border border-white/20 text-white/70 tls-type-label rounded-sm inline-flex items-center gap-2 hover:text-white">
             <Download className="w-3.5 h-3.5" /> Export
           </button>
-          <button type="button" onClick={() => setEditingGroup({})} data-testid="group-new-btn" className="px-3 py-2 bg-[#FFD700] text-black text-[10px] font-bold uppercase tracking-wider rounded-sm inline-flex items-center gap-2">
+          <button type="button" onClick={() => setEditingGroup({})} data-testid="group-new-btn" className="px-3 py-2 bg-[#FFD700] text-black tls-type-label rounded-sm inline-flex items-center gap-2">
             <Plus className="w-3.5 h-3.5" /> Neue Gruppe
           </button>
         </div>
@@ -251,7 +251,7 @@ export function CatalogTab({ board = false }) {
 
       {sections.map((section) => (
         <section key={section.value} data-testid={`catalog-section-${section.value}`}>
-          <h3 className="text-[11px] font-bold uppercase tracking-[0.25em] text-white/50 mb-2">{section.label} <span className="text-white/30">· {section.groups.length}</span></h3>
+          <h3 className="tls-type-label text-white/50 mb-2">{section.label} <span className="text-white/30">· {section.groups.length}</span></h3>
           <div className="border border-white/10 bg-[#121212] rounded-sm divide-y divide-white/5">
             {section.groups.map((g) => {
               const groupTiers = tiersByGroup[g.code] || [];
@@ -265,10 +265,10 @@ export function CatalogTab({ board = false }) {
                       <Badge material={groupTiers[groupTiers.length - 1]?.material || "bronze"} art={g.art} icon={g.icon} size="sm" animate={false} />
                       <span className="min-w-0">
                         <span className="block font-semibold tls-wrap">{g.name}</span>
-                        <span className="block text-[11px] text-white/45 truncate">{g.description || "ohne Beschreibung"}</span>
+                        <span className="block tls-type-small text-white/45 truncate">{g.description || "ohne Beschreibung"}</span>
                       </span>
                     </button>
-                    <div className="flex flex-wrap items-center gap-2 text-[10px] uppercase tracking-widest">
+                    <div className="flex flex-wrap items-center gap-2 tls-type-label">
                       <span className="text-white/40">{groupTiers.length} Stufe{groupTiers.length === 1 ? "" : "n"}</span>
                       {hidden && <span className="inline-flex items-center gap-1 text-[#A855F7]" title="Name und Stufen erscheinen erst nach der Freischaltung" data-testid={`group-hidden-${g.code}`}><EyeOff className="w-3 h-3" /> versteckt</span>}
                       {g.is_special && <span className="text-[#FFD700]">Sonder</span>}
@@ -277,17 +277,17 @@ export function CatalogTab({ board = false }) {
                       {g.staff_only && <span className="text-white/45" title="Sieht nur die Leitung - und wer sie schon hat">nur Leitung</span>}
                       <RetiredChip doc={g} testId={`group-retired-${g.code}`} />
                       <button type="button" onClick={() => togglePublic(g)} data-testid={`group-public-${g.code}`} className={`font-bold ${g.public ? "text-[#00FF88]" : "text-white/40"}`}>{g.public ? "Öffentlich" : "Intern"}</button>
-                      <button type="button" onClick={() => setEditingGroup(g)} data-testid={`group-edit-${g.code}`} className="text-[#29B6E8] hover:underline normal-case tracking-normal text-xs">Bearbeiten</button>
-                      {g.is_admin_created && <button type="button" onClick={() => deleteGroup(g)} className="text-[#FF3B30] hover:underline normal-case tracking-normal text-xs">Löschen</button>}
+                      <button type="button" onClick={() => setEditingGroup(g)} data-testid={`group-edit-${g.code}`} className="text-[#29B6E8] hover:underline tls-type-small">Bearbeiten</button>
+                      {g.is_admin_created && <button type="button" onClick={() => deleteGroup(g)} className="text-[#FF3B30] hover:underline tls-type-small">Löschen</button>}
                     </div>
                   </div>
                   {isOpen && (
                     <div className="px-4 pb-4" data-testid={`group-tiers-${g.code}`}>
-                      {hidden && <p className="mb-2 text-[11px] text-[#A855F7]/80">Versteckt: Wer die Gruppe noch nicht hat, sieht nur ein Fragezeichen – Name und Stufen erscheinen erst nach der Freischaltung.</p>}
+                      {hidden && <p className="mb-2 tls-type-small text-[#A855F7]/80">Versteckt: Wer die Gruppe noch nicht hat, sieht nur ein Fragezeichen – Name und Stufen erscheinen erst nach der Freischaltung.</p>}
                       <RetiredReason doc={g} testId={`group-retired-reason-text-${g.code}`} />
                       <div className="tls-swipe pb-0 border border-white/5 rounded-sm">
-                        <table className="w-full text-sm min-w-[640px]">
-                          <thead className="bg-[#0A0A0A] text-[10px] uppercase tracking-widest text-white/45">
+                        <table className="w-full tls-type-small min-w-[640px]">
+                          <thead className="bg-[#0A0A0A] tls-type-label text-white/45">
                             <tr>
                               <th className="text-left px-3 py-2">Material</th>
                               <th className="text-left px-3 py-2">Stufe</th>
@@ -303,31 +303,31 @@ export function CatalogTab({ board = false }) {
                               return (
                                 <tr key={t.code} data-testid={`tier-row-${t.code}`}>
                                   <td className="px-3 py-2"><MaterialChip tier={t} /></td>
-                                  <td className="px-3 py-2"><div className="font-semibold">{t.name}</div>{t.description && <div className="text-[11px] text-white/45">{t.description}</div>}</td>
-                                  <td className={`px-3 py-2 text-xs ${condition.tone}`}>
+                                  <td className="px-3 py-2"><div className="font-semibold">{t.name}</div>{t.description && <div className="tls-type-small text-white/45">{t.description}</div>}</td>
+                                  <td className={`px-3 py-2 tls-type-small ${condition.tone}`}>
                                     {condition.text}
-                                    {status && !t.manual_only && <span className="ml-2 text-[9px] uppercase tracking-widest" style={{ color: status[1] }}>{status[0]}</span>}
-                                    {t.member_only && <div className="mt-0.5 text-[9px] uppercase tracking-widest text-[#FFD700]">nur Mitglieder</div>}
+                                    {status && !t.manual_only && <span className="ml-2 tls-type-label" style={{ color: status[1] }}>{status[0]}</span>}
+                                    {t.member_only && <div className="mt-0.5 tls-type-label text-[#FFD700]">nur Mitglieder</div>}
                                     {(retiredState(t).active || retiredState(t).upcoming) && (
-                                      <div className="mt-0.5 text-[9px] uppercase tracking-widest">
+                                      <div className="mt-0.5 tls-type-label">
                                         <RetiredChip doc={t} testId={`tier-retired-${t.code}`} />
-                                        {t.retired_reason && <div className="normal-case tracking-normal text-[11px] text-white/45" data-testid={`tier-retired-reason-text-${t.code}`}>Grund: {t.retired_reason}</div>}
+                                        {t.retired_reason && <div className="tls-type-small text-white/45" data-testid={`tier-retired-reason-text-${t.code}`}>Grund: {t.retired_reason}</div>}
                                       </div>
                                     )}
                                   </td>
                                   <td className="px-3 py-2 text-right tabular-nums">+{t.points}</td>
                                   <td className="px-3 py-2 text-right whitespace-nowrap">
-                                    <button type="button" onClick={() => setEditingTier({ tier: t, group: g })} data-testid={`tier-edit-${t.code}`} className="text-[#29B6E8] hover:underline mr-3 text-xs">Bearbeiten</button>
-                                    <button type="button" onClick={() => deleteTier(t)} className="text-[#FF3B30] hover:underline text-xs">Löschen</button>
+                                    <button type="button" onClick={() => setEditingTier({ tier: t, group: g })} data-testid={`tier-edit-${t.code}`} className="text-[#29B6E8] hover:underline mr-3 tls-type-small">Bearbeiten</button>
+                                    <button type="button" onClick={() => deleteTier(t)} className="text-[#FF3B30] hover:underline tls-type-small">Löschen</button>
                                   </td>
                                 </tr>
                               );
                             })}
-                            {!groupTiers.length && <tr><td colSpan="5" className="px-3 py-6 text-center text-white/40 text-xs">Noch keine Stufen.</td></tr>}
+                            {!groupTiers.length && <tr><td colSpan="5" className="px-3 py-6 text-center text-quiet tls-type-small">Noch keine Stufen.</td></tr>}
                           </tbody>
                         </table>
                       </div>
-                      <button type="button" onClick={() => setEditingTier({ tier: null, group: g })} data-testid={`tier-new-${g.code}`} className="mt-2 px-3 py-1.5 border border-[#FFD700]/40 text-[#FFD700] text-[10px] font-bold uppercase tracking-widest rounded-sm inline-flex items-center gap-1.5">
+                      <button type="button" onClick={() => setEditingTier({ tier: null, group: g })} data-testid={`tier-new-${g.code}`} className="mt-2 px-3 py-1.5 border border-[#FFD700]/40 text-[#FFD700] tls-type-label rounded-sm inline-flex items-center gap-1.5">
                         <Plus className="w-3 h-3" /> Neue Stufe
                       </button>
                     </div>
@@ -338,7 +338,7 @@ export function CatalogTab({ board = false }) {
           </div>
         </section>
       ))}
-      {!sections.length && <p className="text-sm text-white/40">Keine Gruppe passt zur Suche.</p>}
+      {!sections.length && <p className="tls-type-small text-quiet">Keine Gruppe passt zur Suche.</p>}
 
       <Panel title="Katalog einspielen" icon={Upload} accent="#29B6E8" hint="Eine Exportdatei (JSON) übernehmen: erst wird der zusammengeführte Stand geprüft, bei Fehlern wird nichts geschrieben. Gelöscht wird nie etwas." testId="catalog-import">
         <BoardOnly board={board} what="Einspielen">
@@ -360,20 +360,20 @@ function CheckReport({ report, groupsByCode, onJump, onClose }) {
       icon={report.ok ? CheckCircle2 : AlertTriangle}
       accent={report.ok ? "#00FF88" : "#FF3B30"}
       hint={`${report.counts.groups} Gruppen und ${report.counts.tiers} Stufen geprüft – dieselben Regeln wie im automatischen Test. ${report.counts.warnings} Hinweis${report.counts.warnings === 1 ? "" : "e"}.`}
-      actions={<button type="button" onClick={onClose} className="text-[10px] uppercase tracking-widest text-white/50 hover:text-white">Schließen</button>}
+      actions={<button type="button" onClick={onClose} className="tls-type-label text-white/50 hover:text-white">Schließen</button>}
       testId="catalog-report"
     >
       {rows.length ? (
         <ul className="divide-y divide-white/5 max-h-80 overflow-y-auto">
           {rows.map((f, i) => (
-            <li key={`${f.code}-${f.group || ""}-${f.tier || ""}-${i}`} className="py-2 flex items-start gap-3 text-xs" data-testid={`finding-${f.level}`}>
-              <span className={`mt-0.5 shrink-0 text-[9px] font-bold uppercase tracking-widest ${f.level === "error" ? "text-[#FF3B30]" : "text-[#FFD700]"}`}>{f.level === "error" ? "Fehler" : "Hinweis"}</span>
+            <li key={`${f.code}-${f.group || ""}-${f.tier || ""}-${i}`} className="py-2 flex items-start gap-3 tls-type-small" data-testid={`finding-${f.level}`}>
+              <span className={`mt-0.5 shrink-0 tls-type-label ${f.level === "error" ? "text-[#FF3B30]" : "text-[#FFD700]"}`}>{f.level === "error" ? "Fehler" : "Hinweis"}</span>
               <span className="flex-1 text-white/75">{f.message}</span>
               {f.group && groupsByCode[f.group] && <button type="button" onClick={() => onJump(f.group)} className="shrink-0 text-[#29B6E8] hover:underline">zur Gruppe</button>}
             </li>
           ))}
         </ul>
-      ) : <p className="text-xs text-white/55">Alles in Ordnung.</p>}
+      ) : <p className="tls-type-small text-white/55">Alles in Ordnung.</p>}
     </Panel>
   );
 }
@@ -422,7 +422,7 @@ function ImportBox({ onApplied }) {
     <div className="space-y-3">
       <FilePick label="Exportdatei wählen" accept="application/json,.json" onFile={onFile} testId="catalog-import-file" />
       {result && (
-        <div className="text-xs border border-white/10 rounded-sm p-3 space-y-2" data-testid="catalog-import-result">
+        <div className="tls-type-small border border-white/10 rounded-sm p-3 space-y-2" data-testid="catalog-import-result">
           <div>{result.groups} Gruppen und {result.tiers} Stufen in der Datei · {result.check.ok ? <span className="text-[#00FF88]">Prüfung ohne Fehler</span> : <span className="text-[#FF3B30]">{result.check.counts.errors} Fehler – nichts eingespielt</span>}</div>
           {!result.check.ok && (
             <ul className="list-disc pl-5 text-white/70 max-h-40 overflow-y-auto">
@@ -430,7 +430,7 @@ function ImportBox({ onApplied }) {
             </ul>
           )}
           {payload && result.check.ok && !result.applied && (
-            <button type="button" onClick={() => send(payload, false)} disabled={busy} data-testid="catalog-import-apply" className="px-3 py-1.5 bg-[#29B6E8] text-black text-[10px] font-bold uppercase tracking-widest rounded-sm disabled:opacity-40">
+            <button type="button" onClick={() => send(payload, false)} disabled={busy} data-testid="catalog-import-apply" className="px-3 py-1.5 bg-[#29B6E8] text-black tls-type-label rounded-sm disabled:opacity-40">
               {busy ? "Spiele ein …" : "Jetzt einspielen"}
             </button>
           )}

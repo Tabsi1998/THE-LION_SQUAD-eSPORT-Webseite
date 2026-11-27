@@ -19,7 +19,7 @@ function LogoSurface({ src, light = false, testId }) {
       <div className={`h-20 rounded-sm border flex items-center justify-center p-3 ${light ? "bg-white border-black/10" : "bg-[#0A0A0A] border-white/10"}`} data-testid={testId}>
         <img src={resolveMediaUrl(src)} alt="" className="max-h-full max-w-full object-contain" />
       </div>
-      <figcaption className="text-[10px] uppercase tracking-widest font-bold text-white/45">{light ? "Heller Grund" : "Dunkler Grund"}</figcaption>
+      <figcaption className="tls-type-label text-white/45">{light ? "Heller Grund" : "Dunkler Grund"}</figcaption>
     </figure>
   );
 }

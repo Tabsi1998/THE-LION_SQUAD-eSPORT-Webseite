@@ -66,7 +66,7 @@ export function TvCheckInScreen({ tournament, registrations = [] }) {
       <div className="tv-screen-checkin__left">
         <div className="tv-kicker tv-t-head tv-green">Check-in läuft</div>
         <div className="tv-screen-checkin__title font-heading" data-fit={String(tournament?.title || "").length > 22 ? "small" : undefined}>{tournament?.title}</div>
-        <div className="tv-screen-checkin__num" data-testid="tv-checkin-count"><b className="font-heading">{view.present}</b><small className="tv-t-head">von {view.total} da</small></div>
+        <div className="tv-screen-checkin__num" data-testid="tv-checkin-count"><b className="tls-type-num">{view.present}</b><small className="tv-t-head">von {view.total} da</small></div>
         <div className="tv-screen-checkin__bar" role="presentation"><i style={{ width: `${(share * 100).toFixed(2)}%` }} /></div>
         <p className="tv-t-head tv-muted" data-testid="tv-checkin-hint">
           {view.allPresent ? "Alle da. Gleich geht es los." : [view.closesText, "Noch nicht da? Bitte bei der Turnierleitung melden."].filter(Boolean).join(" ")}

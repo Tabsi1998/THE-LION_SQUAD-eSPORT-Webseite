@@ -20,7 +20,7 @@ function labelContent(label, required) {
   return (
     <span className="flex items-center justify-between gap-3">
       <span>{label}</span>
-      {required && <span className="text-[9px] text-[#FFD700]">Pflichtfeld</span>}
+      {required && <span className="tls-type-small text-[#FFD700]">Pflichtfeld</span>}
     </span>
   );
 }
@@ -50,7 +50,7 @@ export function AuthTextField({
 
   return (
     <div className="block">
-      <label htmlFor={id} className="block text-[11px] font-bold uppercase tracking-widest text-white/65 mb-1.5">
+      <label htmlFor={id} className="block tls-type-label text-white/65 mb-1.5">
         {labelContent(label, required)}
       </label>
       <input
@@ -91,7 +91,7 @@ export function AuthPasswordField({
 
   return (
     <div className="block">
-      <label htmlFor={id} className="block text-[11px] font-bold uppercase tracking-widest text-white/65 mb-1.5">
+      <label htmlFor={id} className="block tls-type-label text-white/65 mb-1.5">
         {labelContent(label, required)}
       </label>
       <div className="relative">
@@ -138,7 +138,7 @@ export function AuthSelectField({
 
   return (
     <div className="block">
-      <label htmlFor={id} className="block text-[11px] font-bold uppercase tracking-widest text-white/65 mb-1.5">
+      <label htmlFor={id} className="block tls-type-label text-white/65 mb-1.5">
         {labelContent(label, required)}
       </label>
       <select
@@ -163,7 +163,7 @@ export function AuthCheckboxField({ id, checked, onChange, required = false, err
 
   return (
     <div>
-      <label className="flex items-start gap-2 text-sm text-white/75">
+      <label className="flex items-start gap-2 tls-type-small text-white/75">
         <input
           id={id}
           type="checkbox"
@@ -193,7 +193,7 @@ export function AuthFormAlert({ id, tone = "error", children }) {
     : "text-[#FF8A80] bg-[#FF3B30]/10 border-[#FF3B30]/35";
 
   return (
-    <div id={id} role={tone === "error" ? "alert" : "status"} className={`text-sm border p-3 rounded-sm ${cls}`}>
+    <div id={id} role={tone === "error" ? "alert" : "status"} className={`tls-type-small border p-3 rounded-sm ${cls}`}>
       {children}
     </div>
   );
@@ -202,8 +202,8 @@ export function AuthFormAlert({ id, tone = "error", children }) {
 function FieldHelp({ ids, description, error }) {
   return (
     <>
-      {description && <div id={ids.descriptionId} className="mt-1 text-[10px] text-white/45">{description}</div>}
-      {error && <div id={ids.errorId} role="alert" className="mt-1 text-xs text-[#FF8A80]">{error}</div>}
+      {description && <div id={ids.descriptionId} className="mt-1 tls-type-small text-white/45">{description}</div>}
+      {error && <div id={ids.errorId} role="alert" className="mt-1 tls-type-small text-[#FF8A80]">{error}</div>}
     </>
   );
 }

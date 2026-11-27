@@ -44,7 +44,7 @@ function SessionRow({ session, index, onChange, onRemove, removable, racePoints 
           {session.points_mode === "own" && (
             <TextField label="Punkte je Platz" value={session.points} onChange={(points) => onChange({ points })} placeholder="12, 9, 7, 6, 5" testId="weekend-session-points" />
           )}
-          <p className="text-xs text-white/55 tabular-nums" data-testid="weekend-session-preview">
+          <p className="tls-type-small text-white/55 tabular-nums" data-testid="weekend-session-preview">
             {session.points_mode === "series" && racePoints === null ? "Wie das Rennen (laut Veranstalter)" : pointsPreview(list)}
           </p>
         </div>
@@ -83,7 +83,7 @@ export function WeekendFormatsField({ formats, onChange, racePoints = [] }) {
       hint="Eine Runde (gleiches Kürzel) hat mehrere Läufe – etwa Qualifying, Sprint und Rennen. Die Terminliste legt je Zeile alle Läufe an, mit dem Versatz ab der Uhrzeit der Zeile. Ein Qualifying zählt in der Regel nicht; sein Platz 1 ist die Pole.">
       {formats.length === 0 ? (
         <button type="button" onClick={() => onChange([emptyFormat()])} data-testid="weekend-add"
-          className="tls-btn tls-btn--quiet px-3 py-2 rounded-sm text-[11px] font-bold uppercase tracking-wider inline-flex items-center gap-1.5">
+          className="tls-btn tls-btn--quiet px-3 py-2 rounded-sm tls-type-label inline-flex items-center gap-1.5">
           <Plus className="w-3.5 h-3.5" /> Ablauf festlegen
         </button>
       ) : (
@@ -94,10 +94,10 @@ export function WeekendFormatsField({ formats, onChange, racePoints = [] }) {
                 <div className="flex items-end gap-3">
                   {/* „Format 1: Quali + Sprint + Hauptrennen“ - die Läufe in zeitlicher Reihenfolge. */}
                   <div className="flex-1 min-w-0">
-                    <p className="text-xs font-bold uppercase tracking-widest text-white/60" data-testid="weekend-format-title">
+                    <p className="tls-type-label text-white/60" data-testid="weekend-format-title">
                       {`Format ${index + 1}`}{index === 0 ? " · ab Runde 1" : ""}
                     </p>
-                    <p className="mt-0.5 text-sm text-white/80 [overflow-wrap:anywhere]" data-testid="weekend-format-summary">{formatSummary(format.sessions)}</p>
+                    <p className="mt-0.5 tls-type-small text-white/80 [overflow-wrap:anywhere]" data-testid="weekend-format-summary">{formatSummary(format.sessions)}</p>
                   </div>
                   {index > 0 && (
                     <TextField label="Ab Runde" type="number" min="2" value={format.from_round} onChange={(from_round) => update(format.key, { from_round })} className="w-28 shrink-0" testId="weekend-format-from" />
@@ -123,7 +123,7 @@ export function WeekendFormatsField({ formats, onChange, racePoints = [] }) {
                 </ol>
                 {format.sessions.length < 6 && (
                   <button type="button" onClick={() => update(format.key, { sessions: [...format.sessions, emptySession({ label: "Sprint", grid: "manual" })] })} data-testid="weekend-session-add"
-                    className="tls-btn tls-btn--quiet px-3 py-1.5 rounded-sm text-[11px] font-bold uppercase tracking-wider inline-flex items-center gap-1.5">
+                    className="tls-btn tls-btn--quiet px-3 py-1.5 rounded-sm tls-type-label inline-flex items-center gap-1.5">
                     <Plus className="w-3.5 h-3.5" /> Lauf
                   </button>
                 )}
@@ -131,7 +131,7 @@ export function WeekendFormatsField({ formats, onChange, racePoints = [] }) {
             ))}
           </ol>
           <button type="button" onClick={addPhase} data-testid="weekend-phase-add"
-            className="tls-btn tls-btn--quiet px-3 py-2 rounded-sm text-[11px] font-bold uppercase tracking-wider inline-flex items-center gap-1.5">
+            className="tls-btn tls-btn--quiet px-3 py-2 rounded-sm tls-type-label inline-flex items-center gap-1.5">
             <Plus className="w-3.5 h-3.5" /> Format ab Runde …
           </button>
         </>

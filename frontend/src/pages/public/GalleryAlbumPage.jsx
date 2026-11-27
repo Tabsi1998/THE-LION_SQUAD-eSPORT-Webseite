@@ -137,7 +137,7 @@ export default function GalleryAlbumPage() {
   if (error) return (
     <PublicLayout>
       <div className="max-w-2xl mx-auto px-6 py-20 text-center">
-        <h1 className="font-heading text-3xl font-black">{error}</h1>
+        <h1 className="tls-type-title">{error}</h1>
         <Link to="/galerie" className="mt-6 inline-flex items-center gap-2 text-[#29B6E8]"><ArrowLeft className="w-4 h-4" /> Zurück</Link>
       </div>
     </PublicLayout>
@@ -156,14 +156,14 @@ export default function GalleryAlbumPage() {
           className="mb-3"
         />
         <div className="flex items-center justify-between gap-3">
-          <Link to="/galerie" data-testid="album-back" className="inline-flex items-center gap-2 text-xs uppercase tracking-wider text-white/50 hover:text-[#29B6E8]">
+          <Link to="/galerie" data-testid="album-back" className="inline-flex items-center gap-2 tls-type-label text-white/50 hover:text-[#29B6E8]">
             <ArrowLeft className="w-3.5 h-3.5" /> Alle Alben
           </Link>
           {/* Teilen (#1154): Mitglieder-Alben öffnen sich nur für Mitglieder. */}
           <ShareButton kind="album" id={a.slug || a.id} title={a.title} detail="Galerie" />
         </div>
-        <h1 className="mt-6 font-heading text-3xl md:text-5xl font-black uppercase">{a.title}</h1>
-        <div className="mt-3 flex flex-wrap items-center gap-4 text-sm text-white/60">
+        <h1 className="mt-6 tls-type-title">{a.title}</h1>
+        <div className="mt-3 flex flex-wrap items-center gap-4 tls-type-small text-white/60">
           {a.taken_at && <span className="inline-flex items-center gap-1.5"><Calendar className="w-3.5 h-3.5" /> {viennaDate(a.taken_at, { dateStyle: "long" })}</span>}
           {/* Fotos gehören zum Event (#1185): das Album nennt sein Event und führt zurück. */}
           {a.event && <Link to={`/events/${a.event.slug || a.event.id}`} className="text-[#9F7AEA] hover:underline" data-testid="album-event-link">Vom Event: {a.event.name} →</Link>}
@@ -175,7 +175,7 @@ export default function GalleryAlbumPage() {
         {hasSections && (
           <div className="mt-6 flex flex-wrap gap-2">
             {sectionGroups.map((group) => (
-              <a key={group.id} href={`#${sectionAnchor(group.section || { id: group.id })}`} className="tls-btn tls-btn--quiet inline-flex items-center gap-2 rounded-sm px-3 py-2 text-xs font-bold uppercase tracking-wider">
+              <a key={group.id} href={`#${sectionAnchor(group.section || { id: group.id })}`} className="tls-btn tls-btn--quiet inline-flex items-center gap-2 rounded-sm px-3 py-2 tls-type-label">
                 {group.title || "Medien"} <span className="text-white/35">{group.items.length}</span>
               </a>
             ))}
@@ -192,10 +192,10 @@ export default function GalleryAlbumPage() {
                 {hasSections && (
                   <div className="mb-4 flex items-end justify-between gap-3 border-b border-white/10 pb-3">
                     <div>
-                      <h2 className="font-heading text-2xl md:text-3xl font-black uppercase">{group.title}</h2>
-                      {group.description && <p className="mt-1 text-sm text-white/55 max-w-2xl">{group.description}</p>}
+                      <h2 className="tls-type-section">{group.title}</h2>
+                      {group.description && <p className="mt-1 tls-type-body text-white/55 max-w-2xl">{group.description}</p>}
                     </div>
-                    <span className="text-[10px] uppercase tracking-widest text-white/40">{group.items.length} Medien</span>
+                    <span className="tls-type-label text-quiet">{group.items.length} Medien</span>
                   </div>
                 )}
                 <div className="columns-2 sm:columns-3 xl:columns-4 gap-3">
@@ -265,11 +265,11 @@ function GalleryTile({ item, onDimensions }) {
       ) : (
         <div className="w-full h-full flex flex-col items-center justify-center gap-2 text-white/35">
           <Film className="w-9 h-9" />
-          <span className="text-[10px] uppercase tracking-widest font-bold">Video</span>
+          <span className="tls-type-label">Video</span>
         </div>
       )}
       <div className="absolute inset-0 bg-gradient-to-t from-black/65 via-transparent to-transparent" />
-      <span className="absolute left-2 bottom-2 inline-flex items-center gap-1 rounded-sm bg-black/70 px-2 py-1 text-[10px] font-black uppercase tracking-widest text-white">
+      <span className="absolute left-2 bottom-2 inline-flex items-center gap-1 rounded-sm bg-black/70 px-2 py-1 tls-type-label text-white">
         <Play className="w-3 h-3 fill-current" /> {item.embed_provider ? providerLabel(item.embed_provider) : "Video"}
       </span>
     </>
@@ -361,10 +361,10 @@ function Lightbox({ item, onClose, onPrev, onNext, tile = null }) {
       </div>
       <button onClick={(e) => { e.stopPropagation(); onNext(); }} className="absolute right-4 p-3 text-white/70 hover:text-white z-10" aria-label="Nächstes"><ChevronRight className="w-6 h-6" /></button>
       {(item.caption || photoCredit(item)) && (
-        <div className="absolute bottom-4 left-1/2 -translate-x-1/2 max-w-[80vw] text-center text-sm text-white/85 bg-black/60 px-4 py-2 rounded-sm">
+        <div className="absolute bottom-4 left-1/2 -translate-x-1/2 max-w-[80vw] text-center tls-type-small text-white/85 bg-black/60 px-4 py-2 rounded-sm">
           {item.caption}
           {/* Eingesandt (#1186): „Foto: Name“, wenn die Person das wollte. */}
-          {photoCredit(item) ? <span className={item.caption ? "block text-xs text-white/60" : ""} data-testid="gallery-lightbox-credit">{photoCredit(item)}</span> : null}
+          {photoCredit(item) ? <span className={item.caption ? "block tls-type-small text-white/60" : ""} data-testid="gallery-lightbox-credit">{photoCredit(item)}</span> : null}
         </div>
       )}
     </div>
@@ -383,7 +383,7 @@ function LightboxImage({ item }) {
         className="max-w-[90vw] max-h-[78vh] object-contain"
       />
       {originalUrl && (
-        <a href={originalUrl} download={item.original_filename || undefined} className="tls-btn tls-btn--quiet inline-flex items-center gap-2 rounded-sm px-4 py-2 text-xs font-bold uppercase tracking-wider">
+        <a href={originalUrl} download={item.original_filename || undefined} className="tls-btn tls-btn--quiet inline-flex items-center gap-2 rounded-sm px-4 py-2 tls-type-label">
           <Download className="w-3.5 h-3.5" /> Original herunterladen
         </a>
       )}
@@ -445,7 +445,7 @@ function LightboxVideo({ item }) {
           preload="metadata"
           className="max-w-[90vw] max-h-[78vh] bg-black"
         />
-        <a href={src} download className="tls-btn tls-btn--quiet inline-flex items-center gap-2 rounded-sm px-4 py-2 text-xs font-bold uppercase tracking-wider">
+        <a href={src} download className="tls-btn tls-btn--quiet inline-flex items-center gap-2 rounded-sm px-4 py-2 tls-type-label">
           <Download className="w-3.5 h-3.5" /> Video herunterladen
         </a>
       </div>

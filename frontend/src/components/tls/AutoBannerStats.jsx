@@ -18,23 +18,23 @@ export function AutoBannerList() {
 
   return (
     <div className="border border-white/10 bg-[#121212] rounded-sm p-4" data-testid="auto-banner-list">
-      <div className="font-bold uppercase tracking-widest text-xs text-white/65 mb-1">Automatische Banner</div>
-      <p className="text-[11px] text-white/45 mb-3">Laufen von selbst an Turnier, Fast-Lap-Challenge oder Server. Geschaltet werden sie dort.</p>
+      <div className="tls-type-label text-white/65 mb-1">Automatische Banner</div>
+      <p className="tls-type-small text-white/45 mb-3">Laufen von selbst an Turnier, Fast-Lap-Challenge oder Server. Geschaltet werden sie dort.</p>
       <div className="space-y-2">
         {(items || []).map((item) => (
           <div key={item.id} className="border border-white/10 bg-black/20 rounded-sm p-3" data-testid={`auto-banner-${item.id}`}>
-            <div className="text-[10px] font-bold uppercase tracking-widest text-honor">
+            <div className="tls-type-label text-honor">
               {autoBannerKindLabel(item.kind)} · {autoBannerTemplateLabel(item.kind, item.template)}
             </div>
-            <div className="font-bold text-sm break-words">{item.title || item.text}</div>
-            {item.title && item.text && <div className="text-[11px] text-white/55 break-words">{item.text}</div>}
-            <div className="text-[11px] text-white/45">{autoBannerPeriod(item)}</div>
-            <div className="mt-1 text-[11px] text-white/45">{autoBannerNumbers(item.stats)}</div>
+            <div className="font-bold tls-type-small break-words">{item.title || item.text}</div>
+            {item.title && item.text && <div className="tls-type-small text-white/55 break-words">{item.text}</div>}
+            <div className="tls-type-small text-white/45">{autoBannerPeriod(item)}</div>
+            <div className="mt-1 tls-type-small text-white/45">{autoBannerNumbers(item.stats)}</div>
             {item.manage_url && (() => {
               const linkText = item.kind === "server" ? "Zu den Servern" : item.kind === "fastlap" ? "Zur Challenge" : "Zum Turnier";
               // Mehrere gleich lautende Links in der Liste: der Titel sagt dem Screenreader, wohin es geht.
               return (
-                <Link to={item.manage_url} aria-label={item.title ? `${linkText} ${item.title}` : linkText} className="mt-1 inline-block text-[11px] font-bold text-[#29B6E8] hover:underline">
+                <Link to={item.manage_url} aria-label={item.title ? `${linkText} ${item.title}` : linkText} className="mt-1 inline-block tls-type-small font-bold text-[#29B6E8] hover:underline">
                   {linkText}
                 </Link>
               );
@@ -42,7 +42,7 @@ export function AutoBannerList() {
           </div>
         ))}
         {items && items.length === 0 && (
-          <div className="text-sm text-white/35 py-4 text-center">
+          <div className="tls-type-small text-quiet py-4 text-center">
             {failed ? "Automatische Banner konnten nicht geladen werden." : "Gerade läuft kein automatischer Banner."}
           </div>
         )}
@@ -66,7 +66,7 @@ export function AutoBannerStats({ kind, refId }) {
   const items = Array.isArray(data?.items) ? data.items : [];
   if (items.length === 0) return null;
   return (
-    <div className="-mt-1 pl-5 text-xs text-white/50" data-testid={`auto-banner-stats-${kind}`}>
+    <div className="-mt-1 pl-5 tls-type-small text-white/50" data-testid={`auto-banner-stats-${kind}`}>
       <div>{autoBannerNumbers(data.total)}</div>
       {items.length > 1 && items.map((item) => (
         <div key={item.id} className="text-white/50">

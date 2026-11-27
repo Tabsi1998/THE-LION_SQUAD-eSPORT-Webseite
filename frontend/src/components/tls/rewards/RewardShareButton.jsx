@@ -43,7 +43,7 @@ export function RewardShareButton({ award, nav = typeof navigator !== "undefined
   if (!canShareReward(award)) return null;
   const url = rewardShareLink(award);
   const text = [award?.reward?.name, award?.reward?.art?.season, award?.reward?.art?.division, "THE LION SQUAD"].filter(Boolean).join(" · ");
-  const button = "tls-btn inline-flex min-h-[44px] items-center justify-center gap-2 px-3 py-2 text-[11px] font-bold uppercase tracking-widest rounded-sm";
+  const button = "tls-btn inline-flex min-h-[44px] items-center justify-center gap-2 px-3 py-2 tls-type-label rounded-sm";
   if (mobile) {
     const share = async () => {
       const result = await shareResultImage({ file: fileRef.current, url, text, title: award?.reward?.name, nav });

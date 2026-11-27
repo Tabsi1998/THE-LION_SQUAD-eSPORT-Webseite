@@ -104,21 +104,21 @@ function PrizesView({ data, onRetry }) {
 
       {certificates.length > 0 && (
         <section className="mb-10">
-          <h2 className="text-lg font-heading font-bold uppercase tracking-widest text-[#FFD700] mb-4">Meine Urkunden</h2>
+          <h2 className="tls-type-section text-[#FFD700] mb-4">Meine Urkunden</h2>
           <div className="grid sm:grid-cols-2 gap-4">{certificates.map((item) => <CertificateCard key={item.id} item={item} />)}</div>
         </section>
       )}
 
       {open.length > 0 && (
         <section className="mb-10">
-          <h2 className="text-lg font-heading font-bold uppercase tracking-widest text-[#29B6E8] mb-4">Offene Gewinne</h2>
+          <h2 className="tls-type-section text-[#29B6E8] mb-4">Offene Gewinne</h2>
           <div className="grid sm:grid-cols-2 gap-4">{open.map((p) => <PrizeCard key={p.id} p={p} highlight />)}</div>
         </section>
       )}
 
       {closed.length > 0 && (
         <section>
-          <h2 className="text-lg font-heading font-bold uppercase tracking-widest text-white/60 mb-4">Archiv</h2>
+          <h2 className="tls-type-section text-white/60 mb-4">Archiv</h2>
           <div className="grid sm:grid-cols-2 gap-4">{closed.map((p) => <PrizeCard key={p.id} p={p} />)}</div>
         </section>
       )}
@@ -129,10 +129,10 @@ function PrizesView({ data, onRetry }) {
 function PrizeStat({ icon: Icon, label, value, color }) {
   return (
     <div className="border border-white/10 bg-[#121212] rounded-sm p-4">
-      <div className="flex items-center gap-2 text-[10px] uppercase tracking-widest text-white/45 font-bold">
+      <div className="flex items-center gap-2 tls-type-label text-white/45">
         <Icon className="w-3.5 h-3.5" style={{ color }} /> {label}
       </div>
-      <div className="mt-2 font-heading text-2xl font-black tabular-nums" style={{ color }}>{value}</div>
+      <div className="mt-2 tls-type-section tls-type-num" style={{ color }}>{value}</div>
     </div>
   );
 }
@@ -148,23 +148,23 @@ function CertificateCard({ item }) {
     <div data-testid={`my-certificate-${item.id}`} className="border border-[#FFD700]/35 bg-gradient-to-br from-[#FFD700]/10 to-transparent rounded-sm p-5">
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
-          <div className="text-[11px] font-bold uppercase tracking-widest text-[#FFD700] flex items-center gap-2">
+          <div className="tls-type-label text-[#FFD700] flex items-center gap-2">
             <Award className="w-3.5 h-3.5" /> {item.label || `Platz #${item.rank}`}
           </div>
-          <div className="font-heading font-bold text-lg uppercase mt-1">{item.title}</div>
-          <div className="mt-1 text-xs text-white/50">{item.category || "Gesamtwertung"}</div>
+          <div className="tls-type-card mt-1">{item.title}</div>
+          <div className="mt-1 tls-type-small text-white/50">{item.category || "Gesamtwertung"}</div>
         </div>
-        <div className="shrink-0 w-10 h-10 border border-[#FFD700]/40 rounded-sm flex items-center justify-center font-heading font-black text-[#FFD700]">
+        <div className="shrink-0 w-10 h-10 border border-[#FFD700]/40 rounded-sm flex items-center justify-center tls-type-num text-[#FFD700]">
           {item.rank}
         </div>
       </div>
       <div className="mt-4 flex flex-wrap gap-2">
         {item.source_url && (
-          <Link to={item.source_url} className="inline-flex items-center gap-2 px-3 py-2 border border-white/15 text-white/70 rounded-sm text-[10px] uppercase tracking-wider font-bold hover:text-white">
+          <Link to={item.source_url} className="inline-flex items-center gap-2 px-3 py-2 border border-white/15 text-white/70 rounded-sm tls-type-label hover:text-white">
             Anzeigen
           </Link>
         )}
-        <a href={absoluteDownloadUrl(item.download_url)} target="_blank" rel="noreferrer" className="inline-flex items-center gap-2 px-3 py-2 border border-[#FFD700]/45 text-[#FFD700] rounded-sm text-[10px] uppercase tracking-wider font-bold hover:bg-[#FFD700]/10">
+        <a href={absoluteDownloadUrl(item.download_url)} target="_blank" rel="noreferrer" className="inline-flex items-center gap-2 px-3 py-2 border border-[#FFD700]/45 text-[#FFD700] rounded-sm tls-type-label hover:bg-[#FFD700]/10">
           <Download className="w-3 h-3" /> PDF
         </a>
       </div>
@@ -181,49 +181,49 @@ function PrizeCard({ p, highlight }) {
     <div data-testid={`my-prize-${p.id}`} className={`border rounded-sm p-5 ${highlight ? "border-[#29B6E8]/40 bg-gradient-to-br from-[#29B6E8]/5 to-transparent" : "border-white/10 bg-[#121212]"}`}>
       <div className="flex items-start justify-between mb-3">
         <div className="min-w-0">
-          <div className="text-[11px] font-bold uppercase tracking-widest text-[#29B6E8] flex items-center gap-2">
+          <div className="tls-type-label text-[#29B6E8] flex items-center gap-2">
             {/* Verlosung (#641): ein Gewinn aus dem Adventkalender hat keinen Platz. */}
             {p.source_type === "season" ? <><Gift className="w-3.5 h-3.5" /> {p.place_label || "Verlosung"}</> : <><Trophy className="w-3.5 h-3.5" /> Platz #{p.place}</>}
           </div>
-          <div className="font-heading font-bold text-lg uppercase mt-1">{p.prize_label}</div>
+          <div className="tls-type-card mt-1">{p.prize_label}</div>
           {p.recipient_type === "team" && (
-            <div className="mt-1 inline-flex items-center gap-1.5 text-[10px] uppercase tracking-widest text-[#10B981]">
+            <div className="mt-1 inline-flex items-center gap-1.5 tls-type-label text-[#10B981]">
               <Users className="w-3 h-3" /> Team-Gewinn: {p.recipient_label}
             </div>
           )}
         </div>
-        <span className={`inline-flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider ${s.color}`}>
+        <span className={`inline-flex items-center gap-1.5 tls-type-label ${s.color}`}>
           <Icn className="w-3.5 h-3.5" /> {s.label}
         </span>
       </div>
       {(p.source_url || p.tournament_slug) && (
-        <Link to={p.source_url || `/tournaments/${p.tournament_slug}`} className="text-sm text-white/70 hover:text-[#29B6E8] block mb-2">
+        <Link to={p.source_url || `/tournaments/${p.tournament_slug}`} className="tls-type-small text-white/70 hover:text-[#29B6E8] block mb-2">
           {p.fastlap_challenge_title || p.tournament_title}{p.source_type === "season" && p.season_source_label ? ` · ${p.season_source_label}` : ""}
         </Link>
       )}
-      {p.fastlap_source_label && <div className="text-xs text-[#29B6E8] mb-2">{p.fastlap_source_label}</div>}
-      {p.prize_value && <div className="text-xs text-white/40">{p.prize_value}</div>}
+      {p.fastlap_source_label && <div className="tls-type-small text-[#29B6E8] mb-2">{p.fastlap_source_label}</div>}
+      {p.prize_value && <div className="tls-type-small text-quiet">{p.prize_value}</div>}
       {p.status === "ready" && (
-        <div className="mt-3 text-xs text-[#29B6E8] flex items-center gap-1.5 border border-[#29B6E8]/20 bg-[#29B6E8]/5 rounded-sm px-3 py-2">
+        <div className="mt-3 tls-type-small text-[#29B6E8] flex items-center gap-1.5 border border-[#29B6E8]/20 bg-[#29B6E8]/5 rounded-sm px-3 py-2">
           <MapPin className="w-3 h-3" /> Hol dir deinen Preis beim nächsten Vereinsabend!
         </div>
       )}
       {/* Die Abholfrist läuft ab „Bereit“ (#2123, ER1) - vorher bereitet der Verein den Gewinn noch vor. */}
       {p.status === "pending" && (
-        <div className="mt-3 text-[11px] flex items-center gap-1.5 text-white/40" data-testid={`my-prize-pending-${p.id}`}>
+        <div className="mt-3 tls-type-small flex items-center gap-1.5 text-quiet" data-testid={`my-prize-pending-${p.id}`}>
           <CalendarDays className="w-3 h-3" />
           Wir melden uns, sobald er abholbereit ist – ab dann hast du 90 Tage Zeit.
         </div>
       )}
       {p.pickup_deadline && p.status === "ready" && (
-        <div className={`mt-3 text-[11px] flex items-center gap-1.5 ${urgent ? "text-[#FFD700]" : "text-white/40"}`}>
+        <div className={`mt-3 tls-type-small flex items-center gap-1.5 ${urgent ? "text-[#FFD700]" : "text-quiet"}`}>
           <CalendarDays className="w-3 h-3" />
           Abholbar bis: {formatDate(p.pickup_deadline)}
           {urgent && <span className="font-bold uppercase tracking-widest">· {due < 0 ? "überfällig" : `${due} Tage`}</span>}
         </div>
       )}
       {p.picked_up_at && (
-        <div className="mt-2 text-[11px] text-white/40">
+        <div className="mt-2 tls-type-small text-quiet">
           Übergeben: {formatDate(p.picked_up_at)}
         </div>
       )}

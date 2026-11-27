@@ -83,16 +83,16 @@ export function MatchReportForm({ participants = [], match = {}, entry: serverEn
 
   return (
     <div className="space-y-4" data-testid="match-report">
-      <div className="text-xs text-[#29B6E8] font-bold uppercase tracking-wider flex items-center gap-2"><ClipboardCheck className="w-3.5 h-3.5" /> Ergebnis melden</div>
+      <div className="tls-type-label text-[#29B6E8] flex items-center gap-2"><ClipboardCheck className="w-3.5 h-3.5" /> Ergebnis melden</div>
 
       {status !== "open" && status !== "agreed" && (
-        <div className={`rounded-sm border px-4 py-3 text-sm ${TONE[status] || TONE.waiting}`} data-testid="match-report-state" data-status={status}>
+        <div className={`rounded-sm border px-4 py-3 tls-type-small ${TONE[status] || TONE.waiting}`} data-testid="match-report-state" data-status={status}>
           <p className="font-bold">{REPORT_STATE_TEXT[status]}</p>
           {/* Bestätigen mit einem Tipp (#1159): die Meldung der Gegenseite in Worten, von wem und wann, mit Foto. */}
           {status === "confirm" && (state?.proposal_text || state?.proposal_summary) && (
-            <p className="mt-1 text-base font-bold text-white" data-testid="match-report-proposal">{state.proposal_text || `Die Gegenseite meldet: ${state.proposal_summary}`}</p>
+            <p className="mt-1 tls-type-body font-bold text-white" data-testid="match-report-proposal">{state.proposal_text || `Die Gegenseite meldet: ${state.proposal_summary}`}</p>
           )}
-          {status === "confirm" && state?.proposal_by && <p className="mt-0.5 text-xs opacity-80">gemeldet von {state.proposal_by}{state.proposal_at ? ` um ${clock(state.proposal_at)}` : ""}</p>}
+          {status === "confirm" && state?.proposal_by && <p className="mt-0.5 tls-type-small opacity-80">gemeldet von {state.proposal_by}{state.proposal_at ? ` um ${clock(state.proposal_at)}` : ""}</p>}
           {status === "confirm" && state?.proposal_photo?.url && (
             <a href={chatAttachmentSrc(state.proposal_photo.url)} target="_blank" rel="noreferrer" className="mt-2 block w-32 overflow-hidden rounded-sm border border-white/15" data-testid="match-report-proposal-photo">
               <img src={chatAttachmentSrc(state.proposal_photo.url, 400)} alt="Foto der Gegenseite" className="h-20 w-full object-cover" />
@@ -106,19 +106,19 @@ export function MatchReportForm({ participants = [], match = {}, entry: serverEn
             </a>
           )}
           {status === "confirm" && (readOnly || state?.can_confirm === false ? (
-            <p className="mt-2 text-xs opacity-80" data-testid="match-report-lead-confirms">Bestätigen kann die Teamleitung.</p>
+            <p className="mt-2 tls-type-small opacity-80" data-testid="match-report-lead-confirms">Bestätigen kann die Teamleitung.</p>
           ) : (
             <div className="mt-3 grid grid-cols-2 gap-2 sm:flex sm:flex-wrap">
-              <button type="button" disabled={busy} onClick={() => onReport({ results: state.proposal, screenshot_url: null, note: null })} className="tls-btn tls-btn--primary inline-flex min-h-[44px] items-center justify-center gap-2 px-4 py-2 rounded-sm text-xs uppercase tracking-wider font-bold disabled:opacity-50" data-testid="match-report-confirm">
+              <button type="button" disabled={busy} onClick={() => onReport({ results: state.proposal, screenshot_url: null, note: null })} className="tls-btn tls-btn--primary inline-flex min-h-[44px] items-center justify-center gap-2 px-4 py-2 rounded-sm tls-type-label disabled:opacity-50" data-testid="match-report-confirm">
                 <Check className="w-3.5 h-3.5" /> Stimmt
               </button>
-              <button type="button" disabled={busy} onClick={() => onWrongResult?.()} className="tls-btn tls-btn--quiet inline-flex min-h-[44px] items-center justify-center gap-2 px-4 py-2 rounded-sm text-xs uppercase tracking-wider font-bold disabled:opacity-50" data-testid="match-report-wrong">
+              <button type="button" disabled={busy} onClick={() => onWrongResult?.()} className="tls-btn tls-btn--quiet inline-flex min-h-[44px] items-center justify-center gap-2 px-4 py-2 rounded-sm tls-type-label disabled:opacity-50" data-testid="match-report-wrong">
                 <X className="w-3.5 h-3.5" /> Stimmt nicht
               </button>
             </div>
           ))}
           {(status === "waiting" || status === "conflict") && !editing && (
-            <button type="button" onClick={() => setEditing(true)} className="mt-2 text-xs font-bold uppercase tracking-wider underline underline-offset-2 hover:text-white" data-testid="match-report-change">Meldung ändern</button>
+            <button type="button" onClick={() => setEditing(true)} className="mt-2 tls-type-label underline underline-offset-2 hover:text-white" data-testid="match-report-change">Meldung ändern</button>
           )}
         </div>
       )}
@@ -140,13 +140,13 @@ export function MatchReportForm({ participants = [], match = {}, entry: serverEn
 
           <ProofPhotoPicker matchId={match.id} value={photo} onChange={setPhoto} />
           <input value={note} onChange={(e) => setNote(e.target.value)} maxLength={1000} className="input" placeholder="Notiz für die Turnierleitung (freiwillig)" data-testid="match-report-note" />
-          <p className={`rounded-sm border px-3 py-2 text-sm font-bold ${sentence ? "border-[#29B6E8]/35 bg-[#29B6E8]/10 text-[#BFE9F8]" : "border-white/10 bg-white/5 text-white/45"}`} data-testid="match-report-sentence">
+          <p className={`rounded-sm border px-3 py-2 tls-type-small font-bold ${sentence ? "border-[#29B6E8]/35 bg-[#29B6E8]/10 text-[#BFE9F8]" : "border-white/10 bg-white/5 text-white/45"}`} data-testid="match-report-sentence">
             {sentence || outcome.error}
           </p>
-          {error && <p className="text-sm text-[#FF6B60]" role="alert" data-testid="match-report-error">{error}</p>}
+          {error && <p className="tls-type-small text-[#FF6B60]" role="alert" data-testid="match-report-error">{error}</p>}
           <div className="flex flex-wrap items-center gap-3">
-            <button disabled={busy} className="tls-btn tls-btn--primary min-h-[44px] px-4 py-2 rounded-sm text-xs uppercase tracking-wider font-bold disabled:opacity-50" data-testid="match-report-submit">Ergebnis melden</button>
-            <p className="text-xs text-white/50">Meldet die Gegenseite dasselbe, steht das Ergebnis fest. Weicht es ab, entscheidet die Turnierleitung.</p>
+            <button disabled={busy} className="tls-btn tls-btn--primary min-h-[44px] px-4 py-2 rounded-sm tls-type-label disabled:opacity-50" data-testid="match-report-submit">Ergebnis melden</button>
+            <p className="tls-type-small text-white/50">Meldet die Gegenseite dasselbe, steht das Ergebnis fest. Weicht es ab, entscheidet die Turnierleitung.</p>
           </div>
         </form>
       )}

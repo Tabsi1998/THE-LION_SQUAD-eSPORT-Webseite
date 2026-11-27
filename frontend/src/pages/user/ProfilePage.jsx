@@ -309,12 +309,12 @@ export default function ProfilePage({ group = null, extraTabs = [] }) {
     <>
       {/* „So sehen andere mich“ (#1149, #2059): das eigene öffentliche Profil - es bleibt unter /u/<name>. */}
       {hasProfile ? (
-        <Link to={`/u/${encodeURIComponent(user.username)}`} data-testid="settings-to-profile" className="tls-btn tls-btn--secondary inline-flex min-h-11 items-center gap-2 px-4 py-2 rounded-sm text-xs font-bold uppercase tracking-wider">
+        <Link to={`/u/${encodeURIComponent(user.username)}`} data-testid="settings-to-profile" className="tls-btn tls-btn--secondary inline-flex min-h-11 items-center gap-2 px-4 py-2 rounded-sm tls-type-label">
           <Eye className="w-3.5 h-3.5" aria-hidden="true" /> So sehen andere mich
         </Link>
       ) : null}
       {hasSecurity ? (
-        <button type="button" onClick={logoutNow} data-testid="settings-logout" className="tls-btn tls-btn--danger inline-flex min-h-11 items-center gap-2 px-4 py-2 rounded-sm text-xs font-bold uppercase tracking-wider">
+        <button type="button" onClick={logoutNow} data-testid="settings-logout" className="tls-btn tls-btn--danger inline-flex min-h-11 items-center gap-2 px-4 py-2 rounded-sm tls-type-label">
           <LogOut className="w-3.5 h-3.5" aria-hidden="true" /> Abmelden
         </button>
       ) : null}

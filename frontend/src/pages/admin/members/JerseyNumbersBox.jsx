@@ -18,8 +18,8 @@ const ACTIONS = {
   chosen: "gewählt", requested: "Antrag gestellt", set_by_board: "vom Vorstand gesetzt", reopened: "Neuwahl freigegeben",
   rejected: "Antrag abgelehnt", released_exit: "frei nach Austritt", adopted: "aus Dolibarr übernommen",
 };
-const input = "bg-[#0A0A0A] border border-white/10 focus:border-honor rounded-sm text-white text-sm px-3 py-2 focus:outline-none";
-const small = "tls-btn px-3 py-1.5 rounded-sm text-[11px] font-bold uppercase tracking-wider disabled:opacity-50";
+const input = "bg-[#0A0A0A] border border-white/10 focus:border-honor rounded-sm text-white tls-type-small px-3 py-2 focus:outline-none";
+const small = "tls-btn px-3 py-1.5 rounded-sm tls-type-label disabled:opacity-50";
 
 function numberText(value) {
   return value === null || value === undefined ? "–" : String(value);
@@ -44,22 +44,22 @@ function SettingsForm({ settings, onSaved }) {
   };
   return (
     <form onSubmit={save} className="border border-white/10 rounded-sm bg-[#121212] p-4 space-y-3" data-testid="jersey-settings">
-      <h3 className="font-heading text-sm font-black uppercase">Regeln</h3>
+      <h3 className="tls-type-label">Regeln</h3>
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-        <label className="block text-[11px] font-bold uppercase tracking-widest text-white/60">Von
+        <label className="block tls-type-label text-white/60">Von
           <input value={form.min} onChange={(e) => set("min", e.target.value)} inputMode="numeric" data-testid="jersey-settings-min" className={`${input} mt-1 w-full`} />
         </label>
-        <label className="block text-[11px] font-bold uppercase tracking-widest text-white/60">Bis
+        <label className="block tls-type-label text-white/60">Bis
           <input value={form.max} onChange={(e) => set("max", e.target.value)} inputMode="numeric" data-testid="jersey-settings-max" className={`${input} mt-1 w-full`} />
         </label>
-        <label className="col-span-2 block text-[11px] font-bold uppercase tracking-widest text-white/60">Reserviert (nicht wählbar)
+        <label className="col-span-2 block tls-type-label text-white/60">Reserviert (nicht wählbar)
           <input value={form.reserved} onChange={(e) => set("reserved", e.target.value)} placeholder="z. B. 0, 13" data-testid="jersey-settings-reserved" className={`${input} mt-1 w-full normal-case tracking-normal font-normal`} />
         </label>
       </div>
-      <label className="block text-[11px] font-bold uppercase tracking-widest text-white/60">Feld in Dolibarr (ergänzendes Attribut beim Mitglied)
+      <label className="block tls-type-small font-bold text-white/60">Feld in Dolibarr (ergänzendes Attribut beim Mitglied)
         <input value={form.dolibarr_field} onChange={(e) => set("dolibarr_field", e.target.value)} data-testid="jersey-settings-field" className={`${input} mt-1 w-full sm:w-72 font-mono normal-case tracking-normal font-normal`} />
       </label>
-      <p className="text-xs text-white/45">
+      <p className="tls-type-small text-white/45">
         In Dolibarr: Einrichtung → Module/Anwendungen → Mitglieder (Zahnrad) → Ergänzende Attribute (Mitglieder) → neues Attribut mit genau diesem Code, Typ „Ganzzahl“ (Integer).
         Eine Nummer außerhalb des Bereichs bleibt bestehen, bis sie jemand ändert.
       </p>
@@ -88,10 +88,10 @@ function RequestCard({ row, onDone }) {
     <div className="border border-honor/30 rounded-sm bg-honor/5 p-4" data-testid={`jersey-request-${row.id}`}>
       <div className="flex flex-wrap items-baseline justify-between gap-2">
         <div className="font-bold text-white break-words min-w-0">{row.name}</div>
-        <div className="text-xs text-white/45">{day(row.received_at)}</div>
+        <div className="tls-type-small text-white/45">{day(row.received_at)}</div>
       </div>
-      <div className="mt-1 text-sm text-white/80">{jerseyRequestLine(row)}</div>
-      {row.reason && <p className="mt-1 text-sm text-white/60 break-words">„{row.reason}“</p>}
+      <div className="mt-1 tls-type-small text-white/80">{jerseyRequestLine(row)}</div>
+      {row.reason && <p className="mt-1 tls-type-small text-white/60 break-words">„{row.reason}“</p>}
       <input value={reason} onChange={(e) => setReason(e.target.value)} maxLength={500} placeholder="Begründung (optional, sieht das Mitglied)" className={`${input} mt-3 w-full`} />
       <div className="mt-3 flex flex-wrap gap-2">
         {row.wished !== null && row.wished !== undefined && (
@@ -163,15 +163,15 @@ function MemberRow({ row, range, onChanged }) {
   return (
     <li className="px-4 py-3" data-testid={`jersey-row-${row.username || row.user_id}`}>
       <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
-        <div className="w-14 shrink-0 font-heading text-2xl font-black tabular-nums text-honor" data-testid="jersey-row-number">{numberText(row.number)}</div>
+        <div className="w-14 shrink-0 tls-type-section tls-type-num text-honor" data-testid="jersey-row-number">{numberText(row.number)}</div>
         <div className="min-w-0 flex-1 basis-40">
           <div className="font-bold text-white break-words">{row.name}</div>
-          <div className="text-[11px] text-white/45 break-words">
+          <div className="tls-type-small text-white/45 break-words">
             {row.number === null ? (row.can_choose ? "wählt noch selbst" : "keine Nummer") : `${SET_BY[row.set_by] || ""}${row.chosen_at ? ` · ${day(row.chosen_at)}` : ""}`}
             {row.outside_rules ? " · außerhalb der Regeln" : ""}
           </div>
           {row.dolibarr && row.number !== null && (
-            <div className={`text-[11px] ${SYNC_TONE[row.dolibarr.state] || "text-warn"}`} data-testid="jersey-row-sync">{row.dolibarr.text}</div>
+            <div className={`tls-type-small ${SYNC_TONE[row.dolibarr.state] || "text-warn"}`} data-testid="jersey-row-sync">{row.dolibarr.text}</div>
           )}
         </div>
         <div className="flex flex-wrap gap-2">
@@ -185,13 +185,13 @@ function MemberRow({ row, range, onChanged }) {
       {editing && (
         <form onSubmit={save} className="tls-reveal mt-3 flex flex-wrap items-center gap-2">
           <input value={value} onChange={(e) => setValue(e.target.value.replace(/\s+/g, "").slice(0, 4))} inputMode="numeric" aria-label={`Neue Nummer für ${row.name}`}
-            data-testid="jersey-row-input" className={`${input} w-24 text-center font-heading text-lg font-black tabular-nums`} />
+            data-testid="jersey-row-input" className={`${input} w-24 text-center tls-type-card tls-type-num`} />
           <button type="submit" disabled={busy || local.value === null || !!local.error || (check && !check.free && check.reason !== "own")} data-testid="jersey-row-save" className={`${small} tls-btn--primary`}>Eintragen</button>
-          <span className="text-xs text-white/55" aria-live="polite">{hint}</span>
+          <span className="tls-type-small text-white/55" aria-live="polite">{hint}</span>
         </form>
       )}
       {showLog && (
-        <ol className="tls-reveal mt-3 space-y-1 border-l-2 border-white/10 pl-3 text-xs text-white/60">
+        <ol className="tls-reveal mt-3 space-y-1 border-l-2 border-white/10 pl-3 tls-type-small text-white/60">
           {row.log.map((entry, i) => (
             <li key={`${entry.at}-${i}`}>
               {day(entry.at)} · {ACTIONS[entry.action] || entry.action}
@@ -230,12 +230,12 @@ export function JerseyNumbersBox() {
   if (failed && !data) {
     return (
       <div className="border border-honor/30 rounded-sm p-4" role="alert">
-        <div className="text-sm text-white/80">Die Nummern wurden nicht geladen.</div>
+        <div className="tls-type-small text-white/80">Die Nummern wurden nicht geladen.</div>
         <button type="button" onClick={load} className={`${small} tls-btn--secondary mt-3`}>Nochmal versuchen</button>
       </div>
     );
   }
-  if (!data) return <div className="text-sm text-white/50" data-testid="jersey-loading">Lade Nummern …</div>;
+  if (!data) return <div className="tls-type-small text-white/50" data-testid="jersey-loading">Lade Nummern …</div>;
 
   const { counts, settings } = data;
   const open = data.requests.filter((row) => OPEN_STATES.has(row.status));
@@ -245,7 +245,7 @@ export function JerseyNumbersBox() {
   return (
     <div className="space-y-6" data-testid="jersey-admin">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <p className="text-sm text-white/70" data-testid="jersey-counts">
+        <p className="tls-type-body text-white/70" data-testid="jersey-counts">
           <strong className="text-white">{counts.taken}</strong> vergeben · <strong className="text-white">{counts.free}</strong> frei
           {counts.reserved ? ` · ${counts.reserved} reserviert` : ""} · Bereich {settings.min}–{settings.max}. Nicht öffentlich – nur Mitglied und Vorstand sehen die Nummer.
         </p>
@@ -255,37 +255,37 @@ export function JerseyNumbersBox() {
           </button>
         )}
       </div>
-      {data.dolibarr.text && <p className="text-xs text-warn" data-testid="jersey-dolibarr-warning">{data.dolibarr.text}</p>}
+      {data.dolibarr.text && <p className="tls-type-small text-warn" data-testid="jersey-dolibarr-warning">{data.dolibarr.text}</p>}
       {!!data.duplicates.length && (
-        <p className="text-xs text-warn" data-testid="jersey-duplicates">In Dolibarr steht dieselbe Nummer bei mehreren aktiven Mitgliedern: {data.duplicates.join(", ")}. Bitte dort bereinigen.</p>
+        <p className="tls-type-small text-warn" data-testid="jersey-duplicates">In Dolibarr steht dieselbe Nummer bei mehreren aktiven Mitgliedern: {data.duplicates.join(", ")}. Bitte dort bereinigen.</p>
       )}
 
       {open.length > 0 && (
         <section className="space-y-3" data-testid="jersey-open-requests">
-          <h3 className="font-heading text-sm font-black uppercase">Offene Anträge ({open.length})</h3>
+          <h3 className="tls-type-label">Offene Anträge ({open.length})</h3>
           <div className="grid gap-3 md:grid-cols-2">{open.map((row) => <RequestCard key={row.id} row={row} onDone={load} />)}</div>
         </section>
       )}
 
       <section>
-        <h3 className="font-heading text-sm font-black uppercase mb-3">Mitglieder</h3>
+        <h3 className="tls-type-label mb-3">Mitglieder</h3>
         {data.rows.length ? (
           <ul className="border border-white/10 rounded-sm bg-[#121212] divide-y divide-white/5" data-testid="jersey-rows">
             {data.rows.map((row) => <MemberRow key={row.user_id} row={row} range={range} onChanged={load} />)}
           </ul>
         ) : (
-          <p className="text-sm text-white/50" data-testid="jersey-empty">Noch keine Mitglieder – sobald jemand Mitglied ist, steht er hier.</p>
+          <p className="tls-type-small text-white/50" data-testid="jersey-empty">Noch keine Mitglieder – sobald jemand Mitglied ist, steht er hier.</p>
         )}
       </section>
 
       {!!data.dolibarr_only.length && (
         <section data-testid="jersey-dolibarr-only">
-          <h3 className="font-heading text-sm font-black uppercase mb-2">Nur in Dolibarr</h3>
-          <p className="text-xs text-white/45 mb-2">Mitglieder ohne zugeordnetes Website-Konto. Ihre Nummern gelten als vergeben.</p>
+          <h3 className="tls-type-label mb-2">Nur in Dolibarr</h3>
+          <p className="tls-type-small text-white/45 mb-2">Mitglieder ohne zugeordnetes Website-Konto. Ihre Nummern gelten als vergeben.</p>
           <ul className="flex flex-wrap gap-2">
             {data.dolibarr_only.map((row) => (
-              <li key={`${row.number}-${row.member_id}`} className="px-2.5 py-1 border border-white/10 rounded-sm text-xs text-white/70">
-                <span className="font-heading font-black text-honor">{row.number}</span> · Mitglied {row.member_id}
+              <li key={`${row.number}-${row.member_id}`} className="px-2.5 py-1 border border-white/10 rounded-sm tls-type-small text-white/70">
+                <span className="tls-type-num text-honor">{row.number}</span> · Mitglied {row.member_id}
               </li>
             ))}
           </ul>
@@ -293,8 +293,8 @@ export function JerseyNumbersBox() {
       )}
 
       {data.requests.some((row) => !OPEN_STATES.has(row.status)) && (
-        <details className="text-sm text-white/60">
-          <summary className="cursor-pointer text-[11px] font-bold uppercase tracking-widest">Entschiedene Anträge</summary>
+        <details className="tls-type-small text-white/60">
+          <summary className="cursor-pointer tls-type-label">Entschiedene Anträge</summary>
           <ul className="mt-2 space-y-1">
             {data.requests.filter((row) => !OPEN_STATES.has(row.status)).map((row) => (
               <li key={row.id} className="break-words">{day(row.decided_at)} · {row.name} · {jerseyRequestLine(row)} · {row.status_label}{row.decision_reason ? ` – ${row.decision_reason}` : ""}</li>

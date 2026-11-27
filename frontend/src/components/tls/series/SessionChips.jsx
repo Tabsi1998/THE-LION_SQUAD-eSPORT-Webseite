@@ -8,7 +8,7 @@ import { dayNoon, viennaDate } from "@/lib/vienna";
 // Wochentag. Ein Chip ist ein Link (`hrefFor`), ein Knopf (`onOpen`, etwa „Ergebnis eintragen“ in der Verwaltung) oder
 // reiner Text. So docken die Ergebnis-Ansicht je Lauf (#1950) und die Verwaltung an, ohne die Chips neu zu bauen.
 
-const BASE = "inline-flex items-center gap-1.5 px-2 py-1 border rounded-sm text-[11px] font-bold uppercase tracking-[0.1em] leading-none whitespace-nowrap";
+const BASE = "inline-flex items-center gap-1.5 px-2 py-1 border rounded-sm tls-type-label leading-none whitespace-nowrap";
 const PRESS = "tls-session-chip transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#29B6E8] hover:border-white/40 hover:text-white";
 
 function weekday(day) {

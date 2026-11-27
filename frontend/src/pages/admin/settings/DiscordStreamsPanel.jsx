@@ -9,7 +9,7 @@ import { whenText } from "./DiscordEmbedsPanel";
 // bei Stream-Bots; alle zehn Minuten aktualisiert, am Ende „war live“ oder gelöscht. Wer gemeldet wird, entscheidet
 // dieselbe Regel wie auf der Startseite. Das Aussehen steht im Reiter „Gestaltung“.
 
-const INPUT = "w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-sm";
+const INPUT = "w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm tls-type-small";
 
 export function streamStateText(state) {
   if (!state) return "";
@@ -60,8 +60,8 @@ export function DiscordStreamsPanel({ onDesign }) {
     <section className="border border-white/10 rounded-sm p-4 space-y-3" data-testid="discord-streams">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h3 className="font-heading text-base font-black uppercase inline-flex items-center gap-2"><Radio className="w-4 h-4 text-[#9146FF]" /> Stream-Meldungen</h3>
-          <p className="mt-1 text-xs text-white/55 max-w-2xl">
+          <h3 className="tls-type-card inline-flex items-center gap-2"><Radio className="w-4 h-4 text-[#9146FF]" /> Stream-Meldungen</h3>
+          <p className="mt-1 tls-type-small text-white/55 max-w-2xl">
             Je Stream eine Meldung, sobald jemand aus dem Verein live geht – mit Titel, Spiel, Zuschauern und Vorschaubild. Alle zehn Minuten
             aktualisiert, am Ende gelöscht oder „war live“. Gemeldet wird, wer auch auf der Startseite erscheint. Mit „Meldung löschen“
             steht im Kanal immer genau, wer gerade live ist – das ersetzt die frühere Übersicht „Live jetzt“.
@@ -69,17 +69,17 @@ export function DiscordStreamsPanel({ onDesign }) {
         </div>
         {onDesign && (
           <button type="button" onClick={onDesign} data-testid="discord-streams-design"
-            className="inline-flex items-center gap-2 px-3 py-1.5 border border-[#5865F2]/50 text-[#b8c0ff] rounded-sm text-[11px] font-bold uppercase tracking-wider">
+            className="inline-flex items-center gap-2 px-3 py-1.5 border border-[#5865F2]/50 text-[#b8c0ff] rounded-sm tls-type-label">
             <Palette className="w-3.5 h-3.5" /> Aussehen gestalten
           </button>
         )}
       </div>
-      <label className="inline-flex items-center gap-2 text-sm">
+      <label className="inline-flex items-center gap-2 tls-type-small">
         <input type="checkbox" checked={!!draft.enabled} onChange={(event) => setDraft((current) => ({ ...current, enabled: event.target.checked }))} data-testid="discord-streams-enabled" className="accent-[#9146FF]" />
         Stream-Meldungen an
       </label>
       <div className="grid sm:grid-cols-3 gap-3">
-        <label className="block text-xs">
+        <label className="block tls-type-small">
           <div className="uppercase tracking-widest text-white/45 font-bold mb-1">Kanal</div>
           <select value={draft.channel_id} onChange={(event) => setDraft((current) => ({ ...current, channel_id: event.target.value }))} className={INPUT} data-testid="discord-streams-channel">
             <option value="">– kein Kanal –</option>
@@ -87,14 +87,14 @@ export function DiscordStreamsPanel({ onDesign }) {
             {channels.map((channel) => <option key={channel.id} value={String(channel.id)} disabled={!channel.can_send}>{channelOptionLabel(channel, "community")}</option>)}
           </select>
         </label>
-        <label className="block text-xs">
+        <label className="block tls-type-small">
           <div className="uppercase tracking-widest text-white/45 font-bold mb-1">Wenn der Stream endet</div>
           <select value={draft.on_end} onChange={(event) => setDraft((current) => ({ ...current, on_end: event.target.value }))} className={INPUT} data-testid="discord-streams-end">
             <option value="delete">Meldung löschen – der Kanal zeigt, wer gerade live ist</option>
             <option value="edit">Meldung zu „war live“ machen</option>
           </select>
         </label>
-        <label className="block text-xs">
+        <label className="block tls-type-small">
           <div className="uppercase tracking-widest text-white/45 font-bold mb-1">Rolle erwähnen</div>
           {state.roles_available ? (
             <select value={draft.role_id} onChange={(event) => setDraft((current) => ({ ...current, role_id: event.target.value }))} className={INPUT} data-testid="discord-streams-role">
@@ -112,9 +112,9 @@ export function DiscordStreamsPanel({ onDesign }) {
           )}
         </label>
       </div>
-      <div className={`text-xs ${state.last_error || state.reason ? "text-[#FFD700]" : "text-white/50"}`} data-testid="discord-streams-state">{streamStateText(state)}</div>
+      <div className={`tls-type-small ${state.last_error || state.reason ? "text-[#FFD700]" : "text-white/50"}`} data-testid="discord-streams-state">{streamStateText(state)}</div>
       <button type="button" disabled={busy || !dirty} onClick={save} data-testid="discord-streams-save"
-        className="px-4 py-2 bg-[#9146FF] text-white font-bold uppercase tracking-wider rounded-sm text-xs disabled:opacity-40">Speichern</button>
+        className="px-4 py-2 bg-[#9146FF] text-white tls-type-label rounded-sm disabled:opacity-40">Speichern</button>
     </section>
   );
 }

@@ -55,7 +55,7 @@
 /* Nach einer Korrektur (Fabian 26.11., B): ein ruhiges Schild über allem - keine Warnfarbe. */
 .tls-season-moment__notice {
   display: inline-flex; margin-bottom: 8px; padding: 3px 10px; border-radius: 999px; border: 1px solid rgb(255 255 255 / 0.18);
-  font-size: 11px; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase; color: rgb(255 255 255 / 0.75);
+  font-size: var(--tls-type-label-size); font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase; color: rgb(255 255 255 / 0.75);
 }
 /* Zweite Karte (Belohnungen des Meisters, A): Die Zeilen folgen gleich, nicht erst nach dem Wappen. */
 .tls-season-moment .tls-placement__card[data-play="run"] .tls-season-moment__rewards .tls-placement__line {

@@ -17,7 +17,7 @@ import { gameChips, gameScore, gameState, gamesByWeek, weekWarnText } from "./st
 
 const RESULTS_OPEN = new Set(["live", "paused"]);
 const DONE_TONE = new Set(["done"]);
-const BUTTON = "inline-flex min-h-[44px] items-center justify-center gap-1.5 rounded-sm px-3 text-[11px] font-bold uppercase tracking-wider";
+const BUTTON = "inline-flex min-h-[44px] items-center justify-center gap-1.5 rounded-sm px-3 tls-type-label";
 const STATE_TONE = {
   done: "border-white/15 text-white/70",
   live: "border-live/50 text-live",
@@ -48,19 +48,19 @@ function GameRow({ match, byId, canResults, onResult, onReload }) {
   return (
     <li className="grid gap-3 p-4 md:grid-cols-[minmax(0,1fr)_auto] md:items-center" data-testid={`staffel-game-${match.id}`}>
       <div className="min-w-0">
-        <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px] uppercase tracking-wider text-white/60">
+        <div className="flex flex-wrap items-center gap-x-2 gap-y-1 tls-type-label text-white/60">
           <span className={`inline-flex items-center rounded-sm border px-1.5 py-0.5 font-bold ${STATE_TONE[state.tone]}`} data-testid={`staffel-game-state-${match.id}`}>{state.text}</span>
           <span className="tabular-nums">{DONE_TONE.has(state.tone) ? "" : matchWhen(match)}</span>
         </div>
-        <p className="mt-1.5 flex min-w-0 flex-wrap items-baseline gap-x-2 text-sm font-semibold text-white">
+        <p className="mt-1.5 flex min-w-0 flex-wrap items-baseline gap-x-2 tls-type-body font-semibold text-white">
           <span className={`[overflow-wrap:anywhere] ${score.winner && score.winner !== sides[0]?.id ? "text-white/60" : ""}`}>{sides[0]?.name || "noch offen"}</span>
-          <span className="shrink-0 font-heading text-base font-black tabular-nums text-white" data-testid={`staffel-game-score-${match.id}`}>{score.text || "–"}</span>
+          <span className="shrink-0 tls-type-card tls-type-num text-white" data-testid={`staffel-game-score-${match.id}`}>{score.text || "–"}</span>
           <span className={`[overflow-wrap:anywhere] ${score.winner && score.winner !== sides[1]?.id ? "text-white/60" : ""}`}>{sides[1]?.name || "noch offen"}</span>
         </p>
         {chips.length ? (
           <ul className="mt-2 flex flex-wrap gap-1.5" aria-label="Stand auf der Matchseite" data-testid={`staffel-game-chips-${match.id}`}>
             {chips.map((chip) => (
-              <li key={chip.key} className={`inline-flex items-center rounded-sm border px-1.5 py-0.5 text-[11px] font-semibold ${CHIP_TONE[chip.tone]}`}
+              <li key={chip.key} className={`inline-flex items-center rounded-sm border px-1.5 py-0.5 tls-type-small font-semibold ${CHIP_TONE[chip.tone]}`}
                 data-testid={`staffel-game-chip-${match.id}-${chip.key}`}>{chip.text}</li>
             ))}
           </ul>
@@ -100,10 +100,10 @@ export function StaffelGamesTab({ tournament, registrations = [], matches = [], 
   return (
     <div className="space-y-4">
       <div id="ergebnisse" className="scroll-mt-24 rounded-sm border border-white/10 bg-[#121212] p-4">
-        <h2 className="font-heading text-xl font-black uppercase" data-testid="staffel-games-count">
+        <h2 className="tls-type-section" data-testid="staffel-games-count">
           Spiele <span className="tabular-nums text-white/60">{total ? `${played} von ${total} gespielt` : ""}</span>
         </h2>
-        <p className="mt-1 text-sm text-white/60">
+        <p className="mt-1 tls-type-small text-white/60">
           {resultsOpen
             ? "Check-in, Veto, Vorfälle und Verfahren laufen auf der Matchseite. Hier trägst du Ergebnisse ein und korrigierst sie."
             : staffelBeforeStart(tournament)
@@ -113,7 +113,7 @@ export function StaffelGamesTab({ tournament, registrations = [], matches = [], 
       </div>
 
       {!weeks.length ? (
-        <p className="rounded-sm border border-white/10 bg-[#121212] px-4 py-10 text-center text-sm text-white/60" data-testid="staffel-games-empty">Noch keine festen Spiele.</p>
+        <p className="rounded-sm border border-white/10 bg-[#121212] px-4 py-10 text-center tls-type-small text-white/60" data-testid="staffel-games-empty">Noch keine festen Spiele.</p>
       ) : weeks.map((week) => {
         const done = week.matches.filter((match) => DONE_TONE.has(gameState(match).tone)).length;
         // Was in der Woche noch jemanden braucht (warnender Chip) - schon im zugeklappten Kopf sichtbar.
@@ -122,8 +122,8 @@ export function StaffelGamesTab({ tournament, registrations = [], matches = [], 
           <details key={week.number ?? "ohne"} open={week.number === firstOpen || weekNeedsLook(week)} className="group min-w-0 overflow-hidden rounded-sm border border-white/10 bg-[#121212]"
             data-testid={`staffel-week-${week.number ?? "ohne"}`}>
             <summary className="flex min-h-[44px] cursor-pointer list-none flex-wrap items-center justify-between gap-x-3 gap-y-1 px-4 py-3 hover:bg-white/5 [&::-webkit-details-marker]:hidden">
-              <span className="shrink-0 whitespace-nowrap font-heading text-base font-black uppercase">{week.number ? `Spielwoche ${week.number}` : "Ohne Spielwoche"}</span>
-              <span className="ml-auto flex min-w-0 flex-wrap items-center justify-end gap-x-2 gap-y-1 text-xs text-white/60 tabular-nums">
+              <span className="shrink-0 whitespace-nowrap tls-type-card">{week.number ? `Spielwoche ${week.number}` : "Ohne Spielwoche"}</span>
+              <span className="ml-auto flex min-w-0 flex-wrap items-center justify-end gap-x-2 gap-y-1 tls-type-small text-white/60 tabular-nums">
                 {warns ? <span className="font-semibold text-warn" data-testid={`staffel-week-warn-${week.number ?? "ohne"}`}>{warns}</span> : null}
                 {done === week.matches.length ? "alle gespielt" : `${done} von ${week.matches.length} gespielt`}
                 <ChevronDown className="h-4 w-4 shrink-0 transition-transform group-open:rotate-180" aria-hidden="true" />

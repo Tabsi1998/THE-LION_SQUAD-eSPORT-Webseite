@@ -154,7 +154,7 @@ export function PublicLayout({ children }) {
                   to="/login"
                   data-testid="nav-login"
                   title="Anmelden"
-                  className="tls-hit hidden md:inline-flex items-center px-3 py-2 lg:h-10 lg:w-10 lg:justify-center lg:p-0 lg:border lg:border-white/10 lg:rounded-sm min-[1440px]:h-auto min-[1440px]:w-auto min-[1440px]:justify-start min-[1440px]:px-3 min-[1440px]:py-2 min-[1440px]:border-0 min-[1440px]:rounded-none text-xs font-bold uppercase tracking-wider whitespace-nowrap text-white/80 hover:text-[#29B6E8] lg:hover:border-[#29B6E8]/50 lg:hover:bg-[#29B6E8]/10 min-[1440px]:hover:bg-transparent transition"
+                  className="tls-hit hidden md:inline-flex items-center px-3 py-2 lg:h-10 lg:w-10 lg:justify-center lg:p-0 lg:border lg:border-white/10 lg:rounded-sm min-[1440px]:h-auto min-[1440px]:w-auto min-[1440px]:justify-start min-[1440px]:px-3 min-[1440px]:py-2 min-[1440px]:border-0 min-[1440px]:rounded-none tls-type-label whitespace-nowrap text-white/80 hover:text-[#29B6E8] lg:hover:border-[#29B6E8]/50 lg:hover:bg-[#29B6E8]/10 min-[1440px]:hover:bg-transparent transition"
                 >
                   <UserRound aria-hidden="true" className="hidden lg:block min-[1440px]:hidden w-4 h-4" />
                   <span className="lg:sr-only min-[1440px]:not-sr-only">Anmelden</span>
@@ -162,7 +162,7 @@ export function PublicLayout({ children }) {
                 <Link
                   to="/register"
                   data-testid="nav-register"
-                  className="tls-btn tls-btn--primary inline-flex px-4 py-2 lg:px-3 min-[1440px]:px-4 text-xs font-bold uppercase tracking-wider lg:whitespace-nowrap min-[1440px]:whitespace-normal rounded-sm"
+                  className="tls-btn tls-btn--primary inline-flex px-4 py-2 lg:px-3 min-[1440px]:px-4 tls-type-label lg:whitespace-nowrap min-[1440px]:whitespace-normal rounded-sm"
                 >
                   <span className="lg:hidden min-[1440px]:inline">Mitglied werden</span>
                   <span className="hidden lg:inline min-[1440px]:hidden">Beitreten</span>
@@ -196,17 +196,17 @@ export function PublicLayout({ children }) {
               <MobileNav isClubMember={isClubMember} signedIn={Boolean(user)} onClose={closeMobile} />
               <div className="border-t border-white/10 mt-3 pt-3 space-y-0.5">
                 {user && isAdmin && adminNeedsSecondFactor && (
-                  <Link to={mfaSetupPath("/admin")} onClick={closeMobile} data-testid="nav-mfa-setup-mobile" className="block px-3 py-2 text-sm font-semibold uppercase tracking-wider text-[#29B6E8]">
+                  <Link to={mfaSetupPath("/admin")} onClick={closeMobile} data-testid="nav-mfa-setup-mobile" className="block px-3 py-2 tls-type-label text-[#29B6E8]">
                     <ShieldCheck className="w-3.5 h-3.5 inline mr-1.5" /> 2FA einrichten
                   </Link>
                 )}
                 {user && isAdmin && !adminNeedsSecondFactor && (
-                  <Link to="/admin" onClick={closeMobile} className="block px-3 py-2 text-sm font-semibold uppercase tracking-wider text-[#29B6E8]">
+                  <Link to="/admin" onClick={closeMobile} className="block px-3 py-2 tls-type-label text-[#29B6E8]">
                     <Shield className="w-3.5 h-3.5 inline mr-1.5" /> Admin
                   </Link>
                 )}
                 {showsDutyEntry(user) && (
-                  <Link to="/admin" onClick={closeMobile} data-testid="nav-duty-mobile" className="block px-3 py-2 text-sm font-semibold uppercase tracking-wider text-[#29B6E8]">
+                  <Link to="/admin" onClick={closeMobile} data-testid="nav-duty-mobile" className="block px-3 py-2 tls-type-label text-[#29B6E8]">
                     <ClipboardList className="w-3.5 h-3.5 inline mr-1.5" /> Mein Dienst
                   </Link>
                 )}
@@ -214,11 +214,11 @@ export function PublicLayout({ children }) {
                   <>
                     {/* Wie im Benutzermenü am PC (#2059): Dashboard und die Gruppen von „Mein Bereich“, dazu das öffentliche Profil. */}
                     {userMenuEntries({ mitglied: Boolean(user.is_club_member) || isAnyAdmin(user) }).map((entry) => (
-                      <Link key={entry.key} to={entry.to} onClick={closeMobile} data-testid={userMenuTestId(entry.key, "-mobile")} className="block px-3 py-2 text-sm font-semibold uppercase tracking-wider text-white/80">
+                      <Link key={entry.key} to={entry.to} onClick={closeMobile} data-testid={userMenuTestId(entry.key, "-mobile")} className="block px-3 py-2 tls-type-label text-white/80">
                         <entry.icon className="w-3.5 h-3.5 inline mr-1.5" /> {entry.label}
                       </Link>
                     ))}
-                    <Link to={`/u/${encodeURIComponent(user.username)}`} onClick={closeMobile} data-testid={userMenuTestId("profile", "-mobile")} className="block px-3 py-2 text-sm font-semibold uppercase tracking-wider text-white/80">
+                    <Link to={`/u/${encodeURIComponent(user.username)}`} onClick={closeMobile} data-testid={userMenuTestId("profile", "-mobile")} className="block px-3 py-2 tls-type-label text-white/80">
                       <Eye className="w-3.5 h-3.5 inline mr-1.5" /> So sehen andere mich
                     </Link>
                     <button
@@ -230,15 +230,15 @@ export function PublicLayout({ children }) {
                           nav("/");
                         }
                       }}
-                      className="w-full text-left px-3 py-2 text-sm font-semibold uppercase tracking-wider text-[#FF3B30]"
+                      className="w-full text-left px-3 py-2 tls-type-small font-semibold uppercase tracking-wider text-[#FF3B30]"
                     >
                       <LogOut className="w-3.5 h-3.5 inline mr-1.5" /> Abmelden
                     </button>
                   </>
                 ) : (
                   <>
-                    <Link to="/login" onClick={closeMobile} className="block px-3 py-2 text-sm font-semibold uppercase tracking-wider text-white/80">Anmelden</Link>
-                    <Link to="/register" onClick={closeMobile} className="block px-3 py-2 text-sm font-semibold uppercase tracking-wider text-[#29B6E8]">Registrieren</Link>
+                    <Link to="/login" onClick={closeMobile} className="block px-3 py-2 tls-type-label text-white/80">Anmelden</Link>
+                    <Link to="/register" onClick={closeMobile} className="block px-3 py-2 tls-type-label text-[#29B6E8]">Registrieren</Link>
                   </>
                 )}
               </div>
@@ -278,33 +278,33 @@ export function PublicLayout({ children }) {
               bricht um, statt den Satz zu einer Wortsäule zu drücken. */}
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-5 flex flex-col lg:flex-row lg:items-center justify-between gap-4 min-w-0">
             <div className="min-w-0 lg:flex-1 lg:min-w-[18rem]" data-testid="footer-cta-text">
-              <div className="text-[11px] font-bold uppercase tracking-[0.3em] text-[#29B6E8]">Dabei sein</div>
-              <div className="mt-1 text-sm text-white/65">Auf Discord ist das Rudel jeden Tag da — mit der LionsAPP hast du Termine, Turniere und Chat am Handy.</div>
+              <div className="tls-type-label text-[#29B6E8]">Dabei sein</div>
+              <div className="mt-1 tls-type-small text-white/65">Auf Discord ist das Rudel jeden Tag da — mit der LionsAPP hast du Termine, Turniere und Chat am Handy.</div>
             </div>
             {/* Knopfleiste (#425): Discord als offizieller Knopf; die LionsAPP als eigene Store-Knöpfe (#1084) für Google
                 Play und den App Store, je erst mit Link - sonst „bald …“ (für beide zusammen ein Chip). */}
             <div className="flex flex-wrap items-center gap-3 min-w-0 lg:justify-end" data-testid="footer-buttons">
               <DiscordLiveLine discord={discordNow} />
               {discordHref && (
-                <a href={discordHref} target="_blank" rel="noreferrer" data-testid="footer-discord-button" className="inline-flex items-center gap-2 rounded-md bg-[#5865F2] px-4 py-2.5 text-sm font-bold text-white hover:bg-[#4752C4] transition">
+                <a href={discordHref} target="_blank" rel="noreferrer" data-testid="footer-discord-button" className="inline-flex items-center gap-2 rounded-md bg-[#5865F2] px-4 py-2.5 tls-type-small font-bold text-white hover:bg-[#4752C4] transition">
                   <svg className="w-5 h-5" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d={SOCIAL_ICONS.discord.path} /></svg> Discord beitreten
                 </a>
               )}
               {footerCta.playStoreUrl && <StoreButton href={footerCta.playStoreUrl} testId="footer-play-button" />}
               {footerCta.appStoreUrl && <StoreButton href={footerCta.appStoreUrl} small="Laden im" big="App Store" icon="apple" testId="footer-appstore-button" />}
               {!footerCta.playStoreUrl && !footerCta.appStoreUrl ? (
-                <span data-testid="footer-apps-soon" className="inline-flex items-center gap-2 rounded-md border border-white/15 px-4 py-2.5 text-sm text-white/55">
+                <span data-testid="footer-apps-soon" className="inline-flex items-center gap-2 rounded-md border border-white/15 px-4 py-2.5 tls-type-small text-white/55">
                   <Smartphone className="w-4 h-4" /> {footerCta.bothSoonLabel}
                 </span>
               ) : (
                 <>
                   {!footerCta.playStoreUrl && (
-                    <span data-testid="footer-play-soon" className="inline-flex items-center gap-2 rounded-md border border-white/15 px-4 py-2.5 text-sm text-white/55">
+                    <span data-testid="footer-play-soon" className="inline-flex items-center gap-2 rounded-md border border-white/15 px-4 py-2.5 tls-type-small text-white/55">
                       <Smartphone className="w-4 h-4" /> {footerCta.playSoonLabel}
                     </span>
                   )}
                   {!footerCta.appStoreUrl && (
-                    <span data-testid="footer-appstore-soon" className="inline-flex items-center gap-2 rounded-md border border-white/15 px-4 py-2.5 text-sm text-white/55">
+                    <span data-testid="footer-appstore-soon" className="inline-flex items-center gap-2 rounded-md border border-white/15 px-4 py-2.5 tls-type-small text-white/55">
                       <Smartphone className="w-4 h-4" /> {footerCta.appSoonLabel}
                     </span>
                   )}
@@ -325,8 +325,8 @@ export function PublicLayout({ children }) {
             {footerColumns(branding, { isMember: isClubMember }).map((column) => (
               // „Mitmachen“ steht am Handy allein in seiner Zeile: über die ganze Breite, Links in zwei Spalten (#2295) - kürzer statt länger.
               <nav key={column.key} aria-label={column.title} data-testid={`footer-column-${column.key}`} className={column.key === "join" ? "min-w-0 col-span-2 md:col-span-1" : "min-w-0"}>
-                <div className="text-[11px] font-bold uppercase tracking-[0.3em] text-[#29B6E8]">{column.title}</div>
-                <ul className={column.key === "join" ? "mt-4 grid grid-cols-2 md:grid-cols-1 gap-x-8 gap-y-2 text-sm text-white/65" : "mt-4 space-y-2 text-sm text-white/65"}>
+                <div className="tls-type-label text-[#29B6E8]">{column.title}</div>
+                <ul className={column.key === "join" ? "mt-4 grid grid-cols-2 md:grid-cols-1 gap-x-8 gap-y-2 tls-type-small text-white/65" : "mt-4 space-y-2 tls-type-small text-white/65"}>
                   {column.links.map((link) => (
                     <li key={link.label}>
                       {link.external ? (
@@ -342,7 +342,7 @@ export function PublicLayout({ children }) {
             <div className="col-span-2 md:col-span-1 min-w-0" data-testid="footer-contact">
               <Logo size="lg" asLink={false} />
               {footerContact.any && (
-                <address className="mt-4 not-italic text-sm text-white/65 space-y-1">
+                <address className="mt-4 not-italic tls-type-small text-white/65 space-y-1">
                   {footerContact.name && <div className="font-bold text-white/85">{footerContact.name}</div>}
                   {footerContact.address.map((line) => <div key={line}>{line}</div>)}
                   {footerContact.email && <div><a href={`mailto:${footerContact.email}`} className="hover:text-white transition">{footerContact.email}</a></div>}
@@ -363,7 +363,7 @@ export function PublicLayout({ children }) {
         </div>
         {/* Reihe 2 — Bottom Bar; der Strich darüber ist die Kante, auf der die Saison-Deko steht (#662) */}
         <div className="border-t border-white/5" data-season-line="footer">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-5 flex flex-col md:flex-row items-center justify-between gap-3 text-xs text-white/40 min-w-0">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-5 flex flex-col md:flex-row items-center justify-between gap-3 tls-type-small text-quiet min-w-0">
             <span>
               © {new Date().getFullYear()} {clubName} — {tagline}. Alle Rechte vorbehalten.
               {/* Version der Website (aus package.json, pflegt release-please); heller wie „Status“ für den Kontrast. */}

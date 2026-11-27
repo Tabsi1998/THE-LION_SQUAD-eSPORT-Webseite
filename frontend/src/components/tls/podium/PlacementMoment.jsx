@@ -64,7 +64,7 @@ export function PlacementMoment({ plan, onClose, reduced = false }) {
         </div>
         <div className="tls-placement__actions tls-placement__line" style={{ "--tls-i": lines.length }}>
           <ShareButton kind="tournament" id={placement.tournamentSlug || placement.tournamentId} title={placement.tournamentTitle} testId="placement-moment-share" />
-          <Link to={bracketPath} onClick={onClose} className="tls-btn tls-btn--secondary inline-flex min-h-[44px] items-center gap-2 px-3 py-2 rounded-sm text-xs font-bold uppercase tracking-wider" data-testid="placement-moment-bracket">
+          <Link to={bracketPath} onClick={onClose} className="tls-btn tls-btn--secondary inline-flex min-h-[44px] items-center gap-2 px-3 py-2 rounded-sm tls-type-label" data-testid="placement-moment-bracket">
             <GitBranch className="h-3.5 w-3.5" aria-hidden="true" /> Turnierbaum
           </Link>
         </div>

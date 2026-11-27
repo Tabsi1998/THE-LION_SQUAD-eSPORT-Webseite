@@ -53,20 +53,20 @@ export function SquadKaderSheet({ squad, onClose, onSaved }) {
   return (
     <AdminSheet title="Kader bearbeiten" eyebrow={squad.display_name} onClose={onClose} onSubmit={submit} saving={saving} submitTestId="kader-save" testId="kader-sheet" noValidate>
       <fieldset className="grid gap-2 sm:grid-cols-2" data-testid="kader-members">
-        <legend className="mb-2 text-[11px] font-bold uppercase tracking-widest text-white/60">Kader</legend>
+        <legend className="mb-2 tls-type-label text-white/60">Kader</legend>
         {members.map((person) => {
           const role = form.member_ids.includes(person.id) ? roleOf(form, person.id) : null;
           return (
-            <label key={person.id} className="flex min-h-[44px] min-w-0 cursor-pointer items-center gap-2.5 rounded-sm border border-white/10 px-3 py-2 text-sm has-[:checked]:border-[#29B6E8]/60 has-[:checked]:bg-[#29B6E8]/5">
+            <label key={person.id} className="flex min-h-[44px] min-w-0 cursor-pointer items-center gap-2.5 rounded-sm border border-white/10 px-3 py-2 tls-type-small has-[:checked]:border-[#29B6E8]/60 has-[:checked]:bg-[#29B6E8]/5">
               <input type="checkbox" className="accent-[#29B6E8]" checked={form.member_ids.includes(person.id)} disabled={isLocked(form, person.id)} onChange={() => toggle(person.id)} data-testid={`kader-member-${person.id}`} />
               <span className="min-w-0 flex-1 truncate">{person.display_name}</span>
-              {role ? <span className="shrink-0 text-[10px] font-bold uppercase tracking-wider text-[#FFD700]">{role.label}</span> : null}
+              {role ? <span className="shrink-0 tls-type-label text-[#FFD700]">{role.label}</span> : null}
             </label>
           );
         })}
       </fieldset>
       {short ? (
-        <p className="rounded-sm border border-warn/40 bg-warn/10 px-3 py-2 text-sm text-white/85" role="status" data-testid="kader-short">
+        <p className="rounded-sm border border-warn/40 bg-warn/10 px-3 py-2 tls-type-body text-white/85" role="status" data-testid="kader-short">
           Im Kader stehen dann {form.member_ids.length} Spieler, die Liga verlangt mindestens {squad.min_squad_size}. Speichern geht trotzdem, das Team bekommt eine Warnung.
         </p>
       ) : null}
@@ -76,10 +76,10 @@ export function SquadKaderSheet({ squad, onClose, onSaved }) {
             options={[["", "Niemand"], ...roleChoices(form.member_ids, members, role.field, form).map((person) => [person.id, person.name])]} testId={`kader-${role.field}`} />
         ))}
       </div>
-      <p className="text-xs leading-relaxed text-white/55">Wer eine Rolle hat, bleibt im Kader, bis die Rolle neu vergeben ist. Ohne Captain und Vertreter handelt im Spiel die Teamleitung.</p>
+      <p className="tls-type-small leading-relaxed text-white/55">Wer eine Rolle hat, bleibt im Kader, bis die Rolle neu vergeben ist. Ohne Captain und Vertreter handelt im Spiel die Teamleitung.</p>
       <SelectField label="Status" value={form.status} onChange={(value) => setForm((current) => ({ ...current, status: value }))} options={STATUS_OPTIONS} testId="kader-status" />
-      <p className="text-xs text-white/55">Steht im Protokoll. Das Team sieht den neuen Kader sofort.</p>
-      {error ? <p className="text-sm text-warn" role="alert" data-testid="kader-error">{error}</p> : null}
+      <p className="tls-type-small text-white/55">Steht im Protokoll. Das Team sieht den neuen Kader sofort.</p>
+      {error ? <p className="tls-type-small text-warn" role="alert" data-testid="kader-error">{error}</p> : null}
     </AdminSheet>
   );
 }

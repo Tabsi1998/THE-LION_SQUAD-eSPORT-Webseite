@@ -13,6 +13,7 @@ import { toast } from "sonner";
 import { BarChart3, Calculator, Flag, Info, ListChecks, Pencil, Plus, Search, Trash2 } from "lucide-react";
 import { PersonPicker } from "@/components/tls/PersonPicker";
 import { asInstant, viennaDate } from "@/lib/vienna";
+import { ShortCaps } from "@/components/tls/ShortCaps";
 
 const DEFAULT_POINTS = "25,18,15,12,10,8,6,4,2,1";
 // „Abgeschlossen“ setzt nur der Knopf „Abschließen“ mit Vorschau und Rückfrage (#2123, ER8).
@@ -234,21 +235,21 @@ export default function AdminSeasonsPage() {
     <AdminLayout>
       <div className="flex items-center justify-between mb-6 flex-wrap gap-3">
         <div>
-          <span className="text-[11px] font-bold uppercase tracking-[0.3em] text-[#29B6E8]">eSports</span>
-          <h1 className="font-heading text-3xl md:text-4xl font-black uppercase mt-1">Jahreswertung</h1>
-          <p className="text-sm text-white/45 mt-2 max-w-3xl">
+          <span className="tls-type-label text-[#29B6E8]">eSports</span>
+          <h1 className="tls-type-title mt-1"><ShortCaps>Jahreswertung</ShortCaps></h1>
+          <p className="tls-type-body text-white/45 mt-2 max-w-3xl">
             Saison anlegen, aktivieren und abschließen. Punkte entstehen von selbst aus Turnieren, Fast Laps und Event-Teilnahmen –
             immer in der einen aktiven Jahreswertung. Korrekturen tragt ihr mit Grund von Hand ein.
           </p>
         </div>
-        <button onClick={() => setCreating(true)} data-testid="season-new" className="px-4 py-2 bg-[#29B6E8] text-black font-bold uppercase tracking-wider rounded-sm inline-flex items-center gap-2 text-xs">
+        <button onClick={() => setCreating(true)} data-testid="season-new" className="px-4 py-2 bg-[#29B6E8] text-black tls-type-label rounded-sm inline-flex items-center gap-2">
           <Plus className="w-4 h-4" /> Neue Jahreswertung
         </button>
       </div>
 
       {/* Altbestand (#2123): früher ließen sich mehrere Wertungen aktivieren - Punkte landen dann nur in einer. */}
       {list.filter((s) => s.status === "active").length > 1 && (
-        <div role="alert" data-testid="season-multiple-active" className="mb-4 rounded-sm border border-live/40 bg-live/10 p-4 text-sm text-white/85">
+        <div role="alert" data-testid="season-multiple-active" className="mb-4 rounded-sm border border-live/40 bg-live/10 p-4 tls-type-small text-white/85">
           <strong className="text-live">Mehrere aktive Wertungen:</strong>{" "}
           {list.filter((s) => s.status === "active").map((s) => `„${s.name}“`).join(", ")}. Neue Punkte landen nur in einer davon –
           bitte alle bis auf eine abschließen oder auf „Entwurf“ setzen.
@@ -314,7 +315,7 @@ function CompleteSheet({ season, onClose, onDone }) {
   return (
     <AdminSheet title={`„${season.name}“ abschließen`} eyebrow="Jahreswertung" size="lg" onClose={onClose} onSubmit={submit} saving={saving}
       submitLabel="Endgültig abschließen" savingLabel="Schließe ab …" submitDisabled={!preview} submitTestId="season-complete-submit" testId="season-complete-sheet">
-      <div className="rounded-sm border border-honor/30 bg-honor/5 p-4 text-sm text-white/75 space-y-2">
+      <div className="rounded-sm border border-honor/30 bg-honor/5 p-4 tls-type-small text-white/75 space-y-2">
         <p className="font-bold text-honor">Das passiert einmalig und lässt sich nicht zurücknehmen:</p>
         <ul className="list-disc pl-5 space-y-1">
           <li>Die Rangliste wird festgeschrieben.</li>
@@ -323,25 +324,25 @@ function CompleteSheet({ season, onClose, onDone }) {
           <li>Neue Ergebnisse bekommen danach keine Jahrespunkte mehr, bis eine neue Jahreswertung aktiv ist.</li>
         </ul>
       </div>
-      {failed && <p className="text-sm text-live" role="alert">{failed}</p>}
-      {!preview && !failed && <p className="text-sm text-white/40">Lade Vorschau …</p>}
+      {failed && <p className="tls-type-small text-live" role="alert">{failed}</p>}
+      {!preview && !failed && <p className="tls-type-small text-quiet">Lade Vorschau …</p>}
       {preview && (
         <div data-testid="season-complete-preview" className="space-y-3">
-          <p className="text-sm text-white/60">
+          <p className="tls-type-small text-white/60">
             {preview.ranked} {preview.ranked === 1 ? "Platz" : "Plätze"} · {preview.awards_total} {preview.awards_total === 1 ? "Erfolg" : "Erfolge"} beim Abschluss
           </p>
           <ol className="divide-y divide-white/5 border border-white/10 rounded-sm">
             {rows.slice(0, 10).map((row) => (
-              <li key={row.user_id || row.rank} className="flex flex-wrap items-center gap-x-3 gap-y-1 px-3 py-2 text-sm">
-                <span className="font-heading font-black w-6 tabular-nums">{row.rank}</span>
+              <li key={row.user_id || row.rank} className="flex flex-wrap items-center gap-x-3 gap-y-1 px-3 py-2 tls-type-small">
+                <span className="tls-type-num w-6">{row.rank}</span>
                 <span className="min-w-0 flex-1 truncate">{row.display_name || row.username || "—"}</span>
                 <span className="tabular-nums text-[#29B6E8]">{Number(row.points || 0).toLocaleString("de-DE")} P</span>
-                {row.awards?.length > 0 && <span className="w-full pl-9 text-[11px] text-white/45">{row.awards.map((a) => a.name).join(", ")}</span>}
+                {row.awards?.length > 0 && <span className="w-full pl-9 tls-type-small text-white/45">{row.awards.map((a) => a.name).join(", ")}</span>}
               </li>
             ))}
-            {rows.length === 0 && <li className="px-3 py-4 text-sm text-white/40">Noch keine Punkte in dieser Jahreswertung.</li>}
+            {rows.length === 0 && <li className="px-3 py-4 tls-type-small text-quiet">Noch keine Punkte in dieser Jahreswertung.</li>}
           </ol>
-          {rows.length > 10 && <p className="text-xs text-white/40">… und {rows.length - 10} weitere Plätze.</p>}
+          {rows.length > 10 && <p className="tls-type-small text-quiet">… und {rows.length - 10} weitere Plätze.</p>}
         </div>
       )}
     </AdminSheet>
@@ -355,23 +356,23 @@ function SeasonCard({ season, onEdit, onDelete, onComplete }) {
         {season.banner_url ? (
           <img src={resolveMediaUrl(season.banner_url)} alt="" className="w-full h-full object-cover opacity-80" />
         ) : (
-          <div className="w-full h-full flex items-center justify-center text-white/20 font-heading font-black uppercase">{labelKind(season.kind)}</div>
+          <div className="w-full h-full flex items-center justify-center text-white/20 font-black uppercase">{labelKind(season.kind)}</div>
         )}
       </div>
       <div className="p-4 space-y-3">
         <div className="flex items-center justify-between gap-2">
-          <div className="text-[10px] uppercase tracking-widest text-[#29B6E8] font-bold">{labelKind(season.kind)}</div>
-          <span className="text-[10px] uppercase tracking-widest px-2 py-1 border border-white/10 bg-white/5 text-white/60">{labelStatus(season.status)}</span>
+          <div className="tls-type-label text-[#29B6E8]">{labelKind(season.kind)}</div>
+          <span className="tls-type-label px-2 py-1 border border-white/10 bg-white/5 text-white/60">{labelStatus(season.status)}</span>
         </div>
         <div>
-          <h3 className="font-heading text-lg font-bold">{season.name}</h3>
-          <div className="text-xs text-white/45 mt-1">{formatDateRange(season.start_date, season.end_date)}</div>
+          <h3 className="tls-type-card">{season.name}</h3>
+          <div className="tls-type-small text-white/45 mt-1">{formatDateRange(season.start_date, season.end_date)}</div>
         </div>
-        <div className="grid grid-cols-2 gap-2 text-xs">
+        <div className="grid grid-cols-2 gap-2 tls-type-small">
           <InfoPill label="Streichresultate" value={Number(season.drop_worst || 0)} />
           <InfoPill label="Volle Saison" value={fullSeasonText(season)} />
         </div>
-        <div className="rounded-sm border border-[#29B6E8]/20 bg-[#29B6E8]/5 p-3 text-xs text-white/60">
+        <div className="rounded-sm border border-[#29B6E8]/20 bg-[#29B6E8]/5 p-3 tls-type-small text-white/60">
           {season.status === "active"
             ? "Aktiv: neue Ergebnisse aus Turnieren, Fast Laps und Event-Teilnahmen bekommen hier ihre Punkte."
             : season.status === "draft"
@@ -379,18 +380,18 @@ function SeasonCard({ season, onEdit, onDelete, onComplete }) {
               : "Bekommt keine neuen Punkte mehr."}
         </div>
         <div className="flex gap-2 flex-wrap">
-          <button onClick={onEdit} data-testid={`season-edit-${season.id}`} className="px-3 py-1.5 border border-[#29B6E8]/50 text-[#29B6E8] text-xs uppercase font-bold rounded-sm inline-flex items-center gap-1">
+          <button onClick={onEdit} data-testid={`season-edit-${season.id}`} className="px-3 py-1.5 border border-[#29B6E8]/50 text-[#29B6E8] tls-type-label rounded-sm inline-flex items-center gap-1">
             <Pencil className="w-3 h-3" /> Bearbeiten
           </button>
-          <Link to={`/seasons/${season.slug}`} target="_blank" className="px-3 py-1.5 border border-white/15 text-white/70 text-xs uppercase font-bold rounded-sm hover:text-white">Öffentliche Seite</Link>
+          <Link to={`/seasons/${season.slug}`} target="_blank" className="px-3 py-1.5 border border-white/15 text-white/70 tls-type-label rounded-sm hover:text-white">Öffentliche Seite</Link>
           {season.status === "active" && (
-            <button onClick={onComplete} data-testid={`season-complete-${season.id}`} className="px-3 py-1.5 border border-honor/50 text-honor text-xs uppercase font-bold rounded-sm inline-flex items-center gap-1">
+            <button onClick={onComplete} data-testid={`season-complete-${season.id}`} className="px-3 py-1.5 border border-honor/50 text-honor tls-type-label rounded-sm inline-flex items-center gap-1">
               <Flag className="w-3 h-3" /> Abschließen
             </button>
           )}
           {/* Löschen nur als Entwurf ohne Punkte (#2123, ER9) - sonst archivieren. */}
           {season.status === "draft" && (
-            <button onClick={onDelete} data-testid={`season-delete-${season.id}`} className="px-3 py-1.5 border border-live/40 text-live text-xs uppercase font-bold rounded-sm inline-flex items-center gap-1">
+            <button onClick={onDelete} data-testid={`season-delete-${season.id}`} className="px-3 py-1.5 border border-live/40 text-live tls-type-label rounded-sm inline-flex items-center gap-1">
               <Trash2 className="w-3 h-3" /> Löschen
             </button>
           )}
@@ -559,16 +560,16 @@ function AdjustmentsSection({ season }) {
           <TextField label="Punkte (minus für Abzug)" type="number" step="0.5" value={points} onChange={setPoints} placeholder="z. B. 10 oder -15" testId="season-adjust-points" />
           <TextField label="Grund" value={reason} onChange={setReason} maxLength={200} placeholder="z. B. Fair-Play-Bonus Herbst-Cup" testId="season-adjust-reason" />
         </FormGrid>
-        <button type="button" onClick={add} disabled={!ready || busy} data-testid="season-adjust-submit" className="px-3 py-2 border border-[#29B6E8]/50 text-[#29B6E8] text-xs uppercase font-bold rounded-sm disabled:opacity-40">
+        <button type="button" onClick={add} disabled={!ready || busy} data-testid="season-adjust-submit" className="px-3 py-2 border border-[#29B6E8]/50 text-[#29B6E8] tls-type-label rounded-sm disabled:opacity-40">
           Korrektur eintragen
         </button>
         {rows.length > 0 && (
           <ul className="divide-y divide-white/5 border border-white/10 rounded-sm" data-testid="season-adjust-list">
             {rows.map((row) => (
-              <li key={row.id} className="flex flex-wrap items-center gap-x-3 gap-y-1 px-3 py-2 text-sm">
+              <li key={row.id} className="flex flex-wrap items-center gap-x-3 gap-y-1 px-3 py-2 tls-type-small">
                 <span className={`tabular-nums font-bold ${row.total_points < 0 ? "text-live" : "text-ok"}`}>{row.total_points > 0 ? "+" : ""}{formatPoints(row.total_points)}</span>
                 <span className="min-w-0 flex-1 truncate">{row.recipient_label}</span>
-                <span className="w-full sm:w-auto text-xs text-white/50 break-words">{row.bonus_reason}</span>
+                <span className="w-full sm:w-auto tls-type-small text-white/50 break-words">{row.bonus_reason}</span>
                 <button type="button" onClick={() => remove(row)} aria-label={`Korrektur für ${row.recipient_label} entfernen`} className="p-1 text-live/80 hover:text-live">
                   <Trash2 className="w-3.5 h-3.5" />
                 </button>
@@ -589,15 +590,15 @@ function RuleSummary({ form }) {
   return (
     <aside className="border border-[#29B6E8]/25 bg-[#06131A] rounded-sm p-4 space-y-4">
       <div>
-        <div className="flex items-center gap-2 text-[#29B6E8] text-[11px] uppercase tracking-widest font-bold">
+        <div className="flex items-center gap-2 text-[#29B6E8] tls-type-label">
           <Calculator className="w-4 h-4" /> Punktevergabe
         </div>
-        <h3 className="font-heading text-xl font-black uppercase mt-1">So wird gewertet</h3>
-        <p className="text-xs text-white/55 mt-2">
+        <h3 className="tls-type-card mt-1">So wird gewertet</h3>
+        <p className="tls-type-small text-white/55 mt-2">
           Wertungen entstehen mit: Basispunkte × Gewicht × Teilnehmerfaktor + Bonuspunkte – beim Veröffentlichen der Ergebnisse,
           immer in der aktiven Jahreswertung. Nach einer Korrektur und erneutem Veröffentlichen werden sie angeglichen.
         </p>
-        <p className="text-xs text-white/45 mt-2">
+        <p className="tls-type-small text-white/45 mt-2">
           Major, Normal, Mini usw. stellst du beim jeweiligen Turnier oder bei der Fast-Lap-Challenge ein. Es zählt alles mit einem
           Gewicht über 0 – ausschließen heißt dort „Keine Jahreswertung“. Der Teilnehmerfaktor richtet sich nach den tatsächlich
           bestätigten bzw. eingecheckten Teilnehmern, nicht nach den Plätzen. Bonuspunkte gibt es derzeit für die Event-Teilnahme (+5).
@@ -615,7 +616,7 @@ function RuleSummary({ form }) {
         <MiniTable icon={ListChecks} title="Gewichtung" rows={WEIGHT_HELP} />
       </div>
 
-      <div className="rounded-sm border border-white/10 bg-black/20 p-3 space-y-2 text-xs text-white/55">
+      <div className="rounded-sm border border-white/10 bg-black/20 p-3 space-y-2 tls-type-small text-white/55">
         <div className="flex items-start gap-2">
           <Info className="w-4 h-4 text-[#FFD700] shrink-0 mt-0.5" />
           <div>Streichresultate: {Number(form.drop_worst || 0)}</div>
@@ -628,10 +629,10 @@ function RuleSummary({ form }) {
 function MiniTable({ icon: Icon, title, rows }) {
   return (
     <div className="rounded-sm border border-white/10 bg-black/20 p-3">
-      <div className="flex items-center gap-2 text-[11px] uppercase tracking-widest text-white/50 font-bold mb-2">
+      <div className="flex items-center gap-2 tls-type-label text-white/50 mb-2">
         <Icon className="w-3.5 h-3.5" /> {title}
       </div>
-      <div className="grid grid-cols-2 gap-x-3 gap-y-1 text-xs">
+      <div className="grid grid-cols-2 gap-x-3 gap-y-1 tls-type-small">
         {rows.map(([label, value]) => (
           <div key={`${label}-${value}`} className="flex items-center justify-between gap-2">
             <span className="text-white/55">{label}</span>
@@ -660,10 +661,10 @@ function SourcePicker({ label, helper, items, selected, onToggle, onSetSelected,
     <div className="border border-white/10 bg-[#0A0A0A] rounded-sm p-3 space-y-3">
       <div className="flex items-start justify-between gap-3">
         <div>
-          <div className="text-[11px] font-bold uppercase tracking-widest text-white/70">{label}</div>
-          <div className="text-[11px] text-white/35 mt-1">{helper}</div>
+          <div className="tls-type-label text-white/70">{label}</div>
+          <div className="tls-type-small text-quiet mt-1">{helper}</div>
         </div>
-        <span className="text-[10px] uppercase tracking-widest px-2 py-1 border border-white/10 bg-white/5 text-white/60 shrink-0">
+        <span className="tls-type-label px-2 py-1 border border-white/10 bg-white/5 text-white/60 shrink-0">
           {selected.length ? `${selected.length} gewählt` : "keine"}
         </span>
       </div>
@@ -674,26 +675,26 @@ function SourcePicker({ label, helper, items, selected, onToggle, onSetSelected,
       </label>
 
       <div className="flex gap-2 flex-wrap">
-        <button type="button" onClick={() => onSetSelected(Array.from(new Set([...selected, ...filtered.map((item) => item.id)])))} className="px-2 py-1 border border-white/10 text-white/60 hover:text-white text-[10px] uppercase tracking-widest rounded-sm">
+        <button type="button" onClick={() => onSetSelected(Array.from(new Set([...selected, ...filtered.map((item) => item.id)])))} className="px-2 py-1 border border-white/10 text-white/60 hover:text-white tls-type-label rounded-sm">
           Sichtbare wählen
         </button>
-        <button type="button" onClick={() => onSetSelected(selected.filter((id) => !filtered.some((item) => item.id === id)))} className="px-2 py-1 border border-white/10 text-white/60 hover:text-white text-[10px] uppercase tracking-widest rounded-sm">
+        <button type="button" onClick={() => onSetSelected(selected.filter((id) => !filtered.some((item) => item.id === id)))} className="px-2 py-1 border border-white/10 text-white/60 hover:text-white tls-type-label rounded-sm">
           Sichtbare lösen
         </button>
-        {selectedVisible > 0 && <span className="text-[10px] uppercase tracking-widest text-[#29B6E8] self-center">{selectedVisible} sichtbar gewählt</span>}
+        {selectedVisible > 0 && <span className="tls-type-label text-[#29B6E8] self-center">{selectedVisible} sichtbar gewählt</span>}
       </div>
 
       <div className="max-h-72 overflow-y-auto border border-white/10 rounded-sm p-2 space-y-1 bg-black/20">
         {filtered.map((item) => (
-          <label key={item.id} className="flex items-start gap-2 text-sm hover:bg-white/5 px-2 py-2 rounded-sm">
+          <label key={item.id} className="flex items-start gap-2 tls-type-small hover:bg-white/5 px-2 py-2 rounded-sm">
             <input type="checkbox" checked={selectedSet.has(item.id)} onChange={() => onToggle(item.id)} className="accent-[#29B6E8] mt-1" />
             <span className="min-w-0">
               <span className="block truncate text-white/85">{getLabel(item)}</span>
-              <span className="block text-[11px] text-white/40 mt-0.5">{getMeta(item)}</span>
+              <span className="block tls-type-small text-quiet mt-0.5">{getMeta(item)}</span>
             </span>
           </label>
         ))}
-        {filtered.length === 0 && <div className="text-xs text-white/35 p-2">Keine passenden Einträge vorhanden.</div>}
+        {filtered.length === 0 && <div className="tls-type-small text-quiet p-2">Keine passenden Einträge vorhanden.</div>}
       </div>
     </div>
   );
@@ -702,8 +703,8 @@ function SourcePicker({ label, helper, items, selected, onToggle, onSetSelected,
 function InfoPill({ label, value, compact = false }) {
   return (
     <div className="rounded-sm border border-white/10 bg-black/20 px-3 py-2 min-w-0">
-      <div className="text-[10px] uppercase tracking-widest text-white/35">{label}</div>
-      <div className={`text-white/75 mt-0.5 ${compact ? "text-[11px] truncate" : "text-xs"}`}>{value}</div>
+      <div className="tls-type-label text-quiet">{label}</div>
+      <div className={`tls-type-small text-white/75 mt-0.5 ${compact ? "truncate" : ""}`}>{value}</div>
     </div>
   );
 }

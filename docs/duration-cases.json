@@ -1,0 +1,21 @@
+{
+  "_info": "Eine Schreibweise für Dauern (#1304): „154 Tage 16 Std.“ statt „154T 16H“. Dieselben Fälle für die Website (frontend/src/lib/datetime.test.js) und später die App. Höchstens zwei Einheiten, die größte zuerst; eine Einheit mit 0 fällt weg. `ms` ist die Dauer in Millisekunden, `round: \"up\"` rundet auf ganze Minuten auf (Restzeit bis zu einem Termin).",
+  "cases": [
+    { "note": "Tage und Stunden", "ms": 13363200000, "expected": "154 Tage 16 Std." },
+    { "note": "ein Tag in der Einzahl", "ms": 97200000, "expected": "1 Tag 3 Std." },
+    { "note": "volle Tage ohne Stunden", "ms": 259200000, "expected": "3 Tage" },
+    { "note": "Minuten fallen bei Tagen weg", "ms": 90060000, "expected": "1 Tag 1 Std." },
+    { "note": "Stunden und Minuten", "ms": 11520000, "expected": "3 Std. 12 Min." },
+    { "note": "volle Stunden", "ms": 7200000, "expected": "2 Std." },
+    { "note": "nur Minuten", "ms": 2700000, "expected": "45 Min." },
+    { "note": "Sekunden fallen bei Minuten weg", "ms": 2759000, "expected": "45 Min." },
+    { "note": "unter einer Minute: Sekunden", "ms": 42000, "expected": "42 Sek." },
+    { "note": "Bruchteile einer Sekunde zählen nicht", "ms": 42999, "expected": "42 Sek." },
+    { "note": "null", "ms": 0, "expected": "0 Sek." },
+    { "note": "Vergangenes zählt als null", "ms": -5000, "expected": "0 Sek." },
+    { "note": "aufgerundet: angefangene Minute zählt", "ms": 2701000, "round": "up", "expected": "46 Min." },
+    { "note": "aufgerundet: unter einer Minute wird 1 Min.", "ms": 1000, "round": "up", "expected": "1 Min." },
+    { "note": "aufgerundet: genau eine Stunde bleibt eine Stunde", "ms": 3600000, "round": "up", "expected": "1 Std." },
+    { "note": "aufgerundet: null bleibt null", "ms": 0, "round": "up", "expected": "0 Sek." }
+  ]
+}

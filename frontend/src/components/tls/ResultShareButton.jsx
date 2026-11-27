@@ -34,7 +34,7 @@ export function ResultShareButton({ tournamentId, options: given = null, showPag
   if (!options.shareable) {
     if (!["private_profile", "not_public"].includes(options.reason)) return null;
     return (
-      <p className="text-xs text-white/55" data-testid={`${testId}-hint`}>
+      <p className="tls-type-small text-white/55" data-testid={`${testId}-hint`}>
         {options.text}
         {options.reason === "private_profile" ? <> <Link to="/mein-bereich/datenschutz" className="text-[#29B6E8] hover:underline">Zur Sichtbarkeit</Link></> : null}
       </p>
@@ -51,7 +51,7 @@ export function ResultShareButton({ tournamentId, options: given = null, showPag
     if (result.status === "copied") toast.success("Link kopiert.");
     else toast.error("Kopieren ging nicht – öffne die Vorschau und kopiere die Adresse aus der Leiste.");
   };
-  const button = "tls-btn inline-flex items-center justify-center gap-2 px-3 py-2 text-[11px] font-bold uppercase tracking-widest rounded-sm";
+  const button = "tls-btn inline-flex items-center justify-center gap-2 px-3 py-2 tls-type-label rounded-sm";
   return (
     <div className="flex flex-wrap items-center gap-2" data-testid={testId}>
       {mobile ? (
@@ -68,7 +68,7 @@ export function ResultShareButton({ tournamentId, options: given = null, showPag
           </button>
         </>
       )}
-      {showPage ? <Link to={options.path} className="text-[11px] font-bold uppercase tracking-widest text-[#29B6E8] hover:text-white" data-testid={`${testId}-page`}>Vorschau</Link> : null}
+      {showPage ? <Link to={options.path} className="tls-type-label text-[#29B6E8] hover:text-white" data-testid={`${testId}-page`}>Vorschau</Link> : null}
     </div>
   );
 }

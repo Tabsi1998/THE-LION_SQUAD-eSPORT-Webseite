@@ -61,7 +61,7 @@
 @media (hover: hover) and (pointer: fine) {
   .tls-reward-card:hover { border-color: rgb(var(--tls-reward-rgb) / 0.6); transform: translateY(calc(-2px * var(--tls-motion-on))); }
 }
-.tls-reward-card__kind { font-size: 10px; font-weight: 800; letter-spacing: 0.18em; text-transform: uppercase; color: rgb(var(--tls-reward-rgb)); }
+.tls-reward-card__kind { font-size: var(--tls-type-label-size); font-weight: 800; letter-spacing: 0.18em; text-transform: uppercase; color: rgb(var(--tls-reward-rgb)); }
 .tls-reward-card__name { font-weight: 800; font-size: 14px; line-height: 1.2; color: #fff; overflow-wrap: anywhere; }
 .tls-reward-card__meta { font-size: 12px; color: rgb(255 255 255 / 0.6); overflow-wrap: anywhere; }
 .tls-reward-card__actions { display: flex; flex-wrap: wrap; justify-content: center; gap: 6px; margin-top: 4px; }
@@ -78,7 +78,7 @@
 .tls-reward-chip {
   display: inline-flex; align-items: center; gap: 6px; max-width: 100%; padding: 3px 10px 3px 4px; border-radius: 999px;
   border: 1px solid rgb(var(--tls-reward-rgb, 41 182 232) / 0.5); background: rgb(var(--tls-reward-rgb, 41 182 232) / 0.08);
-  font-size: 11px; font-weight: 800; letter-spacing: 0.12em; text-transform: uppercase; color: #fff;
+  font-size: var(--tls-type-label-size); font-weight: 800; letter-spacing: 0.12em; text-transform: uppercase; color: #fff;
 }
 .tls-reward-chip span:last-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
@@ -101,24 +101,24 @@
 .tls-trophy-filters__kinds { display: flex; gap: 6px; overflow-x: auto; }
 .tls-trophy-filters__chip {
   flex: none; min-height: 36px; padding: 6px 12px; border-radius: 2px; border: 1px solid rgb(255 255 255 / 0.15);
-  font-size: 10px; font-weight: 800; letter-spacing: 0.12em; text-transform: uppercase; color: rgb(255 255 255 / 0.6);
+  font-size: var(--tls-type-label-size); font-weight: 800; letter-spacing: 0.12em; text-transform: uppercase; color: rgb(255 255 255 / 0.6);
   transition: color var(--tls-motion-fast) ease, border-color var(--tls-motion-fast) ease, background-color var(--tls-motion-fast) ease;
 }
 .tls-trophy-filters__chip[aria-pressed="true"] { border-color: var(--tls-brand, #29B6E8); color: var(--tls-brand, #29B6E8); background: rgb(41 182 232 / 0.1); }
 @media (hover: hover) and (pointer: fine) { .tls-trophy-filters__chip:hover { color: #fff; } }
 .tls-trophy-filters__row { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 8px 12px; min-width: 0; }
 .tls-trophy-filters__select { display: grid; gap: 4px; min-width: 0; flex: 1 1 9rem; max-width: 16rem; }
-.tls-trophy-filters__select span { font-size: 10px; font-weight: 800; letter-spacing: 0.14em; text-transform: uppercase; color: rgb(255 255 255 / 0.5); }
+.tls-trophy-filters__select span { font-size: var(--tls-type-label-size); font-weight: 800; letter-spacing: 0.14em; text-transform: uppercase; color: rgb(255 255 255 / 0.5); }
 .tls-trophy-filters__select select {
   min-height: 40px; width: 100%; padding: 6px 10px; border-radius: 2px; border: 1px solid rgb(255 255 255 / 0.1); background: #0A0A0A;
-  color: #fff; font-size: 13px;
+  color: #fff; font-size: var(--tls-type-small-size);
 }
-.tls-trophy-filters__count { flex: none; white-space: nowrap; margin-left: auto; align-self: center; font-size: 11px; font-weight: 700; color: rgb(255 255 255 / 0.5); font-variant-numeric: tabular-nums; }
+.tls-trophy-filters__count { flex: none; white-space: nowrap; margin-left: auto; align-self: center; font-size: var(--tls-type-label-size); font-weight: 700; color: rgb(255 255 255 / 0.5); font-variant-numeric: tabular-nums; }
 /* Am Handy steht der Zähler in einer eigenen Zeile - neben dem Platz-Filter ragte er sonst rechts hinaus. */
 @media (max-width: 639px) { .tls-trophy-filters__count { flex-basis: 100%; margin-left: 0; } }
 .tls-trophy-filters__reset {
   display: inline-flex; align-items: center; gap: 6px; min-height: 36px; padding: 6px 10px; border-radius: 2px; border: 1px solid rgb(255 255 255 / 0.15);
-  font-size: 10px; font-weight: 800; letter-spacing: 0.12em; text-transform: uppercase; color: rgb(255 255 255 / 0.7);
+  font-size: var(--tls-type-label-size); font-weight: 800; letter-spacing: 0.12em; text-transform: uppercase; color: rgb(255 255 255 / 0.7);
 }
 .tls-trophy-hint { font-size: 12px; color: rgb(255 255 255 / 0.55); }
 .tls-trophy-empty { padding: 40px 16px; text-align: center; font-size: 14px; color: rgb(255 255 255 / 0.55); border: 1px dashed rgb(255 255 255 / 0.15); border-radius: 2px; display: grid; }
@@ -128,10 +128,10 @@
 .tls-trophy-card__art { display: grid; place-items: center; width: 112px; height: 112px; }
 .tls-trophy-card__cup { width: 84px; height: 96px; }
 .tls-trophy-card__image { width: 112px; height: 112px; object-fit: contain; border-radius: 8px; box-shadow: 0 0 0 1px rgb(var(--tls-reward-rgb) / 0.45); }
-.tls-trophy-card__place { font-size: 11px; font-weight: 800; letter-spacing: 0.16em; text-transform: uppercase; color: rgb(var(--tls-reward-rgb)); overflow-wrap: anywhere; }
-.tls-trophy-card__date { display: inline-flex; align-items: center; gap: 4px; font-size: 11px; color: rgb(255 255 255 / 0.45); font-variant-numeric: tabular-nums; }
+.tls-trophy-card__place { font-size: var(--tls-type-label-size); font-weight: 800; letter-spacing: 0.16em; text-transform: uppercase; color: rgb(var(--tls-reward-rgb)); overflow-wrap: anywhere; }
+.tls-trophy-card__date { display: inline-flex; align-items: center; gap: 4px; font-size: var(--tls-type-label-size); color: rgb(255 255 255 / 0.45); font-variant-numeric: tabular-nums; }
 .tls-trophy-card__choice {
-  min-height: 32px; padding: 4px 8px; border-radius: 2px; border: 1px solid rgb(255 255 255 / 0.2); font-size: 10px; font-weight: 800;
+  min-height: 32px; padding: 4px 8px; border-radius: 2px; border: 1px solid rgb(255 255 255 / 0.2); font-size: var(--tls-type-label-size); font-weight: 800;
   letter-spacing: 0.1em; text-transform: uppercase; color: rgb(255 255 255 / 0.65);
   transition: color var(--tls-motion-fast) ease, border-color var(--tls-motion-fast) ease, transform var(--tls-motion-fast) var(--tls-ease);
 }

@@ -7,13 +7,13 @@ export function Row({ children }) {
 // Ein Hinweis am Feld (#1048): diese Eingabe wird so nicht gespeichert. Die Eingabe bleibt stehen.
 export function FieldError({ message, testId }) {
   if (!message) return null;
-  return <p role="alert" data-testid={testId} className="mt-1.5 text-[11px] text-warn">{message}</p>;
+  return <p role="alert" data-testid={testId} className="mt-1.5 tls-type-small text-warn">{message}</p>;
 }
 // Ein Feld mit einer Eingabe ist ein <label>: ein Klick auf den Titel setzt den Fokus hinein. Mehrere Knöpfe oder ein
 // verstecktes Datei-Feld (Bild hochladen, Mehrfachauswahl, Häkchen-Liste) brauchen `group` - sonst löst jeder Klick in
 // die Fläche, auch neben das Bild, den ersten Knopf darin aus und öffnet etwa die Dateiauswahl.
 export function Field({ label, error = "", errorTestId, group = false, children }) {
-  const title = <div className="text-[11px] font-bold uppercase tracking-widest text-white/60 mb-1.5">{label}</div>;
+  const title = <div className="tls-type-label text-white/60 mb-1.5">{label}</div>;
   if (group) {
     return (
       <div role="group" aria-label={typeof label === "string" ? label : undefined} className="block">

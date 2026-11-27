@@ -143,7 +143,7 @@ export function DistributeBox({ kind, itemId, title = "", visibility = "", appOn
   return (
     <section className="border border-white/10 bg-[#121212] rounded-sm" data-testid="distribute-box">
       <button type="button" onClick={() => setOpen((value) => !value)} aria-expanded={open} data-testid="distribute-toggle" className="w-full flex items-center justify-between gap-3 px-4 py-3 text-left">
-        <span className="text-[11px] font-bold uppercase tracking-widest text-[#29B6E8]">Verteilen</span>
+        <span className="tls-type-label text-[#29B6E8]">Verteilen</span>
         <ChevronDown className={`w-4 h-4 text-white/50 transition ${open ? "rotate-180" : ""}`} />
       </button>
       {open && (
@@ -151,35 +151,35 @@ export function DistributeBox({ kind, itemId, title = "", visibility = "", appOn
           <div className="flex items-start gap-3" data-testid="distribute-newsletter">
             <Mail className="w-4 h-4 mt-0.5 text-white/50 shrink-0" />
             <div className="min-w-0 flex-1 space-y-2">
-              <div className="text-xs font-bold uppercase tracking-wider text-white/70">Newsletter</div>
+              <div className="tls-type-label text-white/70">Newsletter</div>
               {!itemId && (audience || appOnly
-                ? <p className="text-sm text-white/75" data-testid="distribute-audience-line">{appOnly ? APP_ONLY_NEWSLETTER : audienceLine(audience)}</p>
-                : <p className="text-sm text-white/55">Nach dem ersten Speichern steht hier, an wie viele Personen der Newsletter geht.</p>)}
-              {itemId && error && <p className="text-sm text-white/55" data-testid="distribute-error">{error}</p>}
+                ? <p className="tls-type-small text-white/75" data-testid="distribute-audience-line">{appOnly ? APP_ONLY_NEWSLETTER : audienceLine(audience)}</p>
+                : <p className="tls-type-body text-white/55">Nach dem ersten Speichern steht hier, an wie viele Personen der Newsletter geht.</p>)}
+              {itemId && error && <p className="tls-type-small text-white/55" data-testid="distribute-error">{error}</p>}
               {itemId && !error && box && appOnly && box.state !== "sent" && (
-                <p className="text-sm text-white/75" data-testid="distribute-newsletter-line">{APP_ONLY_NEWSLETTER}</p>
+                <p className="tls-type-small text-white/75" data-testid="distribute-newsletter-line">{APP_ONLY_NEWSLETTER}</p>
               )}
               {itemId && !error && box && !(appOnly && box.state !== "sent") && (
                 <>
-                  <p className="text-sm text-white/75" data-testid="distribute-newsletter-line">{newsletterLine(box)}</p>
+                  <p className="tls-type-small text-white/75" data-testid="distribute-newsletter-line">{newsletterLine(box)}</p>
                   {box.state === "ready" && box.can_send && (
-                    <button type="button" disabled={busy} onClick={() => send(false)} data-testid="distribute-send" className="tls-btn tls-btn--primary px-4 py-2 rounded-sm text-xs font-bold uppercase tracking-wider disabled:opacity-50">Jetzt senden</button>
+                    <button type="button" disabled={busy} onClick={() => send(false)} data-testid="distribute-send" className="tls-btn tls-btn--primary px-4 py-2 rounded-sm tls-type-label disabled:opacity-50">Jetzt senden</button>
                   )}
                   {box.state === "sent" && (box.can_resend ? (
-                    <button type="button" disabled={busy} onClick={() => send(true)} data-testid="distribute-resend" className="tls-btn tls-btn--quiet px-4 py-2 rounded-sm text-xs font-bold uppercase tracking-wider disabled:opacity-50">Nochmal senden …</button>
+                    <button type="button" disabled={busy} onClick={() => send(true)} data-testid="distribute-resend" className="tls-btn tls-btn--quiet px-4 py-2 rounded-sm tls-type-label disabled:opacity-50">Nochmal senden …</button>
                   ) : (
-                    <p className="text-xs text-white/45" data-testid="distribute-resend-locked">Ein zweites Mal senden nur Redaktion und System.</p>
+                    <p className="tls-type-small text-white/45" data-testid="distribute-resend-locked">Ein zweites Mal senden nur Redaktion und System.</p>
                   ))}
                   {box.state !== "internal" && (
                     <div>
-                      <button type="button" disabled={previewBusy} onClick={togglePreview} aria-expanded={Boolean(preview)} data-testid="distribute-preview-toggle" className="tls-btn tls-btn--quiet px-4 py-2 rounded-sm text-xs font-bold uppercase tracking-wider disabled:opacity-50">
+                      <button type="button" disabled={previewBusy} onClick={togglePreview} aria-expanded={Boolean(preview)} data-testid="distribute-preview-toggle" className="tls-btn tls-btn--quiet px-4 py-2 rounded-sm tls-type-label disabled:opacity-50">
                         {preview ? "Vorschau schließen" : previewBusy ? "Lade Vorschau …" : "Mail ansehen"}
                       </button>
                       {preview && (
                         <div className="mt-2 border border-white/10 rounded-sm bg-white" data-testid="distribute-preview">
-                          <div className="px-3 py-2 border-b border-black/10 text-sm text-black font-bold break-words" data-testid="distribute-preview-subject">{preview.subject}</div>
+                          <div className="px-3 py-2 border-b border-black/10 tls-type-small text-black font-bold break-words" data-testid="distribute-preview-subject">{preview.subject}</div>
                           <iframe title="Vorschau der Newsletter-Mail" sandbox="" srcDoc={preview.html} className="w-full h-[420px] bg-white" data-testid="distribute-preview-frame" />
-                          <p className="px-3 py-2 border-t border-black/10 text-[11px] text-black/60">So sieht die Mail aus – mit deinem Namen als Anrede. Jede Person bekommt ihren eigenen.</p>
+                          <p className="px-3 py-2 border-t border-black/10 tls-type-small text-black/60">So sieht die Mail aus – mit deinem Namen als Anrede. Jede Person bekommt ihren eigenen.</p>
                         </div>
                       )}
                     </div>
@@ -192,8 +192,8 @@ export function DistributeBox({ kind, itemId, title = "", visibility = "", appOn
             <div className="flex items-start gap-3" data-testid="distribute-app-push-row">
               <Smartphone className="w-4 h-4 mt-0.5 text-white/50 shrink-0" />
               <div className="min-w-0 flex-1">
-                <div className="text-xs font-bold uppercase tracking-wider text-white/70">App-Push</div>
-                <p className="mt-1 text-sm text-white/75" data-testid="distribute-app-push">{appPushLine({ appOnly, visibility, appPush, alreadyPublic, wasMembersOnly, membersNotified })}</p>
+                <div className="tls-type-label text-white/70">App-Push</div>
+                <p className="mt-1 tls-type-small text-white/75" data-testid="distribute-app-push">{appPushLine({ appOnly, visibility, appPush, alreadyPublic, wasMembersOnly, membersNotified })}</p>
               </div>
             </div>
           )}
@@ -201,8 +201,8 @@ export function DistributeBox({ kind, itemId, title = "", visibility = "", appOn
             <div className="flex items-start gap-3" data-testid="distribute-announcement">
               <Bell className="w-4 h-4 mt-0.5 text-white/50 shrink-0" />
               <div className="min-w-0 flex-1">
-                <div className="text-xs font-bold uppercase tracking-wider text-white/70">Meldung</div>
-                <p className="mt-1 text-sm text-white/65">{box.announcement}{box.announced_at && box.announced_count ? ` Gemeldet am ${viennaDateTime(box.announced_at)} an ${people(box.announced_count)}.` : ""}</p>
+                <div className="tls-type-label text-white/70">Meldung</div>
+                <p className="mt-1 tls-type-small text-white/65">{box.announcement}{box.announced_at && box.announced_count ? ` Gemeldet am ${viennaDateTime(box.announced_at)} an ${people(box.announced_count)}.` : ""}</p>
               </div>
             </div>
           )}

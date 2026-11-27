@@ -39,15 +39,15 @@ export function EventFactsSection({ bringText, onBringText, highlights, onHighli
   return (
     <div className="space-y-5" data-testid="event-facts-admin">
       <label className="block">
-        <span className="block text-[11px] uppercase tracking-widest text-white/50 font-bold mb-1.5">Mitbringen – eine Zeile je Punkt</span>
+        <span className="block tls-type-small text-white/50 font-bold mb-1.5">Mitbringen – eine Zeile je Punkt</span>
         <textarea value={bringText} onChange={(ev) => onBringText(ev.target.value)} rows={4} data-testid="event-bring-along"
           placeholder={"eigener Controller\nKopfhörer"} className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-sm" />
-        <span className={`block mt-1 text-xs ${lines.length > BRING_ALONG_MAX ? "text-[#FF6B6B]" : "text-white/40"}`}>
+        <span className={`block mt-1 tls-type-small ${lines.length > BRING_ALONG_MAX ? "text-[#FF6B6B]" : "text-quiet"}`}>
           {lines.length} von höchstens {BRING_ALONG_MAX} Zeilen · steht im Fakten-Kasten oben auf der Event-Seite.
         </span>
       </label>
       <div>
-        <div className="text-[11px] uppercase tracking-widest text-white/50 font-bold mb-1.5">Highlights – Kacheln über dem Text (statt Emoji-Überschriften)</div>
+        <div className="tls-type-small text-white/50 font-bold mb-1.5">Highlights – Kacheln über dem Text (statt Emoji-Überschriften)</div>
         <ul className="space-y-2" data-testid="event-highlights-admin">
           {highlights.map((row, index) => (
             <li key={`${index}-${row.icon}`} className="flex flex-wrap items-center gap-2">
@@ -67,10 +67,10 @@ export function EventFactsSection({ bringText, onBringText, highlights, onHighli
         </ul>
         {highlights.length < HIGHLIGHTS_MAX ? (
           <button type="button" onClick={() => onHighlights([...highlights, { icon: "star", text: "" }])} data-testid="event-highlight-add"
-            className="mt-2 inline-flex items-center gap-1.5 text-xs font-bold text-[#9F7AEA] hover:text-white">
+            className="mt-2 inline-flex items-center gap-1.5 tls-type-small font-bold text-[#9F7AEA] hover:text-white">
             <Plus className="w-3.5 h-3.5" /> Highlight hinzufügen
           </button>
-        ) : <p className="mt-2 text-xs text-white/40">Höchstens {HIGHLIGHTS_MAX} Highlights.</p>}
+        ) : <p className="mt-2 tls-type-small text-quiet">Höchstens {HIGHLIGHTS_MAX} Highlights.</p>}
       </div>
     </div>
   );
@@ -88,16 +88,16 @@ export function EventBannerFields({ url, style, focusX, focusY, onChange }) {
   return (
     <div className="space-y-3" data-testid="event-banner-fields">
       <label className="block">
-        <span className="block text-[11px] uppercase tracking-widest text-white/50 font-bold mb-1.5">Kopfbild zeigen als</span>
+        <span className="block tls-type-label text-white/50 mb-1.5">Kopfbild zeigen als</span>
         <select value={style || "auto"} onChange={(ev) => onChange({ banner_style: ev.target.value })} data-testid="event-banner-style"
           className="w-full sm:w-auto bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-sm">
           {BANNER_STYLE_LABELS.map(([key, label]) => <option key={key} value={key}>{label}</option>)}
         </select>
-        <span className="block mt-1 text-xs text-white/40">Dasselbe Bild steht auf der Event-Karte. „Automatisch“: Bilder mit durchsichtigem Hintergrund oder wenigen Farben gelten als Logo.</span>
+        <span className="block mt-1 tls-type-small text-quiet">Dasselbe Bild steht auf der Event-Karte. „Automatisch“: Bilder mit durchsichtigem Hintergrund oder wenigen Farben gelten als Logo.</span>
       </label>
       {style !== "logo" ? (
         <div>
-          <div className="text-xs text-white/55 mb-1">Fokuspunkt: ins Bild klicken – dieser Punkt bleibt beim Zuschneiden sichtbar ({focusX} % / {focusY} %).</div>
+          <div className="tls-type-small text-white/55 mb-1">Fokuspunkt: ins Bild klicken – dieser Punkt bleibt beim Zuschneiden sichtbar ({focusX} % / {focusY} %).</div>
           <button type="button" onClick={pick} className="relative block w-full max-w-md overflow-hidden rounded-sm cursor-crosshair" data-testid="event-banner-focus" aria-label="Fokuspunkt setzen">
             <img src={resolveMediaUrl(url)} alt="" className="block w-full h-auto" />
             <span className="absolute w-4 h-4 -ml-2 -mt-2 rounded-full border-2 border-white bg-[#29B6E8]/70 pointer-events-none" style={{ left: `${focusX}%`, top: `${focusY}%` }} />

@@ -6,6 +6,7 @@ import { api, formatRequestError, resolveMediaUrl, uploadApi } from "@/lib/api";
 import { viennaDateTime } from "@/lib/vienna";
 import { ReasonedButton } from "./AdminShopPage";
 import ShopTabs from "./ShopTabs";
+import { ShortCaps } from "@/components/tls/ShortCaps";
 
 // Motive des Vereins (#1708, #2069) - Verwaltung → Finanzen → Shop → Motive. Nur die Finanzen laden hoch; der Grund
 // ist optional und kommt ins Protokoll. Ein Motiv hat eine Hauptdatei für dunkle Shirts (SVG bevorzugt, sonst PNG/JPG)
@@ -68,7 +69,7 @@ const SAMPLE_SHIRTS = [
 function Section({ title, icon: Icon, children, testId }) {
   return (
     <section className="border border-white/10 bg-surface-1 rounded-sm p-4 space-y-3" data-testid={testId}>
-      <h2 className="text-xs font-bold uppercase tracking-wider text-white/70 inline-flex items-center gap-2">
+      <h2 className="tls-type-label text-white/70 inline-flex items-center gap-2">
         {Icon && <Icon className="w-3.5 h-3.5 text-white/50" aria-hidden="true" />} {title}
       </h2>
       {children}
@@ -78,17 +79,17 @@ function Section({ title, icon: Icon, children, testId }) {
 
 function Field({ label, hint, children }) {
   return (
-    <label className="block text-sm">
+    <label className="block tls-type-small">
       <span className="text-white/70">{label}</span>
       {children}
-      {hint && <span className="block text-xs text-white/45 mt-1">{hint}</span>}
+      {hint && <span className="block tls-type-small text-white/45 mt-1">{hint}</span>}
     </label>
   );
 }
 
-const INPUT = "mt-1 w-full min-h-10 bg-black/40 border border-white/15 rounded-sm px-3 text-sm placeholder:text-white/35 focus:border-brand outline-none disabled:opacity-50";
-const QUIET_BUTTON = "tls-btn tls-btn--quiet min-h-9 px-3 text-xs font-bold uppercase tracking-wider rounded-sm";
-const SECONDARY_BUTTON = "tls-btn tls-btn--secondary min-h-9 px-3 text-xs font-bold uppercase tracking-wider rounded-sm disabled:opacity-40";
+const INPUT = "mt-1 w-full min-h-10 bg-black/40 border border-white/15 rounded-sm px-3 tls-type-small placeholder:text-white/35 focus:border-brand outline-none disabled:opacity-50";
+const QUIET_BUTTON = "tls-btn tls-btn--quiet min-h-9 px-3 tls-type-label rounded-sm";
+const SECONDARY_BUTTON = "tls-btn tls-btn--secondary min-h-9 px-3 tls-type-label rounded-sm disabled:opacity-40";
 
 function ReasonInput({ id, value, onChange, disabled }) {
   return (
@@ -104,7 +105,7 @@ function Light({ check, testId }) {
   const level = LEVELS[check?.level] || LEVELS.unknown;
   const Icon = level.icon;
   return (
-    <span className={`inline-flex items-center gap-1.5 border rounded-sm px-2 py-0.5 text-xs font-bold ${level.className}`} title={check?.text} data-testid={testId}>
+    <span className={`inline-flex items-center gap-1.5 border rounded-sm px-2 py-0.5 tls-type-small font-bold ${level.className}`} title={check?.text} data-testid={testId}>
       <Icon className="w-3.5 h-3.5" aria-hidden="true" /> {level.label}{check?.dpi ? ` · ${Math.floor(check.dpi)} DPI` : ""}
     </span>
   );
@@ -121,7 +122,7 @@ function ShirtPreview({ version, title, shirt, testId }) {
           ? <img src={resolveMediaUrl(version.public_path)} alt={`${title} ${VARIANT_LABELS[shirt]}, Version ${version.version}`} className="max-w-full max-h-full object-contain p-3" loading="lazy" />
           : <FileImage className={`w-8 h-8 ${dark ? "text-white/30" : "text-black/30"}`} aria-label="keine Datei" />}
       </div>
-      <figcaption className="text-xs text-white/60">Auf {dark ? "dunklem" : "hellem"} Shirt{version ? ` · v${version.version}` : ""}</figcaption>
+      <figcaption className="tls-type-small text-white/60">Auf {dark ? "dunklem" : "hellem"} Shirt{version ? ` · v${version.version}` : ""}</figcaption>
     </figure>
   );
 }
@@ -131,7 +132,7 @@ function Swatches({ colors, testId }) {
   return (
     <ul className="flex flex-wrap gap-1.5" aria-label="Farben im SVG" data-testid={testId}>
       {colors.map((hex) => (
-        <li key={hex} className="inline-flex items-center gap-1.5 border border-white/15 rounded-sm px-1.5 py-0.5 text-xs font-mono" data-testid="shop-motif-color">
+        <li key={hex} className="inline-flex items-center gap-1.5 border border-white/15 rounded-sm px-1.5 py-0.5 tls-type-small font-mono" data-testid="shop-motif-color">
           <span className="w-3 h-3 rounded-sm border border-white/30" style={{ backgroundColor: hex }} aria-hidden="true" />
           {hex}
         </li>
@@ -162,8 +163,8 @@ function PlacementRow({ spec, busy, onSave }) {
     <li className="border-t border-white/10 pt-3 first:border-t-0 first:pt-0" data-testid={`shop-placement-${spec.key}`}>
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <div className="text-sm font-bold">{spec.label}</div>
-          <div className="text-xs text-white/60 mt-0.5">
+          <div className="tls-type-small font-bold">{spec.label}</div>
+          <div className="tls-type-small text-white/60 mt-0.5">
             Druckbreite <b className="text-white/85">{spec.print_width}</b> · Bereich {spec.area_width} × {spec.area_height} · mind. {spec.min_dpi} DPI = {spec.min_width_px} px Breite
             {!spec.is_default && <span className="ml-2 text-honor">angepasst</span>}
           </div>
@@ -186,13 +187,13 @@ function PlacementRow({ spec, busy, onSave }) {
             {field("area_height_in", "Bereich Höhe (Zoll)", 0.1)}
             {field("min_dpi", "Mindest-DPI", 1)}
           </div>
-          {!valid && <p className="text-xs text-warn" data-testid={`shop-placement-${spec.key}-invalid`}>Zahlen größer 0; die Druckbreite darf nicht breiter sein als der Bereich.</p>}
+          {!valid && <p className="tls-type-small text-warn" data-testid={`shop-placement-${spec.key}-invalid`}>Zahlen größer 0; die Druckbreite darf nicht breiter sein als der Bereich.</p>}
           <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
             <ReasonInput id={`shop-placement-${spec.key}-reason`} value={reason} onChange={setReason} disabled={busy} />
-            <button type="submit" disabled={!ready} className="tls-btn tls-btn--primary min-h-10 px-4 text-xs font-bold uppercase tracking-wider rounded-sm disabled:opacity-40" data-testid={`shop-placement-${spec.key}-save`}>
+            <button type="submit" disabled={!ready} className="tls-btn tls-btn--primary min-h-10 px-4 tls-type-label rounded-sm disabled:opacity-40" data-testid={`shop-placement-${spec.key}-save`}>
               {busy ? "Speichert …" : "Speichern"}
             </button>
-            <button type="button" onClick={() => setOpen(false)} className="tls-btn tls-btn--quiet min-h-10 px-4 text-xs font-bold uppercase tracking-wider rounded-sm">Abbrechen</button>
+            <button type="button" onClick={() => setOpen(false)} className="tls-btn tls-btn--quiet min-h-10 px-4 tls-type-label rounded-sm">Abbrechen</button>
           </div>
         </form>
       )}
@@ -225,9 +226,9 @@ function DropZone({ file, onFile, onFiles, accept, disabled, label, hint, testId
       className={`flex flex-col items-center justify-center gap-1.5 min-h-28 border border-dashed rounded-sm px-4 py-5 text-center cursor-pointer transition-colors duration-150 focus-within:border-brand ${over ? "border-brand bg-brand/10" : "border-white/20 hover:border-white/40"}`}
       data-over={over ? "true" : "false"} data-testid={`${testId}-dropzone`}>
       <Upload className="w-5 h-5 text-white/50" aria-hidden="true" />
-      {label && <span className="text-xs font-bold uppercase tracking-wider text-white/70">{label}</span>}
-      <span className="text-sm">{file ? <b className="break-all">{file.name}</b> : "Datei hierher ziehen oder klicken"}</span>
-      <span className="text-xs text-white/45">{hint || "SVG (am besten), PNG mit durchsichtigem Hintergrund oder JPG"}</span>
+      {label && <span className="tls-type-label text-white/70">{label}</span>}
+      <span className="tls-type-small">{file ? <b className="break-all">{file.name}</b> : "Datei hierher ziehen oder klicken"}</span>
+      <span className="tls-type-small text-white/45">{hint || "SVG (am besten), PNG mit durchsichtigem Hintergrund oder JPG"}</span>
       <input type="file" accept={accept} disabled={disabled} multiple={!!onFiles} onChange={(event) => take(event.target.files)}
         className="sr-only" data-testid={`${testId}-file`} />
     </label>
@@ -251,7 +252,7 @@ function PairPreview({ image, mark, shirt, name, testId }) {
         {image && <img src={image} alt={`Vorschau ${VARIANT_LABELS[shirt]}${name ? `: ${name}` : ""}`} className="max-w-full max-h-full object-contain p-3" />}
         {mark && <img src={mark} alt="" aria-hidden="true" className="absolute inset-0 m-auto max-w-full max-h-full object-contain p-3 motion-safe:animate-pulse" data-testid={`${testId}-mark`} />}
       </div>
-      <figcaption className="text-xs text-white/60">
+      <figcaption className="tls-type-small text-white/60">
         Auf {dark ? "dunklem" : "hellem"} Shirt{mark ? <span className="text-warn"> · markiert</span> : ""}
       </figcaption>
     </figure>
@@ -260,12 +261,12 @@ function PairPreview({ image, mark, shirt, name, testId }) {
 
 function PairReport({ check, onSwap, onRetry, busy }) {
   if (check.status === "checking") {
-    return <p className="text-sm text-white/60" role="status" data-testid="shop-pair-checking">Prüft das Paar …</p>;
+    return <p className="tls-type-small text-white/60" role="status" data-testid="shop-pair-checking">Prüft das Paar …</p>;
   }
   const report = check.report;
   if (!report) {
     return check.error ? (
-      <div role="alert" className="flex flex-col gap-2 border border-warn/50 bg-warn/10 rounded-sm px-3 py-2 text-sm sm:flex-row sm:items-start" data-testid="shop-pair-error">
+      <div role="alert" className="flex flex-col gap-2 border border-warn/50 bg-warn/10 rounded-sm px-3 py-2 tls-type-small sm:flex-row sm:items-start" data-testid="shop-pair-error">
         <span className="inline-flex gap-2 flex-1">
           <XOctagon className="w-4 h-4 mt-0.5 shrink-0 text-warn" aria-hidden="true" />
           <span>{check.error}</span>
@@ -279,24 +280,24 @@ function PairReport({ check, onSwap, onRetry, busy }) {
   return (
     <div className="space-y-3 border border-white/10 rounded-sm p-3" data-testid="shop-pair-report" data-level={report.level}>
       <div className="flex flex-wrap items-center gap-2">
-        <span className={`inline-flex items-center gap-1.5 border rounded-sm px-2 py-0.5 text-xs font-bold ${level.className}`} data-testid="shop-pair-light">
+        <span className={`inline-flex items-center gap-1.5 border rounded-sm px-2 py-0.5 tls-type-small font-bold ${level.className}`} data-testid="shop-pair-light">
           <Icon className="w-3.5 h-3.5" aria-hidden="true" /> {level.label}
         </span>
-        <span className="text-sm">{report.summary}</span>
+        <span className="tls-type-small">{report.summary}</span>
       </div>
       <ul className="space-y-1" data-testid="shop-pair-checks">
         {report.checks.map((item) => {
           const tone = PAIR_LEVELS[item.level] || PAIR_LEVELS.red;
           const ItemIcon = tone.icon;
           return (
-            <li key={item.key} className="flex gap-2 text-xs text-white/75" data-level={item.level} data-testid={`shop-pair-check-${item.key}`}>
+            <li key={item.key} className="flex gap-2 tls-type-small text-white/75" data-level={item.level} data-testid={`shop-pair-check-${item.key}`}>
               <ItemIcon className={`w-3.5 h-3.5 mt-0.5 shrink-0 ${item.level === "green" ? "text-ok" : "text-warn"}`} aria-hidden="true" />
               <span>{item.text}</span>
             </li>
           );
         })}
       </ul>
-      <div className="flex flex-wrap items-center gap-2 text-xs text-white/70" data-testid="shop-pair-assignment">
+      <div className="flex flex-wrap items-center gap-2 tls-type-small text-white/70" data-testid="shop-pair-assignment">
         <span>
           {report.swapped ? "Automatisch zugeordnet: die hellere Datei gilt für dunkle Shirts." : "Zuordnung wie gewählt."}
           {!report.swapped && report.suggest_swap && !report.assign_uncertain ? " Die Dateien wirken vertauscht – die hellere gehört zu den dunklen Shirts." : ""}
@@ -325,17 +326,17 @@ function PairConfirm({ report, busy, onConfirm, onCancel }) {
   useEffect(() => { box.current?.focus?.(); }, []);
   return (
     <div ref={box} tabIndex={-1} role="alertdialog" aria-modal="false" aria-labelledby="shop-pair-confirm-title" className="space-y-3 border border-warn/50 bg-warn/10 rounded-sm p-3 outline-none focus-visible:border-brand" data-testid="shop-pair-confirm">
-      <p id="shop-pair-confirm-title" className="text-sm font-bold inline-flex items-center gap-2">
+      <p id="shop-pair-confirm-title" className="tls-type-small font-bold inline-flex items-center gap-2">
         <AlertTriangle className="w-4 h-4 text-warn" aria-hidden="true" /> Trotz Warnung speichern?
       </p>
-      <ul className="list-disc pl-5 space-y-1 text-sm">
+      <ul className="list-disc pl-5 space-y-1 tls-type-small">
         {warnings.map((item) => <li key={item.key}>{item.text}</li>)}
       </ul>
       <div className="flex flex-col gap-2 sm:flex-row">
-        <button type="button" onClick={onConfirm} disabled={busy} className="tls-btn tls-btn--primary min-h-10 px-4 text-xs font-bold uppercase tracking-wider rounded-sm disabled:opacity-40" data-testid="shop-pair-confirm-yes">
+        <button type="button" onClick={onConfirm} disabled={busy} className="tls-btn tls-btn--primary min-h-10 px-4 tls-type-label rounded-sm disabled:opacity-40" data-testid="shop-pair-confirm-yes">
           {busy ? "Speichert …" : "Trotzdem speichern"}
         </button>
-        <button type="button" onClick={onCancel} disabled={busy} className="tls-btn tls-btn--quiet min-h-10 px-4 text-xs font-bold uppercase tracking-wider rounded-sm" data-testid="shop-pair-confirm-no">
+        <button type="button" onClick={onCancel} disabled={busy} className="tls-btn tls-btn--quiet min-h-10 px-4 tls-type-label rounded-sm" data-testid="shop-pair-confirm-no">
           Abbrechen
         </button>
       </div>
@@ -356,7 +357,7 @@ function PairFields({ dark, light, disabled, onDark, onLight, onBoth }) {
         <DropZone file={light} onFile={onLight} onFiles={onBoth} accept={ACCEPT} disabled={disabled} label="Für helle Shirts"
           hint="Die Fassung „auf Weiß“" testId="shop-pair-light" />
       </div>
-      <p className="text-xs text-white/45">Tipp: beide Dateien auf einmal in ein Feld ziehen oder auswählen – die Website ordnet sie selbst zu. Am besten zwei SVGs mit gleicher Zeichenfläche.</p>
+      <p className="tls-type-small text-white/45">Tipp: beide Dateien auf einmal in ein Feld ziehen oder auswählen – die Website ordnet sie selbst zu. Am besten zwei SVGs mit gleicher Zeichenfläche.</p>
     </div>
   );
 }
@@ -562,7 +563,7 @@ function UploadForm({ designs, placements, limits, busy, preset, onUpload, onPai
         {[{ value: false, label: "Neue Datei für ein Motiv" }, { value: true, label: "Neues Motiv" }].map((option) => (
           <button key={option.label} type="button" role="radio" aria-checked={isNew === option.value} disabled={!option.value && designs.length === 0}
             onClick={() => { setIsNew(option.value); setKey(option.value ? "" : designs[0]?.design_key || ""); setVariant("dark"); }}
-            className={`min-h-10 px-3 text-sm border rounded-sm transition-colors duration-150 disabled:opacity-40 ${isNew === option.value ? "border-brand bg-brand/10" : "border-white/10 hover:border-white/30"}`}
+            className={`min-h-10 px-3 tls-type-small border rounded-sm transition-colors duration-150 disabled:opacity-40 ${isNew === option.value ? "border-brand bg-brand/10" : "border-white/10 hover:border-white/30"}`}
             data-testid={`shop-design-mode-${option.value ? "new" : "version"}`}>
             {option.label}
           </button>
@@ -572,7 +573,7 @@ function UploadForm({ designs, placements, limits, busy, preset, onUpload, onPai
         {[{ value: "single", label: "Eine Datei" }, { value: "pair", label: "Als Paar (hell + dunkel)" }].map((option) => (
           <button key={option.value} type="button" role="radio" aria-checked={shape === option.value}
             onClick={() => { setShape(option.value); setProblem(""); setConfirming(false); }}
-            className={`min-h-10 px-3 text-sm border rounded-sm transition-colors duration-150 ${shape === option.value ? "border-brand bg-brand/10" : "border-white/10 hover:border-white/30"}`}
+            className={`min-h-10 px-3 tls-type-small border rounded-sm transition-colors duration-150 ${shape === option.value ? "border-brand bg-brand/10" : "border-white/10 hover:border-white/30"}`}
             data-testid={`shop-design-shape-${option.value}`}>
             {option.label}
           </button>
@@ -602,12 +603,12 @@ function UploadForm({ designs, placements, limits, busy, preset, onUpload, onPai
               {designs.map((item) => <option key={item.design_key} value={item.design_key}>{item.title} ({item.design_key}) – {item.placement_label}</option>)}
             </select>
           </Field>
-          {!pair && <div className="text-sm">
+          {!pair && <div className="tls-type-small">
             <span className="text-white/70">Fassung</span>
             <div className="mt-1 flex flex-wrap gap-2" role="radiogroup" aria-label="Fassung">
               {["dark", "light"].map((value) => (
                 <button key={value} type="button" role="radio" aria-checked={variant === value} onClick={() => setVariant(value)}
-                  className={`min-h-10 px-3 text-sm border rounded-sm transition-colors duration-150 ${variant === value ? "border-brand bg-brand/10" : "border-white/10 hover:border-white/30"}`}
+                  className={`min-h-10 px-3 tls-type-small border rounded-sm transition-colors duration-150 ${variant === value ? "border-brand bg-brand/10" : "border-white/10 hover:border-white/30"}`}
                   data-testid={`shop-design-variant-${value}`}>
                   {value === "dark" ? "Für dunkle Shirts (Hauptdatei)" : "Für helle Shirts (eigene Datei)"}
                 </button>
@@ -623,7 +624,7 @@ function UploadForm({ designs, placements, limits, busy, preset, onUpload, onPai
       ) : (
         <DropZone file={file} onFile={(next) => { setFile(next); setProblem(""); }} disabled={busy} accept={ACCEPT} />
       )}
-      <p className="text-xs text-white/45">
+      <p className="tls-type-small text-white/45">
         {limits.formats.join(", ")} · PNG/JPG höchstens {limits.max_mb} MB, SVG höchstens {limits.svg_max_mb} MB.
         {spec ? ` ${spec.label}: Druckbreite ${spec.print_width}, für PNG mind. ${spec.min_width_px} px Breite (${spec.min_dpi} DPI).` : ""}
       </p>
@@ -632,27 +633,27 @@ function UploadForm({ designs, placements, limits, busy, preset, onUpload, onPai
         <PairConfirm report={check.report} busy={busy} onConfirm={() => savePair(true)} onCancel={closeConfirm} />
       )}
       {pair && pairLevel === "red" && (
-        <p className="text-xs text-warn" data-testid="shop-pair-blocked">Speichern gesperrt – bitte die Dateien korrigieren und neu wählen.</p>
+        <p className="tls-type-small text-warn" data-testid="shop-pair-blocked">Speichern gesperrt – bitte die Dateien korrigieren und neu wählen.</p>
       )}
       {!pair && isSvg(file) && (
-        <p className="text-xs text-white/70" data-testid="shop-design-precheck">
+        <p className="tls-type-small text-white/70" data-testid="shop-design-precheck">
           SVG: der Server prüft es streng (keine Skripte, keine Pixelbilder, keine Verweise nach außen) und rastert es scharf für den Druck.
         </p>
       )}
       {!pair && pixels && spec && !isSvg(file) && (
-        <p className={`text-xs ${dpi >= spec.min_dpi ? "text-ok" : "text-warn"}`} data-testid="shop-design-precheck">
+        <p className={`tls-type-small ${dpi >= spec.min_dpi ? "text-ok" : "text-warn"}`} data-testid="shop-design-precheck">
           {pixels.width} × {pixels.height} px: bei {inches(spec.print_width_in)} Breite {Math.floor(dpi)} DPI – {dpi >= spec.min_dpi ? "reicht" : `zu wenig, nötig sind ${spec.min_dpi}`}.
         </p>
       )}
       {problem && (
-        <div role="alert" className="flex gap-2 border border-warn/50 bg-warn/10 rounded-sm px-3 py-2 text-sm" data-testid="shop-design-upload-error">
+        <div role="alert" className="flex gap-2 border border-warn/50 bg-warn/10 rounded-sm px-3 py-2 tls-type-small" data-testid="shop-design-upload-error">
           <XOctagon className="w-4 h-4 mt-0.5 shrink-0 text-warn" aria-hidden="true" />
           <span>{problem}</span>
         </div>
       )}
       <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
         <ReasonInput id="shop-design-reason" value={reason} onChange={setReason} disabled={busy} />
-        <button ref={submitButton} type="submit" disabled={pair ? !pairReady || confirming : !ready} className="tls-btn tls-btn--primary min-h-10 px-4 text-xs font-bold uppercase tracking-wider rounded-sm disabled:opacity-40 inline-flex items-center gap-2" data-testid="shop-design-submit">
+        <button ref={submitButton} type="submit" disabled={pair ? !pairReady || confirming : !ready} className="tls-btn tls-btn--primary min-h-10 px-4 tls-type-label rounded-sm disabled:opacity-40 inline-flex items-center gap-2" data-testid="shop-design-submit">
           <Upload className="w-3.5 h-3.5" aria-hidden="true" /> {busy ? "Lädt hoch …" : pair ? "Paar speichern" : "Hochladen und prüfen"}
         </button>
       </div>
@@ -685,8 +686,8 @@ function ColorEditor({ design, busy, onSave }) {
       </Field>
       <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
         <ReasonInput id={`shop-design-${design.design_key}-colors-reason`} value={reason} onChange={setReason} disabled={busy} />
-        <button type="submit" disabled={!ready} className="tls-btn tls-btn--primary min-h-10 px-4 text-xs font-bold uppercase tracking-wider rounded-sm disabled:opacity-40" data-testid={`shop-design-${design.design_key}-colors-save`}>Speichern</button>
-        <button type="button" onClick={() => setOpen(false)} className="tls-btn tls-btn--quiet min-h-10 px-4 text-xs font-bold uppercase tracking-wider rounded-sm">Abbrechen</button>
+        <button type="submit" disabled={!ready} className="tls-btn tls-btn--primary min-h-10 px-4 tls-type-label rounded-sm disabled:opacity-40" data-testid={`shop-design-${design.design_key}-colors-save`}>Speichern</button>
+        <button type="button" onClick={() => setOpen(false)} className="tls-btn tls-btn--quiet min-h-10 px-4 tls-type-label rounded-sm">Abbrechen</button>
       </div>
     </form>
   );
@@ -708,7 +709,7 @@ function ExceptionEditor({ design, busy, max, onSave }) {
   const update = (index, patch) => setRows((now) => now.map((row, at) => (at === index ? { ...row, ...patch } : row)));
   return (
     <div className="w-full space-y-2 border border-white/10 rounded-sm p-3" data-testid={id}>
-      <p className="text-xs text-white/55">Sonst entscheidet die Helligkeit der Shirtfarbe. Der Name muss so heißen wie die Farbe an den Varianten (z. B. Navy).</p>
+      <p className="tls-type-small text-white/55">Sonst entscheidet die Helligkeit der Shirtfarbe. Der Name muss so heißen wie die Farbe an den Varianten (z. B. Navy).</p>
       <ul className="space-y-2">
         {rows.map((row, index) => (
           <li key={index} className="flex flex-col gap-2 sm:flex-row sm:items-center">
@@ -763,9 +764,9 @@ function MotifCard({ design, busy, maxExceptions, onColors, onExceptions, onNewF
   return (
     <li className="border border-white/10 rounded-sm p-3 bg-black/20" data-testid={`shop-design-${key}`}>
       <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
-        <h3 className="text-base font-bold">{design.title}</h3>
-        <code className="text-xs text-white/50">{key}</code>
-        <span className="text-xs text-white/60">{design.placement_label}</span>
+        <h3 className="tls-type-card">{design.title}</h3>
+        <code className="tls-type-small text-white/50">{key}</code>
+        <span className="tls-type-small text-white/60">{design.placement_label}</span>
       </div>
       <div className="mt-3 grid gap-4 md:grid-cols-[minmax(0,20rem)_minmax(0,1fr)]">
         <div className="grid grid-cols-2 gap-3" data-testid={`shop-motif-${key}-previews`}>
@@ -774,27 +775,27 @@ function MotifCard({ design, busy, maxExceptions, onColors, onExceptions, onNewF
         </div>
         <div className="min-w-0 space-y-2">
           {latest ? (
-            <dl className="grid gap-x-6 gap-y-1 text-sm sm:grid-cols-2" data-testid={`shop-design-${key}-latest`}>
-              <div><dt className="text-white/50 text-xs">Hauptdatei</dt><dd>v{latest.version} · {viennaDateTime(latest.created_at)}{latest.created_by ? ` · ${latest.created_by}` : ""}</dd></div>
-              <div><dt className="text-white/50 text-xs">Format</dt><dd data-testid={`shop-motif-${key}-format`}>
+            <dl className="grid gap-x-6 gap-y-1 tls-type-small sm:grid-cols-2" data-testid={`shop-design-${key}-latest`}>
+              <div><dt className="text-white/50 tls-type-small">Hauptdatei</dt><dd>v{latest.version} · {viennaDateTime(latest.created_at)}{latest.created_by ? ` · ${latest.created_by}` : ""}</dd></div>
+              <div><dt className="text-white/50 tls-type-small">Format</dt><dd data-testid={`shop-motif-${key}-format`}>
                 {latest.is_vector
                   ? <span className="inline-flex items-center gap-1 text-ok"><CheckCircle2 className="w-3.5 h-3.5" aria-hidden="true" /> echtes Vektor-SVG</span>
                   : `${latest.source_format || "PNG"} (Pixel)`}
               </dd></div>
-              <div><dt className="text-white/50 text-xs">Maße im Druck</dt><dd className="tabular-nums">{latest.print_size || "–"}</dd></div>
-              <div><dt className="text-white/50 text-xs">Druckdatei</dt><dd className="tabular-nums">{latest.width_px} × {latest.height_px} px{latest.has_alpha ? " · durchsichtig" : " · ohne Transparenz"}{latest.aspect_ratio ? ` · Seitenverhältnis ${number(latest.aspect_ratio, 3)}` : ""}</dd></div>
-              <div><dt className="text-white/50 text-xs">Prüfsumme (SHA-256)</dt><dd><code className="font-mono text-xs" title={latest.sha256}>{latest.sha256_short}…</code></dd></div>
-              <div><dt className="sr-only">Auflösung</dt><dd className="flex flex-wrap items-center gap-2"><Light check={latest.check} testId={`shop-design-${key}-check`} /><span className="text-xs text-white/60">{latest.check?.text}</span></dd></div>
+              <div><dt className="text-white/50 tls-type-small">Maße im Druck</dt><dd className="tabular-nums">{latest.print_size || "–"}</dd></div>
+              <div><dt className="text-white/50 tls-type-small">Druckdatei</dt><dd className="tabular-nums">{latest.width_px} × {latest.height_px} px{latest.has_alpha ? " · durchsichtig" : " · ohne Transparenz"}{latest.aspect_ratio ? ` · Seitenverhältnis ${number(latest.aspect_ratio, 3)}` : ""}</dd></div>
+              <div><dt className="text-white/50 tls-type-small">Prüfsumme (SHA-256)</dt><dd><code className="font-mono tls-type-small" title={latest.sha256}>{latest.sha256_short}…</code></dd></div>
+              <div><dt className="sr-only">Auflösung</dt><dd className="flex flex-wrap items-center gap-2"><Light check={latest.check} testId={`shop-design-${key}-check`} /><span className="tls-type-small text-white/60">{latest.check?.text}</span></dd></div>
             </dl>
-          ) : <p className="text-sm text-white/55">Noch keine Datei.</p>}
+          ) : <p className="tls-type-small text-white/55">Noch keine Datei.</p>}
           <Swatches colors={latest?.colors} testId={`shop-motif-${key}-colors`} />
-          <div className="flex flex-wrap items-center gap-2 text-sm" data-testid={`shop-motif-${key}-light`}>
-            <span className="text-white/50 text-xs">Für helle Shirts:</span>
-            <span className={`inline-flex items-center border rounded-sm px-2 py-0.5 text-xs font-bold ${lightState.tone}`} data-state={light.state}>{lightState.label}</span>
-            {light.hint && <span className="text-xs text-white/60">{light.hint}</span>}
+          <div className="flex flex-wrap items-center gap-2 tls-type-small" data-testid={`shop-motif-${key}-light`}>
+            <span className="text-white/50 tls-type-small">Für helle Shirts:</span>
+            <span className={`inline-flex items-center border rounded-sm px-2 py-0.5 tls-type-small font-bold ${lightState.tone}`} data-state={light.state}>{lightState.label}</span>
+            {light.hint && <span className="tls-type-small text-white/60">{light.hint}</span>}
           </div>
           {design.pair_stale && design.pair?.outdated && (
-            <div role="status" className="flex flex-col gap-2 border border-warn/40 bg-warn/10 rounded-sm px-3 py-2 text-sm sm:flex-row sm:items-center" data-testid={`shop-motif-${key}-pair-stale`}>
+            <div role="status" className="flex flex-col gap-2 border border-warn/40 bg-warn/10 rounded-sm px-3 py-2 tls-type-small sm:flex-row sm:items-center" data-testid={`shop-motif-${key}-pair-stale`}>
               <span className="inline-flex items-start gap-2 flex-1">
                 <AlertTriangle className="w-4 h-4 mt-0.5 shrink-0 text-warn" aria-hidden="true" />
                 <span>
@@ -806,13 +807,13 @@ function MotifCard({ design, busy, maxExceptions, onColors, onExceptions, onNewF
               </button>
             </div>
           )}
-          <div className="flex flex-wrap items-center gap-2 text-sm">
-            <span className="text-white/50 text-xs">Feste Shirtfarben:</span>
+          <div className="flex flex-wrap items-center gap-2 tls-type-small">
+            <span className="text-white/50 tls-type-small">Feste Shirtfarben:</span>
             {(design.garment_colors || []).length
-              ? design.garment_colors.map((color) => <span key={color} className="border border-white/15 rounded-sm px-2 py-0.5 text-xs" data-testid="shop-design-color">{color}</span>)
-              : <span className="text-xs text-white/55">keine - die Helligkeit entscheidet</span>}
+              ? design.garment_colors.map((color) => <span key={color} className="border border-white/15 rounded-sm px-2 py-0.5 tls-type-small" data-testid="shop-design-color">{color}</span>)
+              : <span className="tls-type-small text-white/55">keine - die Helligkeit entscheidet</span>}
             {(design.color_variants || []).map((item) => (
-              <span key={item.color} className="border border-brand/40 rounded-sm px-2 py-0.5 text-xs" data-testid="shop-motif-exception">{item.color} → {VARIANT_LABELS[item.variant]}</span>
+              <span key={item.color} className="border border-brand/40 rounded-sm px-2 py-0.5 tls-type-small" data-testid="shop-motif-exception">{item.color} → {VARIANT_LABELS[item.variant]}</span>
             ))}
           </div>
           <div className="flex flex-wrap items-center gap-2">
@@ -842,12 +843,12 @@ function MotifCard({ design, busy, maxExceptions, onColors, onExceptions, onNewF
       </div>
       {design.versions.length > 0 && (
         <details className="mt-3 border-t border-white/10 pt-2 group">
-          <summary className="cursor-pointer text-xs font-bold uppercase tracking-wider text-white/60 hover:text-white min-h-8 inline-flex items-center" data-testid={`shop-design-${key}-history`}>
+          <summary className="cursor-pointer tls-type-label text-white/60 hover:text-white min-h-8 inline-flex items-center" data-testid={`shop-design-${key}-history`}>
             Versionsverlauf ({design.versions.length})
           </summary>
           <ol className="mt-2 space-y-1.5">
             {design.versions.map((version) => (
-              <li key={version.version} className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-white/70" data-testid={`shop-design-${key}-v${version.version}`}>
+              <li key={version.version} className="flex flex-wrap items-center gap-x-3 gap-y-1 tls-type-small text-white/70" data-testid={`shop-design-${key}-v${version.version}`}>
                 <b className="text-white">v{version.version}</b>
                 <span>{VARIANT_LABELS[version.variant] || VARIANT_LABELS.dark}</span>
                 <span className="text-white/50">{ORIGIN_LABELS[version.origin] || version.origin}{version.derived_from ? ` aus v${version.derived_from}` : ""}{version.is_vector ? " · SVG" : ""}</span>
@@ -905,7 +906,7 @@ function MotifSettings({ settings, busy, onSave }) {
   const changed = ink.toLowerCase() !== settings.light_ink || parsed !== settings.threshold || Object.keys(pairChanged).length > 0;
   return (
     <div className="space-y-3" data-testid="shop-motif-settings">
-      <p className="text-xs text-white/55">
+      <p className="tls-type-small text-white/55">
         Die Fassung für helle Shirts entsteht, indem Weiß ({settings.replaced_color}) durch die Ersatzfarbe ersetzt wird – alle anderen Farben bleiben. Welche Fassung eine Shirtfarbe bekommt, entscheidet ihre Helligkeit; eine Ausnahme je Farbe geht am Motiv.
       </p>
       <div className="grid gap-3 sm:grid-cols-2">
@@ -924,7 +925,7 @@ function MotifSettings({ settings, busy, onSave }) {
         {SAMPLE_SHIRTS.map((shirt) => {
           const variant = thresholdValid && luminance(shirt.hex) >= parsed ? "light" : "dark";
           return (
-            <li key={shirt.name} className="inline-flex items-center gap-1.5 border border-white/10 rounded-sm px-2 py-1 text-xs" data-variant={variant}>
+            <li key={shirt.name} className="inline-flex items-center gap-1.5 border border-white/10 rounded-sm px-2 py-1 tls-type-small" data-variant={variant}>
               <span className="w-3.5 h-3.5 rounded-sm border border-white/30" style={{ backgroundColor: shirt.hex }} aria-hidden="true" />
               {shirt.name} → {VARIANT_LABELS[variant]}
             </li>
@@ -933,7 +934,7 @@ function MotifSettings({ settings, busy, onSave }) {
       </ul>
       {Object.keys(pairValues).length > 0 && (
         <fieldset className="space-y-2 border-t border-white/10 pt-3" data-testid="shop-motif-pair-settings">
-          <legend className="text-xs font-bold uppercase tracking-wider text-white/60">Paar-Prüfung (hell + dunkel)</legend>
+          <legend className="tls-type-label text-white/60">Paar-Prüfung (hell + dunkel)</legend>
           <div className="grid gap-3 sm:grid-cols-2">
             {PAIR_SETTINGS.filter(({ name }) => name in pairValues).map(({ name, label, hint }) => (
               <Field key={name} label={label}
@@ -988,17 +989,17 @@ export default function AdminShopDesignsPage() {
   const placements = useMemo(() => data?.placements || [], [data]);
 
   if (error) {
-    return <AdminLayout><div className="border border-warn/40 bg-warn/10 rounded-sm p-4 text-sm" data-testid="shop-designs-error">{error}</div></AdminLayout>;
+    return <AdminLayout><div className="border border-warn/40 bg-warn/10 rounded-sm p-4 tls-type-small" data-testid="shop-designs-error">{error}</div></AdminLayout>;
   }
-  if (!data) return <AdminLayout><div className="text-sm text-white/45" role="status">Lade Motive …</div></AdminLayout>;
+  if (!data) return <AdminLayout><div className="tls-type-small text-white/45" role="status">Lade Motive …</div></AdminLayout>;
 
   const settings = data.motif_settings;
   return (
     <AdminLayout>
       <div>
-        <h1 className="font-heading text-3xl font-black uppercase inline-flex items-center gap-3"><ShoppingBag className="w-7 h-7 text-honor" aria-hidden="true" /> Shop</h1>
+        <h1 className="tls-type-title inline-flex items-center gap-3"><ShoppingBag className="w-7 h-7 text-honor" aria-hidden="true" /> <ShortCaps>Shop</ShortCaps></h1>
         <ShopTabs />
-        <p className="mt-4 text-sm text-white/60 max-w-2xl">
+        <p className="mt-4 tls-type-body text-white/60 max-w-2xl">
           Motive des Vereins: eine Hauptdatei für dunkle Shirts (am besten als SVG) und eine Fassung für helle Shirts – automatisch umgefärbt oder als eigene Datei. Jede Datei wird geprüft, ohne Metadaten neu abgelegt und bekommt als neue Version eine eigene Adresse für Printful. Ältere Versionen bleiben für ihre Bestellungen.
         </p>
       </div>
@@ -1006,7 +1007,7 @@ export default function AdminShopDesignsPage() {
       <div className="mt-6 space-y-4 max-w-5xl">
         <Section title="Motive" icon={FileImage} testId="shop-designs">
           {data.designs.length === 0
-            ? <p className="text-sm text-white/55" data-testid="shop-designs-empty">Noch keine Motive. Lade unten die erste Datei hoch.</p>
+            ? <p className="tls-type-small text-white/55" data-testid="shop-designs-empty">Noch keine Motive. Lade unten die erste Datei hoch.</p>
             : (
               <ul className="space-y-3">
                 {data.designs.map((design) => (
@@ -1036,7 +1037,7 @@ export default function AdminShopDesignsPage() {
         )}
 
         <Section title="Druckbereiche je Platzierung" icon={Ruler} testId="shop-placements">
-          <p className="text-xs text-white/55">Printful rechnet in Zoll; 1 Zoll = 2,54 cm. Die Ampel der Motive rechnet mit diesen Werten, jede Version behält die Maße, mit denen sie geprüft wurde.</p>
+          <p className="tls-type-small text-white/55">Printful rechnet in Zoll; 1 Zoll = 2,54 cm. Die Ampel der Motive rechnet mit diesen Werten, jede Version behält die Maße, mit denen sie geprüft wurde.</p>
           <ul className="space-y-3">
             {placements.map((spec) => (
               <PlacementRow key={spec.key} spec={spec} busy={busy === `placement-${spec.key}`}

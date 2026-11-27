@@ -24,7 +24,7 @@ export function GamingTab({ form, set, setNow = set, setGameId, gameIdGroups }) 
                   </Field>
                   <Field label="Bevorzugte Rolle">
                     <Input value={form.preferred_role} onChange={(v) => set("preferred_role", v)} placeholder="z.B. IGL, Support, Driver" maxLength={PROFILE_LIMITS.preferred_role} testId="profile-preferred-role" />
-                    <p className="text-[11px] text-white/45 mt-1.5">Erscheint auf deinem Profil, sobald du sie unter Privatsphäre → Sonstiges freigibst. Ohne Freigabe siehst nur du sie.</p>
+                    <p className="tls-type-small text-white/45 mt-1.5">Erscheint auf deinem Profil, sobald du sie unter Privatsphäre → Sonstiges freigibst. Ohne Freigabe siehst nur du sie.</p>
                   </Field>
                   {/* Liga (#2204): ob ich in meiner Season spielen darf und was ich tun muss. */}
                   <LeagueEligibilityNotice />
@@ -32,17 +32,17 @@ export function GamingTab({ form, set, setNow = set, setGameId, gameIdGroups }) 
                     <div className="border border-white/10 rounded-sm bg-[#0A0A0A] p-5 space-y-4">
                       <div>
                         <div className="flex items-center gap-1">
-                          <h3 className="font-heading font-black uppercase">Spiel-IDs</h3>
+                          <h3 className="tls-type-card">Spiel-IDs</h3>
                           <HelpLink thema="konto-und-profil" schritt="spiel-ids" className="-my-2" />
                         </div>
-                        <p className="text-xs text-white/50 mt-1">IDs können für Hauptspiele gelten und automatisch bei passenden Spielversionen verwendet werden, z.B. Activision ID für Call of Duty und BO6/BO7.</p>
+                        <p className="tls-type-small text-white/50 mt-1">IDs können für Hauptspiele gelten und automatisch bei passenden Spielversionen verwendet werden, z.B. Activision ID für Call of Duty und BO6/BO7.</p>
                       </div>
                       {/* Liga (#2108): welche ID in einer laufenden Season gilt - live zum Formular. */}
                       <LeagueIdNotice gameIds={form.game_ids} />
                       {gameIdGroups.map((group) => (
                         <div key={group.slug} className="border-t border-white/10 pt-4 first:border-t-0 first:pt-0">
-                          <div className="text-[11px] uppercase tracking-widest font-bold text-[#29B6E8] mb-1">{group.title}</div>
-                          {group.games.length > 1 && <div className="text-[10px] text-white/40 mb-3">Gilt für: {group.games.join(", ")}</div>}
+                          <div className="tls-type-label text-[#29B6E8] mb-1">{group.title}</div>
+                          {group.games.length > 1 && <div className="tls-type-small text-quiet mb-3">Gilt für: {group.games.join(", ")}</div>}
                           <Row>
                             {group.fields.map((field) => (
                               <Field key={field.key} label={`${field.label}${field.required !== false ? " *" : ""}`}>
@@ -54,10 +54,10 @@ export function GamingTab({ form, set, setNow = set, setGameId, gameIdGroups }) 
                                 ) : (
                                   <Input value={form.game_ids?.[group.slug]?.[field.key] || ""} onChange={(v) => setGameId(group.slug, field.key, v)} placeholder={field.help_text || field.label} testId={`profile-game-id-${group.slug}-${field.key}`} />
                                 )}
-                                {field.format_hint ? <p className="text-[11px] text-white/45 mt-1.5" data-testid={`profile-game-id-hint-${group.slug}-${field.key}`}>So soll es aussehen: {field.format_hint}</p> : null}
+                                {field.format_hint ? <p className="tls-type-small text-white/45 mt-1.5" data-testid={`profile-game-id-hint-${group.slug}-${field.key}`}>So soll es aussehen: {field.format_hint}</p> : null}
                                 {/* Plattform-Feld (#2281): danach richtet sich, in welcher Liga-Season du spielen darfst. */}
                                 {field.platform === true ? (
-                                  <p className="text-[11px] text-white/45 mt-1.5" data-testid={`profile-game-id-platform-${group.slug}-${field.key}`}>
+                                  <p className="tls-type-small text-white/45 mt-1.5" data-testid={`profile-game-id-platform-${group.slug}-${field.key}`}>
                                     Deine Plattform – Liga-Seasons mit Plattform-Regel prüfen diesen Wert.{field.required === false ? " Du kannst ihn jederzeit ändern; es zählt der aktuelle Wert." : ""}
                                   </p>
                                 ) : null}

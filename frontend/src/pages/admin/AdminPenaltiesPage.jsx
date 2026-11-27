@@ -12,6 +12,7 @@ import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { AlertTriangle, Clock, ExternalLink, Flag, Gavel, ShieldAlert, RefreshCw, Undo2 } from "lucide-react";
 import { viennaDateTime } from "@/lib/vienna";
 import { toast } from "sonner";
+import { ShortCaps } from "@/components/tls/ShortCaps";
 
 const KIND_META = {
   lap_penalty: { icon: Clock, color: "#FF9500", label: "Strafzeit" },
@@ -81,9 +82,9 @@ export default function AdminPenaltiesPage() {
 
   return (
     <AdminLayout>
-      <span className="text-[11px] font-bold uppercase tracking-[0.3em] text-[#FF3B30]">eSports</span>
-      <h1 className="font-heading text-3xl md:text-4xl font-black uppercase mt-1">Strafen</h1>
-      <p className="mt-2 text-white/55 text-sm max-w-2xl">
+      <span className="tls-type-label text-[#FF3B30]">eSports</span>
+      <h1 className="tls-type-title mt-1"><ShortCaps>Strafen</ShortCaps></h1>
+      <p className="mt-2 text-white/55 tls-type-body max-w-2xl">
         Alle Strafzeiten, ungültigen Runden, kampflosen Niederlagen, Vorfälle und Strafen der Liga – sortiert nach Datum. Spieler sehen ihre eigenen Einträge unter „Meine Strafen“.
       </p>
 
@@ -100,7 +101,7 @@ export default function AdminPenaltiesPage() {
             key={k}
             onClick={() => setFilter(k)}
             data-testid={`pen-filter-${k}`}
-            className={`px-3 py-1.5 text-[11px] font-bold uppercase tracking-wider rounded-sm border ${
+            className={`px-3 py-1.5 tls-type-label rounded-sm border ${
               filter === k
                 ? "bg-[#FF3B30] text-white border-[#FF3B30]"
                 : "border-white/10 text-white/60 hover:text-white hover:border-white/20"
@@ -112,7 +113,7 @@ export default function AdminPenaltiesPage() {
         <button
           onClick={load}
           data-testid="pen-refresh"
-          className="ml-auto px-3 py-1.5 border border-white/10 hover:bg-white/5 rounded-sm text-[11px] font-bold uppercase tracking-wider inline-flex items-center gap-2"
+          className="ml-auto px-3 py-1.5 border border-white/10 hover:bg-white/5 rounded-sm tls-type-label inline-flex items-center gap-2"
         >
           <RefreshCw className="w-3 h-3" /> Neu laden
         </button>
@@ -161,30 +162,30 @@ function Row({ p, onTakeBack }) {
           ) : (
             <span className="font-bold break-words" data-testid={`pen-team-${p.ref_id}`}>{p.team_name || "—"}</span>
           )}
-          <div className="text-[10px] uppercase tracking-widest" style={{ color: meta.color }}>{meta.label}</div>
+          <div className="tls-type-label" style={{ color: meta.color }}>{meta.label}</div>
         </div>
       </div>
       <div className="min-w-0">
-        {p.kind === "league_sanction" ? <div className="text-sm font-bold text-white" data-testid={`pen-sanction-${p.ref_id}`}>{p.label}{p.sanction?.period ? ` · ${p.sanction.period}` : ""}{p.sanction?.status === "revoked" ? " · widerrufen" : ""}</div> : null}
-        <div className="text-sm text-white/85 italic">„{p.reason}"</div>
-        <div className="text-[11px] text-white/45 mt-1">
+        {p.kind === "league_sanction" ? <div className="tls-type-small font-bold text-white" data-testid={`pen-sanction-${p.ref_id}`}>{p.label}{p.sanction?.period ? ` · ${p.sanction.period}` : ""}{p.sanction?.status === "revoked" ? " · widerrufen" : ""}</div> : null}
+        <div className="tls-type-small text-white/85 italic">„{p.reason}"</div>
+        <div className="tls-type-small text-white/45 mt-1">
           {p.context_url ? (
             <Link to={p.context_url} className="hover:underline">{p.context_title}</Link>
           ) : p.context_title}
           {p.context_subtitle && <span> · {p.context_subtitle}</span>}
         </div>
       </div>
-      <div className="md:text-right text-[11px] text-white/45 whitespace-nowrap">
+      <div className="md:text-right tls-type-small text-white/45 whitespace-nowrap">
         <div>{date}</div>
         <div>von {p.issued_by_name}</div>
         <div className="mt-2 flex flex-wrap md:justify-end gap-2">
           {p.admin_url && (
-            <Link to={p.admin_url} data-testid={`pen-open-${p.ref_id}`} className="inline-flex items-center gap-1 px-2 py-1 border border-white/15 rounded-sm text-[10px] font-bold uppercase tracking-wider text-white/70 hover:text-[#29B6E8] hover:border-[#29B6E8]/50">
+            <Link to={p.admin_url} data-testid={`pen-open-${p.ref_id}`} className="inline-flex items-center gap-1 px-2 py-1 border border-white/15 rounded-sm tls-type-label text-white/70 hover:text-[#29B6E8] hover:border-[#29B6E8]/50">
               <ExternalLink className="w-3 h-3" aria-hidden="true" /> Öffnen
             </Link>
           )}
           {LAP_KINDS.has(p.kind) && (
-            <button type="button" onClick={() => onTakeBack(p)} data-testid={`pen-take-back-${p.ref_id}`} className="inline-flex items-center gap-1 px-2 py-1 border border-white/15 rounded-sm text-[10px] font-bold uppercase tracking-wider text-white/70 hover:text-[#FF3B30] hover:border-[#FF3B30]/50">
+            <button type="button" onClick={() => onTakeBack(p)} data-testid={`pen-take-back-${p.ref_id}`} className="inline-flex items-center gap-1 px-2 py-1 border border-white/15 rounded-sm tls-type-label text-white/70 hover:text-[#FF3B30] hover:border-[#FF3B30]/50">
               <Undo2 className="w-3 h-3" aria-hidden="true" /> Zurücknehmen
             </button>
           )}

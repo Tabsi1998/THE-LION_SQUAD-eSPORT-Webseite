@@ -51,6 +51,7 @@ import { LeagueSeasonHistory } from "@/components/tls/league/LeagueSeasonHistory
 import { LeagueOverallStanding } from "@/components/tls/league/LeagueOverallStanding";
 import { LeagueSeasonLine } from "@/components/tls/league/LeagueSeasonLine";
 import { LeagueMomentHint } from "@/components/tls/league/LeagueMomentHint";
+import { ShortCaps } from "@/components/tls/ShortCaps";
 
 const TEAM_TAB_ALIASES = { awards: "trophies", trophies: "trophies", trophaeen: "trophies", overview: "overview" };
 
@@ -101,16 +102,16 @@ function TeamList() {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
         <div className="flex items-end justify-between gap-4 flex-wrap">
           <div>
-            <span className="text-[11px] font-bold uppercase tracking-[0.3em] text-[#29B6E8]">Teams</span>
-            <h1 className="mt-2 font-heading text-4xl md:text-6xl font-black uppercase">Teams & Clans</h1>
+            <span className="tls-type-label text-[#29B6E8]">Teams</span>
+            <h1 className="mt-2 tls-type-title"><ShortCaps>Teams & Clans</ShortCaps></h1>
             <p className="mt-3 text-white/60 max-w-xl">Erstelle dein Team, teile den Beitrittscode und verwalte Logo, Banner, Beschreibung und Discord-Link.</p>
           </div>
           {user ? (
-            <button onClick={() => setEditing(emptyTeam)} data-testid="team-create-open" className="tls-btn tls-btn--primary inline-flex items-center gap-2 px-4 py-2 rounded-sm font-bold uppercase tracking-wider text-xs">
+            <button onClick={() => setEditing(emptyTeam)} data-testid="team-create-open" className="tls-btn tls-btn--primary inline-flex items-center gap-2 px-4 py-2 rounded-sm tls-type-label">
               <Plus className="w-3.5 h-3.5" /> Team erstellen
             </button>
           ) : (
-            <Link to="/login?next=/teams" className="tls-btn tls-btn--secondary px-4 py-2 rounded-sm font-bold uppercase tracking-wider text-xs">Zum Erstellen anmelden</Link>
+            <Link to="/login?next=/teams" className="tls-btn tls-btn--secondary px-4 py-2 rounded-sm tls-type-label">Zum Erstellen anmelden</Link>
           )}
         </div>
 
@@ -118,9 +119,9 @@ function TeamList() {
             darunter. Vorher stand die Verwaltung als Reiter unter /profile. */}
         {user ? (
           <div className="mt-10" data-testid="teams-mine">
-            <h2 className="font-heading text-2xl font-black uppercase mb-3">Deine Teams</h2>
+            <h2 className="tls-type-section mb-3">Deine Teams</h2>
             <TeamsPanel />
-            <h2 className="mt-10 font-heading text-2xl font-black uppercase">Teams entdecken</h2>
+            <h2 className="mt-10 tls-type-section">Teams entdecken</h2>
           </div>
         ) : null}
         <div className="mt-6 relative max-w-xl">
@@ -146,7 +147,7 @@ function TeamList() {
               {teamLevels.status === "error" && (
                 <LoadNotice testId="teams-levels-error" className="mb-5" message="Die Team-Level konnten gerade nicht geladen werden." onRetry={teamLevels.reload} />
               )}
-              {!needle && list.length >= TEAM_LIST_LIMIT ? <p className="mb-4 text-xs text-white/45" data-testid="teams-more-hint">Das sind die {TEAM_LIST_LIMIT} neuesten Teams – die Suche findet alle.</p> : null}
+              {!needle && list.length >= TEAM_LIST_LIMIT ? <p className="mb-4 tls-type-small text-white/45" data-testid="teams-more-hint">Das sind die {TEAM_LIST_LIMIT} neuesten Teams – die Suche findet alle.</p> : null}
               <Reveal className="tls-reveal-grid tls-dim-siblings grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4 gap-5">
                 {list.map((t) => <TeamCard key={t.id} team={t} levelInfo={levels[t.id]} crown={crowns[t.id] || null} />)}
               </Reveal>
@@ -181,25 +182,25 @@ function TeamCard({ team: t, levelInfo, crown = null }) {
             <TeamLogo team={t} size="md" />
           )}
           <div className="flex-1 min-w-0">
-            <div className="text-[10px] uppercase tracking-widest text-[#29B6E8] font-bold flex items-center gap-2">
+            <div className="tls-type-label text-[#29B6E8] flex items-center gap-2">
               <span>[{t.tag}]</span>
               {levelInfo && (
-                <span data-testid={`team-level-chip-${t.tag}`} className="px-1.5 py-0.5 border border-[#29B6E8]/40 rounded-full text-[9px] font-black bg-[#29B6E8]/10">LVL {levelInfo.level}</span>
+                <span data-testid={`team-level-chip-${t.tag}`} className="px-1.5 py-0.5 border border-[#29B6E8]/40 rounded-full tls-type-small font-black bg-[#29B6E8]/10">LVL {levelInfo.level}</span>
               )}
               {crown === "gold" && (
-                <span data-testid={`team-crown-chip-${t.tag}`} className="px-1.5 py-0.5 border border-[#FFD700]/50 rounded-full text-[9px] font-black bg-[#FFD700]/10 text-[#FFD700] inline-flex items-center gap-1">
+                <span data-testid={`team-crown-chip-${t.tag}`} className="px-1.5 py-0.5 border border-[#FFD700]/50 rounded-full tls-type-small font-black bg-[#FFD700]/10 text-[#FFD700] inline-flex items-center gap-1">
                   <Crown className="w-2.5 h-2.5" /> #1
                 </span>
               )}
             </div>
-            <h3 className="tls-card__title font-heading text-xl font-bold truncate">{t.name}</h3>
-            <div className="text-xs text-white/50 inline-flex items-center gap-1 mt-0.5">
+            <h3 className="tls-card__title tls-type-card truncate">{t.name}</h3>
+            <div className="tls-type-small text-white/50 inline-flex items-center gap-1 mt-0.5">
               <Users className="w-3.5 h-3.5" /> {t.member_count ?? t.member_ids?.length ?? 0} Mitglieder
               {levelInfo && <span className="text-white/35">· {levelInfo.points} Pkt.</span>}
             </div>
           </div>
         </div>
-        {t.description && <p className="mt-3 text-sm text-white/60 line-clamp-2">{t.description}</p>}
+        {t.description && <p className="mt-3 tls-type-body text-white/60 line-clamp-2">{t.description}</p>}
       </div>
     </Link>
   );
@@ -273,7 +274,7 @@ function TeamDetail({ id }) {
     return (
       <PublicLayout>
         <div className="p-20 text-center" data-testid="team-missing">
-          <h1 className="font-heading text-3xl uppercase">{dissolved ? "Team aufgelöst" : "Team nicht gefunden"}</h1>
+          <h1 className="tls-type-title">{dissolved ? "Team aufgelöst" : "Team nicht gefunden"}</h1>
           {dissolved ? <p className="mt-3 text-white/60">{goneDetail}</p> : null}
           <Link to="/teams" className="inline-block mt-4 text-[#29B6E8] hover:underline">← Zu den Teams</Link>
         </div>
@@ -421,13 +422,13 @@ function TeamDetail({ id }) {
         actions={(
           <>
             {canEdit ? (
-              <button type="button" onClick={() => setInviteOpen(true)} data-testid="team-invite-open" className="tls-btn tls-btn--primary px-4 py-2 rounded-sm text-xs uppercase tracking-wider font-bold inline-flex items-center gap-2"><UserPlus className="w-3.5 h-3.5" /> Einladen</button>
+              <button type="button" onClick={() => setInviteOpen(true)} data-testid="team-invite-open" className="tls-btn tls-btn--primary px-4 py-2 rounded-sm tls-type-label inline-flex items-center gap-2"><UserPlus className="w-3.5 h-3.5" /> Einladen</button>
             ) : null}
             {canEditTeam ? (
-              <button onClick={() => setEditing(team)} disabled={mutating} data-testid="team-edit-open" className="tls-btn tls-btn--secondary px-4 py-2 rounded-sm text-xs uppercase tracking-wider font-bold inline-flex items-center gap-2 disabled:opacity-50"><Edit className="w-3.5 h-3.5" /> Bearbeiten</button>
+              <button onClick={() => setEditing(team)} disabled={mutating} data-testid="team-edit-open" className="tls-btn tls-btn--secondary px-4 py-2 rounded-sm tls-type-label inline-flex items-center gap-2 disabled:opacity-50"><Edit className="w-3.5 h-3.5" /> Bearbeiten</button>
             ) : null}
             {teamNeedsSecondFactor ? (
-              <Link to={mfaSetupPath(`/teams/${team.id}`)} data-testid="team-mfa-setup" title="Teams verwalten geht für Admins erst mit bestätigter Zwei-Faktor-Anmeldung." className="tls-btn tls-btn--secondary px-4 py-2 rounded-sm text-xs uppercase tracking-wider font-bold inline-flex items-center gap-2"><ShieldCheck className="w-3.5 h-3.5" /> 2FA einrichten</Link>
+              <Link to={mfaSetupPath(`/teams/${team.id}`)} data-testid="team-mfa-setup" title="Teams verwalten geht für Admins erst mit bestätigter Zwei-Faktor-Anmeldung." className="tls-btn tls-btn--secondary px-4 py-2 rounded-sm tls-type-label inline-flex items-center gap-2"><ShieldCheck className="w-3.5 h-3.5" /> 2FA einrichten</Link>
             ) : null}
             {/* Teilen (#1154): für alle, auch Gäste. */}
             <ShareButton kind="team" id={team.id} title={team.tag ? `${team.name} [${team.tag}]` : team.name} detail="Team" />
@@ -461,7 +462,7 @@ function TeamDetail({ id }) {
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex gap-1 tls-swipe">
             {[["overview", "Übersicht"], ["trophies", `Trophäen${trophies.length ? ` (${trophies.length})` : ""}`]].map(([key, label]) => (
               <button key={key} type="button" onClick={() => setTab(key)} data-testid={`team-tab-${key}`}
-                className={`px-4 py-3 text-xs font-bold uppercase tracking-wider whitespace-nowrap transition ${activeTab === key ? "text-[#29B6E8] border-b-2 border-[#29B6E8]" : "text-white/60 hover:text-white"}`}>
+                className={`px-4 py-3 tls-type-label whitespace-nowrap transition ${activeTab === key ? "text-[#29B6E8] border-b-2 border-[#29B6E8]" : "text-white/60 hover:text-white"}`}>
                 {label}
               </button>
             ))}
@@ -470,7 +471,7 @@ function TeamDetail({ id }) {
       ) : null}
       {activeTab === "trophies" ? (
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10 space-y-4" data-testid="team-awards">
-          <h2 className="font-heading text-2xl font-bold uppercase flex items-center gap-2"><Trophy className="w-5 h-5 text-[#FFD700]" /> Trophäen</h2>
+          <h2 className="tls-type-section flex items-center gap-2"><Trophy className="w-5 h-5 text-[#FFD700]" /> Trophäen</h2>
           {/* Turnier-Pokale und Liga-Belohnungen in einer Vitrine (Nr. 59); die Teamleitung wählt Teambanner, Titel und Embleme. */}
           <TrophyCabinet awards={trophies} testId="team-trophies"
             owner={canEdit ? {
@@ -505,8 +506,8 @@ function TeamDetail({ id }) {
           <LeagueOverallStanding rows={team.league_overall} showTeam testId="team-league-overall" />
           {canEdit && <section data-testid="team-manage-members">
             <div className="mb-4">
-              <h2 className="font-heading text-2xl font-bold uppercase">Mitglieder verwalten</h2>
-              <p className="mt-1 text-xs text-white/45">Die Teamleitung vergibt Rollen und kann die Leitung übergeben. Co-Leitungen pflegen Teamdaten, laden ein und verwalten Co-Teams.</p>
+              <h2 className="tls-type-section">Mitglieder verwalten</h2>
+              <p className="mt-1 tls-type-small text-white/45">Die Teamleitung vergibt Rollen und kann die Leitung übergeben. Co-Leitungen pflegen Teamdaten, laden ein und verwalten Co-Teams.</p>
             </div>
             <div className="grid sm:grid-cols-2 gap-3">
               {team.members?.map((m) => {
@@ -525,32 +526,32 @@ function TeamDetail({ id }) {
                   className="tls-card border border-white/10 bg-[#121212] rounded-sm p-4 flex flex-col gap-2">
                   <Link to={`/u/${encodeURIComponent(m.username)}`} className="flex items-center justify-between gap-2">
                     <div className="min-w-0">
-                      <div className="font-heading text-lg font-bold truncate">{m.display_name || m.username}</div>
-                      <div className="text-xs text-white/45">@{m.username}</div>
+                      <div className="tls-type-card truncate">{m.display_name || m.username}</div>
+                      <div className="tls-type-small text-white/45">@{m.username}</div>
                     </div>
-                    <span className={`shrink-0 px-2 py-0.5 border rounded-sm text-[10px] font-bold uppercase tracking-wider ${roleColor}`}>{roleLabel}</span>
+                    <span className={`shrink-0 px-2 py-0.5 border rounded-sm tls-type-label ${roleColor}`}>{roleLabel}</span>
                   </Link>
                   {(showKick || showRole || showTransfer) && (
                     <div className="flex flex-wrap gap-1.5 pt-2 border-t border-white/5">
                       {showRole && !isCo && (
                         <button disabled={mutating} onClick={(e) => { e.preventDefault(); setRole(m, "co_leader"); }}
                           data-testid={`team-promote-${m.id}`}
-                          className="tls-btn tls-btn--secondary px-2 py-1 text-[10px] font-bold uppercase tracking-wider rounded-sm">↑ Co-Leitung</button>
+                          className="tls-btn tls-btn--secondary px-2 py-1 tls-type-label rounded-sm">↑ Co-Leitung</button>
                       )}
                       {showRole && isCo && (
                         <button disabled={mutating} onClick={(e) => { e.preventDefault(); setRole(m, "member"); }}
                           data-testid={`team-demote-${m.id}`}
-                          className="tls-btn tls-btn--quiet px-2 py-1 text-[10px] font-bold uppercase tracking-wider rounded-sm">↓ Mitglied</button>
+                          className="tls-btn tls-btn--quiet px-2 py-1 tls-type-label rounded-sm">↓ Mitglied</button>
                       )}
                       {showTransfer && (
                         <button disabled={mutating} onClick={(e) => { e.preventDefault(); transferLead(m); }}
                           data-testid={`team-transfer-${m.id}`}
-                          className="tls-btn tls-btn--secondary px-2 py-1 text-[10px] font-bold uppercase tracking-wider rounded-sm">★ Zur Teamleitung machen</button>
+                          className="tls-btn tls-btn--secondary px-2 py-1 tls-type-label rounded-sm">★ Zur Teamleitung machen</button>
                       )}
                       {showKick && (
                         <button disabled={mutating} onClick={(e) => { e.preventDefault(); kickMember(m); }}
                           data-testid={`team-kick-${m.id}`}
-                          className="tls-btn tls-btn--danger ml-auto px-2 py-1 text-[10px] font-bold uppercase tracking-wider rounded-sm">Entfernen</button>
+                          className="tls-btn tls-btn--danger ml-auto px-2 py-1 tls-type-label rounded-sm">Entfernen</button>
                       )}
                     </div>
                   )}
@@ -570,22 +571,22 @@ function TeamDetail({ id }) {
           {actionError && <AuthFormAlert id="team-action-error">{actionError}</AuthFormAlert>}
           {user && !isMember && (
             <form onSubmit={join} className="border border-white/10 bg-[#121212] rounded-sm p-4 space-y-3">
-              <div className="text-[11px] uppercase tracking-widest text-[#29B6E8] font-bold">Team beitreten</div>
+              <div className="tls-type-label text-[#29B6E8]">Team beitreten</div>
               <input value={joinCode} onChange={(e) => { setJoinCode(e.target.value); setActionError(""); }} placeholder="Beitrittscode" required data-testid="team-join-code" className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm" />
-              <button disabled={mutating} data-testid="team-join-submit" className="tls-btn tls-btn--primary w-full px-4 py-2 rounded-sm text-xs uppercase tracking-wider font-bold inline-flex justify-center items-center gap-2 disabled:opacity-50"><UserPlus className="w-3.5 h-3.5" /> {mutating ? "Prüfe…" : "Beitreten"}</button>
+              <button disabled={mutating} data-testid="team-join-submit" className="tls-btn tls-btn--primary w-full px-4 py-2 rounded-sm tls-type-label inline-flex justify-center items-center gap-2 disabled:opacity-50"><UserPlus className="w-3.5 h-3.5" /> {mutating ? "Prüfe…" : "Beitreten"}</button>
             </form>
           )}
           {user && isMember && team.leader_id !== user.id && (
-            <button onClick={leave} disabled={mutating} data-testid="team-leave" className="tls-btn tls-btn--quiet w-full px-4 py-2 rounded-sm text-xs uppercase tracking-wider font-bold disabled:opacity-50">Team verlassen</button>
+            <button onClick={leave} disabled={mutating} data-testid="team-leave" className="tls-btn tls-btn--quiet w-full px-4 py-2 rounded-sm tls-type-label disabled:opacity-50">Team verlassen</button>
           )}
           {/* Kein Knopf ohne Erklärung (#2113, L-C6): die Teamleitung sieht, warum sie nicht gehen kann und was sie tun kann. */}
           {user && isMember && team.leader_id === user.id && (
-            <div className="border border-white/10 bg-[#121212] rounded-sm p-4 text-xs text-white/60" data-testid="team-leave-leader-hint">
-              <div className="text-[11px] uppercase tracking-widest text-white/45 font-bold">Team verlassen</div>
+            <div className="border border-white/10 bg-[#121212] rounded-sm p-4 tls-type-small text-white/60" data-testid="team-leave-leader-hint">
+              <div className="tls-type-label text-white/45">Team verlassen</div>
               <p className="mt-1">Als Teamleitung kannst du das Team nicht einfach verlassen. Übergib zuerst die Leitung unter „Mitglieder verwalten“ mit „Zur Teamleitung machen“ – danach gehörst du zur Co-Leitung und kannst gehen. Oder löse das Team unter „Bearbeiten“ auf.</p>
             </div>
           )}
-          {team.discord_link && <a href={team.discord_link} target="_blank" rel="noreferrer" className="tls-btn tls-btn--quiet block px-4 py-3 rounded-sm text-center text-sm font-bold uppercase tracking-wider">Discord</a>}
+          {team.discord_link && <a href={team.discord_link} target="_blank" rel="noreferrer" className="tls-btn tls-btn--quiet block px-4 py-3 rounded-sm text-center tls-type-small font-bold uppercase tracking-wider">Discord</a>}
           {/* Rankingbanner (Nr. 60, #2425): je öffentlicher Season Platz und Bilanz als Bild mit festem Link - für Discord und Streams. */}
           <TeamRankBanners rows={team.rank_banners} />
         </aside>
@@ -667,7 +668,7 @@ function TeamChat({ team, user }) {
 
   return (
     <section data-testid="team-chat">
-      <h2 className="font-heading text-2xl font-bold uppercase mb-4 flex items-center gap-2">
+      <h2 className="tls-type-section mb-4 flex items-center gap-2">
         <MessageSquare className="w-4 h-4 text-[#29B6E8]" /> Team-Chat
       </h2>
       <div className="border border-white/10 bg-[#121212] rounded-sm overflow-hidden">
@@ -677,11 +678,11 @@ function TeamChat({ team, user }) {
             return (
               <div key={message.id} className={`flex ${mine ? "justify-end" : "justify-start"}`}>
                 <div className={`max-w-[85%] border rounded-sm px-3 py-2 ${mine ? "border-[#29B6E8]/40 bg-[#29B6E8]/10" : "border-white/10 bg-[#0A0A0A]"}`}>
-                  <div className="flex items-center gap-2 text-[10px] uppercase tracking-widest text-white/40">
+                  <div className="flex items-center gap-2 tls-type-small text-quiet">
                     <span className={mine ? "text-[#29B6E8]" : "text-white/55"}>{message.author?.display_name || message.author?.username || "Benutzer"}</span>
                     {message.created_at && <span>{viennaDateTime(message.created_at, { dateStyle: "short", timeStyle: "short" })}</span>}
                   </div>
-                  {message.message && <div className="mt-1 whitespace-pre-wrap break-words text-sm text-white/85"><MentionText text={message.message} /></div>}
+                  {message.message && <div className="mt-1 whitespace-pre-wrap break-words tls-type-small text-white/85"><MentionText text={message.message} /></div>}
                   <ChatMessageAttachments attachments={message.attachments} />
                   <ChatMessageSticker sticker={message.sticker} />
                   <ModerationStateBadge moderation={message.moderation} />
@@ -689,7 +690,7 @@ function TeamChat({ team, user }) {
               </div>
             );
           })}
-          {messages.length === 0 && <div className="text-center py-10 text-sm text-white/35">Noch keine Nachrichten im Team-Chat.</div>}
+          {messages.length === 0 && <div className="text-center py-10 tls-type-small text-quiet">Noch keine Nachrichten im Team-Chat.</div>}
         </div>
         <ChatAttachmentDrafts drafts={attachments.drafts} onRemove={attachments.remove} />
         <ChatStickerPicker open={stickersOpen} onClose={() => setStickersOpen(false)} onPick={sendSticker} disabled={loading} />
@@ -711,9 +712,9 @@ function TeamChat({ team, user }) {
             maxLength={1500}
             placeholder="Nachricht schreiben, mit @username erwähnen..."
             className="flex-1 min-w-0"
-            textareaClassName="h-10 max-h-28 w-full resize-none bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-sm focus:outline-none focus:border-[#29B6E8]"
+            textareaClassName="h-10 max-h-28 w-full resize-none bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm tls-type-small focus:outline-none focus:border-[#29B6E8]"
           />
-          <button type="button" onClick={send} disabled={loading || !attachments.canSend(text)} className="tls-btn tls-btn--primary inline-flex items-center gap-2 px-4 py-2 rounded-sm text-xs uppercase tracking-wider font-bold disabled:opacity-45">
+          <button type="button" onClick={send} disabled={loading || !attachments.canSend(text)} className="tls-btn tls-btn--primary inline-flex items-center gap-2 px-4 py-2 rounded-sm tls-type-label disabled:opacity-45">
             <Send className="w-3.5 h-3.5" /> Senden
           </button>
         </div>
@@ -779,8 +780,8 @@ function TeamModal({ team, onClose, onSaved, canDissolve = false, canChangeVisib
       footer={(
         <>
           {submitError && <div className="w-full"><AuthFormAlert id="team-submit-error">{submitError}</AuthFormAlert></div>}
-          <button type="button" onClick={onClose} disabled={saving} className="tls-btn tls-btn--quiet px-4 py-2 rounded-sm text-xs uppercase tracking-wider font-bold disabled:opacity-50">Abbrechen</button>
-          <button type="submit" form="team-edit-form" disabled={saving} data-testid="team-save" className="tls-btn tls-btn--primary ml-auto px-5 py-2 rounded-sm text-xs uppercase tracking-wider font-bold disabled:opacity-50">{saving ? "Speichere…" : "Speichern"}</button>
+          <button type="button" onClick={onClose} disabled={saving} className="tls-btn tls-btn--quiet px-4 py-2 rounded-sm tls-type-label disabled:opacity-50">Abbrechen</button>
+          <button type="submit" form="team-edit-form" disabled={saving} data-testid="team-save" className="tls-btn tls-btn--primary ml-auto px-5 py-2 rounded-sm tls-type-label disabled:opacity-50">{saving ? "Speichere…" : "Speichern"}</button>
         </>
       )}
     >
@@ -794,11 +795,11 @@ function TeamModal({ team, onClose, onSaved, canDissolve = false, canChangeVisib
         {!isNew && <TeamColorPicker value={form.color || AUTO_COLOR} onChange={(v) => set("color", v)} />}
         {!isNew && canChangeVisibility ? (
           <div className="border border-white/10 bg-[#0A0A0A] rounded-sm p-3">
-            <label className="flex items-center gap-3 min-h-11 cursor-pointer text-sm font-bold">
+            <label className="flex items-center gap-3 min-h-11 cursor-pointer tls-type-small font-bold">
               <input type="checkbox" checked={form.is_public !== false} onChange={(e) => set("is_public", e.target.checked)} data-testid="team-public-toggle" className="accent-[#29B6E8]" />
               Team öffentlich
             </label>
-            <p className="text-xs text-white/55" data-testid="team-public-hint">
+            <p className="tls-type-small text-white/55" data-testid="team-public-hint">
               {form.is_public !== false
                 ? "Alle finden das Team in der Teamliste und der Suche und sehen die Teamseite."
                 : "Privat: Das Team steht nicht in der Teamliste, der Suche und auf Profilen, die Teamseite sehen nur Mitglieder. Beitreten geht nur über den Einladungs-Link oder eine persönliche Einladung. In Turnieren, an denen ihr teilnehmt, bleibt der Teamname sichtbar."}
@@ -816,14 +817,14 @@ function TeamModal({ team, onClose, onSaved, canDissolve = false, canChangeVisib
 function TeamColorPicker({ value, onChange }) {
   return (
     <fieldset data-testid="team-color-picker">
-      <legend className="text-[11px] font-bold uppercase tracking-widest text-white/60 mb-1.5">Team-Farbe</legend>
+      <legend className="tls-type-label text-white/60 mb-1.5">Team-Farbe</legend>
       <div className="flex flex-wrap gap-2">
         <button
           type="button"
           onClick={() => onChange(AUTO_COLOR)}
           aria-pressed={value === AUTO_COLOR}
           data-testid="team-color-auto"
-          className={`h-9 rounded-sm border px-3 text-[11px] font-bold ${value === AUTO_COLOR ? "border-[#29B6E8] text-[#29B6E8]" : "border-white/15 text-white/60 hover:text-white"}`}
+          className={`h-9 rounded-sm border px-3 tls-type-small font-bold ${value === AUTO_COLOR ? "border-[#29B6E8] text-[#29B6E8]" : "border-white/15 text-white/60 hover:text-white"}`}
         >
           Automatisch (Farbe des Spiels)
         </button>
@@ -846,10 +847,10 @@ function TeamColorPicker({ value, onChange }) {
 }
 
 function TeamLogo({ team, size = "md", bare = false }) {
-  const cls = bare ? "w-full h-full" : `${size === "lg" ? "w-28 h-28 text-3xl" : "w-16 h-16 text-xl"} bg-[#0A0A0A] border border-white/10 rounded-sm`;
+  const cls = bare ? "w-full h-full" : `${size === "lg" ? "w-28 h-28 tls-type-section" : "w-16 h-16 tls-type-card"} bg-[#0A0A0A] border border-white/10 rounded-sm`;
   return (
-    <div className={`${cls} flex items-center justify-center shrink-0 overflow-hidden ${bare ? "text-xl bg-[#0A0A0A]" : ""}`}>
-      {team.logo_url ? <img src={resolveMediaUrl(team.logo_url)} alt={team.name} className="w-full h-full object-cover" /> : <span className="font-heading font-black text-[#29B6E8]">{team.tag}</span>}
+    <div className={`${cls} flex items-center justify-center shrink-0 overflow-hidden ${bare ? "tls-type-card bg-[#0A0A0A]" : ""}`}>
+      {team.logo_url ? <img src={resolveMediaUrl(team.logo_url)} alt={team.name} className="w-full h-full object-cover" /> : <span className="font-black text-[#29B6E8]">{team.tag}</span>}
     </div>
   );
 }
@@ -866,12 +867,12 @@ function TeamLevelPanel({ info }) {
     <section data-testid="team-level-panel" className="border border-[#29B6E8]/25 bg-[#121212] rounded-sm p-5">
       <div className="flex items-end justify-between gap-3 flex-wrap">
         <div>
-          <div className="text-[11px] uppercase tracking-widest text-[#29B6E8] font-bold">Team-Level</div>
-          <div className="mt-1 font-heading text-3xl font-black" data-testid="team-level-value">LEVEL {info.level}</div>
+          <div className="tls-type-label text-[#29B6E8]">Team-Level</div>
+          <div className="mt-1 tls-type-section" data-testid="team-level-value">LEVEL {info.level}</div>
         </div>
         <div className="text-right">
-          <div className="text-2xl font-black text-white" data-testid="team-points-value">{info.points} <span className="text-sm text-white/40 font-bold">PUNKTE</span></div>
-          <div className="text-[11px] text-white/40">{inLevel} / {span} bis Level {info.level + 1}</div>
+          <div className="tls-type-section tls-type-num text-white" data-testid="team-points-value">{info.points} <span className="tls-type-small text-quiet font-bold">PUNKTE</span></div>
+          <div className="tls-type-small text-quiet">{inLevel} / {span} bis Level {info.level + 1}</div>
         </div>
       </div>
       <div className="mt-3 h-2.5 bg-black/50 border border-white/10 rounded-full overflow-hidden">
@@ -881,12 +882,12 @@ function TeamLevelPanel({ info }) {
           style={{ width: `${info.progress || 0}%` }}
         />
       </div>
-      <div className="mt-3 flex flex-wrap gap-2 text-[11px] text-white/50">
+      <div className="mt-3 flex flex-wrap gap-2 tls-type-small text-white/50">
         <span className="px-2 py-1 border border-white/10 rounded-sm">Mitglieder-Achievements: <b className="text-white/80">{info.member_points}</b></span>
         <span className="px-2 py-1 border border-white/10 rounded-sm">Turniere: <b className="text-white/80">{info.tournament_points}</b> ({info.tournaments} Teilnahmen{info.wins ? `, ${info.wins} Siege` : ""})</span>
       </div>
       <div className="mt-5">
-        <div className="text-[11px] uppercase tracking-widest text-white/50 font-bold mb-2">Team-Achievements</div>
+        <div className="tls-type-label text-white/50 mb-2">Team-Achievements</div>
         <div className="grid grid-cols-2 gap-2">
           {(info.achievements || []).map((a) => {
             const Icon = a.earned ? (TEAM_ACH_ICONS[a.icon] || Trophy) : Lock;
@@ -904,8 +905,8 @@ function TeamLevelPanel({ info }) {
               >
                 <Icon className={`w-4 h-4 shrink-0 ${a.earned ? "text-[#FFD700]" : "text-white/35"}`} />
                 <div className="min-w-0">
-                  <div className="text-xs font-bold truncate">{a.name}</div>
-                  <div className="text-[10px] truncate opacity-70">{a.description}</div>
+                  <div className="tls-type-small font-bold truncate">{a.name}</div>
+                  <div className="tls-type-small truncate opacity-70">{a.description}</div>
                 </div>
               </div>
             );
@@ -918,7 +919,7 @@ function TeamLevelPanel({ info }) {
 
 // `group` für Bild-Felder: als <label> löst ein Klick in die Fläche das versteckte Datei-Feld aus (Dateiauswahl).
 function Field({ label, group = false, children }) {
-  const title = <div className="text-[11px] font-bold uppercase tracking-widest text-white/60 mb-1.5">{label}</div>;
+  const title = <div className="tls-type-label text-white/60 mb-1.5">{label}</div>;
   if (group) return <div role="group" aria-label={label} className="block">{title}{children}</div>;
   return <label className="block">{title}{children}</label>;
 }

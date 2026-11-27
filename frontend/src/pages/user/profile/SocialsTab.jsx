@@ -37,7 +37,7 @@ function ManualField({ platform, value, onChange, note = "", error = "" }) {
   return (
     <div>
       <label className="block">
-        <div className="flex items-center gap-2 text-[11px] font-bold uppercase tracking-widest text-white/60 mb-1.5">
+        <div className="flex items-center gap-2 tls-type-label text-white/60 mb-1.5">
           <Icon className="w-3.5 h-3.5 text-[#29B6E8]" aria-hidden="true" /> {platform.l}
         </div>
         <input
@@ -53,11 +53,11 @@ function ManualField({ platform, value, onChange, note = "", error = "" }) {
       <FieldError message={error} testId={`${testId}-error`} />
       <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1">
         {preview ? (
-          <a href={preview} target="_blank" rel="noopener noreferrer" data-testid={`${testId}-preview`} className="inline-flex items-center gap-1 text-[11px] text-white/45 hover:text-[#29B6E8] break-all">
+          <a href={preview} target="_blank" rel="noopener noreferrer" data-testid={`${testId}-preview`} className="inline-flex items-center gap-1 tls-type-small text-white/45 hover:text-[#29B6E8] break-all">
             <ExternalLink className="w-3 h-3 shrink-0" aria-hidden="true" /> {preview}
           </a>
         ) : null}
-        {note ? <span className="text-[11px] text-white/35" data-testid={`${testId}-not-linkable`}>{note}</span> : null}
+        {note ? <span className="tls-type-small text-quiet" data-testid={`${testId}-not-linkable`}>{note}</span> : null}
       </div>
     </div>
   );
@@ -81,18 +81,18 @@ function LinkRow({ platformKey, link, available, form, set, onLink, onUnlink, in
         <PlatformIcon kind={meta.key} className="w-5 h-5" />
       </span>
       <div className="min-w-0 flex-1">
-        <div className="flex items-center gap-1.5 text-sm font-bold text-white">
+        <div className="flex items-center gap-1.5 tls-type-small font-bold text-white">
           <span>{label}</span>
-          {link && <span className="inline-flex items-center gap-1 text-[#00FF88] text-[11px] font-bold" data-testid={`${testId}-verified`}><BadgeCheck className="w-3.5 h-3.5" aria-hidden="true" /> verifiziert</span>}
+          {link && <span className="inline-flex items-center gap-1 text-[#00FF88] tls-type-small font-bold" data-testid={`${testId}-verified`}><BadgeCheck className="w-3.5 h-3.5" aria-hidden="true" /> verifiziert</span>}
         </div>
         {link ? (
-          <div className="text-[11px] text-white/55 truncate" data-testid={`${testId}-linked-since`}>
+          <div className="tls-type-small text-white/55 truncate" data-testid={`${testId}-linked-since`}>
             verknüpft als {linkedName}{since ? ` · seit ${since}` : ""}
           </div>
         ) : available ? (
-          <div className="text-[11px] text-white/45">nicht verknüpft – einmal anmelden, der Name kommt von {label}.</div>
+          <div className="tls-type-small text-white/45">nicht verknüpft – einmal anmelden, der Name kommt von {label}.</div>
         ) : (
-          <div className="text-[11px] text-white/45" data-testid={`${testId}-not-available`}>Auf der Website noch nicht eingerichtet – bis dahin von Hand:</div>
+          <div className="tls-type-small text-white/45" data-testid={`${testId}-not-available`}>Auf der Website noch nicht eingerichtet – bis dahin von Hand:</div>
         )}
         {!link && !available && field ? (
           <input
@@ -107,12 +107,12 @@ function LinkRow({ platformKey, link, available, form, set, onLink, onUnlink, in
       </div>
       <div className="flex items-center gap-2 shrink-0">
         {link && link.url && (
-          <a href={link.url} target="_blank" rel="noopener noreferrer" data-testid={`${testId}-official`} title={`Bei ${label} öffnen`} className="inline-flex items-center gap-1 text-[11px] text-[#29B6E8] hover:text-white">
+          <a href={link.url} target="_blank" rel="noopener noreferrer" data-testid={`${testId}-official`} title={`Bei ${label} öffnen`} className="inline-flex items-center gap-1 tls-type-small text-[#29B6E8] hover:text-white">
             <ExternalLink className="w-3.5 h-3.5" aria-hidden="true" /> öffnen
           </a>
         )}
         {link && (
-          <button type="button" onClick={() => onUnlink(platformKey)} data-testid={`${testId}-unlink`} className="inline-flex items-center gap-1 px-2.5 py-1.5 border border-white/15 rounded-sm text-[11px] font-bold uppercase tracking-wider text-white/60 hover:text-[#FF3B30] hover:border-[#FF3B30]/50">
+          <button type="button" onClick={() => onUnlink(platformKey)} data-testid={`${testId}-unlink`} className="inline-flex items-center gap-1 px-2.5 py-1.5 border border-white/15 rounded-sm tls-type-label text-white/60 hover:text-[#FF3B30] hover:border-[#FF3B30]/50">
             <Unlink className="w-3.5 h-3.5" aria-hidden="true" /> Verknüpfung lösen
           </button>
         )}
@@ -128,7 +128,7 @@ function LinkRow({ platformKey, link, available, form, set, onLink, onUnlink, in
         )}
         {!link && available && (
           <button type="button" onClick={() => (input ? onLink(platformKey, inputValue.trim()) : onLink(platformKey))} disabled={inputMissing} data-testid={`${testId}-link`} style={brandButtonStyle(meta.key)}
-            className="inline-flex items-center gap-2 px-3.5 py-2 border rounded-sm text-xs font-bold tracking-wide shadow-[0_0_16px_-8px_var(--social-color)] hover:brightness-110 transition">
+            className="inline-flex items-center gap-2 px-3.5 py-2 border rounded-sm tls-type-label shadow-[0_0_16px_-8px_var(--social-color)] hover:brightness-110 transition">
             <PlatformIcon kind={meta.key} className="w-4 h-4" /> {linkButtonLabel(meta.key, label)}
           </button>
         )}
@@ -155,7 +155,7 @@ export function SocialsTab({ form, set, setNow = set, errors = {}, links = null,
   const discordLinked = Boolean(linkForField(linkedRows, "discord_name"));
   return (
     <Section>
-      <div className="border border-[#29B6E8]/25 bg-[#29B6E8]/5 rounded-sm p-3 text-xs text-white/65" data-testid="profile-links-hint">
+      <div className="border border-[#29B6E8]/25 bg-[#29B6E8]/5 rounded-sm p-3 tls-type-small text-white/65" data-testid="profile-links-hint">
         <strong className="text-white">Konto verknüpfen statt tippen:</strong> Einmal bei der Plattform anmelden – der Name kommt von dort und trägt „verifiziert“, sichtbar für alle, die dein Profil sehen dürfen.
         {" "}Die Plattform liefert nur, was hier steht: {Object.values(delivers).map((p) => p.delivers).filter(Boolean).join("; ") || "Kennung und Nutzername"}.
         {" "}<Lock className="inline w-3 h-3 align-[-2px] text-white/45" aria-hidden="true" /> Wer welches Konto sieht, regelst du unter{" "}
@@ -180,9 +180,9 @@ export function SocialsTab({ form, set, setNow = set, errors = {}, links = null,
 
       {(twitchLinked || form.twitch_handle) ? (
         <div className="flex items-start justify-between gap-4 p-3 border border-[#9146FF]/30 bg-[#9146FF]/5 rounded-sm">
-          <div className="text-sm">
+          <div className="tls-type-small">
             <div className="font-bold text-white">Twitch-Live-Embed im öffentlichen Profil zeigen</div>
-            <div className="text-white/60 text-xs mt-1">Wenn du live bist, erscheint dein Stream als eingebetteter Player auf deinem öffentlichen Profil.</div>
+            <div className="text-white/60 tls-type-small mt-1">Wenn du live bist, erscheint dein Stream als eingebetteter Player auf deinem öffentlichen Profil.</div>
           </div>
           <ProfileSwitch
             label="Twitch-Live-Embed im öffentlichen Profil zeigen"
@@ -196,9 +196,9 @@ export function SocialsTab({ form, set, setNow = set, errors = {}, links = null,
 
       {steamLinked ? (
         <div className="flex items-start justify-between gap-4 p-3 border border-[#66c0f4]/30 bg-[#66c0f4]/5 rounded-sm" data-testid="profile-steam-status-row">
-          <div className="text-sm">
+          <div className="tls-type-small">
             <div className="font-bold text-white">Meinen Steam-Status im Mitgliederbereich zeigen</div>
-            <div className="text-white/60 text-xs mt-1">Mitglieder sehen unter „Gerade in Steam“, dass du online bist und was du gerade spielst – nur, wenn dein Steam-Profil öffentlich ist. Nie öffentlich, nie im Discord; kein Verlauf.</div>
+            <div className="text-white/60 tls-type-small mt-1">Mitglieder sehen unter „Gerade in Steam“, dass du online bist und was du gerade spielst – nur, wenn dein Steam-Profil öffentlich ist. Nie öffentlich, nie im Discord; kein Verlauf.</div>
           </div>
           <ProfileSwitch
             label="Meinen Steam-Status im Mitgliederbereich zeigen"
@@ -212,9 +212,9 @@ export function SocialsTab({ form, set, setNow = set, errors = {}, links = null,
 
       {discordLinked ? (
         <div className="flex items-start justify-between gap-4 p-3 border border-[#5865F2]/30 bg-[#5865F2]/5 rounded-sm" data-testid="profile-discord-game-roles-row">
-          <div className="text-sm">
+          <div className="tls-type-small">
             <div className="font-bold text-white">Spiel-Rollen im Discord</div>
-            <div className="text-white/60 text-xs mt-1">Hast du ein Spielprofil (Spieler-ID) oder stehst in einem Team-Kader, gibt dir der Bot die passende Rolle, etwa „CoD-Spieler“ – auf dem Server des Spiels und am Hauptserver. Aus: keine Spiel-Rollen; Vereinsrollen wie „Mitglied“ bleiben.</div>
+            <div className="text-white/60 tls-type-small mt-1">Hast du ein Spielprofil (Spieler-ID) oder stehst in einem Team-Kader, gibt dir der Bot die passende Rolle, etwa „CoD-Spieler“ – auf dem Server des Spiels und am Hauptserver. Aus: keine Spiel-Rollen; Vereinsrollen wie „Mitglied“ bleiben.</div>
           </div>
           <ProfileSwitch
             label="Spiel-Rollen im Discord"
@@ -227,7 +227,7 @@ export function SocialsTab({ form, set, setNow = set, errors = {}, links = null,
       ) : null}
 
       <div>
-        <div className="text-[11px] font-bold uppercase tracking-widest text-white/45 mb-2">Von Hand – diese Plattformen bieten keine Anmeldung</div>
+        <div className="tls-type-small font-bold text-white/45 mb-2">Von Hand – diese Plattformen bieten keine Anmeldung</div>
         <div className="space-y-4">
           {manualRows.map((keys) => (
             <Row key={keys.join("+")}>

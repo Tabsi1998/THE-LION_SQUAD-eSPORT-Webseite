@@ -39,11 +39,11 @@ function Items({ items, tone, onJump, testId }) {
         const anchor = onJump ? readinessAnchor(item.code) : "";
         return (
           <li key={`${item.code}-${index}`} data-code={item.code}
-            className={`flex flex-wrap items-center justify-between gap-x-3 gap-y-1.5 rounded-sm border px-3 py-2 text-sm ${tone === "problem" ? "border-live/40 bg-live/10 text-white" : "border-white/15 bg-white/[0.03] text-white/75"}`}>
+            className={`flex flex-wrap items-center justify-between gap-x-3 gap-y-1.5 rounded-sm border px-3 py-2 tls-type-small ${tone === "problem" ? "border-live/40 bg-live/10 text-white" : "border-white/15 bg-white/[0.03] text-white/75"}`}>
             <span className="min-w-[min(100%,14rem)] flex-1 [overflow-wrap:anywhere]">{item.text}</span>
             {anchor ? (
               <button type="button" onClick={() => onJump(anchor)} data-testid={`${testId}-go-${item.code}`}
-                className="tls-btn tls-btn--quiet inline-flex min-h-[36px] shrink-0 items-center gap-1 rounded-sm px-2.5 py-1 text-[11px] font-bold uppercase tracking-wider">
+                className="tls-btn tls-btn--quiet inline-flex min-h-[36px] shrink-0 items-center gap-1 rounded-sm px-2.5 py-1 tls-type-label">
                 Zu {tabLabelOf(anchor)} <ArrowRight className="h-3 w-3" aria-hidden="true" />
               </button>
             ) : null}
@@ -65,23 +65,23 @@ export function SeasonReadinessPanel({ readiness, visibility = "off", overrideRe
       hint="Prüfung vor der Veröffentlichung. Probleme (rot) halten das Veröffentlichen auf, Warnungen nicht. Jeder Punkt führt dorthin, wo du ihn erledigst.">
       <div className="flex flex-wrap items-center justify-between gap-3">
         {result ? (
-          <p className={`inline-flex items-center gap-2 text-sm font-semibold ${result.ok ? "text-[#29B6E8]" : "text-live"}`} data-testid={`${testId}-state`} role="status">
+          <p className={`inline-flex items-center gap-2 tls-type-small font-semibold ${result.ok ? "text-[#29B6E8]" : "text-live"}`} data-testid={`${testId}-state`} role="status">
             {result.ok ? <CheckCircle2 className="w-4 h-4" aria-hidden="true" /> : <ClipboardCheck className="w-4 h-4" aria-hidden="true" />}
             {result.ok ? "Bereit zur Veröffentlichung" : `${result.problems.length === 1 ? "1 Problem" : `${result.problems.length} Probleme`} vor der Veröffentlichung`}
             {result.warnings.length ? <span className="font-normal text-white/55">· {result.warnings.length === 1 ? "1 Warnung" : `${result.warnings.length} Warnungen`}</span> : null}
           </p>
-        ) : <span className="text-sm text-white/45">Prüfe …</span>}
+        ) : <span className="tls-type-small text-white/45">Prüfe …</span>}
         <button type="button" onClick={reload} disabled={busy} data-testid={`${testId}-reload`}
-          className="tls-btn tls-btn--quiet px-3 py-1.5 rounded-sm text-[11px] font-bold uppercase tracking-wider inline-flex items-center gap-1.5 disabled:opacity-50">
+          className="tls-btn tls-btn--quiet px-3 py-1.5 rounded-sm tls-type-label inline-flex items-center gap-1.5 disabled:opacity-50">
           <RefreshCw className="w-3.5 h-3.5" aria-hidden="true" /> Neu prüfen
         </button>
       </div>
-      {error ? <p className="text-sm text-warn" role="alert">{error}</p> : null}
+      {error ? <p className="tls-type-small text-warn" role="alert">{error}</p> : null}
       {result ? (
         <>
           <Items items={result.problems} tone="problem" onJump={onJump} testId={`${testId}-problems`} />
           <Items items={result.warnings} tone="warning" onJump={onJump} testId={`${testId}-warnings`} />
-          {clean ? <p className="text-sm text-white/60" data-testid={`${testId}-clean`}>Nichts offen. Veröffentlichen geht mit „Sichtbarkeit“ rechts daneben.</p> : null}
+          {clean ? <p className="tls-type-small text-white/60" data-testid={`${testId}-clean`}>Nichts offen. Veröffentlichen geht mit „Sichtbarkeit“ rechts daneben.</p> : null}
           {offerOverride ? (
             <TextField label="Grund für die Notausnahme" maxLength={500} value={overrideReason} onChange={onOverrideReason}
               hint="Nur der Superadmin: Mit Grund (mindestens 5 Zeichen) veröffentlicht „Überblick speichern“ trotz Problemen. Der Grund steht im Protokoll."
@@ -136,9 +136,9 @@ export function SeasonPoolMinimum({ seasonId, readiness, canEdit = true, onSaved
           const short = row.have < row.needed;
           return (
             <li key={key || "alle"} className="grid grid-cols-[1fr_auto] items-end gap-2 rounded-sm border border-white/10 bg-[#0A0A0A] px-3 py-2" data-testid={`${testId}-row-${key || "alle"}`}>
-              <div className="min-w-0 text-sm">
+              <div className="min-w-0 tls-type-small">
                 <div className="truncate font-semibold text-white">{row.label}</div>
-                <div className={`text-xs tabular-nums ${short ? "text-live" : "text-white/55"}`}>{row.have} von mindestens {row.needed} {row.needed === 1 ? "Map" : "Maps"}</div>
+                <div className={`tls-type-small tabular-nums ${short ? "text-live" : "text-white/55"}`}>{row.have} von mindestens {row.needed} {row.needed === 1 ? "Map" : "Maps"}</div>
               </div>
               {canEdit ? (
                 <TextField label="Mindestens" type="number" min={1} max={50} value={form[key] ?? ""} placeholder={String(row.derived)}
@@ -149,17 +149,17 @@ export function SeasonPoolMinimum({ seasonId, readiness, canEdit = true, onSaved
         })}
       </ul>
       {result.total ? (
-        <p className={`text-xs tabular-nums ${result.total.have < result.total.needed ? "text-live" : "text-white/55"}`} data-testid={`${testId}-total`}>
+        <p className={`tls-type-small tabular-nums ${result.total.have < result.total.needed ? "text-live" : "text-white/55"}`} data-testid={`${testId}-total`}>
           Über alle Modi: {result.total.have} von mindestens {result.total.needed} {result.total.kind === "maps" ? "verschiedenen Maps" : "Maps"}.
         </p>
       ) : null}
       {canEdit ? (
         <div className="flex flex-wrap items-center gap-3">
           <button type="button" onClick={saveMinimum} disabled={busy} data-testid={`${testId}-min-save`}
-            className="tls-btn tls-btn--secondary px-3 py-1.5 rounded-sm text-[11px] font-bold uppercase tracking-wider disabled:opacity-50">
+            className="tls-btn tls-btn--secondary px-3 py-1.5 rounded-sm tls-type-label disabled:opacity-50">
             Mindestgröße speichern
           </button>
-          <span className="text-xs text-white/45">Eigene Zahl überschreibt, leer heißt abgeleitet.</span>
+          <span className="tls-type-small text-white/45">Eigene Zahl überschreibt, leer heißt abgeleitet.</span>
         </div>
       ) : null}
     </FormSection>

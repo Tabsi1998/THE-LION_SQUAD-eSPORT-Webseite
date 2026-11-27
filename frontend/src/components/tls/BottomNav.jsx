@@ -77,7 +77,7 @@ export function BottomNav() {
   // (etwa der Löwe bei leeren Listen, #1325) die obere Ecke der Fußzeile genau hinter die Leiste schiebt.
   return (
     <nav
-      className="tls-bottom-nav lg:hidden fixed bottom-0 left-0 right-0 z-40 bg-[#0A0A0A]/96 backdrop-blur-xl border-t border-white/10"
+      className="tls-bottom-nav lg:hidden fixed bottom-0 left-0 right-0 z-40 bg-[#0A0A0A]/[0.96] backdrop-blur-xl border-t border-white/10"
       style={{ paddingBottom: "env(safe-area-inset-bottom, 0px)" }}
       aria-label="Mobile Navigation"
       data-testid="bottom-nav"
@@ -115,7 +115,7 @@ export function BottomNav() {
                 ) : null}
               </span>
               <span
-                className={`text-[9px] uppercase tracking-wider font-bold leading-none ${
+                className={`tls-type-label leading-none ${
                   active ? "text-[#29B6E8]" : ""
                 }`}
               >

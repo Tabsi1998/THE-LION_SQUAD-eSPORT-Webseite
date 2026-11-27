@@ -31,7 +31,7 @@ function fmtSize(bytes) {
 export function DocumentGroup({ label, docs, onView }) {
   return (
     <div>
-      {label && <div className="text-[11px] uppercase tracking-widest text-white/40 font-bold mb-3">{label}</div>}
+      {label && <div className="tls-type-label text-quiet mb-3">{label}</div>}
       <div className="space-y-2">
         {docs.map((d) => <DocumentRow key={d.id} d={d} onView={onView} />)}
       </div>
@@ -49,13 +49,13 @@ export function DocumentRow({ d, onView }) {
       </div>
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-2 flex-wrap">
-          <span className="text-[10px] uppercase tracking-widest font-bold" style={{ color: c }}>{CATEGORY_LABELS[d.category] || d.category}</span>
-          {d.source === "dolibarr" && <span className="text-[10px] uppercase tracking-widest font-bold px-1.5 py-0.5 rounded-sm border border-white/15 text-white/55" data-testid={`doc-source-${d.id}`}>{d.personal ? "Vereinsakte · nur für dich" : "Vereinsakte"}</span>}
+          <span className="tls-type-label" style={{ color: c }}>{CATEGORY_LABELS[d.category] || d.category}</span>
+          {d.source === "dolibarr" && <span className="tls-type-small font-bold px-1.5 py-0.5 rounded-sm border border-white/15 text-white/55" data-testid={`doc-source-${d.id}`}>{d.personal ? "Vereinsakte · nur für dich" : "Vereinsakte"}</span>}
           {d.pinned && <Pin className="w-3 h-3 text-[#FFD700]" />}
         </div>
-        <div className="font-heading font-bold text-white mt-0.5">{d.title}</div>
-        {d.description && <div className="text-xs text-white/55 mt-1 line-clamp-2">{d.description}</div>}
-        <div className="mt-2 flex items-center gap-3 text-[10px] text-white/40 uppercase tracking-wider">
+        <div className="font-bold text-white mt-0.5">{d.title}</div>
+        {d.description && <div className="tls-type-small text-white/55 mt-1 line-clamp-2">{d.description}</div>}
+        <div className="mt-2 flex items-center gap-3 tls-type-small text-quiet">
           {d.original_filename && <span>{d.original_filename}</span>}
           {d.file_size && <span>{fmtSize(d.file_size)}</span>}
           {d.view_count > 0 && <span>{d.view_count} Ansichten</span>}
@@ -67,7 +67,7 @@ export function DocumentRow({ d, onView }) {
           type="button"
           onClick={() => onView(d)}
           data-testid={`doc-view-${d.id}`}
-          className="w-full sm:w-auto justify-center shrink-0 inline-flex items-center gap-2 px-4 py-2 bg-[#FFD700]/15 hover:bg-[#FFD700]/25 text-[#FFD700] border border-[#FFD700]/40 font-bold uppercase tracking-wider text-xs rounded-sm transition"
+          className="w-full sm:w-auto justify-center shrink-0 inline-flex items-center gap-2 px-4 py-2 bg-[#FFD700]/15 hover:bg-[#FFD700]/25 text-[#FFD700] border border-[#FFD700]/40 tls-type-label rounded-sm transition"
         >
           <Eye className="w-3.5 h-3.5" /> Ansehen
         </button>
@@ -77,7 +77,7 @@ export function DocumentRow({ d, onView }) {
           target="_blank"
           rel="noreferrer"
           data-testid={`doc-view-${d.id}`}
-          className="w-full sm:w-auto justify-center shrink-0 inline-flex items-center gap-2 px-4 py-2 bg-[#FFD700]/15 hover:bg-[#FFD700]/25 text-[#FFD700] border border-[#FFD700]/40 font-bold uppercase tracking-wider text-xs rounded-sm transition"
+          className="w-full sm:w-auto justify-center shrink-0 inline-flex items-center gap-2 px-4 py-2 bg-[#FFD700]/15 hover:bg-[#FFD700]/25 text-[#FFD700] border border-[#FFD700]/40 tls-type-label rounded-sm transition"
         >
           <Eye className="w-3.5 h-3.5" /> Ansehen
         </a>
@@ -88,7 +88,7 @@ export function DocumentRow({ d, onView }) {
           target="_blank"
           rel="noreferrer"
           data-testid={`doc-download-${d.id}`}
-          className="w-full sm:w-auto justify-center shrink-0 inline-flex items-center gap-2 px-3 py-2 border border-white/15 text-white/60 hover:text-white font-bold uppercase tracking-wider text-xs rounded-sm transition"
+          className="w-full sm:w-auto justify-center shrink-0 inline-flex items-center gap-2 px-3 py-2 border border-white/15 text-white/60 hover:text-white tls-type-label rounded-sm transition"
         >
           <Download className="w-3.5 h-3.5" /> Download
         </a>

@@ -310,7 +310,8 @@ describe("AchievementsShowcasePage (#619, #1229)", () => {
     mockApi({ board: [{ user_id: "u2", username: "ben", display_name: "Ben", level: 12, xp: 4000, prestige: 0, title: "Rudel", rank: 1 }] });
     fireEvent.click(screen.getByTestId("leaderboard-by-level"));
     await waitFor(() => expect(callsTo("/achievements/leaderboard").at(-1)).toEqual({ limit: 10, by: "level" }));
-    expect(await screen.findByText("Level 12")).toBeInTheDocument();
+    // Die Zahl steht in der Zahlen-Schrift (NumText, #1304) - der Text bleibt „Level 12“.
+    await waitFor(() => expect(screen.getByTestId("podium-1")).toHaveTextContent("Level 12"));
     expect(screen.getByTestId("podium-1")).toHaveTextContent("Rudel");
     expect(screen.queryByTestId("leaderboard-category")).toBeNull();
   });

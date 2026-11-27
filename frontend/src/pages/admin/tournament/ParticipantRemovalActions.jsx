@@ -124,10 +124,10 @@ export function ParticipantRemovalActions({ tournament, registration, onDone, co
   cancelRef.current = cancel;
 
   const buttonClass = touch
-    ? "inline-flex min-h-[44px] items-center justify-center px-3 border border-live/40 text-live rounded-sm text-[11px] font-bold uppercase tracking-wider disabled:opacity-50"
+    ? "inline-flex min-h-[44px] items-center justify-center px-3 border border-live/40 text-live rounded-sm tls-type-label disabled:opacity-50"
     : compact
-    ? "px-2 py-2 border border-live/40 text-live rounded-sm text-[10px] font-bold uppercase disabled:opacity-50"
-    : "px-2 py-1 border border-live/40 text-live rounded-sm text-[10px] font-bold uppercase disabled:opacity-50";
+    ? "px-2 py-2 border border-live/40 text-live rounded-sm tls-type-label disabled:opacity-50"
+    : "px-2 py-1 border border-live/40 text-live rounded-sm tls-type-label disabled:opacity-50";
   const ops = Array.isArray(plan?.ops) ? plan.ops.filter(Boolean) : [];
   const labels = KIND_LABELS[kind] || KIND_LABELS.withdrawn;
 
@@ -150,22 +150,22 @@ export function ParticipantRemovalActions({ tournament, registration, onDone, co
             className="flex max-h-[90vh] w-full max-w-lg min-w-0 flex-col rounded-sm border border-white/10 bg-[#121212] shadow-xl"
           >
             <div className="shrink-0 border-b border-white/10 p-4">
-              <h2 id={`${reasonId}-title`} className="font-heading text-base font-bold uppercase text-white break-words [overflow-wrap:anywhere]">
+              <h2 id={`${reasonId}-title`} className="tls-type-section text-white break-words [overflow-wrap:anywhere]">
                 {headline(kind, name)}
               </h2>
-              <p className="mt-1 text-xs text-white/60">
+              <p className="mt-1 tls-type-small text-white/60">
                 {kind === "withdrawn"
                   ? "Die Person scheidet aus. Was mit ihren Spielen passiert, steht hier - erst mit „Austritt eintragen“ wird es wirksam."
                   : "Die Person scheidet aus. Was mit ihren Spielen passiert, steht hier - erst mit „Disqualifizieren“ wird es wirksam."}
               </p>
             </div>
-            <div data-testid="admin-reg-removal-ops" className="min-h-0 flex-1 overflow-y-auto p-4 text-sm text-white/85">
+            <div data-testid="admin-reg-removal-ops" className="min-h-0 flex-1 overflow-y-auto p-4 tls-type-small text-white/85">
               {plan.summary ? <p className="mb-3 break-words [overflow-wrap:anywhere]">{plan.summary}</p> : null}
               {ops.length > 0 ? (
                 <ul className="space-y-1">
                   {ops.map((op, index) => (
                     <li key={index} data-testid="admin-reg-removal-op" className="flex min-w-0 gap-2 break-words">
-                      <span className="mt-0.5 w-20 shrink-0 text-[10px] font-bold uppercase tracking-wider text-white/45">{OP_LABELS[op.kind] || "Umbau"}</span>
+                      <span className="mt-0.5 w-20 shrink-0 tls-type-label text-white/45">{OP_LABELS[op.kind] || "Umbau"}</span>
                       <span className="min-w-0 flex-1 [overflow-wrap:anywhere]">{op.text || OP_FALLBACK[op.kind] || "Umbau"}</span>
                     </li>
                   ))}
@@ -175,7 +175,7 @@ export function ParticipantRemovalActions({ tournament, registration, onDone, co
               ) : null}
             </div>
             <div className="shrink-0 space-y-3 border-t border-white/10 p-4">
-              <label className="block text-xs text-white/60">
+              <label className="block tls-type-small text-white/60">
                 <span className="mb-1 block font-bold uppercase tracking-wider">Grund</span>
                 <input
                   id={reasonId}
@@ -188,10 +188,10 @@ export function ParticipantRemovalActions({ tournament, registration, onDone, co
                 />
               </label>
               <div className="flex flex-wrap justify-end gap-2">
-                <button type="button" onClick={cancel} disabled={busy === "confirm"} data-testid="admin-reg-removal-cancel" className="tls-btn tls-btn--quiet rounded-sm px-4 py-2 text-xs font-bold uppercase tracking-wider">
+                <button type="button" onClick={cancel} disabled={busy === "confirm"} data-testid="admin-reg-removal-cancel" className="tls-btn tls-btn--quiet rounded-sm px-4 py-2 tls-type-label">
                   Abbrechen
                 </button>
-                <button ref={confirmRef} type="button" onClick={confirm} disabled={!!busy || !plan.id} data-testid="admin-reg-removal-confirm" className="tls-btn tls-btn--danger rounded-sm px-4 py-2 text-xs font-bold uppercase tracking-wider">
+                <button ref={confirmRef} type="button" onClick={confirm} disabled={!!busy || !plan.id} data-testid="admin-reg-removal-confirm" className="tls-btn tls-btn--danger rounded-sm px-4 py-2 tls-type-label">
                   {busy === "confirm" ? labels.busy : labels.confirm}
                 </button>
               </div>

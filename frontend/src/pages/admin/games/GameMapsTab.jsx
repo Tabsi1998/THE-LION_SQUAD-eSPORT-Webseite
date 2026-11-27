@@ -57,20 +57,20 @@ function WithoutModeNotice({ game, maps, onAssign }) {
   const more = maps.length > 5 ? ` und ${maps.length - 5} weitere` : "";
   return (
     <section className="rounded-sm border border-warn/30 bg-warn/5 p-3 space-y-2" aria-label="Maps ohne Modus" data-testid="game-maps-without-mode">
-      <p className="text-sm font-semibold text-warn">Diese Maps haben noch keinen Modus</p>
-      <p className="text-xs text-white/70 break-words">
+      <p className="tls-type-small font-semibold text-warn">Diese Maps haben noch keinen Modus</p>
+      <p className="tls-type-small text-white/70 break-words">
         {names}{more}. In neuen Pools stehen sie erst mit Modus zur Wahl. Gespeicherte Pools und laufende Spiele betrifft das nicht.
       </p>
       <div className="flex flex-wrap items-center gap-2">
         {offered.map(({ mode, label, status }) => (
-          <label key={mode} className="inline-flex items-center gap-2 px-2.5 py-1 rounded-sm border border-white/15 bg-[#0A0A0A] text-xs text-white/80 cursor-pointer">
+          <label key={mode} className="inline-flex items-center gap-2 px-2.5 py-1 rounded-sm border border-white/15 bg-[#0A0A0A] tls-type-small text-white/80 cursor-pointer">
             <input type="checkbox" checked={chosen.includes(mode)} onChange={() => setOff((list) => (list.includes(mode) ? list.filter((key) => key !== mode) : [...list, mode]))}
               className="accent-[#29B6E8]" data-testid={`game-maps-assign-${mode}`} />
             {label}{status === "inactive" ? " (inaktiv)" : ""}
           </label>
         ))}
         <button type="button" disabled={!chosen.length} onClick={() => onAssign(chosen)} data-testid="game-maps-assign"
-          className="tls-btn tls-btn--primary px-3 py-1.5 rounded-sm text-[11px] font-bold uppercase tracking-wider disabled:opacity-50">
+          className="tls-btn tls-btn--primary px-3 py-1.5 rounded-sm tls-type-label disabled:opacity-50">
           {maps.length === 1 ? "Der Map zuordnen" : `Allen ${maps.length} Maps zuordnen`}
         </button>
       </div>
@@ -117,24 +117,24 @@ function MapSheet({ game, item, onClose, onSaved }) {
       <ImageUpload value={form.image_url} onChange={(value) => set("image_url", value || "")} label="Bild (16 : 9)" testId="game-map-image" variant="wide" allowLibrary />
       {isNew ? (
         <fieldset className="space-y-2">
-          <legend className="text-[11px] font-bold uppercase tracking-widest text-white/60">Freigegeben in</legend>
+          <legend className="tls-type-label text-white/60">Freigegeben in</legend>
           {choices.length ? (
             <>
               <div className="flex flex-wrap gap-2">
                 {choices.map(({ mode, label }) => {
                   const on = form.modes.includes(mode);
                   return (
-                    <label key={mode} className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-sm border text-xs cursor-pointer select-none focus-within:outline focus-within:outline-1 focus-within:outline-[#29B6E8] ${on ? "border-[#29B6E8]/70 bg-[#29B6E8]/10 text-white" : "border-white/10 bg-[#0A0A0A] text-white/65 hover:border-white/25"}`}>
+                    <label key={mode} className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-sm border tls-type-small cursor-pointer select-none focus-within:outline focus-within:outline-1 focus-within:outline-[#29B6E8] ${on ? "border-[#29B6E8]/70 bg-[#29B6E8]/10 text-white" : "border-white/10 bg-[#0A0A0A] text-white/65 hover:border-white/25"}`}>
                       <input type="checkbox" checked={on} onChange={() => toggleMode(mode)} className="accent-[#29B6E8]" />
                       {label}
                     </label>
                   );
                 })}
               </div>
-              <p className="text-xs text-white/45">Nur in den gewählten Modi kann die Map in einen Pool. Später änderst du das in der Tabelle.</p>
+              <p className="tls-type-small text-white/45">Nur in den gewählten Modi kann die Map in einen Pool. Später änderst du das in der Tabelle.</p>
             </>
           ) : (
-            <p className="text-xs text-white/45">Das Spiel hat keine Modi – die Map gilt dann für jeden Pool. Modi legst du im Reiter Modi an.</p>
+            <p className="tls-type-small text-white/45">Das Spiel hat keine Modi – die Map gilt dann für jeden Pool. Modi legst du im Reiter Modi an.</p>
           )}
         </fieldset>
       ) : null}
@@ -296,50 +296,50 @@ export function GameMapsTab({ gameId, reloadKey = 0, onOpenModes }) {
   return (
     <div className="space-y-5" data-testid="game-maps">
       <div className="flex flex-wrap items-end justify-between gap-4">
-        <p className="max-w-2xl text-sm text-white/55">
+        <p className="max-w-2xl tls-type-body text-white/55">
           Turniere, Phasen und Seasons wählen daraus ihren Map-Pool. {columns.length ? "Häkchen = in diesem Modus freigegeben; nur dort lässt sich die Map in einen Pool wählen. Jedes Häkchen speichert sofort." : ""}
           {" "}Spätere Änderungen ändern keinen gespeicherten Pool.
         </p>
         <div className="flex flex-wrap items-center gap-2">
           {archivedCount ? (
-            <label className="inline-flex items-center gap-2 text-xs text-white/65">
+            <label className="inline-flex items-center gap-2 tls-type-small text-white/65">
               <input type="checkbox" checked={showArchived} onChange={(event) => setShowArchived(event.target.checked)} className="accent-[#29B6E8]" data-testid="game-maps-show-archived" />
               Archivierte zeigen ({archivedCount})
             </label>
           ) : null}
           <button type="button" onClick={() => setImporting(true)} disabled={full} data-testid="game-maps-import"
-            className="tls-btn tls-btn--quiet px-4 py-2 rounded-sm text-xs font-bold uppercase tracking-wider inline-flex items-center gap-2 disabled:opacity-50">
+            className="tls-btn tls-btn--quiet px-4 py-2 rounded-sm tls-type-label inline-flex items-center gap-2 disabled:opacity-50">
             <Copy className="w-3.5 h-3.5" aria-hidden="true" /> Aus Spiel übernehmen
           </button>
           <button type="button" onClick={() => setEditing({})} disabled={full} data-testid="game-maps-add"
-            className="tls-btn tls-btn--primary px-4 py-2 rounded-sm text-xs font-bold uppercase tracking-wider inline-flex items-center gap-2 disabled:opacity-50">
+            className="tls-btn tls-btn--primary px-4 py-2 rounded-sm tls-type-label inline-flex items-center gap-2 disabled:opacity-50">
             <Plus className="w-3.5 h-3.5" aria-hidden="true" /> Map hinzufügen
           </button>
         </div>
       </div>
       {!game.modes.length ? (
-        <p className="rounded-sm border border-white/10 bg-[#121212] px-4 py-3 text-xs text-white/60" data-testid="game-maps-no-modes">
+        <p className="rounded-sm border border-white/10 bg-[#121212] px-4 py-3 tls-type-small text-white/60" data-testid="game-maps-no-modes">
           Das Spiel hat keine Modi – jede Map gilt dann für jeden Pool.{" "}
           <button type="button" onClick={onOpenModes} className="text-[#29B6E8] underline-offset-2 hover:underline focus-visible:outline focus-visible:outline-1 focus-visible:outline-[#29B6E8] rounded-sm">Modi anlegen</button>
         </p>
       ) : null}
       {withoutMode.length ? <WithoutModeNotice game={game} maps={withoutMode} onAssign={assignModes} /> : null}
       {shown.length === 0 ? (
-        <p className="border border-dashed border-white/15 rounded-sm px-4 py-6 text-sm text-white/55" data-testid="game-maps-empty">
+        <p className="border border-dashed border-white/15 rounded-sm px-4 py-6 tls-type-body text-white/55" data-testid="game-maps-empty">
           Noch keine Map. Lege die Maps an, die in Turnieren und Saisons gespielt werden – mit Bild, damit Pools und Spieltage sie zeigen.
         </p>
       ) : (
         <TableScroll label={`Maps von ${game.name}`} testId="game-maps-table">
-          <table className="w-full min-w-max text-sm">
-            <thead className="bg-[#0A0A0A] text-[10px] uppercase tracking-widest text-white/50">
+          <table className="w-full min-w-max tls-type-small">
+            <thead className="bg-[#0A0A0A] tls-type-label text-white/50">
               <tr>
                 <th scope="col" className="sticky left-0 z-10 bg-[#0A0A0A] text-left px-3 py-2.5 font-bold">Map</th>
                 {columns.map((mode) => {
                   const count = shown.filter((item) => (item.modes || []).includes(mode.mode)).length;
                   return (
                     <th key={mode.mode} scope="col" className="px-2 py-2.5 text-center font-bold normal-case tracking-normal" data-testid={`game-maps-mode-${mode.mode}`}>
-                      <span className={`block text-xs ${modeStatusOf(mode) === "active" ? "text-white/80" : "text-white/45"}`}>{mode.label}</span>
-                      <span className="block text-[10px] font-normal text-white/40">{modeSuffix(mode) || (count === 1 ? "1 Map" : `${count} Maps`)}</span>
+                      <span className={`block tls-type-small ${modeStatusOf(mode) === "active" ? "text-white/80" : "text-white/45"}`}>{mode.label}</span>
+                      <span className="block tls-type-small font-normal text-quiet">{modeSuffix(mode) || (count === 1 ? "1 Map" : `${count} Maps`)}</span>
                     </th>
                   );
                 })}
@@ -359,7 +359,7 @@ export function GameMapsTab({ gameId, reloadKey = 0, onOpenModes }) {
                         <MapThumb item={item} />
                         <div className="min-w-0">
                           <div className="max-w-[8.5rem] sm:max-w-[16rem] truncate font-semibold text-white" title={item.name}>{item.name}</div>
-                          <div className="max-w-[8.5rem] sm:max-w-[16rem] truncate text-[11px] text-white/40">{item.slug}</div>
+                          <div className="max-w-[8.5rem] sm:max-w-[16rem] truncate tls-type-small text-quiet">{item.slug}</div>
                         </div>
                       </div>
                     </td>
@@ -375,7 +375,7 @@ export function GameMapsTab({ gameId, reloadKey = 0, onOpenModes }) {
                         </td>
                       );
                     })}
-                    <td className="px-3 py-2 whitespace-nowrap text-xs" data-testid={`game-map-state-${item.slug}`}>
+                    <td className="px-3 py-2 whitespace-nowrap tls-type-small" data-testid={`game-map-state-${item.slug}`}>
                       <span className={`font-semibold ${STATE_CLASS[status]}`}>{STATE_TEXT[status]}</span>
                       <span className="block text-white/45 tabular-nums">{poolsText(item.in_pools)}</span>
                     </td>
@@ -400,7 +400,7 @@ export function GameMapsTab({ gameId, reloadKey = 0, onOpenModes }) {
       )}
       {maps.some((item) => item.status !== "archived") ? (
         <details className="group rounded-sm border border-white/10 bg-[#121212] p-4" data-testid="game-default-pool-box">
-          <summary className="cursor-pointer select-none text-xs font-bold uppercase tracking-widest text-white/70 hover:text-white focus-visible:outline focus-visible:outline-1 focus-visible:outline-[#29B6E8] rounded-sm">
+          <summary className="cursor-pointer select-none tls-type-label text-white/70 hover:text-white focus-visible:outline focus-visible:outline-1 focus-visible:outline-[#29B6E8] rounded-sm">
             Standard-Pool {data.default_pool ? `· Version ${data.default_pool.version}` : "· noch keiner"}
           </summary>
           <div className="mt-3">

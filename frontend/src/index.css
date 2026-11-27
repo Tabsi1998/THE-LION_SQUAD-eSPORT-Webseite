@@ -81,16 +81,19 @@ img, video, canvas, svg {
   max-width: 100%;
 }
 
-.font-heading { font-family: 'Unbounded', 'Arial Black', 'Segoe UI Black', sans-serif; }
-.font-display { font-family: 'Rajdhani', 'Bahnschrift Condensed', 'Arial Narrow', sans-serif; }
-.font-body { font-family: 'Outfit', 'Segoe UI', -apple-system, BlinkMacSystemFont, sans-serif; }
+/* Die Schriften selbst (#1228) - welche wo steht, sagt die Schrift-Treppe (styles/system.css, #1302): Unbounded nur auf
+   der Bühne und in Seitentiteln, Rajdhani für Zahlen. `.font-display` bleibt als Name für Rajdhani, damit alte Stellen
+   nicht brechen; neue Stellen nehmen tls-type-num. `.font-heading` steht nur noch an den Ausnahmen (TV-Seiten). */
+.font-heading { font-family: var(--tls-font-stage); }
+.font-display { font-family: var(--tls-font-num); }
+.font-body { font-family: var(--tls-font-text); }
 
 /* Lange Überschriften (#1218): Handy und Tablet trennen große Überschriften mit Bindestrich (die Seite ist
    lang="de"), statt sie mitten im Wort ohne Zeichen zu brechen oder aus dem Bild laufen zu lassen. Getrennt werden
    nur Wörter ab zehn Buchstaben. Feste Wörter in Großbuchstaben tragen zusätzlich eine weiche Trennstelle (&shy;),
    weil nicht jeder Browser großgeschriebene Wörter selbst trennt. Am PC bleibt alles, wie es ist. */
 @media (max-width: 1023px) {
-  h1, h2, .font-heading {
+  h1, h2, .font-heading, .tls-type-hero, .tls-type-title {
     -webkit-hyphens: auto;
     hyphens: auto;
     hyphenate-limit-chars: 10 4 4;
@@ -101,18 +104,17 @@ img, video, canvas, svg {
     overflow-wrap: anywhere;
   }
 }
-/* Am Handy wird die große Schrift so klein, dass ein Wort mit 14 Buchstaben bei 360 px in die Zeile passt -
-   ab etwa 460 px Breite bleibt sie so groß wie vorher. */
+/* Am Handy wird der Seitentitel (tls-type-title, 30 px) so klein, dass ein GROSSES Wort mit 14 Buchstaben bei 360 px in
+   die Zeile passt - ab 390 px steht er auf seinen 30 px. */
 @media (max-width: 639px) {
-  :is(h1, h2).font-heading.text-3xl {
-    font-size: clamp(1.5rem, 7.8vw, 1.875rem);
+  .tls-type-title {
+    font-size: clamp(1.5rem, 7.8vw, var(--tls-type-title-size));
   }
-  :is(h1, h2).font-heading:is(.text-4xl, .text-5xl, .text-6xl, .text-7xl, .text-8xl) {
-    font-size: clamp(1.5rem, 7.8vw, 2.25rem);
-  }
-  h1.font-heading.tls-head-name--long {
-    font-size: clamp(1.375rem, 6.4vw, 1.875rem);
-  }
+}
+/* Ein sehr langer Name im Profilkopf (#1218) kommt eine Stufe kleiner - auf allen Breiten höchstens die 30 px, die der
+   Seitentitel am Handy hat (kein Wert außerhalb der Treppe). */
+.tls-type-title.tls-head-name--long {
+  font-size: clamp(1.375rem, 6.4vw, 1.875rem);
 }
 /* Namen im Profilkopf (Spieler- und Vereinsprofil): höchstens zwei Zeilen. Ein sehr langer Name kommt eine
    Schriftstufe kleiner (tls-head-name--long), erst danach endet er mit „…“. Ein Name ohne Leerzeichen darf
@@ -226,12 +228,12 @@ button.tls-bracket-row[aria-pressed="true"] { background-color: rgb(var(--tls-ho
 .tls-bracket-rank:empty { background: transparent; }
 .tls-bracket-rank.is-qualified { color: var(--tls-surface-0); background: var(--tls-brand); }
 .tls-bracket-tag {
-  font-size: 10px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; padding: 1px 6px; border-radius: 3px;
+  font-size: var(--tls-type-label-size); font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; padding: 1px 6px; border-radius: 3px;
   color: var(--tls-warn); background: rgb(var(--tls-warn-rgb) / 0.14);
 }
 /* Lauf-Karte (#1178): die Linie „2 kommen weiter → C“ zwischen den Plätzen. */
 .tls-bracket-cut {
-  display: flex; align-items: center; gap: 8px; padding: 2px 10px; font-size: 11px; font-weight: 600; color: var(--tls-brand);
+  display: flex; align-items: center; gap: 8px; padding: 2px 10px; font-size: var(--tls-type-small-size); font-weight: 600; color: var(--tls-brand);
 }
 .tls-bracket-cut::before, .tls-bracket-cut::after { content: ""; height: 1px; flex: 1; background: rgb(var(--tls-brand-rgb) / 0.45); }
 .tls-bracket-cut > span { flex: none; }
@@ -407,11 +409,11 @@ button.tls-bracket-row:active, .tls-bracket-head:active { transform: scale(calc(
 }
 .tls-standing-me {
   flex: none; display: inline-flex; align-items: center; padding: 1px 6px; border-radius: 3px;
-  font-size: 10px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase;
+  font-size: var(--tls-type-label-size); font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase;
   color: var(--tls-brand); background: rgb(var(--tls-brand-rgb) / 0.12);
 }
 /* Liga-Staffel (E.1, #1625): was den Gleichstand entschied, kampflos, Abzug, Ausscheiden - klein unter dem Namen. */
-.tls-standing-notes { display: flex; flex-wrap: wrap; gap: 2px 8px; margin-top: 2px; font-size: 11px; line-height: 1.3; color: var(--tls-muted); }
+.tls-standing-notes { display: flex; flex-wrap: wrap; gap: 2px 8px; margin-top: 2px; font-size: var(--tls-type-small-size); line-height: 1.3; color: var(--tls-muted); }
 .tls-standing-note { overflow-wrap: anywhere; }
 .tls-standing-note[data-tone="decision"], .tls-standing-note[data-tone="tiebreak"] { color: rgb(var(--tls-brand-rgb) / 0.9); }
 .tls-standing-note[data-tone="exit"] { color: rgb(var(--tls-warn-rgb)); font-weight: 600; }
@@ -460,7 +462,7 @@ button.tls-bracket-row:active, .tls-bracket-head:active { transform: scale(calc(
 .tls-sched-card:focus-visible, .tls-sched-line:focus-visible { outline: 2px solid var(--tls-brand); outline-offset: 2px; }
 .tls-sched-name { overflow-wrap: anywhere; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; line-height: 1.3; }
 .tls-sched-status {
-  display: inline-flex; align-items: center; gap: 6px; font-size: 10px; font-weight: 700; letter-spacing: 0.1em;
+  display: inline-flex; align-items: center; gap: 6px; font-size: var(--tls-type-label-size); font-weight: 700; letter-spacing: 0.1em;
   text-transform: uppercase; white-space: nowrap; color: var(--tls-text-muted);
 }
 .tls-sched-status[data-tone="live"] { color: var(--tls-live); }
@@ -511,18 +513,18 @@ button.tls-bracket-row:active, .tls-bracket-head:active { transform: scale(calc(
 .tls-podium__name {
   max-width: 100%; overflow-wrap: normal; word-break: normal; hyphens: manual;
   display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden;
-  font-size: 13px; font-weight: 600; line-height: 1.25; color: #fff;
+  font-size: var(--tls-type-small-size); font-weight: 600; line-height: 1.25; color: #fff;
 }
 /* Ein einzelnes Wort („KartKönigin“) bleibt ganz oder endet mit „…“ - nie „KartK|önigin“. */
 .tls-podium__name--word { display: block; white-space: nowrap; text-overflow: ellipsis; }
 .tls-podium__entry[data-mine="true"] .tls-podium__name { color: var(--tls-brand); }
-.tls-podium__value { font-family: 'Rajdhani', 'Bahnschrift Condensed', sans-serif; font-size: 13px; font-weight: 700; font-variant-numeric: tabular-nums; color: var(--tls-text-muted); }
+.tls-podium__value { font-family: 'Rajdhani', 'Bahnschrift Condensed', sans-serif; font-size: var(--tls-type-small-size); font-weight: 700; font-variant-numeric: tabular-nums; color: var(--tls-text-muted); }
 /* Im Baum (#2336): der Weg zum Platz darf zwei Zeilen nehmen (nie abgeschnitten), die gewonnenen Spiele stehen klein
    darunter; der Satz unter dem Podest erklärt, warum Siege und Platz nicht zusammenpassen müssen. */
 .tls-podium__path { display: flex; max-width: 100%; flex-direction: column; align-items: center; gap: 1px; }
 .tls-podium__path .tls-podium__value { line-height: 1.2; overflow-wrap: anywhere; color: rgb(255 255 255 / 0.82); }
-.tls-podium__games { font-family: 'Rajdhani', 'Bahnschrift Condensed', sans-serif; font-size: 11px; font-weight: 600; line-height: 1.3; font-variant-numeric: tabular-nums; color: var(--tls-quiet); }
-.tls-podium__note { max-width: 46ch; margin: 14px auto 0; text-align: center; font-size: 13px; line-height: 1.45; color: var(--tls-text-muted); }
+.tls-podium__games { font-family: 'Rajdhani', 'Bahnschrift Condensed', sans-serif; font-size: var(--tls-type-label-size); font-weight: 600; line-height: 1.3; font-variant-numeric: tabular-nums; color: var(--tls-quiet); }
+.tls-podium__note { max-width: 46ch; margin: 14px auto 0; text-align: center; font-size: var(--tls-type-small-size); line-height: 1.45; color: var(--tls-text-muted); }
 .tls-podium__empty { padding-bottom: 8px; font-family: 'Rajdhani', sans-serif; font-size: 20px; color: rgb(255 255 255 / 0.3); }
 .tls-podium__crown {
   position: absolute; left: 50%; top: -26px; display: inline-grid; place-items: center; overflow: hidden;
@@ -1229,7 +1231,7 @@ button.tls-bracket-row:active, .tls-bracket-head:active { transform: scale(calc(
   border-top: 1px solid rgba(255,215,0,0.72);
   border-bottom: 1px solid rgba(255,215,0,0.72);
   color: #ffd21a;
-  font-size: 0.72rem;
+  font-size: var(--tls-type-label-size);
   font-weight: 900;
   letter-spacing: 0.16em;
   line-height: 1;
@@ -1281,7 +1283,7 @@ button.tls-bracket-row:active, .tls-bracket-head:active { transform: scale(calc(
   }
   .tls-maintenance-tape__marquee {
     min-height: 1.55rem;
-    font-size: 0.62rem;
+    font-size: var(--tls-type-label-size);
     letter-spacing: 0.1em;
   }
 }
@@ -1368,7 +1370,7 @@ button.tls-bracket-row:active, .tls-bracket-head:active { transform: scale(calc(
   min-width: 0;
   flex: 1;
   color: rgba(255,255,255,0.78);
-  font-size: 0.78rem;
+  font-size: var(--tls-type-label-size);
   font-weight: 800;
   letter-spacing: 0.09em;
   line-height: 1.35;
@@ -1389,7 +1391,7 @@ button.tls-bracket-row:active, .tls-bracket-head:active { transform: scale(calc(
   border: 1px solid currentColor;
   padding: 0.4rem 0.7rem;
   color: currentColor;
-  font-size: 0.68rem;
+  font-size: var(--tls-type-label-size);
   font-weight: 900;
   letter-spacing: 0.13em;
   line-height: 1;
@@ -1419,12 +1421,12 @@ button.tls-bracket-row:active, .tls-bracket-head:active { transform: scale(calc(
     gap: 0.55rem;
   }
   .tls-site-banner__text {
-    font-size: 0.68rem;
+    font-size: var(--tls-type-label-size);
     letter-spacing: 0.06em;
   }
   .tls-site-banner__link {
     padding: 0.38rem 0.55rem;
-    font-size: 0.62rem;
+    font-size: var(--tls-type-small-size);
   }
 }
 
@@ -1478,30 +1480,27 @@ textarea.input {
   resize: vertical;
 }
 
+/* Lesetext (#1302): Stufe „Text“ (17 / 16 px, Zeilenabstand 1,6). Überschriften im Text sind Abschnitt und Kartentitel -
+   Outfit, normal geschrieben (#1303); Unbounded bleibt dem Seitentitel über dem Artikel. */
 .prose-cms {
   color: rgba(255,255,255,0.78);
-  line-height: 1.7;
-  font-size: 15px;
+  line-height: 1.6;
+  font-size: var(--tls-type-body-size);
 }
-.prose-cms h1 {
-  font-family: var(--font-heading, "Unbounded"), sans-serif;
-  font-size: 2rem;
-  text-transform: uppercase;
-  letter-spacing: 0;
-  margin: 1.5em 0 0.5em;
-  color: #fff;
-}
-.prose-cms h2 {
-  font-family: var(--font-heading, "Unbounded"), sans-serif;
-  font-size: 1.5rem;
-  text-transform: uppercase;
-  letter-spacing: 0;
+.prose-cms :is(h1, h2) {
+  font-family: var(--tls-font-text);
+  font-size: var(--tls-type-section-size);
+  font-weight: 800;
+  line-height: 1.2;
+  text-transform: none;
+  letter-spacing: normal;
   margin: 1.25em 0 0.5em;
   color: #fff;
 }
 .prose-cms h3 {
   font-weight: 700;
-  font-size: 1.15rem;
+  font-size: var(--tls-type-card-size);
+  line-height: 1.3;
   margin: 1em 0 0.4em;
   color: #fff;
 }
@@ -1818,7 +1817,7 @@ input.no-spin::-webkit-outer-spin-button, input.no-spin::-webkit-inner-spin-butt
 .tls-lvf-stars {
   order: -1;
   color: #FFD700;
-  font-size: 11px;
+  font-size: var(--tls-type-label-size);
   line-height: 1;
   letter-spacing: 0.1em;
   text-shadow: 0 0 6px rgba(255, 215, 0, 0.6);
@@ -1845,7 +1844,7 @@ input.no-spin::-webkit-outer-spin-button, input.no-spin::-webkit-inner-spin-butt
   background: rgba(0, 0, 0, 0.6);
 }
 .tls-lvf-pip.is-on { background: var(--lvf-rc); box-shadow: 0 0 6px var(--lvf-rc); }
-.tls-lvf--card .tls-lvf-tag { font-size: 10px; padding: 1px 8px; }
+.tls-lvf--card .tls-lvf-tag { font-size: var(--tls-type-label-size); padding: 1px 8px; }
 .tls-lvf--card .tls-lvf-pip { width: 6px; height: 6px; }
 
 /* Signatur des Rangs (#1455, LoewenRangSignature.jsx): zwei Leinwände um die Fläche, nur im Profilkopf. Die hintere
@@ -2113,7 +2112,7 @@ input.no-spin::-webkit-outer-spin-button, input.no-spin::-webkit-inner-spin-butt
 .tls-new-chip {
   display: inline-flex; align-items: center; gap: 0.25rem; padding: 0.1rem 0.4rem; border-radius: 2px;
   border: 1px solid rgba(41,182,232,0.5); background: rgba(41,182,232,0.14); color: #29B6E8;
-  font-size: 10px; font-weight: 800; letter-spacing: 0.14em; text-transform: uppercase;
+  font-size: var(--tls-type-label-size); font-weight: 800; letter-spacing: 0.14em; text-transform: uppercase;
 }
 @media (prefers-reduced-motion: reduce) {
   .tls-skeleton, .tls-page-enter, .tls-changed, .tls-changed-row { animation: none !important; }
@@ -2309,7 +2308,7 @@ html.tls-vt .tls-bottom-nav { view-transition-name: tls-bottom-nav; }
   border-radius: 2px;
   background: #F3F5F7;
   color: #0A0A0A;
-  font-size: 11px;
+  font-size: var(--tls-type-small-size);
   font-weight: 600;
   line-height: 1.3;
   white-space: nowrap;
@@ -2693,7 +2692,7 @@ html[data-season-still-cards] .tls-card[data-season-perch="card"]:focus-visible 
   .tls-area-jump__list { flex-direction: column; align-items: flex-start; gap: 0.25rem; overflow: visible; }
   .tls-area-jump__item { flex-direction: column; align-items: flex-start; justify-content: center; min-height: 2.75rem; padding: 0.375rem 0.25rem; white-space: normal; }
   .tls-area-jump__item::after { left: 0.25rem; right: 0.25rem; }
-  .tls-area-jump__count { font-size: 0.6875rem; letter-spacing: 0.06em; }
+  .tls-area-jump__count { font-size: var(--tls-type-label-size); letter-spacing: 0.06em; }
   .tls-area-jump__dot { display: none; }
 }
 
@@ -2729,7 +2728,7 @@ html[data-season-still-cards] .tls-card[data-season-perch="card"]:focus-visible 
   border-radius: 2px;
   background: var(--tls-black);
 }
-.tls-date-tile__month { font-size: 0.625rem; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: var(--tls-cyan); }
+.tls-date-tile__month { font-size: var(--tls-type-label-size); font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: var(--tls-cyan); }
 .tls-date-tile__day { font-size: 1.25rem; font-weight: 900; line-height: 1; color: var(--tls-white); }
 
 /* Nachbarn treten zurück (#1080): fährt die Maus über eine Kachel, werden die anderen leiser. Nur mit Maus. */
@@ -2919,7 +2918,7 @@ html[data-season-still-cards] .tls-card[data-season-perch="card"]:focus-visible 
   animation-duration: calc(var(--tls-motion-slow) * 6);
 }
 .tls-lap-chip-web {
-  display: inline-block; margin-top: 2px; font-size: 10px; font-weight: 700; letter-spacing: 0.04em;
+  display: inline-block; margin-top: 2px; font-size: var(--tls-type-label-size); font-weight: 700; letter-spacing: 0.04em;
   color: var(--tls-cyan); font-variant-numeric: tabular-nums;
   animation: tls-chip-in var(--tls-motion-mid) var(--tls-ease) both;
 }
@@ -2960,7 +2959,7 @@ html[data-season-still-cards] .tls-card[data-season-perch="card"]:focus-visible 
   font-size: 1.6rem; font-weight: 700; color: #fff; touch-action: manipulation;
   transition: background-color var(--tls-motion-fast) var(--tls-ease), transform var(--tls-motion-fast) var(--tls-ease);
 }
-.tls-keypad__key--wide { font-size: 0.8rem; }
+.tls-keypad__key--wide { font-size: var(--tls-type-small-size); }
 .tls-keypad__key:active { transform: scale(calc(1 - 0.04 * var(--tls-motion-on))); background: rgba(41, 182, 232, 0.18); }
 .tls-keypad__key:focus-visible { outline: 2px solid var(--tls-cyan); outline-offset: 2px; }
 @media (hover: hover) and (pointer: fine) {
@@ -2968,7 +2967,7 @@ html[data-season-still-cards] .tls-card[data-season-perch="card"]:focus-visible 
 }
 /* „Versuch 2 von 3“: der Zähler tickt beim Wechsel einmal ein (neuer key → neue Animation). */
 .tls-attempt-chip {
-  font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.12em; font-variant-numeric: tabular-nums;
+  font-size: var(--tls-type-label-size); font-weight: 700; text-transform: uppercase; letter-spacing: 0.12em; font-variant-numeric: tabular-nums;
   border: 1px solid currentColor; border-radius: 2px; padding: 3px 8px;
   animation: tls-tick-in var(--tls-motion-mid) var(--tls-ease) both;
 }
@@ -2994,7 +2993,7 @@ html[data-season-still-cards] .tls-card[data-season-perch="card"]:focus-visible 
   display: grid;
   gap: 0.4rem;
   min-width: 0;
-  font-size: 11px;
+  font-size: var(--tls-type-label-size);
   font-weight: 700;
   letter-spacing: 0.12em;
   text-transform: uppercase;
@@ -3063,7 +3062,7 @@ html[data-season-still-cards] .tls-card[data-season-perch="card"]:focus-visible 
   background: rgba(255, 215, 0, 0.1);
   border-bottom: 1px solid rgba(255, 215, 0, 0.3);
   color: #FFD700;
-  font-size: 13px;
+  font-size: var(--tls-type-small-size);
   font-weight: 700;
 }
 
@@ -3197,7 +3196,7 @@ html[data-season-still-cards] .tls-card[data-season-perch="card"]:focus-visible 
   text-align: left;
 }
 .tls-store__text small {
-  font-size: 10px;
+  font-size: var(--tls-type-label-size);
   letter-spacing: 0.12em;
   text-transform: uppercase;
   opacity: 0.75;
@@ -3245,7 +3244,7 @@ html[data-season-still-cards] .tls-card[data-season-perch="card"]:focus-visible 
   border-radius: 9px;
   overflow: hidden;
   font-family: var(--font-heading, inherit);
-  font-size: 11px;
+  font-size: var(--tls-type-small-size);
   font-weight: 800;
   color: #04141B;
   background: linear-gradient(135deg, #29B6E8, #0B4A61);
@@ -3415,7 +3414,7 @@ html[data-season-still-cards] .tls-card[data-season-perch="card"]:focus-visible 
    Vereinstermine tragen Vereinsgold. Termine heben sich gestaffelt an, der Abo-Hinweis ebenso, beim Kopieren erscheint
    der Haken. Mit „Bewegung reduzieren“ steht --tls-motion-on auf 0 und die Dauern auf fast null: nichts bewegt sich. */
 .tls-own-badge {
-  display: inline-flex; align-items: center; padding: 1px 6px; border-radius: 3px; font-size: 10px; font-weight: 700;
+  display: inline-flex; align-items: center; padding: 1px 6px; border-radius: 3px; font-size: var(--tls-type-label-size); font-weight: 700;
   letter-spacing: 0.06em; text-transform: uppercase; white-space: nowrap;
   color: var(--tls-brand); background: rgb(var(--tls-brand-rgb) / 0.12);
 }
@@ -3566,7 +3565,7 @@ html[data-season-still-cards] .tls-card[data-season-perch="card"]:focus-visible 
 .tls-veto-clock__track { stroke: rgb(255 255 255 / 0.12); }
 .tls-veto-clock__arc { stroke: rgb(var(--tls-veto-rgb)); }
 .tls-veto-clock__text { text-align: right; }
-.tls-veto-clock__caption { display: flex; align-items: center; justify-content: flex-end; gap: 0.25rem; font-size: 10px; text-transform: uppercase; letter-spacing: 0.2em; color: rgb(255 255 255 / 0.55); }
+.tls-veto-clock__caption { display: flex; align-items: center; justify-content: flex-end; gap: 0.25rem; font-size: var(--tls-type-label-size); text-transform: uppercase; letter-spacing: 0.2em; color: rgb(255 255 255 / 0.55); }
 .tls-veto-clock__icon { width: 1.3em; height: 1.3em; flex-shrink: 0; }
 .tls-veto-clock[data-urgent="true"] .tls-veto-clock__caption { color: rgb(var(--tls-live-rgb)); font-weight: 700; }
 .tls-veto-clock__number { color: #fff; }
@@ -3587,7 +3586,7 @@ html[data-season-still-cards] .tls-card[data-season-perch="card"]:focus-visible 
 .tls-veto-step {
   position: relative; display: grid; gap: 0.125rem; align-content: start; min-width: 0; scroll-snap-align: center;
   padding: 0.375rem 0.5rem; border-radius: 2px; border: 1px solid rgb(255 255 255 / 0.08); background: rgb(255 255 255 / 0.02);
-  font-size: 11px; color: rgb(255 255 255 / 0.6);
+  font-size: var(--tls-type-small-size); color: rgb(255 255 255 / 0.6);
 }
 .tls-veto-step::before {
   content: ""; position: absolute; left: 0; top: 0; bottom: 0; width: 2px; background: rgb(var(--tls-veto-rgb) / 0.8); opacity: 0.35;
@@ -3597,14 +3596,14 @@ html[data-season-still-cards] .tls-card[data-season-perch="card"]:focus-visible 
 .tls-veto-step[data-state="open"] { opacity: 0.6; }
 .tls-veto-step[data-state="current"] { border-color: rgb(var(--tls-veto-rgb) / 0.75); background: rgb(var(--tls-veto-rgb) / 0.1); color: #fff; }
 .tls-veto-step[data-state="current"]::before { opacity: 1; }
-.tls-veto-step__head { display: flex; align-items: baseline; gap: 0.375rem; font-weight: 800; text-transform: uppercase; letter-spacing: 0.06em; font-size: 10px; }
+.tls-veto-step__head { display: flex; align-items: baseline; gap: 0.375rem; font-weight: 800; text-transform: uppercase; letter-spacing: 0.06em; font-size: var(--tls-type-label-size); }
 .tls-veto-step__num { font-variant-numeric: tabular-nums; color: rgb(var(--tls-veto-rgb)); }
 .tls-veto-step__who { font-weight: 700; color: rgb(255 255 255 / 0.85); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .tls-veto-step__mode { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .tls-veto-step__map { display: flex; align-items: center; gap: 0.375rem; min-width: 0; margin-top: 0.125rem; font-weight: 700; color: #fff; }
 .tls-veto-step[data-kind="ban"] .tls-veto-step__map { color: rgb(255 255 255 / 0.6); text-decoration: line-through; text-decoration-color: rgb(255 255 255 / 0.35); }
 .tls-veto-step__thumb { width: 1.75rem; height: 1rem; flex-shrink: 0; border-radius: 1px; object-fit: cover; }
-.tls-veto-step__now { margin-top: 0.125rem; font-weight: 800; text-transform: uppercase; letter-spacing: 0.12em; font-size: 10px; color: rgb(var(--tls-veto-rgb)); }
+.tls-veto-step__now { margin-top: 0.125rem; font-weight: 800; text-transform: uppercase; letter-spacing: 0.12em; font-size: var(--tls-type-label-size); color: rgb(var(--tls-veto-rgb)); }
 @media (min-width: 1024px) {
   .tls-veto-flow__list { grid-auto-columns: minmax(6.5rem, 1fr); }
 }
@@ -3616,7 +3615,7 @@ html[data-season-still-cards] .tls-card[data-season-perch="card"]:focus-visible 
 .tls-veto-mode { position: relative; min-width: 0; padding: 0.75rem; border-radius: 2px; border: 1px solid rgb(255 255 255 / 0.1); background: #0a0a0a; }
 .tls-veto-mode[data-current="true"] { border-color: rgb(255 255 255 / 0.18); }
 .tls-veto-mode__head { display: flex; align-items: center; gap: 0.5rem; font-size: 0.75rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.1em; color: rgb(255 255 255 / 0.7); }
-.tls-veto-mode__now { margin-left: auto; padding: 0 0.375rem; border-radius: 2px; font-size: 10px; letter-spacing: 0.15em; color: #000; background: rgb(255 255 255 / 0.85); }
+.tls-veto-mode__now { margin-left: auto; padding: 0 0.375rem; border-radius: 2px; font-size: var(--tls-type-label-size); letter-spacing: 0.15em; color: #000; background: rgb(255 255 255 / 0.85); }
 .tls-veto-mode__cards { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0.5rem; margin-top: 0.5rem; }
 
 /* Der Rahmen des laufenden Zugs zeichnet sich einmal nach: vier Kanten, die nacheinander aus ihrer Ecke wachsen (scale). */
@@ -3637,7 +3636,7 @@ html[data-season-still-cards] .tls-card[data-season-perch="card"]:focus-visible 
 }
 .tls-veto-card--live .tls-veto-card__media { display: block; }
 .tls-veto-card--live .tls-veto-card__img { transition: opacity var(--tls-motion-mid) var(--tls-ease); }
-.tls-veto-card--live .tls-veto-card__state { display: block; font-size: 11px; color: rgb(255 255 255 / 0.6); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.tls-veto-card--live .tls-veto-card__state { display: block; font-size: var(--tls-type-small-size); color: rgb(255 255 255 / 0.6); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .tls-veto-card--live .tls-veto-card__label { display: inline-flex; align-items: center; gap: 0.25rem; }
 /* Gesperrt (oder in einem anderen Modus gespielt): gedimmt und leicht abgesenkt. */
 .tls-veto-card--live[data-status="banned"], .tls-veto-card--live[data-status="elsewhere"] {
@@ -3700,7 +3699,7 @@ html[data-season-still-cards] .tls-card[data-season-perch="card"]:focus-visible 
 .tls-standing-row.tls-you { box-shadow: none; background-color: transparent; }
 /* Die Marke an der Zeile („Du“, „Dein Team“, „Verein“) sieht aus wie das Etikett „Du“ (.tls-you-tag): eine Pille in
    gemischter Schreibung, nie wie ein Initialen-Kästchen. */
-.tls-standing-me { border-radius: 999px; padding: 1px 7px; font-size: 11px; line-height: 1.35; letter-spacing: 0.02em; text-transform: none; }
+.tls-standing-me { border-radius: 999px; padding: 1px 7px; font-size: var(--tls-type-label-size); line-height: 1.35; letter-spacing: 0.02em; text-transform: none; }
 /* Wischbare Leisten schneiden oben und unten ab: Fokus-Winkel an Knöpfen und Karten sitzen dort an der Kante. Eine
    Karte hebt sich beim Fokus und Drüberfahren um 5 px - Leisten mit Karten haben darum oben 6 px Luft (fest, kein
    Sprung beim Fokus), sonst schnitte die Leiste die oberen Winkel und die Kante der Karte ab. */

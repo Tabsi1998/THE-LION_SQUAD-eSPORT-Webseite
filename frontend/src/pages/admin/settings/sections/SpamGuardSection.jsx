@@ -37,7 +37,7 @@ const SECRET_STATE = { ok: "hinterlegt", missing: "fehlt", unreadable: "nicht le
 function NumberField({ label, value, onChange, range, testId }) {
   return (
     <label className="block">
-      <div className="text-[11px] font-bold uppercase tracking-widest text-white/60 mb-1.5">{label}{range ? ` (${range.min}–${range.max})` : ""}</div>
+      <div className="tls-type-label text-white/60 mb-1.5">{label}{range ? ` (${range.min}–${range.max})` : ""}</div>
       <input type="number" min={range?.min} max={range?.max} value={value ?? ""} data-testid={testId}
         onChange={(event) => onChange(event.target.value === "" ? "" : Number(event.target.value))}
         className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-sm" />
@@ -48,7 +48,7 @@ function NumberField({ label, value, onChange, range, testId }) {
 function ReasonField({ value, onChange, testId }) {
   return (
     <label className="block">
-      <div className="text-[11px] font-bold uppercase tracking-widest text-white/60 mb-1.5">Grund (Pflicht, steht im Protokoll)</div>
+      <div className="tls-type-small font-bold text-white/60 mb-1.5">Grund (Pflicht, steht im Protokoll)</div>
       <input value={value} onChange={(event) => onChange(event.target.value)} maxLength={500} data-testid={testId}
         className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-sm" />
     </label>
@@ -167,7 +167,7 @@ export function SpamGuardSection() {
     }
   };
 
-  if (!view || !draft || !turnstileDraft) return <p className="text-sm text-white/50">Lade Spamschutz …</p>;
+  if (!view || !draft || !turnstileDraft) return <p className="tls-type-small text-white/50">Lade Spamschutz …</p>;
   const bounds = view.bounds || {};
   const setField = (key) => (value) => setDraft((current) => ({ ...current, [key]: value }));
   const setWeight = (key) => (value) => setDraft((current) => ({ ...current, weights: { ...current.weights, [key]: value } }));
@@ -178,14 +178,14 @@ export function SpamGuardSection() {
 
   return (
     <div className="space-y-6" data-testid="spam-guard-section">
-      <p className="text-sm text-white/60 max-w-3xl">
+      <p className="tls-type-body text-white/60 max-w-3xl">
         Schützt Kontaktformular, Registrierung, „Passwort vergessen“ und „Bestätigung erneut senden“ ohne externen Dienst: unsichtbares Feld,
         signiertes Formular-Token mit Mindestzeit, Limits je IP und E-Mail (nur als Hash gezählt) und eine Bewertung des Inhalts.
         Sicher erkannter Spam wird still verworfen und nur gezählt; nur verdächtige Kontaktnachrichten landen als „Spam“ in der Kontakt-Inbox, ohne Mail.
       </p>
 
       {stats && (
-        <div className="border border-white/10 bg-[#121212] rounded-sm p-5 text-sm text-white/80" data-testid="spam-guard-stats">
+        <div className="border border-white/10 bg-[#121212] rounded-sm p-5 tls-type-small text-white/80" data-testid="spam-guard-stats">
           <strong>{stats.today?.caught || 0}</strong> abgefangen heute · <strong>{stats.week?.caught || 0}</strong> in 7 Tagen
           {stats.quote_week != null && <> · Quote {String(stats.quote_week).replace(".", ",")} %</>}
           {stats.peak_24h?.count > 0 && <> · stärkste Stunde (24 h): {stats.peak_24h.count}</>}
@@ -195,8 +195,8 @@ export function SpamGuardSection() {
       <div className="border border-white/10 bg-[#121212] rounded-sm p-5 space-y-5">
         <div className="flex items-start justify-between gap-4">
           <div>
-            <div className="font-heading font-bold uppercase text-sm" id="spam-guard-enabled-label">Spamschutz an</div>
-            <p className="text-xs text-white/50 mt-1">Aus heißt: nur die Limits wirken. Vorgabe: an.</p>
+            <div className="tls-type-label" id="spam-guard-enabled-label">Spamschutz an</div>
+            <p className="tls-type-small text-white/50 mt-1">Aus heißt: nur die Limits wirken. Vorgabe: an.</p>
           </div>
           <button type="button" role="switch" aria-checked={!!draft.enabled} aria-labelledby="spam-guard-enabled-label" onClick={() => setField("enabled")(!draft.enabled)} data-testid="spam-guard-enabled"
             className={`relative w-12 h-6 rounded-full shrink-0 transition-colors ${draft.enabled ? "bg-[#29B6E8]" : "bg-white/15"}`}>
@@ -209,7 +209,7 @@ export function SpamGuardSection() {
           ))}
         </div>
         <div>
-          <div className="font-heading font-bold uppercase text-sm mb-2">Punkte je Merkmal</div>
+          <div className="tls-type-label mb-2">Punkte je Merkmal</div>
           <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3">
             {WEIGHT_FIELDS.map(([key, label]) => (
               <NumberField key={key} label={label} value={draft.weights?.[key]} onChange={setWeight(key)} range={bounds.weights} testId={`spam-guard-weight-${key}`} />
@@ -217,11 +217,11 @@ export function SpamGuardSection() {
           </div>
         </div>
         <div>
-          <div className="font-heading font-bold uppercase text-sm mb-2">Limits</div>
+          <div className="tls-type-label mb-2">Limits</div>
           <div className="space-y-3">
             {limitForms.map((form) => (
               <div key={form.key}>
-                <div className="text-xs text-white/70 mb-1">{form.label}</div>
+                <div className="tls-type-small text-white/70 mb-1">{form.label}</div>
                 <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-3">
                   {LIMIT_FIELDS.map(([key, label]) => (
                     <NumberField key={key} label={label} value={draft.limits?.[form.key]?.[key]} onChange={setLimit(form.key, key)} range={bounds.limits?.[key]} testId={`spam-guard-limit-${form.key}-${key}`} />
@@ -229,30 +229,30 @@ export function SpamGuardSection() {
                 </div>
               </div>
             ))}
-            <p className="text-xs text-white/50">Die Registrierung begrenzt „Zugang“ → „Grenze je Netz“.</p>
+            <p className="tls-type-small text-white/50">Die Registrierung begrenzt „Zugang“ → „Grenze je Netz“.</p>
           </div>
         </div>
         <label className="block">
-          <div className="text-[11px] font-bold uppercase tracking-widest text-white/60 mb-1.5">Spam-Wörter (eines je Zeile, ganze Wörter)</div>
+          <div className="tls-type-small font-bold text-white/60 mb-1.5">Spam-Wörter (eines je Zeile, ganze Wörter)</div>
           <textarea rows={5} value={draft.spam_words_text} onChange={(event) => setField("spam_words_text")(event.target.value)} data-testid="spam-guard-words"
             className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-sm font-mono" />
         </label>
         <ReasonField value={reason} onChange={setReason} testId="spam-guard-reason" />
         <button type="button" onClick={save} disabled={saving || !dirty} data-testid="spam-guard-save"
-          className="px-4 py-2 bg-[#29B6E8] text-black text-xs font-bold uppercase rounded-sm disabled:opacity-50">Spamschutz speichern</button>
+          className="px-4 py-2 bg-[#29B6E8] text-black tls-type-label rounded-sm disabled:opacity-50">Spamschutz speichern</button>
       </div>
 
       <div className="border border-white/10 bg-[#121212] rounded-sm p-5 space-y-4" data-testid="spam-guard-turnstile">
         <div>
-          <div className="font-heading font-bold uppercase text-sm">Cloudflare Turnstile (optional)</div>
-          <p className="text-xs text-white/50 mt-1">
+          <div className="tls-type-label">Cloudflare Turnstile (optional)</div>
+          <p className="tls-type-small text-white/50 mt-1">
             Eine zusätzliche Stufe, Vorgabe aus. Ist Cloudflare nicht erreichbar, entscheiden die eigenen Stufen allein – niemand wird ausgesperrt.
             In der App gilt Turnstile nicht. Datenschutz: Turnstile überträgt IP-Adresse und Browsermerkmale an Cloudflare (USA); die
             Datenschutzerklärung nennt das automatisch, sobald Turnstile an ist und für ein Formular gilt.
           </p>
         </div>
         <div className="flex items-center justify-between gap-4">
-          <span className="text-sm" id="turnstile-enabled-label">Turnstile an</span>
+          <span className="tls-type-small" id="turnstile-enabled-label">Turnstile an</span>
           <button type="button" role="switch" aria-checked={!!turnstileDraft.enabled} aria-labelledby="turnstile-enabled-label" data-testid="turnstile-enabled"
             onClick={() => setTurnstileDraft((current) => ({ ...current, enabled: !current.enabled }))}
             className={`relative w-12 h-6 rounded-full shrink-0 transition-colors ${turnstileDraft.enabled ? "bg-[#29B6E8]" : "bg-white/15"}`}>
@@ -261,25 +261,25 @@ export function SpamGuardSection() {
         </div>
         <div className="grid sm:grid-cols-2 gap-3">
           <label className="block">
-            <div className="text-[11px] font-bold uppercase tracking-widest text-white/60 mb-1.5">Site Key (öffentlich)</div>
+            <div className="tls-type-label text-white/60 mb-1.5">Site Key (öffentlich)</div>
             <input value={turnstileDraft.site_key} onChange={(event) => setTurnstileDraft((current) => ({ ...current, site_key: event.target.value }))} data-testid="turnstile-site-key"
               className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-sm font-mono" />
           </label>
           <label className="block">
-            <div className="text-[11px] font-bold uppercase tracking-widest text-white/60 mb-1.5">Secret Key – {SECRET_STATE[secretState] || secretState}</div>
+            <div className="tls-type-label text-white/60 mb-1.5">Secret Key – {SECRET_STATE[secretState] || secretState}</div>
             <input type="password" autoComplete="new-password" value={secret} onChange={(event) => setSecret(event.target.value)} placeholder={secretState === "ok" ? "hinterlegt – nur zum Ersetzen ausfüllen" : "Secret Key eintragen"}
               data-testid="turnstile-secret" className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-sm font-mono" />
-            {view.turnstile.secret?.detail && <p className="mt-1 text-xs text-[#FF8A80]">{view.turnstile.secret.detail}</p>}
+            {view.turnstile.secret?.detail && <p className="mt-1 tls-type-small text-[#FF8A80]">{view.turnstile.secret.detail}</p>}
           </label>
           <label className="block">
-            <div className="text-[11px] font-bold uppercase tracking-widest text-white/60 mb-1.5">Modus</div>
+            <div className="tls-type-label text-white/60 mb-1.5">Modus</div>
             <select value={turnstileDraft.mode} onChange={(event) => setTurnstileDraft((current) => ({ ...current, mode: event.target.value }))} data-testid="turnstile-mode"
               className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-sm">
               {(view.turnstile.modes || []).map((mode) => <option key={mode.key} value={mode.key}>{mode.label}</option>)}
             </select>
-            <p className="mt-1 text-xs text-white/50">„Nur bei Verdacht“: das Formular zeigt das Widget erst, wenn der Inhalt verdächtig ist.</p>
+            <p className="mt-1 tls-type-small text-white/50">„Nur bei Verdacht“: das Formular zeigt das Widget erst, wenn der Inhalt verdächtig ist.</p>
             {turnstileDraft.mode === "suspect" && (
-              <p className="mt-1 text-xs text-warn" data-testid="turnstile-suspect-warning">
+              <p className="mt-1 tls-type-small text-warn" data-testid="turnstile-suspect-warning">
                 Achtung: Bots können an der nachträglichen Rückfrage lernen, dass sie aufgefallen sind. Darum fragt der Server zusätzlich einen
                 Zufallsanteil unauffälliger Anfragen. Sicherer ist „Immer“.
               </p>
@@ -291,30 +291,30 @@ export function SpamGuardSection() {
               range={view.turnstile.sample_bounds} testId="turnstile-sample-percent" />
           )}
           <fieldset>
-            <legend className="text-[11px] font-bold uppercase tracking-widest text-white/60 mb-1.5">Gilt für</legend>
+            <legend className="tls-type-label text-white/60 mb-1.5">Gilt für</legend>
             {turnstileForms.map((form) => (
-              <label key={form.key} className="flex items-center gap-2 text-sm">
+              <label key={form.key} className="flex items-center gap-2 tls-type-small">
                 <input type="checkbox" checked={!!turnstileDraft.forms[form.key]} data-testid={`turnstile-form-${form.key}`}
                   onChange={(event) => setTurnstileDraft((current) => ({ ...current, forms: { ...current.forms, [form.key]: event.target.checked } }))} />
                 {form.label}
               </label>
             ))}
-            <p className="mt-1 text-xs text-white/50">„Passwort vergessen“ teilt sich die Adresse mit der App – dort kein Turnstile.</p>
+            <p className="mt-1 tls-type-small text-white/50">„Passwort vergessen“ teilt sich die Adresse mit der App – dort kein Turnstile.</p>
           </fieldset>
         </div>
         <ReasonField value={turnstileReason} onChange={setTurnstileReason} testId="turnstile-reason" />
         <div className="flex flex-wrap gap-2">
           <button type="button" onClick={saveTurnstile} disabled={saving} data-testid="turnstile-save"
-            className="px-4 py-2 bg-[#29B6E8] text-black text-xs font-bold uppercase rounded-sm disabled:opacity-50">Turnstile speichern</button>
+            className="px-4 py-2 bg-[#29B6E8] text-black tls-type-label rounded-sm disabled:opacity-50">Turnstile speichern</button>
           <button type="button" onClick={testTurnstile} disabled={saving || secretState !== "ok"} data-testid="turnstile-test"
-            className="px-4 py-2 border border-white/15 text-xs font-bold uppercase rounded-sm disabled:opacity-50">Testen</button>
+            className="px-4 py-2 border border-white/15 tls-type-label rounded-sm disabled:opacity-50">Testen</button>
           {secretState !== "missing" && (
             <button type="button" onClick={removeSecret} disabled={saving} data-testid="turnstile-remove-secret"
-              className="px-4 py-2 border border-live/30 text-live text-xs font-bold uppercase rounded-sm disabled:opacity-50">Secret Key entfernen</button>
+              className="px-4 py-2 border border-live/30 text-live tls-type-label rounded-sm disabled:opacity-50">Secret Key entfernen</button>
           )}
         </div>
         {(testResult || view.turnstile.last_test) && (
-          <p className={`text-xs ${(testResult || view.turnstile.last_test).ok ? "text-ok" : "text-[#FF8A80]"}`} data-testid="turnstile-test-result">
+          <p className={`tls-type-small ${(testResult || view.turnstile.last_test).ok ? "text-ok" : "text-[#FF8A80]"}`} data-testid="turnstile-test-result">
             Letzter Test: {(testResult || view.turnstile.last_test).detail}
           </p>
         )}

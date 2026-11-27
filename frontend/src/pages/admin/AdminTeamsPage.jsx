@@ -13,6 +13,7 @@ import { useLoad } from "@/hooks/useLoad";
 import { useSubmissionGuard } from "@/hooks/useSubmissionGuard";
 import { DissolvedTeamRow } from "@/pages/public/team/DissolvedTeams";
 import { viennaDate } from "@/lib/vienna";
+import { ShortCaps } from "@/components/tls/ShortCaps";
 
 // Teamverwaltung (#2128, TM7): alle Teams mit Suche - auch private; ein Team ohne aktive Teamleitung fällt auf. Verwaltet
 // wird ein Team auf seiner Teamseite, die Zeile führt dorthin. Darunter die aufgelösten Teams mit „Wiederherstellen“ und
@@ -31,17 +32,17 @@ function TeamRow({ team }) {
     <>
       <div className="flex flex-wrap items-center gap-3">
         <div className="w-10 h-10 bg-[#0A0A0A] border border-white/10 rounded-sm overflow-hidden flex items-center justify-center shrink-0">
-          {team.logo_url ? <img src={resolveMediaUrl(team.logo_url)} alt="" className="w-full h-full object-cover" /> : <span className="font-heading font-black text-xs text-[#29B6E8]">{team.tag}</span>}
+          {team.logo_url ? <img src={resolveMediaUrl(team.logo_url)} alt="" className="w-full h-full object-cover" /> : <span className="tls-type-small font-black text-[#29B6E8]">{team.tag}</span>}
         </div>
         <div className="min-w-0 flex-1 basis-48">
-          <div className="font-heading font-bold [overflow-wrap:anywhere]">{team.name} <span className="text-xs text-[#29B6E8]">[{team.tag}]</span></div>
-          <div className="text-xs text-white/50 [overflow-wrap:anywhere]">
+          <div className="font-bold [overflow-wrap:anywhere]">{team.name} <span className="tls-type-small text-[#29B6E8]">[{team.tag}]</span></div>
+          <div className="tls-type-small text-white/50 [overflow-wrap:anywhere]">
             {team.leader_gone
               ? <span className="inline-flex items-center gap-1 text-[#FF6B6B] font-bold" data-testid={`admin-team-orphan-${team.id}`}><UserX className="w-3 h-3" aria-hidden="true" /> Ohne aktive Teamleitung</span>
               : <>Teamleitung: {leader || "Unbekannt"}</>}
           </div>
         </div>
-        <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-white/55">
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-1 tls-type-small text-white/55">
           <span className="inline-flex items-center gap-1"><Users className="w-3.5 h-3.5" aria-hidden="true" /> {team.member_count}</span>
           <span>{team.squad_count} {team.squad_count === 1 ? "Co-Team" : "Co-Teams"}</span>
           {team.is_public === false ? <span className="inline-flex items-center gap-1 text-white/80 font-bold" data-testid={`admin-team-private-${team.id}`}><Lock className="w-3 h-3" aria-hidden="true" /> Privat</span> : null}
@@ -55,7 +56,7 @@ function TeamRow({ team }) {
     return (
       <div data-testid={`admin-team-${team.id}`} className="border border-white/10 bg-[#121212] rounded-sm p-3">
         {body}
-        <p className="mt-2 text-xs text-white/45" data-testid={`admin-team-closed-${team.id}`}>Die Teamseite sehen nur Mitglieder, Turnierleitung und Club-Admins.</p>
+        <p className="mt-2 tls-type-small text-white/45" data-testid={`admin-team-closed-${team.id}`}>Die Teamseite sehen nur Mitglieder, Turnierleitung und Club-Admins.</p>
       </div>
     );
   }
@@ -98,9 +99,9 @@ export default function AdminTeamsPage() {
 
   return (
     <AdminLayout>
-      <span className="text-[11px] font-bold uppercase tracking-[0.3em] text-[#29B6E8]">eSports</span>
-      <h1 className="font-heading text-3xl md:text-4xl font-black uppercase mt-1">Teams</h1>
-      <p className="mt-2 text-white/55 text-sm max-w-2xl">
+      <span className="tls-type-label text-[#29B6E8]">eSports</span>
+      <h1 className="tls-type-title mt-1"><ShortCaps>Teams</ShortCaps></h1>
+      <p className="mt-2 text-white/55 tls-type-body max-w-2xl">
         Alle Teams, auch private. Mitglieder, Rollen und Leitung verwaltest du auf der Teamseite – ein Klick auf die Zeile führt dorthin.
       </p>
 
@@ -113,7 +114,7 @@ export default function AdminTeamsPage() {
             aria-selected={tab === entry.key}
             onClick={() => { setTab(entry.key); setPage(0); }}
             data-testid={`admin-teams-tab-${entry.key}`}
-            className={`min-h-11 px-3 py-1.5 text-[11px] font-bold uppercase tracking-wider rounded-sm border ${tab === entry.key ? "bg-[#29B6E8] text-black border-[#29B6E8]" : "border-white/10 text-white/60 hover:text-white hover:border-white/20"}`}
+            className={`min-h-11 px-3 py-1.5 tls-type-label rounded-sm border ${tab === entry.key ? "bg-[#29B6E8] text-black border-[#29B6E8]" : "border-white/10 text-white/60 hover:text-white hover:border-white/20"}`}
           >
             {entry.label}
           </button>
@@ -138,7 +139,7 @@ export default function AdminTeamsPage() {
           loading={<SkeletonList count={5} label="Lade Teams" />}
           errorTitle="Die Teams konnten nicht geladen werden"
           empty={(
-            <div className="border border-dashed border-white/15 rounded-sm p-10 text-center text-sm text-white/45" data-testid="admin-teams-empty">
+            <div className="border border-dashed border-white/15 rounded-sm p-10 text-center tls-type-small text-white/45" data-testid="admin-teams-empty">
               {needle ? "Kein Team passt zu deiner Suche." : tab === "dissolved" ? "Gerade ist kein aufgelöstes Team wiederherstellbar." : "Noch keine Teams."}
             </div>
           )}
@@ -146,20 +147,20 @@ export default function AdminTeamsPage() {
           {(result) => (
             <div className="space-y-2" data-testid="admin-teams-list">
               {tab === "dissolved" ? (
-                <p className="text-xs text-white/50">Aufgelöste Teams lassen sich {result.restore_days} Tage lang wiederherstellen{result.can_restore ? "" : " – das machen Club-Admins und, wenn sie selbst aufgelöst hat, die frühere Teamleitung"}. Danach bleiben nur Name und Kürzel für alte Turniere.</p>
+                <p className="tls-type-small text-white/50">Aufgelöste Teams lassen sich {result.restore_days} Tage lang wiederherstellen{result.can_restore ? "" : " – das machen Club-Admins und, wenn sie selbst aufgelöst hat, die frühere Teamleitung"}. Danach bleiben nur Name und Kürzel für alte Turniere.</p>
               ) : null}
               {(result.items || []).map((team) => (tab === "dissolved" && result.can_restore
                 ? <DissolvedTeamRow key={team.id} team={team} onRestored={load.reload} />
                 : tab === "dissolved"
-                  ? <div key={team.id} className="border border-white/10 bg-[#121212] rounded-sm p-3 text-sm" data-testid={`admin-dissolved-${team.id}`}>{team.name} <span className="text-xs text-white/50">[{team.tag}]</span></div>
+                  ? <div key={team.id} className="border border-white/10 bg-[#121212] rounded-sm p-3 tls-type-small" data-testid={`admin-dissolved-${team.id}`}>{team.name} <span className="tls-type-small text-white/50">[{team.tag}]</span></div>
                   : <TeamRow key={team.id} team={team} />))}
-              <div className="flex flex-wrap items-center justify-between gap-2 pt-2 text-xs text-white/50">
+              <div className="flex flex-wrap items-center justify-between gap-2 pt-2 tls-type-small text-white/50">
                 <span data-testid="admin-teams-count">{total} {total === 1 ? "Team" : "Teams"}</span>
                 {total > PAGE_SIZE ? (
                   <span className="flex items-center gap-2">
-                    <button type="button" disabled={page === 0} onClick={() => setPage((value) => value - 1)} className="tls-btn tls-btn--quiet min-h-11 px-3 py-1.5 rounded-sm text-[11px] uppercase tracking-wider font-bold disabled:opacity-40">Zurück</button>
+                    <button type="button" disabled={page === 0} onClick={() => setPage((value) => value - 1)} className="tls-btn tls-btn--quiet min-h-11 px-3 py-1.5 rounded-sm tls-type-label disabled:opacity-40">Zurück</button>
                     <span>Seite {page + 1} von {Math.ceil(total / PAGE_SIZE)}</span>
-                    <button type="button" disabled={(page + 1) * PAGE_SIZE >= total} onClick={() => setPage((value) => value + 1)} data-testid="admin-teams-next" className="tls-btn tls-btn--quiet min-h-11 px-3 py-1.5 rounded-sm text-[11px] uppercase tracking-wider font-bold disabled:opacity-40">Weiter</button>
+                    <button type="button" disabled={(page + 1) * PAGE_SIZE >= total} onClick={() => setPage((value) => value + 1)} data-testid="admin-teams-next" className="tls-btn tls-btn--quiet min-h-11 px-3 py-1.5 rounded-sm tls-type-label disabled:opacity-40">Weiter</button>
                   </span>
                 ) : null}
               </div>
@@ -170,14 +171,14 @@ export default function AdminTeamsPage() {
 
       {data.can_renew_all ? (
         <section className="mt-10 border border-honor/25 bg-honor/5 rounded-sm p-4 space-y-3 max-w-2xl" data-testid="admin-teams-renew-all">
-          <div className="flex items-center gap-2 text-[11px] uppercase tracking-widest text-honor font-bold"><KeyRound className="w-4 h-4" aria-hidden="true" /> Beitrittscodes</div>
-          <p className="text-sm text-white/65">Gibt allen Teams auf einmal einen neuen Beitrittscode – zum Beispiel nach einer Bereinigung. Einzelne Teams erneuern ihren Code selbst unter „Einladen“.</p>
-          <label className="flex items-center gap-3 min-h-11 cursor-pointer text-sm font-bold">
+          <div className="flex items-center gap-2 tls-type-label text-honor"><KeyRound className="w-4 h-4" aria-hidden="true" /> Beitrittscodes</div>
+          <p className="tls-type-body text-white/65">Gibt allen Teams auf einmal einen neuen Beitrittscode – zum Beispiel nach einer Bereinigung. Einzelne Teams erneuern ihren Code selbst unter „Einladen“.</p>
+          <label className="flex items-center gap-3 min-h-11 cursor-pointer tls-type-small font-bold">
             <input type="checkbox" checked={renewLinks} onChange={(event) => setRenewLinks(event.target.checked)} data-testid="admin-teams-renew-links" className="accent-[#29B6E8]" />
             Einladungs-Links mit erneuern
           </label>
           {renewError ? <AuthFormAlert id="admin-teams-renew-error">{renewError}</AuthFormAlert> : null}
-          <button type="button" onClick={renewAll} disabled={submitting} data-testid="admin-teams-renew-all-button" className="tls-btn tls-btn--danger inline-flex min-h-11 items-center gap-2 px-4 py-2 rounded-sm text-xs uppercase tracking-wider font-bold disabled:opacity-50">
+          <button type="button" onClick={renewAll} disabled={submitting} data-testid="admin-teams-renew-all-button" className="tls-btn tls-btn--danger inline-flex min-h-11 items-center gap-2 px-4 py-2 rounded-sm tls-type-label disabled:opacity-50">
             <KeyRound className="w-3.5 h-3.5" aria-hidden="true" /> {submitting ? "Erneuere…" : "Alle Beitrittscodes erneuern"}
           </button>
         </section>

@@ -93,7 +93,7 @@
   88% { opacity: 0.8; }
   100% { opacity: 0; transform: scale(1.8); }
 }
-.tls-snowflake__note { position: absolute; top: 100%; left: 0; margin-top: 0.4rem; white-space: nowrap; font-size: 11px; color: #dbeeff; background: rgba(10, 10, 10, 0.92); border: 1px solid rgba(160, 200, 255, 0.35); border-radius: 0.35rem; padding: 0.25rem 0.5rem; z-index: 70; }
+.tls-snowflake__note { position: absolute; top: 100%; left: 0; margin-top: 0.4rem; white-space: nowrap; font-size: var(--tls-type-small-size); color: #dbeeff; background: rgba(10, 10, 10, 0.92); border: 1px solid rgba(160, 200, 255, 0.35); border-radius: 0.35rem; padding: 0.25rem 0.5rem; z-index: 70; }
 @media (max-width: 640px) {
   .tls-snowflake { width: 2.25rem; height: 2.25rem; }
   .tls-snowflake__svg { width: 22px; height: 22px; }

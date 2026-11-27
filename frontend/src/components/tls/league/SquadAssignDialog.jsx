@@ -37,7 +37,7 @@ function SquadIds({ players = [], label, squadId }) {
     <span className="mt-1.5 block" data-testid={`squad-assign-ids-${squadId}`}>
       <span className="flex flex-wrap gap-1">
         {players.map((player) => (
-          <span key={player.id} className={`inline-flex max-w-full items-center gap-1 rounded-sm border px-1.5 py-0.5 text-[11px] ${player.ok ? "border-white/10 text-white/70" : "border-warn/40 text-warn"}`}
+          <span key={player.id} className={`inline-flex max-w-full items-center gap-1 rounded-sm border px-1.5 py-0.5 tls-type-small ${player.ok ? "border-white/10 text-white/70" : "border-warn/40 text-warn"}`}
             data-state={player.state}>
             {player.ok ? <Check className="h-3 w-3 shrink-0 text-ok" aria-hidden="true" /> : <AlertTriangle className="h-3 w-3 shrink-0" aria-hidden="true" />}
             <span className="truncate">{player.name}</span>
@@ -45,7 +45,7 @@ function SquadIds({ players = [], label, squadId }) {
           </span>
         ))}
       </span>
-      {warning ? <span className="mt-1 block text-xs text-warn break-words [overflow-wrap:anywhere]" data-testid={`squad-assign-ids-warning-${squadId}`}>{warning}</span> : null}
+      {warning ? <span className="mt-1 block tls-type-small text-warn break-words [overflow-wrap:anywhere]" data-testid={`squad-assign-ids-warning-${squadId}`}>{warning}</span> : null}
     </span>
   );
 }
@@ -127,7 +127,7 @@ export function SquadAssignDialog({ tournament, onAssigned, triggerClassName = "
 
   return (
     <>
-      <button type="button" onClick={start} data-testid="squad-assign-open" className={triggerClassName || "tls-btn tls-btn--secondary inline-flex items-center gap-2 rounded-sm px-4 py-2 text-xs font-bold uppercase tracking-wider"}>
+      <button type="button" onClick={start} data-testid="squad-assign-open" className={triggerClassName || "tls-btn tls-btn--secondary inline-flex items-center gap-2 rounded-sm px-4 py-2 tls-type-label"}>
         <Users className="h-4 w-4" /> Co-Team zuteilen
       </button>
       {open ? (
@@ -142,18 +142,18 @@ export function SquadAssignDialog({ tournament, onAssigned, triggerClassName = "
             className="outline-none flex max-h-[90vh] w-full max-w-lg min-w-0 flex-col rounded-sm border border-white/10 bg-[#121212] shadow-xl"
           >
             <div className="shrink-0 border-b border-white/10 p-4">
-              <h2 id={titleId} className="font-heading text-base font-bold uppercase text-white">Co-Team zuteilen</h2>
-              <p className="mt-1 text-xs text-white/60">
+              <h2 id={titleId} className="tls-type-section text-white">Co-Team zuteilen</h2>
+              <p className="mt-1 tls-type-small text-white/60">
                 {team ? "Schritt 2 von 2: Welches Co-Team spielt in dieser Staffel?" : "Schritt 1 von 2: Zu welchem Team gehört das Co-Team?"}
               </p>
-              {data ? <p className="mt-1 text-[11px] text-white/45" data-testid="squad-assign-seats">{seatsText(data)}</p> : null}
+              {data ? <p className="mt-1 tls-type-small text-white/45" data-testid="squad-assign-seats">{seatsText(data)}</p> : null}
             </div>
 
-            <div className="min-h-0 flex-1 overflow-y-auto p-4 text-sm text-white/85">
+            <div className="min-h-0 flex-1 overflow-y-auto p-4 tls-type-small text-white/85">
               {loadError ? (
                 <div className="space-y-3">
                   <p role="alert" className="text-warn">{loadError}</p>
-                  <button type="button" onClick={load} data-testid="squad-assign-reload" className="tls-btn tls-btn--secondary min-h-[44px] rounded-sm px-4 py-2 text-xs font-bold uppercase tracking-wider">
+                  <button type="button" onClick={load} data-testid="squad-assign-reload" className="tls-btn tls-btn--secondary min-h-[44px] rounded-sm px-4 py-2 tls-type-label">
                     Erneut laden
                   </button>
                 </div>
@@ -179,8 +179,8 @@ export function SquadAssignDialog({ tournament, onAssigned, triggerClassName = "
                       <label key={row.id} aria-label={row.name} className="flex min-w-0 cursor-pointer items-center gap-3 rounded-sm border border-white/10 bg-[#0A0A0A] p-3 hover:border-white/25">
                         <input type="radio" name="squad-assign-team" value={row.id} checked={teamId === row.id} onChange={() => pickTeam(row.id)} className="accent-[#29B6E8]" data-testid={`squad-assign-team-${row.id}`} />
                         <span className="min-w-0 flex-1">
-                          <span className="block truncate font-bold text-white">{row.name}{row.tag ? <span className="ml-2 text-xs text-[#29B6E8]">[{row.tag}]</span> : null}</span>
-                          <span className="block text-xs text-white/50">
+                          <span className="block truncate font-bold text-white">{row.name}{row.tag ? <span className="ml-2 tls-type-small text-[#29B6E8]">[{row.tag}]</span> : null}</span>
+                          <span className="block tls-type-small text-white/50">
                             {row.in_staffel ? "hat schon ein Co-Team in dieser Staffel" : `${row.squads.length} ${row.squads.length === 1 ? "Co-Team" : "Co-Teams"}, ${free} zuteilbar`}
                           </span>
                         </span>
@@ -195,7 +195,7 @@ export function SquadAssignDialog({ tournament, onAssigned, triggerClassName = "
 
               {team ? (
                 <fieldset className="min-w-0 space-y-2">
-                  <legend className="mb-2 text-xs font-bold uppercase tracking-wider text-white/60 break-words">{team.name}</legend>
+                  <legend className="mb-2 tls-type-small font-bold text-white/60 break-words">{team.name}</legend>
                   {team.squads.map((row) => {
                     const blocked = row.problems.length > 0;
                     return (
@@ -203,17 +203,17 @@ export function SquadAssignDialog({ tournament, onAssigned, triggerClassName = "
                         <input type="radio" name="squad-assign-squad" value={row.id} disabled={blocked} checked={squadId === row.id} onChange={() => { setSquadId(row.id); setError(""); }} className="mt-1 accent-[#29B6E8]" data-testid={`squad-assign-squad-${row.id}`} />
                         <span className="min-w-0 flex-1">
                           <span className="block font-bold text-white break-words [overflow-wrap:anywhere]">{row.display_name}</span>
-                          <span className="block text-xs text-white/55">{row.member_count} im Kader · {rolesLine(row)}</span>
+                          <span className="block tls-type-small text-white/55">{row.member_count} im Kader · {rolesLine(row)}</span>
                           <SquadIds players={row.players} label={data.id_label} squadId={row.id} />
                           {row.problems.map((text) => (
-                            <span key={text} className="mt-1 block text-xs text-warn break-words [overflow-wrap:anywhere]">{text}</span>
+                            <span key={text} className="mt-1 block tls-type-small text-warn break-words [overflow-wrap:anywhere]">{text}</span>
                           ))}
                           {/* Alter und Plattform (#2270, #2313): wer hier nicht spielen darf - ein Hinweis, das Zuteilen geht trotzdem. */}
                           {!blocked && row.shortfall ? (
-                            <span className="mt-1 block text-xs text-warn break-words [overflow-wrap:anywhere]" data-testid={`squad-assign-shortfall-${row.id}`}>{row.shortfall}</span>
+                            <span className="mt-1 block tls-type-small text-warn break-words [overflow-wrap:anywhere]" data-testid={`squad-assign-shortfall-${row.id}`}>{row.shortfall}</span>
                           ) : null}
                           {!blocked && row.notes?.length ? (
-                            <span className="mt-1 block text-xs text-warn" data-testid={`squad-assign-notes-${row.id}`}>
+                            <span className="mt-1 block tls-type-small text-warn" data-testid={`squad-assign-notes-${row.id}`}>
                               {row.notes.map((text) => <span key={text} className="block break-words [overflow-wrap:anywhere]">{text}</span>)}
                             </span>
                           ) : null}
@@ -223,19 +223,19 @@ export function SquadAssignDialog({ tournament, onAssigned, triggerClassName = "
                   })}
                 </fieldset>
               ) : null}
-              {error ? <p role="alert" data-testid="squad-assign-error" className="mt-3 text-sm text-warn break-words">{error}</p> : null}
+              {error ? <p role="alert" data-testid="squad-assign-error" className="mt-3 tls-type-small text-warn break-words">{error}</p> : null}
             </div>
 
             <div className="flex shrink-0 flex-wrap justify-end gap-2 border-t border-white/10 p-4">
               {team ? (
-                <button type="button" onClick={() => pickTeam("")} disabled={busy} className="tls-btn tls-btn--quiet mr-auto min-h-[44px] rounded-sm px-4 py-2 text-xs font-bold uppercase tracking-wider">
+                <button type="button" onClick={() => pickTeam("")} disabled={busy} className="tls-btn tls-btn--quiet mr-auto min-h-[44px] rounded-sm px-4 py-2 tls-type-label">
                   Anderes Team
                 </button>
               ) : null}
-              <button type="button" onClick={() => setOpen(false)} disabled={busy} className="tls-btn tls-btn--quiet min-h-[44px] rounded-sm px-4 py-2 text-xs font-bold uppercase tracking-wider">
+              <button type="button" onClick={() => setOpen(false)} disabled={busy} className="tls-btn tls-btn--quiet min-h-[44px] rounded-sm px-4 py-2 tls-type-label">
                 Abbrechen
               </button>
-              <button type="button" onClick={submit} disabled={busy || !squad} data-testid="squad-assign-confirm" className="tls-btn tls-btn--primary min-h-[44px] rounded-sm px-4 py-2 text-xs font-bold uppercase tracking-wider disabled:opacity-50">
+              <button type="button" onClick={submit} disabled={busy || !squad} data-testid="squad-assign-confirm" className="tls-btn tls-btn--primary min-h-[44px] rounded-sm px-4 py-2 tls-type-label disabled:opacity-50">
                 {busy ? "Teile zu …" : "Zuteilen"}
               </button>
             </div>

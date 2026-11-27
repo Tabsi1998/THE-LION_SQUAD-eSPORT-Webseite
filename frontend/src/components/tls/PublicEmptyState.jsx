@@ -9,8 +9,8 @@ export const LION_ART_SIZE = "h-24 w-24 md:h-[120px] md:w-[120px] lg:h-[140px] l
 function ActionLink({ action, primary = false }) {
   if (!action) return null;
   const cls = primary
-    ? "tls-btn tls-btn--primary inline-flex min-h-11 items-center justify-center px-4 py-2 rounded-sm text-xs font-bold uppercase tracking-wider"
-    : "tls-hit inline-flex items-center text-sm font-semibold text-[#29B6E8] hover:text-white underline-offset-4 hover:underline";
+    ? "tls-btn tls-btn--primary inline-flex min-h-11 items-center justify-center px-4 py-2 rounded-sm tls-type-label"
+    : "tls-hit inline-flex items-center tls-type-small font-semibold text-[#29B6E8] hover:text-white underline-offset-4 hover:underline";
   if (action.onClick) {
     return <button type="button" onClick={action.onClick} className={cls}>{action.label}</button>;
   }
@@ -46,8 +46,8 @@ export function PublicEmptyState({
 }) {
   return (
     <Frame art={art} className={className} data-testid="public-empty-state" data-art={art}>
-      <h2 className="text-xl font-bold text-white md:text-2xl">{title}</h2>
-      {description && <p className="mt-2 text-base leading-relaxed text-white/65">{description}</p>}
+      <h2 className="tls-type-section text-white">{title}</h2>
+      {description && <p className="mt-2 tls-type-body leading-relaxed text-white/65">{description}</p>}
       {(primaryAction || secondaryAction) && (
         <div className="mt-5 flex flex-wrap items-center justify-center gap-x-5 gap-y-3 lg:justify-start">
           <ActionLink action={primaryAction} primary />
@@ -73,12 +73,12 @@ export function PublicErrorState({ kind = "error", title, description, onRetry, 
   const offline = kind === "offline";
   return (
     <Frame art={artForProblem(kind)} className={className} role="alert" data-testid="public-error-state" data-kind={kind}>
-      <h2 className="text-xl font-bold text-white md:text-2xl">{title || (offline ? "Ohne Netz" : "Laden hat nicht geklappt")}</h2>
-      <p className="mt-2 text-base leading-relaxed text-white/65">
+      <h2 className="tls-type-section text-white">{title || (offline ? "Ohne Netz" : "Laden hat nicht geklappt")}</h2>
+      <p className="mt-2 tls-type-body leading-relaxed text-white/65">
         {description || (offline ? "Sobald dein Gerät wieder Netz hat, lädt die Seite weiter. Nichts ist verloren." : "Da ist uns ein Kabel rausgerutscht - das liegt an der Verbindung oder am Server, nicht an dir.")}
       </p>
       {onRetry && (
-        <button type="button" onClick={onRetry} data-testid="public-error-retry" className="tls-btn tls-btn--primary mt-5 inline-flex min-h-11 items-center gap-2 px-4 py-2 rounded-sm text-xs font-bold uppercase tracking-wider">
+        <button type="button" onClick={onRetry} data-testid="public-error-retry" className="tls-btn tls-btn--primary mt-5 inline-flex min-h-11 items-center gap-2 px-4 py-2 rounded-sm tls-type-label">
           <RotateCcw className="h-3.5 w-3.5" aria-hidden="true" /> Nochmal versuchen
         </button>
       )}

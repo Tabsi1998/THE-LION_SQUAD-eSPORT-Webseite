@@ -69,22 +69,22 @@ export function MapImportSheet({ game, onClose, onDone }) {
     <AdminSheet title={source ? `Aus ${source.name} übernehmen` : "Maps übernehmen"} eyebrow={game.name} onClose={onClose} onSubmit={submit} saving={saving}
       submitLabel={picked.length === 1 ? "1 Map übernehmen" : `${picked.length} Maps übernehmen`} savingLabel="Übernehme …" submitDisabled={!picked.length}
       submitTestId="map-import-save" testId="map-import-sheet">
-      {sources === null ? <p className="text-sm text-white/50">Lade Spiele …</p> : null}
-      {sources && !sources.length ? <p className="text-sm text-white/60" data-testid="map-import-none">Kein anderes Spiel hat aktive Maps.</p> : null}
+      {sources === null ? <p className="tls-type-small text-white/50">Lade Spiele …</p> : null}
+      {sources && !sources.length ? <p className="tls-type-small text-white/60" data-testid="map-import-none">Kein anderes Spiel hat aktive Maps.</p> : null}
       {sources?.length ? (
         <>
           <SelectField label="Aus welchem Spiel?" value={sourceId} onChange={setSourceId}
             options={sources.map((row) => [row.id, `${row.name} (${row.maps})`])} testId="map-import-source" />
-          <p className="text-xs text-white/50">Es entstehen eigene Maps dieses Spiels. Das Bild wird mitverwendet, die Modi nur soweit {game.name} sie kennt. Die Quelle bleibt unverändert.</p>
-          {candidates === null ? <p className="text-sm text-white/50">Lade Maps …</p> : (
+          <p className="tls-type-small text-white/50">Es entstehen eigene Maps dieses Spiels. Das Bild wird mitverwendet, die Modi nur soweit {game.name} sie kennt. Die Quelle bleibt unverändert.</p>
+          {candidates === null ? <p className="tls-type-small text-white/50">Lade Maps …</p> : (
             <ul className="space-y-1" data-testid="map-import-list">
               {candidates.map((row) => (
-                <li key={row.id} data-testid={`map-import-row-${row.id}`} className="flex items-center gap-2 rounded-sm border border-white/10 bg-[#0A0A0A] px-2.5 py-2 text-sm">
+                <li key={row.id} data-testid={`map-import-row-${row.id}`} className="flex items-center gap-2 rounded-sm border border-white/10 bg-[#0A0A0A] px-2.5 py-2 tls-type-small">
                   <label className={`flex min-w-0 flex-1 items-center gap-2 ${row.exists ? "text-white/40" : "cursor-pointer text-white/85"}`}>
                     <input type="checkbox" disabled={row.exists} checked={picked.includes(row.id)} onChange={() => toggle(row.id)} className="accent-[#29B6E8]" aria-label={row.name} />
                     <span className="truncate">{row.name}</span>
                   </label>
-                  <span className="shrink-0 text-[11px] text-white/45">{row.exists ? "schon da" : (row.modes || []).join(", ") || "ohne Modus"}</span>
+                  <span className="shrink-0 tls-type-small text-white/45">{row.exists ? "schon da" : (row.modes || []).join(", ") || "ohne Modus"}</span>
                 </li>
               ))}
             </ul>

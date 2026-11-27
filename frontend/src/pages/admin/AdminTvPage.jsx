@@ -9,6 +9,7 @@ import { api, formatRequestError } from "@/lib/api";
 import { PLAYLIST_SECONDS, PLAYLIST_SLIDES, SLIDE_LABELS, playlistLabel } from "@/lib/tvPlaylist";
 import { TV_DEFAULTS, TV_FIELDS, TV_GROUPS, TV_VIEWS, buildTvLink, fieldsForView, linkOverrides, parseTvPath, resolveTvSettings, sameTvValue, takesTvKey, tvValueLabel } from "@/lib/tvSettings";
 import { viennaDateTime } from "@/lib/vienna";
+import { ShortCaps } from "@/components/tls/ShortCaps";
 
 // TV & Beamer (#1110): eine Stelle für alle Bildschirme. Oben die Grundwerte - sie gelten auf jedem TV und kommen
 // ohne Neuladen dort an. Darunter der Link-Baukasten: Ansicht wählen, nur die Abweichungen für diesen Bildschirm
@@ -19,7 +20,7 @@ import { viennaDateTime } from "@/lib/vienna";
 // als eigene Ansicht. Was nur ein Turnier betrifft („Pause bis“, Sponsor je Runde), steht beim Turnier.
 
 const FIELD_BOX = "border border-white/10 bg-[#0F0F0F] rounded-sm p-4";
-const INPUT = "bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-sm";
+const INPUT = "bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm tls-type-small";
 
 /** Was in einer Liste von Turnieren, Events oder Challenges als Name steht. */
 function titleOf(item) {
@@ -88,9 +89,9 @@ export default function AdminTvPage() {
 
   return (
     <AdminLayout>
-      <span className="text-[11px] font-bold uppercase tracking-[0.3em] text-[#29B6E8]">eSports</span>
-      <h1 className="font-heading text-3xl md:text-4xl font-black uppercase mt-1 flex items-center gap-3"><Tv className="w-7 h-7 text-[#29B6E8]" /> TV &amp; Beamer</h1>
-      <p className="text-sm text-white/55 mt-2 max-w-3xl">
+      <span className="tls-type-label text-[#29B6E8]">eSports</span>
+      <h1 className="tls-type-title mt-1 flex items-center gap-3"><Tv className="w-7 h-7 text-[#29B6E8]" /> <ShortCaps>TV &amp; Beamer</ShortCaps></h1>
+      <p className="tls-type-body text-white/55 mt-2 max-w-3xl">
         Eine Stelle für alle Bildschirme: Turnierbaum, Station, Aufrufe, Event und Fast Lap am Fernseher oder Beamer. Die Grundwerte gelten überall und kommen ohne Neuladen am TV an.
         Ein einzelner Bildschirm darf abweichen – das steht dann in seinem Link. Was nur ein Turnier betrifft („Pause bis“, welcher Sponsor eine Runde präsentiert), stellst du beim Turnier ein.
       </p>
@@ -98,24 +99,24 @@ export default function AdminTvPage() {
       <section className="mt-6 border border-white/10 bg-[#121212] rounded-sm p-5" data-testid="tv-defaults">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
-            <h2 className="font-heading text-lg font-black uppercase">Grundwerte für alle Bildschirme</h2>
-            <p className="mt-1 text-xs text-white/50 max-w-2xl">Voreingestellt ist die Auswahl aus der TV-Vorschau. Geändert wird erst mit „Speichern“.</p>
+            <h2 className="tls-type-section">Grundwerte für alle Bildschirme</h2>
+            <p className="mt-1 tls-type-small text-white/50 max-w-2xl">Voreingestellt ist die Auswahl aus der TV-Vorschau. Geändert wird erst mit „Speichern“.</p>
           </div>
           <div className="flex flex-wrap gap-2">
-            <button type="button" onClick={reset} disabled={busy || !payload} className="inline-flex items-center gap-2 px-3 py-2 border border-white/15 text-white/70 rounded-sm text-xs uppercase tracking-wider font-bold hover:text-white disabled:opacity-40" data-testid="tv-defaults-reset">
+            <button type="button" onClick={reset} disabled={busy || !payload} className="inline-flex items-center gap-2 px-3 py-2 border border-white/15 text-white/70 rounded-sm tls-type-label hover:text-white disabled:opacity-40" data-testid="tv-defaults-reset">
               <RotateCcw className="w-3.5 h-3.5" /> Auf Standard
             </button>
-            <button type="button" onClick={save} disabled={busy || !dirty} className="inline-flex items-center gap-2 px-4 py-2 bg-[#29B6E8] text-black rounded-sm text-xs uppercase tracking-wider font-bold disabled:opacity-40" data-testid="tv-defaults-save">
+            <button type="button" onClick={save} disabled={busy || !dirty} className="inline-flex items-center gap-2 px-4 py-2 bg-[#29B6E8] text-black rounded-sm tls-type-label disabled:opacity-40" data-testid="tv-defaults-save">
               <Save className="w-3.5 h-3.5" /> Speichern
             </button>
           </div>
         </div>
-        {loadError && <div className="mt-3 text-xs text-[#FF6B6B]" data-testid="tv-defaults-error">Die Grundwerte konnten nicht geladen werden.</div>}
+        {loadError && <div className="mt-3 tls-type-small text-[#FF6B6B]" data-testid="tv-defaults-error">Die Grundwerte konnten nicht geladen werden.</div>}
         <div className="mt-4 space-y-5">
           {TV_GROUPS.map((group) => (
             <div key={group.key} data-testid={`tv-group-${group.key}`}>
-              <h3 className="text-xs font-bold uppercase tracking-[0.2em] text-[#29B6E8]">{group.label}</h3>
-              <p className="mt-1 text-xs text-white/45 max-w-3xl">{group.hint}</p>
+              <h3 className="tls-type-label text-[#29B6E8]">{group.label}</h3>
+              <p className="mt-1 tls-type-small text-white/45 max-w-3xl">{group.hint}</p>
               <div className="mt-3 grid gap-3 md:grid-cols-2">
                 {TV_FIELDS.filter((field) => field.group === group.key).map((field) => (
                   <SettingField key={field.key} field={field} value={draft[field.key]} defaultValue={TV_DEFAULTS[field.key]} disabled={busy || !payload}
@@ -144,12 +145,12 @@ function NumberInput({ field, value, onChange, disabled, testId }) {
     if (next !== value) onChange(next);
   };
   return (
-    <label className="inline-flex items-center gap-2 text-sm">
+    <label className="inline-flex items-center gap-2 tls-type-small">
       <input type="number" inputMode="numeric" min={field.min} max={field.max} step={1} value={text} disabled={disabled}
         onChange={(event) => setText(event.target.value)} onBlur={commit} onKeyDown={(event) => { if (event.key === "Enter") commit(); }}
         className={`${INPUT} w-24`} data-testid={testId} aria-label={field.label} />
       <span className="text-white/60">{field.unit}</span>
-      <span className="text-[10px] text-white/35">({field.min} bis {field.max})</span>
+      <span className="tls-type-small text-quiet">({field.min} bis {field.max})</span>
     </label>
   );
 }
@@ -177,12 +178,12 @@ export function PlaylistEditor({ value, onChange, disabled = false, testPrefix =
     <div className="space-y-1.5" data-testid={testPrefix}>
       {rows.map((row, index) => (
         <div key={row.slide} className={`flex flex-wrap items-center gap-2 rounded-sm border px-2 py-1.5 ${row.on ? "border-white/15" : "border-white/5 opacity-60"}`} data-testid={`${testPrefix}-${row.slide}`}>
-          <label className="inline-flex items-center gap-2 text-sm min-w-[9rem]">
+          <label className="inline-flex items-center gap-2 tls-type-small min-w-[9rem]">
             <input type="checkbox" checked={row.on} disabled={disabled || (row.on && onCount <= 1)} className="accent-[#29B6E8]" data-testid={`${testPrefix}-on-${row.slide}`}
               onChange={(event) => emit(rows.map((entry) => (entry.slide === row.slide ? { ...entry, on: event.target.checked } : entry)))} />
             {SLIDE_LABELS[row.slide]}
           </label>
-          <label className="inline-flex items-center gap-1.5 text-xs text-white/60">
+          <label className="inline-flex items-center gap-1.5 tls-type-small text-white/60">
             <input type="number" min={PLAYLIST_SECONDS.min} max={PLAYLIST_SECONDS.max} step={1} value={row.seconds} disabled={disabled || !row.on}
               className={`${INPUT} w-20 py-1`} aria-label={`${SLIDE_LABELS[row.slide]}: Sekunden`} data-testid={`${testPrefix}-seconds-${row.slide}`}
               onChange={(event) => {
@@ -208,15 +209,15 @@ function SettingField({ field, value, defaultValue, onChange, disabled }) {
   return (
     <div className={`${FIELD_BOX} ${field.type === "playlist" ? "md:col-span-2" : ""}`} data-testid={`tv-setting-${field.key}`}>
       <div className="flex items-start justify-between gap-3">
-        <div className="text-sm font-bold text-white/90">{field.label}</div>
-        <span className={`text-[10px] uppercase tracking-wider text-right ${isDefault ? "text-white/35" : "text-[#FFD700]"}`}>
+        <div className="tls-type-small font-bold text-white/90">{field.label}</div>
+        <span className={`tls-type-label text-right ${isDefault ? "text-quiet" : "text-[#FFD700]"}`}>
           {isDefault ? "Standard" : `Standard: ${tvValueLabel(field.key, defaultValue)}`}
         </span>
       </div>
-      <p className="mt-1 text-xs text-white/50">{field.hint}</p>
+      <p className="mt-1 tls-type-small text-white/50">{field.hint}</p>
       <div className="mt-3">
         {field.type === "bool" ? (
-          <label className="inline-flex items-center gap-2 text-sm">
+          <label className="inline-flex items-center gap-2 tls-type-small">
             <input type="checkbox" checked={!!value} disabled={disabled} onChange={(event) => onChange(event.target.checked)} className="accent-[#29B6E8]" data-testid={`tv-input-${field.key}`} />
             <span>{value ? "An" : "Aus"}</span>
           </label>
@@ -228,7 +229,7 @@ function SettingField({ field, value, defaultValue, onChange, disabled }) {
           <div className="flex flex-wrap gap-2" role="radiogroup" aria-label={field.label}>
             {field.options.map(([optionValue, optionLabel]) => (
               <button key={String(optionValue)} type="button" role="radio" aria-checked={value === optionValue} disabled={disabled} onClick={() => onChange(optionValue)}
-                className={`px-3 py-1.5 rounded-sm border text-xs font-bold uppercase tracking-wider ${value === optionValue ? "border-[#29B6E8] bg-[#29B6E8]/15 text-[#29B6E8]" : "border-white/15 text-white/60 hover:text-white"}`}
+                className={`px-3 py-1.5 rounded-sm border tls-type-label ${value === optionValue ? "border-[#29B6E8] bg-[#29B6E8]/15 text-[#29B6E8]" : "border-white/15 text-white/60 hover:text-white"}`}
                 data-testid={`tv-input-${field.key}-${optionValue}`}>
                 {optionLabel}
               </button>
@@ -259,7 +260,7 @@ function OverrideSelect({ field, value, defaultValue, onChange }) {
   const current = value === undefined ? "" : String(value);
   return (
     <label className="block" data-testid={`tv-override-${field.key}`}>
-      <div className="text-[11px] font-bold uppercase tracking-widest text-white/60 mb-1.5">{field.label}</div>
+      <div className="tls-type-label text-white/60 mb-1.5">{field.label}</div>
       <select value={current} onChange={(event) => {
         const raw = event.target.value;
         if (raw === "") onChange(undefined);
@@ -276,7 +277,7 @@ function PlaylistOverride({ field, value, defaultValue, onChange }) {
   const preset = value === undefined ? "" : (PLAYLIST_PRESETS.find(([, , list]) => list && sameTvValue("playlist", list, value))?.[0] || "custom");
   return (
     <div className="block sm:col-span-2" data-testid={`tv-override-${field.key}`}>
-      <div className="text-[11px] font-bold uppercase tracking-widest text-white/60 mb-1.5">{field.label}</div>
+      <div className="tls-type-label text-white/60 mb-1.5">{field.label}</div>
       <select value={preset} onChange={(event) => {
         const choice = PLAYLIST_PRESETS.find(([key]) => key === event.target.value);
         if (!choice) onChange(undefined);
@@ -404,8 +405,8 @@ function LinkBuilder({ defaults }) {
   }[view];
   return (
     <section className="mt-6 border border-white/10 bg-[#121212] rounded-sm p-5" data-testid="tv-link-builder">
-      <h2 className="font-heading text-lg font-black uppercase inline-flex items-center gap-2"><Monitor className="w-5 h-5 text-[#29B6E8]" /> Link für einen Bildschirm</h2>
-      <p className="mt-1 text-xs text-white/50 max-w-3xl">
+      <h2 className="tls-type-section inline-flex items-center gap-2"><Monitor className="w-5 h-5 text-[#29B6E8]" /> Link für einen Bildschirm</h2>
+      <p className="mt-1 tls-type-small text-white/50 max-w-3xl">
         Ansicht wählen, nur die Abweichungen für diesen Bildschirm einstellen, Link kopieren oder den QR-Code am TV-Gerät scannen.
         Alles andere kommt aus den Grundwerten. Ändert sich eine Abweichung, den neuen Link am TV öffnen.
       </p>
@@ -415,15 +416,15 @@ function LinkBuilder({ defaults }) {
           <div className="flex flex-wrap gap-2" role="radiogroup" aria-label="Ansicht">
             {TV_VIEWS.map((entry) => (
               <button key={entry.key} type="button" role="radio" aria-checked={view === entry.key} onClick={() => { setView(entry.key); setTargetId(""); setStationId(""); }}
-                className={`px-3 py-1.5 rounded-sm border text-xs font-bold uppercase tracking-wider ${view === entry.key ? "border-[#29B6E8] bg-[#29B6E8]/15 text-[#29B6E8]" : "border-white/15 text-white/60 hover:text-white"}`}
+                className={`px-3 py-1.5 rounded-sm border tls-type-label ${view === entry.key ? "border-[#29B6E8] bg-[#29B6E8]/15 text-[#29B6E8]" : "border-white/15 text-white/60 hover:text-white"}`}
                 data-testid={`tv-view-${entry.key}`}>
                 {entry.label}
               </button>
             ))}
           </div>
-          <p className="text-xs text-white/45" data-testid="tv-view-hint">{viewHint}</p>
+          <p className="tls-type-small text-white/45" data-testid="tv-view-hint">{viewHint}</p>
           <label className="block">
-            <div className="text-[11px] font-bold uppercase tracking-widest text-white/60 mb-1.5">{meta.target}</div>
+            <div className="tls-type-label text-white/60 mb-1.5">{meta.target}</div>
             <select value={targetId} onChange={(event) => { setTargetId(event.target.value); setStationId(""); }} className={`w-full ${INPUT}`} data-testid="tv-target">
               <option value="">{meta.target} auswählen</option>
               {options.map((item) => <option key={item.id} value={item.id}>{titleOf(item)}</option>)}
@@ -431,7 +432,7 @@ function LinkBuilder({ defaults }) {
           </label>
           {meta.needsStation ? (
             <label className="block">
-              <div className="text-[11px] font-bold uppercase tracking-widest text-white/60 mb-1.5">Station</div>
+              <div className="tls-type-label text-white/60 mb-1.5">Station</div>
               <select value={stationId} onChange={(event) => setStationId(event.target.value)} disabled={!targetId} className={`w-full ${INPUT} disabled:opacity-50`} data-testid="tv-station">
                 <option value="">{targetId && !stations.length ? "Dieses Turnier hat noch keine Stationen" : "Station auswählen"}</option>
                 {stations.map((item) => <option key={item.id} value={item.id}>{item.name || item.label || item.id}</option>)}
@@ -451,16 +452,16 @@ function LinkBuilder({ defaults }) {
           </div>
           {takesTvKey(meta) ? (
             <div className={FIELD_BOX} data-testid="tv-key-box">
-              <div className="text-sm font-bold text-white/90 inline-flex items-center gap-2"><KeyRound className="w-4 h-4 text-[#FFD700]" /> Anzeige-Schlüssel{meta.needsKey ? "" : " (freiwillig)"}</div>
+              <div className="tls-type-small font-bold text-white/90 inline-flex items-center gap-2"><KeyRound className="w-4 h-4 text-[#FFD700]" /> Anzeige-Schlüssel{meta.needsKey ? "" : " (freiwillig)"}</div>
               {meta.keyFor === "event" ? (
-                <p className="mt-1 text-xs text-white/50" data-testid="tv-key-hint">Für Turniere „Nur Mitglieder“ braucht der Bildschirm einen TV-Zugang: Mit Schlüssel zeigen Hallen- und Aufruf-Tafel am Hallen-PC ohne Anmeldung alle Turniere dieses Events, ohne Schlüssel nur die öffentlichen. Der Schlüssel erlaubt nur das Anschauen dieses einen Events und lässt sich unten widerrufen.</p>
+                <p className="mt-1 tls-type-small text-white/50" data-testid="tv-key-hint">Für Turniere „Nur Mitglieder“ braucht der Bildschirm einen TV-Zugang: Mit Schlüssel zeigen Hallen- und Aufruf-Tafel am Hallen-PC ohne Anmeldung alle Turniere dieses Events, ohne Schlüssel nur die öffentlichen. Der Schlüssel erlaubt nur das Anschauen dieses einen Events und lässt sich unten widerrufen.</p>
               ) : (
-                <p className="mt-1 text-xs text-white/50" data-testid="tv-key-hint">Damit läuft der Turnierbaum (und jede Station dieses Turniers) am Hallen-PC ohne Anmeldung. Der Schlüssel erlaubt nur das Anschauen dieses einen Turniers und lässt sich unten widerrufen.</p>
+                <p className="mt-1 tls-type-small text-white/50" data-testid="tv-key-hint">Damit läuft der Turnierbaum (und jede Station dieses Turniers) am Hallen-PC ohne Anmeldung. Der Schlüssel erlaubt nur das Anschauen dieses einen Turniers und lässt sich unten widerrufen.</p>
               )}
               <div className="mt-3 flex flex-wrap gap-2">
                 <input value={label} onChange={(event) => setLabel(event.target.value)} maxLength={80} placeholder="Name des Bildschirms, z. B. Beamer Halle"
                   className={`flex-1 min-w-[12rem] ${INPUT}`} data-testid="tv-key-label" />
-                <button type="button" onClick={createKey} disabled={!targetId || busy} className="inline-flex items-center gap-2 px-4 py-2 bg-[#FFD700] text-black rounded-sm text-xs uppercase tracking-wider font-bold disabled:opacity-40" data-testid="tv-key-create">
+                <button type="button" onClick={createKey} disabled={!targetId || busy} className="inline-flex items-center gap-2 px-4 py-2 bg-[#FFD700] text-black rounded-sm tls-type-label disabled:opacity-40" data-testid="tv-key-create">
                   <KeyRound className="w-3.5 h-3.5" /> {key ? "Neuen Schlüssel" : meta.needsKey ? "Link erstellen" : "Link mit Schlüssel"}
                 </button>
               </div>
@@ -469,7 +470,7 @@ function LinkBuilder({ defaults }) {
           <div className="flex flex-wrap gap-2">
             <input value={pasted} onChange={(event) => setPasted(event.target.value)} placeholder="Vorhandenen TV-Link einfügen, um ihn zu ändern"
               className={`flex-1 min-w-[12rem] ${INPUT}`} data-testid="tv-link-paste" />
-            <button type="button" onClick={takeOver} disabled={!pasted.trim()} className="px-3 py-2 border border-white/15 text-white/70 rounded-sm text-xs uppercase tracking-wider font-bold hover:text-white disabled:opacity-40" data-testid="tv-link-takeover">
+            <button type="button" onClick={takeOver} disabled={!pasted.trim()} className="px-3 py-2 border border-white/15 text-white/70 rounded-sm tls-type-label hover:text-white disabled:opacity-40" data-testid="tv-link-takeover">
               Übernehmen
             </button>
           </div>
@@ -479,17 +480,17 @@ function LinkBuilder({ defaults }) {
           {ready ? (
             <>
               <div className="bg-white p-2 rounded-sm"><BrandedQRCode value={link} size={200} /></div>
-              <code className="w-full break-all text-xs text-white/70 bg-black/40 border border-white/10 rounded-sm p-2" data-testid="tv-link">{link}</code>
+              <code className="w-full break-all tls-type-small text-white/70 bg-black/40 border border-white/10 rounded-sm p-2" data-testid="tv-link">{link}</code>
               <div className="flex flex-wrap justify-center gap-2">
-                <button type="button" onClick={copy} className="inline-flex items-center gap-2 px-4 py-2 bg-[#29B6E8] text-black rounded-sm text-xs uppercase tracking-wider font-bold" data-testid="tv-link-copy"><Copy className="w-3.5 h-3.5" /> Link kopieren</button>
-                <a href={link} target="_blank" rel="noreferrer" className="inline-flex items-center gap-2 px-4 py-2 border border-white/15 text-white/80 rounded-sm text-xs uppercase tracking-wider font-bold hover:text-white" data-testid="tv-link-open"><ExternalLink className="w-3.5 h-3.5" /> Öffnen</a>
+                <button type="button" onClick={copy} className="inline-flex items-center gap-2 px-4 py-2 bg-[#29B6E8] text-black rounded-sm tls-type-label" data-testid="tv-link-copy"><Copy className="w-3.5 h-3.5" /> Link kopieren</button>
+                <a href={link} target="_blank" rel="noreferrer" className="inline-flex items-center gap-2 px-4 py-2 border border-white/15 text-white/80 rounded-sm tls-type-label hover:text-white" data-testid="tv-link-open"><ExternalLink className="w-3.5 h-3.5" /> Öffnen</a>
               </div>
               {Object.keys(usedOverrides).length ? (
-                <p className="text-xs text-white/50">Abweichungen nur für diesen Bildschirm: {Object.entries(usedOverrides).map(([fieldKey, value]) => `${TV_FIELDS.find((field) => field.key === fieldKey)?.label} ${tvValueLabel(fieldKey, value)}`).join(", ")}.</p>
-              ) : <p className="text-xs text-white/50">Keine Abweichungen – dieser Bildschirm folgt den Grundwerten.</p>}
+                <p className="tls-type-small text-white/50">Abweichungen nur für diesen Bildschirm: {Object.entries(usedOverrides).map(([fieldKey, value]) => `${TV_FIELDS.find((field) => field.key === fieldKey)?.label} ${tvValueLabel(fieldKey, value)}`).join(", ")}.</p>
+              ) : <p className="tls-type-small text-white/50">Keine Abweichungen – dieser Bildschirm folgt den Grundwerten.</p>}
             </>
           ) : (
-            <p className="text-sm text-white/45 max-w-sm" data-testid="tv-link-missing">
+            <p className="tls-type-small text-white/45 max-w-sm" data-testid="tv-link-missing">
               {!targetId
                 ? `Erst ${meta.target === "Event" ? "ein Event" : meta.target === "Turnier" ? "ein Turnier" : "eine Fast-Lap-Challenge"} auswählen.`
                 : meta.needsStation && !stationId
@@ -541,18 +542,18 @@ function TvKeyList() {
 
   return (
     <section className="mt-6 border border-white/10 bg-[#121212] rounded-sm p-5" data-testid="tv-keys">
-      <h2 className="font-heading text-lg font-black uppercase inline-flex items-center gap-2"><KeyRound className="w-5 h-5 text-[#FFD700]" /> Aktive Anzeige-Schlüssel</h2>
-      <p className="mt-1 text-xs text-white/50 max-w-3xl">Jeder Link mit Schlüssel steht hier – mit Bildschirm, Turnier oder Event und wann er zuletzt da war. Widerrufen beendet ihn sofort.</p>
-      {error && <div className="mt-3 text-xs text-[#FF6B6B]">Die Schlüssel konnten nicht geladen werden.</div>}
-      {!keys.length && !error ? <div className="mt-4 border border-dashed border-white/15 rounded-sm p-5 text-sm text-white/45" data-testid="tv-keys-empty">Noch keine Links mit Schlüssel.</div> : null}
+      <h2 className="tls-type-section inline-flex items-center gap-2"><KeyRound className="w-5 h-5 text-[#FFD700]" /> Aktive Anzeige-Schlüssel</h2>
+      <p className="mt-1 tls-type-small text-white/50 max-w-3xl">Jeder Link mit Schlüssel steht hier – mit Bildschirm, Turnier oder Event und wann er zuletzt da war. Widerrufen beendet ihn sofort.</p>
+      {error && <div className="mt-3 tls-type-small text-[#FF6B6B]">Die Schlüssel konnten nicht geladen werden.</div>}
+      {!keys.length && !error ? <div className="mt-4 border border-dashed border-white/15 rounded-sm p-5 tls-type-small text-white/45" data-testid="tv-keys-empty">Noch keine Links mit Schlüssel.</div> : null}
       <div className="mt-4 space-y-2">
         {keys.map((row) => (
           <div key={row.id} className="flex flex-wrap items-center justify-between gap-3 border border-white/10 bg-[#0F0F0F] rounded-sm px-4 py-3" data-testid={`tv-key-${row.id}`}>
             <div className="min-w-0">
-              <div className="text-sm font-bold text-white/90">{row.label}</div>
-              <div className="text-xs text-white/50">{row.target_type === "event" ? `Event ${row.target_title}` : row.target_title || row.tournament_title} · erstellt {row.created_at ? viennaDateTime(row.created_at, { dateStyle: "short", timeStyle: "short" }) : "–"} · {row.last_used_at ? `zuletzt da ${viennaDateTime(row.last_used_at, { dateStyle: "short", timeStyle: "short" })}` : "noch nie geöffnet"} · <span data-testid={`tv-key-until-${row.id}`} className={row.expired ? "text-[#FF6B6B]" : undefined}>{row.expired ? `abgelaufen (eine Woche nach dem ${row.target_type === "event" ? "Event" : "Turnier"})` : row.expires_at ? `gilt bis ${viennaDateTime(row.expires_at, { dateStyle: "short" })}` : "gilt bis zum Widerruf"}</span></div>
+              <div className="tls-type-small font-bold text-white/90">{row.label}</div>
+              <div className="tls-type-small text-white/50">{row.target_type === "event" ? `Event ${row.target_title}` : row.target_title || row.tournament_title} · erstellt {row.created_at ? viennaDateTime(row.created_at, { dateStyle: "short", timeStyle: "short" }) : "–"} · {row.last_used_at ? `zuletzt da ${viennaDateTime(row.last_used_at, { dateStyle: "short", timeStyle: "short" })}` : "noch nie geöffnet"} · <span data-testid={`tv-key-until-${row.id}`} className={row.expired ? "text-[#FF6B6B]" : undefined}>{row.expired ? `abgelaufen (eine Woche nach dem ${row.target_type === "event" ? "Event" : "Turnier"})` : row.expires_at ? `gilt bis ${viennaDateTime(row.expires_at, { dateStyle: "short" })}` : "gilt bis zum Widerruf"}</span></div>
             </div>
-            <button type="button" onClick={() => revoke(row)} className="inline-flex items-center gap-2 px-3 py-2 border border-[#FF3B30]/40 text-[#FF6B6B] rounded-sm text-xs uppercase tracking-wider font-bold hover:bg-[#FF3B30]/10" data-testid={`tv-key-revoke-${row.id}`}>
+            <button type="button" onClick={() => revoke(row)} className="inline-flex items-center gap-2 px-3 py-2 border border-[#FF3B30]/40 text-[#FF6B6B] rounded-sm tls-type-label hover:bg-[#FF3B30]/10" data-testid={`tv-key-revoke-${row.id}`}>
               <Trash2 className="w-3.5 h-3.5" /> Widerrufen
             </button>
           </div>

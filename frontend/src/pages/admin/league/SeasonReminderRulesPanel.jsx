@@ -58,7 +58,7 @@ export function SeasonReminderRulesPanel({ seasonId, canEdit = true }) {
   }, [seasonId]);
 
   if (!form) {
-    return error ? <p className="text-sm text-warn" role="alert" data-testid="reminder-rules-error">{error}</p> : null;
+    return error ? <p className="tls-type-small text-warn" role="alert" data-testid="reminder-rules-error">{error}</p> : null;
   }
   const set = (key, value) => setForm((current) => ({ ...current, [key]: value }));
   const save = async () => {
@@ -83,12 +83,12 @@ export function SeasonReminderRulesPanel({ seasonId, canEdit = true }) {
     <FormSection title="Erinnerungen" testId="season-reminder-rules"
       hint="Gilt sofort für alle Staffeln dieser Season (gesperrte nehmen es beim Übertragen mit). Kommt im Web, in der App und per Push – jede Person kann „Spiele & Aufrufe“ in ihren Benachrichtigungs-Einstellungen abschalten.">
       {!state?.active ? (
-        <p className="rounded-sm border border-white/15 bg-white/[0.03] px-3 py-2 text-sm text-white/75" data-testid="reminder-rules-inactive">
+        <p className="rounded-sm border border-white/15 bg-white/[0.03] px-3 py-2 tls-type-small text-white/75" data-testid="reminder-rules-inactive">
           Für diese Season ist noch nichts gespeichert – es gelten die Vorgaben unten.
         </p>
       ) : null}
       {!canEdit ? (
-        <p className="rounded-sm border border-white/15 bg-white/[0.03] px-3 py-2 text-sm text-white/75" data-testid="reminder-rules-readonly">
+        <p className="rounded-sm border border-white/15 bg-white/[0.03] px-3 py-2 tls-type-small text-white/75" data-testid="reminder-rules-readonly">
           Nur lesen: Ändern darf, wer für diese Liga „Season konfigurieren“ hat.
         </p>
       ) : null}
@@ -114,7 +114,7 @@ export function SeasonReminderRulesPanel({ seasonId, canEdit = true }) {
           </FormGrid>
         </Kind>
         <Kind label="Ergebnis fehlt" checked={form.result_missing} onChange={(value) => set("result_missing", value)} testId="reminder-rules-result" disabled={!canEdit}
-          hint={`An beide Captains${resultHours ? `, ${resultHours} h nach dem Termin (einstellbar oben unter „Termine und Verschiebungen“)` : ""}. Wartet, solange ein Vorfall oder Verfahren offen ist.`} />
+          hint={`An beide Captains${resultHours ? `, ${resultHours} Std. nach dem Termin (einstellbar oben unter „Termine und Verschiebungen“)` : ""}. Wartet, solange ein Vorfall oder Verfahren offen ist.`} />
         <Kind label="Map-Veto wartet" checked={form.veto_turn} onChange={(value) => set("veto_turn", value)} testId="reminder-rules-veto" disabled={!canEdit}
           hint={`An die Seite am Zug, wenn sie das Veto gerade nicht offen hat – einmal je Schritt.${stepSeconds ? ` Zeit je Schritt in dieser Season: ${stepSeconds} Sekunden.` : ""}`}>
           <FormGrid cols={2}>
@@ -123,15 +123,15 @@ export function SeasonReminderRulesPanel({ seasonId, canEdit = true }) {
             <TextField label="Nicht in den letzten Sekunden" type="number" min={0} max={120} value={form.veto_min_left_seconds}
               onChange={(value) => set("veto_min_left_seconds", value)} hint="Vorgabe 5" disabled={!canEdit || !form.veto_turn} testId="reminder-rules-veto-left" />
           </FormGrid>
-          {misfit ? <p className="mt-2 text-sm text-warn" data-testid="reminder-rules-veto-misfit">{misfit}</p> : null}
+          {misfit ? <p className="mt-2 tls-type-small text-warn" data-testid="reminder-rules-veto-misfit">{misfit}</p> : null}
         </Kind>
       </div>
       <Kind label="Zusätzlich per Discord" checked={form.discord} onChange={(value) => set("discord", value)} testId="reminder-rules-discord" disabled={!canEdit}
         hint="Direktnachricht vom Vereins-Bot – nur an alle, die Discord in ihren Einstellungen eingeschaltet haben. Keine Funktion hängt an Discord." />
-      {error ? <p className="text-sm text-warn" role="alert" data-testid="reminder-rules-error">{error}</p> : null}
+      {error ? <p className="tls-type-small text-warn" role="alert" data-testid="reminder-rules-error">{error}</p> : null}
       {canEdit ? (
         <button type="button" onClick={save} disabled={saving} data-testid="reminder-rules-save"
-          className="tls-btn tls-btn--primary min-h-11 rounded-sm px-4 py-2 text-xs font-bold uppercase tracking-wider disabled:opacity-50">
+          className="tls-btn tls-btn--primary min-h-11 rounded-sm px-4 py-2 tls-type-label disabled:opacity-50">
           {saving ? "Speichere …" : "Erinnerungen speichern"}
         </button>
       ) : null}

@@ -16,7 +16,7 @@ export function MediaLibrarySearch({ library, testId = "media-library" }) {
           className="min-h-11 w-full bg-transparent text-sm text-white focus:outline-none"
         />
       </label>
-      <span className="text-xs tabular-nums text-white/45" data-testid={`${testId}-count`}>
+      <span className="tls-type-small tabular-nums text-white/45" data-testid={`${testId}-count`}>
         {library.items.length} von {library.total}
       </span>
     </div>
@@ -32,7 +32,7 @@ export function MediaLibraryMore({ library, testId = "media-library" }) {
         onClick={library.loadMore}
         disabled={library.loadingMore}
         data-testid={`${testId}-more`}
-        className="tls-btn tls-btn--quiet min-h-11 rounded-sm text-xs font-bold uppercase tracking-wider"
+        className="tls-btn tls-btn--quiet min-h-11 rounded-sm tls-type-label"
       >
         {library.loadingMore ? "Lade …" : "Mehr laden"}
       </button>

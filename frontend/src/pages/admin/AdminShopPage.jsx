@@ -6,6 +6,7 @@ import { api, formatRequestError } from "@/lib/api";
 import { formatCents, parseEuro } from "@/lib/billing";
 import { viennaDateTime } from "@/lib/vienna";
 import ShopTabs from "./ShopTabs";
+import { ShortCaps } from "@/components/tls/ShortCaps";
 
 // Shop (#1706): Stufe, Notschalter, Preise, Printful-Zugang und Status - Verwaltung → Finanzen → Shop. Stufen statt
 // „Aus/Vorschau/Live“ (Entscheidung Obmann 27.10.2026). Jede Änderung braucht einen Grund und steht im Protokoll der
@@ -31,7 +32,7 @@ function centsToInput(cents) {
 function Section({ title, icon: Icon, children, testId }) {
   return (
     <section className="border border-white/10 bg-[#121212] rounded-sm p-4 space-y-3" data-testid={testId}>
-      <h2 className="text-xs font-bold uppercase tracking-wider text-white/70 inline-flex items-center gap-2">
+      <h2 className="tls-type-label text-white/70 inline-flex items-center gap-2">
         {Icon && <Icon className="w-3.5 h-3.5 text-white/50" aria-hidden="true" />} {title}
       </h2>
       {children}
@@ -76,12 +77,12 @@ export function ReasonedButton({ id, label, busy, disabled, blockedHint, onSubmi
           className={`min-h-10 flex-1 bg-black/40 border rounded-sm px-3 text-sm placeholder:text-white/45 focus:border-brand outline-none disabled:opacity-50 ${hint === REASON_HINT ? "border-warn" : "border-white/15"}`}
           data-testid={`${id}-reason`} />
         <button type="submit" disabled={!!busy} aria-disabled={!complete}
-          className={`tls-btn tls-btn--${variant} min-h-10 px-4 text-xs font-bold uppercase tracking-wider rounded-sm transition-opacity ${complete ? "" : "opacity-60"}`}
+          className={`tls-type-label tls-btn tls-btn--${variant} min-h-10 px-4 rounded-sm transition-opacity ${complete ? "" : "opacity-60"}`}
           data-testid={`${id}-submit`}>
           {busy ? "Speichert …" : label}
         </button>
       </div>
-      {hint ? <p id={`${id}-hint`} role="alert" className="text-xs text-warn" data-testid={`${id}-hint`}>{hint}</p> : null}
+      {hint ? <p id={`${id}-hint`} role="alert" className="tls-type-small text-warn" data-testid={`${id}-hint`}>{hint}</p> : null}
     </form>
   );
 }
@@ -90,8 +91,8 @@ function StatusTile({ label, value, tone = "quiet", testId }) {
   const tones = { ok: "text-ok", warn: "text-warn", quiet: "text-white/70", honor: "text-honor" };
   return (
     <div className="border border-white/10 bg-black/30 rounded-sm px-3 py-2" data-testid={testId}>
-      <div className="text-[10px] uppercase tracking-wider text-white/45">{label}</div>
-      <div className={`text-sm font-bold ${tones[tone] || tones.quiet}`}>{value}</div>
+      <div className="tls-type-label text-white/45">{label}</div>
+      <div className={`tls-type-small font-bold ${tones[tone] || tones.quiet}`}>{value}</div>
     </div>
   );
 }
@@ -137,9 +138,9 @@ export default function AdminShopPage() {
   };
 
   if (error) {
-    return <AdminLayout><div className="border border-warn/40 bg-warn/10 rounded-sm p-4 text-sm" data-testid="shop-config-error">{error}</div></AdminLayout>;
+    return <AdminLayout><div className="border border-warn/40 bg-warn/10 rounded-sm p-4 tls-type-small" data-testid="shop-config-error">{error}</div></AdminLayout>;
   }
-  if (!data) return <AdminLayout><div className="text-sm text-white/45" role="status">Lade Shop-Einstellungen …</div></AdminLayout>;
+  if (!data) return <AdminLayout><div className="tls-type-small text-white/45" role="status">Lade Shop-Einstellungen …</div></AdminLayout>;
 
   const { config, stages, rights } = data;
   const key = config.printful_key || {};
@@ -161,9 +162,9 @@ export default function AdminShopPage() {
   return (
     <AdminLayout>
       <div>
-        <h1 className="font-heading text-3xl font-black uppercase inline-flex items-center gap-3"><ShoppingBag className="w-7 h-7 text-honor" aria-hidden="true" /> Shop</h1>
+        <h1 className="tls-type-title inline-flex items-center gap-3"><ShoppingBag className="w-7 h-7 text-honor" aria-hidden="true" /> <ShortCaps>Shop</ShortCaps></h1>
         <ShopTabs />
-        <p className="mt-4 text-sm text-white/60 max-w-2xl">
+        <p className="mt-4 tls-type-body text-white/60 max-w-2xl">
           Wer den Vereinsshop sieht, ob Bestellungen an Printful gehen, Preise und der Zugang zu Printful. Jede Änderung braucht einen Grund und steht im Protokoll der Adminaktionen.
         </p>
       </div>
@@ -185,20 +186,20 @@ export default function AdminShopPage() {
                   onClick={() => setStage(item.key)}
                   className={`text-left border rounded-sm px-3 py-2.5 transition-colors duration-150 disabled:cursor-not-allowed ${selected ? "border-brand bg-brand/10" : "border-white/10 hover:border-white/30"} ${item.locked ? "opacity-60" : ""}`}
                   data-testid={`shop-stage-${item.key}`}>
-                  <span className="flex items-center gap-2 text-sm font-bold">
+                  <span className="flex items-center gap-2 tls-type-small font-bold">
                     {item.locked && <Lock className="w-3.5 h-3.5 text-warn" aria-hidden="true" />}
                     {item.label}
-                    {config.stage === item.key && <span className="text-[10px] uppercase tracking-wider text-ok">aktiv</span>}
+                    {config.stage === item.key && <span className="tls-type-label text-ok">aktiv</span>}
                   </span>
-                  <span className="block text-xs text-white/55 mt-0.5">{item.hint}</span>
-                  {item.locked && item.lock_reason && <span className="block text-xs text-warn mt-1" data-testid={`shop-stage-${item.key}-lock`}>{item.lock_reason}</span>}
+                  <span className="block tls-type-small text-white/55 mt-0.5">{item.hint}</span>
+                  {item.locked && item.lock_reason && <span className="block tls-type-small text-warn mt-1" data-testid={`shop-stage-${item.key}-lock`}>{item.lock_reason}</span>}
                 </button>
               );
             })}
           </div>
           {stage !== config.stage && (
             <div className="space-y-2" data-testid="shop-stage-change">
-              <div className="text-sm text-white/70">Von <b>{stageOf(config.stage)?.label}</b> auf <b>{stageOf(stage)?.label}</b> umstellen:</div>
+              <div className="tls-type-small text-white/70">Von <b>{stageOf(config.stage)?.label}</b> auf <b>{stageOf(stage)?.label}</b> umstellen:</div>
               <ReasonedButton id="shop-stage-save" label="Stufe speichern" busy={busy === "stage"} required={stage === "public"}
                 onSubmit={(reason) => run("stage", () => api.patch(BASE, { stage, reason }), (next) => `Stufe jetzt: ${next.config.stage_label}.`)} />
             </div>
@@ -206,7 +207,7 @@ export default function AdminShopPage() {
         </Section>
 
         <Section title="Steuer geklärt (#1701)" icon={Lock} testId="shop-tax">
-          <p className="text-sm text-white/65" data-testid="shop-tax-state">
+          <p className="tls-type-small text-white/65" data-testid="shop-tax-state">
             {config.tax_cleared
               ? <>Freigegeben von {config.tax_cleared.by} am {viennaDateTime(config.tax_cleared.at)}{config.tax_cleared.reason ? ` – „${config.tax_cleared.reason}“` : ""}.</>
               : "Noch nicht freigegeben. Solange bleibt „Öffentlich“ gesperrt."}
@@ -216,17 +217,17 @@ export default function AdminShopPage() {
                 variant={config.tax_cleared ? "secondary" : "primary"} busy={busy === "tax"} required
                 onSubmit={(reason) => run("tax", () => api.put(`${BASE}/tax-clearance`, { cleared: !config.tax_cleared, reason }),
                   config.tax_cleared ? "Freigabe zurückgenommen." : "Steuer als geklärt freigegeben.")} />
-            : <p className="text-xs text-white/45">Diese Freigabe setzt nur der Superadmin.</p>}
+            : <p className="tls-type-small text-white/45">Diese Freigabe setzt nur der Superadmin.</p>}
         </Section>
 
         <Section title="Notschalter: Bestellungen an Printful senden" icon={Power} testId="shop-switch">
-          <p className="text-sm text-white/65" data-testid="shop-switch-state">
+          <p className="tls-type-small text-white/65" data-testid="shop-switch-state">
             {config.orders_to_printful
               ? "An: bezahlte und freigegebene Bestellungen dürfen an Printful gehen."
               : "Aus: nichts geht an Printful. Bestellungen warten."}{" "}
             Der Schalter gilt unabhängig von der Stufe.
           </p>
-          {!config.orders_to_printful && key.state !== "ok" && <p className="text-xs text-warn" data-testid="shop-switch-needs-key">Erst den Printful-Schlüssel hinterlegen.</p>}
+          {!config.orders_to_printful && key.state !== "ok" && <p className="tls-type-small text-warn" data-testid="shop-switch-needs-key">Erst den Printful-Schlüssel hinterlegen.</p>}
           <ReasonedButton id="shop-switch-toggle" label={config.orders_to_printful ? "Ausschalten" : "Einschalten"}
             variant={config.orders_to_printful ? "danger" : "primary"} busy={busy === "switch"} required={!config.orders_to_printful}
             disabled={!config.orders_to_printful && key.state !== "ok"}
@@ -236,44 +237,44 @@ export default function AdminShopPage() {
         </Section>
 
         <Section title="Preise und Versand" icon={Truck} testId="shop-prices">
-          <dl className="grid gap-x-6 gap-y-1 text-sm sm:grid-cols-2">
-            <div><dt className="text-white/50 text-xs">Mitglieder</dt><dd data-testid="shop-member-price">Printful brutto: was der Verein an Printful zahlt (Ware, Versand, Steuer), Aufschlag {formatCents(config.member_markup_cents)}</dd></div>
-            <div><dt className="text-white/50 text-xs">Versandland</dt><dd data-testid="shop-countries">{config.shipping_countries.join(", ")} (Österreich) – weitere erst nach der Steuerklärung</dd></div>
+          <dl className="grid gap-x-6 gap-y-1 tls-type-small sm:grid-cols-2">
+            <div><dt className="text-white/50 tls-type-small">Mitglieder</dt><dd data-testid="shop-member-price">Printful brutto: was der Verein an Printful zahlt (Ware, Versand, Steuer), Aufschlag {formatCents(config.member_markup_cents)}</dd></div>
+            <div><dt className="text-white/50 tls-type-small">Versandland</dt><dd data-testid="shop-countries">{config.shipping_countries.join(", ")} (Österreich) – weitere erst nach der Steuerklärung</dd></div>
           </dl>
           <div className="grid gap-3 sm:grid-cols-2">
-            <label className="block text-sm">
+            <label className="block tls-type-small">
               <span className="text-white/70">Öffentlicher Aufschlag je Artikel (€)</span>
               <input value={markup} onChange={(event) => setMarkup(event.target.value)} inputMode="decimal" placeholder="0,00"
                 className="mt-1 w-full min-h-10 bg-black/40 border border-white/15 rounded-sm px-3 tabular-nums focus:border-brand outline-none" data-testid="shop-markup" />
-              <span className="block text-xs text-white/45 mt-1">Nur bei öffentlichen Käufen. Hat ein Produkt einen eigenen Aufschlag, ersetzt der diesen.</span>
+              <span className="block tls-type-small text-white/45 mt-1">Nur bei öffentlichen Käufen. Hat ein Produkt einen eigenen Aufschlag, ersetzt der diesen.</span>
             </label>
-            <label className="block text-sm">
+            <label className="block tls-type-small">
               <span className="text-white/70">Ersatzpauschale Versand (€)</span>
               <input value={fallback} onChange={(event) => setFallback(event.target.value)} inputMode="decimal" placeholder="leer = keine"
                 className="mt-1 w-full min-h-10 bg-black/40 border border-white/15 rounded-sm px-3 tabular-nums focus:border-brand outline-none" data-testid="shop-fallback" />
-              <span className="block text-xs text-white/45 mt-1">Gilt, wenn Printful den Versand nicht schätzen kann. Leer: dann wird nicht bestellt.</span>
+              <span className="block tls-type-small text-white/45 mt-1">Gilt, wenn Printful den Versand nicht schätzen kann. Leer: dann wird nicht bestellt.</span>
             </label>
-            <label className="block text-sm">
+            <label className="block tls-type-small">
               <span className="text-white/70">Mindestpreis je Artikel (€)</span>
               <input value={minPrice} onChange={(event) => setMinPrice(event.target.value)} inputMode="decimal" placeholder="1,00"
                 className="mt-1 w-full min-h-10 bg-black/40 border border-white/15 rounded-sm px-3 tabular-nums focus:border-brand outline-none" data-testid="shop-min-price" />
-              <span className="block text-xs text-white/45 mt-1">Kein Verkaufspreis darunter – auch nicht 0 €. Die Prüfung vor dem Veröffentlichen hält sich daran.</span>
+              <span className="block tls-type-small text-white/45 mt-1">Kein Verkaufspreis darunter – auch nicht 0 €. Die Prüfung vor dem Veröffentlichen hält sich daran.</span>
             </label>
-            <label className="block text-sm">
+            <label className="block tls-type-small">
               <span className="text-white/70">Toleranz bei Preisänderung (€)</span>
               <input value={tolerance} onChange={(event) => setTolerance(event.target.value)} inputMode="decimal" placeholder="0,50"
                 className="mt-1 w-full min-h-10 bg-black/40 border border-white/15 rounded-sm px-3 tabular-nums focus:border-brand outline-none" data-testid="shop-price-tolerance" />
-              <span className="block text-xs text-white/45 mt-1">Vor dem Auslösen schätzt Printful neu. Ist es um mehr als diesen Betrag teurer, geht die Bestellung nicht automatisch hinaus, sondern an die Leitung („Preis geändert“). Günstiger: Die Differenz bleibt beim Verein.</span>
+              <span className="block tls-type-small text-white/45 mt-1">Vor dem Auslösen schätzt Printful neu. Ist es um mehr als diesen Betrag teurer, geht die Bestellung nicht automatisch hinaus, sondern an die Leitung („Preis geändert“). Günstiger: Die Differenz bleibt beim Verein.</span>
             </label>
           </div>
-          {!pricesValid && <p className="text-xs text-warn" data-testid="shop-prices-invalid">Beträge in Euro, z. B. 3,50 – Aufschlag bis {formatCents(data.limits.public_markup_cents)}, Pauschale 0,01 bis {formatCents(data.limits.fallback_shipping_cents)}, Mindestpreis 0,01 bis {formatCents(data.limits.min_price_cents)}, Toleranz 0 bis {formatCents(toleranceLimit)}.</p>}
+          {!pricesValid && <p className="tls-type-small text-warn" data-testid="shop-prices-invalid">Beträge in Euro, z. B. 3,50 – Aufschlag bis {formatCents(data.limits.public_markup_cents)}, Pauschale 0,01 bis {formatCents(data.limits.fallback_shipping_cents)}, Mindestpreis 0,01 bis {formatCents(data.limits.min_price_cents)}, Toleranz 0 bis {formatCents(toleranceLimit)}.</p>}
           <ReasonedButton id="shop-prices-save" label="Preise speichern" busy={busy === "prices"} disabled={!pricesValid || !pricesChanged}
             blockedHint={!pricesValid ? "Erst gültige Beträge eintragen (0 bis 100 €)." : "Es hat sich noch nichts geändert."}
             onSubmit={(reason) => run("prices", () => api.patch(BASE, { public_markup_cents: markupCents, fallback_shipping_cents: fallbackCents, ...(minPriceChanged ? { min_price_cents: minPriceCents } : {}), ...(toleranceChanged ? { price_tolerance_cents: toleranceCents } : {}), reason }), "Preise gespeichert.")} />
         </Section>
 
         <Section title="Printful-Zugang" icon={KeyRound} testId="shop-access">
-          <p className="text-sm text-white/65" data-testid="shop-key-state">
+          <p className="tls-type-small text-white/65" data-testid="shop-key-state">
             {key.state === "ok" && <>Schlüssel hinterlegt seit {viennaDateTime(key.saved_at)}{key.saved_by ? ` von ${key.saved_by}` : ""}. Er wird nie wieder angezeigt.</>}
             {key.state === "missing" && "Kein Schlüssel hinterlegt."}
             {key.state === "unreadable" && <span className="text-warn">Schlüssel {key.detail}</span>}
@@ -281,19 +282,19 @@ export default function AdminShopPage() {
           <div className="flex flex-wrap items-center gap-3">
             <button type="button" disabled={key.state !== "ok" || !!busy}
               onClick={() => run("test", () => api.post(`${BASE}/printful-test`), (next) => next.result?.detail || "Getestet.")}
-              className="tls-btn tls-btn--secondary min-h-10 px-4 text-xs font-bold uppercase tracking-wider rounded-sm disabled:opacity-40" data-testid="shop-key-test">
+              className="tls-btn tls-btn--secondary min-h-10 px-4 tls-type-label rounded-sm disabled:opacity-40" data-testid="shop-key-test">
               {busy === "test" ? "Teste …" : "Verbindung testen"}
             </button>
             {lastTest && (
-              <span className={`text-xs ${lastTest.ok ? "text-ok" : "text-warn"}`} data-testid="shop-key-last-test">
+              <span className={`tls-type-small ${lastTest.ok ? "text-ok" : "text-warn"}`} data-testid="shop-key-last-test">
                 {viennaDateTime(lastTest.at)}: {lastTest.detail}
               </span>
             )}
           </div>
-          <p className="text-xs text-white/45">Der Test liest nur (Liste der Stores) und schickt nie eine Bestellung.</p>
+          <p className="tls-type-small text-white/45">Der Test liest nur (Liste der Stores) und schickt nie eine Bestellung.</p>
           {rights.can_edit_access ? (
             <div className="space-y-2 border-t border-white/10 pt-3">
-              <label className="block text-sm">
+              <label className="block tls-type-small">
                 <span className="text-white/70">{key.state === "missing" ? "API-Schlüssel hinterlegen" : "Neuen API-Schlüssel hinterlegen"}</span>
                 <input type="password" autoComplete="off" value={apiKey} onChange={(event) => setApiKey(event.target.value)}
                   className="mt-1 w-full min-h-10 bg-black/40 border border-white/15 rounded-sm px-3 focus:border-brand outline-none" data-testid="shop-key-input" />
@@ -311,7 +312,7 @@ export default function AdminShopPage() {
               )}
             </div>
           ) : (
-            <p className="text-xs text-white/45" data-testid="shop-key-system-only">Den Zugang hinterlegt, wer den Bereich „System“ hat (Club-Admin, Superadmin).</p>
+            <p className="tls-type-small text-white/45" data-testid="shop-key-system-only">Den Zugang hinterlegt, wer den Bereich „System“ hat (Club-Admin, Superadmin).</p>
           )}
         </Section>
       </div>

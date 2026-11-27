@@ -10,8 +10,8 @@ import { DiscordMessagePreview } from "@/components/tls/DiscordMessagePreview";
 // Prüfung besteht), „Standard wiederherstellen“ und eine Testnachricht in den privaten Testkanal. Gerendert wird immer
 // auf dem Server - die Vorschau zeigt genau das, was der Bot schicken würde.
 
-const INPUT = "w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-sm";
-const LABEL = "text-[10px] uppercase tracking-widest text-white/45 font-bold mb-1";
+const INPUT = "w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm tls-type-small";
+const LABEL = "tls-type-label text-white/45 mb-1";
 
 export function getPath(object, path) {
   return path.split(".").reduce((value, key) => (value == null ? undefined : value[key]), object);
@@ -53,7 +53,7 @@ function TextField({ label, path, draft, onChange, onFocus, multiline = false, r
     <label className="block">
       <div className={LABEL}>{label}</div>
       {multiline ? <textarea rows={rows} {...common} /> : <input {...common} />}
-      {hint && <div className="mt-1 text-[11px] text-white/40">{hint}</div>}
+      {hint && <div className="mt-1 tls-type-small text-quiet">{hint}</div>}
     </label>
   );
 }
@@ -169,8 +169,8 @@ export function DiscordDesignPanel({ initialKind = "stream_live" }) {
   return (
     <section className="space-y-4" data-testid="discord-design">
       <div>
-        <h3 className="font-heading text-lg font-black uppercase inline-flex items-center gap-2"><Palette className="w-5 h-5 text-[#b8c0ff]" /> Gestaltung der Meldungen</h3>
-        <p className="mt-1 text-sm text-white/60 max-w-3xl">
+        <h3 className="tls-type-card inline-flex items-center gap-2"><Palette className="w-5 h-5 text-[#b8c0ff]" /> Gestaltung der Meldungen</h3>
+        <p className="mt-1 tls-type-body text-white/60 max-w-3xl">
           Jede Meldung des Bots als Vorlage: Farbe, Autorzeile, Titel, Text, Felder, Bilder, Fußzeile. Platzhalter in geschweiften Klammern
           füllt die Website mit echten Werten. Rechts siehst du sofort, wie es im Discord aussieht.
         </p>
@@ -183,7 +183,7 @@ export function DiscordDesignPanel({ initialKind = "stream_live" }) {
             <div className="flex flex-wrap gap-2">
               {data.kinds.filter((entry) => entry.group === group).map((entry) => (
                 <button key={entry.key} type="button" role="tab" aria-selected={entry.key === selected} onClick={() => choose(entry.key)} data-testid={`discord-design-kind-${entry.key}`}
-                  className={`px-3 py-1.5 rounded-sm border text-xs font-bold uppercase tracking-wider ${entry.key === selected ? "border-[#5865F2] bg-[#5865F2]/15 text-[#b8c0ff]" : "border-white/10 text-white/60 hover:text-white"}`}>
+                  className={`px-3 py-1.5 rounded-sm border tls-type-label ${entry.key === selected ? "border-[#5865F2] bg-[#5865F2]/15 text-[#b8c0ff]" : "border-white/10 text-white/60 hover:text-white"}`}>
                   {entry.label}{entry.customized ? " ●" : ""}
                 </button>
               ))}
@@ -194,7 +194,7 @@ export function DiscordDesignPanel({ initialKind = "stream_live" }) {
 
       <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
         <div className="space-y-4 min-w-0">
-          <div className="border border-white/10 rounded-sm p-3 text-xs text-white/60">
+          <div className="border border-white/10 rounded-sm p-3 tls-type-small text-white/60">
             <div className="text-white/80 font-bold">{kind.label}{kind.customized ? " – eigene Fassung" : " – Standard"}</div>
             <div className="mt-1">{kind.hint}</div>
           </div>
@@ -202,7 +202,7 @@ export function DiscordDesignPanel({ initialKind = "stream_live" }) {
           <div className="flex gap-2" role="tablist" aria-label="Bearbeiten als">
             {[["form", "Formular"], ["json", "JSON"]].map(([key, label]) => (
               <button key={key} type="button" role="tab" aria-selected={mode === key} onClick={() => setMode(key)} data-testid={`discord-design-mode-${key}`}
-                className={`px-3 py-1.5 rounded-sm border text-xs font-bold uppercase tracking-wider inline-flex items-center gap-1.5 ${mode === key ? "border-[#29B6E8] text-[#29B6E8]" : "border-white/10 text-white/60"}`}>
+                className={`px-3 py-1.5 rounded-sm border tls-type-label inline-flex items-center gap-1.5 ${mode === key ? "border-[#29B6E8] text-[#29B6E8]" : "border-white/10 text-white/60"}`}>
                 {key === "json" && <Braces className="w-3.5 h-3.5" />} {label}
               </button>
             ))}
@@ -271,7 +271,7 @@ export function DiscordDesignPanel({ initialKind = "stream_live" }) {
                     <input value={field.name || ""} onChange={(event) => change(`fields.${index}.name`, event.target.value)} onFocus={() => { focusRef.current = `fields.${index}.name`; }} className={INPUT} aria-label={`Feld ${index + 1}: Name`} data-testid={`discord-design-field-fields.${index}.name`} />
                     <input value={field.value || ""} onChange={(event) => change(`fields.${index}.value`, event.target.value)} onFocus={() => { focusRef.current = `fields.${index}.value`; }} className={INPUT} aria-label={`Feld ${index + 1}: Inhalt`} data-testid={`discord-design-field-fields.${index}.value`} />
                     <div className="flex items-center gap-1">
-                      <label className="inline-flex items-center gap-1 text-[11px] text-white/60" title="nebeneinander">
+                      <label className="inline-flex items-center gap-1 tls-type-small text-white/60" title="nebeneinander">
                         <input type="checkbox" checked={field.inline !== false} onChange={(event) => change(`fields.${index}.inline`, event.target.checked)} aria-label={`Feld ${index + 1}: nebeneinander`} /> ⇆
                       </label>
                       <button type="button" disabled={index === 0} onClick={() => change("fields", fields.map((_, i) => (i === index - 1 ? fields[index] : i === index ? fields[index - 1] : fields[i])))} className="p-1 text-white/50 disabled:opacity-30" aria-label="nach oben"><ArrowUp className="w-3.5 h-3.5" /></button>
@@ -281,7 +281,7 @@ export function DiscordDesignPanel({ initialKind = "stream_live" }) {
                   </div>
                 ))}
                 <button type="button" disabled={fields.length >= 25} onClick={() => change("fields", [...fields, { name: "", value: "", inline: true }])} data-testid="discord-design-field-add"
-                  className="inline-flex items-center gap-1.5 px-3 py-1.5 border border-white/15 text-white/70 rounded-sm text-[11px] font-bold uppercase tracking-wider disabled:opacity-40">
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 border border-white/15 text-white/70 rounded-sm tls-type-label disabled:opacity-40">
                   <Plus className="w-3.5 h-3.5" /> Feld hinzufügen
                 </button>
               </div>
@@ -294,7 +294,7 @@ export function DiscordDesignPanel({ initialKind = "stream_live" }) {
                 <TextField label="Fußzeile" path="footer.text" draft={draft} onChange={change} onFocus={(path) => { focusRef.current = path; }} />
                 <TextField label="Symbol der Fußzeile" path="footer.icon_url" draft={draft} onChange={change} onFocus={(path) => { focusRef.current = path; }} />
               </div>
-              <label className="inline-flex items-center gap-2 text-sm text-white/75">
+              <label className="inline-flex items-center gap-2 tls-type-small text-white/75">
                 <input type="checkbox" checked={!!draft.timestamp} onChange={(event) => change("timestamp", event.target.checked || "")} data-testid="discord-design-timestamp" />
                 Uhrzeit in der Fußzeile {isStream ? "(Beginn bzw. Ende des Streams)" : "(Zeitpunkt der Meldung)"}
               </label>
@@ -306,7 +306,7 @@ export function DiscordDesignPanel({ initialKind = "stream_live" }) {
             <div className="flex flex-wrap gap-1.5">
               {ownPlaceholders.map((entry) => (
                 <button key={entry.name} type="button" onClick={() => insert(entry.name)} title={`${entry.text}${entry.sample ? ` – z. B. ${entry.sample}` : ""}`} data-testid={`discord-design-placeholder-${entry.name}`}
-                  className="px-2 py-1 rounded-sm bg-white/5 border border-white/10 text-[11px] font-mono text-[#b8c0ff] hover:border-[#5865F2]">{`{${entry.name}}`}</button>
+                  className="px-2 py-1 rounded-sm bg-white/5 border border-white/10 tls-type-small font-mono text-[#b8c0ff] hover:border-[#5865F2]">{`{${entry.name}}`}</button>
               ))}
             </div>
             {rowPlaceholders.length > 0 && (
@@ -315,12 +315,12 @@ export function DiscordDesignPanel({ initialKind = "stream_live" }) {
                 <div className="flex flex-wrap gap-1.5">
                   {rowPlaceholders.map((entry) => (
                     <button key={entry.name} type="button" onClick={() => insert(entry.name)} title={`${entry.text}${entry.sample ? ` – z. B. ${entry.sample}` : ""}`} data-testid={`discord-design-placeholder-${entry.name}`}
-                      className="px-2 py-1 rounded-sm bg-white/5 border border-white/10 text-[11px] font-mono text-[#00FF88]/80 hover:border-[#00FF88]/50">{`{${entry.name}}`}</button>
+                      className="px-2 py-1 rounded-sm bg-white/5 border border-white/10 tls-type-small font-mono text-[#00FF88]/80 hover:border-[#00FF88]/50">{`{${entry.name}}`}</button>
                   ))}
                 </div>
               </>
             )}
-            <p className="text-[11px] text-white/45">
+            <p className="tls-type-small text-white/45">
               Teile in <code>[[ … ]]</code> erscheinen nur, wenn jeder Platzhalter darin einen Wert hat. Formatierung wie im Discord: <code>**fett**</code>, <code>*kursiv*</code>,
               <code> __unterstrichen__</code>, <code>[Text](Adresse)</code>. Bilder brauchen eine volle Adresse mit https:// oder einen Platzhalter.
             </p>
@@ -328,18 +328,18 @@ export function DiscordDesignPanel({ initialKind = "stream_live" }) {
 
           <div className="flex flex-wrap gap-2">
             <button type="button" disabled={!!busy || !dirty || !!jsonError} onClick={save} data-testid="discord-design-save"
-              className="inline-flex items-center gap-2 px-4 py-2 bg-[#5865F2] text-white font-bold uppercase tracking-wider rounded-sm text-xs disabled:opacity-40">
+              className="inline-flex items-center gap-2 px-4 py-2 bg-[#5865F2] text-white tls-type-label rounded-sm disabled:opacity-40">
               <Save className="w-3.5 h-3.5" /> Speichern
             </button>
             <button type="button" disabled={!!busy || !!jsonError} onClick={sendTest} data-testid="discord-design-test"
-              className="inline-flex items-center gap-2 px-4 py-2 border border-white/15 text-white/80 font-bold uppercase tracking-wider rounded-sm text-xs disabled:opacity-40">
+              className="inline-flex items-center gap-2 px-4 py-2 border border-white/15 text-white/80 tls-type-label rounded-sm disabled:opacity-40">
               <FlaskConical className="w-3.5 h-3.5" /> Testnachricht
             </button>
             <button type="button" disabled={!!busy || !kind.customized} onClick={reset} data-testid="discord-design-reset"
-              className="inline-flex items-center gap-2 px-4 py-2 border border-white/15 text-white/60 font-bold uppercase tracking-wider rounded-sm text-xs disabled:opacity-40">
+              className="inline-flex items-center gap-2 px-4 py-2 border border-white/15 text-white/60 tls-type-label rounded-sm disabled:opacity-40">
               <RotateCcw className="w-3.5 h-3.5" /> Standard wiederherstellen
             </button>
-            {dirty && <span className="self-center text-xs text-[#FFD700]">nicht gespeichert</span>}
+            {dirty && <span className="self-center tls-type-small text-[#FFD700]">nicht gespeichert</span>}
           </div>
         </div>
 
@@ -349,7 +349,7 @@ export function DiscordDesignPanel({ initialKind = "stream_live" }) {
             <div className="flex gap-1" role="tablist" aria-label="Daten der Vorschau">
               {[["sample", "Beispieldaten"], ["live", "Echte Daten"]].map(([key, label]) => (
                 <button key={key} type="button" role="tab" aria-selected={dataMode === key} onClick={() => setDataMode(key)} data-testid={`discord-design-data-${key}`}
-                  className={`px-2 py-1 rounded-sm border text-[10px] font-bold uppercase tracking-wider ${dataMode === key ? "border-[#29B6E8] text-[#29B6E8]" : "border-white/10 text-white/50"}`}>{label}</button>
+                  className={`px-2 py-1 rounded-sm border tls-type-label ${dataMode === key ? "border-[#29B6E8] text-[#29B6E8]" : "border-white/10 text-white/50"}`}>{label}</button>
               ))}
             </div>
           </div>
@@ -357,12 +357,12 @@ export function DiscordDesignPanel({ initialKind = "stream_live" }) {
             <DiscordMessagePreview embed={preview.embed} content={preview.content || ""} botName="THE LION SQUAD"
               buttons={isStream && preview.embed?.url ? [{ label: "Zuschauen", url: preview.embed.url }] : []} testId="discord-design-message" />
           ) : (
-            <div className="border border-dashed border-white/15 rounded-sm p-6 text-center text-sm text-white/40">Noch keine Vorschau.</div>
+            <div className="border border-dashed border-white/15 rounded-sm p-6 text-center tls-type-small text-quiet">Noch keine Vorschau.</div>
           )}
-          {preview?.note && <div className="text-xs text-white/50" data-testid="discord-design-note">{preview.note}</div>}
-          {typeof preview?.length === "number" && <div className="text-[11px] text-white/40" data-testid="discord-design-length">{preview.length} / {data.limits?.total || 6000} Zeichen</div>}
+          {preview?.note && <div className="tls-type-small text-white/50" data-testid="discord-design-note">{preview.note}</div>}
+          {typeof preview?.length === "number" && <div className="tls-type-small text-quiet" data-testid="discord-design-length">{preview.length} / {data.limits?.total || 6000} Zeichen</div>}
           {errors.length > 0 && (
-            <ul className="border border-[#FF3B30]/40 bg-[#FF3B30]/10 rounded-sm p-3 text-xs text-white/80 list-disc pl-5 space-y-1" data-testid="discord-design-errors">
+            <ul className="border border-[#FF3B30]/40 bg-[#FF3B30]/10 rounded-sm p-3 tls-type-small text-white/80 list-disc pl-5 space-y-1" data-testid="discord-design-errors">
               {errors.map((error) => <li key={error}>{error}</li>)}
             </ul>
           )}

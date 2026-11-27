@@ -10,6 +10,7 @@ import { INPUT_CLASS } from "@/components/tls/FormFields";
 import { rememberPreview } from "@/pages/admin/settings/SeasonsSettings";
 import { EggShape, PATTERN_LABELS } from "@/seasons/easterHunt/EggShape";
 import { asInstant, viennaDate } from "@/lib/vienna";
+import { ShortCaps } from "@/components/tls/ShortCaps";
 
 // Ostereiersuche pflegen (#646, #757): je Jahr ein Vorschlag mit Saat aus dem Jahr (jedes Jahr andere Seiten, Kanten
 // und Muster), danach jedes Ei von Hand: Seite, Kante, Ecke, Muster, Hinweis. Dazu Preise, Freigabe, die Zahlen und
@@ -39,13 +40,13 @@ function dateText(iso) {
 function Tile({ label, value, tone = "text-white", testId }) {
   return (
     <div className="rounded-sm border border-white/10 bg-[#121212] p-4" data-testid={testId}>
-      <div className="text-[10px] font-bold uppercase tracking-widest text-white/45">{label}</div>
-      <div className={`mt-1.5 font-heading text-2xl font-black tabular-nums ${tone}`}>{value}</div>
+      <div className="tls-type-label text-white/45">{label}</div>
+      <div className={`mt-1.5 tls-type-section tls-type-num ${tone}`}>{value}</div>
     </div>
   );
 }
 
-const FIELD_LABEL = "mb-1 block text-[10px] font-bold uppercase tracking-widest text-white/45";
+const FIELD_LABEL = "mb-1 block tls-type-label text-white/45";
 const FIELD_INPUT = `${INPUT_CLASS} !py-1.5 !text-xs`;
 
 /** Eine Karte je Ei - bearbeitbar, solange niemand gefunden hat. Am Handy untereinander, am PC zwei nebeneinander. */
@@ -60,10 +61,10 @@ function EggCard({ egg, index, view, locked, onChange, onPreview }) {
       <div className="mb-3 flex items-center gap-3">
         <EggShape pattern={egg.pattern} size={22} />
         <span className="font-bold">Ei {egg.egg_no ?? index + 1}</span>
-        <span className="min-w-0 flex-1 tls-wrap text-xs text-white/50">{egg.channel === "app" ? "App" : "Website"} · {routes[egg.route] || egg.route}</span>
-        <span className="text-xs tabular-nums text-white/60">{egg.found ? `${egg.found}× gefunden` : "noch nicht gefunden"}</span>
+        <span className="min-w-0 flex-1 tls-wrap tls-type-small text-white/50">{egg.channel === "app" ? "App" : "Website"} · {routes[egg.route] || egg.route}</span>
+        <span className="tls-type-small tabular-nums text-white/60">{egg.found ? `${egg.found}× gefunden` : "noch nicht gefunden"}</span>
         {egg.channel === "web" && onPreview ? (
-          <button type="button" onClick={() => onPreview(egg)} className="inline-flex items-center gap-1 rounded-sm border border-white/15 px-2 py-1 text-[10px] font-bold uppercase tracking-wider text-white/75 hover:border-white/30" title="Das Ei auf der Seite ansehen (Vorschau, zählt nicht)" data-testid={`easter-admin-view-${egg.egg_no ?? index + 1}`}>
+          <button type="button" onClick={() => onPreview(egg)} className="inline-flex items-center gap-1 rounded-sm border border-white/15 px-2 py-1 tls-type-label text-white/75 hover:border-white/30" title="Das Ei auf der Seite ansehen (Vorschau, zählt nicht)" data-testid={`easter-admin-view-${egg.egg_no ?? index + 1}`}>
             <Eye className="h-3 w-3" /> Ansehen
           </button>
         ) : null}
@@ -209,14 +210,14 @@ export default function AdminEasterHuntPage() {
       <div className="mx-auto w-full max-w-6xl" data-testid="easter-admin">
         <div className="mb-6 flex flex-wrap items-end gap-4">
           <div className="min-w-0 flex-1">
-            <span className="inline-flex items-center gap-2 text-[11px] font-bold uppercase tracking-[0.3em] text-[#e9c46a]"><Egg className="h-4 w-4" /> Content</span>
-            <h1 className="mt-1 font-heading text-3xl font-black uppercase md:text-4xl">Ostereiersuche</h1>
-            <p className="mt-2 max-w-3xl text-sm text-white/60">
+            <span className="inline-flex items-center gap-2 tls-type-label text-[#e9c46a]"><Egg className="h-4 w-4" /> Content</span>
+            <h1 className="mt-1 tls-type-title"><ShortCaps>Ostereiersuche</ShortCaps></h1>
+            <p className="mt-2 max-w-3xl tls-type-body text-white/60">
               Versteckte Eier auf der Website und in der App, von Karfreitag bis Ostermontag. Jedes Jahr ein neuer Vorschlag, danach von Hand prüfen. Sobald jemand ein Ei gefunden hat, bleiben die Verstecke.
             </p>
           </div>
           <label className="block w-32">
-            <span className="mb-1.5 block text-[11px] font-bold uppercase tracking-widest text-white/60">Jahr</span>
+            <span className="mb-1.5 block tls-type-label text-white/60">Jahr</span>
             <select value={year} onChange={(event) => setYear(Number(event.target.value))} className={INPUT_CLASS} data-testid="easter-admin-year">
               {years.map((entry) => <option key={entry} value={entry}>{entry}</option>)}
             </select>
@@ -224,8 +225,8 @@ export default function AdminEasterHuntPage() {
           <SeasonSwitch seasonKey="easter_hunt" label="Ostereiersuche" className="w-full xl:w-96" />
         </div>
 
-        {failed && <div className="mb-6 rounded-sm border border-[#FF3B30]/40 bg-[#FF3B30]/10 px-4 py-3 text-sm text-[#ffb4ae]" role="alert">{failed}</div>}
-        {!view && !failed && <div className="py-16 text-center text-sm text-white/45" role="status">Lade Eiersuche …</div>}
+        {failed && <div className="mb-6 rounded-sm border border-[#FF3B30]/40 bg-[#FF3B30]/10 px-4 py-3 tls-type-small text-[#ffb4ae]" role="alert">{failed}</div>}
+        {!view && !failed && <div className="py-16 text-center tls-type-small text-white/45" role="status">Lade Eiersuche …</div>}
 
         {view && (
           <>
@@ -235,45 +236,45 @@ export default function AdminEasterHuntPage() {
               <Tile label="Angefangen" value={view.started} testId="easter-admin-started" />
               <Tile label="Voller Korb" value={view.completed} tone={view.completed ? "text-[#ffd700]" : "text-white/60"} testId="easter-admin-completed" />
             </div>
-            <p className="mb-6 text-sm text-white/60">
+            <p className="mb-6 tls-type-body text-white/60">
               Suche von {dateText(view.starts_at)} bis {dateText(view.ends_at)} · Hinweise ab {dateText(view.hints_open_at)} · Status: {STATUS_LABELS[view.status] || view.status}
             </p>
 
             <section className="mb-6 rounded-sm border border-white/10 bg-[#121212] p-5" data-testid="easter-admin-eggs">
               <div className="mb-3 flex flex-wrap items-center gap-3">
-                <h2 className="font-heading text-xl font-black uppercase flex-1">Verstecke</h2>
+                <h2 className="tls-type-section flex-1">Verstecke</h2>
                 {!locked && (
                   <>
-                    <label className="text-xs text-white/60">Website <input type="number" min={0} max={30} value={counts.web} onChange={(e) => setCounts((c) => ({ ...c, web: Number(e.target.value) }))} className={`${INPUT_CLASS} !inline-block !w-16 !py-1`} aria-label="Eier auf der Website" /></label>
-                    <label className="text-xs text-white/60">App <input type="number" min={0} max={30} value={counts.app} onChange={(e) => setCounts((c) => ({ ...c, app: Number(e.target.value) }))} className={`${INPUT_CLASS} !inline-block !w-16 !py-1`} aria-label="Eier in der App" /></label>
-                    <button type="button" onClick={propose} disabled={busy} data-testid="easter-admin-propose" className="inline-flex items-center gap-2 rounded-sm border border-white/15 px-3 py-2 text-[11px] font-bold uppercase tracking-wider text-white/80 hover:border-white/30 disabled:opacity-40">
+                    <label className="tls-type-small text-white/60">Website <input type="number" min={0} max={30} value={counts.web} onChange={(e) => setCounts((c) => ({ ...c, web: Number(e.target.value) }))} className={`${INPUT_CLASS} !inline-block !w-16 !py-1`} aria-label="Eier auf der Website" /></label>
+                    <label className="tls-type-small text-white/60">App <input type="number" min={0} max={30} value={counts.app} onChange={(e) => setCounts((c) => ({ ...c, app: Number(e.target.value) }))} className={`${INPUT_CLASS} !inline-block !w-16 !py-1`} aria-label="Eier in der App" /></label>
+                    <button type="button" onClick={propose} disabled={busy} data-testid="easter-admin-propose" className="inline-flex items-center gap-2 rounded-sm border border-white/15 px-3 py-2 tls-type-label text-white/80 hover:border-white/30 disabled:opacity-40">
                       <Shuffle className="h-3.5 w-3.5" /> Vorschlag für {year}
                     </button>
                   </>
                 )}
                 {draft && (
-                  <button type="button" onClick={saveEggs} disabled={busy} data-testid="easter-admin-save-eggs" className="inline-flex items-center gap-2 rounded-sm bg-[#e9c46a] px-3 py-2 text-[11px] font-bold uppercase tracking-wider text-black hover:opacity-90 disabled:opacity-40">
+                  <button type="button" onClick={saveEggs} disabled={busy} data-testid="easter-admin-save-eggs" className="inline-flex items-center gap-2 rounded-sm bg-[#e9c46a] px-3 py-2 tls-type-label text-black hover:opacity-90 disabled:opacity-40">
                     Verstecke speichern
                   </button>
                 )}
               </div>
-              {locked && <p className="mb-3 text-xs text-[#ffd98a]" data-testid="easter-admin-locked">Es wurden schon Eier gefunden – die Verstecke bleiben jetzt, wie sie sind.</p>}
-              {draft && <p className="mb-3 text-xs text-white/55">Noch nicht gespeichert.</p>}
+              {locked && <p className="mb-3 tls-type-small text-[#ffd98a]" data-testid="easter-admin-locked">Es wurden schon Eier gefunden – die Verstecke bleiben jetzt, wie sie sind.</p>}
+              {draft && <p className="mb-3 tls-type-small text-white/55">Noch nicht gespeichert.</p>}
               {rows.length ? (
                 <ul className="grid gap-3 lg:grid-cols-2">
                   {rows.map((egg, index) => <EggCard key={`${egg.egg_no ?? "n"}-${index}`} egg={egg} index={index} view={view} locked={locked} onChange={changeRow} onPreview={previewEgg} />)}
                 </ul>
               ) : (
-                <p className="text-sm text-white/55">Noch keine Verstecke – „Vorschlag“ verteilt die Eier für {year}.</p>
+                <p className="tls-type-small text-white/55">Noch keine Verstecke – „Vorschlag“ verteilt die Eier für {year}.</p>
               )}
             </section>
 
             <section className="mb-6 rounded-sm border border-white/10 bg-[#121212] p-5" data-testid="easter-admin-prizes">
-              <h2 className="mb-3 font-heading text-xl font-black uppercase">Preise und Freigabe</h2>
+              <h2 className="mb-3 tls-type-section">Preise und Freigabe</h2>
               <div className="grid gap-3 md:grid-cols-2">
                 {PRIZE_ORDER.map((kind) => (
                   <div key={kind} className="rounded-sm border border-white/10 bg-[#0b0b0b] p-3">
-                    <div className="mb-2 text-[10px] font-bold uppercase tracking-widest text-[#e9c46a]">{view.prize_kinds?.[kind]}</div>
+                    <div className="mb-2 tls-type-label text-[#e9c46a]">{view.prize_kinds?.[kind]}</div>
                     <input type="text" placeholder="Preis (leer = keiner)" value={prizes[kind]?.label || ""} disabled={view.status === "drawn"} onChange={(e) => setPrize(kind, { label: e.target.value })} className={INPUT_CLASS} data-testid={`easter-admin-prize-${kind}`} />
                     <div className="mt-2 flex gap-2">
                       <input type="text" placeholder="Wert" value={prizes[kind]?.value || ""} disabled={view.status === "drawn"} onChange={(e) => setPrize(kind, { value: e.target.value })} className={INPUT_CLASS} />
@@ -283,38 +284,38 @@ export default function AdminEasterHuntPage() {
                 ))}
               </div>
               <div className="mt-4 flex flex-wrap items-center gap-3">
-                <button type="button" onClick={() => saveHunt({}, "Gespeichert.")} disabled={busy || view.status === "drawn"} data-testid="easter-admin-save" className="rounded-sm border border-white/15 px-4 py-2 text-[11px] font-bold uppercase tracking-wider text-white/80 hover:border-white/30 disabled:opacity-40">Speichern</button>
+                <button type="button" onClick={() => saveHunt({}, "Gespeichert.")} disabled={busy || view.status === "drawn"} data-testid="easter-admin-save" className="rounded-sm border border-white/15 px-4 py-2 tls-type-label text-white/80 hover:border-white/30 disabled:opacity-40">Speichern</button>
                 {view.status !== "live" && view.status !== "drawn" && (
-                  <button type="button" onClick={() => saveHunt({ status: "live" }, "Freigegeben – die Suche startet am Karfreitag.")} disabled={busy || !(view.eggs || []).length} data-testid="easter-admin-release" className="rounded-sm bg-[#5fd38d] px-4 py-2 text-[11px] font-bold uppercase tracking-wider text-black hover:opacity-90 disabled:opacity-40">Freigeben</button>
+                  <button type="button" onClick={() => saveHunt({ status: "live" }, "Freigegeben – die Suche startet am Karfreitag.")} disabled={busy || !(view.eggs || []).length} data-testid="easter-admin-release" className="rounded-sm bg-[#5fd38d] px-4 py-2 tls-type-label text-black hover:opacity-90 disabled:opacity-40">Freigeben</button>
                 )}
                 {view.status === "live" && !locked && (
-                  <button type="button" onClick={() => saveHunt({ status: "draft" }, "Zurück auf Entwurf.")} disabled={busy} data-testid="easter-admin-draft" className="rounded-sm border border-white/15 px-4 py-2 text-[11px] font-bold uppercase tracking-wider text-white/70 hover:border-white/30 disabled:opacity-40">Zurück auf Entwurf</button>
+                  <button type="button" onClick={() => saveHunt({ status: "draft" }, "Zurück auf Entwurf.")} disabled={busy} data-testid="easter-admin-draft" className="rounded-sm border border-white/15 px-4 py-2 tls-type-label text-white/70 hover:border-white/30 disabled:opacity-40">Zurück auf Entwurf</button>
                 )}
-                <Link to="/ostern" className="inline-flex items-center gap-2 text-[11px] font-bold uppercase tracking-wider text-[#29B6E8] hover:underline"><ExternalLink className="h-3.5 w-3.5" /> Zur Seite</Link>
+                <Link to="/ostern" className="inline-flex items-center gap-2 tls-type-label text-[#29B6E8] hover:underline"><ExternalLink className="h-3.5 w-3.5" /> Zur Seite</Link>
               </div>
             </section>
 
             <section className="rounded-sm border border-white/10 bg-[#121212] p-5" data-testid="easter-admin-draw">
-              <h2 className="mb-3 flex items-center gap-2 font-heading text-xl font-black uppercase"><Trophy className="h-4 w-4 text-[#ffd700]" /> Auswertung</h2>
+              <h2 className="mb-3 flex items-center gap-2 tls-type-section"><Trophy className="h-4 w-4 text-[#ffd700]" /> Auswertung</h2>
               {view.status === "drawn" ? (
-                <div className="space-y-2 text-sm">
+                <div className="space-y-2 tls-type-small">
                   {(view.fastest_awarded || []).map((row) => <p key={row.user_id}><span className="text-[#e9c46a]">{row.title}:</span> {row.name}</p>)}
                   {view.raffle?.protocol?.length ? view.raffle.protocol.map((record) => <p key={record.id}>Verlosung: {record.winners.map((winner) => winner.name).join(", ")} ({record.eligible} von {record.entries} Losen)</p>) : null}
                   {view.raffle_note && <p className="text-[#ffd98a]">Verlosung: {view.raffle_note}</p>}
                 </div>
               ) : (
                 <>
-                  <p className="text-sm text-white/60">Nach Ostermontag: die Verlosung unter allen mit vollem Korb und die Preise für die Schnellsten. Vorstand und Verwaltung gewinnen nicht.</p>
+                  <p className="tls-type-body text-white/60">Nach Ostermontag: die Verlosung unter allen mit vollem Korb und die Preise für die Schnellsten. Vorstand und Verwaltung gewinnen nicht.</p>
                   {/* Auswerten und die Liste mit E-Mails sind Sache der Vereinsleitung (#2122 NW11). */}
                   {view.may_draw === false ? (
-                    <p className="mt-3 text-xs text-white/50" data-testid="easter-admin-no-draw">Ausgewertet wird von der Vereinsleitung.</p>
+                    <p className="mt-3 tls-type-small text-white/50" data-testid="easter-admin-no-draw">Ausgewertet wird von der Vereinsleitung.</p>
                   ) : (
-                    <button type="button" onClick={draw} disabled={busy || !view.can_draw} data-testid="easter-admin-run-draw" className="mt-3 rounded-sm bg-[#ffd700] px-4 py-2 text-[11px] font-bold uppercase tracking-wider text-black hover:opacity-90 disabled:opacity-40">Auswerten</button>
+                    <button type="button" onClick={draw} disabled={busy || !view.can_draw} data-testid="easter-admin-run-draw" className="mt-3 rounded-sm bg-[#ffd700] px-4 py-2 tls-type-label text-black hover:opacity-90 disabled:opacity-40">Auswerten</button>
                   )}
                 </>
               )}
               {view.may_draw !== false && (
-                <a href={`${API}/seasonal/easter/admin/${year}/participants.csv`} target="_blank" rel="noreferrer" className="mt-4 inline-flex items-center gap-2 text-[11px] font-bold uppercase tracking-wider text-white/70 hover:text-white" data-testid="easter-admin-csv">
+                <a href={`${API}/seasonal/easter/admin/${year}/participants.csv`} target="_blank" rel="noreferrer" className="mt-4 inline-flex items-center gap-2 tls-type-small font-bold text-white/70 hover:text-white" data-testid="easter-admin-csv">
                   <Download className="h-3.5 w-3.5" /> Teilnehmende als CSV (nur Vereinsleitung)
                 </a>
               )}

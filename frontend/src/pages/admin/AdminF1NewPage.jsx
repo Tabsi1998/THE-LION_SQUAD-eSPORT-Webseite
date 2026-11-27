@@ -193,7 +193,7 @@ export default function AdminF1NewPage() {
 
         <FormSection title="Preise (strukturiert)" accent="#FFD700" hint="Wird bei Ergebnisveröffentlichung als Gewinnabholung angelegt.">
           <div className="flex justify-end">
-            <button type="button" onClick={() => set("prize_places", [...(form.prize_places || []), { place: (form.prize_places?.length || 0) + 1, label: "", value: "" }])} data-testid="f1-new-prize-add" className="text-xs font-bold uppercase tracking-wider text-[#29B6E8] hover:text-white">+ Platz hinzufügen</button>
+            <button type="button" onClick={() => set("prize_places", [...(form.prize_places || []), { place: (form.prize_places?.length || 0) + 1, label: "", value: "" }])} data-testid="f1-new-prize-add" className="tls-type-label text-[#29B6E8] hover:text-white">+ Platz hinzufügen</button>
           </div>
           {(form.prize_places || []).map((p, i) => (
             <div key={i} className="grid grid-cols-12 gap-2">
@@ -203,7 +203,7 @@ export default function AdminF1NewPage() {
               <button type="button" onClick={() => set("prize_places", form.prize_places.filter((_, j) => j !== i))} data-testid={`f1-new-prize-remove-${i}`} className="col-span-1 text-white/40 hover:text-[#FF3B30] text-center py-2">✕</button>
             </div>
           ))}
-          {(form.prize_places || []).length === 0 && <div className="text-xs text-white/40">Noch keine Preise - „Platz hinzufügen“ legt die erste Zeile an.</div>}
+          {(form.prize_places || []).length === 0 && <div className="tls-type-small text-quiet">Noch keine Preise - „Platz hinzufügen“ legt die erste Zeile an.</div>}
         </FormSection>
 
         <FastLapStreamFields form={form} set={set} prefix="f1-new" />
@@ -217,7 +217,7 @@ function FastLapSeasonWeightField({ value, onChange }) {
   const isPreset = F1_SEASON_WEIGHT_OPTIONS.some(([optionValue]) => optionValue === normalized);
   return (
     <label className="block border border-[#29B6E8]/20 bg-[#29B6E8]/5 rounded-sm p-4">
-      <div className="text-[11px] font-bold uppercase tracking-widest text-[#29B6E8] mb-1.5">Jahreswertung</div>
+      <div className="tls-type-label text-[#29B6E8] mb-1.5">Jahreswertung</div>
       <div className="grid sm:grid-cols-[1fr_120px] gap-2">
         <select value={isPreset ? normalized : "__custom"} onChange={(e) => onChange(e.target.value === "__custom" ? value : e.target.value)} className={INPUT_CLASS}>
           {F1_SEASON_WEIGHT_OPTIONS.map(([v, l]) => <option key={v} value={v}>{l}</option>)}
@@ -225,7 +225,7 @@ function FastLapSeasonWeightField({ value, onChange }) {
         </select>
         <input type="number" step="0.05" min="0" value={value ?? ""} onChange={(e) => onChange(e.target.value)} className={INPUT_CLASS} aria-label="Jahreswertungs-Faktor" />
       </div>
-      <div className="text-[11px] text-white/45 mt-1.5">
+      <div className="tls-type-small text-white/45 mt-1.5">
         Bestimmt, wie stark diese Fast-Lap Challenge in die Jahreswertung eingeht. 0 bedeutet: keine Jahrespunkte.
       </div>
     </label>

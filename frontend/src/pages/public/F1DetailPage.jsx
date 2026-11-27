@@ -119,25 +119,25 @@ export default function F1DetailPage() {
         <div className="absolute inset-0 bg-gradient-to-b from-[#0A0A0A]/70 to-[#0A0A0A]" />
         <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-14">
           <Breadcrumbs items={[{ label: "Start", to: "/" }, { label: "eSports", to: "/esports" }, { label: "Fast Lap", to: "/fastlap" }, { label: challenge.title }]} className="mb-3" />
-          <Link to="/fastlap" className="text-[11px] font-bold uppercase tracking-[0.3em] text-[#29B6E8] hover:text-white">← Fast Lap Challenges</Link>
+          <Link to="/fastlap" className="tls-type-label text-[#29B6E8] hover:text-white">← Fast Lap Challenges</Link>
           <div className="mt-2 flex flex-wrap items-center gap-3 mb-3">
             <PhaseBadge phase={challenge.public_phase} status={challenge.status} size="lg" />
-            {challenge.is_championship && <span className="text-[11px] font-bold uppercase tracking-wider text-[#FFD700] border border-[#FFD700]/40 px-2 py-1 rounded-sm">Meisterschaft</span>}
+            {challenge.is_championship && <span className="tls-type-label text-[#FFD700] border border-[#FFD700]/40 px-2 py-1 rounded-sm">Meisterschaft</span>}
           </div>
           <div className="flex items-start justify-between gap-3">
-            <h1 data-testid="f1-challenge-title" className="font-heading text-4xl md:text-6xl font-black uppercase leading-tight min-w-0 break-words">{challenge.title}</h1>
+            <h1 data-testid="f1-challenge-title" className="tls-type-title leading-tight min-w-0 break-words">{challenge.title}</h1>
             {/* Teilen (#1154): oben rechts neben dem Titel. */}
             <ShareButton kind="fastlap" id={challenge.slug || challenge.id} title={challenge.title} detail="Fast Lap" start={challenge.start_date} end={challenge.end_date} className="shrink-0 mt-1" />
           </div>
           {challenge.description && <div className="mt-3 max-w-2xl prose-cms" dangerouslySetInnerHTML={{ __html: renderMarkdownLite(challenge.description) }} />}
           {challenge.event && (
-            <Link to={`/events/${challenge.event.slug || challenge.event.id}`} className="tls-btn tls-btn--secondary mt-4 inline-flex items-center gap-2 px-3 py-2 rounded-sm text-xs uppercase tracking-wider font-bold">
+            <Link to={`/events/${challenge.event.slug || challenge.event.id}`} className="tls-btn tls-btn--secondary mt-4 inline-flex items-center gap-2 px-3 py-2 rounded-sm tls-type-label">
               <Calendar className="w-3.5 h-3.5" /> Teil von {challenge.event.name}
             </Link>
           )}
           {/* Aus dem Kasten wird ein Satz (#1277) - nur, wenn Mitglieder hier wirklich außer Wertung fahren. */}
           {challenge.block_club_member_results && challenge.allow_club_reference_times !== false && (
-            <p data-testid="f1-reference-note" className="mt-4 text-sm text-white/60">Vereinsmitglieder fahren außer Wertung mit.</p>
+            <p data-testid="f1-reference-note" className="mt-4 tls-type-small text-white/60">Vereinsmitglieder fahren außer Wertung mit.</p>
           )}
           {isLead && (
             <div className="mt-6 flex flex-wrap gap-3" data-testid="f1-lead-tools">
@@ -180,7 +180,7 @@ export default function F1DetailPage() {
         )}
         {(challenge.prize_places?.length > 0) && (
           <section>
-            <h2 className="font-heading text-xl font-bold uppercase mb-3 flex items-center gap-2"><Trophy className="w-4 h-4 text-[#FFD700]" /> Preise</h2>
+            <h2 className="tls-type-section mb-3 flex items-center gap-2"><Trophy className="w-4 h-4 text-[#FFD700]" /> Preise</h2>
             <PrizeList prizePlaces={challenge.prize_places} />
           </section>
         )}
@@ -189,14 +189,14 @@ export default function F1DetailPage() {
             <button
               data-testid="f1-tab-track"
               onClick={() => setTab("track")}
-              className={`px-4 py-2 text-xs font-bold uppercase tracking-wider rounded-sm border transition ${tab === "track" ? "bg-[#29B6E8] text-black border-[#29B6E8]" : "text-white/70 border-white/10 hover:border-[#29B6E8]/40"}`}
+              className={`px-4 py-2 tls-type-label rounded-sm border transition ${tab === "track" ? "bg-[#29B6E8] text-black border-[#29B6E8]" : "text-white/70 border-white/10 hover:border-[#29B6E8]/40"}`}
             >
               Strecken-Rangliste
             </button>
             <button
               data-testid="f1-tab-championship"
               onClick={() => setTab("championship")}
-              className={`px-4 py-2 text-xs font-bold uppercase tracking-wider rounded-sm border transition ${tab === "championship" ? "bg-[#29B6E8] text-black border-[#29B6E8]" : "text-white/70 border-white/10 hover:border-[#29B6E8]/40"}`}
+              className={`px-4 py-2 tls-type-label rounded-sm border transition ${tab === "championship" ? "bg-[#29B6E8] text-black border-[#29B6E8]" : "text-white/70 border-white/10 hover:border-[#29B6E8]/40"}`}
             >
               Gesamtwertung
             </button>
@@ -206,7 +206,7 @@ export default function F1DetailPage() {
         {tab === "track" && (
           <div className="grid lg:grid-cols-4 gap-6">
             <aside>
-              <div className="text-[11px] uppercase tracking-widest font-bold text-white/50 mb-3">Strecken</div>
+              <div className="tls-type-label text-white/50 mb-3">Strecken</div>
               <div className="space-y-2">
                 {challenge.tracks?.map((tr) => (
                   <button
@@ -223,8 +223,8 @@ export default function F1DetailPage() {
                       <div className="w-20 h-12 rounded-sm bg-[#0A0A0A] border border-white/5" />
                     )}
                     <div className="min-w-0">
-                      <div className="font-heading font-bold truncate">{tr.name}</div>
-                      <div className="text-[10px] uppercase tracking-widest text-white/50">{tr.country}</div>
+                      <div className="font-bold truncate">{tr.name}</div>
+                      <div className="tls-type-label text-white/50">{tr.country}</div>
                     </div>
                   </button>
                 ))}
@@ -246,26 +246,26 @@ export default function F1DetailPage() {
               )}
               <div className="border border-white/10 rounded-sm bg-[#121212] overflow-hidden relative">
                 <div className="p-4 border-b border-white/10 flex items-center justify-between gap-3">
-                  <h3 className="font-heading text-xl font-bold min-w-0 truncate">{board?.track?.name || "—"}</h3>
-                  <span className="shrink-0 text-[11px] uppercase tracking-widest text-white/50 font-display">{board?.entries?.length || 0} Fahrer</span>
+                  <h3 className="tls-type-card min-w-0 truncate">{board?.track?.name || "—"}</h3>
+                  <span className="shrink-0 tls-type-label text-white/50"><span className="tls-type-num">{board?.entries?.length || 0}</span> Fahrer</span>
                 </div>
                 {marks.best && (
                   <div key={marks.bestKey} className="tls-best-flash" role="status" data-testid="f1-best-flash">
-                    <span className="tls-best-flash__kicker font-heading">Neue Bestzeit!</span>
+                    <span className="tls-best-flash__kicker">Neue Bestzeit!</span>
                     <span className="min-w-0 truncate font-bold">{marks.best.entry.display_name}</span>
-                    <span className="font-display font-bold tabular-nums text-honor">{showLapTime(marks.best.entry.time_str)}</span>
-                    {marks.best.gapMs !== null && <span className="font-display tabular-nums text-white/70">{deltaText(marks.best.gapMs)}</span>}
+                    <span className="tls-type-num text-honor">{showLapTime(marks.best.entry.time_str)}</span>
+                    {marks.best.gapMs !== null && <span className="tls-type-num text-white/70">{deltaText(marks.best.gapMs)}</span>}
                   </div>
                 )}
                 <div className="tls-swipe pb-0">
                 {/* Timing-Board (#1077): beim ersten Erscheinen zählen die Zeiten einmal hoch, Platz 1 bis 3 tragen einen
                     Strich in Gold, Silber und Bronze, beim Drüberfahren läuft ein Lichtstreif durch die Zeile. */}
-                <table ref={boardRef} className="tls-lap-board w-full text-sm" data-intro={introOnce(board?.track?.id ? `fastlap:${challenge.id}:${board.track.id}` : "") ? "1" : undefined} data-testid="f1-board">
-                  <thead className="bg-[#0A0A0A] text-[11px] uppercase tracking-widest text-white/50">
+                <table ref={boardRef} className="tls-lap-board w-full tls-type-small" data-intro={introOnce(board?.track?.id ? `fastlap:${challenge.id}:${board.track.id}` : "") ? "1" : undefined} data-testid="f1-board">
+                  <thead className="bg-[#0A0A0A] tls-type-label text-white/50">
                     <tr>
                       <th className="text-left px-4 py-3 w-12">#</th>
                       <th className="text-left px-4 py-3">Fahrer</th>
-                      <th className="text-right px-4 py-3 font-display whitespace-nowrap">Beste Zeit</th>
+                      <th className="text-right px-4 py-3 whitespace-nowrap">Beste Zeit</th>
                       <th className="hidden sm:table-cell text-right px-4 py-3">Abstand</th>
                       <th className="hidden sm:table-cell text-right px-4 py-3">Versuche</th>
                       {showCertificates && <th className="hidden sm:table-cell text-right px-4 py-3">Urkunde</th>}
@@ -282,33 +282,33 @@ export default function F1DetailPage() {
                       const own = Boolean(user?.id) && (e.user_id === user.id || key === user.id);
                       return (
                       <tr key={key} data-flip-key={key} data-testid={`f1-row-${e.rank}`} data-mine={own ? "true" : undefined} className={`tls-lap-row ${e.rank <= 3 ? `tls-lap-row--p${e.rank} bg-[#29B6E8]/5` : ""} ${record ? "tls-lap-row--record" : fresh ? "tls-lap-row--fresh" : ""}${own ? " tls-you tls-you--inset" : ""}`}>
-                        <td className={`px-4 py-3 font-display font-bold ${e.rank === 1 ? "text-[#FFD700]" : e.rank === 2 ? "text-white/80" : e.rank === 3 ? "text-[#CD7F32]" : "text-[#29B6E8]"}`}><span data-rank-digit className="inline-block">{e.rank}</span></td>
+                        <td className={`px-4 py-3 tls-type-num ${e.rank === 1 ? "text-[#FFD700]" : e.rank === 2 ? "text-white/80" : e.rank === 3 ? "text-[#CD7F32]" : "text-[#29B6E8]"}`}><span data-rank-digit className="inline-block">{e.rank}</span></td>
                         <td className="px-3 sm:px-4 py-3">
                           {/* Lange Namen (break-ui): die Zelle kürzt selbst, sonst schöbe ein Name die Zeit aus dem Bild. */}
                           <span className="flex items-center gap-2 min-w-0 max-w-[9.5rem] sm:max-w-[18rem]">
                             <span className="truncate" title={e.display_name}>{e.display_name}</span>
                             {own && <span className="tls-you-tag" data-testid={`f1-you-${e.rank}`}>Du</span>}
-                            {e.is_guest && <span className="shrink-0 text-[9px] font-bold uppercase tracking-widest text-honor/80 border border-honor/30 rounded-sm px-1" title="Gast ohne Konto - nicht in Jahreswertung, Erfolgen und Gewinnen">Gast</span>}
+                            {e.is_guest && <span className="shrink-0 tls-type-label text-honor/80 border border-honor/30 rounded-sm px-1" title="Gast ohne Konto - nicht in Jahreswertung, Erfolgen und Gewinnen">Gast</span>}
                           </span>
                           {/* Am Handy stehen die Versuche unter dem Namen - Abstand, Versuche und Urkunde haben dort keine Spalte. */}
-                          <span className="sm:hidden block text-[10px] text-white/45 tabular-nums">{attemptsCell(e.attempts, maxAttempts)} Versuche</span>
+                          <span className="sm:hidden block tls-type-small tls-type-num text-white/45">{attemptsCell(e.attempts, maxAttempts)} Versuche</span>
                           {chip && <span className={`tls-lap-chip-web ${chip.kind === "best" ? "tls-lap-chip-web--best" : ""}`} data-testid={`f1-chip-${key}`}>{chip.text}</span>}
                         </td>
-                        <td className="px-4 py-3 text-right font-display font-bold text-white tabular-nums">
+                        <td className="px-4 py-3 text-right tls-type-card tls-type-num text-white">
                           <span className="inline-flex items-center gap-1.5">
                             <LapTime key={`${key}:${e.time_str}`} value={e.time_str} play={from !== undefined || introOnce(board?.track?.id ? `fastlap:${challenge.id}:${board.track.id}` : "")} from={from} duration={from !== undefined ? MOTION.slow * 2 : undefined} data-testid={`f1-time-${e.rank}`} />
                             {e.penalty_seconds > 0 && (
                               <span
                                 title={`+${e.penalty_seconds}s Strafzeit · ${e.penalty_note || "ohne Begründung"}`}
                                 data-testid={`f1-penalty-${key}`}
-                                className="inline-flex items-center gap-1 text-[10px] font-bold text-[#FF3B30] bg-[#FF3B30]/10 px-1.5 py-0.5 rounded-sm normal-case"
+                                className="inline-flex items-center gap-1 tls-type-small font-bold text-[#FF3B30] bg-[#FF3B30]/10 px-1.5 py-0.5 rounded-sm"
                               >
                                 +{e.penalty_seconds}s ⓘ
                               </span>
                             )}
                           </span>
                           {e.penalty_note && (
-                            <div className="text-[10px] font-normal text-[#FF3B30]/80 italic mt-0.5 text-right max-w-[260px] ml-auto">
+                            <div className="tls-type-small font-normal text-[#FF3B30]/80 italic mt-0.5 text-right max-w-[260px] ml-auto">
                               „{e.penalty_note}"
                             </div>
                           )}
@@ -324,7 +324,7 @@ export default function F1DetailPage() {
                         {showCertificates && (
                           <td className="hidden sm:table-cell px-4 py-3 text-right">
                             {e.rank <= 4 ? (
-                              <a href={`${API}/exports/f1/${challenge.slug || challenge.id}/certificates/${encodeURIComponent(key)}.pdf${f1ResultQuery({ track_id: activeTrack, access: accessToken })}`} target="_blank" rel="noreferrer" data-testid={`f1-certificate-${e.rank}`} className="inline-flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider text-[#FFD700] hover:text-white">
+                              <a href={`${API}/exports/f1/${challenge.slug || challenge.id}/certificates/${encodeURIComponent(key)}.pdf${f1ResultQuery({ track_id: activeTrack, access: accessToken })}`} target="_blank" rel="noreferrer" data-testid={`f1-certificate-${e.rank}`} className="inline-flex items-center gap-1.5 tls-type-label text-[#FFD700] hover:text-white">
                                 <Award className="w-3 h-3" /> {showResultPdf ? "PDF" : "Drucken"}
                               </a>
                             ) : <span className="text-white/25">—</span>}
@@ -347,23 +347,23 @@ export default function F1DetailPage() {
           <div className="border border-white/10 rounded-sm bg-[#121212] overflow-hidden">
             <div className="p-4 border-b border-white/10 flex items-center gap-2">
               <Trophy className="w-4 h-4 text-[#FFD700]" />
-              <h3 className="font-heading text-xl font-bold">Gesamtwertung der Meisterschaft</h3>
+              <h3 className="tls-type-card">Gesamtwertung der Meisterschaft</h3>
             </div>
-            <table className="w-full text-sm">
-              <thead className="bg-[#0A0A0A] text-[11px] uppercase tracking-widest text-white/50">
+            <table className="w-full tls-type-small">
+              <thead className="bg-[#0A0A0A] tls-type-label text-white/50">
                 <tr>
                   <th className="text-left px-4 py-3 w-12">#</th>
                   <th className="text-left px-4 py-3">Fahrer</th>
                   <th className="text-right px-4 py-3">Siege</th>
                   <th className="text-right px-4 py-3">Rennen</th>
-                  <th className="text-right px-4 py-3 font-display">Punkte</th>
+                  <th className="text-right px-4 py-3 tls-type-num">Punkte</th>
                   {showResultPdf && isLead && <th className="text-right px-4 py-3">Urkunde</th>}
                 </tr>
               </thead>
               <tbody className="divide-y divide-white/5">
                 {championship.standings.map((s) => (
                   <tr key={s.user_id} data-testid={`f1-championship-row-${s.user_id}`} data-mine={user?.id && s.user_id === user.id ? "true" : undefined} className={`${s.rank <= 3 ? "bg-[#FFD700]/5" : ""}${user?.id && s.user_id === user.id ? " tls-you tls-you--inset" : ""}`}>
-                    <td className={`px-4 py-3 font-display font-bold ${s.rank === 1 ? "text-[#FFD700]" : s.rank === 2 ? "text-white/80" : s.rank === 3 ? "text-[#CD7F32]" : "text-[#29B6E8]"}`}>{s.rank}</td>
+                    <td className={`px-4 py-3 tls-type-num ${s.rank === 1 ? "text-[#FFD700]" : s.rank === 2 ? "text-white/80" : s.rank === 3 ? "text-[#CD7F32]" : "text-[#29B6E8]"}`}>{s.rank}</td>
                     <td className="px-4 py-3 text-white">
                       <span className="flex items-center gap-2 min-w-0">
                         <span className="min-w-0 break-words">{s.display_name}</span>
@@ -372,11 +372,11 @@ export default function F1DetailPage() {
                     </td>
                     <td className="px-4 py-3 text-right">{s.wins}</td>
                     <td className="px-4 py-3 text-right">{s.races}</td>
-                    <td className="px-4 py-3 text-right font-display font-bold text-[#29B6E8] text-lg">{s.points}</td>
+                    <td className="px-4 py-3 text-right tls-type-card tls-type-num text-[#29B6E8]">{s.points}</td>
                     {showResultPdf && isLead && (
                       <td className="px-4 py-3 text-right">
                         {s.rank <= 4 ? (
-                          <a href={`${API}/exports/f1/${challenge.slug || challenge.id}/championship-certificates/${s.user_id}.pdf${f1ResultQuery({ access: accessToken })}`} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider text-[#FFD700] hover:text-white">
+                          <a href={`${API}/exports/f1/${challenge.slug || challenge.id}/championship-certificates/${s.user_id}.pdf${f1ResultQuery({ access: accessToken })}`} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1.5 tls-type-label text-[#FFD700] hover:text-white">
                             <Award className="w-3 h-3" /> PDF
                           </a>
                         ) : <span className="text-white/25">—</span>}
@@ -413,12 +413,12 @@ function FastLapConditions({ challenge }) {
   if (!rows.length) return null;
   return (
     <section data-testid="f1-conditions" className="border border-white/10 rounded-sm bg-[#121212] p-4 sm:p-5">
-      <h2 className="font-heading text-xl font-bold uppercase mb-3 flex items-center gap-2"><Flag className="w-4 h-4 text-[#29B6E8]" /> Bedingungen</h2>
+      <h2 className="tls-type-section mb-3 flex items-center gap-2"><Flag className="w-4 h-4 text-[#29B6E8]" /> Bedingungen</h2>
       <dl className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-5 gap-x-4 gap-y-3">
         {rows.map(([key, label, value]) => (
           <div key={key} className="min-w-0">
-            <dt className="text-[10px] font-bold uppercase tracking-widest text-white/45">{label}</dt>
-            <dd className="mt-0.5 text-sm text-white break-words" data-testid={`f1-condition-${key}`}>{value}</dd>
+            <dt className="tls-type-label text-white/45">{label}</dt>
+            <dd className="mt-0.5 tls-type-small text-white break-words" data-testid={`f1-condition-${key}`}>{value}</dd>
           </div>
         ))}
       </dl>
@@ -426,7 +426,7 @@ function FastLapConditions({ challenge }) {
   );
 }
 
-const DOWNLOAD_LINK = "tls-btn tls-btn--secondary inline-flex items-center gap-2 px-3 py-2 text-xs font-bold uppercase tracking-wider rounded-sm";
+const DOWNLOAD_LINK = "tls-btn tls-btn--secondary inline-flex items-center gap-2 px-3 py-2 tls-type-label rounded-sm";
 
 /**
  * „Downloads“ (#1277): für alle erst mit Ergebnissen - Ergebnis-PDF, bei einer Meisterschaft die Gesamtwertung, angemeldet
@@ -448,12 +448,12 @@ function FastLapDownloads({ challenge, activeTrack, accessToken, user, board, ch
         aria-expanded={open}
         aria-controls="f1-downloads-list"
         data-testid="f1-downloads-toggle"
-        className="sm:hidden w-full flex items-center justify-between gap-3 px-4 py-3 text-xs font-bold uppercase tracking-widest text-white/70"
+        className="sm:hidden w-full flex items-center justify-between gap-3 px-4 py-3 tls-type-label text-white/70"
       >
         Downloads
         <ChevronDown className={`w-4 h-4 transition-transform duration-fast ${open ? "rotate-180" : ""}`} aria-hidden="true" />
       </button>
-      <div className="hidden sm:block px-4 pt-3 text-[11px] font-bold uppercase tracking-widest text-white/50">Downloads</div>
+      <div className="hidden sm:block px-4 pt-3 tls-type-label text-white/50">Downloads</div>
       <div id="f1-downloads-list" className={`${open ? "flex" : "hidden"} sm:flex flex-wrap gap-2 px-4 pb-4 pt-1 sm:pt-3`}>
         <a href={`${base}/leaderboard.pdf${f1ResultQuery({ track_id: activeTrack, access: accessToken })}`} target="_blank" rel="noreferrer" data-testid="f1-result-pdf" className={DOWNLOAD_LINK}>
           <FileDown className="w-3.5 h-3.5" /> Ergebnis-PDF
@@ -609,7 +609,7 @@ function InlineFastLapTimeEntry({ challenge, trackId, currentUser, onSaved }) {
 
   if (locked && !isTournamentLead) {
     return (
-      <div data-testid="fastlap-locked" className="mb-5 border border-honor/30 bg-honor/5 rounded-sm p-4 text-sm text-white/75">
+      <div data-testid="fastlap-locked" className="mb-5 border border-honor/30 bg-honor/5 rounded-sm p-4 tls-type-small text-white/75">
         Die Ergebnisse sind veröffentlicht. Zeiten ändert jetzt nur noch die Turnierleitung, mit Begründung.
       </div>
     );
@@ -620,53 +620,53 @@ function InlineFastLapTimeEntry({ challenge, trackId, currentUser, onSaved }) {
       <form onSubmit={submit}>
         <div className="flex items-center justify-between gap-3 mb-3">
           <div>
-            <div className="text-[11px] font-bold uppercase tracking-widest text-[#29B6E8]">Zeit erfassen</div>
-            <div className="text-xs text-white/45 mt-1">Direkt für Zeitnehmer, Schiedsrichter und Organisation.</div>
+            <div className="tls-type-label text-[#29B6E8]">Zeit erfassen</div>
+            <div className="tls-type-small text-white/45 mt-1">Direkt für Zeitnehmer, Schiedsrichter und Organisation.</div>
           </div>
           {/* Am Simulator (#1585): Ziffernblock, Gäste und „Am Start / Als Nächstes“ stehen in der Verwaltung. */}
           <div className="flex items-center gap-3 shrink-0">
-            {currentUser && <div className="hidden sm:block text-[10px] uppercase tracking-widest text-white/35">{currentUser.display_name || currentUser.username}</div>}
-            <Link to={`/admin/f1/${challenge.id}#vor-ort`} data-testid="fastlap-quick-link" className="tls-btn tls-btn--quiet px-3 py-1.5 rounded-sm text-[11px] font-bold uppercase tracking-wider">Schnelleingabe</Link>
+            {currentUser && <div className="hidden sm:block tls-type-small text-quiet">{currentUser.display_name || currentUser.username}</div>}
+            <Link to={`/admin/f1/${challenge.id}#vor-ort`} data-testid="fastlap-quick-link" className="tls-btn tls-btn--quiet px-3 py-1.5 rounded-sm tls-type-label">Schnelleingabe</Link>
           </div>
         </div>
         <div className="grid md:grid-cols-[minmax(12rem,1fr)_9rem_11rem_8rem_auto] gap-2 items-end">
           <PersonPicker purpose="fastlap" contextId={challenge.id} value={driver} onChange={(person) => { setDriver(person); setActionError(""); }} label="Fahrer" placeholder="Fahrer suchen …" testId="fastlap-user" />
           <label className="block">
-            <span className="block text-[11px] font-bold uppercase tracking-widest text-white/60 mb-1">Zeit</span>
+            <span className="block tls-type-label text-white/60 mb-1">Zeit</span>
             <input value={form.time_str} onChange={(e) => set("time_str", e.target.value)} required placeholder="1:24.587" inputMode="decimal" data-testid="fastlap-time" className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm font-display tabular-nums" />
           </label>
           <label className="block">
-            <span className="block text-[11px] font-bold uppercase tracking-widest text-white/60 mb-1">Wertung</span>
+            <span className="block tls-type-label text-white/60 mb-1">Wertung</span>
             <select value={form.score_scope} onChange={(e) => set("score_scope", e.target.value)} className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-sm">
               <option value="official" disabled={forceReferenceScope}>Offiziell</option>
               <option value="club_reference">Referenz</option>
             </select>
           </label>
           <label className="block">
-            <span className="block text-[11px] font-bold uppercase tracking-widest text-white/60 mb-1">Strafe</span>
+            <span className="block tls-type-label text-white/60 mb-1">Strafe</span>
             <input type="number" step="0.1" value={form.penalty_seconds} onChange={(e) => set("penalty_seconds", e.target.value)} data-testid="fastlap-penalty" className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm" />
           </label>
-          <button disabled={saving} data-testid="fastlap-submit" className="tls-btn tls-btn--primary px-4 py-2 font-bold uppercase tracking-wider rounded-sm text-sm disabled:opacity-50">Speichern</button>
+          <button disabled={saving} data-testid="fastlap-submit" className="tls-btn tls-btn--primary px-4 py-2 font-bold uppercase tracking-wider rounded-sm tls-type-small disabled:opacity-50">Speichern</button>
         </div>
         <div className="mt-2 grid md:grid-cols-2 gap-2">
           <input value={form.proof_url} onChange={(e) => set("proof_url", e.target.value)} placeholder="Nachweis-Link (optional)" className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-sm" />
           <input value={form.admin_note} onChange={(e) => set("admin_note", e.target.value)} placeholder={Number(form.penalty_seconds) > 0 ? "Begründung für Strafe" : "Notiz optional"} className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-sm" />
         </div>
-        {forceReferenceScope && <div className="mt-2 text-[10px] text-[#FFD700] uppercase tracking-widest">Vereinsmitglied: nur Referenzzeit möglich.</div>}
+        {forceReferenceScope && <div className="mt-2 tls-type-small text-[#FFD700]">Vereinsmitglied: nur Referenzzeit möglich.</div>}
         {actionError && <div className="mt-3"><AuthFormAlert id="fastlap-action-error">{actionError}</AuthFormAlert></div>}
       </form>
 
       <div className="mt-4 border-t border-white/10 pt-3">
         <div className="mb-2 flex items-center justify-between gap-3">
-          <div className="text-[11px] font-bold uppercase tracking-widest text-white/55">Letzte Zeiten</div>
-          <div className="text-[10px] uppercase tracking-widest text-white/35">{times.length} Einträge</div>
+          <div className="tls-type-label text-white/55">Letzte Zeiten</div>
+          <div className="tls-type-label text-quiet">{times.length} Einträge</div>
         </div>
         <div className="grid md:grid-cols-2 gap-2">
           {times.slice(0, 8).map((time) => (
             <div key={time.id} className={`border rounded-sm px-3 py-2 flex items-center justify-between gap-3 ${time.is_invalid ? "border-[#FF3B30]/35 bg-[#FF3B30]/5" : "border-white/10 bg-[#0A0A0A]/70"}`}>
               <div className="min-w-0">
-                <div className="font-bold text-sm truncate">{time.user?.display_name || time.user?.username || "Unbekannt"}</div>
-                <div className="mt-0.5 flex flex-wrap items-center gap-2 text-[10px] uppercase tracking-wider text-white/42">
+                <div className="font-bold tls-type-small truncate">{time.user?.display_name || time.user?.username || "Unbekannt"}</div>
+                <div className="mt-0.5 flex flex-wrap items-center gap-2 tls-type-label text-quiet">
                   <span>#{time.attempt_number || "-"}</span>
                   {(time.score_scope || "official") === "club_reference" && <span className="text-[#FFD700]">Referenz</span>}
                   {time.penalty_seconds > 0 && <span className="text-[#FF3B30]">+{time.penalty_seconds}s</span>}
@@ -674,7 +674,7 @@ function InlineFastLapTimeEntry({ challenge, trackId, currentUser, onSaved }) {
                 </div>
               </div>
               <div className="flex items-center gap-2 shrink-0">
-                <span className={`font-display font-bold tabular-nums ${time.is_invalid ? "line-through text-white/40" : "text-white"}`}>{showLapTime(time.time_str)}</span>
+                <span className={`tls-type-num ${time.is_invalid ? "line-through text-white/40" : "text-white"}`}>{showLapTime(time.time_str)}</span>
                 <button
                   type="button"
                   onClick={() => deleteTime(time)}
@@ -687,7 +687,7 @@ function InlineFastLapTimeEntry({ challenge, trackId, currentUser, onSaved }) {
               </div>
             </div>
           ))}
-          {times.length === 0 && <div className="md:col-span-2 text-center py-5 text-sm text-white/40 border border-dashed border-white/10 rounded-sm">Noch keine Zeiten auf dieser Strecke.</div>}
+          {times.length === 0 && <div className="md:col-span-2 text-center py-5 tls-type-small text-quiet border border-dashed border-white/10 rounded-sm">Noch keine Zeiten auf dieser Strecke.</div>}
         </div>
       </div>
     </div>
@@ -700,8 +700,8 @@ function ClubReferenceTimes({ entries }) {
     <div className="mt-4 border border-[#FFD700]/20 bg-[#FFD700]/5 rounded-sm p-4">
       <div className="flex items-center justify-between gap-3 mb-3">
         <div>
-          <div className="text-[11px] font-bold uppercase tracking-widest text-[#FFD700]">Vereins-Referenz</div>
-          <div className="text-xs text-white/50 mt-0.5">Top 3 außer Wertung als Zielzeit zum Schlagen.</div>
+          <div className="tls-type-label text-[#FFD700]">Vereins-Referenz</div>
+          <div className="tls-type-small text-white/50 mt-0.5">Top 3 außer Wertung als Zielzeit zum Schlagen.</div>
         </div>
         <Flag className="w-4 h-4 text-[#FFD700]" />
       </div>
@@ -709,11 +709,11 @@ function ClubReferenceTimes({ entries }) {
         {entries.map((entry) => (
           <div key={participantKey(entry)} className="border border-white/10 bg-[#0A0A0A]/60 rounded-sm px-3 py-2">
             <div className="flex items-center justify-between gap-2">
-              <span className="text-[11px] font-display font-bold text-[#FFD700]">#{entry.rank}</span>
-              <span className="font-display font-bold tabular-nums text-white">{showLapTime(entry.time_str)}</span>
+              <span className="tls-type-small tls-type-num text-[#FFD700]">#{entry.rank}</span>
+              <span className="tls-type-num text-white">{showLapTime(entry.time_str)}</span>
             </div>
-            <div className="mt-1 text-sm font-bold truncate">{entry.display_name}</div>
-            <div className="text-[10px] uppercase tracking-widest text-white/40">{entry.attempts} Versuche</div>
+            <div className="mt-1 tls-type-small font-bold truncate">{entry.display_name}</div>
+            <div className="tls-type-label text-quiet">{entry.attempts} Versuche</div>
           </div>
         ))}
       </div>

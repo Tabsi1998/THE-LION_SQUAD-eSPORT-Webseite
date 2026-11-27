@@ -57,28 +57,28 @@ function Calendar({ rounds, originals, profile }) {
   const places = kindShows(profile, "venue");
   return (
     <section className="mt-12" aria-labelledby="series-page-calendar" data-testid="series-page-calendar">
-      <h2 id="series-page-calendar" className="font-heading text-2xl font-black uppercase">Termine</h2>
+      <h2 id="series-page-calendar" className="tls-type-section">Termine</h2>
       {rounds.length === 0 ? (
-        <p className="mt-3 text-sm text-white/55">Noch keine Termine.</p>
+        <p className="mt-3 tls-type-small text-white/55">Noch keine Termine.</p>
       ) : (
         <ol className="mt-4 divide-y divide-white/5 border-y border-white/10">
           {rounds.map((round) => (
             <li key={round.id} className="py-3 flex items-start gap-3" data-testid="series-page-round" data-state={round.state}>
               <span className={`min-w-12 shrink-0 whitespace-nowrap font-black tabular-nums ${round.kind === "final" ? "text-[var(--tls-honor)]" : "text-white/80"}`}>{roundLabel(round)}</span>
               <span className="min-w-0 flex-1">
-                <span className={`block text-sm tabular-nums ${round.state === "cancelled" ? "text-white/45" : "text-white"}`}>{roundWhen(round, { open: OPEN_ROUND })}</span>
+                <span className={`block tls-type-small tabular-nums ${round.state === "cancelled" ? "text-white/45" : "text-white"}`}>{roundWhen(round, { open: OPEN_ROUND })}</span>
                 {places ? (round.title || round.venue || round.country_code || round.opponent) && (
-                  <span className="block text-sm text-white/60">
+                  <span className="block tls-type-small text-white/60">
                     <VenueWithFlag round={round} />
                     {round.opponent && `${round.title || round.venue || round.country_code ? " · " : ""}gegen ${round.opponent}`}
                   </span>
-                ) : round.title && <span className="block text-sm text-white/60">{round.title}</span>}
-                {round.original_club_day && <span className="block text-[11px] text-white/45">ursprünglich {dayLabel(round.original_club_day)}</span>}
+                ) : round.title && <span className="block tls-type-small text-white/60">{round.title}</span>}
+                {round.original_club_day && <span className="block tls-type-small text-white/45">ursprünglich {dayLabel(round.original_club_day)}</span>}
                 <NoScoreNote round={round} profile={profile} />
                 {/* Original-Bilder des Veranstalters (#1933). */}
                 <OriginalsButton items={originalsOf(originals, [round])} title={[roundLabel(round), (places && round.venue) || round.title].filter(Boolean).join(" · ")} className="mt-2" testId="series-page-round-originals" />
               </span>
-              <span className={`inline-flex items-center px-2 py-0.5 border rounded-sm text-[10px] font-bold uppercase tracking-widest whitespace-nowrap ${STATE_TONES[round.state] || STATE_TONES.planned}`}>
+              <span className={`inline-flex items-center px-2 py-0.5 border rounded-sm tls-type-label whitespace-nowrap ${STATE_TONES[round.state] || STATE_TONES.planned}`}>
                 {PUBLIC_STATE_LABELS[round.state] || round.state}
               </span>
             </li>
@@ -138,8 +138,8 @@ export default function ReferenceSeriesPage() {
             <div className={logo ? "flex flex-col sm:flex-row sm:items-center gap-4 sm:gap-6" : ""}>
               <SeriesLogo src={logo} size="lg" testId="series-page-logo" />
               <div className="min-w-0">
-                <p className="text-[11px] font-bold uppercase tracking-[0.3em] text-[#29B6E8]">{eyebrow || "Serie"}</p>
-                <h1 className="font-heading text-4xl md:text-5xl font-black uppercase mt-2">{title}</h1>
+                <p className="tls-type-label text-[#29B6E8]">{eyebrow || "Serie"}</p>
+                <h1 className="tls-type-title mt-2">{title}</h1>
               </div>
             </div>
             <SeriesPartners partners={data.partners} />
@@ -151,7 +151,7 @@ export default function ReferenceSeriesPage() {
             {data.lineage?.kind !== "team_league" && !data.racing && (<>
             <SeriesProgress progress={data.progress} rounds={rounds} profile={data.profile} />
             <section className="mt-10" aria-labelledby="series-page-table">
-              <h2 id="series-page-table" className="font-heading text-2xl font-black uppercase">Gesamtwertung</h2>
+              <h2 id="series-page-table" className="tls-type-section">Gesamtwertung</h2>
               <SeriesRules rules={data.rules} />
               <RuleChanges changes={data.rule_changes} />
               <SeriesStandings standings={data.standings} rounds={rounds} rules={data.rules} extraColumn={bonusColumn(data.rules)} profile={data.profile} />

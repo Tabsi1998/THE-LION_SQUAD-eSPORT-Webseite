@@ -13,6 +13,7 @@ import { toast } from "sonner";
 import {
   Save, Eye, EyeOff, ChevronUp, ChevronDown, RotateCcw, ChevronRight, ChevronDownIcon, Undo2,
 } from "lucide-react";
+import { ShortCaps } from "@/components/tls/ShortCaps";
 
 /** Haupt- und Unterpunkte nach ihrer gespeicherten Reihenfolge - dieselbe Regel wie Website und Server. */
 export function sortNavItems(items) {
@@ -154,9 +155,9 @@ export default function AdminNavPage() {
 
   return (
     <AdminLayout>
-      <span className="text-[11px] font-bold uppercase tracking-[0.3em] text-[#FFD700]">Content</span>
-      <h1 className="font-heading text-3xl md:text-4xl font-black uppercase mt-1">Navigation</h1>
-      <p className="mt-2 text-white/55 text-sm max-w-2xl">
+      <span className="tls-type-label text-[#FFD700]">Content</span>
+      <h1 className="tls-type-title mt-1"><ShortCaps>Navigation</ShortCaps></h1>
+      <p className="mt-2 text-white/55 tls-type-body max-w-2xl">
         Reihenfolge, Namen und Sichtbarkeit des Menüs der Website. Die Unterpunkte eines Menüs siehst du nach dem Aufklappen.
       </p>
 
@@ -165,7 +166,7 @@ export default function AdminNavPage() {
           onClick={save}
           disabled={saving || loading || missing.length > 0}
           data-testid="nav-save"
-          className="px-5 py-2 bg-[#FFD700] text-black font-bold uppercase tracking-wider rounded-sm text-xs inline-flex items-center gap-2 disabled:opacity-50"
+          className="px-5 py-2 bg-[#FFD700] text-black tls-type-label rounded-sm inline-flex items-center gap-2 disabled:opacity-50"
         >
           <Save className="w-3.5 h-3.5" /> {saving ? "Speichere…" : "Speichern"}
         </button>
@@ -173,7 +174,7 @@ export default function AdminNavPage() {
           onClick={load}
           disabled={loading}
           data-testid="nav-reload"
-          className="px-3 py-2 border border-white/10 hover:bg-white/5 rounded-sm text-xs font-bold uppercase tracking-wider inline-flex items-center gap-2"
+          className="px-3 py-2 border border-white/10 hover:bg-white/5 rounded-sm tls-type-label inline-flex items-center gap-2"
         >
           <RotateCcw className="w-3.5 h-3.5" /> Verwerfen
         </button>
@@ -182,14 +183,14 @@ export default function AdminNavPage() {
           onClick={reset}
           disabled={loading || saving}
           data-testid="nav-reset"
-          className="px-3 py-2 border border-white/10 hover:bg-white/5 rounded-sm text-xs font-bold uppercase tracking-wider inline-flex items-center gap-2 disabled:opacity-50"
+          className="px-3 py-2 border border-white/10 hover:bg-white/5 rounded-sm tls-type-label inline-flex items-center gap-2 disabled:opacity-50"
         >
           <Undo2 className="w-3.5 h-3.5" /> Zurücksetzen
         </button>
-        <span className="text-xs text-white/40 ml-auto">{items.length} Hauptpunkte</span>
+        <span className="tls-type-small text-quiet ml-auto">{items.length} Hauptpunkte</span>
       </div>
       {missing.length > 0 && (
-        <p role="alert" className="mt-3 text-xs text-[#FF6B6B]" data-testid="nav-missing-label">Jeder Menüpunkt braucht einen Namen – ein Feld ist leer.</p>
+        <p role="alert" className="mt-3 tls-type-small text-[#FF6B6B]" data-testid="nav-missing-label">Jeder Menüpunkt braucht einen Namen – ein Feld ist leer.</p>
       )}
 
       {loading ? (
@@ -243,12 +244,12 @@ export default function AdminNavPage() {
                     className={`min-w-0 flex-1 bg-[#0A0A0A] border rounded-sm px-3 py-1.5 text-sm font-semibold ${String(it.label || "").trim() ? "border-white/10" : "border-[#FF6B6B]"}`}
                   />
                   {it.to && (
-                    <span className="hidden md:inline text-[11px] text-white/30 font-mono truncate max-w-[180px]">{it.to}</span>
+                    <span className="hidden md:inline tls-type-small text-quiet font-mono truncate max-w-[180px]">{it.to}</span>
                   )}
                   <button
                     onClick={() => toggleVisible(idx)}
                     data-testid={`nav-toggle-${it.key}`}
-                    className={`px-3 py-1.5 text-[11px] font-bold uppercase tracking-wider rounded-sm inline-flex items-center gap-1 ${
+                    className={`px-3 py-1.5 tls-type-label rounded-sm inline-flex items-center gap-1 ${
                       visible ? "text-[#00FF88] bg-[#00FF88]/10" : "text-white/40 bg-white/5"
                     }`}
                   >
@@ -292,12 +293,12 @@ export default function AdminNavPage() {
                               required
                               className={`w-full bg-[#121212] border rounded-sm px-2.5 py-1 text-xs ${String(c.label || "").trim() ? "border-white/10" : "border-[#FF6B6B]"}`}
                             />
-                            {ENTRY_NOTES[c.key] && <span className="mt-0.5 block text-[10px] text-white/45" data-testid={`nav-note-${c.key}`}>{ENTRY_NOTES[c.key]}</span>}
+                            {ENTRY_NOTES[c.key] && <span className="mt-0.5 block tls-type-small text-white/45" data-testid={`nav-note-${c.key}`}>{ENTRY_NOTES[c.key]}</span>}
                           </div>
-                          {c.to && <span className="hidden md:inline text-[10px] text-white/30 font-mono truncate max-w-[160px]">{c.to}</span>}
+                          {c.to && <span className="hidden md:inline tls-type-small text-quiet font-mono truncate max-w-[160px]">{c.to}</span>}
                           <button
                             onClick={() => toggleVisible(idx, cIdx)}
-                            className={`px-2 py-1 text-[10px] font-bold uppercase tracking-wider rounded-sm inline-flex items-center gap-1 ${
+                            className={`px-2 py-1 tls-type-label rounded-sm inline-flex items-center gap-1 ${
                               cVisible ? "text-[#00FF88] bg-[#00FF88]/10" : "text-white/40 bg-white/5"
                             }`}
                           >
@@ -314,7 +315,7 @@ export default function AdminNavPage() {
         </div>
       )}
 
-      <div className="mt-8 p-4 border border-[#FFD700]/30 bg-[#FFD700]/5 rounded-sm text-xs text-white/70">
+      <div className="mt-8 p-4 border border-[#FFD700]/30 bg-[#FFD700]/5 rounded-sm tls-type-small text-white/70">
         <strong className="text-[#FFD700]">Hinweis:</strong> Versteckte Einträge stehen nicht im Menü der Website. Die Seiten selbst bleiben erreichbar – nur der Link im Menü fällt weg. Eigene Menüpunkte gibt es bewusst nicht; jede Seite hat ihren festen Platz.
       </div>
     </AdminLayout>

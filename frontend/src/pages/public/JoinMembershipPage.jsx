@@ -40,13 +40,13 @@ export default function JoinMembershipPage() {
         <div className="relative max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-12 md:py-20 grid gap-8 md:grid-cols-2 md:gap-x-12 items-center">
           <div className="min-w-0">
             {fromMembers && (
-              <div className="mb-6 border border-[#29B6E8]/40 bg-[#29B6E8]/10 rounded-sm p-4 text-sm text-white/80" data-testid="join-from-members">
+              <div className="mb-6 border border-[#29B6E8]/40 bg-[#29B6E8]/10 rounded-sm p-4 tls-type-small text-white/80" data-testid="join-from-members">
                 Der Mitgliederbereich ist Vereinsmitgliedern vorbehalten. Sobald deine Mitgliedschaft bestätigt ist, findest du ihn rechts oben im Menü.
               </div>
             )}
-            <span className="text-[11px] font-bold uppercase tracking-[0.3em] text-[#29B6E8]">Mitglied werden</span>
-            <h1 className="mt-3 font-heading text-4xl md:text-6xl font-black uppercase leading-[1.05]">Werde Teil<br />des Rudels</h1>
-            <p className="mt-6 text-white/70 max-w-xl text-lg">
+            <span className="tls-type-label text-[#29B6E8]">Mitglied werden</span>
+            <h1 className="mt-3 tls-type-hero leading-[1.05]">Werde Teil<br />des Rudels</h1>
+            <p className="mt-6 text-white/70 max-w-xl tls-type-body">
               THE LION SQUAD ist ein offiziell eingetragener österreichischer eSports-Verein. Eine Community, die zusammenhält — online wie offline. Werde offizielles Vereinsmitglied und sei Teil von etwas Größerem.
             </p>
           </div>
@@ -57,7 +57,7 @@ export default function JoinMembershipPage() {
             <Link to="/membership/apply" data-testid="join-apply-btn" className="tls-btn tls-btn--honor inline-flex justify-center items-center gap-2 px-6 py-3.5 font-bold uppercase tracking-wider rounded-sm">
               <Crown className="w-4 h-4" /> Antrag stellen
             </Link>
-            <a href="#beitrag" className="tls-btn tls-btn--quiet inline-flex justify-center items-center px-6 py-3.5 font-bold uppercase tracking-wider rounded-sm text-sm">Was kostet das?</a>
+            <a href="#beitrag" className="tls-btn tls-btn--quiet inline-flex justify-center items-center px-6 py-3.5 font-bold uppercase tracking-wider rounded-sm tls-type-small">Was kostet das?</a>
           </div>
         </div>
       </section>
@@ -65,7 +65,7 @@ export default function JoinMembershipPage() {
       <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-12 space-y-14">
         {/* Was du als Mitglied bekommst - vier Kacheln mit Symbol und je einem Satz */}
         <section data-testid="join-benefits">
-          <h2 className="font-heading text-2xl md:text-3xl font-black uppercase">Was du als Mitglied bekommst</h2>
+          <h2 className="tls-type-section">Was du als Mitglied bekommst</h2>
           <ul className="mt-6 grid grid-cols-2 lg:grid-cols-4 gap-3">
             {benefits.map((benefit, index) => {
               const Icon = BENEFIT_ICONS[benefit.icon] || Star;
@@ -73,7 +73,7 @@ export default function JoinMembershipPage() {
                 <li key={`${benefit.title}-${index}`} className="border border-white/10 rounded-sm bg-[#121212] p-4 flex flex-col gap-2" data-testid={`join-benefit-${index}`}>
                   <Icon className="w-5 h-5 text-white/80" aria-hidden="true" />
                   <span className="font-bold leading-tight">{benefit.title}</span>
-                  {benefit.text ? <span className="text-sm text-white/60">{benefit.text}</span> : null}
+                  {benefit.text ? <span className="tls-type-small text-white/60">{benefit.text}</span> : null}
                 </li>
               );
             })}
@@ -85,15 +85,15 @@ export default function JoinMembershipPage() {
         <section className="border border-white/10 rounded-sm bg-[#121212] p-6 md:p-8" data-testid="join-steps-section">
           {/* Schritt-Anzeige (#1081): ohne Konto beginnt der Weg beim Konto, mit Konto beim Antrag. */}
           <StepBar steps={MEMBERSHIP_STEPS} current={user ? 1 : 0} className="mb-6 max-w-md" testId="join-steps" />
-          <h2 className="font-heading text-2xl font-black uppercase">So wirst du Mitglied</h2>
-          <ol className="mt-4 space-y-3 text-white/70 text-sm">
+          <h2 className="tls-type-section">So wirst du Mitglied</h2>
+          <ol className="mt-4 space-y-3 text-white/70 tls-type-small">
             <Step n="1" title="Konto anlegen">Registriere dich auf dieser Seite – damit bist du Community-Spieler.</Step>
             <Step n="2" title="Antrag stellen">Den Antrag füllst du online aus; dort wählst du auch deine Mitgliedsart.</Step>
             <Step n="3" title="Prüfung">Der Vorstand prüft jeden Antrag persönlich und meldet sich per E-Mail.</Step>
             <Step n="4" title="Mitglied">Nach der Aufnahme bekommst du deine Mitgliedsnummer und die Mitgliedskarte.</Step>
           </ol>
           {/* Mindestalter (#1698): ein Satz für beides - Konto ab 14, Vereinsmitglied ab 18 (lib/minimumAge.js). */}
-          <p className="mt-4 text-sm text-white/60" data-testid="join-age">{ACCOUNT_AGE_TEXT}</p>
+          <p className="mt-4 tls-type-body text-white/60" data-testid="join-age">{ACCOUNT_AGE_TEXT}</p>
           <div className="mt-6 flex flex-col sm:flex-row flex-wrap gap-3">
             {user ? null : (
               <Link to="/register" data-testid="join-register-btn" className="tls-btn tls-btn--primary inline-flex justify-center items-center gap-2 px-5 py-3 font-bold uppercase tracking-wider rounded-sm">
@@ -107,8 +107,8 @@ export default function JoinMembershipPage() {
         </section>
 
         <section data-testid="join-expectations">
-          <h2 className="font-heading text-2xl font-black uppercase">Was wir vom Rudel erwarten</h2>
-          <ul className="mt-4 grid sm:grid-cols-2 gap-x-8 gap-y-2.5 text-sm text-white/70 max-w-4xl">
+          <h2 className="tls-type-section">Was wir vom Rudel erwarten</h2>
+          <ul className="mt-4 grid sm:grid-cols-2 gap-x-8 gap-y-2.5 tls-type-small text-white/70 max-w-4xl">
             <li>• Fairplay und Respekt gegenüber jedem im Verein</li>
             <li>• Zusammenhalt — keiner bleibt allein</li>
             <li>• Aktive Teilnahme an Events und der Community</li>
@@ -128,7 +128,7 @@ export function FeeSection({ fees, purpose = "" }) {
   const stand = feesStandLine(fees);
   return (
     <section id="beitrag" className="scroll-mt-24" data-testid="join-fees">
-      <h2 className="font-heading text-2xl md:text-3xl font-black uppercase">Beitrag</h2>
+      <h2 className="tls-type-section">Beitrag</h2>
       {!fees ? null : list.length ? (
         <>
           <ul className="mt-5 divide-y divide-white/10 border-y border-white/10 md:hidden" data-testid="join-fees-list">
@@ -138,13 +138,13 @@ export function FeeSection({ fees, purpose = "" }) {
                   <span className="font-bold">{fee.label}</span>
                   <span className="shrink-0 font-bold tabular-nums">{feeAmount(fee)}</span>
                 </div>
-                {fee.description ? <div className="text-sm text-white/55">{fee.description}</div> : null}
-                {fee.admission_fee ? <div className="text-xs text-white/45">einmalig {formatMoney(fee.admission_fee, fee.currency)} Aufnahmegebühr</div> : null}
-                {fee.prorated ? <div className="text-xs text-white/45">Eintritt unterm Jahr anteilig</div> : null}
+                {fee.description ? <div className="tls-type-small text-white/55">{fee.description}</div> : null}
+                {fee.admission_fee ? <div className="tls-type-small text-white/45">einmalig {formatMoney(fee.admission_fee, fee.currency)} Aufnahmegebühr</div> : null}
+                {fee.prorated ? <div className="tls-type-small text-white/45">Eintritt unterm Jahr anteilig</div> : null}
               </li>
             ))}
           </ul>
-          <table className="mt-5 hidden md:table w-full max-w-4xl text-sm border border-white/10" data-testid="join-fees-table">
+          <table className="mt-5 hidden md:table w-full max-w-4xl tls-type-small border border-white/10" data-testid="join-fees-table">
             <thead>
               <tr className="bg-[#121212] text-left text-white/60">
                 <th className="px-4 py-3 font-bold">Mitgliedsart</th>
@@ -164,7 +164,7 @@ export function FeeSection({ fees, purpose = "" }) {
               ))}
             </tbody>
           </table>
-          {stand ? <p className="mt-3 text-xs text-white/50" data-testid="join-fees-stand">{stand}</p> : null}
+          {stand ? <p className="mt-3 tls-type-small text-white/50" data-testid="join-fees-stand">{stand}</p> : null}
         </>
       ) : (
         <p className="mt-3 text-white/70" data-testid="join-fees-none">Die Beiträge nennen wir dir im Antrag.</p>
@@ -177,10 +177,10 @@ export function FeeSection({ fees, purpose = "" }) {
 function Step({ n, title, children }) {
   return (
     <li className="flex gap-4">
-      <div className="font-heading font-black text-white/80 text-xl shrink-0 w-8 tabular-nums">{n}</div>
+      <div className="tls-type-card tls-type-num text-white/80 shrink-0 w-8">{n}</div>
       <div>
         <div className="font-bold text-white">{title}</div>
-        <div className="text-white/60 text-sm mt-0.5">{children}</div>
+        <div className="text-white/60 tls-type-small mt-0.5">{children}</div>
       </div>
     </li>
   );

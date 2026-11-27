@@ -26,21 +26,21 @@ export function StationQueueBoard({ queue, busyKey = "", onCall, onStart, onRele
         <div className="mb-3 rounded-sm border border-brand/30 bg-brand/5 p-3" data-testid="live-call-all-box">
           {asking ? (
             <div className="tls-live-reveal" data-testid="live-call-all-confirm">
-              <p className="text-sm text-white">{callAll.length === 1 ? "1 Station" : `${callAll.length} Stationen`} aufrufen? Die Spieler bekommen „Du bist dran“, gestartet wird nichts.</p>
+              <p className="tls-type-small text-white">{callAll.length === 1 ? "1 Station" : `${callAll.length} Stationen`} aufrufen? Die Spieler bekommen „Du bist dran“, gestartet wird nichts.</p>
               <div className="mt-2 grid grid-cols-2 gap-2">
-                <button type="button" className="tls-btn tls-btn--secondary inline-flex min-h-[44px] items-center justify-center rounded-sm px-3 py-2 text-xs font-bold uppercase tracking-wider" onClick={() => setAsking(false)}>Abbrechen</button>
-                <button type="button" disabled={Boolean(busyKey)} className="tls-btn tls-btn--primary inline-flex min-h-[44px] items-center justify-center rounded-sm px-3 py-2 text-xs font-bold uppercase tracking-wider" onClick={() => { setAsking(false); onCallAll(callAll.map((station) => [station, station.next])); }} data-testid="live-call-all-yes">Alle aufrufen</button>
+                <button type="button" className="tls-btn tls-btn--secondary inline-flex min-h-[44px] items-center justify-center rounded-sm px-3 py-2 tls-type-label" onClick={() => setAsking(false)}>Abbrechen</button>
+                <button type="button" disabled={Boolean(busyKey)} className="tls-btn tls-btn--primary inline-flex min-h-[44px] items-center justify-center rounded-sm px-3 py-2 tls-type-label" onClick={() => { setAsking(false); onCallAll(callAll.map((station) => [station, station.next])); }} data-testid="live-call-all-yes">Alle aufrufen</button>
               </div>
             </div>
           ) : (
-            <button type="button" disabled={Boolean(busyKey)} onClick={() => setAsking(true)} className="tls-btn tls-btn--secondary inline-flex min-h-[44px] w-full items-center justify-center gap-2 rounded-sm px-4 py-2 text-xs font-bold uppercase tracking-wider" data-testid="live-call-all">
+            <button type="button" disabled={Boolean(busyKey)} onClick={() => setAsking(true)} className="tls-btn tls-btn--secondary inline-flex min-h-[44px] w-full items-center justify-center gap-2 rounded-sm px-4 py-2 tls-type-label" data-testid="live-call-all">
               <BellRing className="h-4 w-4 shrink-0" aria-hidden="true" /> Alle freien Stationen aufrufen ({callAll.length})
             </button>
           )}
         </div>
       ) : null}
       {summary ? (
-        <div className="flex items-center gap-2 rounded-sm border border-white/10 bg-[#121212] px-3 py-2 text-sm font-bold text-white" data-testid="live-summary">
+        <div className="flex items-center gap-2 rounded-sm border border-white/10 bg-[#121212] px-3 py-2 tls-type-small font-bold text-white" data-testid="live-summary">
           <Timer className="h-4 w-4 shrink-0 text-brand" aria-hidden="true" />
           <span className="min-w-0 [overflow-wrap:anywhere]">{summary}</span>
         </div>
@@ -67,7 +67,7 @@ export function StationQueueBoard({ queue, busyKey = "", onCall, onStart, onRele
         ))}
       </div>
       {(queue?.unplaced || []).length ? (
-        <p className="mt-3 text-xs text-white/50" data-testid="live-unplaced">
+        <p className="mt-3 tls-type-small text-white/50" data-testid="live-unplaced">
           {queue.unplaced.length === 1 ? "1 Spiel hat keine Station (fester Termin oder freigegeben) – es steht in „Ergebnisse“." : `${queue.unplaced.length} Spiele haben keine Station (fester Termin oder freigegeben) – sie stehen in „Ergebnisse“.`}
         </p>
       ) : null}

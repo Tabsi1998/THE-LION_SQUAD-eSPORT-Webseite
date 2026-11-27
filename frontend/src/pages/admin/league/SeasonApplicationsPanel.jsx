@@ -18,7 +18,7 @@ import { GuestBadge } from "@/components/tls/league/GuestBadge";
 import { GuestTeamControl } from "./GuestTeamControl";
 
 const WHEN = { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" };
-const BUTTON = "inline-flex min-h-[40px] items-center rounded-sm px-3 py-1.5 text-[11px] font-bold uppercase tracking-wider disabled:opacity-50";
+const BUTTON = "inline-flex min-h-[40px] items-center rounded-sm px-3 py-1.5 tls-type-label disabled:opacity-50";
 const REASON_MIN = 5;
 const OWN_TEAM = "Über dein eigenes Team entscheidet eine andere Person.";
 const OPEN_GROUPS = [
@@ -51,29 +51,29 @@ function Notes({ row }) {
   return (
     <>
       {row.problems?.length ? (
-        <ul className="mt-2 space-y-1 text-sm text-warn" data-testid={`application-problems-${row.id}`}>
+        <ul className="mt-2 space-y-1 tls-type-small text-warn" data-testid={`application-problems-${row.id}`}>
           {row.problems.map((text) => <li key={text} className="flex gap-2 [overflow-wrap:anywhere]"><AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" /> <span>{text}</span></li>)}
         </ul>
       ) : null}
       {/* Offene Punkte (#2313): fehlende Angaben halten nichts auf - Zulassen geht, gesperrt wird beim Check-in. */}
       {row.warnings?.length || row.shortfall ? (
         <div className="mt-2 rounded-sm border border-white/10 bg-white/[0.03] p-2" data-testid={`application-open-points-${row.id}`}>
-          <p className="text-xs font-bold uppercase tracking-wider text-white/70">
+          <p className="tls-type-label text-white/70">
             Offene Punkte{row.warnings?.length ? ` · ${row.warnings.length} Spieler` : ""}
           </p>
-          {row.shortfall ? <p className="mt-1 text-sm text-white/85 [overflow-wrap:anywhere]">{row.shortfall}</p> : null}
-          {row.warnings?.length ? <ul className="mt-1 space-y-0.5 text-xs text-white/65">{row.warnings.map((text) => <li key={text} className="[overflow-wrap:anywhere]">{text}</li>)}</ul> : null}
-          <p className="mt-1 text-xs text-white/50">Zulassen geht trotzdem. Wer etwas offen hat, kann nicht einchecken und nicht aufgestellt werden; das Team wird erinnert.</p>
+          {row.shortfall ? <p className="mt-1 tls-type-small text-white/85 [overflow-wrap:anywhere]">{row.shortfall}</p> : null}
+          {row.warnings?.length ? <ul className="mt-1 space-y-0.5 tls-type-small text-white/65">{row.warnings.map((text) => <li key={text} className="[overflow-wrap:anywhere]">{text}</li>)}</ul> : null}
+          <p className="mt-1 tls-type-small text-white/50">Zulassen geht trotzdem. Wer etwas offen hat, kann nicht einchecken und nicht aufgestellt werden; das Team wird erinnert.</p>
         </div>
       ) : null}
-      {row.shared_with?.length ? <p className="mt-2 text-xs text-white/60 [overflow-wrap:anywhere]">Gleiche Spieler stehen auch im Antrag von: {row.shared_with.join(", ")}.</p> : null}
+      {row.shared_with?.length ? <p className="mt-2 tls-type-small text-white/60 [overflow-wrap:anywhere]">Gleiche Spieler stehen auch im Antrag von: {row.shared_with.join(", ")}.</p> : null}
     </>
   );
 }
 
 // Befangenheit (#2245, Entscheidung Nr. 73): Über das eigene Team entscheidet eine zweite Person. Der Server prüft dieselbe Regel, hier nur die Anzeige.
 function OwnTeamNote({ row }) {
-  return <p className="text-sm font-semibold text-white/80" data-testid={`application-own-team-${row.id}`}>{OWN_TEAM}</p>;
+  return <p className="tls-type-small font-semibold text-white/80" data-testid={`application-own-team-${row.id}`}>{OWN_TEAM}</p>;
 }
 
 // Offene Anmeldungen (Entscheidung B, #1665): Nur hier steht das Kennzeichen „Gast“ - abgelehnt oder zurückgezogen gibt kein Recht daran.
@@ -116,11 +116,11 @@ function RowActions({ row, options, busy, act, superadmin, conflictReason = "", 
         </div>
       ) : null}
       {autoSeated ? (
-        <p className="text-xs text-white/55" data-testid={`application-auto-seat-${row.id}`}>Ablehnen oder Warteliste nehmen das Co-Team wieder aus der Staffel, solange der Spielplan nicht steht.</p>
+        <p className="tls-type-small text-white/55" data-testid={`application-auto-seat-${row.id}`}>Ablehnen oder Warteliste nehmen das Co-Team wieder aus der Staffel, solange der Spielplan nicht steht.</p>
       ) : options.length ? (
         <SelectField label={unassigned ? "Staffel" : "Staffel (geht auch später)"} value={staffel} onChange={setStaffel} testId={`application-staffel-${row.id}`} className="max-w-md"
           options={[["", "Staffel wählen …"], ...options.map(([value, text]) => [value, text])]} />
-      ) : <p className="text-xs text-white/55">Noch keine Staffel angelegt. Annehmen geht, zuteilen später.</p>}
+      ) : <p className="tls-type-small text-white/55">Noch keine Staffel angelegt. Annehmen geht, zuteilen später.</p>}
       {otherDivision ? (
         <TextField label="Grund für die andere Liga" required value={deviation} onChange={setDeviation} maxLength={500} className="max-w-md"
           hint={row.carry_over ? "Das Co-Team ist in eine andere Liga übernommen. Der Grund steht im Verlauf und im Protokoll."
@@ -180,48 +180,48 @@ function ApplicationRow({ row, options, busy, act, superadmin, seasonId = null, 
           onConflictReason={hasRowActions(row) ? null : setConflictReason} />
       ) : null}
       {row.carry_over ? (
-        <p className="mt-1 text-sm text-white/85 [overflow-wrap:anywhere]" data-testid={`application-carry-${row.id}`}>{carryLine(row.carry_over)}</p>
+        <p className="mt-1 tls-type-small text-white/85 [overflow-wrap:anywhere]" data-testid={`application-carry-${row.id}`}>{carryLine(row.carry_over)}</p>
       ) : null}
       {/* Startrecht (#1627, F.2a): Zugeteilt wird erst nach der Zusage - der Stand steht hier, die Übersicht unter „Startrechte“. */}
       {row.carry_over?.start_right && row.status === "accepted" && !row.assignment ? (
-        <p className={`mt-1 text-xs font-semibold ${row.carry_over.start_right.state === "offered" ? "text-warn" : "text-white/70"}`} data-testid={`application-start-right-${row.id}`}>
+        <p className={`mt-1 tls-type-small font-semibold ${row.carry_over.start_right.state === "offered" ? "text-warn" : "text-white/70"}`} data-testid={`application-start-right-${row.id}`}>
           Startrecht: {stateLabel(row.carry_over.start_right.state)}
           {row.carry_over.start_right.state === "offered" ? ` bis ${untilText(row.carry_over.start_right.accept_until)} – zuteilen geht nach der Zusage` : ""}
         </p>
       ) : null}
-      <p className="mt-1 text-xs text-white/60 [overflow-wrap:anywhere]">
+      <p className="mt-1 tls-type-small text-white/60 [overflow-wrap:anywhere]">
         {row.carry_over ? "Übernommen" : "Eingereicht"} {when(row.submitted_at)} {row.carry_over ? "" : `von ${row.applied_by_name} `}· {row.member_count} Spieler · Captain {row.captain_name || "fehlt"}{row.vice_name ? ` · Vertreter ${row.vice_name}` : ""}
       </p>
-      <p className="text-xs text-white/60">
+      <p className="tls-type-small text-white/60">
         {row.carry_over && !row.rules_version ? "Zustimmung zum Regelwerk folgt vor dem ersten Spiel (Captain im Regelwerk)"
           : row.rules_version ? `Regeln Version ${row.rules_version} zugestimmt ${when(row.rules_at)}` : "Keine Zustimmung zu den Regeln"}
         {row.carry_over ? "" : ` · ${row.privacy_at ? "Datenschutz zugestimmt" : "Keine Zustimmung zum Datenschutz"}`}
       </p>
       {row.assignment ? (
-        <p className="mt-1 flex flex-wrap items-center gap-2 text-sm text-white/85">
+        <p className="mt-1 flex flex-wrap items-center gap-2 tls-type-small text-white/85">
           {row.assignment.label}{row.assignment.left ? " (nicht mehr dabei, der Platz ist frei)" : ""}
           {/* Paket D (#2262): auf die Teilnehmer der Staffel-Seite - nicht mehr in die Turnierverwaltung. */}
-          <Link to={staffelAdminUrl(row.assignment.tournament_id, "teilnehmer")} data-testid={`application-open-staffel-${row.id}`} className="inline-flex min-h-[44px] items-center gap-1 text-xs font-bold text-[#29B6E8] hover:text-white">Staffel öffnen <ArrowRight className="h-3 w-3" aria-hidden="true" /></Link>
+          <Link to={staffelAdminUrl(row.assignment.tournament_id, "teilnehmer")} data-testid={`application-open-staffel-${row.id}`} className="inline-flex min-h-[44px] items-center gap-1 tls-type-small font-bold text-[#29B6E8] hover:text-white">Staffel öffnen <ArrowRight className="h-3 w-3" aria-hidden="true" /></Link>
         </p>
       ) : null}
-      {row.auto_accepted ? <p className="mt-1 text-xs text-white/60" data-testid={`application-auto-${row.id}`}>Automatisch angenommen{row.decided_at ? ` ${when(row.decided_at)}` : ""}.</p> : null}
+      {row.auto_accepted ? <p className="mt-1 tls-type-small text-white/60" data-testid={`application-auto-${row.id}`}>Automatisch angenommen{row.decided_at ? ` ${when(row.decided_at)}` : ""}.</p> : null}
       {/* Warum die Season nicht annehmen bzw. zuteilen konnte (#2348): Staffel voll oder gesperrt, Geschwister-Co-Team, Fehler. */}
       {row.auto_problem ? (
-        <p className="mt-1 text-xs text-warn [overflow-wrap:anywhere]" data-testid={`application-auto-problem-${row.id}`}>
+        <p className="mt-1 tls-type-small text-warn [overflow-wrap:anywhere]" data-testid={`application-auto-problem-${row.id}`}>
           {row.status === "accepted" ? "Nicht automatisch zugeteilt" : "Nicht automatisch angenommen"}: {row.auto_problem}
         </p>
       ) : null}
       {/* Befangenheit (#2348, Nr. 73): Beim Team einer Person der Liga-Leitung hat niemand entschieden - die anderen Zuständigen sehen es. */}
       {row.lead_team_auto ? (
-        <p className="mt-1 flex items-center gap-1.5 text-xs font-semibold text-warn" data-testid={`application-lead-team-${row.id}`}>
+        <p className="mt-1 flex items-center gap-1.5 tls-type-small font-semibold text-warn" data-testid={`application-lead-team-${row.id}`}>
           <AlertTriangle className="h-3.5 w-3.5 shrink-0" aria-hidden="true" /> Team der Leitung – automatisch angenommen
         </p>
       ) : null}
-      {row.decision_reason ? <p className="mt-1 text-sm text-white/75 [overflow-wrap:anywhere]">Grund: {row.decision_reason}{row.decided_by_name ? ` (${row.decided_by_name})` : ""}</p> : null}
+      {row.decision_reason ? <p className="mt-1 tls-type-small text-white/75 [overflow-wrap:anywhere]">Grund: {row.decision_reason}{row.decided_by_name ? ` (${row.decided_by_name})` : ""}</p> : null}
       <Notes row={row} />
       <RowActions row={row} options={options} busy={busy} act={act} superadmin={superadmin} conflictReason={conflictReason} setConflictReason={setConflictReason} />
       {row.history?.length > 1 ? (
-        <details className="mt-2 text-xs text-white/55">
+        <details className="mt-2 tls-type-small text-white/55">
           <summary className="cursor-pointer">Verlauf</summary>
           <ul className="mt-1 space-y-0.5">{row.history.map((step, index) => <li key={index} className="[overflow-wrap:anywhere]">{historyLine(step)}</li>)}</ul>
         </details>
@@ -278,14 +278,14 @@ export function SeasonApplicationsPanel({ seasonId, version, seasonStatus = null
   return (
     <div id="anmeldungen" className="scroll-mt-24">
       <FormSection title="Anmeldungen" testId="season-applications" hint="Was Captains und Vertreter eingereicht haben. Annehmen und Zuteilen prüfen den Kader noch einmal. Wird ein Platz frei, entscheidest du, wer nachrückt.">
-        <p className="text-sm text-white/80" data-testid="season-applications-stats">{statsLine(data.stats)}</p>
-        {!items.length ? <p className="text-sm text-white/55">Noch keine Anmeldung.</p> : null}
+        <p className="tls-type-small text-white/80" data-testid="season-applications-stats">{statsLine(data.stats)}</p>
+        {!items.length ? <p className="tls-type-small text-white/55">Noch keine Anmeldung.</p> : null}
         {OPEN_GROUPS.map((group) => {
           const rows = items.filter((row) => group.statuses.includes(row.status));
           if (!rows.length) return null;
           return (
             <div key={group.key} className="space-y-2">
-              <h3 className="text-[11px] font-bold uppercase tracking-widest text-white/60">{group.title} ({rows.length})</h3>
+              <h3 className="tls-type-label text-white/60">{group.title} ({rows.length})</h3>
               <ul className="space-y-2">{rows.map((row) => (
                 <ApplicationRow key={row.id} row={row} options={options(row)} busy={busy} act={act} superadmin={Boolean(data.superadmin)} seasonId={seasonId} reload={load}
                   seasonClosed={CLOSED_SEASONS.includes(seasonStatus)} />
@@ -295,7 +295,7 @@ export function SeasonApplicationsPanel({ seasonId, version, seasonStatus = null
         })}
         {closed.length ? (
           <details data-testid="season-applications-closed">
-            <summary className="cursor-pointer text-[11px] font-bold uppercase tracking-widest text-white/60">Abgeschlossen ({closed.length})</summary>
+            <summary className="cursor-pointer tls-type-label text-white/60">Abgeschlossen ({closed.length})</summary>
             <ul className="mt-2 space-y-2">{closed.map((row) => <ApplicationRow key={row.id} row={row} options={options(row)} busy={busy} act={act} />)}</ul>
           </details>
         ) : null}

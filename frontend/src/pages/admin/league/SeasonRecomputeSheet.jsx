@@ -58,9 +58,9 @@ export function SeasonRecomputeSheet({ season, onClose, onDone }) {
       submitLabel="Jetzt neu berechnen" savingLabel="Berechne …" submitTestId="recompute-run" submitDisabled={Boolean(done) || !data?.can_run || !data?.changes?.length}
       cancelLabel={done ? "Schließen" : "Abbrechen"} testId="recompute-sheet">
       {done ? (
-        <section aria-labelledby="recompute-done-manual" className="space-y-2 text-sm" data-testid="recompute-done">
+        <section aria-labelledby="recompute-done-manual" className="space-y-2 tls-type-small" data-testid="recompute-done">
           <p className="text-ok">Neu berechnet: {done.changed} {done.changed === 1 ? "Änderung" : "Änderungen"}.</p>
-          <h3 id="recompute-done-manual" className="text-[11px] font-bold uppercase tracking-[0.2em] text-warn">Bitte von Hand prüfen ({done.manual.length})</h3>
+          <h3 id="recompute-done-manual" className="tls-type-label text-warn">Bitte von Hand prüfen ({done.manual.length})</h3>
           <ul className="space-y-1 text-white/80" data-testid="recompute-done-manual">
             {done.manual.map((row) => (
               <li key={row.application_id} className="[overflow-wrap:anywhere]">
@@ -70,10 +70,10 @@ export function SeasonRecomputeSheet({ season, onClose, onDone }) {
           </ul>
         </section>
       ) : null}
-      {error ? <p className="text-sm text-warn" role="alert">{error}</p> : null}
-      {!data && !error ? <p className="text-sm text-white/45" aria-busy="true">Lade Vorschau …</p> : null}
+      {error ? <p className="tls-type-small text-warn" role="alert">{error}</p> : null}
+      {!data && !error ? <p className="tls-type-small text-white/45" aria-busy="true">Lade Vorschau …</p> : null}
       {data && !done ? (
-        <div className="space-y-5 text-sm">
+        <div className="space-y-5 tls-type-small">
           <p className="text-white/75">
             Aus dem heutigen Endstand von {data.predecessor.name}. Nur Teams ohne Staffel folgen ihm; wer nicht mehr dabei ist, wird zurückgenommen
             (nichts wird gelöscht). Captains, deren Liga sich ändert, bekommen eine Nachricht.
@@ -86,13 +86,13 @@ export function SeasonRecomputeSheet({ season, onClose, onDone }) {
           {data.can_run && !data.changes.length ? <p className="text-ok" data-testid="recompute-nothing">Alles passt zum Endstand – nichts zu ändern.</p> : null}
           {data.changes.length ? (
             <section aria-labelledby="recompute-changes" className="space-y-2">
-              <h3 id="recompute-changes" className="text-[11px] font-bold uppercase tracking-[0.2em] text-white/50">Änderungen ({data.changes.length})</h3>
+              <h3 id="recompute-changes" className="tls-type-label text-white/50">Änderungen ({data.changes.length})</h3>
               <ul className="divide-y divide-white/5 rounded-sm border border-white/10 bg-[#0A0A0A]" data-testid="recompute-changes">
                 {data.changes.map((change) => (
                   <li key={`${change.kind}-${change.squad_id}`} className="flex flex-wrap items-baseline gap-x-3 gap-y-1 px-3 py-2" data-testid={`recompute-change-${change.squad_id}`}>
                     <span className="min-w-0 font-semibold text-white [overflow-wrap:anywhere]">{change.display_name}</span>
-                    <span className={`text-xs font-bold uppercase tracking-wider ${change.kind === "revoked" ? "text-warn" : "text-[#29B6E8]"}`}>{KIND_TEXT[change.kind]}</span>
-                    <span className="text-xs text-white/60">{changeLine(change)}</span>
+                    <span className={`tls-type-label ${change.kind === "revoked" ? "text-warn" : "text-[#29B6E8]"}`}>{KIND_TEXT[change.kind]}</span>
+                    <span className="tls-type-small text-white/60">{changeLine(change)}</span>
                   </li>
                 ))}
               </ul>
@@ -100,8 +100,8 @@ export function SeasonRecomputeSheet({ season, onClose, onDone }) {
           ) : null}
           {data.manual.length ? (
             <section aria-labelledby="recompute-manual" className="space-y-2">
-              <h3 id="recompute-manual" className="text-[11px] font-bold uppercase tracking-[0.2em] text-warn">Bitte von Hand prüfen ({data.manual.length})</h3>
-              <p className="text-xs text-white/60">Diese Teams sind schon zugeteilt oder abgemeldet – die Berechnung lässt sie, wie sie sind.</p>
+              <h3 id="recompute-manual" className="tls-type-label text-warn">Bitte von Hand prüfen ({data.manual.length})</h3>
+              <p className="tls-type-small text-white/60">Diese Teams sind schon zugeteilt oder abgemeldet – die Berechnung lässt sie, wie sie sind.</p>
               <ul className="space-y-1 text-white/80" data-testid="recompute-manual">
                 {data.manual.map((row) => (
                   <li key={row.application_id} className="[overflow-wrap:anywhere]">

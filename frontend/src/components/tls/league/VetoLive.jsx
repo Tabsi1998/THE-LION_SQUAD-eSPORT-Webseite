@@ -83,7 +83,7 @@ export function VetoCountdown({ block, offset = 0, size = 72, className = "", tv
       <div className={`tls-veto-clock ${className}`} data-testid="veto-countdown" data-paused="true" data-tv={tv ? "true" : undefined}>
         <div className="tls-veto-clock__text">
           <div className="tls-veto-clock__caption">Pause · Rest</div>
-          <div className="tls-veto-clock__number font-display text-3xl font-bold tabular-nums" data-testid="veto-countdown-text">{remainingText(rest * 1000, 0) || "0:00"}</div>
+          <div className="tls-veto-clock__number tls-type-title tls-type-num" data-testid="veto-countdown-text">{remainingText(rest * 1000, 0) || "0:00"}</div>
         </div>
       </div>
     );
@@ -106,7 +106,7 @@ export function VetoCountdown({ block, offset = 0, size = 72, className = "", tv
         <div className="tls-veto-clock__caption" data-testid="veto-countdown-caption">
           {seconds > 0 && urgent ? <><Hourglass className="tls-veto-clock__icon" aria-hidden="true" /> gleich vorbei</> : seconds > 0 ? "noch" : "Zeit um"}
         </div>
-        <div className="tls-veto-clock__number font-display text-3xl font-bold tabular-nums" role="timer" aria-live="off" data-testid="veto-countdown-text">{remainingText(target, now) || "0:00"}</div>
+        <div className="tls-veto-clock__number tls-type-title tls-type-num" role="timer" aria-live="off" data-testid="veto-countdown-text">{remainingText(target, now) || "0:00"}</div>
         <span className="sr-only" aria-live="polite" data-testid="veto-countdown-announce">{countdownAnnouncement(seconds)}</span>
       </div>
     </div>

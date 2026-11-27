@@ -241,10 +241,10 @@ function NextMatchBanner({ matches, regMap, mineId }) {
       data-testid="bracket-next-match"
       className={`w-full text-left rounded-md border px-4 py-3 flex flex-wrap items-center gap-x-5 gap-y-1 transition-colors duration-mid ease-tls ${live ? "border-live/50 bg-live/[0.08]" : "border-brand/45 bg-brand/[0.08]"} hover:border-white/40`}
     >
-      <span className={`text-[11px] uppercase tracking-[0.25em] font-bold ${live ? "text-live" : "text-brand"}`}>{live ? "Dein Spiel läuft" : "Dein nächstes Spiel"}</span>
-      <span className="font-heading text-lg font-black uppercase">{roundNameOf(match, match.round)} · {match.match_key || "Spiel"}</span>
-      {opponents.length ? <span className="text-sm text-white/75">gegen {opponents.length > 3 ? `${opponents.length} Gegner` : opponents.join(", ")}</span> : <span className="text-sm text-muted-text">Gegner steht noch nicht fest</span>}
-      {(when || station) && <span className="text-xs uppercase tracking-wider text-muted-text">{[forecast ? `voraussichtlich ${when}` : when, station].filter(Boolean).join(" · ")}</span>}
+      <span className={`tls-type-label ${live ? "text-live" : "text-brand"}`}>{live ? "Dein Spiel läuft" : "Dein nächstes Spiel"}</span>
+      <span className="tls-type-card">{roundNameOf(match, match.round)} · {match.match_key || "Spiel"}</span>
+      {opponents.length ? <span className="tls-type-small text-white/75">gegen {opponents.length > 3 ? `${opponents.length} Gegner` : opponents.join(", ")}</span> : <span className="tls-type-small text-muted-text">Gegner steht noch nicht fest</span>}
+      {(when || station) && <span className="tls-type-label text-muted-text">{[forecast ? `voraussichtlich ${when}` : when, station].filter(Boolean).join(" · ")}</span>}
     </button>
   );
 }
@@ -255,17 +255,17 @@ function LiveStrip({ matches, regMap, duration }) {
   if (!live.length) return null;
   return (
     <section data-testid="bracket-live-strip" aria-label="Läuft gerade" className="rounded-md border border-live/40 bg-live/[0.06] p-3">
-      <div className="mb-2 flex items-center gap-2 text-[11px] font-bold uppercase tracking-[0.2em] text-live">
+      <div className="mb-2 flex items-center gap-2 tls-type-label text-live">
         <span className="w-1.5 h-1.5 rounded-full bg-live tv-live-dot" aria-hidden="true" /> Läuft gerade
       </div>
       <ul className="space-y-2">
         <AnimatePresence initial={false}>
           {live.map((match) => (
             <motion.li key={match.id} layout="position" initial={{ opacity: 0, transform: "translateY(-6px)" }} animate={{ opacity: 1, transform: "translateY(0px)" }} exit={{ opacity: 0 }} transition={motionTransition("mid")}
-              className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5 text-sm">
+              className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5 tls-type-small">
               <span className="font-bold text-white/85">{roundNameOf(match, match.round)} · {match.match_key}</span>
               <span className="min-w-0 break-words text-white/75">{(match.slots || []).map((slot) => slotLabel(slot, regMap)).filter(Boolean).join(" – ")}</span>
-              <span className="ml-auto inline-flex items-center gap-1.5 text-xs text-live">
+              <span className="ml-auto inline-flex items-center gap-1.5 tls-type-small text-live">
                 {getStationLabel(match) || "läuft"}{match.started_at ? <>{" · "}<LiveClock startedAt={match.started_at} durationMinutes={duration(match)} pausedAt={match.paused_at} pausedSeconds={match.paused_seconds} /></> : null}
               </span>
             </motion.li>
@@ -364,12 +364,12 @@ const TABLE_HINT_TEXT = {
 function TableHint({ title, tournamentPath }) {
   const inRouter = useInRouterContext();
   const Anchor = ({ to, children }) => (inRouter
-    ? <Link to={to} className="tls-btn tls-btn--secondary inline-flex px-3 py-2 rounded-sm text-xs font-bold uppercase tracking-wider">{children}</Link>
-    : <a href={to} className="tls-btn tls-btn--secondary inline-flex px-3 py-2 rounded-sm text-xs font-bold uppercase tracking-wider">{children}</a>);
+    ? <Link to={to} className="tls-btn tls-btn--secondary inline-flex px-3 py-2 rounded-sm tls-type-label">{children}</Link>
+    : <a href={to} className="tls-btn tls-btn--secondary inline-flex px-3 py-2 rounded-sm tls-type-label">{children}</a>);
   return (
     <div data-testid="bracket-table-hint" className="rounded-md border border-white/10 bg-surface-1 p-5 space-y-3">
-      <h3 className="font-heading text-lg font-black uppercase">{title}</h3>
-      <p className="text-sm text-muted-text max-w-prose" data-testid="bracket-table-hint-text">{TABLE_HINT_TEXT[title] || TABLE_HINT_TEXT.Liga}</p>
+      <h3 className="tls-type-card">{title}</h3>
+      <p className="tls-type-small text-muted-text max-w-prose" data-testid="bracket-table-hint-text">{TABLE_HINT_TEXT[title] || TABLE_HINT_TEXT.Liga}</p>
       {tournamentPath ? (
         <div className="flex flex-wrap gap-2">
           <Anchor to={`${tournamentPath}/standings`}>Zur Tabelle</Anchor>
@@ -388,7 +388,7 @@ function WebStages({ stages, matches, regMap, podiumMap, steps, finalMatch, tour
     const names = Object.keys(sections);
     const multi = stagesForView.length > 1;
     const heading = multi ? (
-      <div className="flex items-center gap-2 uppercase tracking-[0.2em] text-xs font-bold">
+      <div className="flex items-center gap-2 tls-type-small font-bold">
         <span className="w-2 h-2 bg-brand" aria-hidden="true" />
         <span className="text-white/80">{stage.name || `Phase ${stage.number || ""}`}</span>
       </div>
@@ -434,11 +434,11 @@ function SectionTitle({ section, flowHint, sticky = false, fit = false }) {
   // Spalte, die Gassen daneben bleiben für die Linien frei. Am Handy (Runde für Runde) volle Breite.
   return (
     <div className={`flex flex-wrap items-baseline gap-x-3 gap-y-1 ${sticky ? "sticky left-0" : ""}`} style={fit ? { maxWidth: CARD_WIDTH } : undefined} data-section-head={fit ? "" : undefined}>
-      <div className="flex items-center gap-2 uppercase tracking-[0.2em] text-xs font-bold">
+      <div className="flex items-center gap-2 tls-type-label">
         <span className={`w-2 h-2 ${group === "loser" ? "bg-quiet" : group === "final" ? "bg-honor" : "bg-brand"}`} aria-hidden="true" />
         <span className="text-white/80" data-testid={`bracket-section-title-${key}`}>{formatBracketSection(section)}</span>
       </div>
-      {flowHint ? <span className="text-xs text-muted-text">{flowHint}</span> : null}
+      {flowHint ? <span className="tls-type-small text-muted-text">{flowHint}</span> : null}
     </div>
   );
 }
@@ -466,9 +466,9 @@ function SectionSteps({ section, rounds, regMap, podiumMap, flowHint }) {
         <div className="flex items-center justify-between gap-3">
           <button type="button" onClick={() => go(Math.max(0, current - 1))} disabled={current === 0} data-testid="bracket-step-prev" aria-label="Vorige Runde" className="tls-btn tls-btn--quiet shrink-0 inline-flex h-11 w-11 items-center justify-center rounded-sm disabled:opacity-35"><ChevronLeft className="h-5 w-5" aria-hidden="true" /></button>
           <div className="text-center min-w-0 flex-1">
-            <div className="text-[11px] font-bold uppercase tracking-wider text-muted-text" data-testid="bracket-step-label">Runde {current + 1} von {roundNums.length}</div>
+            <div className="tls-type-label text-muted-text" data-testid="bracket-step-label">Runde {current + 1} von {roundNums.length}</div>
             {/* Ganze Wörter (#1561): keine Silbentrennung wie sonst bei Überschriften am Handy, lieber zwei ausgeglichene Zeilen. */}
-            <div className="font-heading text-sm font-black uppercase leading-tight ![hyphens:none] [text-wrap:balance]" data-testid="bracket-round-title">{roundNameOf(rounds[rn][0], rn)}</div>
+            <div className="tls-type-label leading-tight ![hyphens:none] [text-wrap:balance]" data-testid="bracket-round-title">{roundNameOf(rounds[rn][0], rn)}</div>
           </div>
           <button type="button" onClick={() => go(Math.min(roundNums.length - 1, current + 1))} disabled={current >= roundNums.length - 1} data-testid="bracket-step-next" aria-label="Nächste Runde" className="tls-btn tls-btn--quiet shrink-0 inline-flex h-11 w-11 items-center justify-center rounded-sm disabled:opacity-35"><ChevronRight className="h-5 w-5" aria-hidden="true" /></button>
         </div>
@@ -495,10 +495,10 @@ function ChampionCard({ match, regMap }) {
     <div data-node={CHAMPION_ID} data-testid="bracket-champion" data-path={state || undefined} data-done={winnerId ? "1" : undefined} data-sweep={crowned ? "1" : undefined} className={`tls-bracket-champion ${crowned ? "tls-winner-sweep is-crowned" : ""}`}>
       <Trophy className={`tls-bracket-trophy w-6 h-6 shrink-0 ${winnerId ? "text-honor" : "text-quiet"}`} aria-hidden="true" />
       <div className="min-w-0">
-        <div className="text-[11px] font-bold uppercase tracking-[0.2em] text-muted-text">Sieger</div>
+        <div className="tls-type-label text-muted-text">Sieger</div>
         {winnerId
-          ? <div className="font-heading text-base font-black uppercase break-words text-honor">{name}</div>
-          : <div className="text-sm italic text-quiet">noch offen</div>}
+          ? <div className="tls-type-card break-words text-honor">{name}</div>
+          : <div className="tls-type-small italic text-quiet">noch offen</div>}
       </div>
     </div>
   );
@@ -666,7 +666,7 @@ function StageCanvas({ stageId, sections, names, regMap, podiumMap, champion, ha
       <div className={stacked ? "flex flex-col gap-6" : "flex items-stretch"} style={stacked ? undefined : { gap: COLUMN_GAP }}>
         {roundNumbers(sections[name]).map((rn, index, all) => (
           <div key={rn} className="flex shrink-0 flex-col" style={{ width: CARD_WIDTH }}>
-            <div className="mb-3 min-h-[1rem] px-1 text-[11px] font-bold uppercase tracking-wider text-muted-text" data-testid="bracket-round-title">
+            <div className="mb-3 min-h-[1rem] px-1 tls-type-small font-bold text-muted-text" data-testid="bracket-round-title">
               {roundHeading(sections[name][rn], rn, formatBracketSection(name))}
             </div>
             <div className={`flex flex-1 flex-col gap-4 ${trophy && index === all.length - 1 ? "justify-center gap-8" : "justify-around"}`}>
@@ -682,7 +682,7 @@ function StageCanvas({ stageId, sections, names, regMap, podiumMap, champion, ha
   return (
     <>
     {geom.overflow ? (
-      <p className="mb-2 flex items-center gap-1.5 text-xs text-muted-text" data-testid="bracket-scroll-hint">
+      <p className="mb-2 flex items-center gap-1.5 tls-type-small text-muted-text" data-testid="bracket-scroll-hint">
         <ChevronRight className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />Der Baum ist breiter als das Fenster – seitlich scrollen.
       </p>
     ) : null}

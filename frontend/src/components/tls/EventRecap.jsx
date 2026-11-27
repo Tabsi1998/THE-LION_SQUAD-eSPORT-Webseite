@@ -23,7 +23,7 @@ function itemPath(item) {
 // Kleines Treppchen je Turnier bzw. Fast Lap: Platz 2 links, 1 in der Mitte, 3 rechts. Vorlesen in der Reihenfolge der
 // Plätze über die Beschriftung jeder Stufe. Wird durch den Baustein `Podium` aus #1339 ersetzt, sobald es ihn gibt.
 function MiniPodium({ podium, testId }) {
-  if (!podium?.length) return <p className="text-sm text-white/50">Noch keine Ergebnisse.</p>;
+  if (!podium?.length) return <p className="tls-type-small text-white/50">Noch keine Ergebnisse.</p>;
   // Im Baum (#2336) steht zuerst, wie der Platz zustande kam; der Satz darunter nur, wenn Siege und Platz nicht passen.
   const note = podiumRoundNote(podium);
   return (
@@ -36,17 +36,17 @@ function MiniPodium({ podium, testId }) {
         const spoken = [entry.path, entry.detail].filter(Boolean).join(", ");
         return (
           <li key={rank} className="min-w-0 text-center" aria-label={`Platz ${rank}: ${entry.name}${spoken ? `, ${spoken}` : ""}`} data-testid={`${testId}-${rank}`}>
-            <div className={`text-sm font-bold leading-tight break-words ${rank === 1 ? "text-white" : "text-white/85"}`}>{entry.name}</div>
-            {entry.path ? <div className="text-xs font-semibold leading-tight text-white/80 break-words" data-testid={`${testId}-${rank}-path`}>{entry.path}</div> : null}
-            {entry.detail ? <div className="text-[11px] text-white/55 tabular-nums break-words">{entry.detail}</div> : null}
+            <div className={`tls-type-small font-bold leading-tight break-words ${rank === 1 ? "text-white" : "text-white/85"}`}>{entry.name}</div>
+            {entry.path ? <div className="tls-type-small font-semibold leading-tight text-white/80 break-words" data-testid={`${testId}-${rank}-path`}>{entry.path}</div> : null}
+            {entry.detail ? <div className="tls-type-small text-white/55 tabular-nums break-words">{entry.detail}</div> : null}
             <div className={`mt-1.5 rounded-t-sm border border-b-0 flex items-start justify-center pt-1 ${style.bar}`}>
-              <span className={`font-heading text-lg font-black ${style.text}`} aria-hidden="true">{rank}</span>
+              <span className={`tls-type-card tls-type-num ${style.text}`} aria-hidden="true">{rank}</span>
             </div>
           </li>
         );
       })}
     </ol>
-    {note ? <p className="mt-2 text-xs leading-snug text-white/55" data-testid={`${testId}-note`}>{note}</p> : null}
+    {note ? <p className="mt-2 tls-type-small leading-snug text-white/55" data-testid={`${testId}-note`}>{note}</p> : null}
     </>
   );
 }
@@ -72,19 +72,19 @@ export function EventRecap({ event, accessToken = "", fallback = null }) {
 
   return (
     <section id="rueckblick" className="space-y-6 scroll-mt-24" data-section="recap" data-testid="event-recap">
-      <h2 className="font-heading text-2xl font-black uppercase inline-flex items-center gap-2">
+      <h2 className="tls-type-section inline-flex items-center gap-2">
         <Award className="w-5 h-5 text-[#FFD700]" aria-hidden="true" /> Rückblick
       </h2>
 
       {mine && (
         <div className="border border-[#29B6E8]/40 bg-[#29B6E8]/5 rounded-sm p-4" data-testid="event-recap-mine">
-          <div className="inline-flex items-center gap-2 font-heading text-lg font-black uppercase text-[#29B6E8]">
+          <div className="inline-flex items-center gap-2 tls-type-card text-[#29B6E8]">
             <CheckCircle className="w-5 h-5" aria-hidden="true" /> Du warst dabei
           </div>
           {!!mine.results?.length && (
             <ul className="mt-2 space-y-1">
               {mine.results.map((result) => (
-                <li key={`${result.kind}-${result.id}`} className="text-sm text-white/85 flex flex-wrap gap-x-2 min-w-0" data-testid={`event-recap-mine-${result.kind}-${result.id}`}>
+                <li key={`${result.kind}-${result.id}`} className="tls-type-small text-white/85 flex flex-wrap gap-x-2 min-w-0" data-testid={`event-recap-mine-${result.kind}-${result.id}`}>
                   <Link to={itemPath(result)} className="font-bold text-white hover:text-[#29B6E8] break-words">{result.title}</Link>
                   <span className="text-white/65">{ownResultLine(result)}</span>
                 </li>
@@ -98,8 +98,8 @@ export function EventRecap({ event, accessToken = "", fallback = null }) {
         <dl className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2" data-testid="event-recap-numbers">
           {tiles.map((tile) => (
             <div key={tile.key} className="flex flex-col-reverse rounded-sm bg-white/[0.04] px-3 py-3 min-w-0" data-testid={`event-recap-number-${tile.key}`}>
-              <dt className="text-[11px] uppercase tracking-widest font-bold text-white/55">{tile.label}</dt>
-              <dd className="font-heading text-3xl font-black tabular-nums text-white">{tile.value}</dd>
+              <dt className="tls-type-label text-white/55">{tile.label}</dt>
+              <dd className="tls-type-title tls-type-num text-white">{tile.value}</dd>
             </div>
           ))}
         </dl>
@@ -111,11 +111,11 @@ export function EventRecap({ event, accessToken = "", fallback = null }) {
             const Icon = item.kind === "fastlap" ? Flag : Trophy;
             return (
               <div key={`${item.kind}-${item.id}`} className="border border-white/10 bg-[#121212] rounded-sm p-4 min-w-0" data-testid={`event-recap-${item.kind}-${item.id}`}>
-                <Link to={itemPath(item)} className="inline-flex items-center gap-2 font-heading font-bold leading-tight hover:text-[#29B6E8] break-words">
+                <Link to={itemPath(item)} className="inline-flex items-center gap-2 font-bold leading-tight hover:text-[#29B6E8] break-words">
                   <Icon className={`w-4 h-4 shrink-0 ${item.kind === "fastlap" ? "text-[#2DD4BF]" : "text-[#29B6E8]"}`} aria-hidden="true" /> {item.title}
                 </Link>
-                {item.kind === "fastlap" && item.track ? <div className="text-xs text-white/50 mt-0.5">Beste Zeit auf {item.track}</div> : null}
-                {item.kind === "tournament" && item.team ? <div className="text-xs text-white/50 mt-0.5">Team-Turnier</div> : null}
+                {item.kind === "fastlap" && item.track ? <div className="tls-type-small text-white/50 mt-0.5">Beste Zeit auf {item.track}</div> : null}
+                {item.kind === "tournament" && item.team ? <div className="tls-type-small text-white/50 mt-0.5">Team-Turnier</div> : null}
                 <div className="mt-3">
                   <MiniPodium podium={item.podium} testId={`event-recap-podium-${item.id}`} />
                 </div>
@@ -129,9 +129,9 @@ export function EventRecap({ event, accessToken = "", fallback = null }) {
         <Link to={`/news/${recap.report.slug}`} className="tls-card flex items-center gap-3 border border-white/10 bg-[#121212] rounded-sm p-4 min-w-0" data-testid="event-recap-report">
           <Newspaper className="w-5 h-5 text-[#29B6E8] shrink-0" aria-hidden="true" />
           <span className="min-w-0">
-            <span className="block text-[10px] uppercase tracking-widest text-white/45">Bericht</span>
-            <span className="tls-card__title block font-heading font-bold break-words">{recap.report.title}</span>
-            {recap.report.excerpt ? <span className="block text-xs text-white/60 line-clamp-2">{recap.report.excerpt}</span> : null}
+            <span className="block tls-type-label text-white/45">Bericht</span>
+            <span className="tls-card__title block tls-type-card break-words">{recap.report.title}</span>
+            {recap.report.excerpt ? <span className="block tls-type-small text-white/60 line-clamp-2">{recap.report.excerpt}</span> : null}
           </span>
         </Link>
       )}

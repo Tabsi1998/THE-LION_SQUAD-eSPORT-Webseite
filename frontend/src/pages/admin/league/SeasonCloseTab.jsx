@@ -23,7 +23,7 @@ import { SeasonPostseason } from "./SeasonPostseason";
 import { OrderSheet } from "./SeasonTablePanel";
 import "./seasonClose.css";
 
-const BUTTON = "tls-btn inline-flex min-h-11 items-center gap-1.5 rounded-sm px-4 py-2 text-xs font-bold uppercase tracking-wider disabled:opacity-50";
+const BUTTON = "tls-btn inline-flex min-h-11 items-center gap-1.5 rounded-sm px-4 py-2 tls-type-label disabled:opacity-50";
 const CHIP = {
   closed: "border-[#29B6E8]/50 text-[#29B6E8]",
   ready: "border-ok/50 text-ok",
@@ -58,16 +58,16 @@ const TIE_TEST_ID = { zone: "close-decide-zone", playoff: "close-decide-playoff"
 /** Der Endstand einer Playoff- bzw. Relegations-Staffel (#2404): Plätze aus dem Baum bzw. Paarungen mit Ergebnis - keine Tabelle. */
 function Placements({ row, label }) {
   const rows = row.standings || [];
-  if (!rows.length) return <p className="text-sm text-white/55">Noch keine Teams.</p>;
+  if (!rows.length) return <p className="tls-type-small text-white/55">Noch keine Teams.</p>;
   const relegation = row.kind === "relegation";
   return (
     <ol className="divide-y divide-white/5 rounded-sm border border-white/10 bg-[#121212]" aria-label={label} data-testid={`close-placements-${row.tournament_id}`}>
       {rows.map((item) => (
         <li key={item.registration_id} className="flex items-center gap-3 px-3 py-2">
-          {relegation ? null : <span className="w-6 shrink-0 text-right font-display text-base font-bold tabular-nums text-white">{placeText(item)}</span>}
+          {relegation ? null : <span className="w-6 shrink-0 text-right tls-type-card tls-type-num text-white">{placeText(item)}</span>}
           <span className="min-w-0 flex-1">
             <span className="block font-semibold text-white [overflow-wrap:anywhere]">{item.display_name}</span>
-            <span className="block text-xs text-white/60">{relegation ? relegationRowText(item) : reachedText(item)}</span>
+            <span className="block tls-type-small text-white/60">{relegation ? relegationRowText(item) : reachedText(item)}</span>
           </span>
         </li>
       ))}
@@ -82,14 +82,14 @@ function Hints({ row }) {
     <ul className="mt-3 space-y-2" aria-label="Hinweise" data-testid={`close-hints-${row.tournament_id}`}>
       {row.hints.map((hint) => (
         <li key={hint.code} className="rounded-sm border border-white/10 p-3" data-testid={`close-hint-${row.tournament_id}-${hint.code}`}>
-          <p className="flex items-start gap-2 text-sm font-semibold text-white">
+          <p className="flex items-start gap-2 tls-type-small font-semibold text-white">
             <CircleAlert className="mt-0.5 h-4 w-4 shrink-0 text-[#29B6E8]" aria-hidden="true" />
             <span>{hint.label}</span>
           </p>
-          <p className="mt-1 text-xs text-white/65">{hint.text}</p>
+          <p className="mt-1 tls-type-small text-white/65">{hint.text}</p>
           <ul className="mt-2 space-y-1">
             {hint.items.map((item, index) => (
-              <li key={`${item.url}-${index}`} className="text-sm">
+              <li key={`${item.url}-${index}`} className="tls-type-small">
                 <Link to={item.url} className="inline-flex min-h-11 min-w-0 items-center break-words text-[#29B6E8] hover:underline">{item.text}</Link>
               </li>
             ))}
@@ -104,7 +104,7 @@ function Hints({ row }) {
 function Checklist({ row, canResults, superadmin, onDecide }) {
   if (!row.blockers.length) {
     return (
-      <p className="flex items-start gap-2 text-sm text-ok" data-testid={`close-ready-${row.tournament_id}`}>
+      <p className="flex items-start gap-2 tls-type-body text-ok" data-testid={`close-ready-${row.tournament_id}`}>
         <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
         <span>Alle Spiele sind entschieden, kein Vorfall, Verfahren oder Einspruch ist offen und keine Frist läuft mehr.</span>
       </p>
@@ -114,33 +114,33 @@ function Checklist({ row, canResults, superadmin, onDecide }) {
     <ul className="space-y-3" aria-label="Was noch fehlt" data-testid={`close-blockers-${row.tournament_id}`}>
       {row.blockers.map((blocker) => (
         <li key={blocker.code} className="rounded-sm border border-warn/30 bg-warn/5 p-3" data-testid={`close-blocker-${row.tournament_id}-${blocker.code}`}>
-          <p className="flex items-start gap-2 text-sm font-semibold text-white">
+          <p className="flex items-start gap-2 tls-type-small font-semibold text-white">
             <CircleAlert className="mt-0.5 h-4 w-4 shrink-0 text-warn" aria-hidden="true" />
             <span>{blocker.label}{blocker.count > 1 ? ` (${blocker.count})` : ""}</span>
           </p>
-          <p className="mt-1 text-xs text-white/65">{blocker.text}</p>
+          <p className="mt-1 tls-type-small text-white/65">{blocker.text}</p>
           {blocker.items.length ? (
             <ul className="mt-2 space-y-1">
               {blocker.items.map((item, index) => (
-                <li key={`${item.url}-${index}`} className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm">
+                <li key={`${item.url}-${index}`} className="flex flex-wrap items-center gap-x-3 gap-y-1 tls-type-small">
                   {TIE_BLOCKERS[blocker.code] || blocker.code === CROSS_TIE
                     ? <span className="min-w-0 break-words text-white/85">{item.text}</span>
                     : <Link to={item.url} className="inline-flex min-h-11 min-w-0 items-center break-words text-[#29B6E8] hover:underline">{item.text}</Link>}
-                  {untilText(item) ? <span className="text-xs tabular-nums text-white/55">{untilText(item)}</span> : null}
+                  {untilText(item) ? <span className="tls-type-small tabular-nums text-white/55">{untilText(item)}</span> : null}
                 </li>
               ))}
             </ul>
           ) : null}
-          {blocker.count > blocker.items.length ? <p className="mt-1 text-xs text-white/50">und {blocker.count - blocker.items.length} weitere</p> : null}
+          {blocker.count > blocker.items.length ? <p className="mt-1 tls-type-small text-white/50">und {blocker.count - blocker.items.length} weitere</p> : null}
           {TIE_BLOCKERS[blocker.code] ? (
             <div className="mt-2 space-y-2">
               {!row.can_decide ? (
-                <p className="text-xs text-white/65">
+                <p className="tls-type-small text-white/65">
                   In dieser Season entscheidet die Leitung keinen Gleichstand. Nimm im Reiter{" "}
                   <Link to="#punkte" className="text-[#29B6E8] hover:underline">Tabelle</Link> „Entscheid der Leitung“ als letztes Kriterium auf und übertrage die Vorgaben.
                 </p>
               ) : !canResults ? (
-                <p className="text-xs text-white/65">Den Entscheid trifft, wer in dieser Liga „Ergebnisse korrigieren“ darf.</p>
+                <p className="tls-type-small text-white/65">Den Entscheid trifft, wer in dieser Liga „Ergebnisse korrigieren“ darf.</p>
               ) : row.ties.filter((tie) => (tie.kind || "champion") === TIE_BLOCKERS[blocker.code].kind).map((tie) => (tie.own_team && !superadmin
                 ? <OwnTeamNote key={tie.rank} testId={`close-tie-own-${row.tournament_id}`} />
                 : (
@@ -181,7 +181,7 @@ function CloseSheet({ row, superadmin, onClose, onDone }) {
   return (
     <AdminSheet title="Staffel abschließen" eyebrow={staffelLabel(row)} onClose={onClose} onSubmit={submit} saving={saving}
       submitLabel="Jetzt abschließen" savingLabel="Schließe ab …" submitTestId="close-confirm" testId="close-sheet">
-      <div className="space-y-3 text-sm text-white/75">
+      <div className="space-y-3 tls-type-small text-white/75">
         <p>Der Endstand wird festgehalten: Plätze, Punkte, Maps, Entscheide und der Regelstand von jetzt. Website, TV und PDF zeigen ab dann diesen Endstand.</p>
         <ul className="list-disc space-y-1 pl-5 text-white/65">
           <li>Ergebnisse und die Tabelle lassen sich danach nicht mehr ändern.</li>
@@ -233,18 +233,18 @@ function ReopenSheet({ row, superadmin, successor, onClose, onDone }) {
       submitLabel="Wieder öffnen" savingLabel="Öffne …" submitTestId="reopen-confirm" testId="reopen-sheet">
       {/* Neue Season schon angelegt (F.2, Nr. 162): Sie folgt dem neuen Endstand nicht von selbst. */}
       {successor ? (
-        <p className="mb-3 flex items-start gap-2 rounded-sm border border-warn/50 bg-warn/10 p-3 text-sm font-semibold text-white" role="note" data-testid="reopen-successor">
+        <p className="mb-3 flex items-start gap-2 rounded-sm border border-warn/50 bg-warn/10 p-3 tls-type-body font-semibold text-white" role="note" data-testid="reopen-successor">
           <CircleAlert className="mt-0.5 h-4 w-4 shrink-0 text-warn" aria-hidden="true" />
           <span>Es gibt schon die neue Season {successor.name}. Nach dem neuen Abschluss die Übernahme dort neu berechnen.</span>
         </p>
       ) : null}
       {row.incomplete ? (
-        <p className="text-sm text-white/75">
+        <p className="tls-type-body text-white/75">
           Der Abschluss wurde nicht fertig geschrieben – die Staffel ist gesperrt, einen Endstand gibt es nicht. Wieder öffnen gibt sie frei, danach schließt du
           neu ab. Die Captains haben vom Abschluss nichts erfahren und bekommen keine Nachricht.
         </p>
       ) : (
-        <p className="text-sm text-white/75">
+        <p className="tls-type-body text-white/75">
           Die Tabelle wird wieder gerechnet, Ergebnisse lassen sich korrigieren. Fassung {row.final?.version} bleibt im Verlauf sichtbar, der Meister-Eintrag ruht,
           bis neu abgeschlossen ist. Die Captains bekommen eine Nachricht – ohne deinen Grund.
         </p>
@@ -255,7 +255,7 @@ function ReopenSheet({ row, superadmin, successor, onClose, onDone }) {
       </div>
       {needsEmergency ? (
         <div className="mt-4 space-y-2 rounded-sm border border-warn/40 p-3">
-          <p className="text-xs font-semibold text-white/80">Du hast diese Staffel selbst abgeschlossen. Wieder öffnen soll eine zweite Person.</p>
+          <p className="tls-type-small font-semibold text-white/80">Du hast diese Staffel selbst abgeschlossen. Wieder öffnen soll eine zweite Person.</p>
           <TextAreaField label="Grund für die Notausnahme" rows={2} value={emergencyReason} onChange={setEmergencyReason} required
             hint="Als Superadmin geht es trotzdem, mit mindestens fünf Zeichen. Der Grund steht im Protokoll." testId="reopen-emergency-reason" />
         </div>
@@ -277,16 +277,16 @@ function VersionSheet({ row, entry, onClose }) {
   }, [row.tournament_id, entry.version]);
   return (
     <AdminSheet title={`Fassung ${entry.version}`} eyebrow={staffelLabel(row)} size="lg" onClose={onClose} cancelLabel="Schließen" testId="version-sheet">
-      <p className="text-sm text-white/65">{historyLine(entry)}{entry.rules_label ? ` · Regelwerk ${entry.rules_label}` : ""}</p>
+      <p className="tls-type-small text-white/65">{historyLine(entry)}{entry.rules_label ? ` · Regelwerk ${entry.rules_label}` : ""}</p>
       {entry.reopened_at ? (
-        <p className="mt-1 text-sm text-white/65">Wieder geöffnet am {finalMoment(entry.reopened_at)} von {entry.reopened_by_name}: „{entry.reopen_reason}“</p>
+        <p className="mt-1 tls-type-small text-white/65">Wieder geöffnet am {finalMoment(entry.reopened_at)} von {entry.reopened_by_name}: „{entry.reopen_reason}“</p>
       ) : null}
-      {error ? <p className="mt-4 text-sm text-warn" role="alert">{error}</p> : null}
-      {!data && !error ? <p className="mt-4 text-sm text-white/45" aria-busy="true">Lade Fassung …</p> : null}
+      {error ? <p className="mt-4 tls-type-small text-warn" role="alert">{error}</p> : null}
+      {!data && !error ? <p className="mt-4 tls-type-small text-white/45" aria-busy="true">Lade Fassung …</p> : null}
       {data ? (
         <div className="mt-4 space-y-2">
           <Table rows={data.standings || []} rules={data.table_rules} championId={null} label={`Endstand Fassung ${entry.version}`} />
-          {(data.decisions || []).map((decision) => <p key={decisionLine(decision)} className="text-xs text-white/60">Entscheid: {decisionLine(decision)}</p>)}
+          {(data.decisions || []).map((decision) => <p key={decisionLine(decision)} className="tls-type-small text-white/60">Entscheid: {decisionLine(decision)}</p>)}
         </div>
       ) : null}
     </AdminSheet>
@@ -300,28 +300,28 @@ function StaffelCard({ row, data, canResults, onSheet }) {
   return (
     <section className="rounded-sm border border-white/10 bg-[#0A0A0A] p-3 sm:p-4" aria-label={label} data-testid={`close-staffel-${row.tournament_id}`}>
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <h3 className="font-heading text-lg font-black uppercase text-white">{label}</h3>
-        <span className={`rounded-sm border px-2 py-1 text-[11px] font-bold uppercase tracking-wider ${CHIP[state.key]}`} data-testid={`close-state-${row.tournament_id}`}>{state.label}</span>
+        <h3 className="tls-type-card text-white">{label}</h3>
+        <span className={`rounded-sm border px-2 py-1 tls-type-label ${CHIP[state.key]}`} data-testid={`close-state-${row.tournament_id}`}>{state.label}</span>
       </div>
 
       {row.closed ? (
-        <div className="mt-3 space-y-1 text-sm text-white/75" data-testid={`close-final-${row.tournament_id}`}>
+        <div className="mt-3 space-y-1 tls-type-small text-white/75" data-testid={`close-final-${row.tournament_id}`}>
           <p className="flex items-start gap-2"><Lock className="mt-0.5 h-4 w-4 shrink-0 text-[#29B6E8]" aria-hidden="true" />
             <span>Abgeschlossen am {finalMoment(row.final.closed_at)} von {row.final.closed_by_name} · Fassung {row.final.version}
               {row.final.rules_label ? ` · Regelwerk ${row.final.rules_label}` : ""}</span></p>
           {row.final.champion ? (
             <p className="flex items-center gap-2 text-white"><Crown className="h-4 w-4 shrink-0 text-honor" aria-hidden="true" /> Meister: <strong className="min-w-0 break-words">{row.final.champion.display_name}</strong></p>
           ) : null}
-          {(row.final.decisions || []).map((decision) => <p key={decisionLine(decision)} className="text-xs text-white/60">Entscheid: {decisionLine(decision)}</p>)}
+          {(row.final.decisions || []).map((decision) => <p key={decisionLine(decision)} className="tls-type-small text-white/60">Entscheid: {decisionLine(decision)}</p>)}
           {/* Belohnungen (F.4, #2214): mit dem Abschluss vergeben - Einzelheiten im Reiter „Belohnungen“. */}
           {row.rewards ? (
-            <p className="flex items-center gap-2 text-xs text-white/70" data-testid={`close-rewards-${row.tournament_id}`}>
+            <p className="flex items-center gap-2 tls-type-small text-white/70" data-testid={`close-rewards-${row.tournament_id}`}>
               <Gift className="h-3.5 w-3.5 shrink-0 text-[#29B6E8]" aria-hidden="true" />
               {row.rewards === 1 ? "1 Belohnung vergeben" : `${row.rewards} Belohnungen vergeben`} · <Link to="#belohnungen" className="text-[#29B6E8] hover:underline">Belohnungen</Link>
             </p>
           ) : null}
           {row.rewards && row.rewards_roster_fallback?.length ? (
-            <p className="text-xs text-warn" data-testid={`close-rewards-fallback-${row.tournament_id}`}>{rosterFallbackText(row.rewards_roster_fallback)}</p>
+            <p className="tls-type-small text-warn" data-testid={`close-rewards-fallback-${row.tournament_id}`}>{rosterFallbackText(row.rewards_roster_fallback)}</p>
           ) : null}
         </div>
       ) : (
@@ -332,8 +332,8 @@ function StaffelCard({ row, data, canResults, onSheet }) {
       )}
 
       <div className="mt-4">
-        <h4 className="mb-2 text-[11px] font-bold uppercase tracking-[0.2em] text-white/50">{row.closed ? "Endstand" : "Vorschau des Endstands"}</h4>
-        {row.zones_label ? <p className="mb-2 text-xs text-white/55" data-testid={`close-zones-${row.tournament_id}`}>Auf- und Abstieg: {row.zones_label}</p> : null}
+        <h4 className="mb-2 tls-type-label text-white/50">{row.closed ? "Endstand" : "Vorschau des Endstands"}</h4>
+        {row.zones_label ? <p className="mb-2 tls-type-small text-white/55" data-testid={`close-zones-${row.tournament_id}`}>Auf- und Abstieg: {row.zones_label}</p> : null}
         {row.kind
           ? <Placements row={row} label={`${row.closed ? "Endstand" : "Vorschau"} ${label}`} />
           : <Table rows={row.standings || []} rules={row.table_rules} championId={championId} label={`${row.closed ? "Endstand" : "Vorschau"} ${label}`} />}
@@ -346,33 +346,33 @@ function StaffelCard({ row, data, canResults, onSheet }) {
             <Lock className="h-4 w-4" aria-hidden="true" /> Staffel abschließen
           </button>
         ) : null}
-        {!row.closed && !row.incomplete && data.can_act && !row.can_close && row.blockers.length ? <span className="text-xs text-white/55">Geht, sobald die Punkte oben erledigt sind.</span> : null}
+        {!row.closed && !row.incomplete && data.can_act && !row.can_close && row.blockers.length ? <span className="tls-type-small text-white/55">Geht, sobald die Punkte oben erledigt sind.</span> : null}
         {(row.closed || row.incomplete) && row.can_reopen ? (
           <button type="button" onClick={() => onSheet({ kind: "reopen", row })} className={`${BUTTON} tls-btn--secondary`} data-testid={`reopen-button-${row.tournament_id}`}>
             <LockOpen className="h-4 w-4" aria-hidden="true" /> Wieder öffnen
           </button>
         ) : null}
         {row.closed && data.can_act && !row.can_reopen ? (
-          <p className="text-xs font-semibold text-white/80" data-testid={`reopen-note-${row.tournament_id}`}>
+          <p className="tls-type-small font-semibold text-white/80" data-testid={`reopen-note-${row.tournament_id}`}>
             {row.closed_by_me ? "Du hast abgeschlossen. Wieder öffnen muss eine zweite Person." : "Über dein eigenes Team entscheidet eine andere Person."}
           </p>
         ) : null}
-        {!data.can_act ? <span className="text-xs text-white/55" data-testid={`close-readonly-${row.tournament_id}`}>Abschließen und wieder öffnen darf, wer {data.responsible} hat.</span> : null}
+        {!data.can_act ? <span className="tls-type-small text-white/55" data-testid={`close-readonly-${row.tournament_id}`}>Abschließen und wieder öffnen darf, wer {data.responsible} hat.</span> : null}
       </div>
 
       {row.history.length ? (
         <div className="mt-4 border-t border-white/10 pt-3">
-          <h4 className="mb-2 flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-[0.2em] text-white/50"><History className="h-3.5 w-3.5" aria-hidden="true" /> Verlauf</h4>
+          <h4 className="mb-2 flex items-center gap-1.5 tls-type-label text-white/50"><History className="h-3.5 w-3.5" aria-hidden="true" /> Verlauf</h4>
           <ul className="space-y-1.5" data-testid={`close-history-${row.tournament_id}`}>
             {row.history.map((entry) => (
-              <li key={entry.id} className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-white/70">
-                <span className={`rounded-sm border px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wider ${entry.active ? "border-[#29B6E8]/50 text-[#29B6E8]" : "border-white/15 text-white/50"}`}>
+              <li key={entry.id} className="flex flex-wrap items-center gap-x-3 gap-y-1 tls-type-small text-white/70">
+                <span className={`rounded-sm border px-1.5 py-0.5 tls-type-label ${entry.active ? "border-[#29B6E8]/50 text-[#29B6E8]" : "border-white/15 text-white/50"}`}>
                   {entry.active ? "Gilt" : "Ersetzt"}
                 </span>
                 <span className="text-white">{historyLine(entry)}</span>
                 {entry.champion ? <span>Meister: {entry.champion}</span> : null}
                 {entry.reopened_at ? <span className="min-w-0 break-words">wieder geöffnet von {entry.reopened_by_name}: „{entry.reopen_reason}“</span> : null}
-                <button type="button" onClick={() => onSheet({ kind: "version", row, entry })} className="tls-btn tls-btn--quiet ml-auto min-h-11 rounded-sm px-3 py-1 text-[11px] font-bold uppercase tracking-wider"
+                <button type="button" onClick={() => onSheet({ kind: "version", row, entry })} className="tls-btn tls-btn--quiet ml-auto min-h-11 rounded-sm px-3 py-1 tls-type-label"
                   data-testid={`close-version-${row.tournament_id}-${entry.version}`}>Tabelle ansehen</button>
               </li>
             ))}
@@ -403,12 +403,12 @@ export function SeasonCloseTab({ seasonId, canResults = false, canMatches = fals
     load();
   };
 
-  if (error && !data) return <p className="text-sm text-warn" role="alert">{error}</p>;
-  if (!data) return <p className="text-sm text-white/45" aria-busy="true">Lade Abschluss …</p>;
+  if (error && !data) return <p className="tls-type-small text-warn" role="alert">{error}</p>;
+  if (!data) return <p className="tls-type-small text-white/45" aria-busy="true">Lade Abschluss …</p>;
   return (
     <FormSection title="Saisonabschluss" testId="season-close"
       hint="Abgeschlossen wird je Staffel. Der Abschluss hält den Endstand fest – eine spätere Regeländerung ändert ihn nicht mehr.">
-      <p className="text-sm text-white/80" data-testid="season-close-summary">{seasonSummary(data)}</p>
+      <p className="tls-type-small text-white/80" data-testid="season-close-summary">{seasonSummary(data)}</p>
       <div className="mt-4 space-y-4">
         {data.staffeln.map((row) => <StaffelCard key={row.tournament_id} row={row} data={data} canResults={canResults} onSheet={setSheet} />)}
       </div>
@@ -418,7 +418,7 @@ export function SeasonCloseTab({ seasonId, canResults = false, canMatches = fals
       <SeasonPostseason seasonId={seasonId} onChanged={load} />
       {/* Saisonfinale am TV (#1641): nach dem Sieger-Moment je Liga N die Auf- und Absteiger - Weiter und Ende. */}
       <div className="mt-4"><SeasonTvFinaleControl seasonId={seasonId} canSteer={canMatches} /></div>
-      <p className="mt-4 text-[11px] text-white/45">
+      <p className="mt-4 tls-type-small text-white/45">
         Auf- und Abstieg ergeben sich aus dem Endstand (Zonen je Liga im Reiter „Ligen und Staffeln“). Ist alles abgeschlossen, legt „Neue Season aus …“ oben die nächste Season an.
         {" "}Sollen Auf- und Absteiger eine Nachricht bekommen, sobald der Endstand feststeht, oder die Teams ihren Platz erst zusagen:{" "}
         <Link to="#startrechte" className="text-[#29B6E8] hover:underline" data-testid="season-close-start-rights">Startrechte</Link> im Reiter „Anmeldung und Kader“.

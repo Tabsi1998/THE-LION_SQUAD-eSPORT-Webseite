@@ -28,7 +28,7 @@ export function ShareButton({ kind, id, title, detail, start, end, className = "
       data-testid={testId}
       data-native={canNativeShare ? "1" : "0"}
       aria-label={`${title}: ${label}`}
-      className={`tls-btn tls-btn--quiet inline-flex min-h-[44px] items-center gap-2 px-3 py-2 rounded-sm text-xs font-bold uppercase tracking-wider ${className}`}
+      className={`tls-btn tls-btn--quiet inline-flex min-h-[44px] items-center gap-2 px-3 py-2 rounded-sm tls-type-label ${className}`}
     >
       <Icon className="h-4 w-4" aria-hidden="true" />
       <span>{copied ? "Kopiert" : label}</span>

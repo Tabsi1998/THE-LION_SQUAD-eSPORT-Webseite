@@ -7,6 +7,7 @@ import { api, formatRequestError } from "@/lib/api";
 import { techniqueLabel } from "@/lib/shopTechniques";
 import { viennaDateTime } from "@/lib/vienna";
 import ShopTabs from "./ShopTabs";
+import { ShortCaps } from "@/components/tls/ShortCaps";
 
 // Testentwurf an Printful (#2062) - Verwaltung → Finanzen → Shop → Testentwurf. Geführt ohne Vorwissen: Produkt,
 // Variante, Test-Gamertag, Anschrift (Vereinsadresse vorbelegt), Vorschau mit genau den Daten, die gesendet werden,
@@ -14,7 +15,7 @@ import ShopTabs from "./ShopTabs";
 // Bestätigung in der Seite. Ein Bestätigen gibt es hier nicht.
 
 const BASE = "/admin/shop/test-drafts";
-const INPUT = "mt-1 w-full min-h-10 bg-black/40 border border-white/15 rounded-sm px-3 text-sm placeholder:text-white/35 focus:border-brand outline-none disabled:opacity-50";
+const INPUT = "mt-1 w-full min-h-10 bg-black/40 border border-white/15 rounded-sm px-3 tls-type-small placeholder:text-white/35 focus:border-brand outline-none disabled:opacity-50";
 const STEPS = [
   { key: "product", label: "Produkt" },
   { key: "variant", label: "Variante" },
@@ -43,7 +44,7 @@ const KIND_LABELS = { personal: "eigene Datei mit Gamertag bzw. Nummer", base: "
 function PriceCheck({ check }) {
   const gross = check.printful_gross_cents !== undefined;
   return (
-    <p className="text-sm flex flex-wrap items-center gap-x-3 gap-y-1" data-testid="shop-test-draft-price-check">
+    <p className="tls-type-small flex flex-wrap items-center gap-x-3 gap-y-1" data-testid="shop-test-draft-price-check">
       {gross
         ? <>Mitgliederpreis {euro(check.shop_cents)} · Printful brutto (Ware) {euro(check.printful_gross_cents)}{check.catalog_net_cents !== null && check.catalog_net_cents !== undefined ? <> · Katalog netto {euro(check.catalog_net_cents)} (Prüfwert)</> : null}</>
         : <>Preis im Shop {euro(check.shop_cents)} · Ware laut Printful {euro(check.printful_subtotal_cents)}</>}
@@ -67,8 +68,8 @@ function newKey() {
 function Section({ title, icon: Icon, children, testId, step }) {
   return (
     <section className="border border-white/10 bg-surface-1 rounded-sm p-4 space-y-3 min-w-0" data-testid={testId}>
-      <h2 className="text-xs font-bold uppercase tracking-wider text-white/70 inline-flex items-center gap-2">
-        {step && <span className="inline-flex h-5 w-5 items-center justify-center rounded-full bg-brand/20 text-brand text-[11px] font-black" aria-hidden="true">{step}</span>}
+      <h2 className="tls-type-label text-white/70 inline-flex items-center gap-2">
+        {step && <span className="inline-flex h-5 w-5 items-center justify-center rounded-full bg-brand/20 text-brand tls-type-small font-black" aria-hidden="true">{step}</span>}
         {Icon && <Icon className="w-3.5 h-3.5 text-white/50" aria-hidden="true" />} {title}
       </h2>
       {children}
@@ -80,7 +81,7 @@ function Level({ level }) {
   const meta = LEVELS[level] || LEVELS.open;
   const Icon = meta.icon;
   return (
-    <span className={`inline-flex items-center gap-1 text-xs font-bold ${meta.className}`} data-level={level}>
+    <span className={`inline-flex items-center gap-1 tls-type-small font-bold ${meta.className}`} data-level={level}>
       <Icon className="w-3.5 h-3.5" aria-hidden="true" /> {meta.label}
     </span>
   );
@@ -89,7 +90,7 @@ function Level({ level }) {
 function Choice({ active, onClick, children, testId, disabled }) {
   return (
     <button type="button" role="radio" aria-checked={active} onClick={onClick} disabled={disabled} data-testid={testId}
-      className={`min-h-10 px-3 text-sm border rounded-sm inline-flex items-center gap-2 transition-colors duration-150 disabled:opacity-40 ${active ? "border-brand bg-brand/10 text-white" : "border-white/10 text-white/75 hover:border-white/30"}`}>
+      className={`min-h-10 px-3 tls-type-small border rounded-sm inline-flex items-center gap-2 transition-colors duration-150 disabled:opacity-40 ${active ? "border-brand bg-brand/10 text-white" : "border-white/10 text-white/75 hover:border-white/30"}`}>
       {children}
     </button>
   );
@@ -114,14 +115,14 @@ function ConfirmDelete({ draft, onDeleted, testId }) {
   if (!asking) {
     return (
       <button type="button" onClick={() => setAsking(true)} data-testid={`${testId}-delete`}
-        className="tls-btn tls-btn--secondary min-h-10 px-3 text-xs font-bold uppercase tracking-wider rounded-sm inline-flex items-center gap-1.5">
+        className="tls-btn tls-btn--secondary min-h-10 px-3 tls-type-label rounded-sm inline-flex items-center gap-1.5">
         <Trash2 className="w-3.5 h-3.5" aria-hidden="true" /> Entwurf bei Printful löschen
       </button>
     );
   }
   return (
     <div className="tls-reveal border border-warn/40 bg-warn/10 rounded-sm p-3 space-y-2" role="alertdialog" aria-label="Entwurf löschen" data-testid={`${testId}-confirm`}>
-      <p className="text-sm">
+      <p className="tls-type-small">
         {draft.printful_order_id
           ? `Den Entwurf ${draft.printful_order_id} bei Printful wirklich löschen?`
           : "Bei Printful nachsehen und den Entwurf - falls er angelegt wurde - löschen?"}
@@ -129,11 +130,11 @@ function ConfirmDelete({ draft, onDeleted, testId }) {
       </p>
       <div className="flex flex-wrap gap-2">
         <button type="button" onClick={remove} disabled={busy} data-testid={`${testId}-confirm-yes`}
-          className="tls-btn tls-btn--primary min-h-10 px-3 text-xs font-bold uppercase tracking-wider rounded-sm disabled:opacity-40">
+          className="tls-btn tls-btn--primary min-h-10 px-3 tls-type-label rounded-sm disabled:opacity-40">
           {busy ? "Löscht …" : "Ja, löschen"}
         </button>
         <button type="button" onClick={() => setAsking(false)} disabled={busy}
-          className="tls-btn tls-btn--quiet min-h-10 px-3 text-xs font-bold uppercase tracking-wider rounded-sm">Abbrechen</button>
+          className="tls-btn tls-btn--quiet min-h-10 px-3 tls-type-label rounded-sm">Abbrechen</button>
       </div>
     </div>
   );
@@ -141,16 +142,16 @@ function ConfirmDelete({ draft, onDeleted, testId }) {
 
 function Costs({ estimate, error }) {
   if (error) {
-    return <p className="text-sm text-warn" data-testid="shop-test-draft-estimate-error">Keine Kostenschätzung: {error.text}{error.provider_detail ? ` (Printful: ${error.provider_detail})` : ""}</p>;
+    return <p className="tls-type-body text-warn" data-testid="shop-test-draft-estimate-error">Keine Kostenschätzung: {error.text}{error.provider_detail ? ` (Printful: ${error.provider_detail})` : ""}</p>;
   }
-  if (!estimate) return <p className="text-sm text-white/55">Keine Kostenschätzung.</p>;
+  if (!estimate) return <p className="tls-type-small text-white/55">Keine Kostenschätzung.</p>;
   const tax = (estimate.vat_cents || 0) + (estimate.tax_cents || 0);
   return (
-    <dl className="grid grid-cols-2 gap-x-6 gap-y-1 text-sm sm:grid-cols-4" data-testid="shop-test-draft-estimate">
-      <div><dt className="text-white/50 text-xs">Ware</dt><dd className="tabular-nums">{euro(estimate.subtotal_cents)}</dd></div>
-      <div><dt className="text-white/50 text-xs">Versand</dt><dd className="tabular-nums">{euro(estimate.shipping_cents)}</dd></div>
-      <div><dt className="text-white/50 text-xs">Steuer</dt><dd className="tabular-nums">{euro(tax)}</dd></div>
-      <div><dt className="text-white/50 text-xs">Gesamt</dt><dd className="tabular-nums font-bold">{euro(estimate.total_cents)}</dd></div>
+    <dl className="grid grid-cols-2 gap-x-6 gap-y-1 tls-type-small sm:grid-cols-4" data-testid="shop-test-draft-estimate">
+      <div><dt className="text-white/50 tls-type-small">Ware</dt><dd className="tabular-nums">{euro(estimate.subtotal_cents)}</dd></div>
+      <div><dt className="text-white/50 tls-type-small">Versand</dt><dd className="tabular-nums">{euro(estimate.shipping_cents)}</dd></div>
+      <div><dt className="text-white/50 tls-type-small">Steuer</dt><dd className="tabular-nums">{euro(tax)}</dd></div>
+      <div><dt className="text-white/50 tls-type-small">Gesamt</dt><dd className="tabular-nums font-bold">{euro(estimate.total_cents)}</dd></div>
     </dl>
   );
 }
@@ -159,7 +160,7 @@ function Files({ files }) {
   return (
     <ul className="space-y-2" data-testid="shop-test-draft-files">
       {files.map((file) => (
-        <li key={file.placement} className="border border-white/10 rounded-sm p-2 text-xs text-white/75 space-y-1 min-w-0">
+        <li key={file.placement} className="border border-white/10 rounded-sm p-2 tls-type-small text-white/75 space-y-1 min-w-0">
           <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
             <span className="font-bold text-white uppercase tracking-wider">{file.placement_label || file.placement}</span>
             <span>{techniqueLabel(file.technique)}</span>
@@ -183,14 +184,14 @@ function Deviations({ draft }) {
   const summary = draft.deviation_summary || {};
   return (
     <div className="space-y-2" data-testid="shop-test-draft-deviations">
-      <p className="text-sm flex flex-wrap gap-x-4 gap-y-1">
+      <p className="tls-type-small flex flex-wrap gap-x-4 gap-y-1">
         <span className="text-emerald-300">{summary.ok || 0} passen</span>
         <span className={summary.warn ? "text-warn font-bold" : "text-white/50"}>{summary.warn || 0} prüfen</span>
         <span className={summary.error ? "text-red-400 font-bold" : "text-white/50"}>{summary.error || 0} falsch übergeben</span>
       </p>
       <ul className="divide-y divide-white/5 border border-white/10 rounded-sm">
         {rows.map((row, index) => (
-          <li key={`${row.label}-${index}`} className={`tls-reveal grid gap-1 p-2 text-xs sm:grid-cols-[minmax(0,14rem)_minmax(0,1fr)_auto] sm:items-center ${row.level === "error" ? "bg-red-500/10" : row.level === "warn" ? "bg-warn/10" : ""}`}
+          <li key={`${row.label}-${index}`} className={`tls-reveal grid gap-1 p-2 tls-type-small sm:grid-cols-[minmax(0,14rem)_minmax(0,1fr)_auto] sm:items-center ${row.level === "error" ? "bg-red-500/10" : row.level === "warn" ? "bg-warn/10" : ""}`}
             style={{ animationDelay: `${Math.min(index, 8) * 30}ms` }} data-testid="shop-test-draft-deviation" data-level={row.level}>
             <span className="text-white/80 font-bold">{row.label}</span>
             <span className="text-white/60 break-all min-w-0">
@@ -237,9 +238,9 @@ function Resend({ draft, onUpdated, testId }) {
   };
   return (
     <div className="space-y-1">
-      <p className="text-xs text-warn">Ob Printful den Entwurf angelegt hat, ist offen. „Erneut senden / nachsehen“ schickt dieselben Daten; einen schon angelegten Entwurf findet Printful wieder, statt einen zweiten anzulegen.</p>
+      <p className="tls-type-small text-warn">Ob Printful den Entwurf angelegt hat, ist offen. „Erneut senden / nachsehen“ schickt dieselben Daten; einen schon angelegten Entwurf findet Printful wieder, statt einen zweiten anzulegen.</p>
       <button type="button" onClick={resend} disabled={busy} data-testid={`${testId}-resend`}
-        className="tls-btn tls-btn--secondary min-h-10 px-3 text-xs font-bold uppercase tracking-wider rounded-sm inline-flex items-center gap-1.5 disabled:opacity-40">
+        className="tls-btn tls-btn--secondary min-h-10 px-3 tls-type-label rounded-sm inline-flex items-center gap-1.5 disabled:opacity-40">
         <Send className="w-3.5 h-3.5" aria-hidden="true" /> {busy ? "Sieht nach …" : "Erneut senden / nachsehen"}
       </button>
     </div>
@@ -263,7 +264,7 @@ function Recheck({ draft, onUpdated, testId }) {
   };
   return (
     <button type="button" onClick={recheck} disabled={busy} data-testid={`${testId}-recheck`}
-      className="tls-btn tls-btn--secondary min-h-10 px-3 text-xs font-bold uppercase tracking-wider rounded-sm inline-flex items-center gap-1.5 disabled:opacity-40">
+      className="tls-btn tls-btn--secondary min-h-10 px-3 tls-type-label rounded-sm inline-flex items-center gap-1.5 disabled:opacity-40">
       <RefreshCw className={`w-3.5 h-3.5 ${busy ? "motion-safe:animate-spin" : ""}`} aria-hidden="true" /> {busy ? "Sieht nach …" : "Bei Printful nachsehen"}
     </button>
   );
@@ -275,9 +276,9 @@ function AnswerShape({ draft, testId }) {
   const shape = draft.response?.shape;
   if (!shape || !Object.keys(shape).length) return null;
   return (
-    <details className="text-xs" data-testid={`${testId}-shape`}>
+    <details className="tls-type-small" data-testid={`${testId}-shape`}>
       <summary className="cursor-pointer text-white/60 hover:text-white">Technische Details (Aufbau der Printful-Antwort, ohne Personendaten)</summary>
-      <pre className="mt-2 max-h-80 overflow-auto rounded-sm border border-white/10 bg-black/40 p-2 text-[11px] leading-relaxed text-white/70 whitespace-pre-wrap break-all">{JSON.stringify(shape, null, 2)}</pre>
+      <pre className="mt-2 max-h-80 overflow-auto rounded-sm border border-white/10 bg-black/40 p-2 tls-type-small leading-relaxed text-white/70 whitespace-pre-wrap break-all">{JSON.stringify(shape, null, 2)}</pre>
     </details>
   );
 }
@@ -285,20 +286,20 @@ function AnswerShape({ draft, testId }) {
 function Result({ draft, onDeleted, testId }) {
   return (
     <div className="space-y-3" data-testid={testId}>
-      <dl className="grid gap-x-6 gap-y-2 text-sm sm:grid-cols-3">
-        <div><dt className="text-white/50 text-xs">Printful-Auftrag</dt><dd className="tabular-nums font-bold" data-testid={`${testId}-order-id`}>{draft.printful_order_id ?? "–"}</dd></div>
-        <div><dt className="text-white/50 text-xs">Stand</dt><dd>{draft.state_label}{draft.printful_status ? ` (Printful: ${draft.printful_status_label || draft.printful_status})` : ""}</dd></div>
-        <div><dt className="text-white/50 text-xs">Gesendet</dt><dd>{draft.sent_at ? viennaDateTime(draft.sent_at) : "–"}</dd></div>
+      <dl className="grid gap-x-6 gap-y-2 tls-type-small sm:grid-cols-3">
+        <div><dt className="text-white/50 tls-type-small">Printful-Auftrag</dt><dd className="tabular-nums font-bold" data-testid={`${testId}-order-id`}>{draft.printful_order_id ?? "–"}</dd></div>
+        <div><dt className="text-white/50 tls-type-small">Stand</dt><dd>{draft.state_label}{draft.printful_status ? ` (Printful: ${draft.printful_status_label || draft.printful_status})` : ""}</dd></div>
+        <div><dt className="text-white/50 tls-type-small">Gesendet</dt><dd>{draft.sent_at ? viennaDateTime(draft.sent_at) : "–"}</dd></div>
       </dl>
       {draft.dashboard_url && (
         <a href={draft.dashboard_url} target="_blank" rel="noreferrer noopener" data-testid={`${testId}-dashboard`}
-          className="tls-btn tls-btn--secondary min-h-10 px-3 text-xs font-bold uppercase tracking-wider rounded-sm inline-flex items-center gap-1.5">
+          className="tls-btn tls-btn--secondary min-h-10 px-3 tls-type-label rounded-sm inline-flex items-center gap-1.5">
           <ExternalLink className="w-3.5 h-3.5" aria-hidden="true" /> Im Printful-Dashboard ansehen
         </a>
       )}
-      {draft.delete_note && <p className="text-xs text-white/55">{draft.delete_note}</p>}
+      {draft.delete_note && <p className="tls-type-small text-white/55">{draft.delete_note}</p>}
       {draft.last_error && (
-        <p className="text-xs text-warn" data-testid={`${testId}-last-error`}>
+        <p className="tls-type-small text-warn" data-testid={`${testId}-last-error`}>
           Letzter Fehler: {draft.last_error.text}{draft.last_error.provider_detail ? ` (Printful: ${draft.last_error.provider_detail})` : ""}
         </p>
       )}
@@ -408,29 +409,29 @@ export default function AdminShopTestDraftPage() {
   };
 
   if (error) {
-    return <AdminLayout><div className="border border-warn/40 bg-warn/10 rounded-sm p-4 text-sm" data-testid="shop-test-draft-error">{error}</div></AdminLayout>;
+    return <AdminLayout><div className="border border-warn/40 bg-warn/10 rounded-sm p-4 tls-type-small" data-testid="shop-test-draft-error">{error}</div></AdminLayout>;
   }
-  if (!data) return <AdminLayout><div className="text-sm text-white/45" role="status">Lade Testentwurf …</div></AdminLayout>;
+  if (!data) return <AdminLayout><div className="tls-type-small text-white/45" role="status">Lade Testentwurf …</div></AdminLayout>;
 
   const others = data.drafts.filter((item) => item.id !== result?.id);
   return (
     <AdminLayout>
       <div className="min-w-0">
-        <h1 className="font-heading text-3xl font-black uppercase inline-flex items-center gap-3"><ShoppingBag className="w-7 h-7 text-honor" aria-hidden="true" /> Shop</h1>
+        <h1 className="tls-type-title inline-flex items-center gap-3"><ShoppingBag className="w-7 h-7 text-honor" aria-hidden="true" /> <ShortCaps>Shop</ShortCaps></h1>
         <ShopTabs />
-        <p className="mt-4 text-sm text-white/60 max-w-2xl">
+        <p className="mt-4 tls-type-body text-white/60 max-w-2xl">
           Ein Testentwurf legt eine Bestellung nur als <strong>Entwurf</strong> bei Printful an - nie bestätigt, nie bezahlt. Danach in Printful prüfen, ob Produkt, Variante, Druckdateien, Positionen, Anschrift und Preise stimmen, und den Entwurf wieder löschen. Er zählt nicht als Bestellung, nicht im Umsatz und nicht in Dolibarr.
         </p>
       </div>
 
       <div className="mt-6 space-y-4 max-w-4xl min-w-0">
         {!data.access.allowed && (
-          <div className="border border-warn/40 bg-warn/10 rounded-sm p-3 text-sm text-warn space-y-1" role="alert" data-testid="shop-test-draft-blocked">
+          <div className="border border-warn/40 bg-warn/10 rounded-sm p-3 tls-type-small text-warn space-y-1" role="alert" data-testid="shop-test-draft-blocked">
             {data.access.problems.map((problem) => <p key={problem} className="inline-flex gap-2"><AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" aria-hidden="true" /> {problem}</p>)}
           </div>
         )}
         {data.access.allowed && !data.access.orders_to_printful && (
-          <p className="text-xs text-white/55 inline-flex gap-2" data-testid="shop-test-draft-switch">
+          <p className="tls-type-small text-white/55 inline-flex gap-2" data-testid="shop-test-draft-switch">
             <Info className="w-4 h-4 shrink-0" aria-hidden="true" /> Der Notschalter „Bestellungen an Printful senden“ ist aus - Entwürfe gehen trotzdem, weil sie nichts kosten.
           </p>
         )}
@@ -440,9 +441,9 @@ export default function AdminShopTestDraftPage() {
         <form className="space-y-4" onSubmit={makePreview}>
           <Section title="Produkt" step={1} testId="shop-test-draft-product">
             {data.products.length === 0
-              ? <p className="text-sm text-white/55">Noch kein Produkt mit Printful-Produkt und Varianten - erst unter „Produkte“ anlegen.</p>
+              ? <p className="tls-type-body text-white/55">Noch kein Produkt mit Printful-Produkt und Varianten - erst unter „Produkte“ anlegen.</p>
               : (
-                <label className="block text-sm">
+                <label className="block tls-type-small">
                   <span className="text-white/70">Welches Produkt?</span>
                   <select value={productId} onChange={(event) => chooseProduct(event.target.value)} className={INPUT} data-testid="shop-test-draft-product-select">
                     <option value="">Bitte wählen …</option>
@@ -455,14 +456,14 @@ export default function AdminShopTestDraftPage() {
           {product && (
             <Section title="Variante" step={2} testId="shop-test-draft-variant">
               <div className="space-y-2">
-                <p className="text-xs text-white/55">Farbe</p>
+                <p className="tls-type-small text-white/55">Farbe</p>
                 <div className="flex flex-wrap gap-2" role="radiogroup" aria-label="Farbe">
                   {colors.map((value) => <Choice key={value} active={color === value} onClick={() => chooseColor(value)} testId={`shop-test-draft-color-${value}`}>{colorNames[value] || value}</Choice>)}
                 </div>
               </div>
               {color && (
                 <div className="space-y-2 tls-reveal">
-                  <p className="text-xs text-white/55">Größe</p>
+                  <p className="tls-type-small text-white/55">Größe</p>
                   <div className="flex flex-wrap gap-2" role="radiogroup" aria-label="Größe">
                     {sizes.map((item) => (
                       <Choice key={item.id} active={variantId === item.id} onClick={() => chooseVariant(item.id)} testId={`shop-test-draft-size-${item.size}`}>
@@ -472,22 +473,22 @@ export default function AdminShopTestDraftPage() {
                   </div>
                 </div>
               )}
-              {variant && <p className="text-xs text-white/55 tabular-nums">Printful-Variante {variant.printful_variant_id} · Preis im Shop {euro(variant.price_cents)}</p>}
+              {variant && <p className="tls-type-small text-white/55 tabular-nums">Printful-Variante {variant.printful_variant_id} · Preis im Shop {euro(variant.price_cents)}</p>}
             </Section>
           )}
 
           {variant && (
             <Section title={product.member_number ? "Test-Gamertag und Nummer" : "Test-Gamertag"} step={3} testId="shop-test-draft-gamertag">
               {product.gamertag ? (
-                <label className="block text-sm">
+                <label className="block tls-type-small">
                   <span className="text-white/70">Erfundener Name für die Gamertag-Datei</span>
                   <input value={gamertag} onChange={(event) => { setGamertag(event.target.value); reset(); }} maxLength={200} autoComplete="off"
                     placeholder="z. B. Testname" className={INPUT} data-testid="shop-test-draft-gamertag-input" />
-                  <span className="block text-xs text-white/45 mt-1">Erlaubt: {data.gamertag.allowed_text}; {data.gamertag.min_length} bis {data.gamertag.max_length} Zeichen. Bitte keine echten Namen von Mitgliedern.</span>
+                  <span className="block tls-type-small text-white/45 mt-1">Erlaubt: {data.gamertag.allowed_text}; {data.gamertag.min_length} bis {data.gamertag.max_length} Zeichen. Bitte keine echten Namen von Mitgliedern.</span>
                 </label>
-              ) : <p className="text-sm text-white/55">Dieses Produkt hat kein Gamertag-Feld{product.member_number ? "." : " - hier ist nichts zu tun."}</p>}
+              ) : <p className="tls-type-small text-white/55">Dieses Produkt hat kein Gamertag-Feld{product.member_number ? "." : " - hier ist nichts zu tun."}</p>}
               {product.member_number && (
-                <p className="text-sm text-white/70 flex gap-2" data-testid="shop-test-draft-number">
+                <p className="tls-type-body text-white/70 flex gap-2" data-testid="shop-test-draft-number">
                   <Info className="w-4 h-4 shrink-0 mt-0.5 text-white/50" aria-hidden="true" />
                   <span>Vereinsnummer: gedruckt wird die Beispielnummer <strong className="tabular-nums">{product.sample_number}</strong> (die höchste Wunschnummer) - nie die Nummer eines Mitglieds. Bei echten Bestellungen kommt die Wunschnummer nur mit Einwilligung des Mitglieds in den Druck.</span>
                 </p>
@@ -498,29 +499,29 @@ export default function AdminShopTestDraftPage() {
           {variant && gamertagReady && address && (
             <Section title="Anschrift" step={4} testId="shop-test-draft-address">
               {data.address.hint
-                ? <p className="text-xs text-warn" data-testid="shop-test-draft-address-hint">{data.address.hint}</p>
-                : <p className="text-xs text-white/55">Vorbelegt mit der Vereinsadresse aus den Rechtsangaben. Nur der Verein - keine Anschrift von Mitgliedern.</p>}
+                ? <p className="tls-type-small text-warn" data-testid="shop-test-draft-address-hint">{data.address.hint}</p>
+                : <p className="tls-type-small text-white/55">Vorbelegt mit der Vereinsadresse aus den Rechtsangaben. Nur der Verein - keine Anschrift von Mitgliedern.</p>}
               <div className="grid gap-3 sm:grid-cols-2">
                 {ADDRESS_FIELDS.map((field) => (
-                  <label key={field.key} className="block text-sm min-w-0">
+                  <label key={field.key} className="block tls-type-small min-w-0">
                     <span className="text-white/70">{field.label}</span>
                     <input value={address[field.key] || ""} onChange={(event) => setField(field.key, event.target.value)} maxLength={field.max}
                       className={INPUT} data-testid={`shop-test-draft-address-${field.key}`} />
                   </label>
                 ))}
-                <div className="text-sm"><span className="text-white/70">Land</span><p className="mt-1 min-h-10 flex items-center text-white/80">Österreich (AT) - Versand derzeit nur nach Österreich</p></div>
+                <div className="tls-type-small"><span className="text-white/70">Land</span><p className="mt-1 min-h-10 flex items-center text-white/80">Österreich (AT) - Versand derzeit nur nach Österreich</p></div>
               </div>
               <button type="submit" disabled={!ready} data-testid="shop-test-draft-preview-button"
-                className="tls-btn tls-btn--primary min-h-10 px-4 text-xs font-bold uppercase tracking-wider rounded-sm disabled:opacity-40 inline-flex items-center gap-1.5">
+                className="tls-btn tls-btn--primary min-h-10 px-4 tls-type-label rounded-sm disabled:opacity-40 inline-flex items-center gap-1.5">
                 <PackageCheck className="w-4 h-4" aria-hidden="true" /> {busy === "preview" ? "Erzeugt Druckdateien …" : "Vorschau erstellen"}
               </button>
-              <p className="text-xs text-white/45">Die Vorschau erzeugt die Druckdateien wie bei einer echten Bestellung und fragt Printful nach den Kosten - bei Printful wird dabei nichts angelegt.</p>
+              <p className="tls-type-small text-white/45">Die Vorschau erzeugt die Druckdateien wie bei einer echten Bestellung und fragt Printful nach den Kosten - bei Printful wird dabei nichts angelegt.</p>
             </Section>
           )}
         </form>
 
         {refused && (
-          <p className="tls-reveal border border-warn/40 bg-warn/10 rounded-sm p-3 text-sm text-warn flex gap-2" role="alert" data-testid="shop-test-draft-refused">
+          <p className="tls-reveal border border-warn/40 bg-warn/10 rounded-sm p-3 tls-type-small text-warn flex gap-2" role="alert" data-testid="shop-test-draft-refused">
             <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" aria-hidden="true" /> {refused}
           </p>
         )}
@@ -528,29 +529,29 @@ export default function AdminShopTestDraftPage() {
         {preview && !result && (
           <div className="tls-reveal">
             <Section title="Vorschau prüfen - genau das wird gesendet" step={5} testId="shop-test-draft-preview">
-              <dl className="grid gap-x-6 gap-y-2 text-sm sm:grid-cols-2">
-                <div><dt className="text-white/50 text-xs">Position</dt><dd>1 × {preview.product_title} - {preview.variant_display || preview.variant_label} (Printful-Variante {preview.printful_variant_id})</dd></div>
-                <div className="min-w-0"><dt className="text-white/50 text-xs">Externe Kennung</dt><dd className="font-mono text-xs break-all">{preview.external_id}</dd></div>
-                <div><dt className="text-white/50 text-xs">Anschrift</dt><dd>{preview.recipient.name}, {preview.recipient.street}{preview.recipient.street2 ? `, ${preview.recipient.street2}` : ""}, {preview.recipient.zip} {preview.recipient.city}, {preview.recipient.country}</dd></div>
-                <div><dt className="text-white/50 text-xs">Gültig bis</dt><dd>{viennaDateTime(preview.expires_at)}</dd></div>
+              <dl className="grid gap-x-6 gap-y-2 tls-type-small sm:grid-cols-2">
+                <div><dt className="text-white/50 tls-type-small">Position</dt><dd>1 × {preview.product_title} - {preview.variant_display || preview.variant_label} (Printful-Variante {preview.printful_variant_id})</dd></div>
+                <div className="min-w-0"><dt className="text-white/50 tls-type-small">Externe Kennung</dt><dd className="font-mono tls-type-small break-all">{preview.external_id}</dd></div>
+                <div><dt className="text-white/50 tls-type-small">Anschrift</dt><dd>{preview.recipient.name}, {preview.recipient.street}{preview.recipient.street2 ? `, ${preview.recipient.street2}` : ""}, {preview.recipient.zip} {preview.recipient.city}, {preview.recipient.country}</dd></div>
+                <div><dt className="text-white/50 tls-type-small">Gültig bis</dt><dd>{viennaDateTime(preview.expires_at)}</dd></div>
                 {preview.product_options?.length > 0 && (
-                  <div data-testid="shop-test-draft-options"><dt className="text-white/50 text-xs">Produktoptionen (an Printful)</dt>
+                  <div data-testid="shop-test-draft-options"><dt className="text-white/50 tls-type-small">Produktoptionen (an Printful)</dt>
                     <dd>{preview.product_options.map((row) => `${row.label}: ${row.value_label}`).join(" · ")}</dd></div>
                 )}
               </dl>
-              <h3 className="text-xs font-bold uppercase tracking-wider text-white/60">Druckdateien je Fläche</h3>
+              <h3 className="tls-type-label text-white/60">Druckdateien je Fläche</h3>
               <Files files={preview.files} />
-              <h3 className="text-xs font-bold uppercase tracking-wider text-white/60">Kostenschätzung von Printful</h3>
+              <h3 className="tls-type-label text-white/60">Kostenschätzung von Printful</h3>
               <Costs estimate={preview.estimate} error={preview.estimate_error} />
               <PriceCheck check={preview.price_check} />
-              <p className="text-sm text-white/55" data-testid="shop-test-draft-mockup">Mockup: {preview.mockup.detail}</p>
-              {preview.warnings.map((warning) => <p key={warning} className="text-xs text-warn" data-testid="shop-test-draft-warning">{warning}</p>)}
-              {preview.last_error && <p className="text-xs text-warn" data-testid="shop-test-draft-preview-error">Letzter Versuch: {preview.last_error.text}{preview.last_error.provider_detail ? ` (Printful: ${preview.last_error.provider_detail})` : ""}</p>}
+              <p className="tls-type-small text-white/55" data-testid="shop-test-draft-mockup">Mockup: {preview.mockup.detail}</p>
+              {preview.warnings.map((warning) => <p key={warning} className="tls-type-small text-warn" data-testid="shop-test-draft-warning">{warning}</p>)}
+              {preview.last_error && <p className="tls-type-small text-warn" data-testid="shop-test-draft-preview-error">Letzter Versuch: {preview.last_error.text}{preview.last_error.provider_detail ? ` (Printful: ${preview.last_error.provider_detail})` : ""}</p>}
               <button type="button" onClick={send} disabled={!!busy || !data.access.allowed} data-testid="shop-test-draft-send"
-                className="tls-btn tls-btn--primary min-h-10 px-4 text-xs font-bold uppercase tracking-wider rounded-sm disabled:opacity-40 inline-flex items-center gap-1.5">
+                className="tls-btn tls-btn--primary min-h-10 px-4 tls-type-label rounded-sm disabled:opacity-40 inline-flex items-center gap-1.5">
                 <Send className="w-4 h-4" aria-hidden="true" /> {busy === "send" ? "Sendet …" : "Als Entwurf an Printful senden"}
               </button>
-              <p className="text-xs text-white/45">Wird nie bestätigt und kostet nichts. Ein Bestätigen gibt es in der Testansicht nicht.</p>
+              <p className="tls-type-small text-white/45">Wird nie bestätigt und kostet nichts. Ein Bestätigen gibt es in der Testansicht nicht.</p>
             </Section>
           </div>
         )}
@@ -565,19 +566,19 @@ export default function AdminShopTestDraftPage() {
 
         <Section title="Bisherige Testentwürfe" icon={PackageCheck} testId="shop-test-draft-list">
           {others.length === 0
-            ? <p className="text-sm text-white/55">Noch keine{result ? " weiteren" : ""} Testentwürfe.</p>
+            ? <p className="tls-type-small text-white/55">Noch keine{result ? " weiteren" : ""} Testentwürfe.</p>
             : (
               <ul className="space-y-3">
                 {others.map((item) => (
                   <li key={item.id} className="border border-white/10 rounded-sm p-3 space-y-2 min-w-0" data-testid={`shop-test-draft-item-${item.id}`}>
-                    <p className="text-sm font-bold">{item.product_title} - {item.variant_display || item.variant_label}</p>
-                    <p className="text-xs text-white/55">{viennaDateTime(item.created_at)}</p>
+                    <p className="tls-type-small font-bold">{item.product_title} - {item.variant_display || item.variant_label}</p>
+                    <p className="tls-type-small text-white/55">{viennaDateTime(item.created_at)}</p>
                     <Result draft={item} onDeleted={deleted} testId={`shop-test-draft-item-${item.id}-result`} />
                   </li>
                 ))}
               </ul>
             )}
-          <p className="text-xs text-white/45">Höchstens {data.limits.max_open} Testentwürfe liegen gleichzeitig bei Printful; eine Vorschau gilt {data.limits.preview_minutes} Minuten.</p>
+          <p className="tls-type-small text-white/45">Höchstens {data.limits.max_open} Testentwürfe liegen gleichzeitig bei Printful; eine Vorschau gilt {data.limits.preview_minutes} Minuten.</p>
         </Section>
       </div>
     </AdminLayout>

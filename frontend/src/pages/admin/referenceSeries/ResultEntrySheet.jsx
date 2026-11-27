@@ -40,7 +40,7 @@ import { ClipboardList, Plus, RefreshCw, SlidersHorizontal, X } from "lucide-rea
 // Original-Bilder (#1933, OriginalsSection): Screenshots des Veranstalters als Beleg; ein gelesenes Bild wird erst beim
 // Übernehmen angehängt (nach dem Speichern, mit derselben Datei - kein zweites Hochladen von Hand).
 
-const SMALL_INPUT = `${INPUT_CLASS} !py-1.5 text-sm`;
+const SMALL_INPUT = `${INPUT_CLASS} !py-1.5 tls-type-small`;
 
 /** Vorschau eines gelesenen Bilds für „Original-Bilder“ (#1933) - ohne Objekt-URL (Tests, alte Browser) ohne Bild. */
 function originalPicture(file) {
@@ -50,7 +50,7 @@ function originalPicture(file) {
     return null;
   }
 }
-const LABEL = "text-[10px] font-bold uppercase tracking-widest text-white/45";
+const LABEL = "tls-type-label text-white/45";
 const ICON_BUTTON = "p-1.5 rounded-sm text-white/45 hover:text-white hover:bg-white/5 transition active:scale-[0.97]";
 
 function PasteBox({ onApply, label, placeholder, hint, testId }) {
@@ -65,12 +65,12 @@ function PasteBox({ onApply, label, placeholder, hint, testId }) {
     <div className="border border-white/10 rounded-sm bg-[#0A0A0A] p-3 space-y-2" data-testid={testId}>
       <TextAreaField label={label} value={text} onChange={(value) => { setText(value); setErrors([]); }} rows={5} placeholder={placeholder} hint={hint} testId={`${testId}-text`} />
       <div className="flex items-center gap-2">
-        <button type="button" onClick={apply} disabled={!text.trim()} data-testid={`${testId}-apply`} className="tls-btn tls-btn--secondary px-3 py-2 rounded-sm text-xs font-bold uppercase tracking-wider disabled:opacity-50">
+        <button type="button" onClick={apply} disabled={!text.trim()} data-testid={`${testId}-apply`} className="tls-btn tls-btn--secondary px-3 py-2 rounded-sm tls-type-label disabled:opacity-50">
           Liste übernehmen
         </button>
       </div>
       {errors.length > 0 && (
-        <ul className="text-xs text-red-200 space-y-0.5" data-testid={`${testId}-errors`} role="alert">
+        <ul className="tls-type-small text-red-200 space-y-0.5" data-testid={`${testId}-errors`} role="alert">
           {errors.map((error, index) => (
             <li key={index}>{error.line ? `Zeile ${error.line}: ` : ""}{error.message}{error.text ? <span className="text-red-200/60"> – „{error.text}“</span> : null}</li>
           ))}
@@ -83,7 +83,7 @@ function PasteBox({ onApply, label, placeholder, hint, testId }) {
 function RowProblems({ items }) {
   if (!items?.length) return null;
   return (
-    <ul className="mt-1 space-y-0.5 text-xs" data-testid="result-row-problems">
+    <ul className="mt-1 space-y-0.5 tls-type-small" data-testid="result-row-problems">
       {items.map((item, index) => (
         <li key={index} className={item.level === "error" ? "text-red-300" : "text-amber-300"}>{item.message}</li>
       ))}
@@ -101,7 +101,7 @@ function FieldErrors({ fields, testId }) {
   const messages = Object.values(fields || {});
   if (!messages.length) return null;
   return (
-    <ul className="mt-1 space-y-0.5 text-xs text-red-300" data-testid={testId} role="alert">
+    <ul className="mt-1 space-y-0.5 tls-type-small text-red-300" data-testid={testId} role="alert">
       {[...new Set(messages)].map((message) => <li key={message}>{message}</li>)}
     </ul>
   );
@@ -179,7 +179,7 @@ function ResultRow({ row, index, autoPlace, organizerMode, qualifying = false, d
             if (!open && !active) return null;
             return (
               <button key={mark} type="button" aria-pressed={active} onClick={() => toggleMark(mark)} data-testid={`result-row-mark-${mark}`}
-                className={`px-2 py-1 rounded-sm border text-[10px] font-bold uppercase tracking-wider transition-colors active:scale-[0.97] ${active ? "border-[#29B6E8] bg-[#29B6E8]/15 text-[#29B6E8]" : "border-white/10 text-white/50 hover:text-white"}`}>
+                className={`px-2 py-1 rounded-sm border tls-type-label transition-colors active:scale-[0.97] ${active ? "border-[#29B6E8] bg-[#29B6E8]/15 text-[#29B6E8]" : "border-white/10 text-white/50 hover:text-white"}`}>
                 {label}
               </button>
             );
@@ -205,7 +205,7 @@ function ResultRow({ row, index, autoPlace, organizerMode, qualifying = false, d
           <label className="block"><span className={LABEL}>Gesamt laut Veranst.</span>
             <input inputMode="decimal" value={row.official_total} onChange={(event) => onChange({ official_total: event.target.value })} data-testid="result-row-total" {...invalidProps(invalid, "official_total")} className={`${SMALL_INPUT} ${invalid?.official_total ? INVALID : ""}`} /></label>
           {!organizerMode && (
-            <label className="flex items-end gap-2 pb-2 text-xs text-white/70">
+            <label className="flex items-end gap-2 pb-2 tls-type-small text-white/70">
               <input type="checkbox" checked={row.override} onChange={(event) => onChange({ override: event.target.checked })} data-testid="result-row-override" className="accent-[#29B6E8]" />
               Punkte zählen statt Schlüssel
             </label>
@@ -213,11 +213,11 @@ function ResultRow({ row, index, autoPlace, organizerMode, qualifying = false, d
         </div>
       )}
       {open && day && <DayRoundsDetails row={row} number={number} count={day.count} invalid={invalid} onChange={onChange} />}
-      {!open && raceLine && <div className="mt-1 text-[11px] text-white/55 tabular-nums" data-testid="result-row-race">{raceLine}</div>}
+      {!open && raceLine && <div className="mt-1 tls-type-small text-white/55 tabular-nums" data-testid="result-row-race">{raceLine}</div>}
       {/* #1960: was im Feld steht, zählt - ohne Team (oder mit „Ersatzfahrer“) für kein Team; das Stammteam lässt sich
           mit einem Klick eintragen. */}
       {teamHint && (
-        <div className="mt-1 flex flex-wrap items-center gap-x-2 text-[11px] text-white/55">
+        <div className="mt-1 flex flex-wrap items-center gap-x-2 tls-type-small text-white/55">
           <span data-testid="result-row-team-hint">{teamHint.text}</span>
           {teamHint.default_team && (
             <button type="button" onClick={() => onChange({ team: teamHint.default_team })} data-testid="result-row-team-default"
@@ -228,7 +228,7 @@ function ResultRow({ row, index, autoPlace, organizerMode, qualifying = false, d
         </div>
       )}
       {info && (
-        <div className="mt-1 flex flex-wrap items-center gap-x-2 text-[11px] text-white/45 tabular-nums">
+        <div className="mt-1 flex flex-wrap items-center gap-x-2 tls-type-small text-white/45 tabular-nums">
           {/* Bekannt oder neu sagt die Vorschau jedem; ob jemand Vereinsmitglied ist, nur dem Vorstand. */}
           <span data-testid="result-row-known" className={info.is_new ? "font-bold uppercase tracking-widest text-amber-300" : undefined}>{info.is_new ? "neu" : "bekannt"}</span>
           {/* Turniertag (#1961): Tagessumme und Tagesplatz, dann die Saisonpunkte. */}
@@ -237,7 +237,7 @@ function ResultRow({ row, index, autoPlace, organizerMode, qualifying = false, d
         </div>
       )}
       {row.points_hint && (
-        <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-amber-300" data-testid="result-row-hint">
+        <div className="mt-1 flex flex-wrap items-center gap-2 tls-type-small text-amber-300" data-testid="result-row-hint">
           <span>„{row.points_hint.text}“ am Ende: Teil des Namens oder Punkte?</span>
           <button type="button" onClick={onHint} data-testid="result-row-hint-points" className="underline underline-offset-2 hover:text-amber-100">Letzte Zahl = Punkte</button>
           <button type="button" onClick={() => onChange({ points_hint: null })} data-testid="result-row-hint-name" className="underline underline-offset-2 text-amber-300/70 hover:text-amber-100">Gehört zum Namen</button>
@@ -287,7 +287,7 @@ function RaceExtras({ form, onChange, invalid, problems = {} }) {
         </div>
       )}
       {messages.length > 0 && (
-        <ul className="sm:col-span-3 space-y-0.5 text-xs" data-testid="result-race-problems" role="alert">
+        <ul className="sm:col-span-3 space-y-0.5 tls-type-small" data-testid="result-race-problems" role="alert">
           {messages.map((item, index) => (
             <li key={index} className={item.level === "error" ? "text-red-300" : "text-amber-300"}>{item.message}</li>
           ))}
@@ -301,14 +301,14 @@ function OfficialTable({ rows, onPaste, onClear }) {
   return (
     <section className="space-y-2" data-testid="result-table">
       <div className="flex items-center justify-between gap-2">
-        <h3 className="text-[11px] font-bold uppercase tracking-widest text-[#29B6E8]">Tabelle laut Veranstalter</h3>
-        {rows.length > 0 && <button type="button" onClick={onClear} data-testid="result-table-clear" className="tls-btn tls-btn--quiet px-2.5 py-1.5 rounded-sm text-[10px] font-bold uppercase tracking-wider">Leeren</button>}
+        <h3 className="tls-type-label text-[#29B6E8]">Tabelle laut Veranstalter</h3>
+        {rows.length > 0 && <button type="button" onClick={onClear} data-testid="result-table-clear" className="tls-btn tls-btn--quiet px-2.5 py-1.5 rounded-sm tls-type-label">Leeren</button>}
       </div>
       {rows.length > 0 ? (
         <div className="tls-swipe pb-0">
-          <table className="w-full text-sm tabular-nums">
+          <table className="w-full tls-type-small tabular-nums">
             <thead>
-              <tr className="text-left text-[10px] uppercase tracking-widest text-white/45">
+              <tr className="text-left tls-type-label text-white/45">
                 <th className="py-1 pr-2 font-bold">#</th><th className="py-1 pr-2 font-bold">Team</th><th className="py-1 pr-2 font-bold">Sp</th>
                 <th className="py-1 pr-2 font-bold">S-U-N</th><th className="py-1 pr-2 font-bold">Maps</th><th className="py-1 font-bold text-right">Pkt</th>
               </tr>
@@ -340,10 +340,10 @@ function PendingDraft({ draft, participants, busy, onApprove, onDiscard }) {
   const rows = draft.rows || [];
   return (
     <div className="border border-[#29B6E8]/40 bg-[#29B6E8]/5 rounded-sm p-3 space-y-2" data-testid="result-pending">
-      <div className="text-[11px] font-bold uppercase tracking-widest text-[#29B6E8]">Entwurf daneben wartet auf Freigabe</div>
-      <p className="text-xs text-white/60">Das veröffentlichte Ergebnis bleibt sichtbar, bis du den Entwurf freigibst.</p>
+      <div className="tls-type-small font-bold text-[#29B6E8]">Entwurf daneben wartet auf Freigabe</div>
+      <p className="tls-type-small text-white/60">Das veröffentlichte Ergebnis bleibt sichtbar, bis du den Entwurf freigibst.</p>
       {rows.length > 0 && (
-        <ol className="text-sm text-white/80 space-y-0.5" data-testid="result-pending-rows">
+        <ol className="tls-type-small text-white/80 space-y-0.5" data-testid="result-pending-rows">
           {rows.slice(0, 30).map((row, index) => (
             <li key={`${row.participant_id}-${index}`} className="tabular-nums">
               {row.place ?? "–"}. {names[row.participant_id] || "Neuer Name"}{row.points !== null && row.points !== undefined && row.points_source !== "scheme" ? ` · ${formatPoints(row.points)} Pkt` : ""}{row.marks?.length ? ` · ${row.marks.join(", ").toUpperCase()}` : ""}
@@ -352,11 +352,11 @@ function PendingDraft({ draft, participants, busy, onApprove, onDiscard }) {
         </ol>
       )}
       {(draft.matches || []).map((match, index) => (
-        <div key={index} className="text-sm text-white/80">{match.home} {match.home_score}:{match.away_score} {match.away}</div>
+        <div key={index} className="tls-type-small text-white/80">{match.home} {match.home_score}:{match.away_score} {match.away}</div>
       ))}
       <div className="flex flex-wrap gap-2">
-        <button type="button" disabled={busy} onClick={onApprove} data-testid="result-pending-approve" className="tls-btn tls-btn--primary px-3 py-2 rounded-sm text-xs font-bold uppercase tracking-wider disabled:opacity-50">Freigeben</button>
-        <button type="button" disabled={busy} onClick={onDiscard} data-testid="result-pending-discard" className="tls-btn tls-btn--quiet px-3 py-2 rounded-sm text-xs font-bold uppercase tracking-wider disabled:opacity-50">Verwerfen</button>
+        <button type="button" disabled={busy} onClick={onApprove} data-testid="result-pending-approve" className="tls-btn tls-btn--primary px-3 py-2 rounded-sm tls-type-label disabled:opacity-50">Freigeben</button>
+        <button type="button" disabled={busy} onClick={onDiscard} data-testid="result-pending-discard" className="tls-btn tls-btn--quiet px-3 py-2 rounded-sm tls-type-label disabled:opacity-50">Verwerfen</button>
       </div>
     </div>
   );
@@ -680,59 +680,59 @@ export function ResultEntrySheet({ series, round, onClose, onSaved }) {
     <AdminSheet title={`Ergebnis ${round ? sessionLabel(round) : ""}`} eyebrow={series.lineage?.title} size="xl" onClose={onClose} onSubmit={submit} saving={saving}
       submitLabel={submitLabel} savingLabel={ready ? "Übernehme …" : "Prüfe …"} submitTestId="result-submit" testId="result-sheet" noValidate
       footer={ready && canPublish && !imageOpen ? (
-        <button type="button" disabled={saving} onClick={() => save("draft")} data-testid="result-save-draft" className="tls-btn tls-btn--secondary px-4 py-2.5 rounded-sm text-xs font-bold uppercase tracking-wider disabled:opacity-50">
+        <button type="button" disabled={saving} onClick={() => save("draft")} data-testid="result-save-draft" className="tls-btn tls-btn--secondary px-4 py-2.5 rounded-sm tls-type-label disabled:opacity-50">
           Nur als Entwurf
         </button>
       ) : null}>
-      {!data || !form ? <div className="text-sm text-white/40">Lädt …</div> : (
+      {!data || !form ? <div className="tls-type-small text-quiet">Lädt …</div> : (
         <>
-          <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-white/60" data-testid="result-round">
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-1 tls-type-small text-white/60" data-testid="result-round">
             <span className="tabular-nums">{roundWhen(data.round)}</span>
             {kindShows(profile, "venue") && (data.round.venue || data.round.country_code) && <span>· <VenueWithFlag round={{ venue: data.round.venue, country_code: data.round.country_code }} /></span>}
-            {sheetStatus && <span className="text-[10px] font-bold uppercase tracking-widest text-white/45">{sheetStatus === "published" ? "veröffentlicht" : "Entwurf"} · Stand {data.version}</span>}
-            <span className="text-[10px] font-bold uppercase tracking-widest text-white/45" data-testid="result-mode">{qualifying ? qualifyingMode(data.round) : organizerMode ? "Punkte laut Veranstalter" : "Punkte nach Schlüssel"}</span>
+            {sheetStatus && <span className="tls-type-label text-white/45">{sheetStatus === "published" ? "veröffentlicht" : "Entwurf"} · Stand {data.version}</span>}
+            <span className="tls-type-label text-white/45" data-testid="result-mode">{qualifying ? qualifyingMode(data.round) : organizerMode ? "Punkte laut Veranstalter" : "Punkte nach Schlüssel"}</span>
           </div>
 
           {/* #2024: ein gewerteter Termin braucht ein Datum - beim Veröffentlichen geht dieser Tag mit (Vorschlag heute). */}
           {needsDay && (
-            <label className="tls-undated-badge flex flex-wrap items-center gap-x-3 gap-y-1 border border-dashed border-amber-300/40 bg-amber-300/[0.06] rounded-sm px-3 py-2 text-sm text-amber-100" data-testid="result-round-day-box">
+            <label className="tls-undated-badge flex flex-wrap items-center gap-x-3 gap-y-1 border border-dashed border-amber-300/40 bg-amber-300/[0.06] rounded-sm px-3 py-2 tls-type-small text-amber-100" data-testid="result-round-day-box">
               <span className="flex-1 min-w-[12rem]">{`${kindWord(profile, "round_one", "Termin")} ${data.round.code || ""}`.trim()} hat noch kein Datum. Beim Veröffentlichen wird dieser Tag eingetragen:</span>
               <input type="date" required value={roundDay} onChange={(event) => setRoundDay(event.target.value)} aria-label="Tag, an dem gespielt wurde" data-testid="result-round-day" className={`${SMALL_INPUT} w-auto`} />
             </label>
           )}
 
           {stale && (
-            <div className="border border-amber-400/40 bg-amber-400/10 rounded-sm p-3 text-sm text-amber-100 flex flex-wrap items-center gap-3" role="alert" data-testid="result-stale">
+            <div className="border border-amber-400/40 bg-amber-400/10 rounded-sm p-3 tls-type-small text-amber-100 flex flex-wrap items-center gap-3" role="alert" data-testid="result-stale">
               <span className="flex-1 min-w-[12rem]">Inzwischen hat jemand anderes das Ergebnis geändert. Neu laden zeigt den aktuellen Stand; deine Eingaben bleiben daneben aufgehoben.</span>
-              <button type="button" onClick={reloadCurrent} data-testid="result-reload" className="tls-btn tls-btn--secondary px-3 py-2 rounded-sm text-xs font-bold uppercase tracking-wider inline-flex items-center gap-1.5">
+              <button type="button" onClick={reloadCurrent} data-testid="result-reload" className="tls-btn tls-btn--secondary px-3 py-2 rounded-sm tls-type-label inline-flex items-center gap-1.5">
                 <RefreshCw className="w-3.5 h-3.5" /> Neu laden
               </button>
             </div>
           )}
 
           {mine && (
-            <div className="border border-[#29B6E8]/40 bg-[#29B6E8]/5 rounded-sm p-3 text-sm text-white/80 space-y-2" data-testid="result-mine">
-              <div className="text-[11px] font-bold uppercase tracking-widest text-[#29B6E8]">Deine nicht gespeicherten Änderungen</div>
-              <p className="text-xs text-white/60">Das Blatt zeigt jetzt den aktuellen Stand. Deine Eingaben sind nicht gespeichert – übernimm sie bewusst oder verwirf sie.</p>
-              <div className="text-xs text-white/70" data-testid="result-mine-summary">{mineSummary(mine)}</div>
+            <div className="border border-[#29B6E8]/40 bg-[#29B6E8]/5 rounded-sm p-3 tls-type-small text-white/80 space-y-2" data-testid="result-mine">
+              <div className="tls-type-small font-bold text-[#29B6E8]">Deine nicht gespeicherten Änderungen</div>
+              <p className="tls-type-small text-white/60">Das Blatt zeigt jetzt den aktuellen Stand. Deine Eingaben sind nicht gespeichert – übernimm sie bewusst oder verwirf sie.</p>
+              <div className="tls-type-small text-white/70" data-testid="result-mine-summary">{mineSummary(mine)}</div>
               <div className="flex flex-wrap gap-2">
-                <button type="button" onClick={applyMine} data-testid="result-mine-apply" className="tls-btn tls-btn--secondary px-3 py-2 rounded-sm text-xs font-bold uppercase tracking-wider">Meine Eingaben erneut anwenden</button>
-                <button type="button" onClick={() => setMine(null)} data-testid="result-mine-discard" className="tls-btn tls-btn--quiet px-3 py-2 rounded-sm text-xs font-bold uppercase tracking-wider">Verwerfen</button>
+                <button type="button" onClick={applyMine} data-testid="result-mine-apply" className="tls-btn tls-btn--secondary px-3 py-2 rounded-sm tls-type-label">Meine Eingaben erneut anwenden</button>
+                <button type="button" onClick={() => setMine(null)} data-testid="result-mine-discard" className="tls-btn tls-btn--quiet px-3 py-2 rounded-sm tls-type-label">Verwerfen</button>
               </div>
             </div>
           )}
 
           {toPendingDraft && (
-            <p className="border border-[#29B6E8]/30 bg-[#29B6E8]/5 rounded-sm px-3 py-2 text-sm text-white/75" data-testid="result-pending-note">
+            <p className="border border-[#29B6E8]/30 bg-[#29B6E8]/5 rounded-sm px-3 py-2 tls-type-body text-white/75" data-testid="result-pending-note">
               Das Ergebnis ist schon veröffentlicht. Deine Änderung wird ein Entwurf daneben – sichtbar wird sie, wenn der Vorstand sie freigibt.
             </p>
           )}
 
           {pending && <PendingDraft draft={pending} participants={participants} busy={saving || stale} onApprove={() => decide("approve")} onDiscard={() => decide("discard")} />}
           {board && !pending && sheetStatus === "draft" && (
-            <div className="flex flex-wrap items-center gap-3 text-sm text-white/60" data-testid="result-draft-note">
+            <div className="flex flex-wrap items-center gap-3 tls-type-small text-white/60" data-testid="result-draft-note">
               <span>Gespeichert als Entwurf – noch nicht öffentlich.</span>
-              <button type="button" disabled={saving || stale} onClick={() => decide("approve")} data-testid="result-draft-approve" className="tls-btn tls-btn--quiet px-3 py-1.5 rounded-sm text-[11px] font-bold uppercase tracking-wider disabled:opacity-50">Gespeicherten Entwurf veröffentlichen</button>
+              <button type="button" disabled={saving || stale} onClick={() => decide("approve")} data-testid="result-draft-approve" className="tls-btn tls-btn--quiet px-3 py-1.5 rounded-sm tls-type-label disabled:opacity-50">Gespeicherten Entwurf veröffentlichen</button>
             </div>
           )}
 
@@ -752,9 +752,9 @@ export function ResultEntrySheet({ series, round, onClose, onSaved }) {
           {(!teamLeague || form.rows.length > 0) && (
             <section className="space-y-2" data-testid="result-rows-section">
               <div className="flex items-center justify-between gap-2 flex-wrap">
-                <h3 className="text-[11px] font-bold uppercase tracking-widest text-[#29B6E8]">Ergebnisliste{filledRows ? ` · ${filledRows}` : ""}</h3>
+                <h3 className="tls-type-label text-[#29B6E8]">Ergebnisliste{filledRows ? ` · ${filledRows}` : ""}</h3>
                 <div className="flex flex-wrap items-center gap-2">
-                  <button type="button" onClick={() => setPasting((value) => !value)} aria-expanded={pasting} data-testid="result-paste-toggle" className="tls-btn tls-btn--quiet px-3 py-1.5 rounded-sm text-[11px] font-bold uppercase tracking-wider inline-flex items-center gap-1.5">
+                  <button type="button" onClick={() => setPasting((value) => !value)} aria-expanded={pasting} data-testid="result-paste-toggle" className="tls-btn tls-btn--quiet px-3 py-1.5 rounded-sm tls-type-label inline-flex items-center gap-1.5">
                     <ClipboardList className="w-3.5 h-3.5" /> Liste einfügen
                   </button>
                   <ResultImageButton image={image} />
@@ -763,9 +763,9 @@ export function ResultEntrySheet({ series, round, onClose, onSaved }) {
               <ResultImageSummary image={image} rows={form.rows} raceOcr={form.raceOcr} />
               <ConfirmNamesBar count={namesOpen} confirmed={namesUndo?.count || 0} onConfirm={confirmAllNames} onUndo={undoAllNames} />
               {hinted > 1 && (
-                <div className="flex flex-wrap items-center gap-2 border border-amber-400/40 bg-amber-400/10 rounded-sm px-3 py-2 text-xs text-amber-100" data-testid="result-hints">
+                <div className="flex flex-wrap items-center gap-2 border border-amber-400/40 bg-amber-400/10 rounded-sm px-3 py-2 tls-type-small text-amber-100" data-testid="result-hints">
                   <span className="flex-1 min-w-[12rem]">{hinted} Zeilen enden auf eine Zahl – Teil des Namens oder Punkte?</span>
-                  <button type="button" onClick={allHintsToPoints} data-testid="result-hints-points" className="tls-btn tls-btn--quiet px-2.5 py-1.5 rounded-sm text-[10px] font-bold uppercase tracking-wider">Bei allen: letzte Zahl = Punkte</button>
+                  <button type="button" onClick={allHintsToPoints} data-testid="result-hints-points" className="tls-btn tls-btn--quiet px-2.5 py-1.5 rounded-sm tls-type-label">Bei allen: letzte Zahl = Punkte</button>
                 </div>
               )}
               {pasting && (day ? (
@@ -786,7 +786,7 @@ export function ResultEntrySheet({ series, round, onClose, onSaved }) {
                     showTeam={showTeam} profile={profile} />
                 ))}
               </ol>
-              <button type="button" onClick={addRow} data-testid="result-row-add" className="tls-btn tls-btn--secondary px-3 py-2 rounded-sm text-xs font-bold uppercase tracking-wider inline-flex items-center gap-2">
+              <button type="button" onClick={addRow} data-testid="result-row-add" className="tls-btn tls-btn--secondary px-3 py-2 rounded-sm tls-type-label inline-flex items-center gap-2">
                 <Plus className="w-3.5 h-3.5" /> Teilnehmer
               </button>
             </section>
@@ -801,7 +801,7 @@ export function ResultEntrySheet({ series, round, onClose, onSaved }) {
           )}
 
           {teamLeague && form.rows.length === 0 && (
-            <button type="button" onClick={addRow} data-testid="result-row-add" className="tls-btn tls-btn--quiet px-3 py-2 rounded-sm text-xs font-bold uppercase tracking-wider inline-flex items-center gap-2">
+            <button type="button" onClick={addRow} data-testid="result-row-add" className="tls-btn tls-btn--quiet px-3 py-2 rounded-sm tls-type-label inline-flex items-center gap-2">
               <Plus className="w-3.5 h-3.5" /> Einzelwertung (optional)
             </button>
           )}
@@ -813,17 +813,17 @@ export function ResultEntrySheet({ series, round, onClose, onSaved }) {
           <TextAreaField label="Notiz" value={form.note} onChange={(value) => update({ note: value })} rows={2} hint="Optional, etwa „Wertung laut Veranstalter vorläufig“." testId="result-note" />
 
           {invalidCount > 0 && (
-            <p className="border border-red-400/40 bg-red-400/10 rounded-sm px-3 py-2 text-sm text-red-100" role="alert" data-testid="result-invalid">
+            <p className="border border-red-400/40 bg-red-400/10 rounded-sm px-3 py-2 tls-type-small text-red-100" role="alert" data-testid="result-invalid">
               {invalidCount === 1 ? "Eine Eingabe ist ungültig" : `${invalidCount} Eingaben sind ungültig`} – rot markiert. Geprüft und gespeichert wird erst, wenn alles stimmt.
             </p>
           )}
           {imageOpen > 0 && (
-            <p className="border border-amber-400/40 bg-amber-400/10 rounded-sm px-3 py-2 text-sm text-amber-100" role="status" data-testid="result-image-open">
+            <p className="border border-amber-400/40 bg-amber-400/10 rounded-sm px-3 py-2 tls-type-body text-amber-100" role="status" data-testid="result-image-open">
               {imageOpen === 1 ? "Eine Zeile aus dem Bild ist" : `${imageOpen} Zeilen aus dem Bild sind`} noch gelb – prüfen, korrigieren oder mit „Passt so“ bestätigen. Übernommen wird erst danach.
             </p>
           )}
           {fresh && <ResultPreview preview={preview} general={problems.general} board={board} profile={profile} />}
-          {!fresh && preview && <p className="text-xs text-white/45" data-testid="result-preview-outdated">Geändert – „Vorschau“ prüft neu.</p>}
+          {!fresh && preview && <p className="tls-type-small text-white/45" data-testid="result-preview-outdated">Geändert – „Vorschau“ prüft neu.</p>}
         </>
       )}
     </AdminSheet>

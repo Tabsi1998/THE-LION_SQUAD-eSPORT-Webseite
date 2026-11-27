@@ -44,7 +44,7 @@ export function DolibarrSourceBlock({ source, onChange, onSynced, kind = "sponso
   const category = kind === "partners" ? source.partner_category : source.sponsor_category;
   if (!enabled) {
     return (
-      <p className="mb-4 text-xs text-white/45" data-testid="dolibarr-source-off">
+      <p className="mb-4 tls-type-small text-white/45" data-testid="dolibarr-source-off">
         {kind === "partners" ? "Partner" : "Sponsoren"} aus Dolibarr übernehmen? Der Schalter liegt unter{" "}
         <Link to="/admin/dolibarr?tab=features" className="text-[#29B6E8] hover:underline" data-testid="dolibarr-source-features">Dolibarr → Funktionen</Link>.
       </p>
@@ -53,10 +53,10 @@ export function DolibarrSourceBlock({ source, onChange, onSynced, kind = "sponso
   return (
     <div className="mb-6 border border-[#29B6E8]/40 bg-[#29B6E8]/5 rounded-sm p-4 space-y-2" data-testid="dolibarr-source">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <div className="text-sm text-white/80 font-bold">{kind === "partners" ? "Partner" : "Sponsoren"} kommen aus Dolibarr (Kategorie „{category}“)</div>
-        <button type="button" onClick={refresh} disabled={busy} data-testid="dolibarr-source-refresh" className="px-3 py-1 border border-white/20 text-white/80 rounded-sm text-[11px] font-bold uppercase tracking-wider disabled:opacity-40">Jetzt nachlesen</button>
+        <div className="tls-type-small text-white/80 font-bold">{kind === "partners" ? "Partner" : "Sponsoren"} kommen aus Dolibarr (Kategorie „{category}“)</div>
+        <button type="button" onClick={refresh} disabled={busy} data-testid="dolibarr-source-refresh" className="px-3 py-1 border border-white/20 text-white/80 rounded-sm tls-type-label disabled:opacity-40">Jetzt nachlesen</button>
       </div>
-      <div className="flex flex-wrap items-center gap-3 text-xs" data-testid="dolibarr-source-state">
+      <div className="flex flex-wrap items-center gap-3 tls-type-small" data-testid="dolibarr-source-state">
         {source.fetched_at ? (
           <span className="text-white/60">Stand {viennaDateTime(source.fetched_at, { dateStyle: "short", timeStyle: "short" })}: <span className="text-white">{source.counts?.sponsors ?? 0} Sponsoren, {source.counts?.partners ?? 0} Partner</span></span>
         ) : (

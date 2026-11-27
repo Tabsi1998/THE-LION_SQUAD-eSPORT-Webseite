@@ -41,27 +41,27 @@ export function HeatRebuildBar({ tournament, onDecided }) {
       <div className="flex items-start gap-2 min-w-0">
         <GitMerge className="w-4 h-4 mt-0.5 shrink-0 text-honor" aria-hidden="true" />
         <div className="min-w-0 flex-1">
-          <div className="text-[11px] font-bold uppercase tracking-widest text-honor">Vorschlag: Läufe umbauen</div>
-          <div className="text-xs text-white/60 mt-1">Unterbesetzte Läufe lassen sich zusammenlegen, ausgleichen oder abkürzen. Laufende und aufgerufene Läufe bleiben unangetastet.</div>
+          <div className="tls-type-label text-honor">Vorschlag: Läufe umbauen</div>
+          <div className="tls-type-small text-white/60 mt-1">Unterbesetzte Läufe lassen sich zusammenlegen, ausgleichen oder abkürzen. Laufende und aufgerufene Läufe bleiben unangetastet.</div>
         </div>
       </div>
       {ops.length > 0 ? (
-        <ul className="space-y-1 text-sm text-white/85">
+        <ul className="space-y-1 tls-type-small text-white/85">
           {ops.map((op, index) => (
             <li key={index} data-testid="admin-tr-heat-rebuild-op" className="flex gap-2 min-w-0 break-words">
-              <span className="shrink-0 text-[10px] font-bold uppercase tracking-wider text-honor/80 mt-0.5 w-24">{KIND_LABELS[op.kind] || "Umbau"}</span>
+              <span className="shrink-0 tls-type-label text-honor/80 mt-0.5 w-24">{KIND_LABELS[op.kind] || "Umbau"}</span>
               <span className="min-w-0 flex-1 [overflow-wrap:anywhere]">{op.text || KIND_LABELS[op.kind] || "Umbau"}</span>
             </li>
           ))}
         </ul>
       ) : (
-        <div className="text-sm text-white/85 break-words [overflow-wrap:anywhere]">{plan.summary || "Die Läufe sollen umgebaut werden."}</div>
+        <div className="tls-type-small text-white/85 break-words [overflow-wrap:anywhere]">{plan.summary || "Die Läufe sollen umgebaut werden."}</div>
       )}
       <div className="flex flex-wrap gap-2">
-        <button type="button" onClick={() => decide("confirm")} disabled={!!busy} data-testid="admin-tr-heat-rebuild-confirm" className="tls-btn tls-btn--primary px-4 py-2 rounded-sm text-xs font-bold uppercase tracking-wider">
+        <button type="button" onClick={() => decide("confirm")} disabled={!!busy} data-testid="admin-tr-heat-rebuild-confirm" className="tls-btn tls-btn--primary px-4 py-2 rounded-sm tls-type-label">
           {busy === "confirm" ? "Wird umgebaut …" : "Bestätigen"}
         </button>
-        <button type="button" onClick={() => decide("reject")} disabled={!!busy} data-testid="admin-tr-heat-rebuild-reject" className="tls-btn tls-btn--quiet px-4 py-2 rounded-sm text-xs font-bold uppercase tracking-wider">
+        <button type="button" onClick={() => decide("reject")} disabled={!!busy} data-testid="admin-tr-heat-rebuild-reject" className="tls-btn tls-btn--quiet px-4 py-2 rounded-sm tls-type-label">
           Ablehnen
         </button>
       </div>

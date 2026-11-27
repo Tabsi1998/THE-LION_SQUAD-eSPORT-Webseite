@@ -340,8 +340,8 @@ export default function AdminF1EditPage() {
     <AdminLayout>
       <div className="flex items-center justify-between flex-wrap gap-3 mb-6">
         <div>
-          <Link to="/admin/f1" className="text-[11px] font-bold uppercase tracking-[0.3em] text-[#29B6E8] hover:text-white">← Fast-Lap-Challenges</Link>
-          <h1 className="font-heading text-3xl md:text-4xl font-black uppercase mt-1">{challenge.title}</h1>
+          <Link to="/admin/f1" className="tls-type-label text-[#29B6E8] hover:text-white">← Fast-Lap-Challenges</Link>
+          <h1 className="tls-type-title mt-1">{challenge.title}</h1>
           <div className="mt-2 flex items-center gap-3"><StatusBadge status={challenge.status} /></div>
         </div>
         <div className="flex gap-2 flex-wrap">
@@ -352,18 +352,18 @@ export default function AdminF1EditPage() {
                   <option key={s} value={s} disabled={s === "archived" && archiveBlocked(challenge)}>{s === "archived" && archiveBlocked(challenge) ? `${label} (erst nach dem Veröffentlichen)` : label}</option>
                 ))}
               </select>
-              <div className="mt-1 text-[10px] text-white/40">Live schaltet sich selbst, den Rest setzt ihr von Hand.</div>
+              <div className="mt-1 tls-type-small text-quiet">Live schaltet sich selbst, den Rest setzt ihr von Hand.</div>
             </div>
           )}
-          <Link target="_blank" to={`/display/f1/${challenge.id}`} data-testid="f1-tv-admin-link" className="inline-flex items-center gap-2 px-4 py-2 border border-[#29B6E8] text-[#29B6E8] rounded-sm uppercase tracking-wider text-sm font-bold hover:bg-[#29B6E8]/10">
+          <Link target="_blank" to={`/display/f1/${challenge.id}`} data-testid="f1-tv-admin-link" className="inline-flex items-center gap-2 px-4 py-2 border border-[#29B6E8] text-[#29B6E8] rounded-sm tls-type-label hover:bg-[#29B6E8]/10">
             <Tv className="w-4 h-4" /> TV-Ansicht
           </Link>
-          <Link target="_blank" to={`/fastlap/${challenge.slug || challenge.id}`} className="px-4 py-2 border border-white/20 text-white rounded-sm uppercase tracking-wider text-sm font-bold hover:border-[#29B6E8]/60">Öffentliche Seite</Link>
+          <Link target="_blank" to={`/fastlap/${challenge.slug || challenge.id}`} className="px-4 py-2 border border-white/20 text-white rounded-sm tls-type-label hover:border-[#29B6E8]/60">Öffentliche Seite</Link>
           {/* Der Export gehört der Turnierleitung (#2130) - ein Helfer bekäme nur eine rohe 403. */}
-          {isTournamentLead && <a href={`${API}/f1/challenges/${challenge.id}/export.csv`} data-testid="f1-export-csv" className="px-4 py-2 border border-white/20 text-white/80 text-xs uppercase font-bold rounded-sm hover:border-[#29B6E8]/40" target="_blank" rel="noreferrer">CSV</a>}
-          <a href={`${API}/exports/f1/${challenge.id}/leaderboard.pdf${activeTrack ? `?track_id=${activeTrack}` : ""}`} className="px-4 py-2 border border-white/20 text-white/80 text-xs uppercase font-bold rounded-sm hover:border-[#29B6E8]/40" target="_blank" rel="noreferrer">PDF</a>
+          {isTournamentLead && <a href={`${API}/f1/challenges/${challenge.id}/export.csv`} data-testid="f1-export-csv" className="px-4 py-2 border border-white/20 text-white/80 tls-type-label rounded-sm hover:border-[#29B6E8]/40" target="_blank" rel="noreferrer">CSV</a>}
+          <a href={`${API}/exports/f1/${challenge.id}/leaderboard.pdf${activeTrack ? `?track_id=${activeTrack}` : ""}`} className="px-4 py-2 border border-white/20 text-white/80 tls-type-label rounded-sm hover:border-[#29B6E8]/40" target="_blank" rel="noreferrer">PDF</a>
           {isTournamentLead && challenge.status === "draft" && (
-            <button type="button" onClick={deleteChallenge} data-testid="f1-delete-challenge" className="inline-flex items-center gap-2 px-4 py-2 border border-live/40 text-live text-xs uppercase font-bold rounded-sm hover:bg-live/10">
+            <button type="button" onClick={deleteChallenge} data-testid="f1-delete-challenge" className="inline-flex items-center gap-2 px-4 py-2 border border-live/40 text-live tls-type-label rounded-sm hover:bg-live/10">
               <Trash2 className="w-3.5 h-3.5" /> Entwurf löschen
             </button>
           )}
@@ -371,17 +371,17 @@ export default function AdminF1EditPage() {
       </div>
 
       {locked && (
-        <div data-testid="f1-published-lock" className="mb-5 border border-honor/30 bg-honor/5 rounded-sm p-3 text-sm text-white/80">
+        <div data-testid="f1-published-lock" className="mb-5 border border-honor/30 bg-honor/5 rounded-sm p-3 tls-type-small text-white/80">
           Ergebnisse veröffentlicht: Zeiten sind gesperrt. Ändern, Nachtragen und Löschen gehen nur noch durch die Turnierleitung mit Begründung - jede Änderung steht im Protokoll.
         </div>
       )}
       {!locked && OPEN_STATUSES.has(challenge.status) && challenge.public_phase?.state === "completed" && (
-        <div data-testid="f1-end-reached" className="mb-5 border border-[#29B6E8]/30 bg-[#29B6E8]/5 rounded-sm p-3 text-sm text-white/80">
+        <div data-testid="f1-end-reached" className="mb-5 border border-[#29B6E8]/30 bg-[#29B6E8]/5 rounded-sm p-3 tls-type-small text-white/80">
           Die Zeit ist um. Bitte die Zeiten prüfen und die Ergebnisse veröffentlichen - erst dann entstehen die Saisonpunkte. „Beendet“ legt nur die Gewinne an.
         </div>
       )}
       {challenge.status === "completed" && (
-        <div data-testid="f1-completed-hint" className="mb-5 border border-[#29B6E8]/30 bg-[#29B6E8]/5 rounded-sm p-3 text-sm text-white/80">
+        <div data-testid="f1-completed-hint" className="mb-5 border border-[#29B6E8]/30 bg-[#29B6E8]/5 rounded-sm p-3 tls-type-small text-white/80">
           Beendet: Die Gewinne sind angelegt, Saisonpunkte gibt es noch keine. Die entstehen mit „Ergebnisse veröffentlicht“; archivieren geht erst danach.
         </div>
       )}
@@ -414,13 +414,13 @@ export default function AdminF1EditPage() {
       <div className="grid lg:grid-cols-3 gap-6">
         {/* Tracks */}
         <div className="border border-white/10 rounded-sm bg-[#121212] p-5">
-          <h2 className="font-heading font-bold uppercase mb-3 text-lg">Strecken</h2>
+          <h2 className="tls-type-section mb-3">Strecken</h2>
           <div className="space-y-2">
             {tracks.map((tr) => (
               <div key={tr.id} className={`flex items-center justify-between gap-2 border rounded-sm p-2 ${activeTrack === tr.id ? "border-[#29B6E8] bg-[#29B6E8]/5" : "border-white/10"}`}>
                 <button onClick={() => setActiveTrack(tr.id)} data-testid={`f1-track-${tr.id}`} className="flex items-center gap-2 flex-1 text-left">
                   {tr.image_url && <img src={resolveMediaUrl(tr.image_url)} className="w-10 h-7 object-cover rounded-sm" alt="" />}
-                  <div className="min-w-0"><div className="text-sm font-bold truncate">{tr.name}</div><div className="text-[10px] text-white/50">{tr.country}</div></div>
+                  <div className="min-w-0"><div className="tls-type-small font-bold truncate">{tr.name}</div><div className="tls-type-small text-white/50">{tr.country}</div></div>
                 </button>
                 {isTournamentLead && <button onClick={() => setEditTrack({ ...tr, target_time: formatLapTime(tr.target_time_ms), min_time: formatLapTime(tr.min_plausible_ms), max_time: formatLapTime(tr.max_plausible_ms) })} className="p-1 text-white/40 hover:text-[#29B6E8]" title="Strecke bearbeiten"><Pencil className="w-3.5 h-3.5" /></button>}
                 {isTournamentLead && <button onClick={() => delTrack(tr.id)} className="p-1 text-white/40 hover:text-live" title="Strecke löschen"><Trash2 className="w-3.5 h-3.5" /></button>}
@@ -430,7 +430,7 @@ export default function AdminF1EditPage() {
           {isTournamentLead && editTrack && (
             <form onSubmit={saveTrack} className="mt-4 space-y-2 border border-[#29B6E8]/25 bg-[#29B6E8]/5 rounded-sm p-3">
               <div className="flex items-center justify-between">
-                <div className="text-[11px] font-bold uppercase tracking-widest text-[#29B6E8]">Strecke bearbeiten</div>
+                <div className="tls-type-label text-[#29B6E8]">Strecke bearbeiten</div>
                 <button type="button" onClick={() => setEditTrack(null)} className="text-white/40 hover:text-white"><XIcon className="w-3.5 h-3.5" /></button>
               </div>
               <input placeholder="Name" value={editTrack.name || ""} onChange={(e) => setEditTrackField("name", e.target.value)} required data-testid="f1-edit-track-name" className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-sm" />
@@ -442,13 +442,13 @@ export default function AdminF1EditPage() {
                 <input placeholder="Plausibel bis (Standard 10:00)" value={editTrack.max_time || ""} onChange={(e) => setEditTrackField("max_time", e.target.value)} data-testid="f1-edit-track-max" title="Langsamere Zeiten brauchen beim Eintragen eine Bestätigung." className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-sm" />
               </div>
               <input type="number" placeholder="Reihenfolge" value={editTrack.order_index ?? 0} onChange={(e) => setEditTrackField("order_index", e.target.value)} data-testid="f1-edit-track-order" className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-sm" />
-              <button data-testid="f1-edit-track-save" className="w-full px-3 py-2 bg-[#29B6E8] text-black font-bold uppercase tracking-wider rounded-sm text-xs hover:bg-[#1E95C2]">
+              <button data-testid="f1-edit-track-save" className="w-full px-3 py-2 bg-[#29B6E8] text-black tls-type-label rounded-sm hover:bg-[#1E95C2]">
                 Strecke speichern
               </button>
             </form>
           )}
           {isTournamentLead && <form onSubmit={addTrack} className="mt-4 space-y-2 border-t border-white/5 pt-4">
-            <div className="text-[11px] font-bold uppercase tracking-widest text-white/60">Neue Strecke</div>
+            <div className="tls-type-label text-white/60">Neue Strecke</div>
             <input placeholder="Name" value={newTrack.name} onChange={(e) => setNewTrackField("name", e.target.value)} required data-testid="f1-new-track-name" className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-sm" />
             <ImageUpload value={newTrack.image_url} onChange={(v) => setNewTrackField("image_url", v)} label="Streckenbild" testId="f1-new-track-image-upload" variant="wide" allowLibrary />
             <input placeholder="Land" value={newTrack.country} onChange={(e) => setNewTrackField("country", e.target.value)} data-testid="f1-new-track-country" className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-sm" />
@@ -457,7 +457,7 @@ export default function AdminF1EditPage() {
               <input placeholder="Plausibel ab (Standard 0:20)" value={newTrack.min_time} onChange={(e) => setNewTrackField("min_time", e.target.value)} data-testid="f1-new-track-min" title="Schnellere Zeiten brauchen beim Eintragen eine Bestätigung." className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-sm" />
               <input placeholder="Plausibel bis (Standard 10:00)" value={newTrack.max_time} onChange={(e) => setNewTrackField("max_time", e.target.value)} data-testid="f1-new-track-max" title="Langsamere Zeiten brauchen beim Eintragen eine Bestätigung." className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-sm" />
             </div>
-            <button data-testid="f1-add-track-btn" className="w-full px-3 py-2 bg-[#29B6E8] text-black font-bold uppercase tracking-wider rounded-sm text-xs hover:bg-[#1E95C2] inline-flex items-center justify-center gap-2">
+            <button data-testid="f1-add-track-btn" className="w-full px-3 py-2 bg-[#29B6E8] text-black tls-type-label rounded-sm hover:bg-[#1E95C2] inline-flex items-center justify-center gap-2">
               <Plus className="w-3.5 h-3.5" /> Hinzufügen
             </button>
           </form>}
@@ -465,7 +465,7 @@ export default function AdminF1EditPage() {
 
         {/* Time input + list */}
         <div className="lg:col-span-2 border border-white/10 rounded-sm bg-[#121212] p-5">
-          <h2 className="font-heading font-bold uppercase mb-3 text-lg">Zeiten eintragen</h2>
+          <h2 className="tls-type-section mb-3">Zeiten eintragen</h2>
           {activeTrack ? (
             <>
               <form onSubmit={addTime} className="flex flex-wrap gap-2 items-end border-b border-white/5 pb-4 mb-4">
@@ -473,28 +473,28 @@ export default function AdminF1EditPage() {
                   <PersonPicker purpose="fastlap" contextId={challenge.id} value={driver} onChange={setDriver} label="Fahrer" placeholder="Fahrer suchen …" testId="f1-add-time-user" />
                 </div>
                 <div>
-                  <div className="text-[11px] font-bold uppercase tracking-widest text-white/60 mb-1">Zeit (m:ss.SSS)</div>
+                  <div className="tls-type-label text-white/60 mb-1">Zeit (m:ss.SSS)</div>
                   <input value={newTime.time_str} onChange={(e) => setNewTime({ ...newTime, time_str: e.target.value })} placeholder="1:24.587" inputMode="decimal" required data-testid="f1-add-time-value" className="w-36 bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm font-display text-lg tabular-nums" />
                 </div>
                 <div className="min-w-[170px]">
-                  <div className="text-[11px] font-bold uppercase tracking-widest text-white/60 mb-1">Wertung</div>
+                  <div className="tls-type-label text-white/60 mb-1">Wertung</div>
                   <select value={newTime.score_scope || "official"} onChange={(e) => setNewTime({ ...newTime, score_scope: e.target.value })} data-testid="f1-add-time-scope" className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-sm">
                     <option value="official" disabled={forceReferenceScope}>Offizielle Wertung</option>
                     <option value="club_reference">Vereins-Referenz</option>
                   </select>
-                  {forceReferenceScope && <div className="mt-1 text-[10px] text-[#FFD700]">Vereinsmitglied: nur Referenzzeit.</div>}
+                  {forceReferenceScope && <div className="mt-1 tls-type-small text-[#FFD700]">Vereinsmitglied: nur Referenzzeit.</div>}
                 </div>
                 <div>
-                  <div className="text-[11px] font-bold uppercase tracking-widest text-white/60 mb-1">Strafe (s)</div>
+                  <div className="tls-type-label text-white/60 mb-1">Strafe (s)</div>
                   <input type="number" step="0.1" value={newTime.penalty_seconds} onChange={(e) => setNewTime({ ...newTime, penalty_seconds: e.target.value })} data-testid="f1-add-time-penalty" className="w-24 bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm" />
                 </div>
                 <div className="flex-1 min-w-[160px]">
-                  <div className="text-[11px] font-bold uppercase tracking-widest text-white/60 mb-1">Nachweis-Link</div>
+                  <div className="tls-type-label text-white/60 mb-1">Nachweis-Link</div>
                   <input value={newTime.proof_url} onChange={(e) => setNewTime({ ...newTime, proof_url: e.target.value })} placeholder="Link zu Bild oder Video" data-testid="f1-add-time-proof" className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-sm" />
                 </div>
                 {Number(newTime.penalty_seconds) > 0 && (
                   <div className="w-full">
-                    <div className="text-[11px] font-bold uppercase tracking-widest text-[#FF3B30] mb-1">Begründung für Strafe (Pflicht, ≥5 Zeichen)</div>
+                    <div className="tls-type-small font-bold text-[#FF3B30] mb-1">Begründung für Strafe (Pflicht, ≥5 Zeichen)</div>
                     <textarea
                       rows={2}
                       required
@@ -506,15 +506,15 @@ export default function AdminF1EditPage() {
                     />
                   </div>
                 )}
-                <button data-testid="f1-add-time-submit" className="px-4 py-2 bg-[#29B6E8] text-black font-bold uppercase tracking-wider rounded-sm text-sm hover:bg-[#1E95C2]">Eintragen</button>
+                <button data-testid="f1-add-time-submit" className="px-4 py-2 bg-[#29B6E8] text-black font-bold uppercase tracking-wider rounded-sm tls-type-small hover:bg-[#1E95C2]">Eintragen</button>
               </form>
               <div className="space-y-1">
                 {times.map((t) => (
                   <div key={t.id} className={`flex items-center justify-between px-3 py-2 border rounded-sm hover:border-[#29B6E8]/40 ${t.is_invalid ? "border-[#FF3B30]/30 bg-[#FF3B30]/5" : "border-white/5"}`}>
                     <div className="flex items-center gap-3 min-w-0">
-                      <span className="text-white/50 text-xs w-6">#{t.attempt_number}</span>
-                      <span className="text-white text-sm truncate">{t.user?.display_name || t.user?.username}</span>
-                      {t.user?.is_guest && <span className="text-[9px] font-bold uppercase tracking-widest text-honor border border-honor/40 rounded-sm px-1">Gast</span>}
+                      <span className="text-white/50 tls-type-small w-6">#{t.attempt_number}</span>
+                      <span className="text-white tls-type-small truncate">{t.user?.display_name || t.user?.username}</span>
+                      {t.user?.is_guest && <span className="tls-type-label text-honor border border-honor/40 rounded-sm px-1">Gast</span>}
                       {t.user?.is_guest && isTournamentLead && (
                         <button type="button" onClick={() => setLinkGuest({ id: t.guest_id, name: t.user?.display_name || "Gast" })} data-testid={`f1-link-guest-${t.id}`} title="Mit Konto verknüpfen" aria-label={`${t.user?.display_name || "Gast"} mit Konto verknüpfen`} className="p-1 text-white/40 hover:text-[#29B6E8]">
                           <Link2 className="w-3.5 h-3.5" />
@@ -522,11 +522,11 @@ export default function AdminF1EditPage() {
                       )}
                     </div>
                     <div className="flex items-center gap-3">
-                      <span className={`font-display font-bold text-lg tabular-nums ${t.is_invalid ? "line-through text-white/40" : "text-white"}`}>{showLapTime(t.time_str)}</span>
-                      {(t.score_scope || "official") === "club_reference" && <span className="text-[#FFD700] border border-[#FFD700]/30 bg-[#FFD700]/10 px-2 py-1 text-[10px] font-bold uppercase tracking-widest rounded-sm">Referenz</span>}
-                      {t.penalty_seconds > 0 && <span className="text-[#FF3B30] text-xs">+{t.penalty_seconds}s</span>}
-                      {t.is_invalid && <span className="text-[#FF3B30] text-[10px] font-bold uppercase tracking-widest">Ungültig</span>}
-                      {safeHttpUrl(t.proof_url) && <a href={safeHttpUrl(t.proof_url)} target="_blank" rel="noreferrer" className="text-[10px] text-[#29B6E8] uppercase tracking-widest hover:underline">Nachweis</a>}
+                      <span className={`tls-type-card tls-type-num ${t.is_invalid ? "line-through text-white/40" : "text-white"}`}>{showLapTime(t.time_str)}</span>
+                      {(t.score_scope || "official") === "club_reference" && <span className="text-[#FFD700] border border-[#FFD700]/30 bg-[#FFD700]/10 px-2 py-1 tls-type-label rounded-sm">Referenz</span>}
+                      {t.penalty_seconds > 0 && <span className="text-[#FF3B30] tls-type-small">+{t.penalty_seconds}s</span>}
+                      {t.is_invalid && <span className="text-[#FF3B30] tls-type-label">Ungültig</span>}
+                      {safeHttpUrl(t.proof_url) && <a href={safeHttpUrl(t.proof_url)} target="_blank" rel="noreferrer" className="tls-type-label text-[#29B6E8] hover:underline">Nachweis</a>}
                       <button
                         onClick={() => setEditTime({
                           ...t,
@@ -543,10 +543,10 @@ export default function AdminF1EditPage() {
                     </div>
                   </div>
                 ))}
-                {times.length === 0 && <div className="text-center py-6 text-white/40 text-sm">Noch keine Zeiten</div>}
+                {times.length === 0 && <div className="text-center py-6 text-quiet tls-type-small">Noch keine Zeiten</div>}
               </div>
             </>
-          ) : <div className="text-white/40 text-sm">Bitte erst eine Strecke anlegen.</div>}
+          ) : <div className="text-quiet tls-type-small">Bitte erst eine Strecke anlegen.</div>}
         </div>
       </div>
 
@@ -561,20 +561,20 @@ export default function AdminF1EditPage() {
         <div className="fixed inset-0 bg-black/70 z-50 flex items-center justify-center p-4" role="presentation" data-testid="f1-edit-time-backdrop" onClick={(e) => { if (e.target === e.currentTarget) setEditTime(null); }}>
           <div ref={editTimeRef} role="dialog" aria-modal="true" aria-labelledby="f1-edit-time-title" className="bg-[#121212] border border-white/10 rounded-sm max-w-md w-full p-6 space-y-3" data-testid="f1-edit-time-dialog">
             <div className="flex items-center justify-between">
-              <h3 id="f1-edit-time-title" className="font-heading text-lg font-bold uppercase">Zeit bearbeiten</h3>
+              <h3 id="f1-edit-time-title" className="tls-type-card">Zeit bearbeiten</h3>
               <button type="button" onClick={() => setEditTime(null)} className="text-white/40 hover:text-white" aria-label="Schließen"><XIcon className="w-4 h-4" /></button>
             </div>
-            <div className="text-xs text-white/60">Spieler: <span className="text-white">{editTime.user?.display_name || editTime.user?.username}</span></div>
+            <div className="tls-type-small text-white/60">Spieler: <span className="text-white">{editTime.user?.display_name || editTime.user?.username}</span></div>
             <label className="block">
-              <div className="text-[11px] font-bold uppercase tracking-widest text-white/60 mb-1">Zeit (m:ss.SSS)</div>
+              <div className="tls-type-label text-white/60 mb-1">Zeit (m:ss.SSS)</div>
               <input value={editTime.time_str} onChange={(e) => setEditTime({ ...editTime, time_str: e.target.value })} data-testid="f1-edit-time-value" className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm font-display text-lg tabular-nums" />
             </label>
             <label className="block">
-              <div className="text-[11px] font-bold uppercase tracking-widest text-white/60 mb-1">Strafsekunden</div>
+              <div className="tls-type-label text-white/60 mb-1">Strafsekunden</div>
               <input type="number" step="0.1" value={editTime.penalty_seconds ?? 0} onChange={(e) => setEditTime({ ...editTime, penalty_seconds: e.target.value })} data-testid="f1-edit-time-penalty" className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm" />
             </label>
             <label className="block">
-              <div className="text-[11px] font-bold uppercase tracking-widest text-white/60 mb-1">Wertung</div>
+              <div className="tls-type-label text-white/60 mb-1">Wertung</div>
               <select
                 value={editTime.score_scope || "official"}
                 onChange={(e) => setEditTime({ ...editTime, score_scope: e.target.value })}
@@ -585,15 +585,15 @@ export default function AdminF1EditPage() {
                 <option value="club_reference">Vereins-Referenz</option>
               </select>
               {!!challenge?.block_club_member_results && !!editTime.user?.is_club_member && (
-                <div className="mt-1 text-[10px] text-[#FFD700]">Vereinsmitglieder sind bei dieser Challenge nur als Referenz erlaubt.</div>
+                <div className="mt-1 tls-type-small text-[#FFD700]">Vereinsmitglieder sind bei dieser Challenge nur als Referenz erlaubt.</div>
               )}
             </label>
             <label className="block">
-              <div className="text-[11px] font-bold uppercase tracking-widest text-white/60 mb-1">Nachweis-Link</div>
+              <div className="tls-type-label text-white/60 mb-1">Nachweis-Link</div>
               <input value={editTime.proof_url || ""} onChange={(e) => setEditTime({ ...editTime, proof_url: e.target.value })} placeholder="Link zu Bild oder Video" data-testid="f1-edit-time-proof" className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-sm" />
             </label>
             <label className="block">
-              <div className={`text-[11px] font-bold uppercase tracking-widest mb-1 ${(Number(editTime.penalty_seconds) > 0 || editTime.is_invalid) ? "text-[#FF3B30]" : "text-white/60"}`}>
+              <div className={`tls-type-label mb-1 ${(Number(editTime.penalty_seconds) > 0 || editTime.is_invalid) ? "text-[#FF3B30]" : "text-white/60"}`}>
                 {(Number(editTime.penalty_seconds) > 0 || editTime.is_invalid)
                   ? "Begründung (Pflicht, ≥5 Zeichen — wird Spieler angezeigt)"
                   : "Admin-Notiz (intern)"}
@@ -611,7 +611,7 @@ export default function AdminF1EditPage() {
                 }`}
               />
             </label>
-            <label className="flex items-center gap-2 text-sm">
+            <label className="flex items-center gap-2 tls-type-small">
               <input type="checkbox" checked={!!editTime.is_invalid} onChange={(e) => setEditTime({ ...editTime, is_invalid: e.target.checked })} data-testid="f1-edit-time-invalid" className="accent-[#29B6E8]" />
               <span>Als ungültig markieren (zählt nicht für Rangliste)</span>
             </label>

@@ -37,7 +37,7 @@ export function SeasonSwitcher({ seasons, lineageSlug }) {
             >
               {seasonName(season)}
               {season.status === "active" && <span className="tls-season-tab__live">läuft</span>}
-              {season.status === "cancelled" && <span className="text-[10px] uppercase tracking-[0.12em] text-white/45">abgebrochen</span>}
+              {season.status === "cancelled" && <span className="tls-type-label text-white/45">abgebrochen</span>}
             </Link>
           </li>
         ))}
@@ -69,7 +69,7 @@ export function DriverCell({ row, driver, onSelect, canOpen = false }) {
         {row.club_member && <span className="tls-standing-me">Verein</span>}
         {driver?.guest && <GuestBadge />}
       </span>
-      {driver?.team && <span className="mt-0.5 block text-[12px] leading-tight text-white/45 [overflow-wrap:anywhere]">{driver.team}</span>}
+      {driver?.team && <span className="mt-0.5 block tls-type-small leading-tight text-white/45 [overflow-wrap:anywhere]">{driver.team}</span>}
     </span>
   );
 }
@@ -127,8 +127,8 @@ export function RacingPoints({ row }) {
 
 function WhoLine({ label, tone, row, cell, onSelect, testId, showClub = false }) {
   return (
-    <p className="flex flex-wrap items-center gap-x-2 gap-y-0.5 min-w-0 text-sm" data-testid={testId}>
-      <span className={`shrink-0 sm:w-[10rem] text-[10px] font-bold uppercase tracking-[0.14em] ${tone}`}>{label}</span>
+    <p className="flex flex-wrap items-center gap-x-2 gap-y-0.5 min-w-0 tls-type-body" data-testid={testId}>
+      <span className={`shrink-0 sm:w-[10rem] tls-type-label ${tone}`}>{label}</span>
       {" "}
       <span className="flex flex-wrap items-center gap-x-2 gap-y-0.5 min-w-0">
         <DriverName row={row} onSelect={onSelect} canOpen />
@@ -157,7 +157,7 @@ function RoundSummary({ round, rows, publicKeys, onSelect, session = "" }) {
 
 function StateBadge({ state }) {
   return (
-    <span className={`inline-flex items-center px-2 py-0.5 border rounded-sm text-[10px] font-bold uppercase tracking-widest whitespace-nowrap ${STATE_TONES[state] || STATE_TONES.planned}`}>
+    <span className={`inline-flex items-center px-2 py-0.5 border rounded-sm tls-type-label whitespace-nowrap ${STATE_TONES[state] || STATE_TONES.planned}`}>
       {PUBLIC_STATE_LABELS[state] || state}
     </span>
   );
@@ -172,9 +172,9 @@ export function RacingCalendar({ rounds, rows, onSelect, publicKeys, hrefFor, ro
   const weekends = groupWeekends(rounds);
   return (
     <section className="mt-12" aria-labelledby="racing-calendar-title" data-testid="racing-calendar">
-      <h2 id="racing-calendar-title" className="font-heading text-2xl font-black uppercase">Rennkalender</h2>
+      <h2 id="racing-calendar-title" className="tls-type-section">Rennkalender</h2>
       {rounds.length === 0 ? (
-        <p className="mt-3 text-sm text-white/55">Noch keine Termine.</p>
+        <p className="mt-3 tls-type-small text-white/55">Noch keine Termine.</p>
       ) : (
         <ol className="mt-4 divide-y divide-white/5 border-y border-white/10">
           {weekends.map((weekend) => {
@@ -189,11 +189,11 @@ export function RacingCalendar({ rounds, rows, onSelect, publicKeys, hrefFor, ro
               <>
                 <span className={`min-w-12 shrink-0 whitespace-nowrap font-black tabular-nums ${weekend.kind === "final" ? "text-[var(--tls-honor)]" : "text-white/80"}`}>{roundLabel(round)}</span>
                 <div className="min-w-0 flex-1">
-                  <span className={`block text-sm tabular-nums ${weekend.state === "cancelled" ? "text-white/45" : "text-white"}`}>{weekend.multi ? roundWhen({ ...round, time: null }) : roundWhen(round)}</span>
+                  <span className={`block tls-type-small tabular-nums ${weekend.state === "cancelled" ? "text-white/45" : "text-white"}`}>{weekend.multi ? roundWhen({ ...round, time: null }) : roundWhen(round)}</span>
                   {(weekend.title || weekend.venue || weekend.country_code) && (
-                    <span className="block text-sm text-white/60" data-testid="racing-round-venue"><VenueWithFlag round={weekend} /></span>
+                    <span className="block tls-type-small text-white/60" data-testid="racing-round-venue"><VenueWithFlag round={weekend} /></span>
                   )}
-                  {original && <span className="block text-[11px] text-white/45">ursprünglich {dayLabel(original)}</span>}
+                  {original && <span className="block tls-type-small text-white/45">ursprünglich {dayLabel(original)}</span>}
                   {/* Termin ohne Wertung mit Grund (#1960) - je Lauf, der einen hat. */}
                   {weekend.rounds.map((item) => <NoScoreNote key={item.id} round={item} label={weekend.multi ? chipLabel(item) : ""} />)}
                 </div>

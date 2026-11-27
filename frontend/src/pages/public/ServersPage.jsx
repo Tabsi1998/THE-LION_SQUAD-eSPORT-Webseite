@@ -11,6 +11,8 @@ import { ruleFacts, serverTags } from "@/lib/serverFacts";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 import { asInstant, viennaDateTime } from "@/lib/vienna";
+import { formatDuration } from "@/lib/datetime";
+import { ShortCaps } from "@/components/tls/ShortCaps";
 
 const statusLabels = { online: "Online", offline: "Offline", maintenance: "Wartung", planned: "Geplant" };
 const visibilityLabels = { public: "Öffentlich", community: "Community", members: "Vereinsmitglieder", internal: "Intern" };
@@ -53,13 +55,8 @@ function formatRemainingTime(target, now) {
   if (Number.isNaN(date.getTime())) return "";
   const diff = date.getTime() - now;
   if (diff <= 0) return "Ende erreicht";
-  const totalMinutes = Math.ceil(diff / 60000);
-  const days = Math.floor(totalMinutes / 1440);
-  const hours = Math.floor((totalMinutes % 1440) / 60);
-  const minutes = totalMinutes % 60;
-  if (days > 0) return `${days} T. ${hours} Std.`;
-  if (hours > 0) return `${hours} Std. ${minutes} Min.`;
-  return `${minutes} Min.`;
+  // Tage und Stunden ausgeschrieben („154 Tage 16 Std.“, #1304) - angefangene Minuten zählen mit.
+  return formatDuration(diff, { round: "up" });
 }
 
 function maintenanceLabel(server, now) {
@@ -100,8 +97,8 @@ export default function ServersPage() {
   return (
     <PublicLayout>
       <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-14">
-        <span className="text-[11px] font-bold uppercase tracking-[0.3em] text-[#29B6E8]">Community</span>
-        <h1 className="mt-3 pb-2 font-heading text-4xl md:text-6xl font-black uppercase leading-[0.95]">Server</h1>
+        <span className="tls-type-label text-[#29B6E8]">Community</span>
+        <h1 className="mt-3 pb-2 tls-type-title leading-[0.95]"><ShortCaps>Server</ShortCaps></h1>
         <p className="mt-4 max-w-3xl text-white/65">
           Unsere Community- und Vereinsserver. Öffentliche Server sind direkt sichtbar, Community-Server nach dem Anmelden und Vereinsserver nur für aktive Vereinsmitglieder.
         </p>
@@ -114,12 +111,12 @@ export default function ServersPage() {
         </div>
 
         {!user && (
-          <div className="mt-6 border border-[#29B6E8]/25 bg-[#29B6E8]/10 rounded-sm p-4 text-sm text-white/70 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+          <div className="mt-6 border border-[#29B6E8]/25 bg-[#29B6E8]/10 rounded-sm p-4 tls-type-small text-white/70 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
             <div className="flex items-start gap-3">
               <Lock className="w-4 h-4 text-[#29B6E8] mt-0.5 shrink-0" />
               <span>Nach dem Anmelden siehst du zusätzlich Server, die nur für registrierte Community-Konten freigegeben sind.</span>
             </div>
-            <Link to="/login?next=/servers" className="tls-btn tls-btn--secondary inline-flex justify-center px-4 py-2 text-xs font-bold uppercase tracking-wider rounded-sm">
+            <Link to="/login?next=/servers" className="tls-btn tls-btn--secondary inline-flex justify-center px-4 py-2 tls-type-label rounded-sm">
               Anmelden
             </Link>
           </div>
@@ -128,7 +125,7 @@ export default function ServersPage() {
         {items.length === 0 ? (
           <div className="mt-10 border border-dashed border-white/15 rounded-sm p-12 text-center text-white/45">
             <Server className="w-10 h-10 mx-auto mb-4 opacity-40" />
-            <div className="font-heading font-bold text-lg">{loading ? "Server werden geladen…" : "Keine Server sichtbar."}</div>
+            <div className="tls-type-card">{loading ? "Server werden geladen…" : "Keine Server sichtbar."}</div>
           </div>
         ) : (
           <div className="mt-10 space-y-10">
@@ -150,10 +147,10 @@ function Stat({ label, value, icon: Icon, tone }) {
   return (
     <div className="border border-white/10 bg-[#121212] rounded-sm p-4">
       <div className="flex items-center justify-between gap-2">
-        <div className="text-[10px] uppercase tracking-widest text-white/45 font-bold">{label}</div>
+        <div className="tls-type-label text-white/45">{label}</div>
         <Icon className={`w-4 h-4 ${color}`} />
       </div>
-      <div className={`mt-2 font-display text-3xl font-black ${color}`}>{value}</div>
+      <div className={`mt-2 tls-type-title tls-type-num ${color}`}>{value}</div>
     </div>
   );
 }
@@ -162,7 +159,7 @@ function ServerSection({ title, items }) {
   return (
     <section>
       <div className="flex items-end gap-3">
-        <h2 className="pb-1 font-heading text-2xl font-black uppercase leading-[1.08]">{title}</h2>
+        <h2 className="pb-1 tls-type-section leading-[1.08]">{title}</h2>
         <div className="h-px flex-1 bg-white/10" />
       </div>
       <div className="mt-4 grid lg:grid-cols-2 2xl:grid-cols-3 gap-4">
@@ -254,52 +251,52 @@ function ServerCard({ server }) {
           <div className="flex items-start gap-3 min-w-0">
             <GameServerIcon server={server} />
             <div className="min-w-0 max-w-full pt-0.5">
-              <div className="flex items-center gap-2 text-[10px] uppercase tracking-widest text-[#29B6E8] font-bold min-w-0">
+              <div className="flex items-center gap-2 tls-type-label text-[#29B6E8] min-w-0">
                 <Gamepad2 className="w-3 h-3 shrink-0" />
                 <span className="truncate">{gameName(server)}</span>
               </div>
-              <h3 className="mt-1 pb-1 max-w-full font-heading text-xl sm:text-2xl font-black uppercase leading-[1.08] break-words hyphens-auto [overflow-wrap:anywhere]">{server.name}</h3>
+              <h3 className="mt-1 pb-1 max-w-full tls-type-section leading-[1.08] break-words hyphens-auto [overflow-wrap:anywhere]">{server.name}</h3>
             </div>
           </div>
-          <span className={`shrink-0 border px-2 py-1 rounded-sm text-[10px] font-black uppercase tracking-widest ${statusClasses[status] || statusClasses.offline}`}>
+          <span className={`shrink-0 border px-2 py-1 rounded-sm tls-type-label ${statusClasses[status] || statusClasses.offline}`}>
             {statusLabels[status] || status}
           </span>
         </div>
 
-        {server.description && <p className="mt-4 text-sm leading-relaxed text-white/60 line-clamp-3">{server.description}</p>}
+        {server.description && <p className="mt-4 tls-type-body leading-relaxed text-white/60 line-clamp-3">{server.description}</p>}
         {server.modding_enabled && (
           <div className="mt-4 border border-[#29B6E8]/25 bg-[#29B6E8]/5 rounded-sm p-3" data-testid="server-mod-resources">
-            <span className="text-[10px] uppercase font-black tracking-widest text-[#29B6E8]">Modded</span>
+            <span className="tls-type-label text-[#29B6E8]">Modded</span>
             {(modResources.length > 0 || server.modding_notes) && (
               <details className="mt-2">
-                <summary className="cursor-pointer py-2 text-sm font-bold text-white/80">Mods & Einrichtung{modResources.length ? ` (${modResources.length})` : ""}</summary>
-                {server.modding_notes && <p className="mt-2 whitespace-pre-wrap break-words text-sm text-white/65">{server.modding_notes}</p>}
+                <summary className="cursor-pointer py-2 tls-type-small font-bold text-white/80">Mods & Einrichtung{modResources.length ? ` (${modResources.length})` : ""}</summary>
+                {server.modding_notes && <p className="mt-2 whitespace-pre-wrap break-words tls-type-body text-white/65">{server.modding_notes}</p>}
                 <ul className="mt-3 space-y-2">
                   {modResources.map((item, index) => (
                     <li key={index}>
-                      <a href={safeResourceUrl(item.url)} target="_blank" rel="noopener noreferrer" className="flex min-h-11 items-center justify-between gap-3 border border-white/15 rounded-sm px-3 py-2 text-sm hover:border-[#29B6E8]/60">
-                        <span className="min-w-0 break-words"><span className="block text-[10px] uppercase text-[#29B6E8]">{serverResourceLabels[item.kind] || "Download"}</span>{item.label || serverResourceLabels[item.kind] || "Download"}{item.version && <span className="block text-xs text-white/55">Version: {item.version}</span>}</span>
+                      <a href={safeResourceUrl(item.url)} target="_blank" rel="noopener noreferrer" className="flex min-h-11 items-center justify-between gap-3 border border-white/15 rounded-sm px-3 py-2 tls-type-small hover:border-[#29B6E8]/60">
+                        <span className="min-w-0 break-words"><span className="block tls-type-label text-[#29B6E8]">{serverResourceLabels[item.kind] || "Download"}</span>{item.label || serverResourceLabels[item.kind] || "Download"}{item.version && <span className="block tls-type-small text-white/55">Version: {item.version}</span>}</span>
                         <ExternalLink aria-label="Öffnet in neuem Tab" className="w-4 h-4 shrink-0 text-[#29B6E8]" />
                       </a>
                     </li>
                   ))}
                 </ul>
-                <p className="mt-3 text-xs text-white/45">Links öffnen im neuen Tab. Installiere nur Dateien aus vertrauenswürdigen Quellen.</p>
+                <p className="mt-3 tls-type-small text-white/45">Links öffnen im neuen Tab. Installiere nur Dateien aus vertrauenswürdigen Quellen.</p>
               </details>
             )}
           </div>
         )}
 
-        <div className="mt-5 grid grid-cols-2 gap-x-5 gap-y-3 text-xs">
+        <div className="mt-5 grid grid-cols-2 gap-x-5 gap-y-3 tls-type-small">
           {quickFacts.map((fact) => <Info key={fact.label} label={fact.label} value={fact.value} />)}
         </div>
 
         {tags.length > 0 && (
           <div className="mt-4" data-testid="server-tags">
-            <div className="text-[10px] uppercase tracking-widest text-white/35 font-bold mb-2">Server-Merkmale</div>
+            <div className="tls-type-label text-quiet mb-2">Server-Merkmale</div>
             <div className="flex flex-wrap gap-1.5">
               {tags.map((tag) => (
-                <span key={tag} className="px-2 py-0.5 border border-white/10 bg-white/5 rounded-sm text-[11px] text-white/70 break-all">
+                <span key={tag} className="px-2 py-0.5 border border-white/10 bg-white/5 rounded-sm tls-type-small text-white/70 break-all">
                   {tag}
                 </span>
               ))}
@@ -309,7 +306,7 @@ function ServerCard({ server }) {
 
         {max > 0 && (
           <div className="mt-5">
-            <div className="flex items-center justify-between text-[10px] uppercase tracking-widest text-white/35 font-bold">
+            <div className="flex items-center justify-between tls-type-label text-quiet">
               <span>Auslastung</span>
               <span>{pct}%</span>
             </div>
@@ -320,32 +317,32 @@ function ServerCard({ server }) {
         )}
 
         {server.player_names?.length > 0 && (
-          <div className="mt-4 text-xs text-white/45">
+          <div className="mt-4 tls-type-small text-white/45">
             Online: <span className="text-white/70">{server.player_names.slice(0, 6).join(", ")}</span>{server.player_names.length > 6 ? " …" : ""}
           </div>
         )}
 
         <div className="mt-auto pt-5 space-y-2">
           {server.address && (
-            <button type="button" onClick={copyAddress} className="w-full text-left font-mono text-xs border border-white/10 bg-black/30 rounded-sm px-3 py-2 text-white/75 break-all hover:border-[#29B6E8]/50 hover:text-white transition inline-flex items-center justify-between gap-3">
+            <button type="button" onClick={copyAddress} className="w-full text-left font-mono tls-type-small border border-white/10 bg-black/30 rounded-sm px-3 py-2 text-white/75 break-all hover:border-[#29B6E8]/50 hover:text-white transition inline-flex items-center justify-between gap-3">
               <span>{server.address}</span>
               <Clipboard className="w-3.5 h-3.5 shrink-0 text-[#29B6E8]" />
             </button>
           )}
-          {server.password_hint && <div className="text-xs text-[#FFD700]/80">{server.password_hint}</div>}
+          {server.password_hint && <div className="tls-type-small text-[#FFD700]/80">{server.password_hint}</div>}
           {server.access_secret_kind && server.access_secret_kind !== "none" && (
             <div className="border border-[#FFD700]/25 bg-[#FFD700]/10 rounded-sm p-3">
               <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
                 <div className="min-w-0">
-                  <div className="text-[10px] uppercase tracking-widest text-[#FFD700] font-black">{server.access_label || secretLabels[server.access_secret_kind] || "Zugang"}</div>
-                  <div className="font-mono text-xs text-white/70 mt-1 break-all">{server.has_access_secret ? (revealedSecret || server.access_secret_masked || "••••••") : "siehe Hinweis"}</div>
+                  <div className="tls-type-label text-[#FFD700]">{server.access_label || secretLabels[server.access_secret_kind] || "Zugang"}</div>
+                  <div className="font-mono tls-type-small text-white/70 mt-1 break-all">{server.has_access_secret ? (revealedSecret || server.access_secret_masked || "••••••") : "siehe Hinweis"}</div>
                 </div>
                 {server.has_access_secret && (
                   <div className="shrink-0 flex flex-wrap gap-2">
-                    <button type="button" onClick={revealSecret} disabled={secretLoading} className="tls-btn tls-btn--quiet inline-flex items-center gap-2 px-3 py-2 rounded-sm text-xs font-bold uppercase tracking-wider disabled:opacity-50" title="Zugang 10 Sekunden anzeigen">
+                    <button type="button" onClick={revealSecret} disabled={secretLoading} className="tls-btn tls-btn--quiet inline-flex items-center gap-2 px-3 py-2 rounded-sm tls-type-label disabled:opacity-50" title="Zugang 10 Sekunden anzeigen">
                       <Eye className="w-3.5 h-3.5" /> Anzeigen
                     </button>
-                    <button type="button" onClick={copySecret} disabled={secretLoading} className="tls-btn tls-btn--secondary inline-flex items-center gap-2 px-3 py-2 rounded-sm text-xs font-bold uppercase tracking-wider disabled:opacity-50">
+                    <button type="button" onClick={copySecret} disabled={secretLoading} className="tls-btn tls-btn--secondary inline-flex items-center gap-2 px-3 py-2 rounded-sm tls-type-label disabled:opacity-50">
                       <KeyRound className="w-3.5 h-3.5" /> Kopieren
                     </button>
                   </div>
@@ -355,22 +352,22 @@ function ServerCard({ server }) {
           )}
           <div className="flex gap-2 flex-wrap">
             {server.connect_url && (
-              <a href={server.connect_url} target="_blank" rel="noreferrer" className="tls-btn tls-btn--secondary inline-flex items-center gap-2 px-3 py-2 rounded-sm text-xs font-bold uppercase tracking-wider">
+              <a href={server.connect_url} target="_blank" rel="noreferrer" className="tls-btn tls-btn--secondary inline-flex items-center gap-2 px-3 py-2 rounded-sm tls-type-label">
                 Verbinden <ExternalLink className="w-3.5 h-3.5" />
               </a>
             )}
             {server.map_url && (
-              <a href={server.map_url} target="_blank" rel="noreferrer" className="tls-btn tls-btn--secondary inline-flex items-center gap-2 px-3 py-2 rounded-sm text-xs font-bold uppercase tracking-wider">
+              <a href={server.map_url} target="_blank" rel="noreferrer" className="tls-btn tls-btn--secondary inline-flex items-center gap-2 px-3 py-2 rounded-sm tls-type-label">
                 Karte <Map className="w-3.5 h-3.5" />
               </a>
             )}
             {server.external_status_url && (
-              <a href={server.external_status_url} target="_blank" rel="noreferrer" className="tls-btn tls-btn--quiet inline-flex items-center gap-2 px-3 py-2 rounded-sm text-xs font-bold uppercase tracking-wider">
+              <a href={server.external_status_url} target="_blank" rel="noreferrer" className="tls-btn tls-btn--quiet inline-flex items-center gap-2 px-3 py-2 rounded-sm tls-type-label">
                 Status <ExternalLink className="w-3.5 h-3.5" />
               </a>
             )}
             {server.rules_url && (
-              <a href={server.rules_url} target="_blank" rel="noreferrer" className="tls-btn tls-btn--quiet inline-flex items-center gap-2 px-3 py-2 rounded-sm text-xs font-bold uppercase tracking-wider">
+              <a href={server.rules_url} target="_blank" rel="noreferrer" className="tls-btn tls-btn--quiet inline-flex items-center gap-2 px-3 py-2 rounded-sm tls-type-label">
                 Regeln
               </a>
             )}
@@ -401,8 +398,8 @@ function MaintenanceTape({ text }) {
 function Info({ label, value }) {
   return (
     <div className="min-w-0 border-t border-white/10 pt-2">
-      <div className="text-[10px] uppercase tracking-widest text-white/35 font-bold">{label}</div>
-      <div className="mt-1 text-white/75 truncate text-sm">{value || "-"}</div>
+      <div className="tls-type-label text-quiet">{label}</div>
+      <div className="mt-1 text-white/75 truncate tls-type-small">{value || "-"}</div>
     </div>
   );
 }

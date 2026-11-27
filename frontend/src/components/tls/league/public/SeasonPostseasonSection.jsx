@@ -27,14 +27,14 @@ function Head({ row, divisionLabel, titleId }) {
   return (
     <div className="flex flex-wrap items-end justify-between gap-3">
       <div className="min-w-0">
-        <h3 id={titleId} className="flex items-center gap-2 font-heading text-xl font-black uppercase md:text-2xl">
+        <h3 id={titleId} className="flex items-center gap-2 tls-type-section">
           <Swords className="h-4 w-4 shrink-0 tls-league-accent" aria-hidden="true" /> <span className="[overflow-wrap:anywhere]">{label}</span>
-          {row.closed ? <span className="rounded-sm border border-white/15 px-2 py-0.5 text-[11px] font-bold uppercase tracking-wider text-white/60">Endstand</span> : null}
+          {row.closed ? <span className="rounded-sm border border-white/15 px-2 py-0.5 tls-type-label text-white/60">Endstand</span> : null}
         </h3>
-        <p className="mt-1 max-w-2xl text-sm text-white/60">{NOTE[row.kind]}</p>
+        <p className="mt-1 max-w-2xl tls-type-small text-white/60">{NOTE[row.kind]}</p>
       </div>
       {row.slug ? (
-        <Link to={`/tournaments/${row.slug}/bracket`} className="tls-btn tls-btn--quiet inline-flex min-h-11 shrink-0 items-center gap-1.5 rounded-sm px-3 text-xs font-bold uppercase tracking-wider"
+        <Link to={`/tournaments/${row.slug}/bracket`} className="tls-btn tls-btn--quiet inline-flex min-h-11 shrink-0 items-center gap-1.5 rounded-sm px-3 tls-type-label"
           data-testid={`league-postseason-link-${row.tournament_id}`} aria-label={`${label} ${divisionLabel}: alle Spiele`}>
           Alle Spiele <ArrowRight className="h-3.5 w-3.5" aria-hidden="true" />
         </Link>
@@ -57,10 +57,10 @@ function PlayoffTree({ row }) {
   }, [row.tournament_id]);
   useEffect(() => { load(); }, [load]);
   useLiveRefresh(load, ["tournaments", "matches"], { fallbackMs: 15000, tournamentId: row.tournament_id });
-  const waiting = <p className="text-sm text-white/45" aria-busy="true">Lade {kindLabel(row)} …</p>;
+  const waiting = <p className="tls-type-small text-white/45" aria-busy="true">Lade {kindLabel(row)} …</p>;
   return (
     <div className="mt-4 min-w-0">
-      {failed && !data ? <p className="text-sm text-white/55" role="status">Der Baum ließ sich gerade nicht laden.</p> : null}
+      {failed && !data ? <p className="tls-type-small text-white/55" role="status">Der Baum ließ sich gerade nicht laden.</p> : null}
       {!data && !failed ? waiting : null}
       {data ? <Suspense fallback={waiting}><BracketTree data={data} compact quietSections /></Suspense> : null}
     </div>
@@ -71,10 +71,10 @@ function PairTeam({ side, home = false }) {
   return (
     <div className="flex items-center gap-3 px-3 py-2.5" data-won={side.won ? "true" : undefined}>
       <span className="min-w-0 flex-1">
-        <span className="block text-[11px] font-bold uppercase tracking-wider text-white/50">{side.division_label}{home ? " · Heim" : ""}</span>
+        <span className="block tls-type-label text-white/50">{side.division_label}{home ? " · Heim" : ""}</span>
         <span className={`block [overflow-wrap:anywhere] ${side.won ? "font-bold text-white" : "font-medium text-white/85"}`}>{side.display_name}</span>
       </span>
-      {side.score !== null && side.score !== undefined ? <span className={`shrink-0 font-display text-lg font-bold tabular-nums ${side.won ? "tls-league-accent" : "text-white/60"}`}>{side.score}</span> : null}
+      {side.score !== null && side.score !== undefined ? <span className={`shrink-0 tls-type-card tls-type-num ${side.won ? "tls-league-accent" : "text-white/60"}`}>{side.score}</span> : null}
     </div>
   );
 }
@@ -82,7 +82,7 @@ function PairTeam({ side, home = false }) {
 /** Die Paarungen der Relegation: oben das Team der oberen Liga (Heim), darunter das der unteren - mit Ergebnis, sobald es eines gibt. */
 function RelegationPairs({ row }) {
   const pairs = row.pairs || [];
-  if (!pairs.length) return <p className="mt-4 text-sm text-white/55">Die Paarungen stehen noch nicht fest.</p>;
+  if (!pairs.length) return <p className="mt-4 tls-type-small text-white/55">Die Paarungen stehen noch nicht fest.</p>;
   return (
     <ul className="mt-4 grid gap-3 sm:grid-cols-2" aria-label="Paarungen der Relegation" data-testid={`league-relegation-pairs-${row.tournament_id}`}>
       {pairs.map((pair) => {
@@ -91,7 +91,7 @@ function RelegationPairs({ row }) {
           <>
             <PairTeam side={pair.upper} home />
             <PairTeam side={pair.lower} />
-            <p className="px-3 py-2 text-xs text-white/60">{state}</p>
+            <p className="px-3 py-2 tls-type-small text-white/60">{state}</p>
           </>
         );
         return (

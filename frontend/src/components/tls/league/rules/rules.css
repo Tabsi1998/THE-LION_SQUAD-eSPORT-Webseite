@@ -35,7 +35,7 @@
 }
 .tls-rules-toc__head {
   margin: 1.25rem 0 0.5rem;
-  font-size: 11px;
+  font-size: var(--tls-type-label-size);
   font-weight: 700;
   letter-spacing: 0.18em;
   text-transform: uppercase;
@@ -53,7 +53,7 @@
   color: rgba(255, 255, 255, 0.68);
   transition: color var(--tls-motion-fast) var(--tls-ease), border-color var(--tls-motion-fast) var(--tls-ease);
 }
-.tls-rules-toc__link[data-level="2"] { padding-left: 1.5rem; font-size: 0.8125rem; }
+.tls-rules-toc__link[data-level="2"] { padding-left: 1.5rem; font-size: var(--tls-type-small-size); }
 .tls-rules-toc__link:hover, .tls-rules-toc__link:focus-visible { color: #fff; border-left-color: rgba(255, 255, 255, 0.45); outline: none; }
 .tls-rules-toc__link[aria-current="location"] { color: #fff; font-weight: 600; border-left-color: rgb(var(--league-accent-rgb, var(--tls-brand-rgb))); }
 @media (max-width: 1023px) { .tls-rules-toc__link { margin-left: 0; padding-top: 0.55rem; padding-bottom: 0.55rem; } }
@@ -87,7 +87,7 @@
 }
 .tls-rules-search::placeholder { color: rgba(255, 255, 255, 0.5); }
 .tls-rules-search:focus-visible { outline: 2px solid rgb(var(--league-accent-rgb, var(--tls-brand-rgb))); outline-offset: 1px; }
-.tls-rules-search__count { font-size: 0.8125rem; font-variant-numeric: tabular-nums; color: rgba(255, 255, 255, 0.72); white-space: nowrap; }
+.tls-rules-search__count { font-size: var(--tls-type-small-size); font-variant-numeric: tabular-nums; color: rgba(255, 255, 255, 0.72); white-space: nowrap; }
 ::highlight(tls-rules-hit) { background-color: rgba(255, 215, 0, 0.3); color: #fff; }
 ::highlight(tls-rules-hit-active) { background-color: #ffd700; color: #0a0a0a; }
 
@@ -133,7 +133,7 @@
 .tls-rules-doc .prose-cms p:is(:has(+ ul > li > u):has(> em), :has(> img[alt="Klassen-Symbol"]:first-child), :has(> em:first-child + strong)) {
   margin-top: 1.1rem;
   margin-bottom: 0.5rem;
-  font-size: 0.8125rem;
+  font-size: var(--tls-type-small-size);
   color: rgba(255, 255, 255, 0.72);
 }
 .tls-rules-doc .prose-cms p:is(:has(+ ul > li > u):has(> em), :has(> img[alt="Klassen-Symbol"]:first-child), :has(> em:first-child + strong)) > em:first-of-type {
@@ -236,7 +236,7 @@
   border-bottom: 1px solid rgba(255, 255, 255, 0.1);
 }
 .tls-rules-doc .prose-cms .prose-cms-table[data-gear-table] th {
-  font-size: 0.6875rem;
+  font-size: var(--tls-type-label-size);
   font-weight: 700;
   letter-spacing: 0.1em;
   text-transform: uppercase;
@@ -265,12 +265,12 @@
   font-weight: 600;
   color: #ff9f0a;
 }
-.tls-rules-doc .prose-cms .prose-cms-table[data-gear-table] td:nth-child(3) { font-size: 0.8125rem; line-height: 1.45; color: rgba(255, 255, 255, 0.78); }
+.tls-rules-doc .prose-cms .prose-cms-table[data-gear-table] td:nth-child(3) { font-size: var(--tls-type-small-size); line-height: 1.45; color: rgba(255, 255, 255, 0.78); }
 .tls-rules-doc .prose-cms .prose-cms-table[data-gear-table] td:nth-child(3) > u { display: block; text-decoration: none; }
 .tls-rules-doc .prose-cms .prose-cms-table[data-gear-table] td:nth-child(3) > u > em { font-style: normal; font-weight: 600; color: rgba(255, 255, 255, 0.55); }
 .tls-rules-doc .prose-cms .prose-cms-table[data-gear-table] td:nth-child(3) > :is(strong, em):not(:only-child) {
   display: block;
-  font-size: 0.6875rem;
+  font-size: var(--tls-type-label-size);
   font-style: normal;
   font-weight: 700;
   letter-spacing: 0.1em;
@@ -280,7 +280,7 @@
 .tls-rules-doc .prose-cms .prose-cms-table[data-gear-table] td:nth-child(3) > strong { color: #ff9f0a; }
 .tls-rules-doc .prose-cms .prose-cms-table[data-gear-table] td:nth-child(3) > em { font-style: normal; color: var(--tls-rules-new, #7ee2a8); }
 /* Kopf einer Waffenklasse: wie die Zwischenzeile der Karten - Name in Akzentfarbe, „nicht erlaubt“ orange. */
-.tls-rules-doc .prose-cms .prose-cms-table[data-gear-table] tr:not(:has(> td:nth-child(2) > u)) > td { background: rgba(255, 255, 255, 0.035); font-size: 0.8125rem; }
+.tls-rules-doc .prose-cms .prose-cms-table[data-gear-table] tr:not(:has(> td:nth-child(2) > u)) > td { background: rgba(255, 255, 255, 0.035); font-size: var(--tls-type-small-size); }
 .tls-rules-doc .prose-cms .prose-cms-table[data-gear-table] tr:not(:has(> td:nth-child(2) > u)) > td:nth-child(2) > em {
   font-style: normal;
   font-weight: 700;
@@ -354,7 +354,7 @@
   border: 1px solid var(--tls-rules-mark);
   border-radius: 2px;
   padding: 0.05rem 0.4rem;
-  font-size: 11px;
+  font-size: var(--tls-type-label-size);
   font-weight: 700;
   letter-spacing: 0.08em;
   text-transform: uppercase;
@@ -399,7 +399,7 @@
   padding: 1rem;
 }
 .tls-rules-changes__row { display: flex; flex-wrap: wrap; gap: 0.15rem 0.5rem; padding: 0.2rem 0; font-size: 0.9375rem; line-height: 1.45; overflow-wrap: anywhere; }
-.tls-rules-changes__word { flex: none; min-width: 4.75rem; font-size: 0.8125rem; font-weight: 700; color: rgba(255, 255, 255, 0.72); }
+.tls-rules-changes__word { flex: none; min-width: 4.75rem; font-size: var(--tls-type-small-size); font-weight: 700; color: rgba(255, 255, 255, 0.72); }
 .tls-rules-changes a { color: #fff; text-decoration: underline; text-underline-offset: 0.18em; }
 .tls-rules-changes a:hover { color: rgb(var(--league-accent-rgb, var(--tls-brand-rgb))); }
 
@@ -435,5 +435,5 @@
 .tls-rules-ops ins, .tls-rules-ops del { padding: 0 0.15em; border-radius: 2px; }
 .tls-rules-ops ins { color: var(--tls-rules-new); text-decoration: underline; text-decoration-thickness: 2px; text-underline-offset: 0.18em; background: rgba(126, 226, 168, 0.1); }
 .tls-rules-ops del { color: var(--tls-rules-gone); text-decoration: line-through; text-decoration-thickness: 2px; background: rgba(255, 154, 145, 0.1); }
-.tls-rules-status { margin-left: 0.5rem; font-family: inherit; font-size: 11px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: rgba(255, 255, 255, 0.72); }
+.tls-rules-status { margin-left: 0.5rem; font-family: inherit; font-size: var(--tls-type-label-size); font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: rgba(255, 255, 255, 0.72); }
 .tls-rules-compare__legend { margin-bottom: 1.5rem; font-size: 0.875rem; color: rgba(255, 255, 255, 0.72); }

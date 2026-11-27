@@ -33,7 +33,7 @@ export function AccountLevelPill({ level, className = "" }) {
   const tier = accountLevelTier(level);
   return (
     <span
-      className={`inline-flex items-center gap-1 px-2 py-0.5 border text-[10px] uppercase tracking-widest rounded-sm font-bold ${className}`}
+      className={`inline-flex items-center gap-1 px-2 py-0.5 border tls-type-label rounded-sm ${className}`}
       style={{ color: tier.color, borderColor: `${tier.color}66`, backgroundColor: `${tier.color}12` }}
     >
       <Zap className="w-3 h-3" /> Level {Number(level || 1)} · {tier.title}
@@ -62,7 +62,7 @@ export function AccountLevelProgress({ level, points = 0, nextLevelPoints = 100,
             )}
           </motion.div>
           <div className="flex-1 min-w-0">
-            <div className="flex items-center justify-between text-[10px] uppercase tracking-widest text-white/45 font-bold">
+            <div className="flex items-center justify-between tls-type-label text-white/45">
               <span style={{ color: tier.color }} data-testid="account-level-title">{title || tier.title}</span>
               <span className="tabular-nums"><CountUp value={Number(points) || 0} /> / {nextLevelPoints} {unit}</span>
             </div>

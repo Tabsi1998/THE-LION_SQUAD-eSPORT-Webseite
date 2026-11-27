@@ -92,12 +92,12 @@ export function EventDaysSection({ value, onChange, locations, startDate, endDat
     onChange([...days, emptyDay(shiftDate(last?.date, 1), last?.start || "", last?.end || "")]);
   };
   const error = daysFormError(days);
-  const input = "w-full bg-[#0A0A0A] border border-white/10 px-2 py-2 rounded-sm text-sm min-w-0";
-  const label = "uppercase tracking-widest text-white/45 font-bold mb-1 text-[10px]";
+  const input = "w-full bg-[#0A0A0A] border border-white/10 px-2 py-2 rounded-sm tls-type-small min-w-0";
+  const label = "tls-type-label text-white/45 mb-1";
 
   return (
     <div className="space-y-3" data-testid="event-days">
-      <label className="flex items-start gap-2 text-sm text-white/75">
+      <label className="flex items-start gap-2 tls-type-small text-white/75">
         <input
           type="checkbox"
           checked={enabled}
@@ -108,14 +108,14 @@ export function EventDaysSection({ value, onChange, locations, startDate, endDat
         />
         <span>
           Mehrere Tage mit eigenen Zeiten
-          <span className="block text-xs text-white/45">Für ein Wochenende oder eine Woche: jeder Tag mit Beginn, Ende und Einlass. Start und Ende des Events ergeben sich aus dem ersten und letzten Tag.</span>
+          <span className="block tls-type-small text-white/45">Für ein Wochenende oder eine Woche: jeder Tag mit Beginn, Ende und Einlass. Start und Ende des Events ergeben sich aus dem ersten und letzten Tag.</span>
         </span>
       </label>
       {enabled && (
         <>
           {days.map((day, index) => (
             <div key={index} className="border border-white/10 rounded-sm p-3 space-y-2" data-testid={`event-day-${index}`}>
-              <div className="flex items-center justify-between gap-2 text-[11px] uppercase tracking-widest text-white/45 font-bold">
+              <div className="flex items-center justify-between gap-2 tls-type-label text-white/45">
                 <span className="inline-flex items-center gap-1.5"><CalendarDays className="w-3.5 h-3.5" style={{ color: accent }} /> Tag {index + 1}{dayLabel(day.date) ? ` · ${dayLabel(day.date)}` : ""}</span>
                 <span className="flex items-center gap-1">
                   <button type="button" onClick={() => move(index, -1)} disabled={index === 0} className="p-1.5 border border-white/10 rounded-sm disabled:opacity-30" aria-label={`Tag ${index + 1} nach oben`}><ArrowUp className="w-3.5 h-3.5" /></button>
@@ -124,13 +124,13 @@ export function EventDaysSection({ value, onChange, locations, startDate, endDat
                 </span>
               </div>
               <div className="grid grid-cols-3 gap-2">
-                <label className="text-xs col-span-3"><div className={label}>Datum</div><input type="date" value={day.date} onChange={(ev) => setDay(index, { date: ev.target.value })} className={input} data-testid={`event-day-date-${index}`} /></label>
-                <label className="text-xs"><div className={label}>Beginn</div><input type="time" value={day.start} onChange={(ev) => setDay(index, { start: ev.target.value })} className={input} data-testid={`event-day-start-${index}`} /></label>
-                <label className="text-xs"><div className={label}>Ende</div><input type="time" value={day.end} onChange={(ev) => setDay(index, { end: ev.target.value })} className={input} data-testid={`event-day-end-${index}`} /></label>
-                <label className="text-xs"><div className={label}>Einlass</div><input type="time" value={day.door} onChange={(ev) => setDay(index, { door: ev.target.value })} className={input} data-testid={`event-day-door-${index}`} /></label>
-                <label className={`text-xs ${places.length ? "col-span-2" : "col-span-3"}`}><div className={label}>Titel (optional)</div><input value={day.title} onChange={(ev) => setDay(index, { title: ev.target.value })} className={input} placeholder="Warm-up, Finaltag" data-testid={`event-day-title-${index}`} /></label>
+                <label className="tls-type-small col-span-3"><div className={label}>Datum</div><input type="date" value={day.date} onChange={(ev) => setDay(index, { date: ev.target.value })} className={input} data-testid={`event-day-date-${index}`} /></label>
+                <label className="tls-type-small"><div className={label}>Beginn</div><input type="time" value={day.start} onChange={(ev) => setDay(index, { start: ev.target.value })} className={input} data-testid={`event-day-start-${index}`} /></label>
+                <label className="tls-type-small"><div className={label}>Ende</div><input type="time" value={day.end} onChange={(ev) => setDay(index, { end: ev.target.value })} className={input} data-testid={`event-day-end-${index}`} /></label>
+                <label className="tls-type-small"><div className={label}>Einlass</div><input type="time" value={day.door} onChange={(ev) => setDay(index, { door: ev.target.value })} className={input} data-testid={`event-day-door-${index}`} /></label>
+                <label className={`tls-type-small ${places.length ? "col-span-2" : "col-span-3"}`}><div className={label}>Titel (optional)</div><input value={day.title} onChange={(ev) => setDay(index, { title: ev.target.value })} className={input} placeholder="Warm-up, Finaltag" data-testid={`event-day-title-${index}`} /></label>
                 {places.length > 0 && (
-                  <label className="text-xs"><div className={label}>Standort</div>
+                  <label className="tls-type-small"><div className={label}>Standort</div>
                     <select value={day.location_key} onChange={(ev) => setDay(index, { location_key: ev.target.value })} className={input} data-testid={`event-day-location-${index}`}>
                       <option value="">Hauptort</option>
                       {places.map((place) => <option key={place.key} value={place.key}>{place.name}</option>)}
@@ -141,12 +141,12 @@ export function EventDaysSection({ value, onChange, locations, startDate, endDat
             </div>
           ))}
           <div className="flex flex-wrap items-center justify-between gap-2">
-            <button type="button" onClick={add} className="inline-flex items-center gap-2 px-3 py-2 border border-white/15 text-white/70 hover:text-white text-xs uppercase tracking-wider font-bold rounded-sm" data-testid="event-days-add">
+            <button type="button" onClick={add} className="inline-flex items-center gap-2 px-3 py-2 border border-white/15 text-white/70 hover:text-white tls-type-label rounded-sm" data-testid="event-days-add">
               <Plus className="w-3.5 h-3.5" /> Tag
             </button>
-            {error && <div className="text-xs text-[#FF3B30]" data-testid="event-days-error">{error}</div>}
+            {error && <div className="tls-type-small text-[#FF3B30]" data-testid="event-days-error">{error}</div>}
           </div>
-          <p className="text-xs text-white/45">Endet ein Tag nach Mitternacht, trage die Endzeit einfach ein (z. B. 02:00) – sie zählt zum nächsten Morgen. Kalender und Discord bekommen je Tag einen Termin.</p>
+          <p className="tls-type-small text-white/45">Endet ein Tag nach Mitternacht, trage die Endzeit einfach ein (z. B. 02:00) – sie zählt zum nächsten Morgen. Kalender und Discord bekommen je Tag einen Termin.</p>
         </>
       )}
     </div>

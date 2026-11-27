@@ -19,14 +19,14 @@ export function SharePreviewToggle({ visibility, checked, onChange, appOnly = fa
   const selectable = !appOnly && (visibility === "members" || visibility === "community");
   return (
     <div className="border border-white/10 rounded-sm p-3 space-y-2" data-testid="share-preview">
-      <div className="text-xs font-bold uppercase tracking-widest text-white/60 inline-flex items-center gap-2"><Share2 className="w-3.5 h-3.5" /> Vorschau beim Teilen (WhatsApp, Discord …)</div>
+      <div className="tls-type-small font-bold text-white/60 inline-flex items-center gap-2"><Share2 className="w-3.5 h-3.5" /> Vorschau beim Teilen (WhatsApp, Discord …)</div>
       {selectable && (
-        <label className="flex items-center gap-2 text-sm" htmlFor="share-preview-toggle">
+        <label className="flex items-center gap-2 tls-type-small" htmlFor="share-preview-toggle">
           <input id="share-preview-toggle" type="checkbox" checked={!!checked} onChange={(e) => onChange(e.target.checked)} data-testid="share-preview-toggle" className="accent-[#29B6E8]" />
           <span>Beim Teilen Titel und Bild zeigen</span>
         </label>
       )}
-      <p className="text-xs text-white/50" data-testid="share-preview-hint">{sharePreviewHint(visibility, selectable && checked, appOnly)}</p>
+      <p className="tls-type-small text-white/50" data-testid="share-preview-hint">{sharePreviewHint(visibility, selectable && checked, appOnly)}</p>
     </div>
   );
 }

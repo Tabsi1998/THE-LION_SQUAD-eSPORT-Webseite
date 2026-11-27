@@ -58,8 +58,8 @@ export function MapPoolPanel({ tournamentId, canEdit = true }) {
     }
   };
 
-  if (error) return <p className="text-sm text-white/60" data-testid="map-pool-panel-error">{error}</p>;
-  if (!data) return <p className="text-sm text-white/50">Lade Maps …</p>;
+  if (error) return <p className="tls-type-small text-white/60" data-testid="map-pool-panel-error">{error}</p>;
+  if (!data) return <p className="tls-type-small text-white/50">Lade Maps …</p>;
   const tournamentPool = data.tournament && !data.tournament.stale ? data.tournament : null;
   // „Übernehmen von“ (#2129, SP3): andere Turniere und Liga-Seasons desselben Spiels; eine Phase zuerst vom eigenen Turnier.
   const others = Array.isArray(data.sources) ? data.sources : [];
@@ -78,20 +78,20 @@ export function MapPoolPanel({ tournamentId, canEdit = true }) {
       />
       {data.game && (data.stages || []).length ? (
         <section className="border border-white/10 rounded-sm bg-[#121212] p-4" aria-labelledby="stage-pools-heading" data-testid="stage-pools">
-          <h3 id="stage-pools-heading" className="text-[11px] font-bold uppercase tracking-widest text-[#29B6E8]">Phasen</h3>
-          <p className="mt-0.5 text-xs text-white/50">Eine Phase mit eigenem Pool, etwa ein Finale mit anderen Maps, überschreibt den des Turniers.</p>
+          <h3 id="stage-pools-heading" className="tls-type-label text-[#29B6E8]">Phasen</h3>
+          <p className="mt-0.5 tls-type-small text-white/50">Eine Phase mit eigenem Pool, etwa ein Finale mit anderen Maps, überschreibt den des Turniers.</p>
           <ul className="mt-3 space-y-2">
             {data.stages.map((row) => (
               <li key={row.stage_id} className="space-y-2">
                 <div className="flex flex-wrap items-center justify-between gap-2 border border-white/10 rounded-sm bg-[#0A0A0A] px-3 py-2" data-testid={`stage-pool-row-${row.stage_id}`}>
-                  <span className="min-w-0 text-sm text-white">
+                  <span className="min-w-0 tls-type-small text-white">
                     <span className="font-semibold">{row.name || `Phase ${row.number}`}</span>
-                    <span className="ml-2 text-xs text-white/55">{stageLine(row)}</span>
+                    <span className="ml-2 tls-type-small text-white/55">{stageLine(row)}</span>
                   </span>
                   {canEdit ? (
                     <button type="button" onClick={() => setOpen((state) => ({ ...state, [row.stage_id]: !state[row.stage_id] }))}
                       aria-expanded={Boolean(open[row.stage_id])} data-testid={`stage-pool-edit-${row.stage_id}`}
-                      className="tls-btn tls-btn--quiet px-3 py-1.5 rounded-sm text-[11px] font-bold uppercase tracking-wider">
+                      className="tls-btn tls-btn--quiet px-3 py-1.5 rounded-sm tls-type-label">
                       {open[row.stage_id] ? "Schließen" : row.pool ? "Bearbeiten" : "Eigenen Pool festlegen"}
                     </button>
                   ) : null}

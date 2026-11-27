@@ -20,13 +20,14 @@ import {
 } from "@/lib/leagueRules";
 import { changedPlaces, seasonAnchorUrl } from "@/lib/seasonTabs";
 import { viennaDate } from "@/lib/vienna";
+import { ShortCaps } from "@/components/tls/ShortCaps";
 
 const LONG_DAY = { day: "2-digit", month: "2-digit", year: "numeric" };
-const QUIET = "tls-btn tls-btn--quiet inline-flex items-center gap-1.5 rounded-sm px-3 py-1.5 text-[11px] font-bold uppercase tracking-wider disabled:opacity-50";
-const PRIMARY = "tls-btn tls-btn--primary inline-flex items-center gap-1.5 rounded-sm px-4 py-2 text-[11px] font-black uppercase tracking-wider disabled:opacity-50";
+const QUIET = "tls-btn tls-btn--quiet inline-flex items-center gap-1.5 rounded-sm px-3 py-1.5 tls-type-label disabled:opacity-50";
+const PRIMARY = "tls-btn tls-btn--primary inline-flex items-center gap-1.5 rounded-sm px-4 py-2 tls-type-label disabled:opacity-50";
 const REASON_MIN = 5;
 const ICON_BUTTON = "p-1.5 text-white/60 hover:text-[#29B6E8] focus-visible:outline focus-visible:outline-1 focus-visible:outline-[#29B6E8] rounded-sm disabled:opacity-30";
-const SUMMARY = "tls-hit flex min-h-[40px] cursor-pointer list-none items-center gap-2 text-xs font-bold uppercase tracking-wider text-[#29B6E8] [&::-webkit-details-marker]:hidden";
+const SUMMARY = "tls-hit flex min-h-[40px] cursor-pointer list-none items-center gap-2 tls-type-label text-[#29B6E8] [&::-webkit-details-marker]:hidden";
 
 /** Wo eine Variable ohne Wert ist: Bei einer Fassung der Liga zählt jede Season, die sie einfriert - auch wenn die Seite „(je Season)“ zeigt. */
 const whereEmpty = (leagueWide) => (leagueWide ? "in einer Season dieser Liga" : "in dieser Season");
@@ -39,7 +40,7 @@ function formOf(draft) {
 function DroppedAnnexes({ annexes = [], testId }) {
   if (!annexes.length) return null;
   return (
-    <p role="status" className="mb-3 break-words text-sm text-white/70" data-testid={testId}>
+    <p role="status" className="mb-3 break-words tls-type-body text-white/70" data-testid={testId}>
       {annexes.map((row) => `Anlage ${row.key}${row.title ? ` (${row.title})` : ""}`).join(", ")}{" "}
       {annexes.length === 1 ? "entfällt" : "entfallen"} auf der Seite, im PDF und im Vergleich: Sie {annexes.length === 1 ? "besteht" : "bestehen"} nur
       aus Bausteinen, die für diese Season leer sind – etwa ohne Veto-Vorlage. Mit einer Vorlage erscheint sie wieder.
@@ -51,12 +52,12 @@ function VarAlerts({ unknown = [], empty = [], leagueWide = false, testId }) {
   return (
     <>
       {unknown.length ? (
-        <p role="alert" className="mb-3 break-words text-sm text-warn" data-testid={`${testId}-unknown`}>
+        <p role="alert" className="mb-3 break-words tls-type-body text-warn" data-testid={`${testId}-unknown`}>
           Unbekannte Variable: {unknown.map((name) => `{{${name}}}`).join(", ")}. So lässt sich nichts veröffentlichen - bitte aus der Liste einfügen.
         </p>
       ) : null}
       {empty.length ? (
-        <p role="status" className="mb-3 break-words text-sm text-white/70" data-testid={`${testId}-empty`}>
+        <p role="status" className="mb-3 break-words tls-type-small text-white/70" data-testid={`${testId}-empty`}>
           Ohne Wert {whereEmpty(leagueWide)}, im Text steht „(nicht festgelegt)“: {empty.map((name) => `{{${name}}}`).join(", ")}.
         </p>
       ) : null}
@@ -77,8 +78,8 @@ function PendingRelease({ changes, proposal, hasDraft, busy, today, leagueWide, 
       <div className="flex items-start gap-3">
         <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-warn" aria-hidden="true" />
         <div className="min-w-0 flex-1">
-          <h2 id="rules-pending-title" className="font-heading text-lg font-black uppercase text-white">Regelwerk muss freigegeben werden</h2>
-          <p className="mt-1 text-sm text-white/75">
+          <h2 id="rules-pending-title" className="tls-type-section text-white">Regelwerk muss freigegeben werden</h2>
+          <p className="mt-1 tls-type-body text-white/75">
             Seit {changes.label} haben sich Werte geändert, die im Regelwerk stehen ({changedPlaces(changes.rows)}). {changes.label} zeigt weiter den Stand von damals,
             bis du eine neue Fassung freigibst. Von selbst geht nichts raus.
           </p>
@@ -87,8 +88,8 @@ function PendingRelease({ changes, proposal, hasDraft, busy, today, leagueWide, 
       <ul className="mt-4 space-y-3">
         {changes.rows.map((row) => (
           <li key={`${row.season_id}-${row.kind}-${row.block}`} className="rounded-sm border border-white/10 bg-[#0A0A0A] p-3" data-testid={`rules-change-${row.kind || "block"}-${row.block}`}>
-            <p className="mb-1 flex flex-wrap items-center gap-x-2 text-xs font-bold text-white/70">
-              <span className="rounded-sm border border-white/15 px-1.5 py-0.5 text-[10px] uppercase tracking-wider text-white/55">{CHANGE_KIND_WORDS[row.kind] || CHANGE_KIND_WORDS.block}</span>
+            <p className="mb-1 flex flex-wrap items-center gap-x-2 tls-type-small font-bold text-white/70">
+              <span className="rounded-sm border border-white/15 px-1.5 py-0.5 tls-type-label text-white/55">{CHANGE_KIND_WORDS[row.kind] || CHANGE_KIND_WORDS.block}</span>
               {/* Die Marke einer Variable bleibt, wie sie im Text steht - nicht in Großbuchstaben. */}
               <span className={`min-w-0 break-words ${row.kind === "variable" ? "font-mono font-normal text-white/85" : "uppercase tracking-wider"}`}>{row.label}</span>
               <span className="text-white/45">· {row.season_name}{row.status === "missing" ? " · noch nicht festgehalten" : ""}</span>
@@ -98,14 +99,14 @@ function PendingRelease({ changes, proposal, hasDraft, busy, today, leagueWide, 
         ))}
       </ul>
       {hasDraft ? (
-        <p className="mt-4 text-sm text-white/75" data-testid="rules-pending-draft">Der Entwurf unten nimmt beim Veröffentlichen den neuen Stand - prüfen, dann veröffentlichen.</p>
+        <p className="mt-4 tls-type-body text-white/75" data-testid="rules-pending-draft">Der Entwurf unten nimmt beim Veröffentlichen den neuen Stand - prüfen, dann veröffentlichen.</p>
       ) : null}
       {!hasDraft && proposal ? (
         <div className="mt-5 space-y-4" data-testid="rules-proposal">
           {/* Erst die Freigabe, darunter die ganze neue Fassung zum Prüfen - bei langen Regelwerken sonst ein weiter Weg zum Knopf. */}
           <div className="rounded-sm border border-white/10 bg-[#121212] p-4" data-testid="rules-approve">
-            <p className="text-sm font-semibold text-white">Prüfen und freigeben</p>
-            <p className="mt-1 text-sm text-white/65">
+            <p className="tls-type-small font-semibold text-white">Prüfen und freigeben</p>
+            <p className="mt-1 tls-type-body text-white/65">
               Die neue Fassung übernimmt den Text von {changes.label} und die Werte von heute - sie steht darunter zum Prüfen, geänderte Abschnitte sind markiert.
               Zum Anpassen des Texts vorher „Text vorher anpassen“.
             </p>
@@ -158,21 +159,21 @@ function VariablePalette({ variables, onInsert }) {
           className="mb-3 w-full rounded-sm border border-white/10 bg-[#121212] px-3 py-2 text-sm text-white placeholder:text-white/35 focus:border-[#29B6E8] focus:outline-none" data-testid="rules-variables-search" />
         {groups.length ? groups.map((group) => (
           <div key={group.name} className="mb-3 last:mb-0">
-            <p className="mb-1.5 text-[11px] font-bold uppercase tracking-wider text-white/50">{group.name}</p>
+            <p className="mb-1.5 tls-type-small font-bold text-white/50">{group.name}</p>
             <ul className="grid gap-1.5 sm:grid-cols-2">
               {group.rows.map((row) => (
                 <li key={row.name}>
                   <button type="button" onClick={() => onInsert(row.token)} title={row.hint || row.label} data-testid={`rules-var-${row.name}`}
                     className="tls-hit flex w-full min-w-0 flex-col items-start rounded-sm border border-white/10 px-2.5 py-1.5 text-left hover:border-[#29B6E8]/60 focus-visible:outline focus-visible:outline-1 focus-visible:outline-[#29B6E8]">
-                    <span className="text-sm text-white">{row.label}</span>
-                    <span className="font-mono text-[11px] text-white/45">{row.token}</span>
-                    <span className={`break-words text-xs ${row.value == null ? "text-warn" : "text-[#29B6E8]"}`}>{variableValueText(row)}</span>
+                    <span className="tls-type-small text-white">{row.label}</span>
+                    <span className="font-mono tls-type-small text-white/45">{row.token}</span>
+                    <span className={`break-words tls-type-small ${row.value == null ? "text-warn" : "text-[#29B6E8]"}`}>{variableValueText(row)}</span>
                   </button>
                 </li>
               ))}
             </ul>
           </div>
-        )) : <p className="text-sm text-white/50">Keine Variable passt zur Suche.</p>}
+        )) : <p className="tls-type-small text-white/50">Keine Variable passt zur Suche.</p>}
       </div>
     </details>
   );
@@ -183,13 +184,13 @@ function RulesHelp({ blocks, variables }) {
   return (
     <details className="group rounded-sm border border-white/10 bg-[#0A0A0A]" data-testid="rules-help">
       <summary className={`${SUMMARY} px-3`}>Hilfe: alle Bausteine und Variablen</summary>
-      <div className="space-y-4 border-t border-white/10 p-3 text-sm">
+      <div className="space-y-4 border-t border-white/10 p-3 tls-type-small">
         <p className="text-white/70">
           Ein Baustein steht als eigener Absatz (Tabelle oder Liste), eine Variable mitten im Satz. Beide kommen aus den Einstellungen der Season und werden beim
           Veröffentlichen eingefroren. Ändert sich danach eine Einstellung, bleibt die Fassung, wie sie ist, und die Seite zeigt „Regelwerk muss freigegeben werden“.
         </p>
         <div className="tls-swipe pb-0">
-          <table className="w-full text-left text-xs">
+          <table className="w-full text-left tls-type-small">
             <thead><tr className="text-white/50"><th className="py-1 pr-3 font-bold uppercase tracking-wider">Baustein</th><th className="py-1 pr-3 font-bold uppercase tracking-wider">Marke</th><th className="py-1 font-bold uppercase tracking-wider">Inhalt</th></tr></thead>
             <tbody>
               {blocks.map((block) => (
@@ -203,7 +204,7 @@ function RulesHelp({ blocks, variables }) {
           </table>
         </div>
         <div className="tls-swipe pb-0">
-          <table className="w-full text-left text-xs">
+          <table className="w-full text-left tls-type-small">
             <thead><tr className="text-white/50"><th className="py-1 pr-3 font-bold uppercase tracking-wider">Variable</th><th className="py-1 pr-3 font-bold uppercase tracking-wider">Marke</th><th className="py-1 font-bold uppercase tracking-wider">Wert heute</th></tr></thead>
             <tbody>
               {(variables || []).map((row) => (
@@ -238,7 +239,7 @@ function Versions({ view }) {
                 <a className={QUIET} href={`${API}${base}/versions/${row.id}/pdf`} target="_blank" rel="noopener noreferrer">PDF</a>
               </span>
             </div>
-            <p className="mt-1 break-words text-sm text-white/70">{row.change_reason}</p>
+            <p className="mt-1 break-words tls-type-small text-white/70">{row.change_reason}</p>
           </li>
         ))}
       </ul>
@@ -252,7 +253,7 @@ function Consents({ consents }) {
       {consents.rows.length ? (
         <ul className="divide-y divide-white/5">
           {consents.rows.map((row) => (
-            <li key={row.squad_id} className="flex flex-wrap items-center justify-between gap-2 py-2 text-sm" data-testid={`rules-consent-row-${row.squad_id}`}>
+            <li key={row.squad_id} className="flex flex-wrap items-center justify-between gap-2 py-2 tls-type-small" data-testid={`rules-consent-row-${row.squad_id}`}>
               <span className="min-w-0 break-words text-white">{row.team_name || row.squad_name}</span>
               <span className={row.agreed ? "text-white/70" : "font-semibold text-warn"}>
                 {row.agreed ? `zugestimmt am ${viennaDate(row.agreed_at, LONG_DAY)}${row.agreed_by ? ` von ${row.agreed_by}` : ""}` : "offen"}
@@ -260,7 +261,7 @@ function Consents({ consents }) {
             </li>
           ))}
         </ul>
-      ) : <p className="text-sm text-white/60">Es ist noch kein Co-Team zugeteilt.</p>}
+      ) : <p className="tls-type-small text-white/60">Es ist noch kein Co-Team zugeteilt.</p>}
     </FormSection>
   );
 }
@@ -390,16 +391,16 @@ export default function AdminLeagueRulesPage() {
   const canPublish = publish.change_reason.trim().length >= REASON_MIN && publish.valid_from && !busy && (!emptyVars.length || publish.confirm_empty);
   return (
     <AdminLayout>
-      <Link to={back} data-testid="rules-back" className="inline-flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider text-white/50 hover:text-[#29B6E8]">
+      <Link to={back} data-testid="rules-back" className="inline-flex items-center gap-1.5 tls-type-small font-bold text-white/50 hover:text-[#29B6E8]">
         <ArrowLeft className="h-3.5 w-3.5" aria-hidden="true" /> {view?.season ? view.season.name : seasonId ? "Season" : "Liga"}
       </Link>
-      {error ? <p role="alert" className="mt-6 text-sm text-warn">{error}</p> : null}
+      {error ? <p role="alert" className="mt-6 tls-type-small text-warn">{error}</p> : null}
       {view ? (
         <>
           <div className="mb-6 mt-3 flex flex-wrap items-end justify-between gap-3">
             <div className="min-w-0">
-              <h1 className="font-heading text-3xl font-black uppercase break-words md:text-4xl">Regelwerk</h1>
-              <p className="mt-1 text-sm text-white/60">
+              <h1 className="tls-type-title break-words"><ShortCaps>Regelwerk</ShortCaps></h1>
+              <p className="mt-1 tls-type-small text-white/60">
                 {view.league.name}{view.season ? ` · ${view.season.name}` : " · liga-weit, gilt für jede Season ohne eigenes"}
               </p>
             </div>
@@ -414,7 +415,7 @@ export default function AdminLeagueRulesPage() {
 
           {view.inherited && !editing ? (
             <section className="mb-6 rounded-sm border border-white/10 bg-[#121212] p-4" data-testid="rules-inherited">
-              <p className="text-sm text-white/85">Diese Season nutzt {view.inherited.label}, solange sie kein eigenes hat.</p>
+              <p className="tls-type-small text-white/85">Diese Season nutzt {view.inherited.label}, solange sie kein eigenes hat.</p>
               <div className="mt-3 flex flex-wrap gap-2">
                 <Link className={QUIET} to={`/admin/leagues/rules/league/${view.league.id}`}>Regelwerk der Liga</Link>
                 <button type="button" className={QUIET} disabled={busy} onClick={onPrepare}>Eigenes Regelwerk anlegen</button>
@@ -437,14 +438,14 @@ export default function AdminLeagueRulesPage() {
                 <FormSection title="Entwurf" hint="Jede Überschrift wird ein Abschnitt mit eigenem Link. Bleibt sie gleich, bleibt auch der Link." testId="rules-draft">
                   <TextField label="Titel" value={form.title} onChange={(value) => change({ title: value })} maxLength={160} placeholder="Regelwerk der Liga" testId="rules-title" />
                   <div>
-                    <p className="mb-1.5 text-xs font-bold uppercase tracking-wider text-white/60">Baustein einfügen</p>
+                    <p className="mb-1.5 tls-type-label text-white/60">Baustein einfügen</p>
                     <div className="flex flex-wrap gap-2">
                       {view.blocks.map((block) => (
                         <button key={block.key} type="button" title={block.hint} className={QUIET} data-testid={`rules-block-${block.key}`}
                           onClick={() => insert(block.token, { block: true })}>{block.label}</button>
                       ))}
                     </div>
-                    <p className="mt-1.5 text-xs text-white/50">Der Inhalt kommt aus den Einstellungen der Season und wird beim Veröffentlichen eingefroren. Eingefügt wird in den zuletzt benutzten Editor.</p>
+                    <p className="mt-1.5 tls-type-small text-white/50">Der Inhalt kommt aus den Einstellungen der Season und wird beim Veröffentlichen eingefroren. Eingefügt wird in den zuletzt benutzten Editor.</p>
                   </div>
                   <VariablePalette variables={view.variables} onInsert={(token) => insert(token, { block: false })} />
                   <RulesHelp blocks={view.blocks} variables={view.variables} />
@@ -480,21 +481,21 @@ export default function AdminLeagueRulesPage() {
                   <button type="button" className={PRIMARY} disabled={busy} onClick={onSave} data-testid="rules-save">Entwurf speichern</button>
                   <button type="button" className={QUIET} disabled={busy} onClick={onPreview} data-testid="rules-preview">Vorschau</button>
                   {view.draft ? (
-                    <button type="button" disabled={busy} onClick={onDiscard} data-testid="rules-discard" className="tls-btn tls-btn--danger rounded-sm px-3 py-1.5 text-[11px] font-bold uppercase tracking-wider disabled:opacity-50">Verwerfen</button>
+                    <button type="button" disabled={busy} onClick={onDiscard} data-testid="rules-discard" className="tls-btn tls-btn--danger rounded-sm px-3 py-1.5 tls-type-label disabled:opacity-50">Verwerfen</button>
                   ) : null}
-                  {dirty ? <span className="text-xs text-white/60" role="status">Nicht gespeichert</span> : null}
+                  {dirty ? <span className="tls-type-small text-white/60" role="status">Nicht gespeichert</span> : null}
                 </div>
 
                 {preview ? (
                   <section className="tls-rules rounded-sm border border-white/10 bg-[#0A0A0A] p-4 md:p-6" data-testid="rules-preview-panel" aria-label="Vorschau">
-                    <p className="mb-4 text-xs font-bold uppercase tracking-wider text-white/60">Vorschau mit den Daten von heute</p>
+                    <p className="mb-4 tls-type-small font-bold text-white/60">Vorschau mit den Daten von heute</p>
                     {preview.unknown_blocks?.length ? (
-                      <p role="alert" className="mb-4 text-sm text-warn">Unbekannter Baustein: {preview.unknown_blocks.join(", ")}. So lässt sich nichts veröffentlichen.</p>
+                      <p role="alert" className="mb-4 tls-type-small text-warn">Unbekannter Baustein: {preview.unknown_blocks.join(", ")}. So lässt sich nichts veröffentlichen.</p>
                     ) : null}
                     <VarAlerts unknown={preview.unknown_vars} empty={preview.empty_vars} leagueWide={leagueWide} testId="rules-preview-vars" />
                     <DroppedAnnexes annexes={preview.dropped_annexes} testId="rules-preview-dropped" />
                     {preview.foreign_images?.length ? (
-                      <p role="alert" className="mb-4 break-words text-sm text-warn" data-testid="rules-preview-foreign">Fremde Bilder lassen sich nicht speichern: {preview.foreign_images.join(", ")}. Bitte über „Hochladen“ oder die Mediathek wählen.</p>
+                      <p role="alert" className="mb-4 break-words tls-type-body text-warn" data-testid="rules-preview-foreign">Fremde Bilder lassen sich nicht speichern: {preview.foreign_images.join(", ")}. Bitte über „Hochladen“ oder die Mediathek wählen.</p>
                     ) : null}
                     <RulesChanges changes={preview.changes} versionLabel="dieser Fassung" testId="rules-preview-changes" />
                     <RulesDocument sections={preview.sections} versionLabel="dieser Fassung" testId="rules-preview-document" />
@@ -503,12 +504,12 @@ export default function AdminLeagueRulesPage() {
 
                 <FormSection title="Veröffentlichen" hint="Danach lässt sich die Fassung nicht mehr ändern, sie gilt ab dem gewählten Tag." testId="rules-publish-section">
                   {!view.draft?.carried_from && view.successor_seasons?.length ? (
-                    <p className="text-sm text-white/75" data-testid="rules-successor-seasons">
+                    <p className="tls-type-body text-white/75" data-testid="rules-successor-seasons">
                       Dieses Regelwerk gilt auch für {view.successor_seasons.map((row) => row.name).join(", ")} mit übernommenen Teams. Ändert es sich, stimmen sie neu zu – der Haken ist vorbelegt.
                     </p>
                   ) : null}
                   {view.draft?.carried_from ? (
-                    <p className="text-sm text-white/75" data-testid="rules-carried-from">
+                    <p className="tls-type-body text-white/75" data-testid="rules-carried-from">
                       Übernommen aus {view.draft.carried_from.season_name} ({view.draft.carried_from.label}). Die übernommenen Teams stimmen dieser Fassung zu, bevor sie einchecken.
                     </p>
                   ) : null}

@@ -19,9 +19,9 @@ import {
   rosterFallbackText,
 } from "@/lib/leagueRewards";
 
-const BUTTON = "tls-btn inline-flex min-h-11 items-center gap-1.5 rounded-sm px-4 py-2 text-xs font-bold uppercase tracking-wider disabled:opacity-50";
-const SMALL = "tls-btn tls-btn--quiet inline-flex min-h-9 items-center gap-1.5 rounded-sm px-3 py-1.5 text-[11px] font-bold uppercase tracking-wider";
-const SELECT = "min-h-11 w-full rounded-sm border border-white/15 bg-[#0A0A0A] px-3 text-sm text-white focus-visible:outline focus-visible:outline-1 focus-visible:outline-[#29B6E8]";
+const BUTTON = "tls-btn inline-flex min-h-11 items-center gap-1.5 rounded-sm px-4 py-2 tls-type-label disabled:opacity-50";
+const SMALL = "tls-btn tls-btn--quiet inline-flex min-h-9 items-center gap-1.5 rounded-sm px-3 py-1.5 tls-type-label";
+const SELECT = "min-h-11 w-full rounded-sm border border-white/15 bg-[#0A0A0A] px-3 tls-type-small text-white focus-visible:outline focus-visible:outline-1 focus-visible:outline-[#29B6E8]";
 
 /** Der Zustand des Formulars aus der Antwort des Servers. */
 export function rewardsToForm(body) {
@@ -57,7 +57,7 @@ function RewardRow({ item, index, onChange, onRemove, readOnly, testId, media })
           <RewardArt reward={preview} size="md" testId={`${testId}-preview-${index}`} />
         </div>
         <div className="grid min-w-0 flex-1 gap-3 md:grid-cols-2">
-          <label className="block text-[11px] font-bold uppercase tracking-widest text-white/60">
+          <label className="block tls-type-label text-white/60">
             Art
             <select value={item.kind} disabled={readOnly} onChange={(event) => set("kind", event.target.value)} className={`${SELECT} mt-1`} data-testid={`${testId}-kind-${index}`}>
               {REWARD_KINDS.map((row) => <option key={row.key} value={row.key}>{row.label}</option>)}
@@ -66,7 +66,7 @@ function RewardRow({ item, index, onChange, onRemove, readOnly, testId, media })
           <TextField label="Name" value={item.name} maxLength={NAME_MAX} disabled={readOnly} onChange={(value) => set("name", value)}
             placeholder="z. B. Goldmedaille Season 1" testId={`${testId}-name-${index}`} />
           <fieldset className="min-w-0">
-            <legend className="text-[11px] font-bold uppercase tracking-widest text-white/60">Für wen</legend>
+            <legend className="tls-type-label text-white/60">Für wen</legend>
             <div className="mt-1 flex flex-wrap items-end gap-2">
               <select value={item.places.mode} disabled={readOnly} aria-label="Platz, Platzbereich oder alle"
                 onChange={(event) => set("places", event.target.value === "rank" ? { mode: "rank", rank: 1 } : event.target.value === "range" ? { mode: "range", from: 4, to: 6 } : { mode: "all" })}
@@ -88,10 +88,10 @@ function RewardRow({ item, index, onChange, onRemove, readOnly, testId, media })
             </div>
           </fieldset>
           <fieldset className="min-w-0">
-            <legend className="text-[11px] font-bold uppercase tracking-widest text-white/60">Bekommt</legend>
+            <legend className="tls-type-label text-white/60">Bekommt</legend>
             <div className="mt-1 flex flex-wrap gap-x-4 gap-y-1">
               {[["team", "Team"], ["players", "Spieler"]].map(([key, label]) => (
-                <label key={key} className="inline-flex min-h-11 cursor-pointer items-center gap-2 text-sm text-white/85">
+                <label key={key} className="inline-flex min-h-11 cursor-pointer items-center gap-2 tls-type-small text-white/85">
                   <input type="checkbox" checked={item.recipients.includes(key)} disabled={readOnly} onChange={() => toggle(key)}
                     className="h-4 w-4 accent-[var(--tls-cyan)]" data-testid={`${testId}-to-${key}-${index}`} />
                   {label}
@@ -106,7 +106,7 @@ function RewardRow({ item, index, onChange, onRemove, readOnly, testId, media })
           {readOnly ? null : (
             // Eigenes Bild nur auf Wunsch aufgeklappt - sonst bleibt jede Zeile kurz (offen, wenn schon eines gewählt ist).
             <details className="md:col-span-2 group" open={Boolean(item.image_url)} data-testid={`${testId}-image-box-${index}`}>
-              <summary className="cursor-pointer select-none text-[11px] font-bold uppercase tracking-widest text-white/60 hover:text-white min-h-9 flex items-center">
+              <summary className="cursor-pointer select-none tls-type-small font-bold text-white/60 hover:text-white min-h-9 flex items-center">
                 Eigenes Bild (freiwillig, sonst Lionsquad-Vorlage){item.image_url ? " · gewählt" : ""}
               </summary>
               <div className="mt-2">
@@ -123,7 +123,7 @@ function RewardRow({ item, index, onChange, onRemove, readOnly, testId, media })
           </button>
         )}
       </div>
-      {problem ? <p className="mt-2 text-xs text-warn" role="alert" data-testid={`${testId}-problem-${index}`}>{problem}</p> : null}
+      {problem ? <p className="mt-2 tls-type-small text-warn" role="alert" data-testid={`${testId}-problem-${index}`}>{problem}</p> : null}
     </li>
   );
 }
@@ -140,7 +140,7 @@ export function RewardList({ items, onChange, readOnly, testId, emptyText }) {
               onRemove={() => onChange(items.filter((_, at) => at !== index))} />
           ))}
         </ul>
-      ) : <p className="text-sm text-white/55" data-testid={`${testId}-empty`}>{emptyText}</p>}
+      ) : <p className="tls-type-body text-white/55" data-testid={`${testId}-empty`}>{emptyText}</p>}
       {readOnly || items.length >= REWARD_LIMIT ? null : (
         <button type="button" onClick={() => onChange([...items, emptyReward(items.length)])} className={SMALL} data-testid={`${testId}-add`}>
           <Plus className="h-3.5 w-3.5" aria-hidden="true" /> Belohnung hinzufügen
@@ -156,14 +156,14 @@ function StaffelState({ row }) {
       : row.awards ? `${row.awards} vergeben · ${row.teams} ${row.teams === 1 ? "Team" : "Teams"} · ${row.players} Spieler · Fassung ${row.version}`
         : "Abgeschlossen – nichts vergeben";
   return (
-    <li className="text-sm" data-testid={`rewards-staffel-${row.tournament_id}`}>
+    <li className="tls-type-small" data-testid={`rewards-staffel-${row.tournament_id}`}>
       <span className="flex flex-wrap items-baseline justify-between gap-2">
         <span className="font-semibold text-white">Staffel {row.staffel}</span>
         <span className={row.closed && row.awards && !row.suspended ? "text-[#29B6E8]" : "text-white/55"}>{text}</span>
       </span>
       {/* Nr. 167: ohne gemeldete Aufstellung ging die Spieler-Belohnung an den Kader. */}
       {row.closed && !row.suspended && row.roster_fallback?.length ? (
-        <span className="mt-1 block text-xs text-warn" data-testid={`rewards-fallback-${row.tournament_id}`}>
+        <span className="mt-1 block tls-type-small text-warn" data-testid={`rewards-fallback-${row.tournament_id}`}>
           {rosterFallbackText(row.roster_fallback)}
         </span>
       ) : null}
@@ -194,7 +194,7 @@ export function SeasonRewardsTab({ seasonId }) {
   const dirty = Boolean(form) && JSON.stringify(rewardsPayload(form)) !== saved;
   const problem = form ? [listProblem(form.items), ...Object.values(form.divisions).map((rows) => (rows ? listProblem(rows) : ""))].find(Boolean) || "" : "";
 
-  if (error && !data) return <p className="text-sm text-warn" role="alert" data-testid="season-rewards-error">{error}</p>;
+  if (error && !data) return <p className="tls-type-small text-warn" role="alert" data-testid="season-rewards-error">{error}</p>;
   if (!data || !form) return <div className="h-40 animate-pulse rounded-sm bg-white/5" aria-busy="true" aria-label="Lade Belohnungen" />;
   const readOnly = !data.can_edit;
 
@@ -220,9 +220,9 @@ export function SeasonRewardsTab({ seasonId }) {
     <div className="space-y-6" data-testid="season-rewards">
       <FormSection title="Belohnungen der Season" className="scroll-mt-24" testId="season-rewards-season"
         hint="Banner, Emblem, Medaille oder Titel je Platz, Platzbereich oder für alle Teilnehmer. Vergeben wird beim Abschluss einer Staffel aus dem Endstand – wer etwas bekommt, sieht es sofort in Profil und Teamseite und bekommt eine Nachricht.">
-        {readOnly ? <p className="text-xs text-white/55" data-testid="season-rewards-readonly">Ändern darf, wer „Season konfigurieren“ hat.</p> : null}
+        {readOnly ? <p className="tls-type-small text-white/55" data-testid="season-rewards-readonly">Ändern darf, wer „Season konfigurieren“ hat.</p> : null}
         <fieldset>
-          <legend className="text-[11px] font-bold uppercase tracking-widest text-white/60">Spieler-Belohnungen gehen an</legend>
+          <legend className="tls-type-label text-white/60">Spieler-Belohnungen gehen an</legend>
           <div className="mt-1 grid gap-2 sm:grid-cols-2">
             {PLAYER_BASIS.map((row) => (
               <label key={row.key} aria-label={row.label} className={`flex cursor-pointer items-start gap-3 rounded-sm border p-3 ${form.reward_players === row.key ? "border-[#29B6E8]/60 bg-[#29B6E8]/5" : "border-white/10"}`}>
@@ -230,8 +230,8 @@ export function SeasonRewardsTab({ seasonId }) {
                   onChange={() => setForm((current) => ({ ...current, reward_players: row.key }))} className="mt-1 h-4 w-4 accent-[var(--tls-cyan)]"
                   data-testid={`season-rewards-basis-${row.key}`} />
                 <span>
-                  <span className="block text-sm font-semibold text-white">{row.label}{row.key === "fielded" ? " (Vorgabe)" : ""}</span>
-                  <span className="block text-xs text-white/55">{row.hint}</span>
+                  <span className="block tls-type-small font-semibold text-white">{row.label}{row.key === "fielded" ? " (Vorgabe)" : ""}</span>
+                  <span className="block tls-type-small text-white/55">{row.hint}</span>
                 </span>
               </label>
             ))}
@@ -254,7 +254,7 @@ export function SeasonRewardsTab({ seasonId }) {
             return (
               <section key={division.id} className="rounded-sm border border-white/10 p-3 sm:p-4" aria-label={division.label} data-testid={`season-rewards-division-${division.id}`}>
                 <div className="flex flex-wrap items-center justify-between gap-2">
-                  <h3 className="font-heading text-lg font-black uppercase">{division.label}</h3>
+                  <h3 className="tls-type-card">{division.label}</h3>
                   {readOnly ? null : (
                     <button type="button" className={SMALL} data-testid={`season-rewards-own-${division.id}`}
                       onClick={() => setDivision(division.id, own === null ? form.items.map((item) => ({ ...item, key: `${item.key}-${division.id}`, id: null })) : null)}>
@@ -263,7 +263,7 @@ export function SeasonRewardsTab({ seasonId }) {
                   )}
                 </div>
                 {own === null ? (
-                  <p className="mt-2 text-sm text-white/60" data-testid={`season-rewards-inherit-${division.id}`}>
+                  <p className="mt-2 tls-type-small text-white/60" data-testid={`season-rewards-inherit-${division.id}`}>
                     Wie die Season: {form.items.length ? form.items.map((item) => `${item.name || "ohne Namen"} (${placeLabel(item.places)})`).join(", ") : "keine Belohnungen"}.
                   </p>
                 ) : (
@@ -285,7 +285,7 @@ export function SeasonRewardsTab({ seasonId }) {
 
       {readOnly ? null : (
         <div className="sticky bottom-3 z-10 flex flex-wrap items-center justify-end gap-3 rounded-sm border border-white/10 bg-[#0A0A0A]/95 p-3" data-testid="season-rewards-bar">
-          <span className="mr-auto text-xs text-white/60">
+          <span className="mr-auto tls-type-small text-white/60">
             <Gift className="mr-1 inline h-3.5 w-3.5" aria-hidden="true" />
             {problem || (dirty ? "Nicht gespeichert." : "Gespeichert. Gilt beim nächsten Abschluss einer Staffel.")}
           </span>

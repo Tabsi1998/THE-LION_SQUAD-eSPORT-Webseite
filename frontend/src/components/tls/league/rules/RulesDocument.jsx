@@ -54,10 +54,10 @@ export function RulesChanges({ changes, versionLabel, children, testId = "rules-
   return (
     <section className="tls-rules-changes" aria-labelledby={`${testId}-title`} data-testid={testId}>
       <div className="mb-2 flex flex-wrap items-center justify-between gap-x-4 gap-y-1">
-        <h2 id={`${testId}-title`} className="font-heading text-lg font-black uppercase">Neu in {versionLabel}</h2>
+        <h2 id={`${testId}-title`} className="tls-type-section">Neu in {versionLabel}</h2>
         {children}
       </div>
-      {changes.base ? <p className="mb-2 text-sm text-white/70">Im Vergleich zu {changes.base.label}.</p> : null}
+      {changes.base ? <p className="mb-2 tls-type-small text-white/70">Im Vergleich zu {changes.base.label}.</p> : null}
       <ul>
         {rows.map((row) => (
           <li key={`${row.kind}-${row.anchor || row.title}`} className="tls-rules-changes__row">
@@ -113,8 +113,8 @@ export function RulesComparison({ sections = [], children, testId = "rules-compa
                 </span>
               </Heading>
             ) : <span className="tls-rules-badge">{STATUS_WORD[row.status]}</span>}
-            {row.previous_title ? <p className="mb-2 text-sm text-white/70">Hieß vorher: {row.previous_title}</p> : null}
-            {row.coarse ? <p className="mb-2 text-sm text-white/70" data-testid="rules-compare-coarse">Zu lang für Wort für Wort: Der Abschnitt steht ganz da, erst alt, dann neu.</p> : null}
+            {row.previous_title ? <p className="mb-2 tls-type-small text-white/70">Hieß vorher: {row.previous_title}</p> : null}
+            {row.coarse ? <p className="mb-2 tls-type-small text-white/70" data-testid="rules-compare-coarse">Zu lang für Wort für Wort: Der Abschnitt steht ganz da, erst alt, dann neu.</p> : null}
             <RuleOps ops={row.ops} />
           </section>
         );

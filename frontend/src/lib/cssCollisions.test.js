@@ -41,7 +41,8 @@ test("nachgeladene Stylesheets überschreiben keine allgemeinen Klassen aus inde
   const funde = {};
   for (const datei of cssDateien(SRC)) {
     const rel = path.relative(SRC, datei).split(path.sep).join("/");
-    if (rel === "index.css") continue;
+    // styles/system.css hängt index.css selbst vorne an (@import) - sie wird nicht nachgeladen.
+    if (rel === "index.css" || rel === "styles/system.css") continue;
     const doppelt = [...freieKlassen(readFileSync(datei, "utf8"))].filter((klasse) => allgemein.has(klasse)).sort();
     if (doppelt.length) funde[rel] = doppelt;
   }

@@ -12,6 +12,7 @@ import { serverResourceLabels } from "@/lib/serverResources";
 import { viennaDateTime } from "@/lib/vienna";
 import { gameOptionLabel, selectableGames } from "@/lib/gameLabels";
 import { AmpPanelCard } from "./gameServers/AmpPanelCard";
+import { ShortCaps } from "@/components/tls/ShortCaps";
 
 const emptyForm = {
   name: "",
@@ -314,9 +315,9 @@ export default function AdminGameServersPage() {
     <AdminLayout>
       <div className="flex flex-col xl:flex-row xl:items-start xl:justify-between gap-4 mb-6">
         <div className="min-w-0">
-          <span className="text-[11px] font-bold uppercase tracking-[0.3em] text-[#29B6E8]">eSports</span>
-          <h1 className="font-heading text-2xl sm:text-3xl md:text-4xl font-black uppercase mt-1 break-words">Game-Server</h1>
-          <p className="mt-2 text-white/60 text-sm max-w-2xl">
+          <span className="tls-type-label text-[#29B6E8]">eSports</span>
+          <h1 className="tls-type-title mt-1 break-words"><ShortCaps>Game-Server</ShortCaps></h1>
+          <p className="mt-2 text-white/60 tls-type-body max-w-2xl">
             Server pflegen und festlegen, wer sie sieht. Status und Spielerzahl holt sich die Website automatisch vom Server.
           </p>
         </div>
@@ -348,8 +349,8 @@ export default function AdminGameServersPage() {
         <form onSubmit={save} className="mb-8 border border-[#29B6E8]/25 bg-[#101416] rounded-sm p-4 sm:p-5">
           <div className="flex items-start justify-between gap-3 mb-5">
             <div className="min-w-0">
-              <div className="font-heading text-xl font-black uppercase">{editing ? "Server bearbeiten" : "Neuer Server"}</div>
-              <div className="text-xs text-white/45 mt-1">Alle Texte im öffentlichen Bereich bleiben bewusst kurz und klar.</div>
+              <div className="tls-type-card">{editing ? "Server bearbeiten" : "Neuer Server"}</div>
+              <div className="tls-type-small text-white/45 mt-1">Alle Texte im öffentlichen Bereich bleiben bewusst kurz und klar.</div>
             </div>
             <button type="button" onClick={closeForm} className="p-2 text-white/50 hover:text-white shrink-0"><X className="w-5 h-5" /></button>
           </div>
@@ -358,7 +359,7 @@ export default function AdminGameServersPage() {
             <Field label="Name" value={form.name} onChange={(v) => set("name", v)} required />
             <Field label="Kurzadresse" value={form.slug} onChange={(v) => set("slug", v)} placeholder="automatisch wenn leer" />
             <label className="block">
-              <span className="text-[11px] uppercase tracking-widest text-white/45 font-bold">Spiel-Verknüpfung</span>
+              <span className="tls-type-label text-white/45">Spiel-Verknüpfung</span>
               <select value={form.game_id} onChange={(e) => set("game_id", e.target.value)} className="mt-1 w-full bg-[#0A0A0A] border border-white/10 rounded-sm px-3 py-2 text-sm">
                 <option value="">Keine Verknüpfung</option>
                 {form.game_id && !games.some((game) => game.id === form.game_id) && <option value={form.game_id}>Spiel nicht verfügbar – bitte neu auswählen</option>}
@@ -367,14 +368,14 @@ export default function AdminGameServersPage() {
             </label>
             <Field label="Spielname ohne Verknüpfung" value={form.game_name} onChange={(v) => set("game_name", v)} placeholder="z.B. Rust" />
             <label className="block">
-              <span className="text-[11px] uppercase tracking-widest text-white/45 font-bold">Betrieb</span>
+              <span className="tls-type-label text-white/45">Betrieb</span>
               <div className="mt-1 grid grid-cols-3 gap-1 rounded-sm border border-white/10 bg-[#0A0A0A] p-1">
                 {Object.entries(modeLabels).map(([key, label]) => (
                   <button
                     key={key}
                     type="button"
                     onClick={() => set("status", key === "maintenance" ? "maintenance" : key === "planned" ? "planned" : "offline")}
-                    className={`px-2 py-2 text-[11px] font-black uppercase tracking-wider rounded-sm ${operatingMode(form.status) === key ? "bg-[#29B6E8] text-black" : "text-white/55 hover:text-white"}`}
+                    className={`px-2 py-2 tls-type-label rounded-sm ${operatingMode(form.status) === key ? "bg-[#29B6E8] text-black" : "text-white/55 hover:text-white"}`}
                   >
                     {label}
                   </button>
@@ -382,7 +383,7 @@ export default function AdminGameServersPage() {
               </div>
             </label>
             <label className="block">
-              <span className="text-[11px] uppercase tracking-widest text-white/45 font-bold">Sichtbarkeit</span>
+              <span className="tls-type-label text-white/45">Sichtbarkeit</span>
               <select value={form.visibility} onChange={(e) => set("visibility", e.target.value)} className="mt-1 w-full bg-[#0A0A0A] border border-white/10 rounded-sm px-3 py-2 text-sm">
                 {Object.entries(visibilityLabels).map(([key, label]) => <option key={key} value={key}>{label}</option>)}
               </select>
@@ -390,7 +391,7 @@ export default function AdminGameServersPage() {
             <Field label="Adresse" value={form.address} onChange={(v) => set("address", v)} placeholder="gameserver.lionsquad.at:25565" />
             <Field label="Link zum Verbinden" value={form.connect_url} onChange={(v) => set("connect_url", v)} placeholder="steam://connect/..." />
             <label className="block">
-              <span className="text-[11px] uppercase tracking-widest text-white/45 font-bold">Zugang</span>
+              <span className="tls-type-label text-white/45">Zugang</span>
               <select value={form.access_secret_kind} onChange={(e) => set("access_secret_kind", e.target.value)} className="mt-1 w-full bg-[#0A0A0A] border border-white/10 rounded-sm px-3 py-2 text-sm">
                 {Object.entries(secretLabels).map(([key, label]) => <option key={key} value={key}>{label}</option>)}
               </select>
@@ -404,12 +405,12 @@ export default function AdminGameServersPage() {
             <div className="md:col-span-2 xl:col-span-4 flex flex-wrap items-center gap-4 border border-white/10 rounded-sm p-4">
               <GameServerIcon server={{ ...form, game: games.find((game) => game.id === form.game_id) }} />
               <div className="flex-1 min-w-0 space-y-2">
-                <label className="flex items-center gap-2 text-sm text-white/80">
+                <label className="flex items-center gap-2 tls-type-small text-white/80">
                   <input type="checkbox" checked={form.show_game_icon !== false} onChange={(event) => set("show_game_icon", event.target.checked)} className="accent-[#29B6E8]" />
                   Spiel-/Server-Icon anzeigen
                 </label>
-                <p className="text-xs text-white/55">Das Logo des ausgewählten Spiels wird automatisch übernommen. Ein eigenes Server-Icon hat Vorrang. Ohne Bild erscheint das Server-Symbol.</p>
-                <Link to="/admin/games" className="text-xs text-[#29B6E8] underline">Spiele und Logos verwalten</Link>
+                <p className="tls-type-small text-white/55">Das Logo des ausgewählten Spiels wird automatisch übernommen. Ein eigenes Server-Icon hat Vorrang. Ohne Bild erscheint das Server-Symbol.</p>
+                <Link to="/admin/games" className="tls-type-small text-[#29B6E8] underline">Spiele und Logos verwalten</Link>
               </div>
               <div className="w-full sm:w-72" data-testid="server-icon-upload">
                 <ImageUpload value={form.server_icon_url} onChange={(value) => set("server_icon_url", value || "")} label="Eigenes Server-Icon (optional)" testId="server-icon" variant="square"
@@ -419,11 +420,11 @@ export default function AdminGameServersPage() {
             <Field label="Karten-Link" value={form.map_url} onChange={(v) => set("map_url", v)} placeholder="Dynmap, BattleMetrics, Karte..." />
             <Field label="Externe Statusseite" value={form.external_status_url} onChange={(v) => set("external_status_url", v)} placeholder="z.B. BattleMetrics/Serverliste" />
             <label className="block">
-              <span className="text-[11px] uppercase tracking-widest text-white/45 font-bold">Live-Daten von</span>
+              <span className="tls-type-label text-white/45">Live-Daten von</span>
               <select value={form.sync_provider} onChange={(e) => set("sync_provider", e.target.value)} className="mt-1 w-full bg-[#0A0A0A] border border-white/10 rounded-sm px-3 py-2 text-sm">
                 {Object.entries(syncLabels).map(([key, label]) => <option key={key} value={key}>{label}</option>)}
               </select>
-              {form.sync_provider === "amp" && <span className="mt-1 block text-xs text-white/45" data-testid="amp-sync-hint">Den Zugang zum Panel trägst du oben unter „AMP-Panel“ ein.</span>}
+              {form.sync_provider === "amp" && <span className="mt-1 block tls-type-small text-white/45" data-testid="amp-sync-hint">Den Zugang zum Panel trägst du oben unter „AMP-Panel“ ein.</span>}
             </label>
             {form.sync_provider === "amp" && (
               <Field label="AMP-Instanz" value={form.amp_instance} onChange={(v) => set("amp_instance", v)} placeholder="Name oder ID der Instanz im AMP-Panel" />
@@ -431,7 +432,7 @@ export default function AdminGameServersPage() {
             {/* Technik (#2129, SP6): nur nötig, wenn die Abfrage von selbst nicht klappt - deshalb eingeklappt. */}
             {form.sync_provider !== "manual" && (
               <details className="md:col-span-2 xl:col-span-4 border border-white/10 rounded-sm p-3" data-testid="server-technik">
-                <summary className="cursor-pointer select-none text-[11px] uppercase tracking-widest text-white/60 font-bold">Technik – nur nötig, wenn das Abrufen nicht klappt</summary>
+                <summary className="cursor-pointer select-none tls-type-small text-white/60 font-bold">Technik – nur nötig, wenn das Abrufen nicht klappt</summary>
                 <div className="mt-3 grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
                   <Field label="Abfrage-Adresse" value={form.query_host} onChange={(v) => set("query_host", v)} placeholder="leer = die Adresse oben" />
                   <Field label="Abfrage-Port" type="number" value={form.query_port} onChange={(v) => set("query_port", v)} placeholder="z.B. 25565" />
@@ -447,14 +448,14 @@ export default function AdminGameServersPage() {
             {form.sync_provider === "manual" && (
               <>
                 <div className="block">
-                  <span className="text-[11px] uppercase tracking-widest text-white/45 font-bold">Status von Hand</span>
+                  <span className="tls-type-label text-white/45">Status von Hand</span>
                   <div className="mt-1 grid grid-cols-2 gap-1 rounded-sm border border-white/10 bg-[#0A0A0A] p-1">
                     {["online", "offline"].map((value) => (
                       <button
                         key={value}
                         type="button"
                         onClick={() => set("status", value)}
-                        className={`px-2 py-2 text-[11px] font-black uppercase tracking-wider rounded-sm ${form.status === value ? "bg-[#29B6E8] text-black" : "text-white/55 hover:text-white"}`}
+                        className={`px-2 py-2 tls-type-label rounded-sm ${form.status === value ? "bg-[#29B6E8] text-black" : "text-white/55 hover:text-white"}`}
                       >
                         {statusLabels[value]}
                       </button>
@@ -466,57 +467,57 @@ export default function AdminGameServersPage() {
                 <Field label="Map" value={form.map_name} onChange={(v) => set("map_name", v)} />
                 <Field label="Version" value={form.version} onChange={(v) => set("version", v)} />
                 <label className="md:col-span-2 block">
-                  <span className="text-[11px] uppercase tracking-widest text-white/45 font-bold">Spieler-Namen</span>
+                  <span className="tls-type-label text-white/45">Spieler-Namen</span>
                   <input value={form.player_names_text} onChange={(e) => set("player_names_text", e.target.value)} className="mt-1 w-full bg-[#0A0A0A] border border-white/10 rounded-sm px-3 py-2 text-sm" placeholder="Name1, Name2, Name3" />
                 </label>
               </>
             )}
             <Field label="Wartungsnotiz" value={form.maintenance_note} onChange={(v) => set("maintenance_note", v)} placeholder="z.B. Mod-Update, neue Map..." />
             <Field label="Wartung bis" type="datetime-local" value={form.maintenance_until} onChange={(v) => set("maintenance_until", v)} />
-            <label className="flex items-start gap-2 mt-6 text-sm text-white/75">
+            <label className="flex items-start gap-2 mt-6 tls-type-small text-white/75">
               <input type="checkbox" checked={form.site_banner_enabled} onChange={(e) => set("site_banner_enabled", e.target.checked)} className="accent-[#FFD700] mt-1" />
-              <span><strong className="text-white">Wartungsbanner anzeigen</strong><br /><span className="text-xs text-white/50">Nur wenn dieser Haken aktiv ist und der Server auf Wartung steht.</span></span>
+              <span><strong className="text-white">Wartungsbanner anzeigen</strong><br /><span className="tls-type-small text-white/50">Nur wenn dieser Haken aktiv ist und der Server auf Wartung steht.</span></span>
             </label>
             <Field label="Sortierung" type="number" value={form.sort_order} onChange={(v) => set("sort_order", v)} />
             <Field label="Regel-Link" value={form.rules_url} onChange={(v) => set("rules_url", v)} />
             <Field label="Allgemeiner Hinweis" value={form.password_hint} onChange={(v) => set("password_hint", v)} placeholder="z.B. Modpack vorher installieren" />
             <label className="md:col-span-2 xl:col-span-4 block">
-              <span className="text-[11px] uppercase tracking-widest text-white/45 font-bold">Beschreibung</span>
+              <span className="tls-type-label text-white/45">Beschreibung</span>
               <textarea value={form.description} onChange={(e) => set("description", e.target.value)} rows={3} className="mt-1 w-full bg-[#0A0A0A] border border-white/10 rounded-sm px-3 py-2 text-sm" />
             </label>
-            <label className="flex items-center gap-2 mt-6 text-sm text-white/75">
+            <label className="flex items-center gap-2 mt-6 tls-type-small text-white/75">
               <input type="checkbox" checked={form.is_active} onChange={(e) => set("is_active", e.target.checked)} className="accent-[#29B6E8]" />
               Server aktiv anzeigen
             </label>
           </div>
 
           <section className="mt-5 border border-[#29B6E8]/25 rounded-sm p-4 space-y-4" aria-label="Modding-Einstellungen">
-            <label className="flex items-center gap-2 text-sm font-bold">
+            <label className="flex items-center gap-2 tls-type-small font-bold">
               <input type="checkbox" checked={!!form.modding_enabled} onChange={(event) => set("modding_enabled", event.target.checked)} className="accent-[#29B6E8]" />
               Modded / Mods & Einrichtung anzeigen
             </label>
-            <p className="text-xs text-white/55">Optional für jedes Spiel. Ausgeschaltete Angaben bleiben gespeichert, werden aber nicht an die öffentliche Serverliste ausgegeben. Aktive Links folgen der Sichtbarkeit des Servers; das Download-Ziel benötigt bei privaten Dateien einen eigenen Zugriffsschutz.</p>
+            <p className="tls-type-small text-white/55">Optional für jedes Spiel. Ausgeschaltete Angaben bleiben gespeichert, werden aber nicht an die öffentliche Serverliste ausgegeben. Aktive Links folgen der Sichtbarkeit des Servers; das Download-Ziel benötigt bei privaten Dateien einen eigenen Zugriffsschutz.</p>
             <fieldset disabled={!form.modding_enabled || saving} className="space-y-3 disabled:opacity-50">
-              <label className="block text-sm">Installationshinweise
+              <label className="block tls-type-small">Installationshinweise
                 <textarea value={form.modding_notes || ""} maxLength={1500} rows={3} onChange={(event) => set("modding_notes", event.target.value)} placeholder="Welche Version installieren? In welcher Reihenfolge? Keine Passwörter oder geheimen Konfigurationen eintragen."
                   className="mt-1 block w-full bg-[#0A0A0A] border border-white/15 rounded-sm p-3 text-sm" />
               </label>
               {form.mod_resources.map((item, index) => (
                 <div key={index} className="border border-white/15 rounded-sm p-3 space-y-3" data-testid="mod-resource-row">
                   <div className="flex items-center justify-between gap-3">
-                    <label className="flex items-center gap-2 text-sm font-bold"><input type="checkbox" checked={!!item.enabled} onChange={(event) => setResource(index, "enabled", event.target.checked)} className="accent-[#29B6E8]" />Link {index + 1} anzeigen</label>
-                    <button type="button" onClick={() => set("mod_resources", form.mod_resources.filter((_item, position) => index !== position))} className="min-h-11 px-3 text-xs text-[#FF6B62]" aria-label={`Link ${index + 1} entfernen`}>Entfernen</button>
+                    <label className="flex items-center gap-2 tls-type-small font-bold"><input type="checkbox" checked={!!item.enabled} onChange={(event) => setResource(index, "enabled", event.target.checked)} className="accent-[#29B6E8]" />Link {index + 1} anzeigen</label>
+                    <button type="button" onClick={() => set("mod_resources", form.mod_resources.filter((_item, position) => index !== position))} className="min-h-11 px-3 tls-type-small text-[#FF6B62]" aria-label={`Link ${index + 1} entfernen`}>Entfernen</button>
                   </div>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                    <label className="block text-sm">Typ<select value={item.kind} onChange={(event) => setResource(index, "kind", event.target.value)} className="mt-1 block w-full bg-[#0A0A0A] border border-white/15 rounded-sm p-2">{Object.entries(serverResourceLabels).map(([kind, label]) => <option key={kind} value={kind}>{label}</option>)}</select></label>
+                    <label className="block tls-type-small">Typ<select value={item.kind} onChange={(event) => setResource(index, "kind", event.target.value)} className="mt-1 block w-full bg-[#0A0A0A] border border-white/15 rounded-sm p-2">{Object.entries(serverResourceLabels).map(([kind, label]) => <option key={kind} value={kind}>{label}</option>)}</select></label>
                     <Field label="Bezeichnung (optional)" value={item.label} maxLength={80} onChange={(value) => setResource(index, "label", value)} placeholder="z.B. Fabric Loader" />
                     <Field label="Version (optional)" value={item.version} maxLength={80} onChange={(value) => setResource(index, "version", value)} placeholder="z.B. passende Loader-/Pack-Version" />
                     <Field label="HTTPS-Adresse" type="url" value={item.url} maxLength={2000} required={!!item.enabled} onChange={(value) => setResource(index, "url", value)} placeholder="https://..." />
                   </div>
                 </div>
               ))}
-              <button type="button" disabled={form.mod_resources.length >= 8} onClick={() => set("mod_resources", [...form.mod_resources, { kind: "modloader", enabled: false, label: "", version: "", url: "" }])} className="min-h-11 px-4 py-2 border border-[#29B6E8]/45 rounded-sm text-sm text-[#29B6E8] disabled:opacity-40">Link hinzufügen</button>
-              <p className="text-xs text-white/45">Bis zu acht Links: Modloader, Modpaket, Konfiguration oder Anleitung. Nur HTTPS; keine Zugangsdaten im Link. Dateien werden nicht automatisch heruntergeladen oder installiert.</p>
+              <button type="button" disabled={form.mod_resources.length >= 8} onClick={() => set("mod_resources", [...form.mod_resources, { kind: "modloader", enabled: false, label: "", version: "", url: "" }])} className="min-h-11 px-4 py-2 border border-[#29B6E8]/45 rounded-sm tls-type-small text-[#29B6E8] disabled:opacity-40">Link hinzufügen</button>
+              <p className="tls-type-small text-white/45">Bis zu acht Links: Modloader, Modpaket, Konfiguration oder Anleitung. Nur HTTPS; keine Zugangsdaten im Link. Dateien werden nicht automatisch heruntergeladen oder installiert.</p>
             </fieldset>
           </section>
 
@@ -536,8 +537,8 @@ export default function AdminGameServersPage() {
           <article key={server.id} className="border border-white/10 bg-[#121212] rounded-sm p-4 sm:p-5 min-w-0">
             <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
               <div className="min-w-0 w-full">
-                <div className="text-[10px] uppercase tracking-widest text-[#29B6E8] font-bold">{server.game?.short_name || server.game?.name || server.game_name || "Server"}</div>
-                <h2 className="font-heading text-lg sm:text-xl font-black uppercase break-words leading-tight">{server.name}</h2>
+                <div className="tls-type-small text-[#29B6E8] font-bold">{server.game?.short_name || server.game?.name || server.game_name || "Server"}</div>
+                <h2 className="tls-type-section break-words leading-tight">{server.name}</h2>
                 <div className="mt-2 flex gap-1 flex-wrap">
                   <Badge label={statusLabels[server.status] || server.status} tone={server.status === "online" ? "green" : server.status === "maintenance" ? "gold" : "muted"} />
                   <Badge label={visibilityLabels[server.visibility] || server.visibility} tone={server.visibility === "members" ? "gold" : server.visibility === "public" ? "cyan" : "muted"} />
@@ -553,7 +554,7 @@ export default function AdminGameServersPage() {
                 <button onClick={() => remove(server)} title="Löschen" className="min-h-10 inline-flex items-center justify-center p-2 border border-white/10 sm:border-transparent rounded-sm text-white/45 hover:text-[#FF3B30]"><Trash2 className="w-4 h-4" /></button>
               </div>
             </div>
-            <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-2 text-xs">
+            <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-2 tls-type-small">
               <Info label="Adresse" value={server.address || "-"} />
               <Info label="Spieler" value={`${server.player_count || 0}${server.max_players != null ? `/${server.max_players}` : ""}`} />
               <Info label="Live-Daten" value={syncText(server)} />
@@ -566,16 +567,16 @@ export default function AdminGameServersPage() {
                   type="button"
                   disabled={syncing === `${server.id}:mode`}
                   onClick={() => setServerMode(server, mode)}
-                  className={`px-2 sm:px-3 py-2 sm:py-1.5 border rounded-sm text-[10px] font-black uppercase tracking-widest disabled:opacity-50 ${operatingMode(server.status) === mode ? "border-[#29B6E8] text-[#29B6E8] bg-[#29B6E8]/10" : "border-white/10 text-white/50 hover:text-white"}`}
+                  className={`px-2 sm:px-3 py-2 sm:py-1.5 border rounded-sm tls-type-label disabled:opacity-50 ${operatingMode(server.status) === mode ? "border-[#29B6E8] text-[#29B6E8] bg-[#29B6E8]/10" : "border-white/10 text-white/50 hover:text-white"}`}
                 >
                   {label}
                 </button>
               ))}
             </div>
-            {server.last_sync_note && <div className="mt-3 border border-[#FFD700]/25 bg-[#FFD700]/10 text-[#FFD700] rounded-sm px-3 py-2 text-xs">{server.last_sync_note}</div>}
-            {server.last_sync_error && <div role="alert" data-testid={`server-sync-error-${server.slug || server.id}`} className="mt-3 border border-[#FF3B30]/30 bg-[#FF3B30]/10 text-[#FF8A80] rounded-sm px-3 py-2 text-xs break-words">Letzter Abruf fehlgeschlagen: {server.last_sync_error}</div>}
+            {server.last_sync_note && <div className="mt-3 border border-[#FFD700]/25 bg-[#FFD700]/10 text-[#FFD700] rounded-sm px-3 py-2 tls-type-small">{server.last_sync_note}</div>}
+            {server.last_sync_error && <div role="alert" data-testid={`server-sync-error-${server.slug || server.id}`} className="mt-3 border border-[#FF3B30]/30 bg-[#FF3B30]/10 text-[#FF8A80] rounded-sm px-3 py-2 tls-type-small break-words">Letzter Abruf fehlgeschlagen: {server.last_sync_error}</div>}
             {diagnostics[server.id] && <DiagnosticsPanel data={diagnostics[server.id]} />}
-            {server.description && <p className="mt-3 text-sm text-white/55 line-clamp-2">{server.description}</p>}
+            {server.description && <p className="mt-3 tls-type-body text-white/55 line-clamp-2">{server.description}</p>}
           </article>
         ))}
       </div>
@@ -585,7 +586,7 @@ export default function AdminGameServersPage() {
 
 function DiagnosticsPanel({ data }) {
   return (
-    <div className="mt-3 border border-[#FFD700]/25 bg-[#FFD700]/5 rounded-sm p-3 text-xs min-w-0">
+    <div className="mt-3 border border-[#FFD700]/25 bg-[#FFD700]/5 rounded-sm p-3 tls-type-small min-w-0">
       <div className="font-bold uppercase tracking-widest text-[#FFD700]">Verbindungstest</div>
       <div className="mt-2 text-white/60 break-words">{data.recommendation}</div>
       <div className="mt-3 space-y-2">
@@ -610,8 +611,8 @@ function Stat({ label, value, tone }) {
   const color = tone === "green" ? "text-[#00FF88]" : tone === "gold" ? "text-[#FFD700]" : "text-[#29B6E8]";
   return (
     <div className="border border-white/10 bg-[#121212] rounded-sm p-3 sm:p-4 min-w-0">
-      <div className="text-[9px] sm:text-[10px] uppercase tracking-widest text-white/45 font-bold break-words">{label}</div>
-      <div className={`mt-1 font-display text-2xl sm:text-3xl font-black ${color}`}>{value}</div>
+      <div className="tls-type-label text-white/45 break-words">{label}</div>
+      <div className={`mt-1 tls-type-title tls-type-num ${color}`}>{value}</div>
     </div>
   );
 }
@@ -619,7 +620,7 @@ function Stat({ label, value, tone }) {
 function Field({ label, value, onChange, type = "text", placeholder = "", required = false, maxLength }) {
   return (
     <label className="block">
-      <span className="text-[11px] uppercase tracking-widest text-white/45 font-bold">{label}</span>
+      <span className="tls-type-label text-white/45">{label}</span>
       <input required={required} maxLength={maxLength} type={type} value={value ?? ""} onChange={(e) => onChange(e.target.value)} placeholder={placeholder} className="mt-1 w-full bg-[#0A0A0A] border border-white/10 rounded-sm px-3 py-2 text-sm" />
     </label>
   );
@@ -633,13 +634,13 @@ function Badge({ label, tone }) {
     red: "bg-[#FF3B30]/10 text-[#FF3B30]",
     muted: "bg-white/10 text-white/55",
   };
-  return <span className={`px-2 py-1 rounded-sm text-[10px] font-black uppercase tracking-widest ${classes[tone] || classes.muted}`}>{label}</span>;
+  return <span className={`px-2 py-1 rounded-sm tls-type-label ${classes[tone] || classes.muted}`}>{label}</span>;
 }
 
 function Info({ label, value }) {
   return (
     <div className="border border-white/10 bg-black/20 rounded-sm px-3 py-2 min-w-0">
-      <div className="text-[10px] uppercase tracking-widest text-white/35 font-bold">{label}</div>
+      <div className="tls-type-label text-quiet">{label}</div>
       <div className="mt-1 text-white/75 break-words">{value}</div>
     </div>
   );

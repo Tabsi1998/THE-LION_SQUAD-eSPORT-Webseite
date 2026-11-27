@@ -64,13 +64,13 @@ function ProblemRow({ problem, onOpen }) {
         <Icon className="h-5 w-5" />
       </span>
       <span className="min-w-0 flex-1">
-        <span className={`flex flex-wrap items-center gap-x-2 text-[10px] font-bold uppercase tracking-[0.18em] ${TONE_CLASS[tone].split(" ")[1]}`}>
+        <span className={`flex flex-wrap items-center gap-x-2 tls-type-label ${TONE_CLASS[tone].split(" ")[1]}`}>
           <span data-testid={`cockpit-problem-chip-${problem.id}`}>{problem.chip}</span>
           {problem.where ? <span className="text-white/45 tracking-[0.12em] [overflow-wrap:anywhere]">{problem.where}</span> : null}
         </span>
-        <span className="mt-0.5 block text-sm font-bold text-white [overflow-wrap:anywhere]">{problem.title}</span>
-        {problem.what ? <span className="block text-xs text-white/55 [overflow-wrap:anywhere]">{problem.what}</span> : null}
-        {problem.detail ? <span className="mt-0.5 block text-[11px] text-white/70 [overflow-wrap:anywhere]">{problem.detail}</span> : null}
+        <span className="mt-0.5 block tls-type-small font-bold text-white [overflow-wrap:anywhere]">{problem.title}</span>
+        {problem.what ? <span className="block tls-type-small text-white/55 [overflow-wrap:anywhere]">{problem.what}</span> : null}
+        {problem.detail ? <span className="mt-0.5 block tls-type-small text-white/70 [overflow-wrap:anywhere]">{problem.detail}</span> : null}
       </span>
       <ChevronRight className="tls-cockpit-chevron h-5 w-5 shrink-0 text-white/35 group-hover:text-white/70" aria-hidden="true" />
     </Link>
@@ -135,11 +135,11 @@ export function TournamentCockpit({ problems = [], loaded = false, queue, board 
       <section aria-labelledby="cockpit-problems-title" data-testid="cockpit-problems">
         <header className="flex items-end justify-between gap-3">
           <div className="min-w-0">
-            <h2 id="cockpit-problems-title" className="font-heading text-lg font-black uppercase tracking-wide text-white">Probleme</h2>
-            <p className="text-xs text-white/45">Dringendes zuerst – ein Tipp führt zum Fall.</p>
+            <h2 id="cockpit-problems-title" className="tls-type-section text-white">Probleme</h2>
+            <p className="tls-type-small text-white/45">Dringendes zuerst – ein Tipp führt zum Fall.</p>
           </div>
           {/* Vor dem ersten Laden der Fälle nichts ansagen (Review N3) - „Keine Probleme“ wäre geraten. */}
-          <span className={`tls-cockpit-count shrink-0 rounded-sm border px-2 py-0.5 text-[11px] font-bold uppercase tracking-wider ${!loaded ? "border-white/10 text-white/40" : count ? "border-honor/40 text-honor" : "border-ok/40 text-ok"}`} role="status" aria-live="polite" aria-busy={loaded ? undefined : "true"} data-testid="cockpit-problems-count">
+          <span className={`tls-cockpit-count shrink-0 rounded-sm border px-2 py-0.5 tls-type-label ${!loaded ? "border-white/10 text-quiet" : count ? "border-honor/40 text-honor" : "border-ok/40 text-ok"}`} role="status" aria-live="polite" aria-busy={loaded ? undefined : "true"} data-testid="cockpit-problems-count">
             {loaded ? problemCountText(count) : "Wird geladen …"}
           </span>
         </header>
@@ -148,8 +148,8 @@ export function TournamentCockpit({ problems = [], loaded = false, queue, board 
             <div className="tls-live-reveal flex items-center gap-3 rounded-sm border border-ok/25 bg-ok/5 p-4" data-testid="cockpit-problems-empty">
               <CircleCheck className="h-6 w-6 shrink-0 text-ok" aria-hidden="true" />
               <div className="min-w-0">
-                <div className="text-sm font-bold text-white">Alles im Plan</div>
-                <div className="text-xs text-white/55">Gerade hängt nichts. Neue Fälle erscheinen hier von selbst.</div>
+                <div className="tls-type-small font-bold text-white">Alles im Plan</div>
+                <div className="tls-type-small text-white/55">Gerade hängt nichts. Neue Fälle erscheinen hier von selbst.</div>
               </div>
             </div>
           ) : null}
@@ -159,8 +159,8 @@ export function TournamentCockpit({ problems = [], loaded = false, queue, board 
 
       <section aria-labelledby="cockpit-stations-title" data-testid="cockpit-stations">
         <header>
-          <h2 id="cockpit-stations-title" className="font-heading text-lg font-black uppercase tracking-wide text-white">Stationen</h2>
-          <p className="text-xs text-white/45">Was läuft, was als Nächstes kommt – mit einem Tipp aufrufen und starten.</p>
+          <h2 id="cockpit-stations-title" className="tls-type-section text-white">Stationen</h2>
+          <p className="tls-type-small text-white/45">Was läuft, was als Nächstes kommt – mit einem Tipp aufrufen und starten.</p>
         </header>
         <div className="mt-3">
           {queue ? (

@@ -146,13 +146,13 @@ export function EventLiveBoard({ event, accessToken = "" }) {
   const freeStations = stations.filter((station) => !BUSY_STATION_STATUSES.has(station.status) && station.status !== "broken");
   const brokenStations = stations.filter((station) => station.status === "broken");
 
-  if (loading) return <p className="text-sm text-white/45 py-6" data-testid="event-live-loading">Lade, was gerade läuft …</p>;
+  if (loading) return <p className="tls-type-small text-white/45 py-6" data-testid="event-live-loading">Lade, was gerade läuft …</p>;
 
   return (
     <div className="space-y-8" data-testid="event-live-board">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        {lastUpdated ? <span className="inline-flex items-center gap-2 text-xs text-white/45"><RotateCw className="w-3.5 h-3.5" /> Aktualisiert {viennaTime(lastUpdated, { hour: "2-digit", minute: "2-digit" })}</span> : <span />}
-        <button type="button" onClick={load} className="tls-btn tls-btn--quiet inline-flex items-center gap-2 px-3 py-1.5 text-xs uppercase tracking-wider font-bold rounded-sm" data-testid="event-live-refresh">
+        {lastUpdated ? <span className="inline-flex items-center gap-2 tls-type-small text-white/45"><RotateCw className="w-3.5 h-3.5" /> Aktualisiert {viennaTime(lastUpdated, { hour: "2-digit", minute: "2-digit" })}</span> : <span />}
+        <button type="button" onClick={load} className="tls-btn tls-btn--quiet inline-flex items-center gap-2 px-3 py-1.5 tls-type-label rounded-sm" data-testid="event-live-refresh">
           <RotateCw className="w-3.5 h-3.5" /> Aktualisieren
         </button>
       </div>
@@ -220,15 +220,15 @@ function MatchCard({ match, stationMap, featured = false }) {
     <Link to={match.publicUrl} className={`block rounded-sm border bg-[#121212] p-4 transition hover:border-[#29B6E8]/50 ${featured ? "border-[#29B6E8]/35" : "border-white/10"}`}>
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
-          <div className="flex flex-wrap items-center gap-2 text-[10px] uppercase tracking-widest text-white/40">
+          <div className="flex flex-wrap items-center gap-2 tls-type-small text-quiet">
             <span>{match.tournament?.title || "Turnier"}</span>
             <span>{match.groupLabel}</span>
           </div>
-          <h2 className="mt-2 font-heading text-lg font-black uppercase leading-tight break-words">{match.labels.join(" vs. ") || "Teilnehmer offen"}</h2>
+          <h2 className="mt-2 tls-type-section leading-tight break-words">{match.labels.join(" vs. ") || "Teilnehmer offen"}</h2>
         </div>
-        <span className="shrink-0 rounded-sm border border-[#29B6E8]/35 px-2 py-1 text-[10px] uppercase tracking-widest font-bold text-[#29B6E8]">{matchScheduleStatusText(match)}</span>
+        <span className="shrink-0 rounded-sm border border-[#29B6E8]/35 px-2 py-1 tls-type-label text-[#29B6E8]">{matchScheduleStatusText(match)}</span>
       </div>
-      <div className="mt-4 flex flex-wrap gap-3 text-xs text-white/55">
+      <div className="mt-4 flex flex-wrap gap-3 tls-type-small text-white/55">
         <span className="inline-flex items-center gap-1.5"><CalendarClock className="w-3.5 h-3.5" />{formatWhen(match.scheduled_at, { fallback: "Termin offen" })}</span>
         {station && <span className="inline-flex items-center gap-1.5 text-[#FFD700]"><Monitor className="w-3.5 h-3.5" />{station}</span>}
         <span className="inline-flex items-center gap-1.5"><Users className="w-3.5 h-3.5" />{formatMatchKind(match)}</span>
@@ -242,11 +242,11 @@ function ResultRow({ match }) {
     <Link to={match.publicUrl} className="block border border-white/10 bg-black/20 rounded-sm p-3 hover:border-[#29B6E8]/40 transition">
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
-          <div className="tls-wrap text-[10px] uppercase tracking-widest text-white/35">{match.tournament?.title || "Turnier"}</div>
-          <div className="tls-wrap mt-1 font-heading font-bold uppercase">{match.labels.join(" vs. ") || match.groupLabel}</div>
-          {match.resultText && <div className="tls-wrap mt-1 text-xs text-[#00FF88]">{match.resultText}</div>}
+          <div className="tls-wrap tls-type-small text-quiet">{match.tournament?.title || "Turnier"}</div>
+          <div className="tls-wrap mt-1 font-bold uppercase">{match.labels.join(" vs. ") || match.groupLabel}</div>
+          {match.resultText && <div className="tls-wrap mt-1 tls-type-small text-[#00FF88]">{match.resultText}</div>}
         </div>
-        <span className="text-[10px] uppercase tracking-widest font-bold text-white/45">{formatMatchStatus(match.status)}</span>
+        <span className="tls-type-label text-white/45">{formatMatchStatus(match.status)}</span>
       </div>
     </Link>
   );
@@ -263,8 +263,8 @@ function ActivityRow({ item, accessToken }) {
         <Icon className="w-5 h-5" />
       </div>
       <div className="min-w-0">
-        <div className="text-[10px] uppercase tracking-widest text-white/35">{isFastLap ? "Fast Lap" : "Turnier"}</div>
-        <div className="tls-wrap font-heading font-bold uppercase">{item.title || item.name}</div>
+        <div className="tls-type-label text-quiet">{isFastLap ? "Fast Lap" : "Turnier"}</div>
+        <div className="tls-wrap font-bold">{item.title || item.name}</div>
       </div>
     </Link>
   );
@@ -276,11 +276,11 @@ function StationRow({ station }) {
   return (
     <div className="flex items-center justify-between gap-3 border border-white/10 bg-black/20 rounded-sm p-3">
       <div className="min-w-0">
-        <div className="tls-wrap font-heading font-bold uppercase">{station.name || station.label || station.id}</div>
+        <div className="tls-wrap font-bold">{station.name || station.label || station.id}</div>
         {/* Notizen sind Vorschau-Text (#1314): eine Zeile, der volle Text im title. */}
-        <div className="text-xs text-white/40 truncate" title={station.notes || undefined}>{station.notes || station.device_type || "Station"}</div>
+        <div className="tls-type-small text-quiet truncate" title={station.notes || undefined}>{station.notes || station.device_type || "Station"}</div>
       </div>
-      <span className={`shrink-0 rounded-sm border px-2 py-1 text-[10px] uppercase tracking-widest font-bold ${broken ? "border-[#FF3B30]/40 text-[#FF3B30]" : busy ? "border-[#29B6E8]/40 text-[#29B6E8]" : "border-[#00FF88]/35 text-[#00FF88]"}`}>
+      <span className={`shrink-0 rounded-sm border px-2 py-1 tls-type-label ${broken ? "border-[#FF3B30]/40 text-[#FF3B30]" : busy ? "border-[#29B6E8]/40 text-[#29B6E8]" : "border-[#00FF88]/35 text-[#00FF88]"}`}>
         {broken ? "Defekt" : busy ? "Belegt" : "Frei"}
       </span>
     </div>
@@ -291,10 +291,10 @@ function LivePanel({ icon: Icon, title, count, children }) {
   return (
     <section className="border border-white/10 bg-[#0F0F0F] rounded-sm p-4 min-w-0">
       <div className="flex items-center justify-between gap-3 mb-4">
-        <h2 className="font-heading text-xl font-black uppercase inline-flex items-center gap-2">
+        <h2 className="tls-type-section inline-flex items-center gap-2">
           <Icon className="w-5 h-5 text-[#29B6E8]" /> {title}
         </h2>
-        <span className="font-display text-lg text-white/45 tabular-nums">{count}</span>
+        <span className="tls-type-card tls-type-num text-white/45">{count}</span>
       </div>
       <div className="space-y-3">{children}</div>
     </section>
@@ -306,10 +306,10 @@ function LiveStat({ icon: Icon, label, value, tone }) {
   return (
     <div className="border border-white/10 bg-[#121212] rounded-sm p-4">
       <div className="flex items-center justify-between gap-3">
-        <span className="text-[10px] uppercase tracking-widest text-white/45 font-bold">{label}</span>
+        <span className="tls-type-label text-white/45">{label}</span>
         <Icon className={`w-4 h-4 ${color}`} />
       </div>
-      <div className={`mt-2 font-heading text-3xl font-black tabular-nums ${color}`}>{value}</div>
+      <div className={`mt-2 tls-type-title tls-type-num ${color}`}>{value}</div>
     </div>
   );
 }
@@ -317,12 +317,12 @@ function LiveStat({ icon: Icon, label, value, tone }) {
 function MiniMetric({ label, value }) {
   return (
     <div className="border border-white/10 bg-black/20 rounded-sm p-3">
-      <div className="text-[10px] uppercase tracking-widest text-white/35">{label}</div>
-      <div className="mt-1 font-heading text-2xl font-black tabular-nums">{value}</div>
+      <div className="tls-type-label text-quiet">{label}</div>
+      <div className="mt-1 tls-type-section tls-type-num">{value}</div>
     </div>
   );
 }
 
 function InlineEmpty({ text }) {
-  return <div className="border border-dashed border-white/15 rounded-sm p-5 text-center text-sm text-white/45">{text}</div>;
+  return <div className="border border-dashed border-white/15 rounded-sm p-5 text-center tls-type-small text-white/45">{text}</div>;
 }

@@ -82,10 +82,10 @@ export function OriginalViewer({ items, start = 0, title = "", onClose }) {
       <div className="absolute inset-0" onClick={onClose} aria-hidden="true" data-testid="original-viewer-backdrop" />
       <header className="relative z-10 flex items-center gap-3 px-4 pt-[max(12px,env(safe-area-inset-top))] pb-2 sm:px-6">
         <div className="min-w-0 flex-1">
-          {title && <p className="truncate text-xs text-white/55">{title}</p>}
-          <p className="truncate text-sm font-bold text-white" data-testid="original-viewer-label">{labelOf(item)}</p>
+          {title && <p className="truncate tls-type-small text-white/55">{title}</p>}
+          <p className="truncate tls-type-small font-bold text-white" data-testid="original-viewer-label">{labelOf(item)}</p>
         </div>
-        {count > 1 && <span className="shrink-0 text-xs tabular-nums text-white/60" data-testid="original-viewer-count">{index + 1} / {count}</span>}
+        {count > 1 && <span className="shrink-0 tls-type-small tls-type-num text-white/60" data-testid="original-viewer-count">{index + 1} / {count}</span>}
         <button type="button" onClick={onClose} className="tls-original-viewer__icon" aria-label="Schließen" data-testid="original-viewer-close">
           <X className="h-6 w-6" aria-hidden="true" />
         </button>
@@ -115,7 +115,7 @@ export function OriginalViewer({ items, start = 0, title = "", onClose }) {
       <footer className="relative z-10 flex flex-col gap-3 px-4 pt-2 pb-[max(14px,env(safe-area-inset-bottom))] sm:px-6">
         <p className="sr-only" aria-live="polite" data-testid="original-viewer-status">{`Bild ${index + 1} von ${count}: ${labelOf(item)}`}</p>
         {source && (
-          <a href={source} target="_blank" rel="noopener noreferrer nofollow" className="inline-flex items-center gap-1.5 self-center text-xs text-[#29B6E8] underline-offset-4 hover:underline" data-testid="original-viewer-source">
+          <a href={source} target="_blank" rel="noopener noreferrer nofollow" className="inline-flex items-center gap-1.5 self-center tls-type-small text-[#29B6E8] underline-offset-4 hover:underline" data-testid="original-viewer-source">
             Quelle beim Veranstalter <ExternalLink className="h-3 w-3" aria-hidden="true" />
           </a>
         )}
@@ -146,7 +146,7 @@ export function OriginalsButton({ items, title = "", className = "", testId = "o
     <>
       <button ref={button} type="button" onClick={() => setOpen(true)} data-testid={testId}
         aria-label={many ? `Original ansehen, ${items.length} Bilder` : "Original ansehen"}
-        className={`tls-btn tls-btn--quiet inline-flex items-center gap-1.5 rounded-sm px-2.5 py-1.5 text-[11px] font-bold uppercase tracking-wider ${className}`}>
+        className={`tls-btn tls-btn--quiet inline-flex items-center gap-1.5 rounded-sm px-2.5 py-1.5 tls-type-label ${className}`}>
         <Images className="h-3.5 w-3.5" aria-hidden="true" />
         Original ansehen
         {many && <span className="tabular-nums text-white/55" aria-hidden="true">{items.length}</span>}

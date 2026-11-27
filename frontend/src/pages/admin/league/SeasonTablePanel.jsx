@@ -73,11 +73,11 @@ export function OrderSheet({ staffel, tie, override, onClose, onSaved, methods =
   return (
     <AdminSheet title={`Platz ${tie.rank}: Reihenfolge festlegen`} eyebrow={staffel.label} onClose={onClose} onSubmit={submit} saving={saving}
       submitLabel="Festlegen" submitTestId="table-decision-save" testId="table-decision-sheet">
-      <p className="text-sm text-white/65">Nur bei echtem Gleichstand nach allen Kriterien. Die Tabelle zeigt „Platz durch Entscheid der Leitung“ mit deinem Grund.</p>
+      <p className="tls-type-body text-white/65">Nur bei echtem Gleichstand nach allen Kriterien. Die Tabelle zeigt „Platz durch Entscheid der Leitung“ mit deinem Grund.</p>
       <ol className="mt-4 space-y-2" data-testid="table-decision-order">
         {order.map((item, index) => (
           <li key={item.id} className="flex min-h-[44px] items-center gap-2 rounded-sm border border-white/10 bg-[#0A0A0A] px-3 py-2">
-            <span className="w-8 font-display font-bold tabular-nums text-[#29B6E8]">{tie.rank + index}.</span>
+            <span className="w-8 tls-type-num text-[#29B6E8]">{tie.rank + index}.</span>
             <span className="min-w-0 flex-1 break-words text-white">{item.name}</span>
             <button type="button" className="tls-btn tls-btn--quiet inline-flex h-10 w-10 items-center justify-center rounded-sm disabled:opacity-30" disabled={index === 0}
               onClick={() => move(index, -1)} aria-label={`${item.name} nach oben`} data-testid={`table-decision-up-${index}`}>
@@ -132,7 +132,7 @@ function RemoveSheet({ staffel, decision, override, onClose, onSaved }) {
   return (
     <AdminSheet title="Entscheid zurücknehmen" eyebrow={staffel.label} onClose={onClose} onSubmit={submit} saving={saving}
       submitLabel="Zurücknehmen" submitTestId="table-decision-remove-save" testId="table-decision-remove-sheet">
-      <p className="text-sm text-white/65">{decision.names.join(" vor ")}. Danach teilen sich die Teams den Platz wieder, solange sie gleich stehen.</p>
+      <p className="tls-type-small text-white/65">{decision.names.join(" vor ")}. Danach teilen sich die Teams den Platz wieder, solange sie gleich stehen.</p>
       <div className="mt-4">
         <TextAreaField label="Grund" rows={3} value={reason} onChange={setReason} required testId="table-decision-remove-reason" />
       </div>
@@ -165,35 +165,35 @@ function StaffelTies({ tournamentId, label, data, canDecide, onSaved }) {
       <div className="flex flex-wrap items-baseline justify-between gap-2">
         <h3 className="font-bold text-white">Gleichstand</h3>
         {data.rules?.tiebreakers ? (
-          <span className="text-xs text-white/60">{byMaps(data.rules) ? "Punkte = gewonnene Maps · " : ""}{tiebreakOrder(data.rules.tiebreakers)}</span>
+          <span className="tls-type-small text-white/60">{byMaps(data.rules) ? "Punkte = gewonnene Maps · " : ""}{tiebreakOrder(data.rules.tiebreakers)}</span>
         ) : null}
       </div>
-      {!ties.length ? <p className="text-sm text-white/60">Kein offener Gleichstand.</p> : null}
+      {!ties.length ? <p className="tls-type-small text-white/60">Kein offener Gleichstand.</p> : null}
       {canDecide && closed && (ties.length || decisions.length) ? (
-        <p className="text-sm text-white/70" data-testid="staffel-ties-closed">Abgeschlossen – entscheiden und zurücknehmen geht erst nach dem Wiederöffnen im Reiter „Abschluss“ der Season.</p>
+        <p className="tls-type-body text-white/70" data-testid="staffel-ties-closed">Abgeschlossen – entscheiden und zurücknehmen geht erst nach dem Wiederöffnen im Reiter „Abschluss“ der Season.</p>
       ) : null}
       {ties.map((tie) => (
         <div key={tie.rank} className="flex flex-wrap items-center gap-x-3 gap-y-2 rounded-sm border border-warn/30 bg-warn/5 px-3 py-2" data-testid={`season-tie-${tournamentId}-${tie.rank}`}>
           {TIE_KINDS[tie.kind] ? (
-            <span className="rounded-sm border border-warn/50 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wider text-warn" data-testid={`season-tie-kind-${tournamentId}-${tie.rank}`}>
+            <span className="rounded-sm border border-warn/50 px-1.5 py-0.5 tls-type-label text-warn" data-testid={`season-tie-kind-${tournamentId}-${tie.rank}`}>
               {TIE_KINDS[tie.kind]}
             </span>
           ) : null}
-          <span className="min-w-0 text-sm text-white [overflow-wrap:anywhere]">Platz {tie.rank}: {tie.names.join(", ")}</span>
-          <span className="text-xs text-white/60 tabular-nums">{tie.points} Punkte, nach allen Kriterien gleich</span>
+          <span className="min-w-0 tls-type-small text-white [overflow-wrap:anywhere]">Platz {tie.rank}: {tie.names.join(", ")}</span>
+          <span className="tls-type-small text-white/60 tabular-nums">{tie.points} Punkte, nach allen Kriterien gleich</span>
           {decide && blocked(tie) ? <span className="ml-auto"><OwnTeamNote testId={`season-tie-own-${tie.rank}`} /></span> : null}
           {decide && !blocked(tie) ? (
             <button type="button" onClick={() => setSheet({ kind: "order", tie })} data-testid={`season-tie-decide-${tie.rank}`}
-              className="tls-btn tls-btn--secondary ml-auto min-h-[44px] rounded-sm px-3 py-1.5 text-[11px] font-bold uppercase tracking-wider">Reihenfolge festlegen</button>
+              className="tls-btn tls-btn--secondary ml-auto min-h-[44px] rounded-sm px-3 py-1.5 tls-type-label">Reihenfolge festlegen</button>
           ) : null}
         </div>
       ))}
-      {ties.length && !data.can_decide ? <p className="text-xs text-white/60">Die Season sieht keinen Entscheid der Leitung vor – die Teams teilen sich den Platz.</p> : null}
+      {ties.length && !data.can_decide ? <p className="tls-type-small text-white/60">Die Season sieht keinen Entscheid der Leitung vor – die Teams teilen sich den Platz.</p> : null}
       {decisions.length ? (
         <ul className="space-y-1.5" aria-label="Entscheide der Leitung">
           {decisions.map((decision) => (
-            <li key={decision.id} className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-white/70" data-testid={`season-decision-${decision.id}`}>
-              <span className={`rounded-sm border px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wider ${decision.applies ? "border-[#29B6E8]/50 text-[#29B6E8]" : "border-white/15 text-white/60"}`}>
+            <li key={decision.id} className="flex flex-wrap items-center gap-x-3 gap-y-1 tls-type-small text-white/70" data-testid={`season-decision-${decision.id}`}>
+              <span className={`rounded-sm border px-1.5 py-0.5 tls-type-label ${decision.applies ? "border-[#29B6E8]/50 text-[#29B6E8]" : "border-white/15 text-white/60"}`}>
                 {decision.applies ? "Gilt" : "Gilt nicht mehr"}
               </span>
               <span className="text-white [overflow-wrap:anywhere]">{decision.names.join(" vor ")}</span>
@@ -201,7 +201,7 @@ function StaffelTies({ tournamentId, label, data, canDecide, onSaved }) {
               {change && blocked(decision) ? <span className="ml-auto"><OwnTeamNote testId={`season-decision-own-${decision.id}`} /></span> : null}
               {change && !blocked(decision) ? (
                 <button type="button" onClick={() => setSheet({ kind: "remove", decision })} data-testid={`season-decision-remove-${decision.id}`}
-                  className="tls-btn tls-btn--quiet ml-auto min-h-[44px] rounded-sm px-3 py-1 text-[11px] font-bold uppercase tracking-wider">Zurücknehmen</button>
+                  className="tls-btn tls-btn--quiet ml-auto min-h-[44px] rounded-sm px-3 py-1 tls-type-label">Zurücknehmen</button>
               ) : null}
             </li>
           ))}
@@ -239,21 +239,21 @@ export function StaffelTablePanel({ tournamentId, label = "Tabelle", canDecide =
   if (error && !data) {
     return (
       <div role="alert" className="flex flex-col gap-3 rounded-sm border border-warn/40 bg-warn/10 p-4 sm:flex-row sm:items-center sm:justify-between" data-testid="staffel-table-error">
-        <p className="text-sm text-white/85 [overflow-wrap:anywhere]">Die Tabelle ließ sich nicht laden. <span className="block text-white/60">{error}</span></p>
-        <button type="button" onClick={load} className="tls-btn tls-btn--secondary inline-flex min-h-[44px] shrink-0 items-center justify-center rounded-sm px-4 text-xs font-bold uppercase tracking-wider">Nochmal versuchen</button>
+        <p className="tls-type-small text-white/85 [overflow-wrap:anywhere]">Die Tabelle ließ sich nicht laden. <span className="block text-white/60">{error}</span></p>
+        <button type="button" onClick={load} className="tls-btn tls-btn--secondary inline-flex min-h-[44px] shrink-0 items-center justify-center rounded-sm px-4 tls-type-label">Nochmal versuchen</button>
       </div>
     );
   }
-  if (!data) return <p className="text-sm text-white/60" aria-busy="true" data-testid="staffel-table-loading">Lade Tabelle …</p>;
+  if (!data) return <p className="tls-type-small text-white/60" aria-busy="true" data-testid="staffel-table-loading">Lade Tabelle …</p>;
   const rows = Array.isArray(data.standings) ? data.standings : [];
   return (
     <div className="space-y-5" data-testid={`staffel-table-${tournamentId}`}>
       <section className="space-y-2" aria-label={label}>
         <div className="flex flex-wrap items-center justify-between gap-3">
-          <h2 className="font-heading text-xl font-black uppercase">Tabelle</h2>
+          <h2 className="tls-type-section">Tabelle</h2>
           {pdfHref ? (
             <a href={pdfHref} target="_blank" rel="noreferrer" data-testid="staffel-pdf-standings"
-              className="tls-btn tls-btn--quiet inline-flex min-h-[44px] items-center justify-center gap-2 rounded-sm px-4 text-xs font-bold uppercase tracking-wider">
+              className="tls-btn tls-btn--quiet inline-flex min-h-[44px] items-center justify-center gap-2 rounded-sm px-4 tls-type-label">
               <FileDown className="h-4 w-4" aria-hidden="true" /> PDF Tabelle
             </a>
           ) : null}
@@ -267,7 +267,7 @@ export function StaffelTablePanel({ tournamentId, label = "Tabelle", canDecide =
       </section>
       <section id="gleichstand" className="scroll-mt-24 rounded-sm border border-white/10 bg-[#121212] p-4">
         <StaffelTies tournamentId={tournamentId} label={label} data={data} canDecide={canDecide} onSaved={load} />
-        <p className="mt-3 flex items-center gap-1.5 text-xs text-white/60"><Scale className="h-3.5 w-3.5 shrink-0" aria-hidden="true" /> Kampflos, Austritt und „beide nicht erschienen“ rechnet die Tabelle nach den Regeln der Season.</p>
+        <p className="mt-3 flex items-center gap-1.5 tls-type-small text-white/60"><Scale className="h-3.5 w-3.5 shrink-0" aria-hidden="true" /> Kampflos, Austritt und „beide nicht erschienen“ rechnet die Tabelle nach den Regeln der Season.</p>
       </section>
     </div>
   );
@@ -287,17 +287,17 @@ export function SeasonTableLinks({ divisions = [] }) {
       <ul className="divide-y divide-white/5 rounded-sm border border-white/10">
         {staffeln.map((staffel) => (staffelBeforeStart(staffel) ? (
           // Vor dem Start gibt es noch keine Tabelle - kein Weg auf eine leere Seite.
-          <li key={staffel.tournament_id} className="flex min-h-[44px] items-center justify-between gap-3 px-3 text-sm text-white/70"
+          <li key={staffel.tournament_id} className="flex min-h-[44px] items-center justify-between gap-3 px-3 tls-type-small text-white/70"
             data-testid={`season-table-none-${staffel.tournament_id}`}>
             <span className="min-w-0 [overflow-wrap:anywhere]">{staffel.label}</span>
-            <span className="shrink-0 text-xs text-white/60">noch keine Tabelle</span>
+            <span className="shrink-0 tls-type-small text-white/60">noch keine Tabelle</span>
           </li>
         ) : (
           <li key={staffel.tournament_id}>
             <Link to={staffelAdminUrl(staffel.tournament_id, "tabelle")} data-testid={`season-table-open-${staffel.tournament_id}`}
-              className="flex min-h-[44px] items-center justify-between gap-3 px-3 text-sm font-semibold text-white/85 hover:bg-white/5 hover:text-white">
+              className="flex min-h-[44px] items-center justify-between gap-3 px-3 tls-type-small font-semibold text-white/85 hover:bg-white/5 hover:text-white">
               <span className="min-w-0 [overflow-wrap:anywhere]">{staffel.label}</span>
-              <span className="inline-flex shrink-0 items-center gap-1 text-xs font-bold uppercase tracking-wider text-[#29B6E8]">Tabelle öffnen <ArrowRight className="h-3.5 w-3.5" aria-hidden="true" /></span>
+              <span className="inline-flex shrink-0 items-center gap-1 tls-type-label text-[#29B6E8]">Tabelle öffnen <ArrowRight className="h-3.5 w-3.5" aria-hidden="true" /></span>
             </Link>
           </li>
         )))}

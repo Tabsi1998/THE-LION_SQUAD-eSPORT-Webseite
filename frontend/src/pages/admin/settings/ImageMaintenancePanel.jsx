@@ -6,7 +6,7 @@ import { useConfirm } from "@/components/tls/ConfirmDialog";
 import { toast } from "sonner";
 import { Upload } from "lucide-react";
 
-const BUTTON = "px-4 py-2 border border-white/20 text-white/80 font-bold uppercase tracking-wider rounded-sm inline-flex items-center gap-2 text-xs disabled:opacity-50";
+const BUTTON = "px-4 py-2 border border-white/20 text-white/80 tls-type-label rounded-sm inline-flex items-center gap-2 disabled:opacity-50";
 
 export function ImageMaintenancePanel() {
   const [busy, setBusy] = useState("");
@@ -62,8 +62,8 @@ export function ImageMaintenancePanel() {
 
   return (
     <div className="border border-white/10 bg-[#121212] rounded-sm p-5" data-testid="image-maintenance">
-      <div className="font-heading font-bold uppercase mb-1">Bild-Wartung</div>
-      <p className="text-xs text-white/50 mb-3">Gilt für alle Bilder der Website: Sponsoren, News, Events, Spiele und den Rest.</p>
+      <div className="font-bold uppercase mb-1">Bild-Wartung</div>
+      <p className="tls-type-small text-white/50 mb-3">Gilt für alle Bilder der Website: Sponsoren, News, Events, Spiele und den Rest.</p>
       <div className="flex flex-wrap gap-2">
         <button type="button" onClick={check} disabled={Boolean(busy)} data-testid="image-audit-btn" className={`${BUTTON} hover:border-[#FFD700] hover:text-[#FFD700]`}>{busy === "audit" ? "Prüfe…" : "Bilder prüfen"}</button>
         <button type="button" onClick={repair} disabled={Boolean(busy)} data-testid="image-normalize-btn" className={`${BUTTON} hover:border-[#29B6E8] hover:text-[#29B6E8]`}>{busy === "repair" ? "Repariere…" : "Adressen reparieren"}</button>
@@ -71,7 +71,7 @@ export function ImageMaintenancePanel() {
         <button type="button" onClick={importExternal} disabled={Boolean(busy)} data-testid="image-migrate-btn" className={`${BUTTON} hover:border-[#29B6E8] hover:text-[#29B6E8]`}><Upload className="w-4 h-4" aria-hidden="true" /> {busy === "import" ? "Speichere…" : "Externe Bilder lokal speichern"}</button>
       </div>
       {audit?.summary && (
-        <div className="mt-4 grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-2 text-xs" data-testid="image-audit-result">
+        <div className="mt-4 grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-2 tls-type-small" data-testid="image-audit-result">
           {[
             ["OK", audit.summary.local_ok],
             ["Alte Adressen", audit.summary.legacy_local],
@@ -83,7 +83,7 @@ export function ImageMaintenancePanel() {
           ].map(([label, value]) => (
             <div key={label} className="border border-white/10 rounded-sm px-3 py-2">
               <div className="text-white/45 uppercase tracking-wider font-bold">{label}</div>
-              <div className="font-display text-lg text-white mt-1">{value || 0}</div>
+              <div className="tls-type-card tls-type-num text-white mt-1">{value || 0}</div>
             </div>
           ))}
         </div>

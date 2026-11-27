@@ -54,20 +54,20 @@ export function SeasonPassWidget() {
           <div className="lg:col-span-5">
             <div className="inline-flex items-center gap-2 px-3 py-1.5 bg-[#FFD700]/10 border border-[#FFD700]/30 rounded-sm mb-4">
               <span className="w-2 h-2 rounded-full bg-[#FFD700] animate-pulse" />
-              <span className="text-[10px] font-bold uppercase tracking-[0.3em] text-[#FFD700]">
+              <span className="tls-type-label text-[#FFD700]">
                 {/* Nur die aktive Wertung kommt hierher (#2123, ER11) - der Status steht nicht roh daneben. */}
                 {s.kind === "circuit" ? "Lions Circuit" : "TLS Jahreswertung"} · läuft
               </span>
             </div>
-            <h2 className="font-heading text-4xl md:text-5xl font-black uppercase leading-[0.95]">
+            <h2 className="tls-type-section leading-[0.95]">
               <span className="text-white">{s.name}</span>
             </h2>
-            <p className="mt-4 text-white/70 text-base max-w-md">
+            <p className="mt-4 text-white/70 tls-type-body max-w-md">
               {s.description || "Die Vereinswertung bündelt Jahrespunkte aus Turnieren, Fast-Lap-Challenges und bestätigten Event-Teilnahmen."}
             </p>
             <div className="mt-4 grid grid-cols-2 gap-2 max-w-md">
               {pointHints.map(({ icon: Icon, label }) => (
-                <div key={label} className="inline-flex items-center gap-2 border border-white/10 bg-white/[0.03] px-3 py-2 rounded-sm text-[10px] uppercase tracking-widest text-white/65 font-bold">
+                <div key={label} className="inline-flex items-center gap-2 border border-white/10 bg-white/[0.03] px-3 py-2 rounded-sm tls-type-label text-white/65">
                   <Icon className="w-3.5 h-3.5 text-[#FFD700]" /> {label}
                 </div>
               ))}
@@ -80,7 +80,7 @@ export function SeasonPassWidget() {
               >
                 Gesamtwertung <ArrowRight className="w-4 h-4" />
               </Link>
-              <div className="px-4 py-2.5 border border-white/15 rounded-sm text-xs uppercase tracking-widest text-white/60 font-bold">
+              <div className="px-4 py-2.5 border border-white/15 rounded-sm tls-type-label text-white/60">
                 {standings.length} Teilnehmer in der Wertung
               </div>
             </div>
@@ -95,20 +95,20 @@ export function SeasonPassWidget() {
               </div>
               {spotlight ? (
                 <div key={spotlight.user_id} className="tls-spotlight-enter">
-                    <div className="text-[10px] uppercase tracking-[0.3em] font-bold" style={{ color: ["#FFD700", "#C0C0C0", "#CD7F32"][spotlightIdx] }}>
+                    <div className="tls-type-label" style={{ color: ["#FFD700", "#C0C0C0", "#CD7F32"][spotlightIdx] }}>
                       Position {spotlight.rank}
                     </div>
-                    <div className="tls-wrap tls-wrap--name mt-2 font-heading text-3xl md:text-4xl font-black uppercase leading-tight tracking-tight">
+                    <div className="tls-wrap tls-wrap--name mt-2 tls-type-section leading-tight">
                       {spotlight.display_name}
                     </div>
                     <div className="mt-4 flex items-end gap-4">
                       <div>
-                        <div className="text-[10px] uppercase tracking-widest text-white/40">Punkte</div>
-                        <div className="font-display text-5xl md:text-6xl font-black text-[#29B6E8] tabular-nums">{spotlight.points}</div>
+                        <div className="tls-type-label text-quiet">Punkte</div>
+                        <div className="tls-type-hero tls-type-num text-[#29B6E8]">{spotlight.points}</div>
                       </div>
                       <div className="pb-2">
-                        <div className="text-[10px] uppercase tracking-widest text-white/40">Erfolge / Wertungen</div>
-                        <div className="font-display text-xl font-bold text-white">{spotlight.wins} <span className="text-white/40">/</span> {spotlight.events_count}</div>
+                        <div className="tls-type-label text-quiet">Erfolge / Wertungen</div>
+                        <div className="tls-type-card tls-type-num text-white">{spotlight.wins} <span className="text-white/40">/</span> {spotlight.events_count}</div>
                       </div>
                     </div>
                 </div>
@@ -127,17 +127,17 @@ export function SeasonPassWidget() {
                 <div
                   key={r.user_id}
                   data-testid={`season-pass-row-${r.rank}`}
-                  className={`flex items-center justify-between px-3 py-2 border rounded-sm text-sm ${r.rank === 1 ? "border-[#FFD700]/40 bg-[#FFD700]/5" : r.rank <= 3 ? "border-white/20 bg-white/5" : "border-white/10 bg-[#121212]"}`}
+                  className={`flex items-center justify-between px-3 py-2 border rounded-sm tls-type-small ${r.rank === 1 ? "border-[#FFD700]/40 bg-[#FFD700]/5" : r.rank <= 3 ? "border-white/20 bg-white/5" : "border-white/10 bg-[#121212]"}`}
                 >
                   <div className="flex items-center gap-3 min-w-0">
-                    <span className={`font-display font-bold w-6 ${r.rank === 1 ? "text-[#FFD700]" : r.rank === 2 ? "text-white/80" : r.rank === 3 ? "text-[#CD7F32]" : "text-[#29B6E8]"}`}>{r.rank}</span>
+                    <span className={`tls-type-num w-6 ${r.rank === 1 ? "text-[#FFD700]" : r.rank === 2 ? "text-white/80" : r.rank === 3 ? "text-[#CD7F32]" : "text-[#29B6E8]"}`}>{r.rank}</span>
                     <span className="tls-wrap text-white/90">{r.display_name}</span>
                   </div>
-                  <span className="font-display font-bold text-[#29B6E8] tabular-nums">{r.points}</span>
+                  <span className="tls-type-num text-[#29B6E8]">{r.points}</span>
                 </div>
               ))}
               {standings.length === 0 && (
-                <div className="text-white/40 text-center text-xs font-display tracking-widest py-10">NOCH KEINE PUNKTE</div>
+                <div className="text-quiet text-center tls-type-label py-10">NOCH KEINE PUNKTE</div>
               )}
             </div>
           </div>

@@ -10,6 +10,7 @@ import { useLiveRefresh } from "@/hooks/useLiveRefresh";
 import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 import { useOptionalAuth } from "@/context/AuthContext";
 import { sortByNearestDate } from "@/lib/contentSort";
+import { ShortCaps } from "@/components/tls/ShortCaps";
 
 const PAGE_SIZE = 24;
 // Der Server gibt höchstens 200 je Abruf zurück (_page_items) - so weit lädt „Mehr laden“ nach.
@@ -32,7 +33,7 @@ function Chip({ testId, active, tone = "brand", onClick, children }) {
       onClick={onClick}
       aria-pressed={active}
       data-testid={testId}
-      className={`shrink-0 whitespace-nowrap rounded-full px-3.5 py-1.5 text-xs font-bold transition-colors duration-200 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#29B6E8] ${
+      className={`shrink-0 whitespace-nowrap rounded-full px-3.5 py-1.5 tls-type-small font-bold transition-colors duration-200 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#29B6E8] ${
         active ? on : "bg-white/[0.05] text-white/65 hover:bg-white/[0.09] hover:text-white"
       }`}
     >
@@ -170,8 +171,8 @@ export default function TournamentsPage() {
     <PublicLayout>
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12 md:py-16">
         <div className="mb-10">
-          <span className="text-[11px] font-bold uppercase tracking-[0.3em] text-[#29B6E8]">Turniere</span>
-          <h1 className="mt-2 font-heading text-4xl md:text-6xl font-black uppercase">Alle Turniere</h1>
+          <span className="tls-type-label text-[#29B6E8]">Turniere</span>
+          <h1 className="mt-2 tls-type-title"><ShortCaps>Alle Turniere</ShortCaps></h1>
           <p className="mt-3 text-white/60 max-w-xl">Online und vor Ort. Einzelspieler, Teams und Mehrspieler. Vom kleinen Pokal bis zur Saison-Liga.</p>
         </div>
         {/* Handy: beide Zeilen einzeilig zum Wischen; ab Tablet brechen sie um (#1276). */}
@@ -183,7 +184,7 @@ export default function TournamentsPage() {
               data-testid={`tournament-filter-${f.v}`}
               onClick={() => selectStatusFilter(f.v)}
               aria-pressed={statusFilter === f.v}
-              className={`shrink-0 px-4 py-2 text-xs font-bold uppercase tracking-wider rounded-sm border transition ${
+              className={`shrink-0 px-4 py-2 tls-type-label rounded-sm border transition ${
                 statusFilter === f.v
                   ? "bg-[#29B6E8] text-black border-[#29B6E8]"
                   : "bg-transparent text-white/70 border-white/10 hover:border-[#29B6E8]/40"
@@ -215,9 +216,9 @@ export default function TournamentsPage() {
           <PublicLoadingState cards={6} />
         ) : error ? (
           <div className="col-span-full text-center py-20">
-            <div className="text-[#FF3B30] font-display tracking-widest text-sm">FEHLER BEIM LADEN</div>
-            <p className="mt-2 text-white/40 text-sm">Turniere konnten nicht geladen werden. Bitte Seite neu laden.</p>
-            <button onClick={load} className="tls-btn tls-btn--secondary mt-4 px-4 py-2 rounded-sm text-xs font-bold uppercase tracking-wider">
+            <div className="text-[#FF3B30] tls-type-label">FEHLER BEIM LADEN</div>
+            <p className="mt-2 text-quiet tls-type-small">Turniere konnten nicht geladen werden. Bitte Seite neu laden.</p>
+            <button onClick={load} className="tls-btn tls-btn--secondary mt-4 px-4 py-2 rounded-sm tls-type-label">
               Erneut versuchen
             </button>
           </div>
@@ -242,7 +243,7 @@ export default function TournamentsPage() {
         {!loading && !error && hasMore ? (
           <div className="mt-10 flex justify-center">
             <button type="button" onClick={loadMore} disabled={loadingMore} data-testid="tournaments-load-more"
-              className="tls-btn tls-btn--secondary min-h-11 px-6 py-2.5 rounded-sm text-xs font-bold uppercase tracking-wider disabled:opacity-50">
+              className="tls-btn tls-btn--secondary min-h-11 px-6 py-2.5 rounded-sm tls-type-label disabled:opacity-50">
               {loadingMore ? "Lädt …" : "Mehr laden"}
             </button>
           </div>

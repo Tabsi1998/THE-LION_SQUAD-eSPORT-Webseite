@@ -38,13 +38,19 @@ export function formatLapLike(ms, template) {
   return `${String(Math.floor(rest / 60)).padStart(first.length, "0")}:${minutesText}:${secondsText}${separator}${part}`;
 }
 
+/** „1:24,587“ → ["1:24,", "587"]: die Tausendstel stehen eine Stufe kleiner (#1304). Kein Bruchteil: null. */
+export function splitLapFraction(text) {
+  const match = /^(.*\d[.,])(\d{1,3})$/.exec(String(text ?? ""));
+  return match ? [match[1], match[2]] : null;
+}
+
 export function LapTime({ value, play = false, from = 0, duration = LAP_COUNT_MS, className = "", ...rest }) {
   const shown = formatRaceTime(value);
   const start = Number(from);
   // Die alte Zeit in der Form der neuen - CountUp zählt von dort aus.
   const startText = Number.isFinite(start) && start > 0 ? formatLapLike(start, shown) : undefined;
   // Live-Aktualisierung: die Tafel setzt eine neue Zeit selbst in Szene (useLapBoardMotion) - kein zweites Aufleuchten.
-  return <CountUp value={shown} from={startText} play={play} duration={duration} flash={false} className={className} {...rest} />;
+  return <CountUp value={shown} from={startText} play={play} duration={duration} flash={false} split={splitLapFraction} splitClassName="tls-lap__fraction" className={className} {...rest} />;
 }
 
 /** Einmal je Besuch und Schlüssel: true beim ersten Aufruf, danach false (auch nach einem Neuladen im selben Tab). */

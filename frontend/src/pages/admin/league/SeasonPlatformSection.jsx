@@ -9,7 +9,7 @@ import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { api } from "@/lib/api";
 import { CROSSPLAY_OPTIONS, INPUT_DEVICE_OPTIONS, platformShort } from "@/lib/leaguePlatform";
 
-const BOX = "rounded-sm border px-3 py-2 text-sm [overflow-wrap:anywhere]";
+const BOX = "rounded-sm border px-3 py-2 tls-type-small [overflow-wrap:anywhere]";
 
 /** Die Plattformen eines Felds zum Anhaken, in der Reihenfolge des Spiels - geteilt mit dem Liga-N-Blatt. */
 export function PlatformChoices({ field, value = [], onChange, testId, disabled }) {
@@ -78,14 +78,14 @@ export function SeasonPlatformSection({ seasonId, form, set, id, version }) {
         <div className={`${BOX} border-[#29B6E8]/30 bg-[#29B6E8]/5 text-white/80 flex flex-wrap items-center gap-x-3 gap-y-2`} data-testid="season-platform-suggestion">
           <span className="min-w-0 flex-1">Vorschlag: „{suggested.label}“ – am Spiel als Plattform gekennzeichnet.</span>
           <button type="button" onClick={() => chooseField(suggested.key)} data-testid="season-platform-suggestion-take"
-            className="tls-btn tls-btn--secondary min-h-[44px] px-3 py-2 rounded-sm text-xs font-bold uppercase tracking-wider">Übernehmen</button>
+            className="tls-btn tls-btn--secondary min-h-[44px] px-3 py-2 rounded-sm tls-type-label">Übernehmen</button>
         </div>
       ) : null}
       {field ? (
         <fieldset className="min-w-0 space-y-1">
-          <legend className="text-[11px] font-bold uppercase tracking-widest text-white/60">Erlaubte Plattformen</legend>
+          <legend className="tls-type-label text-white/60">Erlaubte Plattformen</legend>
           <PlatformChoices field={field} value={form.allowed_platforms} onChange={(value) => set("allowed_platforms", value)} testId="season-platform-allowed" />
-          <p className="text-xs text-white/50" data-testid="season-platform-allowed-hint">{allowedHint(form, field)}</p>
+          <p className="tls-type-small text-white/50" data-testid="season-platform-allowed-hint">{allowedHint(form, field)}</p>
         </fieldset>
       ) : null}
       <FormGrid cols={2}>
@@ -96,17 +96,17 @@ export function SeasonPlatformSection({ seasonId, form, set, id, version }) {
       </FormGrid>
       {state.divisions?.length ? (
         <div className="space-y-1" data-testid="season-platform-divisions">
-          <p className="text-[11px] font-bold uppercase tracking-widest text-white/60">So gilt es je Liga (gespeicherter Stand)</p>
-          <ul className="space-y-1 text-sm text-white/75">
+          <p className="tls-type-small font-bold text-white/60">So gilt es je Liga (gespeicherter Stand)</p>
+          <ul className="space-y-1 tls-type-small text-white/75">
             {state.divisions.map((row) => (
               <li key={row.id} className="flex min-w-0 flex-wrap gap-x-2" data-testid={`season-platform-division-${row.id}`}>
                 <span className="font-bold text-white">{row.label}</span>
                 <span className="min-w-0 [overflow-wrap:anywhere]">{platformShort(row.effective)}</span>
-                <span className="text-xs text-white/45">{Object.keys(row.overrides || {}).length ? "weicht ab" : "wie Season"}</span>
+                <span className="tls-type-small text-white/45">{Object.keys(row.overrides || {}).length ? "weicht ab" : "wie Season"}</span>
               </li>
             ))}
           </ul>
-          <p className="text-xs text-white/45">Abweichen stellst du bei der Liga ein: Reiter „Ligen und Staffeln“, Stift bei der Liga.</p>
+          <p className="tls-type-small text-white/45">Abweichen stellst du bei der Liga ein: Reiter „Ligen und Staffeln“, Stift bei der Liga.</p>
         </div>
       ) : null}
     </FormSection>

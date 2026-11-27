@@ -14,7 +14,7 @@ export default function HomeTodayCards({ items }) {
   return (
     <section aria-labelledby="home-today-title" className="border-b border-white/10 bg-honor/[0.04]" data-testid="home-today">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 md:py-5 flex flex-col gap-3 md:flex-row md:items-center md:gap-6">
-        <h2 id="home-today-title" className="shrink-0 flex items-center gap-2.5 text-xs font-bold uppercase tracking-[0.16em] text-quiet">
+        <h2 id="home-today-title" className="shrink-0 flex items-center gap-2.5 tls-type-label text-quiet">
           <span className="inline-flex items-center gap-[7px] px-2.5 py-1 rounded-full bg-honor/[0.12] border border-honor/45 text-honor tracking-[0.12em]">
             <span className="tls-run-pulse" aria-hidden="true" />
             Heute
@@ -46,10 +46,10 @@ function TodayCard({ item, index }) {
         data-testid={`home-today-item-${lineage.slug}-${series.season_slug}`}
       >
         {/* #2014: das Logo der Saison bzw. Spur steht vor dem Spiel-Logo - wie bei „Läuft gerade“. */}
-        <GameMark game={markWithLogo(item.game || (lineage.game_name ? { name: lineage.game_name } : null), seriesLogo(lineage, series))} code className="w-10 h-10 !rounded-lg !bg-surface-3 border border-white/10" codeClass="font-display text-[15px] !text-brand" iconClass="w-5 h-5" padded />
+        <GameMark game={markWithLogo(item.game || (lineage.game_name ? { name: lineage.game_name } : null), seriesLogo(lineage, series))} code className="w-10 h-10 !rounded-lg !bg-surface-3 border border-white/10" codeClass="tls-type-small tls-type-num !text-brand" iconClass="w-5 h-5" padded />
         <div className="min-w-0 flex-1">
-          <div className="font-semibold text-[15px] leading-snug text-zinc-200 break-words [overflow-wrap:anywhere]" data-testid="home-today-title">{lineage.title}</div>
-          <div className="mt-0.5 text-[13px] text-zinc-400 break-words [overflow-wrap:anywhere]" data-testid="home-today-facts">
+          <div className="font-semibold tls-type-small leading-snug text-zinc-200 break-words [overflow-wrap:anywhere]" data-testid="home-today-title">{lineage.title}</div>
+          <div className="mt-0.5 tls-type-small text-zinc-400 break-words [overflow-wrap:anywhere]" data-testid="home-today-facts">
             {/* Flagge des heutigen Rennens (#1925) vor der Runde. */}
             {parts.map((part, position) => (
               <Fragment key={position}>
@@ -61,7 +61,7 @@ function TodayCard({ item, index }) {
           </div>
           {item.next?.sessions?.length > 1 && <SessionChips rounds={item.next.sessions.map((entry, position) => ({ ...entry, id: `${position}` }))} showTime className="mt-1.5" testId="home-today-sessions" />}
         </div>
-        <span className="shrink-0 inline-flex items-center gap-1 text-[11px] font-bold uppercase tracking-[0.14em] text-brand">
+        <span className="shrink-0 inline-flex items-center gap-1 tls-type-label text-brand">
           <span className="hidden sm:inline">Tabelle</span>
           <ArrowRight className="w-4 h-4" aria-hidden="true" />
         </span>

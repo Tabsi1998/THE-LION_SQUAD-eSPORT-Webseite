@@ -39,7 +39,7 @@ export function PhotoSubmitPanel({ album, info, onSent }) {
   if (!info) return null;
   const hint = submissionHint(info);
   if (!info.can_submit && !done) {
-    return hint ? <p className="mt-4 text-sm text-white/50" data-testid="photo-submit-closed">{hint}</p> : null;
+    return hint ? <p className="mt-4 tls-type-body text-white/50" data-testid="photo-submit-closed">{hint}</p> : null;
   }
 
   const remaining = Math.max(0, (info.remaining || 0) - files.length);
@@ -89,28 +89,28 @@ export function PhotoSubmitPanel({ album, info, onSent }) {
     <div className="mt-6 rounded-sm border border-white/10 bg-[#121212] p-4" data-testid="photo-submit">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <div className="font-heading font-black uppercase">Warst du dabei?</div>
-          {hint ? <div className="text-xs text-white/55" data-testid="photo-submit-hint">{hint}</div> : null}
+          <div className="font-black uppercase">Warst du dabei?</div>
+          {hint ? <div className="tls-type-small text-white/55" data-testid="photo-submit-hint">{hint}</div> : null}
         </div>
         {!open && info.can_submit ? (
-          <button type="button" onClick={() => setOpen(true)} className="tls-btn tls-btn--primary inline-flex min-h-[44px] items-center gap-2 rounded-sm px-4 py-2 text-xs font-bold uppercase tracking-wider" data-testid="photo-submit-open">
+          <button type="button" onClick={() => setOpen(true)} className="tls-btn tls-btn--primary inline-flex min-h-[44px] items-center gap-2 rounded-sm px-4 py-2 tls-type-label" data-testid="photo-submit-open">
             <ImagePlus className="w-4 h-4" /> Fotos einsenden
           </button>
         ) : null}
       </div>
-      {done ? <p className="mt-3 text-sm text-[#7EE2A8]" role="status" data-testid="photo-submit-done">{done}</p> : null}
+      {done ? <p className="mt-3 tls-type-small text-[#7EE2A8]" role="status" data-testid="photo-submit-done">{done}</p> : null}
       {errors.length ? (
-        <ul className="mt-2 space-y-1 text-xs text-[#FF6B60]" data-testid="photo-submit-errors">
+        <ul className="mt-2 space-y-1 tls-type-small text-[#FF6B60]" data-testid="photo-submit-errors">
           {errors.map((line) => <li key={line}>{line}</li>)}
         </ul>
       ) : null}
       {open && info.can_submit ? (
         <div className="mt-4 space-y-4">
           <div className="flex flex-wrap gap-2">
-            <button type="button" onClick={() => cameraRef.current?.click()} disabled={!remaining || !!sending} className="tls-btn tls-btn--secondary inline-flex min-h-[44px] items-center gap-2 rounded-sm px-3 py-2 text-xs font-bold uppercase tracking-wider md:hidden" data-testid="photo-submit-camera">
+            <button type="button" onClick={() => cameraRef.current?.click()} disabled={!remaining || !!sending} className="tls-btn tls-btn--secondary inline-flex min-h-[44px] items-center gap-2 rounded-sm px-3 py-2 tls-type-label md:hidden" data-testid="photo-submit-camera">
               <Camera className="w-4 h-4" /> Foto aufnehmen
             </button>
-            <button type="button" onClick={() => galleryRef.current?.click()} disabled={!remaining || !!sending} className="tls-btn tls-btn--secondary inline-flex min-h-[44px] items-center gap-2 rounded-sm px-3 py-2 text-xs font-bold uppercase tracking-wider" data-testid="photo-submit-pick">
+            <button type="button" onClick={() => galleryRef.current?.click()} disabled={!remaining || !!sending} className="tls-btn tls-btn--secondary inline-flex min-h-[44px] items-center gap-2 rounded-sm px-3 py-2 tls-type-label" data-testid="photo-submit-pick">
               <ImagePlus className="w-4 h-4" /> Fotos wählen
             </button>
             <input ref={cameraRef} type="file" accept={SUBMISSION_ACCEPT} capture="environment" className="hidden" onChange={(event) => { add(event.target.files); event.target.value = ""; }} data-testid="photo-submit-camera-input" />
@@ -131,24 +131,24 @@ export function PhotoSubmitPanel({ album, info, onSent }) {
             </ul>
           ) : null}
           {skipped.length ? (
-            <ul className="space-y-1 text-xs text-[#FFD700]" data-testid="photo-submit-skipped">
+            <ul className="space-y-1 tls-type-small text-[#FFD700]" data-testid="photo-submit-skipped">
               {skipped.map((entry) => <li key={entry.name}>{entry.name}: {entry.reason}</li>)}
             </ul>
           ) : null}
-          <label className="flex items-start gap-3 text-sm text-white/80">
+          <label className="flex items-start gap-3 tls-type-small text-white/80">
             <input type="checkbox" checked={consent} onChange={(event) => setConsent(event.target.checked)} className="mt-1 h-4 w-4 accent-[#29B6E8]" data-testid="photo-submit-consent" />
             <span>Die Personen auf den Fotos sind einverstanden, dass die Bilder in der Galerie erscheinen.</span>
           </label>
-          <label className="flex items-start gap-3 text-sm text-white/80">
+          <label className="flex items-start gap-3 tls-type-small text-white/80">
             <input type="checkbox" checked={credit} onChange={(event) => setCredit(event.target.checked)} className="mt-1 h-4 w-4 accent-[#29B6E8]" data-testid="photo-submit-credit" />
             <span>Mit meinem Namen zeigen („Foto: …“)</span>
           </label>
           <div className="flex flex-wrap items-center gap-3">
-            <button type="button" onClick={send} disabled={!consent || !files.length || !!sending} className="tls-btn tls-btn--primary inline-flex min-h-[44px] items-center gap-2 rounded-sm px-4 py-2 text-xs font-bold uppercase tracking-wider" data-testid="photo-submit-send">
+            <button type="button" onClick={send} disabled={!consent || !files.length || !!sending} className="tls-btn tls-btn--primary inline-flex min-h-[44px] items-center gap-2 rounded-sm px-4 py-2 tls-type-label" data-testid="photo-submit-send">
               {sending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
               {sending ? `Sende ${sending.at} von ${sending.of} …` : files.length ? `${files.length} ${files.length === 1 ? "Foto" : "Fotos"} senden` : "Senden"}
             </button>
-            <span className="text-xs text-white/45">Die Fotos erscheinen erst nach der Freigabe durch den Vorstand.</span>
+            <span className="tls-type-small text-white/45">Die Fotos erscheinen erst nach der Freigabe durch den Vorstand.</span>
           </div>
         </div>
       ) : null}

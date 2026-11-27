@@ -55,8 +55,8 @@ export function PortraitImage({ photo, cutout, round = false, size, sizes = PORT
 export function RoleLine({ label, word, quiet = false }) {
   return (
     <span className="flex flex-wrap items-baseline gap-x-1.5 min-w-0">
-      <span lang="de" className={`text-[11px] font-bold uppercase tracking-[0.18em] break-words hyphens-auto ${quiet ? "text-white/55" : "text-[#FFD700]"}`}>{softBreaks(label)}</span>
-      {word ? <span lang="de" className="text-xs font-bold text-white/75 break-words hyphens-auto">{softBreaks(word)}</span> : null}
+      <span lang="de" className={`tls-type-small font-bold break-words hyphens-auto ${quiet ? "text-white/55" : "text-[#FFD700]"}`}>{softBreaks(label)}</span>
+      {word ? <span lang="de" className="tls-type-small font-bold text-white/75 break-words hyphens-auto">{softBreaks(word)}</span> : null}
     </span>
   );
 }
@@ -80,16 +80,16 @@ export function BoardPortrait({ person, title, label = "", withheld = false, siz
         <RoleLine label={role.label} word={role.word} />
         {person ? (
           <>
-            <span className={`tls-card__title font-heading font-black leading-tight break-words ${size === "lg" ? "text-lg md:text-xl" : "text-base"}`}>{names.primary}</span>
+            <span className="tls-card__title tls-type-card leading-tight break-words">{names.primary}</span>
             {names.secondary ? (
-              <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-white/55 min-w-0">
+              <span className="inline-flex items-center gap-1.5 tls-type-small font-semibold text-white/55 min-w-0">
                 <Gamepad2 className="w-3.5 h-3.5 shrink-0" aria-hidden="true" /> <span className="break-all">{names.secondary}</span>
               </span>
             ) : null}
-            {since ? <span className="text-[11px] text-white/40">seit {since}</span> : null}
+            {since ? <span className="tls-type-small text-quiet">seit {since}</span> : null}
           </>
         ) : (
-          <span className="text-sm text-white/50">{withheld ? "Name nicht freigegeben" : "Position offen"}</span>
+          <span className="tls-type-small text-white/50">{withheld ? "Name nicht freigegeben" : "Position offen"}</span>
         )}
       </span>
     </Wrapper>
@@ -104,10 +104,10 @@ export function VacancyPortrait({ title, label = "", text = "", size = "lg", tes
     <div data-testid={testId} data-season-anchor="card" className={`tls-card flex flex-col min-w-0 w-full border border-dashed border-[#29B6E8]/40 rounded-sm bg-[#0B1418] overflow-hidden ${size === "lg" ? "max-w-[280px]" : "max-w-[220px]"}`}>
       <PortraitImage photo="" cutout className="w-full" />
       <div className={`flex flex-col gap-2 flex-1 ${size === "lg" ? "p-4" : "p-3"}`}>
-        <span className="text-[11px] font-bold uppercase tracking-[0.18em] text-[#29B6E8]">Wir suchen</span>
-        <span lang="de" className="font-heading font-black leading-tight break-words hyphens-auto text-sm sm:text-base md:text-lg">{softBreaks(role)}</span>
-        {text ? <p className="text-sm text-white/65">{text}</p> : null}
-        <Link to={contact} data-testid={testId ? `${testId}-contact` : undefined} className="tls-btn tls-btn--secondary mt-auto inline-flex w-full justify-center px-3 py-2 rounded-sm text-xs font-bold uppercase tracking-wider">
+        <span className="tls-type-label text-[#29B6E8]">Wir suchen</span>
+        <span lang="de" className="tls-type-card leading-tight break-words hyphens-auto">{softBreaks(role)}</span>
+        {text ? <p className="tls-type-body text-white/65">{text}</p> : null}
+        <Link to={contact} data-testid={testId ? `${testId}-contact` : undefined} className="tls-btn tls-btn--secondary mt-auto inline-flex w-full justify-center px-3 py-2 rounded-sm tls-type-label">
           Interesse melden
         </Link>
       </div>
@@ -125,7 +125,7 @@ export function BoardAvatar({ contact, testId, quiet = false }) {
       <span className="min-w-0 flex flex-col gap-0.5">
         <RoleLine label={role.label} word={role.word} quiet={quiet} />
         <span className="font-bold text-white leading-tight break-words group-hover:text-[#29B6E8] transition">{contact.name}</span>
-        {contact.gamertag ? <span className="inline-flex items-center gap-1 text-xs text-white/50"><Gamepad2 className="w-3 h-3" aria-hidden="true" /> {contact.gamertag}</span> : null}
+        {contact.gamertag ? <span className="inline-flex items-center gap-1 tls-type-small text-white/50"><Gamepad2 className="w-3 h-3" aria-hidden="true" /> {contact.gamertag}</span> : null}
       </span>
     </Wrapper>
   );

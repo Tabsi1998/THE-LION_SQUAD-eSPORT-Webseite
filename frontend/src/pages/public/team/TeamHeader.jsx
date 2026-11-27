@@ -32,7 +32,7 @@ export function TeamCrest({ team, hex }) {
       {team.logo_url ? (
         <img src={resolveMediaUrl(team.logo_url)} alt={team.name} className="w-full h-full object-cover" />
       ) : (
-        <span className="font-heading font-black text-xl md:text-2xl" style={{ color: hex }} data-testid="team-crest-placeholder">{team.tag || initials(team.name)}</span>
+        <span className="tls-type-section" style={{ color: hex }} data-testid="team-crest-placeholder">{team.tag || initials(team.name)}</span>
       )}
     </div>
   );
@@ -57,13 +57,13 @@ export function TeamFaces({ team, userId }) {
             <li key={face.id} className="shrink-0 w-[68px] text-center" data-testid={`team-face-${face.id}`}>
               <Link to={face.username ? `/u/${encodeURIComponent(face.username)}` : "#"} className="group inline-flex flex-col items-center gap-1.5" aria-label={`${name}, ${face.roleLabel}${mine ? " (du)" : ""}`}>
                 <span className="relative inline-flex">
-                  <span className="w-14 h-14 rounded-full overflow-hidden flex items-center justify-center text-sm font-black text-white ring-1 ring-white/15 group-hover:ring-[#29B6E8]/60 transition" style={face.avatar_url ? undefined : { backgroundColor: faceTone(name) }}>
+                  <span className="w-14 h-14 rounded-full overflow-hidden flex items-center justify-center tls-type-small font-black text-white ring-1 ring-white/15 group-hover:ring-[#29B6E8]/60 transition" style={face.avatar_url ? undefined : { backgroundColor: faceTone(name) }}>
                     {face.avatar_url ? <img src={resolveMediaUrl(face.avatar_url)} alt="" loading="lazy" className="w-full h-full object-cover" /> : initials(name)}
                   </span>
                   {mine ? <YouCorners /> : null}
                 </span>
-                <span className="block w-full truncate text-[11px] font-bold text-white/85">{name}</span>
-                <span className={`block text-[10px] uppercase tracking-wider ${face.role === "player" ? "text-white/45" : "text-white/75"}`} data-testid={`team-face-role-${face.id}`}>{face.roleLabel}</span>
+                <span className="block w-full truncate tls-type-small font-bold text-white/85">{name}</span>
+                <span className={`block tls-type-label ${face.role === "player" ? "text-white/45" : "text-white/75"}`} data-testid={`team-face-role-${face.id}`}>{face.roleLabel}</span>
                 {mine ? <span className="tls-you-tag" data-testid={`team-face-you-tag-${face.id}`}>Du</span> : null}
               </Link>
             </li>
@@ -80,7 +80,7 @@ export function TeamHeader({ team, header, levelInfo, userId, actions = null, ch
   return (
     <section className="border-b border-white/10 pb-6" data-testid="team-header" data-color={header?.color || team.color || "cyan"}>
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-6">
-        <Link to="/teams" className="text-[11px] font-bold uppercase tracking-[0.3em] text-[#29B6E8] hover:text-white">← Teams</Link>
+        <Link to="/teams" className="tls-type-label text-[#29B6E8] hover:text-white">← Teams</Link>
         {/* Mit eigenem Banner hat das Band dasselbe Format wie der Zuschnitt beim Hochladen (3:1), sonst schneidet object-cover
             oben und unten weg. Ohne Banner bleibt der flache Farbstreifen. */}
         <div className={`relative mt-3 ${team.banner_url ? "aspect-[3/1] w-full" : "h-[120px] md:h-[140px] lg:h-[160px]"} rounded-sm overflow-hidden border border-white/10`} style={{ background: bandBackground(hex) }} data-testid="team-band" data-banner={team.banner_url ? "true" : undefined}>
@@ -96,20 +96,20 @@ export function TeamHeader({ team, header, levelInfo, userId, actions = null, ch
         </div>
         <div className="relative -mt-9 md:-mt-12 flex flex-col items-center text-center">
           <TeamCrest team={team} hex={hex} />
-          <h1 className="mt-3 font-heading text-3xl md:text-4xl font-black leading-tight break-words max-w-full" data-testid="team-name">{team.name}</h1>
-          <div className="mt-2 flex flex-wrap items-center justify-center gap-x-2 gap-y-1 text-sm text-white/65" data-testid="team-header-line">
+          <h1 className="mt-3 tls-type-title leading-tight break-words max-w-full" data-testid="team-name">{team.name}</h1>
+          <div className="mt-2 flex flex-wrap items-center justify-center gap-x-2 gap-y-1 tls-type-small text-white/65" data-testid="team-header-line">
             {team.tag ? <span className="font-bold tracking-wider">{team.tag}</span> : null}
             {/* Gastteam (#1665): von der Liga-Leitung bestätigt, nie aus der Mitgliedschaft. */}
             {team.guest_badge ? <GuestBadge badge={team.guest_badge} testId="team-guest-badge" /> : null}
             {team.is_public === false ? (
-              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-sm border border-white/15 bg-white/[0.06] text-xs font-bold text-white/85" data-testid="team-private-chip">
+              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-sm border border-white/15 bg-white/[0.06] tls-type-small font-bold text-white/85" data-testid="team-private-chip">
                 <Lock className="w-3 h-3" aria-hidden="true" /> Privat
               </span>
             ) : null}
             {game ? (
               <>
                 <span aria-hidden="true">·</span>
-                <span className="px-2 py-0.5 rounded-sm border border-white/15 bg-white/[0.06] text-xs font-bold text-white/85" data-testid="team-game-plaque">{game.name || game.short_name}</span>
+                <span className="px-2 py-0.5 rounded-sm border border-white/15 bg-white/[0.06] tls-type-small font-bold text-white/85" data-testid="team-game-plaque">{game.name || game.short_name}</span>
               </>
             ) : null}
             {levelInfo ? (
@@ -122,7 +122,7 @@ export function TeamHeader({ team, header, levelInfo, userId, actions = null, ch
               </>
             ) : null}
           </div>
-          {team.description ? <p className="mt-3 text-sm md:text-base text-white/70 max-w-2xl">{team.description}</p> : null}
+          {team.description ? <p className="mt-3 tls-type-body text-white/70 max-w-2xl">{team.description}</p> : null}
           {actions ? <div className="mt-4 flex flex-wrap justify-center gap-2" data-testid="team-header-actions">{actions}</div> : null}
           <div className="mt-5 w-full">
             <TeamFaces team={team} userId={userId} />

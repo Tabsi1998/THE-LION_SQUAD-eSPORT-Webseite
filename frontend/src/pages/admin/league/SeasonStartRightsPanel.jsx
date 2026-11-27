@@ -15,7 +15,7 @@ import { STATE_CLASS } from "@/lib/leagueApplications";
 import { MODE_OPTIONS, SUCCESSOR_OPTIONS, countsLine, openRightsQuestion, placeLine, settingsForm, settingsPayload, stateLabel, stateTone, untilText, whyText } from "@/lib/leagueStartRights";
 import { MOVEMENT_TEXT, teamFrom } from "@/lib/leagueSuccessor";
 
-const BUTTON = "inline-flex min-h-[44px] items-center rounded-sm px-3 py-2 text-[11px] font-bold uppercase tracking-wider disabled:opacity-50";
+const BUTTON = "inline-flex min-h-[44px] items-center rounded-sm px-3 py-2 tls-type-label disabled:opacity-50";
 const REASON_MIN = 5;
 const MOVE_ICON = { up: ArrowUp, down: ArrowDown, stay: Minus };
 const MOVE_CLASS = { up: "text-ok", down: "text-warn", stay: "text-white/45" };
@@ -23,7 +23,7 @@ const TONE_CLASS = { ...STATE_CLASS, muted: STATE_CLASS.quiet };
 
 function StateBadge({ state }) {
   return (
-    <span data-state={state} className={`inline-flex shrink-0 rounded-sm border px-2 py-0.5 text-[11px] font-bold uppercase tracking-wider ${TONE_CLASS[stateTone(state)]}`}>
+    <span data-state={state} className={`inline-flex shrink-0 rounded-sm border px-2 py-0.5 tls-type-label ${TONE_CLASS[stateTone(state)]}`}>
       {stateLabel(state)}
     </span>
   );
@@ -54,7 +54,7 @@ function AcceptSheet({ seasonId, row, superadmin, onClose, onDone }) {
     <AdminSheet title="Zusage eintragen" eyebrow={`${row.display_name} · ${row.division_label}`} onClose={onClose} onSubmit={submit} saving={saving}
       submitLabel="Zusage eintragen" savingLabel="Trage ein …" submitTestId="start-right-accept-confirm" testId="start-right-accept-sheet"
       submitDisabled={blockedOwn || reason.trim().length < REASON_MIN || overrideMissing(needsReason, conflictReason)}>
-      <div className="space-y-4 text-sm">
+      <div className="space-y-4 tls-type-small">
         <p className="text-white/75">
           Das Team hat dir zugesagt, aber nicht selbst auf „Startrecht annehmen“ gedrückt? Dann trägst du die Zusage hier ein.
           Sie ist keine Zuteilung und keine Zustimmung zum Regelwerk.
@@ -95,24 +95,24 @@ function FillSheet({ seasonId, place, superadmin, onClose, onDone }) {
     <AdminSheet title="Nachrücken lassen" eyebrow={`${place.division_label} · Platz von ${place.display_name}`} onClose={onClose} onSubmit={submit}
       saving={saving} submitLabel="Nachrücken lassen" savingLabel="Trage ein …" submitTestId="start-right-fill-confirm" testId="start-right-fill-sheet"
       submitDisabled={!chosen || blockedOwn || reason.trim().length < REASON_MIN || overrideMissing(needsReason, conflictReason)}>
-      <div className="space-y-4 text-sm">
+      <div className="space-y-4 tls-type-small">
         <p className="text-white/75" data-testid="start-right-fill-intro">{placeLine(place)}</p>
         <fieldset className="space-y-1">
-          <legend className="text-[11px] font-bold uppercase tracking-[0.2em] text-white/50">Wer rückt nach?</legend>
+          <legend className="tls-type-label text-white/50">Wer rückt nach?</legend>
           {place.candidates.map((row) => (
             <label key={row.application_id} className="flex min-h-[44px] items-center gap-2 rounded-sm border border-white/10 bg-[#0A0A0A] px-3 py-2">
               <input type="radio" name="start-right-candidate" value={row.application_id} checked={candidateId === row.application_id}
                 onChange={() => setCandidateId(row.application_id)} data-testid={`start-right-fill-candidate-${row.application_id}`} className="shrink-0 accent-[#29B6E8]" />
               <span className="min-w-0 [overflow-wrap:anywhere]">
                 <span className="block font-semibold text-white">{row.display_name}</span>
-                <span className="block text-xs text-white/60">{teamFrom(row)}</span>
+                <span className="block tls-type-small text-white/60">{teamFrom(row)}</span>
               </span>
             </label>
           ))}
         </fieldset>
         <TextAreaField label="Grund" required rows={2} value={reason} onChange={setReason} testId="start-right-fill-reason"
           hint="Mindestens fünf Zeichen. Steht im Verlauf und im Protokoll." />
-        <p className="text-xs text-white/55">
+        <p className="tls-type-small text-white/55">
           Das Team kann den Platz ablehnen oder die Frist verstreichen lassen – dann bleibt es in seiner Liga, und der Platz ist wieder frei.
         </p>
         {blockedOwn ? <OwnTeamNote testId="start-right-fill-own-team" /> : null}
@@ -133,20 +133,20 @@ function RightRow({ row, canAct, onAccept }) {
             <span className="min-w-0 font-semibold text-white [overflow-wrap:anywhere]">{row.display_name}</span>
             <StateBadge state={row.state} />
           </div>
-          <p className="mt-0.5 text-xs text-white/60 [overflow-wrap:anywhere]">{MOVEMENT_TEXT[row.movement]} · {teamFrom(row)}{row.via === "relegation" ? " · über die Relegation" : ""}</p>
-          {row.state === "offered" && row.waits_for_lead ? <p className="mt-0.5 text-xs font-semibold text-warn">Frist vorbei – jetzt entscheidest du: Zusage eintragen oder im Eingang ablehnen.</p> : null}
-          {row.state === "offered" && row.paused ? <p className="mt-0.5 text-xs text-white/85">Frist ruht, solange der Endstand geprüft wird</p> : null}
-          {row.state === "offered" && row.accept_until && !row.waits_for_lead && !row.paused ? <p className="mt-0.5 text-xs text-white/85">Zusage bis {untilText(row.accept_until)}</p> : null}
+          <p className="mt-0.5 tls-type-small text-white/60 [overflow-wrap:anywhere]">{MOVEMENT_TEXT[row.movement]} · {teamFrom(row)}{row.via === "relegation" ? " · über die Relegation" : ""}</p>
+          {row.state === "offered" && row.waits_for_lead ? <p className="mt-0.5 tls-type-small font-semibold text-warn">Frist vorbei – jetzt entscheidest du: Zusage eintragen oder im Eingang ablehnen.</p> : null}
+          {row.state === "offered" && row.paused ? <p className="mt-0.5 tls-type-small text-white/85">Frist ruht, solange der Endstand geprüft wird</p> : null}
+          {row.state === "offered" && row.accept_until && !row.waits_for_lead && !row.paused ? <p className="mt-0.5 tls-type-small text-white/85">Zusage bis {untilText(row.accept_until)}</p> : null}
           {row.state === "accepted" && row.accepted_via === "lead" ? (
-            <p className="mt-0.5 text-xs text-white/60 [overflow-wrap:anywhere]">Von der Leitung eingetragen{row.accepted_by_name ? ` (${row.accepted_by_name})` : ""}: {row.accept_reason}</p>
+            <p className="mt-0.5 tls-type-small text-white/60 [overflow-wrap:anywhere]">Von der Leitung eingetragen{row.accepted_by_name ? ` (${row.accepted_by_name})` : ""}: {row.accept_reason}</p>
           ) : null}
-          {row.state === "participating" && row.staffel ? <p className="mt-0.5 text-xs text-white/60">{row.staffel}</p> : null}
+          {row.state === "participating" && row.staffel ? <p className="mt-0.5 tls-type-small text-white/60">{row.staffel}</p> : null}
           {row.fills ? (
-            <p className="mt-0.5 text-xs text-white/85 [overflow-wrap:anywhere]" data-testid={`start-right-fills-${row.application_id}`}>
+            <p className="mt-0.5 tls-type-small text-white/85 [overflow-wrap:anywhere]" data-testid={`start-right-fills-${row.application_id}`}>
               Nachgerückt für {row.fills.for_name} ({whyText(row.fills.why)}){row.fills.by ? ` – ausgelöst von ${row.fills.by_name || "der Leitung"}: ${row.fills.reason}` : " – nach der Regel"}. Vorher: {row.fills.back_label}.
             </p>
           ) : null}
-          {row.filled_by ? <p className="mt-0.5 text-xs text-white/60 [overflow-wrap:anywhere]">Der Platz ging an {row.filled_by.display_name}.</p> : null}
+          {row.filled_by ? <p className="mt-0.5 tls-type-small text-white/60 [overflow-wrap:anywhere]">Der Platz ging an {row.filled_by.display_name}.</p> : null}
         </div>
       </div>
       {canAct && row.state === "offered" ? (
@@ -181,7 +181,7 @@ export function SeasonStartRightsPanel({ seasonId, canSeason = false, canApplica
   useEffect(() => { load(); }, [load, version]);
   useApiInvalidation(() => load(), ["leagues"]);
 
-  if (!data || !form) return error ? <p className="text-sm text-warn" role="alert" data-testid="start-rights-error">{error}</p> : null;
+  if (!data || !form) return error ? <p className="tls-type-small text-warn" role="alert" data-testid="start-rights-error">{error}</p> : null;
   const set = (key, value) => setForm((current) => ({ ...current, [key]: value }));
   const question = openRightsQuestion(form, data.open_rights);
   const save = async (confirmed = false) => {
@@ -221,7 +221,7 @@ export function SeasonStartRightsPanel({ seasonId, canSeason = false, canApplica
       <FormSection title="Startrechte" testId="season-start-rights"
         hint="Wie Co-Teams aus der Vorgänger-Season ihren Platz in dieser Season bekommen: automatisch oder mit Zusage innerhalb einer Frist – und wer nachrückt, wenn ein Platz frei wird. Ein Startrecht ist keine Zuteilung, keine Zustimmung zum Regelwerk und keine Pflicht mitzuspielen.">
         {!canSeason ? (
-          <p className="rounded-sm border border-white/15 bg-white/[0.03] px-3 py-2 text-sm text-white/75" data-testid="start-rights-readonly">
+          <p className="rounded-sm border border-white/15 bg-white/[0.03] px-3 py-2 tls-type-body text-white/75" data-testid="start-rights-readonly">
             Nur lesen: Die Einstellung ändert, wer für diese Liga „Season konfigurieren“ hat.
           </p>
         ) : null}
@@ -254,9 +254,9 @@ export function SeasonStartRightsPanel({ seasonId, canSeason = false, canApplica
               hint="Einmal an Captain und Vertreter, sobald der Endstand dieser Season samt Playoffs und Relegation feststeht. Nie aus einer laufenden Tabelle." />
           </>
         ) : null}
-        {error ? <p className="text-sm text-warn" role="alert" data-testid="start-rights-error">{error}</p> : null}
+        {error ? <p className="tls-type-small text-warn" role="alert" data-testid="start-rights-error">{error}</p> : null}
         {canSeason && asking && question ? (
-          <div className="space-y-2 rounded-sm border border-warn/50 bg-warn/10 p-3 text-sm text-white" role="alertdialog" aria-labelledby="start-rights-confirm-title"
+          <div className="space-y-2 rounded-sm border border-warn/50 bg-warn/10 p-3 tls-type-small text-white" role="alertdialog" aria-labelledby="start-rights-confirm-title"
             data-testid="start-rights-confirm-open">
             <p id="start-rights-confirm-title" className="font-semibold">{form.active ? "Auf „Automatisch dabei“ umschalten?" : "Startrechte ausschalten?"}</p>
             <p>{question} Zurücknehmen lässt sich das nicht – wer nicht mitspielen will, meldet sich dann ab.</p>
@@ -279,17 +279,17 @@ export function SeasonStartRightsPanel({ seasonId, canSeason = false, canApplica
         {data.active && data.predecessor && data.rows.length ? (
           <div className="space-y-3 border-t border-white/10 pt-4">
             <div>
-              <h3 className="text-[11px] font-bold uppercase tracking-[0.2em] text-white/50">Startrechte aus {data.predecessor.name}</h3>
-              {countsLine(data.counts) ? <p className="mt-1 text-sm text-white/85" data-testid="start-rights-counts">{countsLine(data.counts)}</p> : null}
+              <h3 className="tls-type-small font-bold text-white/50">Startrechte aus {data.predecessor.name}</h3>
+              {countsLine(data.counts) ? <p className="mt-1 tls-type-small text-white/85" data-testid="start-rights-counts">{countsLine(data.counts)}</p> : null}
             </div>
             {data.paused ? (
-              <p className="flex gap-2 rounded-sm border border-warn/40 bg-warn/10 px-3 py-2 text-sm text-white" role="status" data-testid="start-rights-paused">
+              <p className="flex gap-2 rounded-sm border border-warn/40 bg-warn/10 px-3 py-2 tls-type-body text-white" role="status" data-testid="start-rights-paused">
                 <CircleAlert className="mt-0.5 h-4 w-4 shrink-0 text-warn" aria-hidden="true" />
                 <span>{data.predecessor.name} ist wieder geöffnet: Der Endstand wird geprüft. Die Fristen stehen still und laufen danach um die Dauer der Pause länger. Zusagen geht weiter, aber kein Startrecht verfällt und niemand rückt nach. Nach dem neuen Abschluss oben „Übernahme neu berechnen“.</span>
               </p>
             ) : null}
             {data.started && data.open_rights > 0 ? (
-              <p className="flex gap-2 rounded-sm border border-white/15 bg-white/[0.03] px-3 py-2 text-sm text-white/85" role="status" data-testid="start-rights-started">
+              <p className="flex gap-2 rounded-sm border border-white/15 bg-white/[0.03] px-3 py-2 tls-type-body text-white/85" role="status" data-testid="start-rights-started">
                 <CircleAlert className="mt-0.5 h-4 w-4 shrink-0 text-warn" aria-hidden="true" />
                 <span>Das Startdatum ist erreicht: Ab jetzt verfällt kein Startrecht mehr von selbst, und niemand rückt automatisch nach. Offene Zusagen entscheidest du – „Zusage eintragen“ oder im Eingang ablehnen.</span>
               </p>
@@ -299,7 +299,7 @@ export function SeasonStartRightsPanel({ seasonId, canSeason = false, canApplica
                 {data.open_places.map((place) => (
                   <li key={place.application_id} className="flex flex-wrap items-center justify-between gap-2 rounded-sm border border-warn/40 px-3 py-2"
                     data-testid={`start-right-place-${place.application_id}`}>
-                    <span className="min-w-0 flex-1 basis-64 text-sm text-white/90 [overflow-wrap:anywhere]">{placeLine(place, { paused: data.paused, started: data.started })}</span>
+                    <span className="min-w-0 flex-1 basis-64 tls-type-small text-white/90 [overflow-wrap:anywhere]">{placeLine(place, { paused: data.paused, started: data.started })}</span>
                     {canFill && place.candidates.length ? (
                       <button type="button" onClick={() => setFilling(place)} className={`tls-btn tls-btn--secondary ${BUTTON}`} data-testid={`start-right-fill-${place.application_id}`}>Nachrücken lassen</button>
                     ) : null}

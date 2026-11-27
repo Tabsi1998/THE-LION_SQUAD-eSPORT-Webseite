@@ -60,19 +60,19 @@ function WeatherSwitch({ season, busy, onSeasonSave, onPreview }) {
   const intensities = season.intensity === "subtle" ? { subtle: "dezent (nichts zu sehen)", ...WEATHER_INTENSITIES } : WEATHER_INTENSITIES;
   return (
     <div className="pt-3 border-t border-white/5 space-y-2" data-testid="season-weather">
-      <div className="flex flex-wrap items-center gap-x-5 gap-y-2 text-xs">
-        <label className="flex items-center gap-2 text-sm">
+      <div className="flex flex-wrap items-center gap-x-5 gap-y-2 tls-type-small">
+        <label className="flex items-center gap-2 tls-type-small">
           <input type="checkbox" checked={!!season.enabled} disabled={busy} onChange={(e) => onSeasonSave({ enabled: e.target.checked }, e.target.checked ? "Wetter an." : "Wetter aus.")} className="accent-[#29B6E8]" data-testid="season-weather-enabled" />
           <span>Wetter zeigen</span>
         </label>
         <label className="flex items-center gap-2">
-          <span className="text-white/45 uppercase tracking-wider text-[10px]">Stärke</span>
+          <span className="text-white/45 tls-type-label">Stärke</span>
           <select value={season.intensity} disabled={busy || !season.enabled} onChange={(e) => onSeasonSave({ intensity: e.target.value }, `Wetter: ${intensities[e.target.value]}.`)} className="bg-[#0A0A0A] border border-white/10 px-2 py-1.5 rounded-sm" data-testid="season-weather-intensity">
             {Object.entries(intensities).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
           </select>
         </label>
         <div className="flex items-center gap-3">
-          <span className="text-white/45 uppercase tracking-wider text-[10px]">Wo</span>
+          <span className="text-white/45 tls-type-label">Wo</span>
           {Object.entries(WEATHER_CHANNELS).filter(([value]) => !season.supported_channels || season.supported_channels.includes(value)).map(([value, label]) => (
             <label key={value} className="flex items-center gap-1.5">
               <input type="checkbox" checked={(season.channels || []).includes(value)} disabled={busy || !season.enabled} onChange={(e) => {
@@ -84,11 +84,11 @@ function WeatherSwitch({ season, busy, onSeasonSave, onPreview }) {
             </label>
           ))}
         </div>
-        <button type="button" onClick={onPreview} disabled={busy} data-testid="season-weather-preview" className="px-3 py-1.5 border border-white/20 text-white text-[10px] font-bold uppercase tracking-wider rounded-sm inline-flex items-center gap-1 disabled:opacity-40">
+        <button type="button" onClick={onPreview} disabled={busy} data-testid="season-weather-preview" className="px-3 py-1.5 border border-white/20 text-white tls-type-label rounded-sm inline-flex items-center gap-1 disabled:opacity-40">
           <Eye className="w-3 h-3" /> Vorschau 60 Sekunden
         </button>
       </div>
-      <p className="text-[11px] text-white/40 max-w-2xl">
+      <p className="tls-type-small text-quiet max-w-2xl">
         Das ganze Jahr: regnet, schneit oder gewittert es am Vereinsort, zeigen es Website und App (wo angehakt) – sonst nichts. Vom 1. Advent bis Dreikönig schneit es immer, Regen wird zu Schnee.
         Die Vorschau zeigt einen Gewitterregen, auch wenn es draußen trocken ist – nur dir, sofort, in diesem Tab.
       </p>
@@ -109,22 +109,22 @@ export function SeasonsWeatherCard({ weather, location, busy, onSave, onRefresh,
     <div className="border border-white/10 bg-[#121212] rounded-sm p-5 space-y-3" data-testid="seasons-weather">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="min-w-0">
-          <div className="font-heading font-bold uppercase inline-flex items-center gap-2"><CloudSun className="w-4 h-4 text-[#29B6E8]" /> Wetter am Vereinsort</div>
-          <p className="mt-1 text-xs text-white/50 max-w-2xl">
+          <div className="font-bold uppercase inline-flex items-center gap-2"><CloudSun className="w-4 h-4 text-[#29B6E8]" /> Wetter am Vereinsort</div>
+          <p className="mt-1 tls-type-small text-white/50 max-w-2xl">
             Der Server holt alle zehn Minuten das Wetter für den Vereinsort (Open-Meteo, ohne Schlüssel). Die Deko nimmt daraus den Wind für Netz und Fäden,
             Regen und Schnee, wenn es wirklich regnet oder schneit (im Winter wird Regen zu Schnee), und die Nacht ab dem echten Sonnenuntergang. Fällt der Dienst aus, gilt der letzte Stand oder die Vorgabe.
           </p>
-          <div className="mt-2 text-sm" data-testid="seasons-weather-text">
+          <div className="mt-2 tls-type-small" data-testid="seasons-weather-text">
             <span className="text-white/85">{weather?.location || location?.name || "Innsbruck"}:</span> {weatherText(weather)}
           </div>
-          <div className="mt-1 text-xs text-white/60" data-testid="seasons-weather-layer">{describeWeather({ seasons, weather })}</div>
-          <div className="mt-1 text-xs text-white/45" data-testid="seasons-weather-sun">
+          <div className="mt-1 tls-type-small text-white/60" data-testid="seasons-weather-layer">{describeWeather({ seasons, weather })}</div>
+          <div className="mt-1 tls-type-small text-white/45" data-testid="seasons-weather-sun">
             Sonnenaufgang {timeText(weather?.sunrise)}, Sonnenuntergang {timeText(weather?.sunset)}{weather?.night ? " – gerade Nacht" : ""}
             {weather?.fetched_at ? ` · Stand ${timeText(weather.fetched_at)}` : ""}
             {weather?.error ? ` · letzter Fehler: ${weather.error}` : ""}
           </div>
         </div>
-        <button type="button" onClick={onRefresh} disabled={busy} className="inline-flex items-center gap-2 px-3 py-1.5 border border-white/20 text-[10px] uppercase tracking-wider rounded-sm hover:border-[#29B6E8] transition disabled:opacity-50" data-testid="seasons-weather-refresh">
+        <button type="button" onClick={onRefresh} disabled={busy} className="inline-flex items-center gap-2 px-3 py-1.5 border border-white/20 tls-type-label rounded-sm hover:border-[#29B6E8] transition disabled:opacity-50" data-testid="seasons-weather-refresh">
           <RefreshCw className="w-3.5 h-3.5" /> Jetzt abrufen
         </button>
       </div>
@@ -136,22 +136,22 @@ export function SeasonsWeatherCard({ weather, location, busy, onSave, onRefresh,
         }}
         data-testid="seasons-location-form"
       >
-        <label className="text-xs text-white/60 flex flex-col gap-1">
+        <label className="tls-type-small text-white/60 flex flex-col gap-1">
           Breite
           <input value={form.lat} onChange={(e) => setForm({ ...form, lat: e.target.value })} inputMode="decimal" className="w-28 bg-[#0A0A0A] border border-white/15 rounded-sm px-2 py-1 text-sm text-white" data-testid="seasons-location-lat" />
         </label>
-        <label className="text-xs text-white/60 flex flex-col gap-1">
+        <label className="tls-type-small text-white/60 flex flex-col gap-1">
           Länge
           <input value={form.lon} onChange={(e) => setForm({ ...form, lon: e.target.value })} inputMode="decimal" className="w-28 bg-[#0A0A0A] border border-white/15 rounded-sm px-2 py-1 text-sm text-white" data-testid="seasons-location-lon" />
         </label>
-        <label className="text-xs text-white/60 flex flex-col gap-1">
+        <label className="tls-type-small text-white/60 flex flex-col gap-1">
           Ort
           <input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} maxLength={60} className="w-40 bg-[#0A0A0A] border border-white/15 rounded-sm px-2 py-1 text-sm text-white" data-testid="seasons-location-name" />
         </label>
-        <button type="submit" disabled={busy || !valid || !changed} className="inline-flex items-center gap-2 px-3 py-1.5 bg-[#29B6E8] text-black text-[10px] uppercase tracking-wider font-bold rounded-sm disabled:opacity-50" data-testid="seasons-location-save">
+        <button type="submit" disabled={busy || !valid || !changed} className="inline-flex items-center gap-2 px-3 py-1.5 bg-[#29B6E8] text-black tls-type-label rounded-sm disabled:opacity-50" data-testid="seasons-location-save">
           <MapPin className="w-3.5 h-3.5" /> Ort speichern
         </button>
-        {!valid && <span className="text-xs text-[#FF6B6B]">Breite −90 bis 90, Länge −180 bis 180.</span>}
+        {!valid && <span className="tls-type-small text-[#FF6B6B]">Breite −90 bis 90, Länge −180 bis 180.</span>}
       </form>
       {season && <WeatherSwitch season={season} busy={busy} onSeasonSave={onSeasonSave} onPreview={onPreview} />}
     </div>

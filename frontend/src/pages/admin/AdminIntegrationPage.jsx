@@ -95,27 +95,27 @@ export default function AdminIntegrationPage() {
     <AdminLayout>
       <div className="flex flex-wrap items-end justify-between gap-4 mb-6">
         <div>
-          <span className="text-[11px] font-bold uppercase tracking-[0.3em] text-[#29B6E8]">Verbindungen</span>
-          <h1 className="font-heading text-3xl md:text-4xl font-black uppercase mt-1 flex flex-wrap items-center gap-3" data-testid="integration-title">
+          <span className="tls-type-label text-[#29B6E8]">Verbindungen</span>
+          <h1 className="tls-type-title mt-1 flex flex-wrap items-center gap-3" data-testid="integration-title">
             {integration.label} <StatusChip status={status} />
           </h1>
-          <p className="text-sm text-white/55 mt-2 max-w-3xl">
+          <p className="tls-type-body text-white/55 mt-2 max-w-3xl">
             Alles zu {integration.label} an einer Stelle: Stand, Zugangsdaten, Rückrufadresse, Prüfung und die Anleitung Schritt für Schritt.
           </p>
         </div>
-        <Link to="/admin/setup" className="text-[11px] font-bold uppercase tracking-wider text-white/50 hover:text-white inline-flex items-center gap-1"><ArrowLeft className="w-3 h-3" /> Alle Verbindungen</Link>
+        <Link to="/admin/setup" className="tls-type-label text-white/50 hover:text-white inline-flex items-center gap-1"><ArrowLeft className="w-3 h-3" /> Alle Verbindungen</Link>
       </div>
 
       <div className="max-w-4xl space-y-4">
         {platformOff && (
-          <div data-testid="integration-disabled-hint" className="border border-[#FFD700]/40 bg-[#FFD700]/5 rounded-sm p-4 text-sm">
+          <div data-testid="integration-disabled-hint" className="border border-[#FFD700]/40 bg-[#FFD700]/5 rounded-sm p-4 tls-type-small">
             <strong className="text-[#FFD700]">Für Mitglieder abgeschaltet.</strong> {integration.label} erscheint nirgends – im Profil, im öffentlichen Profil, in der App und in der Datenschutzerklärung nicht.
             Wieder anbieten: Haken setzen unter <Link to="/admin/integrations" className="text-[#29B6E8] hover:underline">Alle Verbindungen → Plattformen für Mitglieder</Link>.
           </div>
         )}
         {app && (
           <div className="border border-white/10 bg-[#121212] rounded-sm p-4" data-testid="integration-app">
-            <div className="font-heading font-bold uppercase text-sm mb-3">Zugangsdaten und Prüfung</div>
+            <div className="tls-type-label mb-3">Zugangsdaten und Prüfung</div>
             <PlatformAppCard app={{ ...app, tab: undefined }} brand={brand} setBrandField={setBrandField} onClearSecret={clearSecret} onSave={save} saving={saving} showGuide={false} showFields={integration.key !== "twitch"} fieldsNote="Client ID und Secret stehen unten bei der Live-Erkennung." />
           </div>
         )}
@@ -126,7 +126,7 @@ export default function AdminIntegrationPage() {
           {/* Aufklappbar (#511): die Felder stehen oben, die Anleitung steht im FAQ unter Einrichtung genauso. */}
           {integration.guides.map((guideKey) => <SetupGuide key={guideKey} guideKey={guideKey} open={false} />)}
         </div>
-        <div className="flex flex-wrap justify-between gap-3 pt-4 border-t border-white/10 text-[11px] font-bold uppercase tracking-wider">
+        <div className="flex flex-wrap justify-between gap-3 pt-4 border-t border-white/10 tls-type-label">
           {previous ? <Link to={`/admin/integrations/${previous.key}`} data-testid="integration-prev" className="inline-flex items-center gap-1 text-white/50 hover:text-white"><ArrowLeft className="w-3 h-3" /> {previous.label}</Link> : <span />}
           {following ? <Link to={`/admin/integrations/${following.key}`} data-testid="integration-next" className="inline-flex items-center gap-1 text-white/50 hover:text-white">{following.label} <ArrowRight className="w-3 h-3" /></Link> : <span />}
         </div>

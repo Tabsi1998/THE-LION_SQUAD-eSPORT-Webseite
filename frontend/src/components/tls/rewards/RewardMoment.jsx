@@ -55,7 +55,7 @@ export function RewardCardContent({ awards, onClose, reduced = false, profileHre
       <div className="tls-placement__actions tls-placement__line" style={{ "--tls-i": lines.length }}>
         {canShareReward(first) ? <RewardShareButton award={first} testId="reward-moment-share" /> : null}
         <Link to={profileHref} onClick={onClose} data-testid="reward-moment-collection"
-          className="tls-btn tls-btn--secondary inline-flex min-h-[44px] items-center gap-2 px-3 py-2 rounded-sm text-xs font-bold uppercase tracking-wider">
+          className="tls-btn tls-btn--secondary inline-flex min-h-[44px] items-center gap-2 px-3 py-2 rounded-sm tls-type-label">
           Zur Sammlung
         </Link>
       </div>

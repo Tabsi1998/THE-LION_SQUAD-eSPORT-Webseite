@@ -15,6 +15,7 @@ import { listLimitHint } from "@/lib/membershipMail";
 import { banState, effectiveAreas, invitationText, rightsChange, rightsHistoryLine } from "@/lib/userRights";
 import { viennaDate } from "@/lib/vienna";
 import { AlertTriangle, ChevronDown, Pencil, Plus, X } from "lucide-react";
+import { ShortCaps } from "@/components/tls/ShortCaps";
 
 // Alle Benutzer (#1357): die Liste ist nur zum Lesen - Name, Konto-Art, Rolle als Wort, Bereiche als Schilder, gesperrt
 // ja/nein. „Bearbeiten“ öffnet ein Seitenblatt: Rolle und Freigaben ändert nur der Superadmin, erst mit „Speichern“ und
@@ -87,26 +88,26 @@ export default function AdminUsersPage() {
     <AdminLayout>
       <div className="flex items-end justify-between gap-4 flex-wrap mb-6">
         <div>
-          <span className="text-[11px] font-bold uppercase tracking-[0.3em] text-[#29B6E8]">Mitglieder</span>
-          <h1 className="font-heading text-3xl md:text-4xl font-black uppercase mt-1">Alle Benutzer</h1>
-          <p className="mt-2 max-w-2xl text-sm text-white/55">Die Liste ist zum Lesen. „Bearbeiten“ öffnet das Konto: {isSuperAdmin ? "Rolle und Freigaben ändern sich erst mit „Speichern“ und einer Rückfrage." : "Rolle und Bereiche stehen dort als Text; Spieler-Konten sperrst du mit Grund."}</p>
+          <span className="tls-type-label text-[#29B6E8]">Mitglieder</span>
+          <h1 className="tls-type-title mt-1"><ShortCaps>Alle Benutzer</ShortCaps></h1>
+          <p className="mt-2 max-w-2xl tls-type-small text-white/55">Die Liste ist zum Lesen. „Bearbeiten“ öffnet das Konto: {isSuperAdmin ? "Rolle und Freigaben ändern sich erst mit „Speichern“ und einer Rückfrage." : "Rolle und Bereiche stehen dort als Text; Spieler-Konten sperrst du mit Grund."}</p>
         </div>
         {isSuperAdmin && (
-          <button onClick={() => setCreating(true)} data-testid="user-create-open" className="inline-flex items-center gap-2 px-4 py-2 bg-[#29B6E8] text-black rounded-sm text-xs font-bold uppercase tracking-wider">
+          <button onClick={() => setCreating(true)} data-testid="user-create-open" className="inline-flex items-center gap-2 px-4 py-2 bg-[#29B6E8] text-black rounded-sm tls-type-label">
             <Plus className="w-3.5 h-3.5" /> Benutzer anlegen
           </button>
         )}
       </div>
       <input placeholder="Name, Benutzername, E-Mail oder Mitgliedsnummer suchen …" value={q} onChange={(e) => setQ(e.target.value)} data-testid="users-search" className="w-full max-w-md bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-sm mb-4" />
-      {listLimitHint(list.length) && <p className="mb-4 border border-[#FF9500]/40 bg-[#FF9500]/5 rounded-sm p-3 text-sm text-white/80" data-testid="users-limit-hint">{listLimitHint(list.length)}</p>}
+      {listLimitHint(list.length) && <p className="mb-4 border border-[#FF9500]/40 bg-[#FF9500]/5 rounded-sm p-3 tls-type-small text-white/80" data-testid="users-limit-hint">{listLimitHint(list.length)}</p>}
 
       <details className="mb-5 border border-white/10 bg-[#121212] rounded-sm group" data-testid="roles-info">
         <summary className="cursor-pointer list-none px-4 py-3 flex items-center justify-between gap-3">
-          <span className="text-[11px] font-bold uppercase tracking-widest text-[#29B6E8]">Was die Rollen dürfen</span>
+          <span className="tls-type-label text-[#29B6E8]">Was die Rollen dürfen</span>
           <ChevronDown className="w-4 h-4 text-white/50 transition group-open:rotate-180" />
         </summary>
         <div className="px-4 pb-4">
-          <p className="text-xs text-white/50 max-w-2xl">Die Rolle ist die Grundstufe; einzelne Bereiche (Turnierleitung, Redaktion, Vereinsverwaltung, Finanzen) gibt der Superadmin je Person frei. Wer einen Vorstandsposten hält, hat die Vereinsverwaltung von selbst. Was sich bei einer Person geändert hat, steht unter „Bearbeiten“ im Rechte-Verlauf.</p>
+          <p className="tls-type-small text-white/50 max-w-2xl">Die Rolle ist die Grundstufe; einzelne Bereiche (Turnierleitung, Redaktion, Vereinsverwaltung, Finanzen) gibt der Superadmin je Person frei. Wer einen Vorstandsposten hält, hat die Vereinsverwaltung von selbst. Was sich bei einer Person geändert hat, steht unter „Bearbeiten“ im Rechte-Verlauf.</p>
           <div className="mt-4 grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
             {ROLE_OPTIONS.map((role) => {
               const info = ROLE_INFO[role] || { can: [], cannot: [] };
@@ -115,17 +116,17 @@ export default function AdminUsersPage() {
                 <div key={role} className={`rounded-sm border px-3 py-3 ${role === "superadmin" ? "border-[#FFD700]/25 bg-[#FFD700]/5" : "border-white/10 bg-black/15"}`}>
                   <div className="flex items-start justify-between gap-3">
                     <div>
-                      <div className="text-sm font-bold text-white">{roleLabel(role)}</div>
-                      <ul className="mt-1 text-[11px] leading-relaxed text-white/55" data-testid={`role-can-${role}`}>
+                      <div className="tls-type-small font-bold text-white">{roleLabel(role)}</div>
+                      <ul className="mt-1 tls-type-small leading-relaxed text-white/55" data-testid={`role-can-${role}`}>
                         {info.can.map((line) => <li key={line}>✓ {line}</li>)}
                       </ul>
                       {info.cannot.length ? (
-                        <ul className="mt-1 text-[11px] leading-relaxed text-white/35" data-testid={`role-cannot-${role}`}>
+                        <ul className="mt-1 tls-type-small leading-relaxed text-quiet" data-testid={`role-cannot-${role}`}>
                           {info.cannot.map((line) => <li key={line}>✗ {line}</li>)}
                         </ul>
                       ) : null}
                     </div>
-                    <div className="font-heading text-2xl font-black tabular-nums text-[#29B6E8]">{count}</div>
+                    <div className="tls-type-section tls-type-num text-[#29B6E8]">{count}</div>
                   </div>
                 </div>
               );
@@ -136,8 +137,8 @@ export default function AdminUsersPage() {
 
       {/* PC: Tabelle; Tablet und Handy: Karten - beides nur zum Lesen. */}
       <div className="hidden lg:block border border-white/10 rounded-sm bg-[#121212] tls-swipe pb-0">
-        <table className="w-full text-sm" data-testid="users-table">
-          <thead className="bg-[#0A0A0A] text-[11px] uppercase tracking-widest text-white/50">
+        <table className="w-full tls-type-small" data-testid="users-table">
+          <thead className="bg-[#0A0A0A] tls-type-label text-white/50">
             <tr>
               <th className="text-left px-4 py-3">Name</th>
               <th className="text-left px-4 py-3">Konto</th>
@@ -152,21 +153,21 @@ export default function AdminUsersPage() {
               <tr key={u.id} className={u.is_banned ? "opacity-60" : ""} data-testid={`user-row-${u.username}`}>
                 <td className="px-4 py-3">
                   <div className="font-semibold">{displayName(u)}</div>
-                  <div className="text-xs text-white/40">@{u.username}</div>
+                  <div className="tls-type-small text-quiet">@{u.username}</div>
                 </td>
-                <td className="px-4 py-3 text-white/70 text-xs">{accountKind(u)}</td>
+                <td className="px-4 py-3 text-white/70 tls-type-small">{accountKind(u)}</td>
                 <td className="px-4 py-3" data-testid={`user-role-${u.username}`}>{roleLabel(u.role || "player")}</td>
                 <td className="px-4 py-3">
                   <div className="flex flex-wrap gap-1" data-testid={`user-areas-${u.username}`}>
-                    {areaBadges(u).map((area) => <span key={area.key} className="text-[10px] uppercase tracking-wider px-2 py-0.5 rounded-sm border border-[#29B6E8]/30 text-[#29B6E8]">{area.label}</span>)}
-                    {!areaBadges(u).length && <span className="text-xs text-white/35">–</span>}
+                    {areaBadges(u).map((area) => <span key={area.key} className="tls-type-label px-2 py-0.5 rounded-sm border border-[#29B6E8]/30 text-[#29B6E8]">{area.label}</span>)}
+                    {!areaBadges(u).length && <span className="tls-type-small text-quiet">–</span>}
                   </div>
                 </td>
-                <td className="px-4 py-3 text-xs">
+                <td className="px-4 py-3 tls-type-small">
                   {statusText(u) ? <span className={u.is_banned ? "text-[#FF6B6B] font-bold" : "text-[#FFD700]"}>{statusText(u)}</span> : <span className="text-white/35">–</span>}
                 </td>
                 <td className="px-4 py-3 text-right">
-                  <button type="button" onClick={() => setEditingId(u.id)} data-testid={`user-edit-${u.username}`} className="inline-flex items-center gap-1.5 px-3 py-1.5 border border-white/15 text-white/80 hover:border-[#29B6E8]/50 hover:text-white rounded-sm text-[11px] font-bold uppercase tracking-wider">
+                  <button type="button" onClick={() => setEditingId(u.id)} data-testid={`user-edit-${u.username}`} className="inline-flex items-center gap-1.5 px-3 py-1.5 border border-white/15 text-white/80 hover:border-[#29B6E8]/50 hover:text-white rounded-sm tls-type-label">
                     <Pencil className="w-3 h-3" /> Bearbeiten
                   </button>
                 </td>
@@ -182,21 +183,21 @@ export default function AdminUsersPage() {
             <div className="flex items-start justify-between gap-3">
               <div className="min-w-0">
                 <div className="font-semibold tls-wrap">{displayName(u)}</div>
-                <div className="text-xs text-white/45 tls-wrap">@{u.username} · {accountKind(u)} · {roleLabel(u.role || "player")}</div>
+                <div className="tls-type-small text-white/45 tls-wrap">@{u.username} · {accountKind(u)} · {roleLabel(u.role || "player")}</div>
               </div>
-              <button type="button" onClick={() => setEditingId(u.id)} data-testid={`user-edit-card-${u.username}`} className="shrink-0 inline-flex items-center gap-1.5 px-3 py-1.5 border border-white/15 text-white/80 rounded-sm text-[11px] font-bold uppercase tracking-wider">
+              <button type="button" onClick={() => setEditingId(u.id)} data-testid={`user-edit-card-${u.username}`} className="shrink-0 inline-flex items-center gap-1.5 px-3 py-1.5 border border-white/15 text-white/80 rounded-sm tls-type-label">
                 <Pencil className="w-3 h-3" /> Bearbeiten
               </button>
             </div>
             {(areaBadges(u).length > 0 || statusText(u)) && (
               <div className="mt-2 flex flex-wrap gap-1">
-                {areaBadges(u).map((area) => <span key={area.key} className="text-[10px] uppercase tracking-wider px-2 py-0.5 rounded-sm border border-[#29B6E8]/30 text-[#29B6E8]">{area.label}</span>)}
-                {statusText(u) && <span className={`text-[10px] uppercase tracking-wider px-2 py-0.5 rounded-sm border ${u.is_banned ? "border-[#FF3B30]/40 text-[#FF6B6B]" : "border-[#FFD700]/40 text-[#FFD700]"}`}>{statusText(u)}</span>}
+                {areaBadges(u).map((area) => <span key={area.key} className="tls-type-label px-2 py-0.5 rounded-sm border border-[#29B6E8]/30 text-[#29B6E8]">{area.label}</span>)}
+                {statusText(u) && <span className={`tls-type-label px-2 py-0.5 rounded-sm border ${u.is_banned ? "border-[#FF3B30]/40 text-[#FF6B6B]" : "border-[#FFD700]/40 text-[#FFD700]"}`}>{statusText(u)}</span>}
               </div>
             )}
           </li>
         ))}
-        {!list.length && <li className="py-10 text-center text-white/40 text-sm">Keine Konten gefunden.</li>}
+        {!list.length && <li className="py-10 text-center text-quiet tls-type-small">Keine Konten gefunden.</li>}
       </ul>
 
       {creating && <CreateUserModal onClose={() => setCreating(false)} onCreated={load} onSaved={() => { setCreating(false); load(); }} />}
@@ -301,8 +302,8 @@ function UserSheet({ target, me, isSuperAdmin, canClub, onClose, onChanged }) {
         testId="user-sheet"
       >
         <section className="space-y-2" data-testid="user-sheet-account">
-          <div className="text-[11px] font-bold uppercase tracking-widest text-white/60">Konto</div>
-          <dl className="grid grid-cols-[8rem_minmax(0,1fr)] gap-x-3 gap-y-1.5 text-sm">
+          <div className="tls-type-label text-white/60">Konto</div>
+          <dl className="grid grid-cols-[8rem_minmax(0,1fr)] gap-x-3 gap-y-1.5 tls-type-small">
             <dt className="text-white/45">Benutzername</dt><dd className="min-w-0 break-words">@{target.username}</dd>
             <dt className="text-white/45">E-Mail</dt><dd className="min-w-0 break-words">{target.email || "–"}</dd>
             <dt className="text-white/45">Konto-Art</dt><dd>{accountKind(target)}</dd>
@@ -310,40 +311,40 @@ function UserSheet({ target, me, isSuperAdmin, canClub, onClose, onChanged }) {
             <dt className="text-white/45">Stand</dt><dd>{target.is_banned ? "gesperrt" : target.password_setup_required ? "Zugangs-Mail offen – Passwort noch nicht gesetzt" : "aktiv"}</dd>
           </dl>
           {invitation ? (
-            <p className="text-xs text-white/60" data-testid="user-sheet-invitation">{invitation} <Link to="/admin/membership-applications" className="text-[#29B6E8] hover:underline">Bewerbungen</Link></p>
+            <p className="tls-type-small text-white/60" data-testid="user-sheet-invitation">{invitation} <Link to="/admin/membership-applications" className="text-[#29B6E8] hover:underline">Bewerbungen</Link></p>
           ) : !target.is_club_member ? (
-            <p className="text-xs text-white/45" data-testid="user-sheet-invitation">Zum Mitgliedsantrag einladen: auf <Link to="/admin/membership-applications" className="text-[#29B6E8] hover:underline">Bewerbungen</Link>.</p>
+            <p className="tls-type-small text-white/45" data-testid="user-sheet-invitation">Zum Mitgliedsantrag einladen: auf <Link to="/admin/membership-applications" className="text-[#29B6E8] hover:underline">Bewerbungen</Link>.</p>
           ) : null}
         </section>
 
         <section className="space-y-3 border-t border-white/10 pt-4" data-testid="user-sheet-rights">
-          <div className="text-[11px] font-bold uppercase tracking-widest text-white/60">Rolle und Freigaben</div>
+          <div className="tls-type-label text-white/60">Rolle und Freigaben</div>
           {canEditRights ? (
             <>
               <SelectField label="Rolle" value={role} onChange={setRole} options={ROLE_OPTIONS.map((r) => [r, roleLabel(r)])} testId="user-sheet-role" />
               <div>
-                <div className="text-[11px] font-bold uppercase tracking-widest text-white/60 mb-1.5">Freigaben</div>
+                <div className="tls-type-label text-white/60 mb-1.5">Freigaben</div>
                 <div className="grid sm:grid-cols-2 gap-2">
                   {GRANTABLE_AREAS.map((area) => {
                     const fromRole = (ROLE_AREAS[role] || []).includes(area);
                     return (
-                      <label key={area} className={`flex items-start gap-2 text-sm border border-white/10 rounded-sm px-3 py-2 ${fromRole ? "opacity-60" : ""}`} title={AREA_HINTS[area]}>
+                      <label key={area} className={`flex items-start gap-2 tls-type-small border border-white/10 rounded-sm px-3 py-2 ${fromRole ? "opacity-60" : ""}`} title={AREA_HINTS[area]}>
                         <input type="checkbox" className="mt-0.5 accent-[#29B6E8]" checked={fromRole || grants.includes(area)} disabled={fromRole} onChange={() => toggleGrant(area)} data-testid={`user-sheet-area-${area}`} />
-                        <span><span className="font-semibold">{AREA_LABELS[area]}</span>{fromRole && <span className="block text-[11px] text-white/45">schon in der Rolle</span>}</span>
+                        <span><span className="font-semibold">{AREA_LABELS[area]}</span>{fromRole && <span className="block tls-type-small text-white/45">schon in der Rolle</span>}</span>
                       </label>
                     );
                   })}
                 </div>
               </div>
-              {change.changed ? <p className="text-xs text-[#FFD700]" data-testid="user-sheet-pending">{change.sentence} Gespeichert wird erst mit „Speichern“.</p> : null}
+              {change.changed ? <p className="tls-type-small text-[#FFD700]" data-testid="user-sheet-pending">{change.sentence} Gespeichert wird erst mit „Speichern“.</p> : null}
             </>
           ) : (
             <>
-              <dl className="grid grid-cols-[8rem_minmax(0,1fr)] gap-x-3 gap-y-1.5 text-sm" data-testid="user-sheet-rights-read">
+              <dl className="grid grid-cols-[8rem_minmax(0,1fr)] gap-x-3 gap-y-1.5 tls-type-small" data-testid="user-sheet-rights-read">
                 <dt className="text-white/45">Rolle</dt><dd>{roleLabel(target.role || "player")}</dd>
                 <dt className="text-white/45">Bereiche</dt><dd>{areaBadges(target).map((area) => area.label).join(", ") || "keine"}</dd>
               </dl>
-              {isSuperAdmin && <p className="text-xs text-white/50" data-testid="user-sheet-own-role">Deine eigene Rolle ändert eine andere Person mit Superadmin-Rolle.</p>}
+              {isSuperAdmin && <p className="tls-type-small text-white/50" data-testid="user-sheet-own-role">Deine eigene Rolle ändert eine andere Person mit Superadmin-Rolle.</p>}
             </>
           )}
         </section>
@@ -353,38 +354,38 @@ function UserSheet({ target, me, isSuperAdmin, canClub, onClose, onChanged }) {
         {canResetProfile && <ProfileResetSection target={target} name={name} onChanged={onChanged} />}
 
         <section className="space-y-2 border-t border-white/10 pt-4" data-testid="user-sheet-ban">
-          <div className="text-[11px] font-bold uppercase tracking-widest text-white/60">Sperren</div>
+          <div className="tls-type-label text-white/60">Sperren</div>
           {ban.canAct ? (
             target.is_banned ? (
-              <button type="button" onClick={unban} data-testid="user-sheet-unban" className="tls-btn tls-btn--secondary px-4 py-2 rounded-sm text-xs font-bold uppercase tracking-wider">Entsperren</button>
+              <button type="button" onClick={unban} data-testid="user-sheet-unban" className="tls-btn tls-btn--secondary px-4 py-2 rounded-sm tls-type-label">Entsperren</button>
             ) : (
               <div className="space-y-2">
-                <p className="text-xs text-white/50">Gesperrt wird mit Grund. Die Person bekommt den Grund per Mail; er steht auch im Protokoll.</p>
-                <button type="button" onClick={() => setBanOpen(true)} data-testid="user-sheet-ban-open" className="tls-btn tls-btn--danger px-4 py-2 rounded-sm text-xs font-bold uppercase tracking-wider">Sperren …</button>
+                <p className="tls-type-small text-white/50">Gesperrt wird mit Grund. Die Person bekommt den Grund per Mail; er steht auch im Protokoll.</p>
+                <button type="button" onClick={() => setBanOpen(true)} data-testid="user-sheet-ban-open" className="tls-btn tls-btn--danger px-4 py-2 rounded-sm tls-type-label">Sperren …</button>
               </div>
             )
           ) : (
-            <p className="text-sm text-white/55" data-testid="user-sheet-ban-locked">{ban.text}</p>
+            <p className="tls-type-body text-white/55" data-testid="user-sheet-ban-locked">{ban.text}</p>
           )}
         </section>
 
         {isSuperAdmin && (
           <section className="border-t border-white/10 pt-4" data-testid="user-sheet-more">
-            <button type="button" onClick={() => setMoreOpen((open) => !open)} aria-expanded={moreOpen} data-testid="user-sheet-more-toggle" className="inline-flex items-center gap-2 text-[11px] font-bold uppercase tracking-widest text-white/60 hover:text-white">
+            <button type="button" onClick={() => setMoreOpen((open) => !open)} aria-expanded={moreOpen} data-testid="user-sheet-more-toggle" className="inline-flex items-center gap-2 tls-type-label text-white/60 hover:text-white">
               Mehr <ChevronDown className={`w-3.5 h-3.5 transition ${moreOpen ? "rotate-180" : ""}`} />
             </button>
             {moreOpen && (
               <div className="mt-3 space-y-4">
                 <div className="space-y-1.5">
-                  <button type="button" onClick={resendAccess} data-testid="user-sheet-resend-access" className="tls-btn tls-btn--secondary px-4 py-2 rounded-sm text-xs font-bold uppercase tracking-wider">Zugangs-Mail erneut senden</button>
-                  <p className="text-xs text-white/45">Ein neuer Link, um das Passwort zu setzen – etwa wenn die erste Mail nicht ankam.</p>
+                  <button type="button" onClick={resendAccess} data-testid="user-sheet-resend-access" className="tls-btn tls-btn--secondary px-4 py-2 rounded-sm tls-type-label">Zugangs-Mail erneut senden</button>
+                  <p className="tls-type-small text-white/45">Ein neuer Link, um das Passwort zu setzen – etwa wenn die erste Mail nicht ankam.</p>
                 </div>
                 {target.id !== me?.id && target.role !== "superadmin" && (
                   <div className="border border-[#FF3B30]/30 rounded-sm p-3 space-y-2" data-testid="user-sheet-delete-box">
-                    <div className="text-xs font-bold text-[#FF6B6B]">Konto löschen</div>
-                    <p className="text-xs text-white/55">Anmeldung und persönliche Daten werden entfernt; Ergebnisse bleiben ohne Namen erhalten. Zum Bestätigen den Namen eintippen: <strong className="text-white">{name}</strong></p>
+                    <div className="tls-type-small font-bold text-[#FF6B6B]">Konto löschen</div>
+                    <p className="tls-type-small text-white/55">Anmeldung und persönliche Daten werden entfernt; Ergebnisse bleiben ohne Namen erhalten. Zum Bestätigen den Namen eintippen: <strong className="text-white">{name}</strong></p>
                     <input value={deleteName} onChange={(event) => setDeleteName(event.target.value)} aria-label="Namen zum Löschen eintippen" data-testid="user-sheet-delete-name" className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-sm" />
-                    <button type="button" disabled={deleteName.trim() !== name} onClick={removeAccount} data-testid="user-sheet-delete" className="tls-btn tls-btn--danger px-4 py-2 rounded-sm text-xs font-bold uppercase tracking-wider disabled:opacity-40">Endgültig löschen</button>
+                    <button type="button" disabled={deleteName.trim() !== name} onClick={removeAccount} data-testid="user-sheet-delete" className="tls-btn tls-btn--danger px-4 py-2 rounded-sm tls-type-label disabled:opacity-40">Endgültig löschen</button>
                   </div>
                 )}
               </div>
@@ -417,22 +418,22 @@ function RightsHistorySection({ target }) {
 
   return (
     <section className="border-t border-white/10 pt-4" data-testid="user-sheet-history">
-      <button type="button" onClick={toggle} aria-expanded={open} data-testid="user-sheet-history-toggle" className="inline-flex items-center gap-2 text-[11px] font-bold uppercase tracking-widest text-white/60 hover:text-white">
+      <button type="button" onClick={toggle} aria-expanded={open} data-testid="user-sheet-history-toggle" className="inline-flex items-center gap-2 tls-type-label text-white/60 hover:text-white">
         Rechte-Verlauf <ChevronDown className={`w-3.5 h-3.5 transition ${open ? "rotate-180" : ""}`} />
       </button>
-      {open && state.status === "loading" && <p className="mt-2 text-xs text-white/45">Lade Verlauf …</p>}
-      {open && state.status === "error" && <p className="mt-2 text-xs text-[#FF6B6B]" data-testid="user-sheet-history-error">Der Verlauf lässt sich gerade nicht laden.</p>}
+      {open && state.status === "loading" && <p className="mt-2 tls-type-small text-white/45">Lade Verlauf …</p>}
+      {open && state.status === "error" && <p className="mt-2 tls-type-small text-[#FF6B6B]" data-testid="user-sheet-history-error">Der Verlauf lässt sich gerade nicht laden.</p>}
       {open && state.status === "ready" && (
         state.items.length ? (
           <ul className="mt-3 space-y-2" data-testid="user-sheet-history-list">
             {state.items.map((row) => (
-              <li key={row.id} className="border-l-2 border-[#29B6E8]/40 pl-3 text-sm">
+              <li key={row.id} className="border-l-2 border-[#29B6E8]/40 pl-3 tls-type-small">
                 <div className="break-words">{rightsHistoryLine(row)}</div>
-                <div className="text-xs text-white/45">{day(row.at)}{row.actor ? ` · von ${row.actor}` : ""}</div>
+                <div className="tls-type-small text-white/45">{day(row.at)}{row.actor ? ` · von ${row.actor}` : ""}</div>
               </li>
             ))}
           </ul>
-        ) : <p className="mt-2 text-xs text-white/45" data-testid="user-sheet-history-empty">Noch keine Änderungen an den Rechten.</p>
+        ) : <p className="mt-2 tls-type-small text-white/45" data-testid="user-sheet-history-empty">Noch keine Änderungen an den Rechten.</p>
       )}
     </section>
   );
@@ -481,17 +482,17 @@ function ProfileResetSection({ target, name, onChanged }) {
 
   return (
     <section className="space-y-2 border-t border-white/10 pt-4" data-testid="user-sheet-profile-reset">
-      <div className="text-[11px] font-bold uppercase tracking-widest text-white/60">Profil zurücksetzen</div>
-      <p className="text-xs text-white/50">Für unpassende Angaben. Die Person kann danach selbst neue eintragen.</p>
+      <div className="tls-type-label text-white/60">Profil zurücksetzen</div>
+      <p className="tls-type-small text-white/50">Für unpassende Angaben. Die Person kann danach selbst neue eintragen.</p>
       <div className="grid sm:grid-cols-2 gap-2">
         {PROFILE_RESET_FIELDS.map(([key, label, hint]) => (
-          <label key={key} className="flex items-start gap-2 text-sm border border-white/10 rounded-sm px-3 py-2">
+          <label key={key} className="flex items-start gap-2 tls-type-small border border-white/10 rounded-sm px-3 py-2">
             <input type="checkbox" className="mt-0.5 accent-[#29B6E8]" checked={fields.includes(key)} onChange={() => toggle(key)} data-testid={`user-sheet-reset-${key}`} />
-            <span><span className="font-semibold">{label}</span>{hint && <span className="block text-[11px] text-white/45">{hint}</span>}</span>
+            <span><span className="font-semibold">{label}</span>{hint && <span className="block tls-type-small text-white/45">{hint}</span>}</span>
           </label>
         ))}
       </div>
-      <label htmlFor="profile-reset-reason" className="block text-[11px] font-bold uppercase tracking-widest text-white/60">Grund (Pflicht)</label>
+      <label htmlFor="profile-reset-reason" className="block tls-type-label text-white/60">Grund (Pflicht)</label>
       <textarea
         id="profile-reset-reason"
         value={reason}
@@ -501,7 +502,7 @@ function ProfileResetSection({ target, name, onChanged }) {
         data-testid="user-sheet-reset-reason"
         className="input min-h-20 resize-y"
       />
-      <button type="button" onClick={reset} disabled={!ready || saving} data-testid="user-sheet-reset" className="tls-btn tls-btn--danger px-4 py-2 rounded-sm text-xs font-bold uppercase tracking-wider disabled:opacity-40">
+      <button type="button" onClick={reset} disabled={!ready || saving} data-testid="user-sheet-reset" className="tls-btn tls-btn--danger px-4 py-2 rounded-sm tls-type-label disabled:opacity-40">
         {saving ? "Setze zurück …" : "Zurücksetzen …"}
       </button>
     </section>
@@ -543,9 +544,9 @@ function BanDialog({ target, onCancel, onBanned }) {
             <AlertTriangle className="w-5 h-5" />
           </div>
           <div className="min-w-0 flex-1">
-            <h2 id="ban-dialog-title" className="font-heading font-black uppercase text-lg break-words">{name} sperren?</h2>
-            <p className="mt-1 text-sm text-white/60 leading-relaxed">{name} (@{target.username}) kann sich danach nicht mehr anmelden und bekommt eine Mail mit dem Grund. Der Grund steht auch im Protokoll.</p>
-            <label htmlFor="ban-reason" className="mt-4 block text-[11px] font-bold uppercase tracking-widest text-white/60">Grund (Pflicht)</label>
+            <h2 id="ban-dialog-title" className="tls-type-section break-words">{name} sperren?</h2>
+            <p className="mt-1 tls-type-body text-white/60 leading-relaxed">{name} (@{target.username}) kann sich danach nicht mehr anmelden und bekommt eine Mail mit dem Grund. Der Grund steht auch im Protokoll.</p>
+            <label htmlFor="ban-reason" className="mt-4 block tls-type-label text-white/60">Grund (Pflicht)</label>
             <textarea
               id="ban-reason"
               value={reason}
@@ -555,17 +556,17 @@ function BanDialog({ target, onCancel, onBanned }) {
               data-testid="ban-dialog-reason"
               className="mt-1 input min-h-24 resize-y"
             />
-            {trimmed && missing ? <p className="mt-1 text-xs text-[#FFD700]" data-testid="ban-dialog-hint">Noch {missing} Zeichen.</p> : null}
+            {trimmed && missing ? <p className="mt-1 tls-type-small text-[#FFD700]" data-testid="ban-dialog-hint">Noch {missing} Zeichen.</p> : null}
           </div>
           <button type="button" onClick={onCancel} className="p-1 text-white/45 hover:text-white" aria-label="Schließen">
             <X className="w-4 h-4" />
           </button>
         </div>
         <div className="p-5 flex flex-col-reverse sm:flex-row gap-2 sm:justify-end">
-          <button type="button" onClick={onCancel} data-testid="ban-dialog-cancel" className="tls-btn tls-btn--quiet px-4 py-2 rounded-sm text-xs font-bold uppercase tracking-wider">
+          <button type="button" onClick={onCancel} data-testid="ban-dialog-cancel" className="tls-btn tls-btn--quiet px-4 py-2 rounded-sm tls-type-label">
             Abbrechen
           </button>
-          <button type="submit" disabled={Boolean(missing) || saving} data-testid="ban-dialog-confirm" className="tls-btn tls-btn--danger px-4 py-2 rounded-sm text-xs font-black uppercase tracking-wider disabled:opacity-50 disabled:cursor-not-allowed">
+          <button type="submit" disabled={Boolean(missing) || saving} data-testid="ban-dialog-confirm" className="tls-btn tls-btn--danger px-4 py-2 rounded-sm tls-type-label disabled:opacity-50 disabled:cursor-not-allowed">
             {saving ? "Sperre …" : "Sperren"}
           </button>
         </div>
@@ -622,7 +623,7 @@ function CreateUserModal({ onClose, onSaved, onCreated }) {
       <TextField label="Anzeigename" value={form.display_name} onChange={(v) => set("display_name", v)} testId="create-user-display" />
       <TextField label="E-Mail" type="email" value={form.email} onChange={(v) => set("email", v)} required testId="create-user-email" />
       <SelectField label="Geschlecht" value={form.gender || ""} onChange={(v) => set("gender", v)} options={[["", "Keine Angabe"], ["male", "Männlich"], ["female", "Weiblich"], ["diverse", "Divers"]]} testId="create-user-gender" />
-      <div className="border border-[#29B6E8]/25 bg-[#29B6E8]/5 p-3 rounded-sm text-sm text-white/70">
+      <div className="border border-[#29B6E8]/25 bg-[#29B6E8]/5 p-3 rounded-sm tls-type-small text-white/70">
         Die Person bekommt per E-Mail einen einmaligen Link und setzt ihr Passwort selbst.
       </div>
       <SelectField label="Rolle" value={form.role} onChange={(v) => set("role", v)} options={ROLE_OPTIONS.map((r) => [r, roleLabel(r)])} testId="create-user-role" />
@@ -630,8 +631,8 @@ function CreateUserModal({ onClose, onSaved, onCreated }) {
       <CheckField label="Öffentliches Profil" checked={form.privacy_public_profile} onChange={(v) => set("privacy_public_profile", v)} testId="create-user-public" />
       {inviteUrl && (
         <div className="border border-[#FFD700]/30 bg-[#FFD700]/10 p-3 rounded-sm" data-testid="create-user-invite">
-          <div className="text-[11px] uppercase tracking-widest text-[#FFD700] font-bold">Link zum Passwort-Setzen</div>
-          <div className="mt-1 text-xs break-all text-white/80">{inviteUrl}</div>
+          <div className="tls-type-label text-[#FFD700]">Link zum Passwort-Setzen</div>
+          <div className="mt-1 tls-type-small break-all text-white/80">{inviteUrl}</div>
         </div>
       )}
     </AdminSheet>

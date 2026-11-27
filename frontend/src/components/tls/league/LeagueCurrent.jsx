@@ -20,12 +20,12 @@ function Row({ row, index, nameOf, testId }) {
       <LeagueBadge badge={row.badge} size="card" label={false} decorative index={index} testId={`${id}-badge`} />
       <div className="min-w-0">
         <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
-          <span className="text-[10px] font-bold uppercase tracking-widest text-[#29B6E8] [overflow-wrap:anywhere]" data-testid={`${id}-label`}>
+          <span className="tls-type-label text-[#29B6E8] [overflow-wrap:anywhere]" data-testid={`${id}-label`}>
             {row.staffel_label || [label, row.staffel ? `Staffel ${row.staffel}` : ""].filter(Boolean).join(" · ")}
           </span>
           {row.internal ? <InternalTag testId={`${id}-internal`} /> : null}
         </div>
-        <div className="tls-league-now__name tls-wrap tls-wrap--name font-heading text-lg" data-testid={`${id}-name`}>{nameOf(row)}</div>
+        <div className="tls-league-now__name tls-wrap tls-wrap--name tls-type-card" data-testid={`${id}-name`}>{nameOf(row)}</div>
         {row.guest_badge ? <span className="tls-guest-badge-line"><GuestBadge badge={row.guest_badge} testId={`${id}-guest`} /></span> : null}
         <div className="tls-league-now__meta flex items-center gap-1.5">
           {/* Emblem der Season bzw. Liga (#2107) klein vor dem Namen - ohne Bild das Liga-Zeichen. */}
@@ -56,7 +56,7 @@ export function LeagueCurrent({ rows, title = "Aktuelle Ligen", nameOf = (row) =
   if (!rows?.length) return null;
   return (
     <section data-testid={testId} aria-labelledby={`${testId}-title`}>
-      <h2 id={`${testId}-title`} className="mb-4 flex items-center gap-2 font-heading text-2xl font-bold uppercase">
+      <h2 id={`${testId}-title`} className="mb-4 flex items-center gap-2 tls-type-section">
         <ListOrdered className="h-5 w-5 text-[#29B6E8]" aria-hidden="true" /> {title}
       </h2>
       <div className="tls-league-now">

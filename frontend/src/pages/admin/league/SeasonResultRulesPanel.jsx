@@ -89,7 +89,7 @@ function SeasonModeSettings({ row, form, onChange, canEdit, id }) {
   if (!canEdit) {
     if (!own) return null;
     return (
-      <ul className="mt-2 space-y-0.5 text-xs text-white/70" data-testid={`${id}-settings-read`}>
+      <ul className="mt-2 space-y-0.5 tls-type-small text-white/70" data-testid={`${id}-settings-read`}>
         {(own.settings || []).map((setting) => (
           <li key={setting.key || setting.label}>{setting.group ? `${setting.group} · ` : ""}{setting.label}: {settingValueText(setting)}</li>
         ))}
@@ -100,7 +100,7 @@ function SeasonModeSettings({ row, form, onChange, canEdit, id }) {
   return (
     <details className="group mt-3 rounded-sm border border-white/10 bg-white/[0.02]" open={open} onToggle={(event) => setOpen(event.currentTarget.open)}
       data-testid={`${id}-settings-box`}>
-      <summary className="tls-hit flex min-h-[44px] cursor-pointer list-none flex-wrap items-center gap-2 px-3 py-2 text-[11px] font-bold uppercase tracking-widest text-white/65 [&::-webkit-details-marker]:hidden">
+      <summary className="tls-hit flex min-h-[44px] cursor-pointer list-none flex-wrap items-center gap-2 px-3 py-2 tls-type-label text-white/65 [&::-webkit-details-marker]:hidden">
         Einstellungen und eigene Regeln
         <span className="normal-case tracking-normal font-semibold text-white/45">{(own?.settings || []).length} Einstellungen</span>
         {differs ? <span className="normal-case tracking-normal text-warn" data-testid={`${id}-settings-differs`}>weicht vom Spiel ab</span> : null}
@@ -108,11 +108,11 @@ function SeasonModeSettings({ row, form, onChange, canEdit, id }) {
       <div className="space-y-3 border-t border-white/10 p-3">
         <ModeSettingsEditor value={form} onChange={onChange} diff={diff} testPrefix={`${id}-settings`} />
         {missing.length ? (
-          <p className="text-xs text-warn" data-testid={`${id}-settings-missing`}>Das Spiel hat dazu: {missing.map((setting) => setting.label).join(", ")}.</p>
+          <p className="tls-type-small text-warn" data-testid={`${id}-settings-missing`}>Das Spiel hat dazu: {missing.map((setting) => setting.label).join(", ")}.</p>
         ) : null}
         {differs && row.game_settings ? (
           <button type="button" onClick={() => onChange(entryToForm(row.game_settings))} data-testid={`${id}-settings-adopt`}
-            className="tls-btn tls-btn--quiet rounded-sm px-3 py-1.5 text-[11px] font-bold uppercase tracking-wider">Einstellungen vom Spiel übernehmen</button>
+            className="tls-btn tls-btn--quiet rounded-sm px-3 py-1.5 tls-type-label">Einstellungen vom Spiel übernehmen</button>
         ) : null}
       </div>
     </details>
@@ -177,12 +177,12 @@ export function SeasonResultRulesPanel({ seasonId, canEdit = true, onSaved, mode
     setSaving(false);
   };
 
-  if (!data) return error ? <p className="text-sm text-warn" role="alert" data-testid="result-rules-error">{error}</p> : null;
+  if (!data) return error ? <p className="tls-type-small text-warn" role="alert" data-testid="result-rules-error">{error}</p> : null;
   return (
     <FormSection title="Ergebnisregeln" testId="season-result-rules"
       hint="Die Season hält die Regel je Modus fest. Ändert jemand später die Regel am Spiel, bleibt die Season, wie sie ist – übernehmen ist ein eigener Schritt. Die Meldung prüft jeden Endstand gegen die Regel.">
       <CheckField label="Punkte je Map Pflicht – jede Map bekommt ihren Endstand" checked={required} onChange={setRequired} disabled={!canEdit} testId="result-rules-required" />
-      {!data.rules.length ? <p className="text-sm text-white/55">Das Spiel hat keine Modi – es gibt nichts einzustellen.</p> : null}
+      {!data.rules.length ? <p className="tls-type-small text-white/55">Das Spiel hat keine Modi – es gibt nichts einzustellen.</p> : null}
       <ul className="space-y-3">
         {data.rules.filter((row) => !modes || modes.includes(row.mode)).map((row) => {
           const form = rows[row.mode] || ruleToRow(null);
@@ -190,10 +190,10 @@ export function SeasonResultRulesPanel({ seasonId, canEdit = true, onSaved, mode
           return (
             <li key={row.mode} className="min-w-0 rounded-sm border border-white/10 bg-[#0A0A0A] p-3" data-testid={id}>
               <div className="flex flex-wrap items-baseline justify-between gap-2">
-                <span className="inline-flex min-w-0 items-center gap-2 font-bold text-white"><ModeIcon src={row.icon_url} size="sm" testId={`${id}-icon`} />{row.label}{row.status !== "active" ? <span className="ml-2 text-xs font-normal text-white/50">({row.status === "removed" ? "dem Spiel entfernt" : row.status === "inactive" ? "inaktiv" : "archiviert"})</span> : null}</span>
-                {row.differs ? <span className="text-xs font-bold text-warn" data-testid={`${id}-differs`}>weicht vom Spiel ab</span> : null}
+                <span className="inline-flex min-w-0 items-center gap-2 font-bold text-white"><ModeIcon src={row.icon_url} size="sm" testId={`${id}-icon`} />{row.label}{row.status !== "active" ? <span className="ml-2 tls-type-small font-normal text-white/50">({row.status === "removed" ? "dem Spiel entfernt" : row.status === "inactive" ? "inaktiv" : "archiviert"})</span> : null}</span>
+                {row.differs ? <span className="tls-type-small font-bold text-warn" data-testid={`${id}-differs`}>weicht vom Spiel ab</span> : null}
               </div>
-              <p className="mt-1 text-xs text-white/55 [overflow-wrap:anywhere]" data-testid={`${id}-game`}>Spiel: {resultRuleText(row.game_rule) || "keine Regel"}</p>
+              <p className="mt-1 tls-type-small text-white/55 [overflow-wrap:anywhere]" data-testid={`${id}-game`}>Spiel: {resultRuleText(row.game_rule) || "keine Regel"}</p>
               {canEdit ? (
                 <div className="mt-3 space-y-3">
                   <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
@@ -221,11 +221,11 @@ export function SeasonResultRulesPanel({ seasonId, canEdit = true, onSaved, mode
                   ) : null}
                   {row.differs && row.game_rule ? (
                     <button type="button" onClick={() => set(row.mode, ruleToRow(row.game_rule))} data-testid={`${id}-adopt`}
-                      className="tls-btn tls-btn--quiet rounded-sm px-3 py-1.5 text-[11px] font-bold uppercase tracking-wider">Vom Spiel übernehmen</button>
+                      className="tls-btn tls-btn--quiet rounded-sm px-3 py-1.5 tls-type-label">Vom Spiel übernehmen</button>
                   ) : null}
                 </div>
               ) : (
-                <p className="mt-1 text-xs text-white/75" data-testid={`${id}-season`}>Season: {resultRuleText(row.season_rule) || "keine Regel"}</p>
+                <p className="mt-1 tls-type-small text-white/75" data-testid={`${id}-season`}>Season: {resultRuleText(row.season_rule) || "keine Regel"}</p>
               )}
               <SeasonModeSettings row={row} form={settings[row.mode] || entryToForm(null)} onChange={(next) => setModeSettings(row.mode, next)}
                 canEdit={canEdit} id={id} />
@@ -233,14 +233,14 @@ export function SeasonResultRulesPanel({ seasonId, canEdit = true, onSaved, mode
           );
         })}
       </ul>
-      {error ? <p className="text-sm text-warn" role="alert" data-testid="result-rules-error">{error}</p> : null}
+      {error ? <p className="tls-type-small text-warn" role="alert" data-testid="result-rules-error">{error}</p> : null}
       {canEdit ? (
         <div className="flex flex-wrap items-center gap-3">
           <button type="button" onClick={save} disabled={saving} data-testid="result-rules-save"
-            className="tls-btn tls-btn--primary rounded-sm px-5 py-2.5 text-xs font-bold uppercase tracking-wider disabled:opacity-50">
+            className="tls-btn tls-btn--primary rounded-sm px-5 py-2.5 tls-type-label disabled:opacity-50">
             {saving ? "Speichere …" : "Ergebnisregeln speichern"}
           </button>
-          {data.staffeln ? <span className="text-xs text-white/50">Bestehende Staffeln übernehmen Änderungen beim Übertragen – auch nach dem ersten Ergebnis, nicht gesperrte.</span> : null}
+          {data.staffeln ? <span className="tls-type-small text-white/50">Bestehende Staffeln übernehmen Änderungen beim Übertragen – auch nach dem ersten Ergebnis, nicht gesperrte.</span> : null}
         </div>
       ) : null}
     </FormSection>

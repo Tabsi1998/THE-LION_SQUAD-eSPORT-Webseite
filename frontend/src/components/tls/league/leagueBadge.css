@@ -40,7 +40,7 @@
 /* Der Beiname bleibt auch beim Meister in seiner Farbe - Gold tragen nur das Wappen und das Wort „Meister“ (Fabian 23.11.). */
 .tls-lbadge__nick { overflow-wrap: anywhere; color: var(--tls-brand, #29B6E8); }
 .tls-lbadge__champion { white-space: nowrap; color: var(--tls-honor); }
-.tls-lbadge--list .tls-lbadge__text { font-size: 11px; letter-spacing: 0.06em; }
+.tls-lbadge--list .tls-lbadge__text { font-size: var(--tls-type-label-size); letter-spacing: 0.06em; }
 /* Hero: der Beiname darf umbrechen (lange Beinamen), die Zahl steht groß im Wappen. */
 .tls-lbadge--hero .tls-lbadge__text {
   display: flex; flex-direction: column; align-items: flex-start; font-size: 15px; letter-spacing: 0.1em;
@@ -112,7 +112,7 @@ a.tls-league-now__row:focus-visible { outline: 2px solid var(--tls-brand, #29B6E
 /* Der Co-Team-Name bricht um (tls-wrap tls-wrap--name), nie „…“ (#1314, Review #1638). */
 .tls-league-now__name { font-weight: 800; color: #fff; }
 .tls-league-now__meta { margin-top: 2px; font-size: 12px; color: rgb(255 255 255 / 0.6); overflow-wrap: anywhere; }
-.tls-league-now__facts { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 12px; margin-top: 6px; font-size: 13px; font-variant-numeric: tabular-nums; }
+.tls-league-now__facts { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 12px; margin-top: 6px; font-size: var(--tls-type-small-size); font-variant-numeric: tabular-nums; }
 .tls-league-now__place { font-weight: 800; color: #fff; }
 .tls-league-now__zone { display: inline-flex; align-items: center; gap: 4px; color: rgb(255 255 255 / 0.78); font-weight: 700; }
 .tls-league-now__next { display: inline-flex; align-items: center; gap: 6px; color: rgb(255 255 255 / 0.72); min-width: 0; overflow-wrap: anywhere; }

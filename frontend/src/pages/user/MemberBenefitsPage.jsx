@@ -26,8 +26,8 @@ export default function MemberBenefitsPage() {
             empty={(
               <div className="border border-dashed border-white/15 rounded-sm p-12 text-center text-white/50">
                 <Gift className="w-10 h-10 mx-auto opacity-40 mb-4" />
-                <div className="font-heading font-bold text-lg">Noch keine Vorteile</div>
-                <div className="text-sm mt-2">Der Vorstand arbeitet an neuen Partnerschaften und Aktionen.</div>
+                <div className="tls-type-card">Noch keine Vorteile</div>
+                <div className="tls-type-small mt-2">Der Vorstand arbeitet an neuen Partnerschaften und Aktionen.</div>
               </div>
             )}
           >
@@ -41,14 +41,14 @@ export default function MemberBenefitsPage() {
                     </div>
                   )}
                   <div className="p-5 flex-1 flex flex-col">
-                    {b.category && <div className="text-[10px] uppercase tracking-widest text-[#FFD700]/80 font-bold">{b.category}</div>}
-                    <h3 className="mt-1 font-heading font-black text-lg">{b.title}</h3>
-                    {b.description && <p className="mt-2 text-sm text-white/65 flex-1">{b.description}</p>}
+                    {b.category && <div className="tls-type-label text-[#FFD700]/80">{b.category}</div>}
+                    <h3 className="mt-1 tls-type-card">{b.title}</h3>
+                    {b.description && <p className="mt-2 tls-type-body text-white/65 flex-1">{b.description}</p>}
                     {b.valid_until && (
-                      <div className="mt-3 text-xs text-white/40">Gültig bis {viennaDate(b.valid_until)}</div>
+                      <div className="mt-3 tls-type-small text-quiet">Gültig bis {viennaDate(b.valid_until)}</div>
                     )}
                     {b.link_url && (
-                      <a href={b.link_url} target="_blank" rel="noreferrer" className="mt-4 inline-flex items-center gap-1.5 text-xs uppercase tracking-wider font-bold text-[#FFD700] hover:underline">
+                      <a href={b.link_url} target="_blank" rel="noreferrer" className="mt-4 inline-flex items-center gap-1.5 tls-type-label text-[#FFD700] hover:underline">
                         Mehr erfahren <ExternalLink className="w-3 h-3" />
                       </a>
                     )}
