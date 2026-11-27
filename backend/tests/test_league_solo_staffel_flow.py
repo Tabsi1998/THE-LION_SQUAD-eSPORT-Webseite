@@ -253,5 +253,6 @@ async def test_a_team_league_next_to_a_solo_league_assigns_co_teams_as_before(fl
     assert solo_reg.status_code == 200, solo_reg.text
     # Die Antwort für eine Team-Staffel bleibt die von vorher - ohne „kind“, mit Teams und Co-Teams.
     assert "kind" not in candidates.json() and candidates.json()["teams"][0]["squads"][0]["id"] == squad["id"]
-    assert [row["action"] for row in await flow.db.audit_logs.find({"action": {"$in": ["league.squad.assign", "league.player.assign"]}},
-                                                                    {"_id": 0}).to_list(5)] == ["league.squad.assign", "league.player.assign"]
+    # Ohne Sortierung liefert echtes MongoDB keine feste Reihenfolge - verglichen wird die Menge.
+    logged = await flow.db.audit_logs.find({"action": {"$in": ["league.squad.assign", "league.player.assign"]}}, {"_id": 0}).to_list(5)
+    assert sorted(row["action"] for row in logged) == ["league.player.assign", "league.squad.assign"]
