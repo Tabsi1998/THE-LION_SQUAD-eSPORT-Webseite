@@ -63,6 +63,7 @@ def privacy_text_for(season: dict, user: dict | None) -> str:
         return text
     return text if (season.get(PRIVACY_RELEASE) or {}).get("text") == text else PRIVACY_PLACEHOLDER
 
+
 NO_WINDOW = "Für diese Season gibt es keine Selbstanmeldung."
 NO_RULES = "Für diese Season ist noch kein gültiges Regelwerk veröffentlicht. Ohne Regelwerk geht keine Anmeldung, die Liga-Leitung veröffentlicht es zuerst."
 RULES_CHANGED = "Das Regelwerk hat sich geändert. Bitte die Seite neu laden und der neuen Fassung zustimmen."

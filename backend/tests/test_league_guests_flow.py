@@ -385,4 +385,3 @@ async def test_without_a_season_text_everybody_sees_the_placeholder_and_release_
     refused = await flow.put(f"/api/admin/leagues/seasons/{w['season']['id']}/privacy-release", json={"released": True})
     assert refused.status_code == 422
     assert (await submit(flow, w, w["teams"][0])).status_code == 200
-
