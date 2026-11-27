@@ -81,6 +81,23 @@ export const OWN_STATUS_STATES = {
   cancelled: ["cancelled", "Abgemeldet"],
 };
 
+/** Der eigene Stand als Plakette („Mein Kalender“, Eventliste, Event-Programm): das Wort kommt vom Server, die Art von
+ *  hier - Warteliste und Anfrage warten, Gefahrenes und Erledigtes ist vorbei, alles andere heißt „du bist dabei“
+ *  (angemeldet, eingecheckt, zugesagt, Schicht). */
+export const OWN_BADGE_KINDS = {
+  waitlist: "waiting",
+  waitlisted: "waiting",
+  pending: "waiting",
+  requested: "waiting",
+  driven: "done",
+  done: "done",
+};
+
+/** Die Art zum eigenen Stand (siehe OWN_BADGE_KINDS), sonst „joined“. */
+export function ownBadgeKind(state) {
+  return OWN_BADGE_KINDS[String(state ?? "").trim().toLowerCase()] || "joined";
+}
+
 /** Zustände, die „Läuft“ zeigen, deren Punkt aber still steht (Fabians Entscheidung vom 27.11.): eine Saison läuft
  *  Monate, ein Puls hieße „gerade jetzt“. */
 export const STILL_STATES = ["active"];

@@ -57,6 +57,7 @@
     "reserved": ["waiting", "Reserviert"]
   },
   "still": ["active"],
+  "ownBadge": { "waitlist": "waiting", "waitlisted": "waiting", "pending": "waiting", "requested": "waiting", "driven": "done", "done": "done", "_sonst": "joined" },
   "own": {
     "approved": ["joined", "Du bist dabei"],
     "registered": ["joined", "Du bist dabei"],

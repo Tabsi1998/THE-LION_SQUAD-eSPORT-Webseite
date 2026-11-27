@@ -2,7 +2,10 @@ import { readFileSync } from "node:fs";
 import path from "node:path";
 import { MATCH_STATUS_LABELS, REGISTRATION_STATUS_LABELS } from "./tournamentLabels";
 import { ROLE_COLORS } from "./categoryColors";
-import { OWN_STATUS_STATES, STATUS_KIND_ORDER, STATUS_KINDS, STATUS_STATES, STILL_STATES, isKnownStatus, statusKind, statusWord } from "./statusKinds";
+import {
+  OWN_BADGE_KINDS, OWN_STATUS_STATES, STATUS_KIND_ORDER, STATUS_KINDS, STATUS_STATES, STILL_STATES, isKnownStatus, ownBadgeKind, statusKind,
+  statusWord,
+} from "./statusKinds";
 
 // Zustands-Schilder (#1306): eine Tabelle für jeden Zustand. Dieser Test hält drei Stellen gleich - lib/statusKinds.js,
 // docs/status-kinds.json (die App liest sie später, wie docs/category-colors.json) und das Aussehen in styles/system.css -
@@ -24,6 +27,11 @@ test("docs/status-kinds.json nennt genau die Arten, Zustände und Du-Wörter der
   expect(shared.states).toEqual(STATUS_STATES);
   expect(shared.own).toEqual(OWN_STATUS_STATES);
   expect(shared.still).toEqual(STILL_STATES);
+  const { _sonst: fallback, ...ownBadge } = shared.ownBadge;
+  expect(ownBadge).toEqual(OWN_BADGE_KINDS);
+  expect(ownBadgeKind("approved")).toBe(fallback);
+  expect(ownBadgeKind("WAITLIST")).toBe("waiting");
+  expect(ownBadgeKind("driven")).toBe("done");
 });
 
 test("zehn Arten; eine laufende Saison zeigt „Läuft“, der Punkt steht aber still (Fabian, 27.11.)", () => {

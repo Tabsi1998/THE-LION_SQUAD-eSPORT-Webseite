@@ -8,6 +8,7 @@ import { Breadcrumbs } from "@/components/tls/Breadcrumbs";
 import { StepBar, eventStep, eventSteps } from "@/components/tls/StepBar";
 import { PhaseBadge } from "@/components/tls/PhaseBadge";
 import { StatusChip } from "@/components/tls/StatusChip";
+import { ownBadgeKind } from "@/lib/statusKinds";
 import { RichContent } from "@/components/tls/RichContent";
 import { useCookieConsent } from "@/components/tls/CookieConsent";
 import { ExternalMediaNotice } from "@/components/tls/ExternalMediaNotice";
@@ -640,9 +641,8 @@ function WhatsOnRow({ row, accessToken }) {
         </span>
         <span className="shrink-0">
           {row.mine ? (
-            <span className="inline-flex items-center gap-1 rounded-sm bg-[#29B6E8]/15 px-2 py-1 tls-type-small font-bold text-[#29B6E8]" data-testid="event-row-mine">
-              <CheckCircle className="w-3.5 h-3.5" aria-hidden="true" /> {row.mine.label}{row.mine.team ? ` · ${row.mine.team}` : ""}
-            </span>
+            // Der eigene Stand als Zustands-Schild (#1306), das Team daneben.
+            <StatusChip kind={ownBadgeKind(row.mine.state)} label={row.mine.label} testId="event-row-mine" meta={row.mine.team ? `mit ${row.mine.team}` : null} metaTestId="event-row-mine-team" />
           ) : row.action === "register" ? (
             <span className="tls-btn tls-btn--primary inline-flex items-center px-3 py-1.5 tls-type-label rounded-sm" data-testid="event-row-register">Anmelden</span>
           ) : (

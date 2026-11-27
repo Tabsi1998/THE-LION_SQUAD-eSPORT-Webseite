@@ -139,6 +139,9 @@ test("„Nur meine“: nur, wofür man selbst oder das Team dabei ist - mit dem 
   expect(screen.queryByTestId("tournament-card-online-cup")).toBeNull();
   const lan = screen.getByTestId("event-card-herbst-lan");
   await userEvent.click(within(lan).getByTestId("event-card-toggle-herbst-lan"));
-  expect(screen.getByTestId("event-child-mine-t-rocket")).toHaveTextContent("Du bist dabei · Lions Rocket");
+  // Zustands-Schild (#1306): das Wort im Schild, das Team daneben.
+  expect(screen.getByTestId("event-child-mine-t-rocket")).toHaveTextContent(/^Du bist dabei$/);
+  expect(screen.getByTestId("event-child-mine-t-rocket")).toHaveAttribute("data-kind", "joined");
+  expect(screen.getByTestId("event-child-mine-t-rocket-team")).toHaveTextContent("mit Lions Rocket");
   expect(screen.queryByTestId("event-child-fastlap-f-lan")).toBeNull();
 });

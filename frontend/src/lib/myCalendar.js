@@ -1,5 +1,6 @@
 import { mergeEventDays } from "@/lib/calendar";
 import { asInstant, viennaDay } from "@/lib/vienna";
+import { ownBadgeKind } from "@/lib/statusKinds";
 
 // „Mein Kalender“ (#1788): die eigenen Termine ohne Abo. Welche es sind, rechnet der Server an einer Stelle
 // (GET /api/calendar/me = dieselbe Liste wie der persönliche Feed); hier nur, wie sie gruppiert und beschriftet werden -
@@ -69,15 +70,7 @@ const BADGE_TONES = {
   done: "done",
 };
 
-// Als Zustands-Schild (#1306): Warteliste und Anfrage warten, gefahren und erledigt ist vorbei, alles andere heißt „du
-// bist dabei“ (angemeldet, eingecheckt, zugesagt, Schicht). Das Wort kommt vom Server, das Team steht neben dem Schild.
-const BADGE_KINDS = {
-  waitlist: "waiting",
-  pending: "waiting",
-  requested: "waiting",
-  driven: "done",
-  done: "done",
-};
+// Als Zustands-Schild (#1306): die Art aus lib/statusKinds.js (ownBadgeKind), das Wort vom Server, das Team daneben.
 
 /** Die Plakette zu einem Termin: der eigene Stand vom Server, beim Turnier mit Team „mit Lions Rocket“. `kind`, `word`
  *  und `team` für das Zustands-Schild; `label` ist der ganze Satz (Vorlesetext, Kalender-Abo). */
@@ -86,7 +79,7 @@ export function ownBadge(item) {
   if (!own?.label) return null;
   const tone = item.kind === "club" ? "club" : BADGE_TONES[own.state] || "mine";
   const label = own.team_name ? `${own.label} · mit ${own.team_name}` : own.label;
-  return { label, tone, kind: BADGE_KINDS[own.state] || "joined", word: own.label, team: own.team_name || null };
+  return { label, tone, kind: ownBadgeKind(own.state), word: own.label, team: own.team_name || null };
 }
 
 /** Status des Abos in einem Satz - „aktiv seit 3. Okt., zuletzt abgerufen …“; ohne Abo nichts. */
