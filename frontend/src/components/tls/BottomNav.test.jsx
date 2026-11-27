@@ -110,3 +110,15 @@ function SeasonProbe() {
   const { pathname } = useLocation();
   return <span data-testid="season-path">{pathname}</span>;
 }
+
+// Die Beschriftung (12 px, ruhiges Grau) braucht den dunklen Grund der Leiste für WCAG AA (4,5 : 1, Prüftor #1660).
+// Tailwind baut eine Deckkraft wie „/96“ nicht (nur 0, 5, 10 … 100 oder in eckigen Klammern) - die Leiste war durchsichtig,
+// und die Schrift stand auf dem verschwommenen Inhalt darunter.
+test("die Leiste hat einen Grund, den Tailwind auch baut - Deckkraft aus der Skala oder in eckigen Klammern", () => {
+  renderAt("/");
+  const nav = document.querySelector(".tls-bottom-nav");
+  const background = nav.className.split(/\s+/).find((name) => name.startsWith("bg-"));
+  expect(background).toBeTruthy();
+  const opacity = /\/(\d+|\[[^\]]+\])$/.exec(background)?.[1];
+  if (opacity && !opacity.startsWith("[")) expect(Number(opacity) % 5, `${background}: Deckkraft ${opacity} baut Tailwind nicht`).toBe(0);
+});

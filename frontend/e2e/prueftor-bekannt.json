@@ -68,36 +68,6 @@
       "grund": "Bestand vor dem Prüftor (#1660): Rahmen der Seite (Fuß mit text-white/40) unter WCAG AA. Anpassung ändert jede Seite sichtbar und braucht Fabians Freigabe; bis dahin bekannt."
     },
     {
-      "seite": "*",
-      "art": "kontrast",
-      "ziel": "color-contrast: [Navigation] a[aria-label=\"Events\"] > .leading-none.tls-type-label",
-      "grund": "Bestand vor dem Prüftor (#1660): Beschriftung der Handy-Leiste - seit der Schrift-Treppe (#1302) 12 px im ruhigen Grau, auf der halbdurchsichtigen Leiste über hellen Flächen aber unter WCAG AA. Anpassung der Leiste ändert jede Seite sichtbar und braucht Fabians Freigabe; bis dahin bekannt."
-    },
-    {
-      "seite": "*",
-      "art": "kontrast",
-      "ziel": "color-contrast: [Navigation] a[aria-label=\"Profil\"] > .leading-none.tls-type-label",
-      "grund": "Bestand vor dem Prüftor (#1660): Beschriftung der Handy-Leiste - seit der Schrift-Treppe (#1302) 12 px im ruhigen Grau, auf der halbdurchsichtigen Leiste über hellen Flächen aber unter WCAG AA. Anpassung der Leiste ändert jede Seite sichtbar und braucht Fabians Freigabe; bis dahin bekannt."
-    },
-    {
-      "seite": "*",
-      "art": "kontrast",
-      "ziel": "color-contrast: [Navigation] a[aria-label=\"Start\"] > .leading-none.tls-type-label",
-      "grund": "Bestand vor dem Prüftor (#1660): Beschriftung der Handy-Leiste - seit der Schrift-Treppe (#1302) 12 px im ruhigen Grau, auf der halbdurchsichtigen Leiste über hellen Flächen aber unter WCAG AA. Anpassung der Leiste ändert jede Seite sichtbar und braucht Fabians Freigabe; bis dahin bekannt."
-    },
-    {
-      "seite": "*",
-      "art": "kontrast",
-      "ziel": "color-contrast: [Navigation] a[data-testid=\"bottom-nav-community\"] > .leading-none.tls-type-label",
-      "grund": "Bestand vor dem Prüftor (#1660): Beschriftung der Handy-Leiste - seit der Schrift-Treppe (#1302) 12 px im ruhigen Grau, auf der halbdurchsichtigen Leiste über hellen Flächen aber unter WCAG AA. Anpassung der Leiste ändert jede Seite sichtbar und braucht Fabians Freigabe; bis dahin bekannt."
-    },
-    {
-      "seite": "*",
-      "art": "kontrast",
-      "ziel": "color-contrast: [Navigation] a[data-testid=\"bottom-nav-verein\"] > .leading-none.tls-type-label",
-      "grund": "Bestand vor dem Prüftor (#1660): Beschriftung der Handy-Leiste - seit der Schrift-Treppe (#1302) 12 px im ruhigen Grau, auf der halbdurchsichtigen Leiste über hellen Flächen aber unter WCAG AA. Anpassung der Leiste ändert jede Seite sichtbar und braucht Fabians Freigabe; bis dahin bekannt."
-    },
-    {
       "seite": "Benachrichtigungen einstellen",
       "art": "kontrast",
       "ziel": "color-contrast: [Fuß] .md\\:justify-end > .hover\\:text-\\[\\#29B6E8\\][type=\"button\"]",
