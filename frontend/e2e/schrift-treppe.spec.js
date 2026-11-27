@@ -201,13 +201,14 @@ test.describe("Schrift-Treppe", () => {
     });
   }
 
-  // Teilnehmerliste eines Turniers bei 320 px: Das Schild „ANGENOMMEN“ ist ein Etikett (12 px) - kurze Namen wie
-  // „NeonFalke“ stehen daneben ganz da, nur sehr lange Namen enden mit „…“ (der ganze Name steht im Profil).
+  // Teilnehmerliste eines Turniers bei 320 px: Das Schild „ANGENOMMEN“ ist ein Etikett (12 px). Kein Name wird
+  // abgeschnitten und keiner endet mit „…“ (#1314): Namen wie „NeonFalke“ stehen in einer Zeile, längere brechen
+  // zwischen Wörtern um („🦁“ / „Löwenherz“) - nie mitten in einem Wort, das allein in die Spalte passt.
   const TOURNAMENT = { id: "t-cup", slug: "herbst-cup", title: "Herbst-Cup 2026", status: "registration_open", start_date: "2026-12-05T13:00:00+00:00", max_participants: 16, participant_count: 8, public_phase: { state: "registration_open", label: "Anmeldung offen" } };
-  const PLAYERS = ["NeonFalke", "Der unglaublich schnelle Kartfahrer", "LuckyLion", "🦁 Löwenherz Ostalpen", "DriftDaniel", "BoostBernd", "TurboTom", "SchnellSchnecke"];
+  const PLAYERS = ["NeonFalke", "Der unglaublich schnelle Kartfahrer", "LuckyLion", "🦁 Löwenherz", "DriftDaniel", "BoostBernd", "TurboTom", "SchnellSchnecke"];
   const REGISTRATIONS = PLAYERS.map((name, index) => ({ id: `r${index + 1}`, display_name: name, status: "approved", seed: index + 1 }));
 
-  test("Teilnehmerliste bei 320 px: Schilder als Etikett, kurze Namen ungekürzt", async ({ page }) => {
+  test("Teilnehmerliste bei 320 px: Schilder als Etikett, kein Name abgeschnitten", async ({ page }) => {
     await page.setViewportSize({ width: 320, height: 740 });
     await mockLongApi(page);
     await page.route(`**/api/tournaments/${TOURNAMENT.slug}`, (route) => route.fulfill(json(TOURNAMENT)));
@@ -218,13 +219,41 @@ test.describe("Schrift-Treppe", () => {
     await expect(first).toBeVisible();
     const badge = first.getByTestId("status-approved");
     expect(await badge.evaluate((node) => getComputedStyle(node).fontSize)).toBe("12px");
-    for (const id of ["r1", "r3", "r7"]) {
-      const cut = await page.getByTestId(`tournament-participant-${id}`).evaluate((row) => {
-        const name = [...row.querySelectorAll("span")].find((node) => node.className.includes("truncate"));
-        return name.scrollWidth > name.clientWidth + 1;
-      });
-      expect(cut, `Name in ${id} abgeschnitten`).toBe(false);
+    for (const [index, player] of PLAYERS.entries()) {
+      const facts = await page.getByTestId(`tournament-participant-r${index + 1}`).evaluate((row, name) => {
+        const node = [...row.querySelectorAll("span")].find((span) => span.textContent === name);
+        const linesOf = (range) => new Set([...range.getClientRects()].map((rect) => Math.round(rect.top))).size;
+        const all = document.createRange();
+        all.selectNodeContents(node);
+        const width = node.getBoundingClientRect().width;
+        const broken = [];
+        let offset = 0;
+        for (const word of name.split(/(?<=\s)/)) {
+          const range = document.createRange();
+          range.setStart(node.firstChild, offset);
+          range.setEnd(node.firstChild, offset + word.trimEnd().length);
+          offset += word.length;
+          const probe = document.createElement("span");
+          probe.style.whiteSpace = "nowrap";
+          probe.textContent = word.trimEnd();
+          node.after(probe);
+          const alone = probe.getBoundingClientRect().width;
+          probe.remove();
+          if (alone <= width && linesOf(range) > 1) broken.push(word.trim());
+        }
+        return { cut: node.scrollWidth > node.clientWidth + 1 || getComputedStyle(node).textOverflow === "ellipsis", lines: linesOf(all), broken };
+      }, player);
+      expect(facts.cut, `Name „${player}“ abgeschnitten`).toBe(false);
+      expect(facts.broken, `„${player}“ mitten im Wort gebrochen`).toEqual([]);
+      if (["NeonFalke", "LuckyLion", "TurboTom"].includes(player)) expect(facts.lines, `„${player}“ in einer Zeile`).toBe(1);
     }
+    // Die Namen stehen bündig hinter dem Setzplatz - auch wenn ein langer Name umbricht.
+    const lefts = await page.evaluate((names) => names.map((name) => {
+      const node = [...document.querySelectorAll("[data-testid^='tournament-participant-r'] span")].find((span) => span.textContent === name);
+      return Math.round(node.getBoundingClientRect().left);
+    }), PLAYERS);
+    expect(Math.max(...lefts) - Math.min(...lefts), `linke Kanten der Namen: ${lefts.join(", ")}`).toBeLessThanOrEqual(1);
+    if (process.env.SHOT_DIR) await page.getByTestId("tournament-participants").screenshot({ path: `${process.env.SHOT_DIR}/teilnehmer-320.png` });
   });
 
   // Kopf der Matchseite: Die Überschrift besteht aus Namen - nie GROSS (#1303), auch kurz („Jo gegen Max“).
