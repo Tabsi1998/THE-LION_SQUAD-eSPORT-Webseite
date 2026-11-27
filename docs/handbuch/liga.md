@@ -653,14 +653,17 @@ steht: Dann teilst du von Hand zu (Nachmeldung, siehe 2.5a).
 ### 2.5c Solo-Liga: Spieler statt Co-Teams
 
 In einer Solo-Liga spielt jede Person für sich, 1 gegen 1 (etwa eine CoD-1v1-Liga mit Maps). Du wählst das beim Anlegen der Liga unter
-**Teilnehmer → Spieler (1 gegen 1)**. Die Wahl gibt es nur bei Spielen, die Einzelspieler erlauben, und sie steht danach fest. Für
-die andere Art legst du eine neue Liga an.
+**Teilnehmer → Spieler (1 gegen 1)**. Die Wahl gibt es nur bei Spielen, die Einzelspieler erlauben (Spielseite, Reiter **Allgemein** →
+**Einzelspieler erlaubt**, Vorgabe an; siehe [Turniere](turniere.md)), und sie steht danach fest. Für die andere Art legst du eine
+neue Liga an. Spielt eine Solo-Liga das Spiel, lässt sich **Einzelspieler erlaubt** dort nicht mehr ausschalten.
 
 **Was anders ist:**
 
 - In der Liga-Übersicht und im Kopf der Season steht **Spieler (1 gegen 1)**, auf der Staffel-Seite **Spieler · 1 gegen 1**.
 - Eine neue Season startet mit **1 gegen 1**, beim Check-in reicht die Person selbst. Die **Teamgröße** ist fest 1. Liga N hat keine
-  eigene Teamgröße und keinen Mindestkader.
+  eigene Teamgröße und keinen Mindestkader. In einer Team-Liga bleibt die Teamgröße wie bisher je Season und je Liga N einstellbar.
+- **Veröffentlichen** geht. **Was fehlt noch?** im Überblick zeigt aber gelb die Warnung „Solo-Liga: Spielbetrieb folgt – Spiele
+  lassen sich noch nicht austragen.“, bis der Spielbetrieb für Spieler fertig ist.
 - Im Reiter **Anmeldung und Kader** stehen nur **Mindestalter**, **Jede Spiel-ID nur einmal** und die **Plattform**. Der Kader ist die
   Person selbst.
 

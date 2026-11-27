@@ -5309,11 +5309,16 @@ EA FC 1v1 und 2v2 wären zwei Ligen. Kein zweites System: dieselbe Liga, Season,
 (`tournament_registrations` mit `user_id`) - die lesenden Bausteine (Endstand, Belohnungen, Gesamtwertung, Moment, Profil) kennen
 Personen schon (Lückenanalyse, Abschnitt 1). Der Code steht in `services/league_participants.py`.
 
+**Teamgröße** (Nr. 295): fest ist sie nur in der Solo-Liga (immer 1). Team-Ligen bleiben wie bisher: Teamgröße je Season, Abweichung
+je Liga N, auch nach der ersten Staffel.
+
 **Felder und Regeln:**
 
 | Wo | Feld / Wert | Regel |
 | --- | --- | --- |
 | `leagues` | `participant_kind: "team" \| "solo"` | beim Anlegen gewählt, Vorgabe `team`. `solo` nur mit einem Spiel, das Einzelspieler erlaubt (`games.supports_solo`, ohne Feld ja), sonst 422 mit Satz. Jeder andere Wert beim Ändern: 409 „Die Teilnehmerart steht ab dem Anlegen fest …“. Ein Spielwechsel einer Solo-Liga prüft das neue Spiel genauso |
+| `games` | `supports_solo` | Schalter „Einzelspieler erlaubt“ auf der Spielseite (Reiter Allgemein, Nr. 296), Vorgabe an, ein Altspiel ohne Feld gilt als erlaubt. Ausschalten, solange eine Solo-Liga - auch archiviert - das Spiel spielt: 409 „Spiel hat Solo-Ligen: …“ (`game_routes.update_game`) |
+| Prüfung vor der Veröffentlichung | Warnung `solo_operations_follow` | „Solo-Liga: Spielbetrieb folgt – Spiele lassen sich noch nicht austragen. …“ ganz oben, gelb hervorgehoben (Nr. 297). Hält das Veröffentlichen nicht auf; fällt mit P3 weg |
 | neue Season einer Solo-Liga | `team_size 1`, `min_squad_size 1`, `max_squad_size 1`, `lineup_min_players 1` | Vorgaben (S11), was die Leitung mitschickt, gilt. Check-in `min_present` folgt daraus (1). Teamgröße und Mindestkader sind in Season und Liga N fest 1 (422 mit Satz) |
 | Season einer Solo-Liga | `application_opens_at` / `…_closes_at` | gibt es noch nicht (422 „Die Selbstanmeldung als Spieler folgt …“); `league_applications.season_problems` lehnt zusätzlich jeden Antrag ab |
 | Staffel | `team_mode: "solo"` | aus der Liga beim Anlegen, nie geändert (`STAFFEL_LOCKED_FIELDS` „Teilnahme“) |
