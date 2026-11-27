@@ -18,6 +18,7 @@ Fehleingaben, gleichzeitige Aktionen, Sperren, Rechte und historische Daten.
 | Grenzfälle | [`liga-grenzfaelle.spec.js`](../../frontend/e2e/liga-abnahme/liga-grenzfaelle.spec.js) | Szenario 16, Rechte, Gleichzeitigkeit, Fehleingaben, Fristen-Job, Abbrüche, Sperren, Altdaten |
 | Saisonende (#1632) | [`liga-saisonende.spec.js`](../../frontend/e2e/liga-abnahme/liga-saisonende.spec.js) | Playoffs und Relegation (#2404), Saisonende-Moment (#1639), Startrechte der Folge-Season (#1627) |
 | Betrieb (#1632) | [`liga-betrieb.spec.js`](../../frontend/e2e/liga-abnahme/liga-betrieb.spec.js) | Vorfälle (D.5), Leitstand mit Protokoll und Rundnachricht (E.4), Erinnerungen (E.5) |
+| Gastteam (#1665) | [`liga-gastteam.spec.js`](../../frontend/e2e/liga-abnahme/liga-gastteam.spec.js) | Schule ohne Freigabe angeben, als Konto ohne Mitgliedschaft anmelden (Platzhalter beim Datenschutz), Kennzeichen der Liga-Leitung, „Gast“ bzw. „Gast · Schule“ öffentlich, am TV nur „Gast“, Spiel melden, keine Verwaltung; eigene Liga mit Index 14 (Gast) und 15, danach Kennzeichen und Angabe wieder weg |
 | Backup-Probelauf (#1632) | [`scripts/liga_backup_probe.sh`](../../scripts/liga_backup_probe.sh), [`scripts/liga_backup_probe.py`](../../scripts/liga_backup_probe.py) | eigener Docker-Stand, Liga-Daten über die Seeds, Backup mit Schreibpause, frischer Stand, Restore, Vergleich (BACKUP_RESTORE.md, „Probelauf“) |
 | Hilfen | [`g1.js`](../../frontend/e2e/liga-abnahme/g1.js) | Anmelden (Sitzungen aus `e2e/abnahme/abnahmeSession.js`), API-Aufrufe mit CSRF, Liga anlegen, Serien und Veto |
 
