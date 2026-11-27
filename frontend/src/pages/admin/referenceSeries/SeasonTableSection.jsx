@@ -93,17 +93,17 @@ function ColumnItem({ column, rounds, roundId, picked, onPick, onRound, people =
           </select>
           <span className="flex items-center justify-end gap-2 sm:justify-start">
             <Badge state={column.state} />
-            {column.unclear > 0 && <span className="tls-type-small font-semibold text-amber-200 tabular-nums">{column.unclear} gelb</span>}
+            {column.unclear > 0 && <span className="tls-type-small font-semibold text-warn tabular-nums">{column.unclear} orange</span>}
           </span>
         </div>
         <div className="tls-type-small text-white/60">{[targetText(column), how, counts].filter(Boolean).join(" · ")}</div>
         {problems.length > 0 && (
-          <ul className="tls-type-small text-red-200 space-y-0.5" data-testid="season-table-problems">
+          <ul className="tls-type-small text-warn space-y-0.5" data-testid="season-table-problems">
             {problems.map((text, index) => <li key={index}>{text}</li>)}
           </ul>
         )}
         {warnings.length > 0 && (
-          <ul className="tls-type-small text-amber-200/90 space-y-0.5" data-testid="season-table-warnings">
+          <ul className="tls-type-small text-warn/90 space-y-0.5" data-testid="season-table-warnings">
             {warnings.map((text, index) => <li key={index}>{text}</li>)}
           </ul>
         )}
@@ -128,10 +128,10 @@ function UnclearList({ cells, decisions, onDecide, onProposals, onOrganizer, bus
   const open = cells.filter((cell) => !cell.decided).length;
   const single = cells.filter((cell) => !cell.decided && cell.candidates.length === 1).length;
   return (
-    <section className={`border rounded-sm p-3 space-y-3 ${open ? "border-amber-400/40 bg-amber-400/[0.06]" : "border-white/10"}`} data-testid="season-table-unclear" aria-live="polite">
+    <section className={`border rounded-sm p-3 space-y-3 ${open ? "border-warn/40 bg-warn/[0.06]" : "border-white/10"}`} data-testid="season-table-unclear" aria-live="polite">
       <div className="flex flex-wrap items-start justify-between gap-2">
         <div className="min-w-0">
-          <h3 className="tls-type-small font-bold text-white">{open ? `${open} ${open === 1 ? "Zelle" : "Zellen"} zum Klären` : "Alle gelben Zellen sind geklärt"}</h3>
+          <h3 className="tls-type-small font-bold text-white">{open ? `${open} ${open === 1 ? "Zelle" : "Zellen"} zum Klären` : "Alle orangen Zellen sind geklärt"}</h3>
           <p className="tls-type-small text-white/60">Hier ist der Platz aus den Punkten nicht eindeutig. Bis zur Klärung zählt der Wert der Tabelle – übernommen wird die Runde erst danach.</p>
         </div>
         {open > 0 && (
@@ -149,7 +149,7 @@ function UnclearList({ cells, decisions, onDecide, onProposals, onOrganizer, bus
           </div>
         )}
       </div>
-      <ul className="divide-y divide-amber-200/10">
+      <ul className="divide-y divide-warn/10">
         {cells.map((cell) => (
           <li key={cell.id} className="py-2 grid gap-2 sm:grid-cols-[minmax(0,1fr)_minmax(0,18rem)] sm:items-center" data-testid="season-table-cell" data-decided={cell.decided || undefined}>
             <div className="min-w-0 tls-type-small">
@@ -158,11 +158,11 @@ function UnclearList({ cells, decisions, onDecide, onProposals, onOrganizer, bus
               <span className="text-white/85 break-words [overflow-wrap:anywhere]">{cell.name}</span>
               <span className="text-white/45"> · </span>
               <span className="tabular-nums text-white">{cell.value} Punkte</span>
-              <span className={`block tls-type-small ${cell.decided ? "text-emerald-200/80" : "text-amber-200"}`}>{cell.decided ? "geklärt" : UNCLEAR_TEXT[cell.code] || "unklar"}</span>
+              <span className={`block tls-type-small ${cell.decided ? "text-ok/80" : "text-warn"}`}>{cell.decided ? "geklärt" : UNCLEAR_TEXT[cell.code] || "unklar"}</span>
             </div>
             <select value={decisionValue(byKey.get(cell.id), cell.candidates)} disabled={busy} aria-label={`Klären: ${cell.round}, ${cell.name}`}
               onChange={(event) => onDecide(cell, event.target.value)} data-testid="season-table-decide"
-              className={`${SELECT_CLASS} ${cell.decided ? "" : "!border-amber-400/70"}`}>
+              className={`${SELECT_CLASS} ${cell.decided ? "" : "!border-warn/70"}`}>
               <option value="">Bitte wählen …</option>
               {cell.candidates.map((candidate, index) => <option key={index} value={`c${index}`}>{candidate.label}</option>)}
               <option value="organizer">Punkte laut Veranstalter ({cell.value})</option>
@@ -183,11 +183,11 @@ function ImageMarks({ marks, onConfirm, onConfirmAll, namesUndo, onConfirmNames,
     onConfirm={onConfirmNames} onUndo={onUndoNames} />;
   if (!marks.length) return bar;
   return (
-    <section className="border border-amber-400/40 bg-amber-400/[0.06] rounded-sm p-3 space-y-2" data-testid="season-table-image-marks" aria-live="polite">
+    <section className="border border-warn/40 bg-warn/[0.06] rounded-sm p-3 space-y-2" data-testid="season-table-image-marks" aria-live="polite">
       <div className="flex flex-wrap items-start justify-between gap-2">
         <div className="min-w-0">
           <h3 className="tls-type-small font-bold text-white">Aus dem Bild unsicher: {cells} {cells === 1 ? "Zelle" : "Zellen"} in {marks.length} {marks.length === 1 ? "Zeile" : "Zeilen"}</h3>
-          <p className="tls-type-small text-amber-100/80">Mit dem Bild vergleichen. Falsches im Feld oben korrigieren und „Neu einlesen“ – sonst „Passt so“. Übernommen wird erst danach.</p>
+          <p className="tls-type-small text-white/75">Mit dem Bild vergleichen. Falsches im Feld oben korrigieren und „Neu einlesen“ – sonst „Passt so“. Übernommen wird erst danach.</p>
         </div>
         <button type="button" onClick={onConfirmAll} data-testid="season-table-image-confirm-all"
           className="tls-btn tls-btn--quiet px-3 py-1.5 rounded-sm tls-type-label inline-flex items-center gap-1.5">
@@ -195,12 +195,12 @@ function ImageMarks({ marks, onConfirm, onConfirmAll, namesUndo, onConfirmNames,
         </button>
       </div>
       {bar}
-      <ul className="divide-y divide-amber-200/10">
+      <ul className="divide-y divide-warn/10">
         {marks.map((mark) => (
           <li key={mark.row} className="py-1.5 flex flex-wrap items-start justify-between gap-2 tls-type-small" data-testid="season-table-image-mark">
-            <span className="min-w-0 text-amber-100">
+            <span className="min-w-0 text-white/85">
               <span className="font-semibold text-white">{mark.name}</span> · {markText(mark)}
-              {mark.notes.length > 0 && <span className="block text-amber-200/70">{mark.notes.join(" · ")}</span>}
+              {mark.notes.length > 0 && <span className="block text-warn/70">{mark.notes.join(" · ")}</span>}
             </span>
             <button type="button" onClick={() => onConfirm(mark.row)} data-testid="season-table-image-confirm"
               className="tls-btn tls-btn--quiet px-2 py-1 rounded-sm tls-type-label inline-flex items-center gap-1">
@@ -303,8 +303,8 @@ function TeamTotalsPanel({ series, result, file = null, onClose, onChanged }) {
           </select>
         </label>
       )}
-      {error && <p className="tls-type-small text-amber-200" role="alert" data-testid="season-table-team-error">{error}</p>}
-      {preview && !preview.team_scoring && <p className="tls-type-small text-amber-200">Die Saison führt keine Teamwertung – die Werte stehen dann nur im Ergebnis.</p>}
+      {error && <p className="tls-type-small text-warn" role="alert" data-testid="season-table-team-error">{error}</p>}
+      {preview && !preview.team_scoring && <p className="tls-type-small text-warn">Die Saison führt keine Teamwertung – die Werte stehen dann nur im Ergebnis.</p>}
       {preview && Object.keys(preview.previous || {}).length > 0 && (
         <fieldset className="space-y-1" data-testid="season-table-team-mode">
           <legend className="tls-type-small font-bold text-white/60 mb-1">Vorhandene Teamwertung dieser Runde</legend>
@@ -320,7 +320,7 @@ function TeamTotalsPanel({ series, result, file = null, onClose, onChanged }) {
       )}
       <OfficialTeamTotals totals={totals} initialRows={initialRows} onChange={setTotals} onOpenChange={setOpen} teams={(preview?.rows || []).map((row) => row.team)} />
       {(preview?.unknown_teams || []).length > 0 && (
-        <p className="tls-type-small text-amber-200" data-testid="season-table-team-unknown">Neu in der Saison: {preview.unknown_teams.join(", ")} – Schreibweise prüfen.</p>
+        <p className="tls-type-small text-warn" data-testid="season-table-team-unknown">Neu in der Saison: {preview.unknown_teams.join(", ")} – Schreibweise prüfen.</p>
       )}
       {rows.length > 0 && (
         <div className="tls-swipe">
@@ -340,12 +340,12 @@ function TeamTotalsPanel({ series, result, file = null, onClose, onChanged }) {
                 <tr key={row.team} data-testid="season-table-team-change" data-state={row.state}>
                   <td className="py-1.5 pr-3 text-white break-words">
                     {row.team}
-                    {TEAM_STATES[row.state] && <span className={`block tls-type-small ${row.state === "removed" ? "text-amber-200" : "text-white/45"}`}>{TEAM_STATES[row.state]}</span>}
+                    {TEAM_STATES[row.state] && <span className={`block tls-type-small ${row.state === "removed" ? "text-warn" : "text-white/45"}`}>{TEAM_STATES[row.state]}</span>}
                   </td>
                   <td className="py-1.5 pr-3 text-right tabular-nums text-white/60">{row.previous ?? "–"}</td>
                   <td className={`py-1.5 pr-3 text-right tabular-nums ${row.state === "removed" ? "text-white/35 line-through" : "text-white"}`}>{row.final ?? row.previous ?? "–"}</td>
                   <td className="py-1.5 pr-3 text-right tabular-nums text-white/70">{row.computed_points ?? "–"}</td>
-                  <td className={`py-1.5 text-right tabular-nums ${row.deviation ? "text-amber-200" : "text-white/45"}`}>{row.deviation ? (row.deviation > 0 ? `+${row.deviation}` : `−${Math.abs(row.deviation)}`) : "–"}</td>
+                  <td className={`py-1.5 text-right tabular-nums ${row.deviation ? "text-warn" : "text-white/45"}`}>{row.deviation ? (row.deviation > 0 ? `+${row.deviation}` : `−${Math.abs(row.deviation)}`) : "–"}</td>
                 </tr>
               ))}
             </tbody>
@@ -353,7 +353,7 @@ function TeamTotalsPanel({ series, result, file = null, onClose, onChanged }) {
         </div>
       )}
       {(removed > 0 || kept > 0) && (
-        <p className={`tls-type-small ${removed ? "text-amber-200" : "text-white/55"}`} data-testid="season-table-team-mode-note">
+        <p className={`tls-type-small ${removed ? "text-warn" : "text-white/55"}`} data-testid="season-table-team-mode-note">
           {removed ? `${removed} ${removed === 1 ? "Team wird" : "Teams werden"} entfernt – sie fehlen im Bild.` : `${kept} ${kept === 1 ? "Team bleibt" : "Teams bleiben"} stehen – nicht im Bild.`}
         </p>
       )}
@@ -363,7 +363,7 @@ function TeamTotalsPanel({ series, result, file = null, onClose, onChanged }) {
           className="tls-btn tls-btn--primary px-4 py-2 rounded-sm tls-type-label disabled:opacity-50">
           {saving ? "Übernimmt …" : "Teamwertung übernehmen"}
         </button>
-        {open > 0 && <span className="tls-type-small text-amber-200">Erst die gelben Zeilen prüfen.</span>}
+        {open > 0 && <span className="tls-type-small text-warn">Erst die orangen Zeilen prüfen.</span>}
       </div>
     </section>
   );
@@ -375,11 +375,11 @@ function rankText(item) {
   return `${item.table_rank} → ${item.rank || "–"}`;
 }
 
-const TOTAL_TONES = { ok: "text-white/60", explained: "text-[#29B6E8]", differs: "text-amber-200", no_total: "text-white/45" };
+const TOTAL_TONES = { ok: "text-white/60", explained: "text-[#29B6E8]", differs: "text-warn", no_total: "text-white/45" };
 
 function TotalsTable({ totals, error, people = "Fahrer" }) {
   const [onlyIssues, setOnlyIssues] = useState(true);
-  if (error) return <p className="tls-type-small text-amber-200" role="alert" data-testid="season-table-totals-error">{error}</p>;
+  if (error) return <p className="tls-type-small text-warn" role="alert" data-testid="season-table-totals-error">{error}</p>;
   if (!totals) return null;
   const summary = totalsSummary(totals);
   const issues = totals.filter((item) => item.state !== "ok" || item.rank_differs);
@@ -393,12 +393,12 @@ function TotalsTable({ totals, error, people = "Fahrer" }) {
     <section className="space-y-2" data-testid="season-table-totals">
       <div className="flex flex-wrap items-baseline justify-between gap-2">
         <h3 className="tls-type-small font-bold text-white">Abgleich mit „Gesamt“</h3>
-        <span className={`tls-type-small tabular-nums ${summary.differs ? "text-amber-200" : "text-white/60"}`} data-testid="season-table-totals-summary">{parts.join(" · ")}</span>
+        <span className={`tls-type-small tabular-nums ${summary.differs ? "text-warn" : "text-white/60"}`} data-testid="season-table-totals-summary">{parts.join(" · ")}</span>
       </div>
       <p className="tls-type-small text-white/55">Die eigene Rechnung nach allen Runden, als wären die Entwürfe veröffentlicht – mit Streichresultaten, Anpassungen und Boni der Saison.</p>
       <CheckField label="Nur Auffällige zeigen" checked={onlyIssues} onChange={setOnlyIssues} testId="season-table-only-issues" />
       {shown.length === 0 ? (
-        <p className="tls-type-small text-emerald-200/90" data-testid="season-table-totals-fine">Alle Summen und Plätze stimmen mit der Tabelle.</p>
+        <p className="tls-type-small text-ok/90" data-testid="season-table-totals-fine">Alle Summen und Plätze stimmen mit der Tabelle.</p>
       ) : (
         <div className="tls-swipe">
           <table className="w-full tls-type-small">
@@ -421,7 +421,7 @@ function TotalsTable({ totals, error, people = "Fahrer" }) {
                   </td>
                   <td className="py-1.5 pr-3 text-right tabular-nums text-white/80">{item.table_total ?? "–"}</td>
                   <td className="py-1.5 pr-3 text-right tabular-nums text-white">{item.computed}</td>
-                  <td className={`py-1.5 pr-3 text-right tabular-nums ${item.rank_differs ? "text-amber-200" : "text-white/70"}`}>{rankText(item)}</td>
+                  <td className={`py-1.5 pr-3 text-right tabular-nums ${item.rank_differs ? "text-warn" : "text-white/70"}`}>{rankText(item)}</td>
                   <td className={`hidden sm:table-cell py-1.5 tls-type-small ${TOTAL_TONES[item.state] || "text-white/60"}`}>{totalText(item)}</td>
                 </tr>
               ))}
@@ -596,7 +596,7 @@ export function SeasonTableSection({ series, onChanged }) {
                   onChange={() => setPoints(value)} data-testid={`season-table-points-${value}`} style={{ accentColor: "#29B6E8" }} className="mt-1 shrink-0" />
                 <span>{label}
                   <span className="block tls-type-small text-white/45">
-                    {value === "scheme" ? "Über das Punkteschema der Runde; nicht Eindeutiges wird gelb." : "Ohne Rückrechnung, etwa wenn Boni schon im Wert stecken (21 = 18 + 3 Bingo) – mit Hinweis, wenn ein Wert nicht im Schema liegt."}
+                    {value === "scheme" ? "Über das Punkteschema der Runde; nicht Eindeutiges wird orange." : "Ohne Rückrechnung, etwa wenn Boni schon im Wert stecken (21 = 18 + 3 Bingo) – mit Hinweis, wenn ein Wert nicht im Schema liegt."}
                   </span>
                 </span>
               </label>
@@ -622,17 +622,17 @@ export function SeasonTableSection({ series, onChanged }) {
             }}
             onUndoNames={() => { setImageMarks((current) => undoTableNames(current, namesUndo)); setNamesUndo(null); }} />
           {parseErrors.length > 0 && (
-            <ul className="tls-type-small text-amber-200 space-y-0.5" data-testid="season-table-parse-errors">
+            <ul className="tls-type-small text-warn space-y-0.5" data-testid="season-table-parse-errors">
               {parseErrors.map((item, index) => <li key={index}>{item.line ? `Zeile ${item.line}: ` : ""}{item.message}</li>)}
             </ul>
           )}
-          {error && <p className="border border-red-400/40 bg-red-400/10 rounded-sm px-3 py-2 tls-type-small text-red-100" role="alert" data-testid="season-table-error">{error}</p>}
+          {error && <p className="border border-warn/40 bg-warn/10 rounded-sm px-3 py-2 tls-type-small text-white/85" role="alert" data-testid="season-table-error">{error}</p>}
           {parsed && parsed.columns.length > 0 && <ColumnKinds parsed={parsed} kinds={kinds} onKind={changeKind} />}
           {preview && (
             <div className="space-y-5" data-testid="season-table-preview">
               <p className="tls-type-body text-white/75 tabular-nums" data-testid="season-table-summary">
                 {preview.summary.rows} {people} · {preview.summary.mapped} von {preview.summary.columns} Runden zugeordnet
-                {preview.summary.unclear ? ` · ${preview.summary.unclear} gelb` : ""}{preview.summary.errors ? ` · ${preview.summary.errors} mit Fehler` : ""}
+                {preview.summary.unclear ? ` · ${preview.summary.unclear} orange` : ""}{preview.summary.errors ? ` · ${preview.summary.errors} mit Fehler` : ""}
               </p>
               <ol className="divide-y divide-white/5 border-y border-white/10">
                 {columns.map((column) => (
@@ -657,7 +657,7 @@ export function SeasonTableSection({ series, onChanged }) {
                   {busy === "apply" ? "Übernimmt …" : `Übernehmen (${picked.length})`}
                 </button>
                 {tableFile && <PendingOriginal target={lastTableRound(columns)} onDrop={() => setTableFile(null)} testId="season-table-original" />}
-                <span className="tls-type-small text-white/50">Ergebnisse kommen als Entwurf. Vorhandenes wird nur ersetzt, wenn du es anhakst – ein veröffentlichtes Ergebnis bekommt einen Entwurf daneben. Runden mit gelben Zellen kommen nach dem Klären dazu.</span>
+                <span className="tls-type-small text-white/50">Ergebnisse kommen als Entwurf. Vorhandenes wird nur ersetzt, wenn du es anhakst – ein veröffentlichtes Ergebnis bekommt einen Entwurf daneben. Runden mit orangen Zellen kommen nach dem Klären dazu.</span>
               </div>
             </div>
           )}

@@ -70,9 +70,9 @@ function PasteBox({ onApply, label, placeholder, hint, testId }) {
         </button>
       </div>
       {errors.length > 0 && (
-        <ul className="tls-type-small text-red-200 space-y-0.5" data-testid={`${testId}-errors`} role="alert">
+        <ul className="tls-type-small text-warn space-y-0.5" data-testid={`${testId}-errors`} role="alert">
           {errors.map((error, index) => (
-            <li key={index}>{error.line ? `Zeile ${error.line}: ` : ""}{error.message}{error.text ? <span className="text-red-200/60"> – „{error.text}“</span> : null}</li>
+            <li key={index}>{error.line ? `Zeile ${error.line}: ` : ""}{error.message}{error.text ? <span className="text-white/60"> – „{error.text}“</span> : null}</li>
           ))}
         </ul>
       )}
@@ -85,7 +85,7 @@ function RowProblems({ items }) {
   return (
     <ul className="mt-1 space-y-0.5 tls-type-small" data-testid="result-row-problems">
       {items.map((item, index) => (
-        <li key={index} className={item.level === "error" ? "text-red-300" : "text-amber-300"}>{item.message}</li>
+        <li key={index} className={item.level === "error" ? "text-warn font-bold" : "text-white/75"}>{item.message}</li>
       ))}
     </ul>
   );
@@ -95,13 +95,13 @@ function RowProblems({ items }) {
 function invalidProps(fields, field) {
   return fields?.[field] ? { "aria-invalid": true, "data-invalid": field } : {};
 }
-const INVALID = "!border-red-400/80";
+const INVALID = "!border-warn/80";
 
 function FieldErrors({ fields, testId }) {
   const messages = Object.values(fields || {});
   if (!messages.length) return null;
   return (
-    <ul className="mt-1 space-y-0.5 tls-type-small text-red-300" data-testid={testId} role="alert">
+    <ul className="mt-1 space-y-0.5 tls-type-small text-warn" data-testid={testId} role="alert">
       {[...new Set(messages)].map((message) => <li key={message}>{message}</li>)}
     </ul>
   );
@@ -142,7 +142,7 @@ function ResultRow({ row, index, autoPlace, organizerMode, qualifying = false, d
   const number = index + 1;
   return (
     <li data-testid="result-row" data-level={level || undefined}
-      className={`py-2.5 pl-2 border-l-2 ${level === "error" ? "border-red-400/70" : level === "warning" ? "border-amber-400/60" : "border-transparent"}`}>
+      className={`py-2.5 pl-2 border-l-2 ${level === "error" ? "border-warn" : level === "warning" ? "border-warn/40" : "border-transparent"}`}>
       {/* Handy: Platz, Name, Punkte und Knöpfe in einer Zeile, das Team darunter; ab sm alles in einer Zeile. Ohne Teams in
           der Saison (#1969) fällt das Team-Feld samt seiner Zeile weg. */}
       <div className={`grid grid-cols-[3.5rem_minmax(0,1fr)_4.5rem_auto_auto] ${showTeam ? "sm:grid-cols-[3.5rem_minmax(0,1fr)_9rem_5rem_auto_auto]" : "sm:grid-cols-[3.5rem_minmax(0,1fr)_5rem_auto_auto]"} items-center gap-2`}>
@@ -172,7 +172,7 @@ function ResultRow({ row, index, autoPlace, organizerMode, qualifying = false, d
       </div>
       {day && <DayRoundsLine row={row} number={number} count={day.count} scheme={day.scheme} doubleUp={day.doubleUp} invalid={invalid} onChange={onChange} />}
       {(open || row.marks.length > 0 || (day && row.bonus_keys?.length > 0)) && (
-        <div className={`mt-2 flex flex-wrap gap-1.5 ${isUncertain(row, "marks") ? "rounded-sm ring-1 ring-amber-400/60 p-1" : ""}`} role="group" aria-label={`Marken Zeile ${number}`}>
+        <div className={`mt-2 flex flex-wrap gap-1.5 ${isUncertain(row, "marks") ? "rounded-sm ring-1 ring-warn/60 p-1" : ""}`} role="group" aria-label={`Marken Zeile ${number}`}>
           {day && <BonusChips row={row} bonuses={day.bonuses} open={open} number={number} onChange={onChange} />}
           {markOptions.map(([mark, label]) => {
             const active = row.marks.includes(mark);
@@ -230,17 +230,17 @@ function ResultRow({ row, index, autoPlace, organizerMode, qualifying = false, d
       {info && (
         <div className="mt-1 flex flex-wrap items-center gap-x-2 tls-type-small text-white/45 tabular-nums">
           {/* Bekannt oder neu sagt die Vorschau jedem; ob jemand Vereinsmitglied ist, nur dem Vorstand. */}
-          <span data-testid="result-row-known" className={info.is_new ? "font-bold uppercase tracking-widest text-amber-300" : undefined}>{info.is_new ? "neu" : "bekannt"}</span>
+          <span data-testid="result-row-known" className={info.is_new ? "font-bold uppercase tracking-widest text-warn" : undefined}>{info.is_new ? "neu" : "bekannt"}</span>
           {/* Turniertag (#1961): Tagessumme und Tagesplatz, dann die Saisonpunkte. */}
           {info.day_points !== null && info.day_points !== undefined && <span data-testid="result-row-day-total">Tag {formatPoints(info.day_points)}{info.place ? ` · Platz ${info.place}` : ""}</span>}
           {scored && <span data-testid="result-row-scored">= {scoredText(scored)}{info.bonus ? ` + ${formatPoints(info.bonus)} Sonderbonus` : ""}</span>}
         </div>
       )}
       {row.points_hint && (
-        <div className="mt-1 flex flex-wrap items-center gap-2 tls-type-small text-amber-300" data-testid="result-row-hint">
+        <div className="mt-1 flex flex-wrap items-center gap-2 tls-type-small text-warn" data-testid="result-row-hint">
           <span>„{row.points_hint.text}“ am Ende: Teil des Namens oder Punkte?</span>
-          <button type="button" onClick={onHint} data-testid="result-row-hint-points" className="underline underline-offset-2 hover:text-amber-100">Letzte Zahl = Punkte</button>
-          <button type="button" onClick={() => onChange({ points_hint: null })} data-testid="result-row-hint-name" className="underline underline-offset-2 text-amber-300/70 hover:text-amber-100">Gehört zum Namen</button>
+          <button type="button" onClick={onHint} data-testid="result-row-hint-points" className="underline underline-offset-2 hover:text-white">Letzte Zahl = Punkte</button>
+          <button type="button" onClick={() => onChange({ points_hint: null })} data-testid="result-row-hint-name" className="underline underline-offset-2 text-warn/70 hover:text-white">Gehört zum Namen</button>
         </div>
       )}
       <FieldErrors fields={invalid} testId="result-row-invalid" />
@@ -289,7 +289,7 @@ function RaceExtras({ form, onChange, invalid, problems = {} }) {
       {messages.length > 0 && (
         <ul className="sm:col-span-3 space-y-0.5 tls-type-small" data-testid="result-race-problems" role="alert">
           {messages.map((item, index) => (
-            <li key={index} className={item.level === "error" ? "text-red-300" : "text-amber-300"}>{item.message}</li>
+            <li key={index} className={item.level === "error" ? "text-warn font-bold" : "text-white/75"}>{item.message}</li>
           ))}
         </ul>
       )}
@@ -583,7 +583,7 @@ export function ResultEntrySheet({ series, round, onClose, onSaved }) {
 
   // Gelbe Zeilen aus dem Bild: erst prüfen, dann übernehmen – „Gelbe Zeilen prüfen“ springt zur ersten.
   const showImageOpen = () => {
-    toast.error(`${imageOpen === 1 ? "Eine Zeile aus dem Bild ist" : `${imageOpen} Zeilen aus dem Bild sind`} noch gelb – bitte prüfen oder mit „Passt so“ bestätigen.`);
+    toast.error(`${imageOpen === 1 ? "Eine Zeile aus dem Bild ist" : `${imageOpen} Zeilen aus dem Bild sind`} noch orange – bitte prüfen oder mit „Passt so“ bestätigen.`);
     const first = document.querySelector('[data-testid="result-sheet"] [data-ocr-uncertain], [data-testid="result-sheet"] [data-testid="result-row-ocr-confirm"]');
     first?.scrollIntoView?.({ block: "center" });
     first?.focus?.();
@@ -671,7 +671,7 @@ export function ResultEntrySheet({ series, round, onClose, onSaved }) {
     }
   };
 
-  const submitLabel = !ready ? (fresh ? "Erneut prüfen" : "Vorschau") : imageOpen ? "Gelbe Zeilen prüfen" : toPendingDraft ? "Entwurf zur Freigabe" : canPublish ? "Veröffentlichen" : "Als Entwurf speichern";
+  const submitLabel = !ready ? (fresh ? "Erneut prüfen" : "Vorschau") : imageOpen ? "Orange Zeilen prüfen" : toPendingDraft ? "Entwurf zur Freigabe" : canPublish ? "Veröffentlichen" : "Als Entwurf speichern";
   const sheetStatus = data?.sheet?.status;
   const pending = board ? data?.sheet?.pending_draft : null;
   const filledRows = built?.payload.rows.length || 0;
@@ -695,14 +695,14 @@ export function ResultEntrySheet({ series, round, onClose, onSaved }) {
 
           {/* #2024: ein gewerteter Termin braucht ein Datum - beim Veröffentlichen geht dieser Tag mit (Vorschlag heute). */}
           {needsDay && (
-            <label className="tls-undated-badge flex flex-wrap items-center gap-x-3 gap-y-1 border border-dashed border-amber-300/40 bg-amber-300/[0.06] rounded-sm px-3 py-2 tls-type-small text-amber-100" data-testid="result-round-day-box">
+            <label className="tls-undated-badge flex flex-wrap items-center gap-x-3 gap-y-1 border border-dashed border-warn/40 bg-warn/[0.06] rounded-sm px-3 py-2 tls-type-small text-white/85" data-testid="result-round-day-box">
               <span className="flex-1 min-w-[12rem]">{`${kindWord(profile, "round_one", "Termin")} ${data.round.code || ""}`.trim()} hat noch kein Datum. Beim Veröffentlichen wird dieser Tag eingetragen:</span>
               <input type="date" required value={roundDay} onChange={(event) => setRoundDay(event.target.value)} aria-label="Tag, an dem gespielt wurde" data-testid="result-round-day" className={`${SMALL_INPUT} w-auto`} />
             </label>
           )}
 
           {stale && (
-            <div className="border border-amber-400/40 bg-amber-400/10 rounded-sm p-3 tls-type-small text-amber-100 flex flex-wrap items-center gap-3" role="alert" data-testid="result-stale">
+            <div className="border border-warn/40 bg-warn/10 rounded-sm p-3 tls-type-small text-white/85 flex flex-wrap items-center gap-3" role="alert" data-testid="result-stale">
               <span className="flex-1 min-w-[12rem]">Inzwischen hat jemand anderes das Ergebnis geändert. Neu laden zeigt den aktuellen Stand; deine Eingaben bleiben daneben aufgehoben.</span>
               <button type="button" onClick={reloadCurrent} data-testid="result-reload" className="tls-btn tls-btn--secondary px-3 py-2 rounded-sm tls-type-label inline-flex items-center gap-1.5">
                 <RefreshCw className="w-3.5 h-3.5" /> Neu laden
@@ -763,7 +763,7 @@ export function ResultEntrySheet({ series, round, onClose, onSaved }) {
               <ResultImageSummary image={image} rows={form.rows} raceOcr={form.raceOcr} />
               <ConfirmNamesBar count={namesOpen} confirmed={namesUndo?.count || 0} onConfirm={confirmAllNames} onUndo={undoAllNames} />
               {hinted > 1 && (
-                <div className="flex flex-wrap items-center gap-2 border border-amber-400/40 bg-amber-400/10 rounded-sm px-3 py-2 tls-type-small text-amber-100" data-testid="result-hints">
+                <div className="flex flex-wrap items-center gap-2 border border-warn/40 bg-warn/10 rounded-sm px-3 py-2 tls-type-small text-white/85" data-testid="result-hints">
                   <span className="flex-1 min-w-[12rem]">{hinted} Zeilen enden auf eine Zahl – Teil des Namens oder Punkte?</span>
                   <button type="button" onClick={allHintsToPoints} data-testid="result-hints-points" className="tls-btn tls-btn--quiet px-2.5 py-1.5 rounded-sm tls-type-label">Bei allen: letzte Zahl = Punkte</button>
                 </div>
@@ -813,13 +813,13 @@ export function ResultEntrySheet({ series, round, onClose, onSaved }) {
           <TextAreaField label="Notiz" value={form.note} onChange={(value) => update({ note: value })} rows={2} hint="Optional, etwa „Wertung laut Veranstalter vorläufig“." testId="result-note" />
 
           {invalidCount > 0 && (
-            <p className="border border-red-400/40 bg-red-400/10 rounded-sm px-3 py-2 tls-type-small text-red-100" role="alert" data-testid="result-invalid">
+            <p className="border border-warn/40 bg-warn/10 rounded-sm px-3 py-2 tls-type-small text-white/85" role="alert" data-testid="result-invalid">
               {invalidCount === 1 ? "Eine Eingabe ist ungültig" : `${invalidCount} Eingaben sind ungültig`} – rot markiert. Geprüft und gespeichert wird erst, wenn alles stimmt.
             </p>
           )}
           {imageOpen > 0 && (
-            <p className="border border-amber-400/40 bg-amber-400/10 rounded-sm px-3 py-2 tls-type-body text-amber-100" role="status" data-testid="result-image-open">
-              {imageOpen === 1 ? "Eine Zeile aus dem Bild ist" : `${imageOpen} Zeilen aus dem Bild sind`} noch gelb – prüfen, korrigieren oder mit „Passt so“ bestätigen. Übernommen wird erst danach.
+            <p className="border border-warn/40 bg-warn/10 rounded-sm px-3 py-2 tls-type-body text-white/85" role="status" data-testid="result-image-open">
+              {imageOpen === 1 ? "Eine Zeile aus dem Bild ist" : `${imageOpen} Zeilen aus dem Bild sind`} noch orange – prüfen, korrigieren oder mit „Passt so“ bestätigen. Übernommen wird erst danach.
             </p>
           )}
           {fresh && <ResultPreview preview={preview} general={problems.general} board={board} profile={profile} />}

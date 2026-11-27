@@ -44,7 +44,7 @@ function StaffelTeams({ leagueSlug, seasonSlug, staffel }) {
         <h2 id={`teams-${staffel.key}`} className="tls-type-section [overflow-wrap:anywhere]">{staffel.label}</h2>
         {data ? <span className="tls-type-label text-white/45">{teams.length} {teams.length === 1 ? "Team" : "Teams"}</span> : null}
       </div>
-      {error && !data ? <p className="mt-4 tls-type-small text-white/55" role="status">Die Teams konnten gerade nicht geladen werden.</p> : null}
+      {error && !data ? <p className="mt-4 tls-type-small text-warn" role="status">Die Teams konnten gerade nicht geladen werden.</p> : null}
       {!data && !error ? <div className="tls-league-skeleton mt-4" aria-busy="true" aria-label="Lade Teams" /> : null}
       {data && !teams.length ? <p className="mt-4 tls-type-small text-white/55">Noch keine Teams zugeteilt.</p> : null}
       {teams.length ? (

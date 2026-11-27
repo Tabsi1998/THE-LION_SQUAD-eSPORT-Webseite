@@ -389,7 +389,7 @@ function Details({ row, event, busy, onChange, onStatus, onRename, onDelete, onC
           </dd>
         </div>
         {row.has_note && !notes ? <div className="tls-type-small text-quiet">Notiz wird geladen …</div> : null}
-        {notes?.error ? <div className="tls-type-small text-quiet">Notiz konnte nicht geladen werden.</div> : null}
+        {notes?.error ? <div className="tls-type-small text-warn">Notiz konnte nicht geladen werden.</div> : null}
         {notes?.note ? (
           <div>
             <dt className="text-white/50">Notiz der Person</dt>

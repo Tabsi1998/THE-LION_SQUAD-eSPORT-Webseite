@@ -790,9 +790,9 @@ function EventRegistrationPanel({ event, user, accessToken = "", onChanged, open
         // Die eigene Anmeldung (#1223): „Du bist dabei“ (oder Warteliste) mit Plätzen in Einzahl und Mehrzahl; „Stornieren“
         // als leiser Link - am Handy unter dem Kasten, ab 640 px rechts im Kasten.
         <div className="mt-5 relative" data-testid="event-own-registration">
-        <div className={`border border-[#10B981]/30 bg-[#10B981]/10 rounded-sm p-4 ${own.can_cancel ? "sm:pr-32" : ""}`}>
+        <div className={`border border-ok/30 bg-ok/10 rounded-sm p-4 ${own.can_cancel ? "sm:pr-32" : ""}`}>
           <div className="flex flex-wrap items-center gap-2">
-            <span className="inline-flex items-center gap-2 text-[#10B981] tls-type-label" data-testid="event-own-status">
+            <span className="inline-flex items-center gap-2 text-ok tls-type-label" data-testid="event-own-status">
               <CheckCircle className="w-4 h-4" /> {own.status === "waitlist" ? EVENT_REGISTRATION_LABELS.waitlist : "Du bist dabei"}
             </span>
           </div>

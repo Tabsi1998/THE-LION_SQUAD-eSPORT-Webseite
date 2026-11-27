@@ -15,7 +15,7 @@ import { Check, ClipboardList, Plus, X } from "lucide-react";
 // Zeilen sind unsicher, bis jemand sie ändert oder „Passt so“ drückt; `onOpenChange` meldet, wie viele noch gelb sind.
 
 const SMALL_INPUT = `${INPUT_CLASS} !py-1.5 tls-type-small`;
-const YELLOW = "!border-amber-400/80 !bg-amber-400/10";
+const YELLOW = "!border-warn/80 !bg-warn/10";
 // Welche Felder einer Zeile aus dem Bild gelb sind (#2018: `ocr.fields`; ohne Angabe beide).
 const teamYellow = (row) => Boolean(row.ocr) && (!row.ocr.fields || row.ocr.fields.includes("team"));
 const pointsYellow = (row) => Boolean(row.ocr) && (!row.ocr.fields || row.ocr.fields.includes("points"));
@@ -106,8 +106,8 @@ export function OfficialTeamTotals({ totals, teams = [], onChange, initialRows =
       <p className="tls-type-small text-white/55">Optional, nach dieser Runde. Ist sie da, gilt sie für Platz und Punkte der Teamwertung – die eigene Rechnung bleibt als Vergleich.</p>
       {image.busy && <p className="tls-type-small text-white/60" role="status" data-testid="result-team-totals-reading">Bild wird gelesen – das dauert ein paar Sekunden.</p>}
       {open > 0 && (
-        <p className="tls-type-small text-amber-100" role="status" data-testid="result-team-totals-open">
-          {open === 1 ? "Eine Zeile aus dem Bild ist" : `${open} Zeilen aus dem Bild sind`} gelb – mit dem Bild vergleichen, korrigieren oder mit „Passt so“ bestätigen.
+        <p className="tls-type-small text-white/85" role="status" data-testid="result-team-totals-open">
+          {open === 1 ? "Eine Zeile aus dem Bild ist" : `${open} Zeilen aus dem Bild sind`} orange – mit dem Bild vergleichen, korrigieren oder mit „Passt so“ bestätigen.
         </p>
       )}
       <ConfirmNamesBar count={teamsOpen} confirmed={teamsUndo ? Object.keys(teamsUndo).length : 0} what="Teams" testId="result-team-totals-confirm-names"
@@ -118,8 +118,8 @@ export function OfficialTeamTotals({ totals, teams = [], onChange, initialRows =
             hint="Je Zeile ein Team und seine Punkte – aus der Tabelle des Veranstalters kopiert (Tab, „|“ oder „;“). Ersetzt die Liste." testId="result-team-totals-text" />
           <button type="button" onClick={apply} disabled={!text.trim()} data-testid="result-team-totals-apply" className="tls-btn tls-btn--secondary px-3 py-2 rounded-sm tls-type-label disabled:opacity-50">Liste übernehmen</button>
           {errors.length > 0 && (
-            <ul className="tls-type-small text-red-200 space-y-0.5" role="alert" data-testid="result-team-totals-errors">
-              {errors.map((error) => <li key={`${error.line}-${error.text}`}>{`Zeile ${error.line}: ${error.message}`}{error.text ? <span className="text-red-200/60">{` – „${error.text}“`}</span> : null}</li>)}
+            <ul className="tls-type-small text-warn space-y-0.5" role="alert" data-testid="result-team-totals-errors">
+              {errors.map((error) => <li key={`${error.line}-${error.text}`}>{`Zeile ${error.line}: ${error.message}`}{error.text ? <span className="text-white/60">{` – „${error.text}“`}</span> : null}</li>)}
             </ul>
           )}
         </div>
@@ -133,12 +133,12 @@ export function OfficialTeamTotals({ totals, teams = [], onChange, initialRows =
                 <div className="grid grid-cols-[minmax(0,1fr)_4.5rem_auto] sm:grid-cols-[minmax(0,1fr)_6rem_auto] items-center gap-2">
                   <input aria-label={`Team ${index + 1}`} value={row.team} list="result-team-total-names" maxLength={120} placeholder="Team" onChange={(event) => update(row.key, { team: event.target.value })} className={`${SMALL_INPUT} ${teamYellow(row) ? YELLOW : ""}`} data-testid="result-team-total-team" />
                   <input aria-label={`Punkte Team ${index + 1}`} value={row.points} placeholder="Pkt" onChange={(event) => update(row.key, { points: event.target.value })} aria-invalid={invalid || undefined}
-                    className={`${SMALL_INPUT} text-right tabular-nums ${invalid ? "!border-red-400/80" : pointsYellow(row) ? YELLOW : ""}`} data-testid="result-team-total-points" />
+                    className={`${SMALL_INPUT} text-right tabular-nums ${invalid ? "!border-warn/80" : pointsYellow(row) ? YELLOW : ""}`} data-testid="result-team-total-points" />
                   <button type="button" onClick={() => publish(rows.filter((item) => item.key !== row.key))} aria-label={`Team ${index + 1} entfernen`} className="p-1.5 rounded-sm text-white/45 hover:text-white hover:bg-white/5"><X className="w-4 h-4" /></button>
                 </div>
                 {row.hint && <p className="tls-type-small text-white/45" data-testid="result-team-total-hint">{row.hint}</p>}
                 {row.ocr && (
-                  <div className="flex flex-wrap items-center gap-x-2 gap-y-1 tls-type-small text-amber-200" data-testid="result-team-total-ocr">
+                  <div className="flex flex-wrap items-center gap-x-2 gap-y-1 tls-type-small text-warn" data-testid="result-team-total-ocr">
                     <span className="min-w-0">Aus dem Bild unsicher{row.ocr.read ? ` – gelesen: ${row.ocr.read}` : ""}</span>
                     <button type="button" onClick={() => confirm(row.key)} data-testid="result-team-total-confirm"
                       className="tls-btn tls-btn--quiet px-2 py-1 rounded-sm tls-type-label inline-flex items-center gap-1">

@@ -188,7 +188,7 @@ function PrizeCard({ p, highlight }) {
           </div>
           <div className="tls-type-card mt-1">{p.prize_label}</div>
           {p.recipient_type === "team" && (
-            <div className="mt-1 inline-flex items-center gap-1.5 tls-type-label text-[#10B981]">
+            <div className="mt-1 inline-flex items-center gap-1.5 tls-type-label text-ok">
               <Users className="w-3 h-3" /> Team-Gewinn: {p.recipient_label}
             </div>
           )}

@@ -27,7 +27,7 @@ export function StaffelStandBadge({ tournament, season, now, testId }) {
   const stand = staffelStand(tournament, { season: season || undefined, now });
   if (!stand) return <StatusBadge status={tournament?.status} />;
   // Offen, aber verborgen: Achtung statt Grün - Teams können sich so nicht anmelden.
-  const tone = stand.live ? "bg-live/20 text-live border-live/50" : stand.hidden ? "bg-warn/15 text-warn border-warn/50" : STAND_TONE[stand.key];
+  const tone = stand.live ? "bg-live/10 text-live border-live/50" : stand.hidden ? "bg-warn/15 text-warn border-warn/50" : STAND_TONE[stand.key];
   return (
     <span data-testid={testId} title={stand.note}
       className={`inline-flex items-center gap-1 rounded-sm border px-2 py-[3px] tls-type-label ${tone}`}>

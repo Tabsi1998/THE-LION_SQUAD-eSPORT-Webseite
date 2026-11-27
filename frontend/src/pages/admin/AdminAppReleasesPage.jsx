@@ -228,7 +228,7 @@ export default function AdminAppReleasesPage() {
           <div className="flex flex-wrap items-center gap-4">
             <button type="button" onClick={saveGithubForm} data-testid="app-release-github-save" className="px-3 py-1.5 border border-white/15 rounded-sm tls-type-label hover:border-[#29B6E8]/60">Speichern</button>
             {github.github_token_configured ? (
-              <button type="button" onClick={() => saveGithub({ clear_github_token: true }, "Token entfernt – der Abgleich stoppt.")} data-testid="app-release-github-clear" className="tls-type-label text-live hover:text-live">Token entfernen</button>
+              <button type="button" onClick={() => saveGithub({ clear_github_token: true }, "Token entfernt – der Abgleich stoppt.")} data-testid="app-release-github-clear" className="tls-type-label text-live">Token entfernen</button>
             ) : null}
             <label className="flex items-center gap-2 cursor-pointer">
               <input type="checkbox" checked={github.github_sync_enabled} onChange={(e) => saveGithub({ github_sync_enabled: e.target.checked }, e.target.checked ? "Abgleich alle 10 Minuten ist an." : "Abgleich ist aus – nur noch „Jetzt abgleichen“.")} data-testid="app-release-github-enabled" className="accent-[#29B6E8]" />
@@ -280,7 +280,7 @@ export default function AdminAppReleasesPage() {
                 <td className="p-3 text-right whitespace-nowrap">
                   <button type="button" onClick={() => setMinBuild(row)} className="tls-type-label text-white/60 hover:text-[#29B6E8] mr-3">Pflicht</button>
                   <a href={`/api/mobile/app-download/${row.build}`} className="inline-flex items-center gap-1 tls-type-label text-white/60 hover:text-[#29B6E8] mr-3"><Download className="w-3 h-3" /> APK</a>
-                  <button type="button" onClick={() => remove(row)} className="inline-flex items-center gap-1 tls-type-label text-live hover:text-live"><Trash2 className="w-3 h-3" /> Löschen</button>
+                  <button type="button" onClick={() => remove(row)} className="inline-flex items-center gap-1 tls-type-label text-live"><Trash2 className="w-3 h-3" /> Löschen</button>
                 </td>
               </tr>
             ))}

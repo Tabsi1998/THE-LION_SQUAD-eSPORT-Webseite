@@ -16,13 +16,13 @@ export const POINT_MODES = [
 
 export const SEASON_STATES = {
   new: { label: "Neu", tone: "border-[#29B6E8]/50 text-[#29B6E8]" },
-  changed: { label: "Abweichungen", tone: "border-amber-400/50 text-amber-200" },
-  same: { label: "Schon übernommen", tone: "border-emerald-400/40 text-emerald-200" },
-  unclear: { label: "Zum Klären", tone: "border-amber-400/60 text-amber-200" },
-  error: { label: "Fehler", tone: "border-red-400/50 text-red-200" },
+  changed: { label: "Abweichungen", tone: "border-warn/50 text-warn" },
+  same: { label: "Schon übernommen", tone: "border-ok/40 text-ok" },
+  unclear: { label: "Zum Klären", tone: "border-warn/60 text-warn" },
+  error: { label: "Fehler", tone: "border-warn bg-warn/10 text-warn" },
   empty: { label: "Keine Punkte", tone: "border-white/15 text-white/55" },
   skip: { label: "Nicht übernommen", tone: "border-white/15 text-white/55" },
-  unmatched: { label: "Kein Termin", tone: "border-amber-400/50 text-amber-200" },
+  unmatched: { label: "Kein Termin", tone: "border-warn/50 text-warn" },
 };
 
 export const HOW_TEXT = {
@@ -307,7 +307,7 @@ export function applySummary(items = []) {
   const errors = count("error");
   const parts = [];
   if (saved) parts.push(`${saved} ${saved === 1 ? "Runde" : "Runden"} als Entwurf übernommen`);
-  if (unclear) parts.push(`${unclear} mit offenen gelben Zellen`);
+  if (unclear) parts.push(`${unclear} mit offenen orangen Zellen`);
   if (conflicts) parts.push(`${conflicts} hat sich seit der Vorschau geändert`);
   if (errors) parts.push(`${errors} mit Fehler`);
   if (!parts.length) return { ok: true, text: "Nichts zu übernehmen – alles ist schon da." };

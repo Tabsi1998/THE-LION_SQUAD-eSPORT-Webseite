@@ -9,7 +9,7 @@ import { emptyRound, roundPoints, roundsTotal } from "@/lib/tournamentDays";
 
 const SMALL_INPUT = `${INPUT_CLASS} !py-1.5 tls-type-small`;
 const LABEL = "tls-type-label text-white/45";
-const INVALID = "!border-red-400/80";
+const INVALID = "!border-warn/80";
 const CHIP = "px-2 py-1 rounded-sm border tls-type-label transition-colors active:scale-[0.97]";
 const CHIP_ON = "border-[#29B6E8] bg-[#29B6E8]/15 text-[#29B6E8]";
 const CHIP_OFF = "border-white/10 text-white/50 hover:text-white";

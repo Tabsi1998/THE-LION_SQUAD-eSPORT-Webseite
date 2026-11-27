@@ -100,7 +100,7 @@ test("Knopf „Bild auslesen“: gelesen wird im Server, die Zeilen ersetzen die
   const summary = screen.getByTestId("result-image-summary");
   expect(within(summary).getByTestId("result-image-counts")).toHaveTextContent("3 Zeilen in die Liste übernommen · Vorlage Rennliga-Ergebnis (dunkel)");
   expect(within(summary).getByTestId("result-image-header")).toHaveTextContent("Schnellste RennrundeBert Bolzt · 1:31,207");
-  expect(within(summary).getByTestId("result-image-status")).toHaveTextContent("2 Zeilen sind gelb");
+  expect(within(summary).getByTestId("result-image-status")).toHaveTextContent("2 Zeilen sind orange");
   expect(within(summary).getByTestId("result-image-warnings")).toHaveTextContent("unscharf");
   // Gelb: genau die unsicheren Felder, darunter was im Bild stand.
   const rows = screen.getAllByTestId("result-row");
@@ -116,11 +116,11 @@ test("übernommen wird erst ohne gelbe Zeilen: ändern oder „Passt so“", asy
   await screen.findByTestId("result-image-pick");
   await pasteUntilRead(png());
   await waitFor(() => expect(screen.getAllByTestId("result-row")).toHaveLength(3), WAIT);
-  await waitFor(() => expect(screen.getByTestId("result-submit")).toHaveTextContent("Gelbe Zeilen prüfen"), WAIT);
+  await waitFor(() => expect(screen.getByTestId("result-submit")).toHaveTextContent("Orange Zeilen prüfen"), WAIT);
   expect(screen.queryByTestId("result-save-draft")).toBeNull();
-  expect(screen.getByTestId("result-image-open")).toHaveTextContent("2 Zeilen aus dem Bild sind noch gelb");
+  expect(screen.getByTestId("result-image-open")).toHaveTextContent("2 Zeilen aus dem Bild sind noch orange");
   fireEvent.click(screen.getByTestId("result-submit"));
-  expect(toastMock.error).toHaveBeenCalledWith(expect.stringContaining("noch gelb"));
+  expect(toastMock.error).toHaveBeenCalledWith(expect.stringContaining("noch orange"));
   expect(apiMock.put).not.toHaveBeenCalled();
 
   // Team korrigiert: die Markierung fällt; der Name der dritten Zeile wird bestätigt.
@@ -146,7 +146,7 @@ test("„Alle Namen bestätigen“: vorbelegte gelbe Namen und Teams auf einmal,
   await pasteUntilRead(png());
   await waitFor(() => expect(screen.getAllByTestId("result-row")).toHaveLength(3), WAIT);
   const bar = await screen.findByTestId("result-confirm-names");
-  expect(bar).toHaveTextContent("2 Namen bzw. Teams aus dem Bild vorbelegt, aber gelb");
+  expect(bar).toHaveTextContent("2 Namen bzw. Teams aus dem Bild vorbelegt, aber orange");
   fireEvent.click(within(bar).getByTestId("result-confirm-names-all"));
   let rows = screen.getAllByTestId("result-row");
   expect(within(rows[1]).getByTestId("result-row-team")).not.toHaveAttribute("data-ocr-uncertain");
@@ -159,7 +159,7 @@ test("„Alle Namen bestätigen“: vorbelegte gelbe Namen und Teams auf einmal,
   expect(within(rows[1]).getByTestId("result-row-team")).toHaveAttribute("data-ocr-uncertain", "team");
   expect(within(rows[1]).getByTestId("result-row-ocr")).toHaveTextContent("Team (gelesen „Blaupted GP“)");
   expect(within(rows[2]).getByTestId("result-row-name")).toHaveAttribute("data-ocr-uncertain", "name");
-  expect(screen.getByTestId("result-image-open")).toHaveTextContent("2 Zeilen aus dem Bild sind noch gelb");
+  expect(screen.getByTestId("result-image-open")).toHaveTextContent("2 Zeilen aus dem Bild sind noch orange");
   expect(screen.getByTestId("result-confirm-names")).toBeInTheDocument();
 }, 15000);
 
@@ -175,8 +175,8 @@ test("gelbe Zeit und gelbe Felder des Rennens: „Mehr“ steht offen, ändern o
   await screen.findByTestId("result-image-pick");
   await pasteUntilRead(png());
   await waitFor(() => expect(screen.getAllByTestId("result-row")).toHaveLength(3), WAIT);
-  await waitFor(() => expect(screen.getByTestId("result-submit")).toHaveTextContent("Gelbe Zeilen prüfen"), WAIT);
-  expect(screen.getByTestId("result-image-open")).toHaveTextContent("2 Zeilen aus dem Bild sind noch gelb");
+  await waitFor(() => expect(screen.getByTestId("result-submit")).toHaveTextContent("Orange Zeilen prüfen"), WAIT);
+  expect(screen.getByTestId("result-image-open")).toHaveTextContent("2 Zeilen aus dem Bild sind noch orange");
   // Die gelbe Zeit steht unter „Mehr“ – das ist dafür schon offen.
   const first = screen.getAllByTestId("result-row")[0];
   expect(within(first).getByTestId("result-row-more")).toHaveAttribute("aria-expanded", "true");
@@ -194,7 +194,7 @@ test("gelbe Zeit und gelbe Felder des Rennens: „Mehr“ steht offen, ändern o
   fireEvent.change(screen.getByTestId("result-fastest-time"), { target: { value: "1:31.207" } });
   expect(screen.getByTestId("result-fastest-time")).not.toHaveAttribute("data-ocr-uncertain");
   expect(screen.getByTestId("result-dotd")).toHaveAttribute("data-ocr-uncertain", "driver_of_the_day");
-  expect(screen.getByTestId("result-image-open")).toHaveTextContent("Eine Zeile aus dem Bild ist noch gelb");
+  expect(screen.getByTestId("result-image-open")).toHaveTextContent("Eine Zeile aus dem Bild ist noch orange");
   fireEvent.click(screen.getByTestId("result-race-ocr-confirm"));
   expect(screen.queryByTestId("result-image-open")).toBeNull();
   expect(screen.queryByTestId("result-race-ocr")).toBeNull();
@@ -211,7 +211,7 @@ test("eine eingefügte Liste oder ein zweites Bild ohne Kopf geben ungeprüfte F
   await screen.findByTestId("result-image-pick");
   await pasteUntilRead(png());
   await waitFor(() => expect(screen.getByTestId("result-fastest-time")).toHaveAttribute("data-ocr-uncertain", "fastest_lap_time"), WAIT);
-  expect(screen.getByTestId("result-image-open")).toHaveTextContent("Eine Zeile aus dem Bild ist noch gelb");
+  expect(screen.getByTestId("result-image-open")).toHaveTextContent("Eine Zeile aus dem Bild ist noch orange");
 
   // Liste ohne schnellste Runde: die Zeilen sind neu, die gelesene Rundenzeit steht noch da - und bleibt gelb.
   fireEvent.click(screen.getByTestId("result-paste-toggle"));
@@ -220,14 +220,14 @@ test("eine eingefügte Liste oder ein zweites Bild ohne Kopf geben ungeprüfte F
   await waitFor(() => expect(screen.getAllByTestId("result-row")).toHaveLength(2), WAIT);
   expect(screen.getByTestId("result-fastest-time")).toHaveValue("1:37,207");
   expect(screen.getByTestId("result-fastest-time")).toHaveAttribute("data-ocr-uncertain", "fastest_lap_time");
-  expect(screen.getByTestId("result-image-open")).toHaveTextContent("Eine Zeile aus dem Bild ist noch gelb");
+  expect(screen.getByTestId("result-image-open")).toHaveTextContent("Eine Zeile aus dem Bild ist noch orange");
 
   // Zweites Bild ohne Kopf: ebenso.
   apiMock.post.mockImplementation(async (url) => ({ data: url.endsWith("/image") ? { ...read, fastest_lap: null, driver_of_the_day: null } : PREVIEW }));
   await pasteUntilRead(png("zweites.png"));
   await waitFor(() => expect(screen.getAllByTestId("result-row")).toHaveLength(3), WAIT);
   expect(screen.getByTestId("result-fastest-time")).toHaveAttribute("data-ocr-uncertain", "fastest_lap_time");
-  await waitFor(() => expect(screen.getByTestId("result-submit")).toHaveTextContent("Gelbe Zeilen prüfen"), WAIT);
+  await waitFor(() => expect(screen.getByTestId("result-submit")).toHaveTextContent("Orange Zeilen prüfen"), WAIT);
   fireEvent.click(screen.getByTestId("result-submit"));
   expect(apiMock.put).not.toHaveBeenCalled();
 

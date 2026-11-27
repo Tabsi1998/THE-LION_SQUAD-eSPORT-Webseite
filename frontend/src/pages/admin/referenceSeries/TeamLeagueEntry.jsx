@@ -23,7 +23,7 @@ const SMALL_INPUT = `${INPUT_CLASS} !py-1.5 tls-type-small`;
 const LABEL = "tls-type-label text-white/45";
 const ICON_BUTTON = "p-1.5 rounded-sm text-white/45 hover:text-white hover:bg-white/5 transition active:scale-[0.97]";
 const QUIET_BUTTON = "tls-btn tls-btn--quiet px-2.5 py-1.5 rounded-sm tls-type-label inline-flex items-center gap-1.5";
-const INVALID = "!border-red-400/80";
+const INVALID = "!border-warn/80";
 
 function invalidProps(fields, field) {
   return fields?.[field] ? { "aria-invalid": true, "data-invalid": field } : {};
@@ -33,7 +33,7 @@ function FieldErrors({ fields, testId }) {
   const messages = Object.values(fields || {});
   if (!messages.length) return null;
   return (
-    <ul className="mt-1 space-y-0.5 tls-type-small text-red-300" data-testid={testId} role="alert">
+    <ul className="mt-1 space-y-0.5 tls-type-small text-warn" data-testid={testId} role="alert">
       {[...new Set(messages)].map((message) => <li key={message}>{message}</li>)}
     </ul>
   );
@@ -42,9 +42,9 @@ function FieldErrors({ fields, testId }) {
 function PasteErrors({ errors, testId }) {
   if (!errors?.length) return null;
   return (
-    <ul className="tls-type-small text-red-200 space-y-0.5" data-testid={testId} role="alert">
+    <ul className="tls-type-small text-warn space-y-0.5" data-testid={testId} role="alert">
       {errors.map((error, index) => (
-        <li key={index}>{error.line ? `Zeile ${error.line}: ` : ""}{error.message}{error.text ? <span className="text-red-200/60"> – „{error.text}“</span> : null}</li>
+        <li key={index}>{error.line ? `Zeile ${error.line}: ` : ""}{error.message}{error.text ? <span className="text-white/60"> – „{error.text}“</span> : null}</li>
       ))}
     </ul>
   );
@@ -140,7 +140,7 @@ function MatchdayPaste({ form, setForm, ownTeams, round, onDone }) {
         </div>
       )}
       {result?.outcome && (
-        <p className={`tls-type-small ${own ? "text-white/75" : "text-amber-200"}`} data-testid="result-matchday-summary" role="status">
+        <p className={`tls-type-small ${own ? "text-white/75" : "text-warn"}`} data-testid="result-matchday-summary" role="status">
           {own
             ? <>{owns.length > 1 ? "Eigene Spiele erkannt: " : "Eigenes Spiel erkannt: "}<span className="text-white font-semibold">{shown}</span></>
             : "Kein eigenes Spiel erkannt – stehen die eigenen Teams und ihre Schreibweisen in der Saison?"}
@@ -230,7 +230,7 @@ function MapRow({ match, item, index, errors, choices, onChange, onRemove }) {
           onChange={(event) => set(withMapName({}, event.target.value, choices))}
           onBlur={() => { if (item.map_id) set({ name: canonicalMapName(item, choices) }); }}
           {...invalidProps(invalid, "name")} data-unknown={unknown ? "true" : undefined} aria-describedby={unknown ? `${item.key}-unknown` : undefined}
-          className={`${SMALL_INPUT} min-w-0 ${invalid?.name ? INVALID : unknown ? "!border-amber-300/70" : ""}`} data-testid="result-map-name" />
+          className={`${SMALL_INPUT} min-w-0 ${invalid?.name ? INVALID : unknown ? "!border-warn/70" : ""}`} data-testid="result-map-name" />
       </div>
       <select aria-label={`Map ${number}: Rolle im Veto`} value={roleValue(item)} onChange={(event) => setRole(event.target.value)} data-testid="result-map-role"
         className={`${SMALL_INPUT} order-last col-span-3 sm:order-none sm:col-span-1`}>
@@ -247,7 +247,7 @@ function MapRow({ match, item, index, errors, choices, onChange, onRemove }) {
       )}
       <button type="button" className={ICON_BUTTON} onClick={onRemove} aria-label={`Map ${number} entfernen`}><X className="w-4 h-4" /></button>
       {unknown ? (
-        <p id={`${item.key}-unknown`} className="order-last col-span-full -mt-1 tls-type-small text-amber-200" data-testid="result-map-unknown">
+        <p id={`${item.key}-unknown`} className="order-last col-span-full -mt-1 tls-type-small text-warn" data-testid="result-map-unknown">
           Nicht im Map-Pool – bleibt als Freitext. Fehlt die Map, in der Bibliothek anlegen oder als weitere Schreibweise eintragen.
         </p>
       ) : null}
@@ -311,7 +311,7 @@ function LineupPicker({ match, roster, participants, onChange }) {
           hint="Mit Spalte für das Häkchen (✓, x oder ja) wird gleich angekreuzt. Fehlt es – beim Kopieren oft ein Bild –, stehen die Namen zum Ankreuzen da." />
       )}
       {notice && (
-        <p className={`tls-type-small ${notice.marked ? "text-white/60" : "text-amber-200"}`} role="status" data-testid="result-lineup-notice">
+        <p className={`tls-type-small ${notice.marked ? "text-white/60" : "text-warn"}`} role="status" data-testid="result-lineup-notice">
           {notice.marked ? `${notice.count} Namen gelesen, Häkchen übernommen.` : `${notice.count} Namen gelesen, aber kein Häkchen erkannt – bitte unten ankreuzen.`}
         </p>
       )}

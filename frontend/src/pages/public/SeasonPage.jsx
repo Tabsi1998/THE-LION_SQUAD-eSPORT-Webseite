@@ -61,7 +61,7 @@ const POINT_SOURCES = [
 const TONE = {
   gold: "border-honor/35 bg-honor/10 text-honor",
   blue: "border-[#29B6E8]/35 bg-[#29B6E8]/10 text-[#29B6E8]",
-  green: "border-[#10B981]/35 bg-[#10B981]/10 text-[#10B981]",
+  green: "border-ok/35 bg-ok/10 text-ok",
   violet: "border-[#A855F7]/35 bg-[#A855F7]/10 text-[#A855F7]",
   white: "border-white/15 bg-white/[0.04] text-white/70",
 };

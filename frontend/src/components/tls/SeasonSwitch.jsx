@@ -52,7 +52,7 @@ export function SeasonSwitch({ seasonKey, label, className = "mb-6" }) {
     }
   };
 
-  if (error) return <div className={`${className} rounded-sm border border-white/10 bg-[#121212] p-4 tls-type-small text-white/55`} data-testid="season-switch-error">{error}</div>;
+  if (error) return <div className={`${className} rounded-sm border border-white/10 bg-[#121212] p-4 tls-type-small text-warn`} data-testid="season-switch-error">{error}</div>;
   if (!state) return null;
   const channels = state.channels || [];
   const toggleChannel = (channel) => {

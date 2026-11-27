@@ -44,7 +44,7 @@ function StateBadge({ state }) {
 // #2024: eigener Zustand „ohne Datum“ neben dem Status - ein offener Termin ist geplant, aber noch nicht festgelegt.
 function UndatedBadge() {
   return (
-    <span className="tls-undated-badge inline-flex items-center px-2 py-0.5 border border-dashed border-amber-300/50 rounded-sm tls-type-label whitespace-nowrap text-amber-200/90" data-testid="round-undated">
+    <span className="tls-undated-badge inline-flex items-center px-2 py-0.5 border border-dashed border-warn/50 rounded-sm tls-type-label whitespace-nowrap text-warn/90" data-testid="round-undated">
       ohne Datum
     </span>
   );
@@ -163,9 +163,9 @@ export function SeriesCalendarSection({ series }) {
             <div className="mt-1 flex flex-wrap gap-x-3 gap-y-1 tls-type-small text-white/55" data-testid="series-calendar-counts">
               {allRounds.length > 0 && <span>{allRounds.length} {profile ? kindWord(profile, allRounds.length === 1 ? "round_one" : "round_many", "Termine") : "Termine"}</span>}
               {planned && <span data-testid="series-calendar-planned">{planned.count} von {planned.planned} {profile ? kindWord(profile, "round_dative", "Terminen") : "vorgesehenen"} angelegt</span>}
-              {undated.length > 0 && <span className="text-amber-200/90" data-testid="series-calendar-undated">{undated.length} ohne Datum</span>}
+              {undated.length > 0 && <span className="text-warn/90" data-testid="series-calendar-undated">{undated.length} ohne Datum</span>}
               {ORDERED_STATES.filter((state) => counts[state]).map((state) => (
-                <span key={state} className={state === "missing" ? "text-amber-300" : undefined}>{counts[state]} {STATE_LABELS[state].toLowerCase()}</span>
+                <span key={state} className={state === "missing" ? "text-warn" : undefined}>{counts[state]} {STATE_LABELS[state].toLowerCase()}</span>
               ))}
             </div>
           )}
@@ -195,11 +195,11 @@ export function SeriesCalendarSection({ series }) {
         </div>}
       </div>
 
-      {error && <p className="mt-3 tls-type-small text-red-300" role="alert">{error}</p>}
+      {error && <p className="mt-3 tls-type-small text-warn" role="alert">{error}</p>}
 
       {hints.length > 0 && (
-        <div className="mt-3 border border-amber-400/40 bg-amber-400/10 rounded-sm p-3 tls-type-small text-amber-100" data-testid="calendar-hints" role="status">
-          <div className="flex items-center gap-2 font-bold"><AlertTriangle className="w-4 h-4 text-amber-300" /> Lücke im Kalender</div>
+        <div className="mt-3 border border-warn/40 bg-warn/10 rounded-sm p-3 tls-type-small text-white/85" data-testid="calendar-hints" role="status">
+          <div className="flex items-center gap-2 font-bold"><AlertTriangle className="w-4 h-4 text-warn" /> Lücke im Kalender</div>
           <ul className="mt-1 space-y-0.5">{hints.map((hint) => <li key={hint.round_id}>{hint.text}</li>)}</ul>
         </div>
       )}
@@ -214,7 +214,7 @@ export function SeriesCalendarSection({ series }) {
       {undated.length > 0 && allRounds.length > undated.length && (
         <div className="mt-3 flex flex-wrap items-center gap-2 tls-type-small">
           <button type="button" aria-pressed={filtering} onClick={() => setOnlyUndated((value) => !value)} data-testid="calendar-filter-undated"
-            className={`px-2.5 py-1 rounded-sm border font-bold uppercase tracking-wider transition-colors active:scale-[0.97] ${filtering ? "border-amber-300/60 bg-amber-300/10 text-amber-200" : "border-white/10 text-white/55 hover:text-white"}`}>
+            className={`px-2.5 py-1 rounded-sm border font-bold uppercase tracking-wider transition-colors active:scale-[0.97] ${filtering ? "border-warn/60 bg-warn/10 text-warn" : "border-white/10 text-white/55 hover:text-white"}`}>
             Nur ohne Datum ({undated.length})
           </button>
         </div>
@@ -223,7 +223,7 @@ export function SeriesCalendarSection({ series }) {
       {rounds.length > 0 && !weekends && (
         <ol className="mt-3 divide-y divide-white/5" data-testid="calendar-rounds">
           {rounds.map((round) => (
-            <li key={round.id} data-testid="calendar-round" data-state={round.state} className={`py-2.5 flex flex-wrap sm:flex-nowrap items-start gap-x-3 gap-y-1 ${hintIds.has(round.id) ? "bg-amber-400/[0.04]" : ""}`}>
+            <li key={round.id} data-testid="calendar-round" data-state={round.state} className={`py-2.5 flex flex-wrap sm:flex-nowrap items-start gap-x-3 gap-y-1 ${hintIds.has(round.id) ? "bg-warn/[0.04]" : ""}`}>
               <div className="min-w-12 max-w-[40%] shrink-0 pt-0.5 tls-type-small tls-type-num text-white/80 [overflow-wrap:anywhere]">{roundLabel(round)}</div>
               <div className="min-w-0 flex-1">
                 <div className={`tls-type-small ${round.state === "cancelled" ? "text-white/45" : "text-white"}`}>
@@ -264,7 +264,7 @@ export function SeriesCalendarSection({ series }) {
                   const index = rounds.indexOf(round);
                   // Handy: Lauf, Zeit und Status in einer Zeile, die Knöpfe darunter; ab sm alles in einer Zeile.
                   return (
-                    <li key={round.id} data-testid="calendar-round" data-state={round.state} className={`grid grid-cols-[6.5rem_minmax(0,1fr)_auto] sm:grid-cols-[7rem_minmax(0,1fr)_auto_auto] items-center gap-x-3 gap-y-1 ${hintIds.has(round.id) ? "bg-amber-400/[0.04]" : ""}`}>
+                    <li key={round.id} data-testid="calendar-round" data-state={round.state} className={`grid grid-cols-[6.5rem_minmax(0,1fr)_auto] sm:grid-cols-[7rem_minmax(0,1fr)_auto_auto] items-center gap-x-3 gap-y-1 ${hintIds.has(round.id) ? "bg-warn/[0.04]" : ""}`}>
                       <span className={`tls-type-label [overflow-wrap:anywhere] ${round.state === "cancelled" ? "text-quiet line-through" : "text-white/75"}`} data-testid="calendar-session">{round.session || "Rennen"}</span>
                       <span className="min-w-0">
                         <span className={`block tls-type-small tabular-nums ${round.state === "cancelled" ? "text-white/45" : "text-white/85"}`}>{round.club_day !== weekend.lead.club_day ? roundWhen(round) : round.time || "ohne Uhrzeit"}</span>

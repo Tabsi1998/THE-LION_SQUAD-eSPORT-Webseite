@@ -32,9 +32,9 @@ const ADDRESS_FIELDS = [
   { key: "city", label: "Ort", max: 80 },
 ];
 const LEVELS = {
-  ok: { label: "passt", className: "text-emerald-300", icon: CheckCircle2 },
+  ok: { label: "passt", className: "text-ok", icon: CheckCircle2 },
   warn: { label: "prüfen", className: "text-warn", icon: AlertTriangle },
-  error: { label: "falsch übergeben", className: "text-red-400", icon: XCircle },
+  error: { label: "falsch übergeben", className: "text-warn", icon: XCircle },
   open: { label: "offen", className: "text-white/50", icon: Info },
 };
 const KIND_LABELS = { personal: "eigene Datei mit Gamertag bzw. Nummer", base: "Grunddatei" };
@@ -185,13 +185,13 @@ function Deviations({ draft }) {
   return (
     <div className="space-y-2" data-testid="shop-test-draft-deviations">
       <p className="tls-type-small flex flex-wrap gap-x-4 gap-y-1">
-        <span className="text-emerald-300">{summary.ok || 0} passen</span>
+        <span className="text-ok">{summary.ok || 0} passen</span>
         <span className={summary.warn ? "text-warn font-bold" : "text-white/50"}>{summary.warn || 0} prüfen</span>
-        <span className={summary.error ? "text-red-400 font-bold" : "text-white/50"}>{summary.error || 0} falsch übergeben</span>
+        <span className={summary.error ? "text-warn font-bold" : "text-white/50"}>{summary.error || 0} falsch übergeben</span>
       </p>
       <ul className="divide-y divide-white/5 border border-white/10 rounded-sm">
         {rows.map((row, index) => (
-          <li key={`${row.label}-${index}`} className={`tls-reveal grid gap-1 p-2 tls-type-small sm:grid-cols-[minmax(0,14rem)_minmax(0,1fr)_auto] sm:items-center ${row.level === "error" ? "bg-red-500/10" : row.level === "warn" ? "bg-warn/10" : ""}`}
+          <li key={`${row.label}-${index}`} className={`tls-reveal grid gap-1 p-2 tls-type-small sm:grid-cols-[minmax(0,14rem)_minmax(0,1fr)_auto] sm:items-center ${row.level === "error" ? "bg-warn/15" : row.level === "warn" ? "bg-white/[0.04]" : ""}`}
             style={{ animationDelay: `${Math.min(index, 8) * 30}ms` }} data-testid="shop-test-draft-deviation" data-level={row.level}>
             <span className="text-white/80 font-bold">{row.label}</span>
             <span className="text-white/60 break-all min-w-0">

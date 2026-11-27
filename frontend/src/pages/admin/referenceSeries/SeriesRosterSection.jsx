@@ -50,7 +50,7 @@ function RosterPasteSheet({ series, team, onClose, onSaved }) {
         placeholder={"Seasonteam-Mitglieder\tWarorga\nName A\nName B"}
         hint="Ein Name je Zeile, so wie beim Veranstalter – gern die Liste „Seasonteam-Mitglieder“ von der Match-Seite. Häkchen-Spalten und die Kopfzeile stören nicht. Neue Namen kommen gleich in den Kader, vorhandene werden zugeordnet." />
       {parsed.errors.length > 0 && (
-        <ul className="tls-type-small text-red-200 space-y-0.5" role="alert" data-testid="roster-paste-errors">
+        <ul className="tls-type-small text-warn space-y-0.5" role="alert" data-testid="roster-paste-errors">
           {parsed.errors.map((error, index) => <li key={index}>{error.line ? `Zeile ${error.line}: ` : ""}{error.message}</li>)}
         </ul>
       )}

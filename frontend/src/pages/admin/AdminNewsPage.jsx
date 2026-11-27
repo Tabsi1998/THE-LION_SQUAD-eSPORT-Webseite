@@ -253,7 +253,7 @@ export default function AdminNewsPage() {
                         </Link>
                       )}
                       {state.key === "withdrawn" ? (
-                        <button type="button" onClick={() => restore(n)} data-testid={`news-restore-${n.id}`} className="tls-type-label px-3 py-1 rounded-sm border border-[#10B981]/40 text-[#10B981] hover:bg-[#10B981]/10 inline-flex items-center gap-1">
+                        <button type="button" onClick={() => restore(n)} data-testid={`news-restore-${n.id}`} className="tls-type-label px-3 py-1 rounded-sm border border-ok/40 text-ok hover:bg-ok/10 inline-flex items-center gap-1">
                           <RotateCcw className="w-3 h-3" /> Wiederherstellen
                         </button>
                       ) : n.can_delete ? (

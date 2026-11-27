@@ -155,7 +155,7 @@ export function DistributeBox({ kind, itemId, title = "", visibility = "", appOn
               {!itemId && (audience || appOnly
                 ? <p className="tls-type-small text-white/75" data-testid="distribute-audience-line">{appOnly ? APP_ONLY_NEWSLETTER : audienceLine(audience)}</p>
                 : <p className="tls-type-body text-white/55">Nach dem ersten Speichern steht hier, an wie viele Personen der Newsletter geht.</p>)}
-              {itemId && error && <p className="tls-type-small text-white/55" data-testid="distribute-error">{error}</p>}
+              {itemId && error && <p className="tls-type-small text-warn" data-testid="distribute-error">{error}</p>}
               {itemId && !error && box && appOnly && box.state !== "sent" && (
                 <p className="tls-type-small text-white/75" data-testid="distribute-newsletter-line">{APP_ONLY_NEWSLETTER}</p>
               )}

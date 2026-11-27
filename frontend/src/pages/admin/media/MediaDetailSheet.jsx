@@ -30,7 +30,7 @@ export function MediaDetailSheet({ item, onClose, onCopy, onRotateLeft, onRotate
       <a href={fullUrl} download={item.original_filename || item.filename} className="px-4 py-2 border border-white/10 hover:bg-white/5 tls-type-label rounded-sm inline-flex items-center gap-2">
         <Download className="w-3.5 h-3.5" /> Herunterladen
       </a>
-      <button type="button" onClick={onDelete} data-testid="media-delete" className="px-4 py-2 bg-live/15 text-live border border-live/40 hover:bg-live/25 tls-type-label rounded-sm inline-flex items-center gap-2">
+      <button type="button" onClick={onDelete} data-testid="media-delete" className="px-4 py-2 bg-live/10 text-live border border-live/40 hover:bg-live hover:text-[#0A0A0A] tls-type-label rounded-sm inline-flex items-center gap-2">
         <Trash2 className="w-3.5 h-3.5" /> Löschen
       </button>
     </div>

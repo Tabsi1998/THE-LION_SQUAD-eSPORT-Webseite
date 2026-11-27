@@ -90,5 +90,5 @@ export function newsPublicationState(post, now = Date.now()) {
   if (!post?.published) return { key: "draft", label: "Entwurf", detail: "", className: "text-white/40" };
   const date = futureDate(post.published_at, now);
   if (date) return { key: "scheduled", label: "Geplant", detail: `Wird ${formatTimeUntil(date)} veröffentlicht`, className: "text-[#29B6E8]" };
-  return { key: "published", label: "Veröffentlicht", detail: "", className: "text-[#10B981]" };
+  return { key: "published", label: "Veröffentlicht", detail: "", className: "text-ok" };
 }

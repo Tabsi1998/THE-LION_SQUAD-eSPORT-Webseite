@@ -5,7 +5,7 @@ import { whenPhrase, whenText, whenTickMs } from "@/lib/countdownRule";
 // Phasen nach Farb-Rolle (#1305) - wie StatusBadge: Rot nur „läuft gerade“, Grün offen, Cyan angekündigt, Grau vorbei.
 const PHASE_STYLES = {
   // LIVE (#1076): der Chip steht ruhig, nur der Punkt pulsiert leise (index.css, .tls-live-dot).
-  live: "bg-live/20 text-live border-live/50",
+  live: "bg-live/10 text-live border-live/50",
   // Mehrtägig (#884): zwischen zwei Tagen - ruhig, mit Countdown bis zum nächsten Tag.
   day_break: "bg-event/15 text-[#C4B5FD] border-event/50",
   registration_open: "bg-ok/15 text-ok border-ok/50",

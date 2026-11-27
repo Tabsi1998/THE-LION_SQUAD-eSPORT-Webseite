@@ -4,8 +4,8 @@ function itemState(item) {
   if (item.done) {
     return {
       Icon: CheckCircle2,
-      iconClass: "text-[#10B981]",
-      borderClass: "border-[#10B981]/20 bg-[#10B981]/5",
+      iconClass: "text-ok",
+      borderClass: "border-ok/20 bg-ok/5",
       textClass: "text-white",
     };
   }

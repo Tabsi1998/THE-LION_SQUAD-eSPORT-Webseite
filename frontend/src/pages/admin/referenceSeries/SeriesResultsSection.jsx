@@ -48,7 +48,7 @@ export function SeriesResultsSection({ series, onChanged }) {
   return (
     <section className="border border-white/10 rounded-sm bg-[#121212] p-4" data-testid="series-results" aria-labelledby="series-results-title">
       <h2 id="series-results-title" className="tls-type-label text-[#29B6E8]">Ergebnisse</h2>
-      {error && <p className="mt-3 tls-type-small text-red-300" role="alert">{error}</p>}
+      {error && <p className="mt-3 tls-type-small text-warn" role="alert">{error}</p>}
       {calendar && rounds.length === 0 && (
         <p className="mt-3 tls-type-small text-white/55" data-testid="results-empty">Noch keine Termine – Ergebnisse gibt es je Termin im Kalender.</p>
       )}
