@@ -75,7 +75,7 @@ function TeamName({ side, won, logo, align = "left" }) {
         {club ? <span className="tls-league-match__club" data-redundant={redundant ? "true" : undefined}>{club} · </span> : null}
         {squad}
         {/* Gastteam (#1665): eine eigene Zeile unter dem Namen. */}
-        {side.guest_badge ? <span className="tls-guest-badge-line"><GuestBadge badge={side.guest_badge} testId={`match-side-guest-${side.registration_id}`} /></span> : null}
+        {side.guest_badge ? <span className="tls-guest-badge-line"><GuestBadge badge={side.guest_badge} compact testId={`match-side-guest-${side.registration_id}`} /></span> : null}
       </span>
       {align === "right" ? <TeamMark name={side.name} logo={logo} /> : null}
     </>

@@ -18,6 +18,14 @@ describe("Gast-Plakette (#1665)", () => {
     expect(badge.getAttribute("title")).toContain(org);
   });
 
+  test("schmale Spalten: die Klasse für „nur Gast am Handy“, der Name bleibt vorgelesen und im title", () => {
+    render(<GuestBadge badge={{ label: "Gast", org: "Probeschule Nord" }} compact testId="guest" />);
+    const badge = screen.getByTestId("guest");
+    expect(badge).toHaveClass("tls-guest-badge--compact");
+    expect(screen.getByText("Gastteam: Probeschule Nord")).toHaveClass("sr-only");
+    expect(badge.getAttribute("title")).toContain("Probeschule Nord");
+  });
+
   test("TV und Discord: nur „Gast“", () => {
     render(<GuestBadge badge={{ label: "Gast" }} testId="guest" />);
     expect(screen.getByTestId("guest")).toHaveTextContent(/^GastGastteam$/);

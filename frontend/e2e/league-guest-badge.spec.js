@@ -99,16 +99,34 @@ async function whole(locator, text) {
   expect(box.left).toBeGreaterThanOrEqual(-1);
   expect(box.right).toBeGreaterThanOrEqual(-1);
   expect(box.viewport).toBeGreaterThanOrEqual(-1);
+  // „Gast“ steht in einer Zeile - nie „GAS/T“ (Prüfung 27.11., 320 px).
+  const label = await locator.locator(".tls-guest-badge__label").evaluate((node) => node.getClientRects().length);
+  expect(label).toBe(1);
+}
+
+/** In schmalen Spalten (Spielplan) am Handy nur „Gast“: eine ruhige Zeile, der Name im title. Ab 640 px der Name dazu. */
+async function compactBelow640(locator, width) {
+  const box = await locator.evaluate((node) => ({ height: node.getBoundingClientRect().height,
+    org: getComputedStyle(node.querySelector(".tls-guest-badge__org")).display, title: node.getAttribute("title") }));
+  expect(box.title).toContain(SCHOOL);
+  if (width < 640) {
+    expect(box.org).toBe("none");
+    expect(box.height).toBeLessThanOrEqual(24);
+  } else {
+    expect(box.org).not.toBe("none");
+  }
 }
 
 async function shot(page, locator, name) {
   if (!SHOTS) return;
   fs.mkdirSync(SHOTS, { recursive: true });
+  // Mitte des Fensters: Am Handy deckt die feste Leiste unten sonst den Ausschnitt ab.
+  await locator.evaluate((node) => node.scrollIntoView({ block: "center" }));
   await page.waitForTimeout(1200);
   await locator.screenshot({ path: path.join(SHOTS, name) });
 }
 
-const SIZES = [[390, 844], [1440, 900]];
+const SIZES = [[320, 640], [390, 844], [1440, 900]];
 
 for (const [width, height] of SIZES) {
   test.describe(`Gast-Plakette bei ${width} px`, () => {
@@ -131,9 +149,10 @@ for (const [width, height] of SIZES) {
       await shot(page, table, `tabelle-${width}.png`);
       await page.goto("/liga/probe-liga/season-1/spieltage");
       await whole(page.getByTestId("match-side-guest-r1").first(), SCHOOL);
+      await compactBelow640(page.getByTestId("match-side-guest-r1").first(), width);
       await expect(page.getByTestId("match-side-guest-r2")).toHaveCount(0);
       await noSideScroll(page);
-      await shot(page, page.getByTestId("match-side-guest-r1").first().locator("xpath=ancestor::*[contains(@class,'tls-league-match')][1]"),
+      await shot(page, page.getByTestId("match-side-guest-r1").first().locator("xpath=ancestor::*[contains(@class,'tls-league-match__teams')][1]"),
         `spielplan-${width}.png`);
     });
 

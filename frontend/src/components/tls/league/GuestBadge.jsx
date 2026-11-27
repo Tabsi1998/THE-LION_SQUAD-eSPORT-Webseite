@@ -11,11 +11,13 @@ export function guestText(badge) {
   return badge.org ? `${badge.label || "Gast"} · ${badge.org}` : badge.label || "Gast";
 }
 
-export function GuestBadge({ badge, testId, className = "" }) {
+/** ``compact``: in schmalen Spalten (Spielplan) am Handy nur „Gast“, der Name ab 640 px - vorgelesen und im title immer. */
+export function GuestBadge({ badge, testId, className = "", compact = false }) {
   if (!badge) return null;
   const org = badge.org || "";
   return (
-    <span className={`tls-guest-badge ${className}`} title={org ? `${GUEST_HINT} ${org}` : GUEST_HINT} data-testid={testId}>
+    <span className={`tls-guest-badge${compact ? " tls-guest-badge--compact" : ""} ${className}`} title={org ? `${GUEST_HINT} ${org}` : GUEST_HINT}
+      data-testid={testId}>
       <span className="tls-guest-badge__label" aria-hidden="true">{badge.label || "Gast"}</span>
       {/* Vorgelesen wird „Gastteam“ statt des Etiketts - und der Name ohne den Punkt dazwischen. */}
       <span className="sr-only">Gastteam{org ? `: ${org}` : ""}</span>
