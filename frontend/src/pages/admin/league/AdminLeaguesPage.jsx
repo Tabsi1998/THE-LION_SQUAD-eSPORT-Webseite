@@ -20,6 +20,7 @@ import { LeagueStaffSheet } from "./LeagueStaffSheet";
 import { leagueAnchorId } from "@/lib/staffelTabs";
 import { AccentField, BannerField, EmblemField } from "./LeagueLookFields";
 import { toast } from "sonner";
+import { ShortCaps } from "@/components/tls/ShortCaps";
 
 const STATUS_TEXT = Object.fromEntries(SEASON_STATUS_OPTIONS);
 const ICON_BUTTON = "p-1.5 text-white/50 hover:text-[#29B6E8] focus-visible:outline focus-visible:outline-1 focus-visible:outline-[#29B6E8] rounded-sm";
@@ -90,8 +91,8 @@ function LeagueSheet({ league, games, onClose, onSaved }) {
       {/* Gestaltung (#2107): gilt für alle Seasons, jede Season kann Emblem und Banner überschreiben. */}
       <div className="space-y-4 border-t border-white/10 pt-4" data-testid="league-look">
         <div>
-          <h3 className="font-heading text-lg font-bold uppercase">Gestaltung</h3>
-          <p className="text-xs text-white/55">Gilt für alle Seasons; eine Season kann Emblem und Banner eigens festlegen. Wirkt beim Speichern sofort.</p>
+          <h3 className="tls-type-card">Gestaltung</h3>
+          <p className="tls-type-small text-white/55">Gilt für alle Seasons; eine Season kann Emblem und Banner eigens festlegen. Wirkt beim Speichern sofort.</p>
         </div>
         <AccentField value={form.accent_color} onChange={(value) => set("accent_color", value)} />
         <EmblemField value={form.emblem_url} onChange={(value) => set("emblem_url", value || "")} accent={form.accent_color} testId="league-emblem" />
@@ -129,7 +130,7 @@ function SeasonSheet({ league, defaults, onClose, onSaved }) {
           hint="Ab 00:00 Uhr Wiener Zeit." testId="season-start" />
         <TextField label="Name" maxLength={80} value={name} onChange={setName} placeholder="leer: Season 1, Season 2 …" testId="season-name" />
       </FormGrid>
-      <p className="text-xs leading-relaxed text-white/60" data-testid="season-defaults">
+      <p className="tls-type-small leading-relaxed text-white/60" data-testid="season-defaults">
         Startet mit den Vorgaben: {defaults.weeks_total} Wochen, Spielwoche {defaults.matchday_days} Tage,
         Standardtermin {weekdayName(defaults.default_match_weekday)} {defaults.default_match_time}, {legs}, Best of {defaults.best_of},
         {" "}{defaults.team_size} gegen {defaults.team_size}, bis {defaults.max_staffel_size} Teams je Staffel. Kader {defaults.min_squad_size} bis {defaults.max_squad_size} Spieler,
@@ -191,32 +192,32 @@ export default function AdminLeaguesPage() {
     <AdminLayout>
       <div className="mb-6 flex flex-wrap items-end justify-between gap-4">
         <div className="min-w-0 max-w-3xl">
-          <h1 className="font-heading text-3xl md:text-4xl font-black uppercase">Liga</h1>
-          <p className="mt-2 text-sm text-white/60">Jede Staffel hat ihre Staffel-Seite: Teilnehmer, Spielplan, Ergebnisse und Tabelle laufen dort. Hier legst du den Rahmen fest.</p>
+          <h1 className="tls-type-title"><ShortCaps>Liga</ShortCaps></h1>
+          <p className="mt-2 tls-type-body text-white/60">Jede Staffel hat ihre Staffel-Seite: Teilnehmer, Spielplan, Ergebnisse und Tabelle laufen dort. Hier legst du den Rahmen fest.</p>
         </div>
         {data && canCreate ? (
           <button type="button" onClick={() => setSheet({ kind: "league" })} disabled={!games.length} data-testid="league-add"
-            className="tls-btn tls-btn--primary px-4 py-2 rounded-sm text-xs font-bold uppercase tracking-wider inline-flex items-center gap-2 disabled:opacity-50">
+            className="tls-btn tls-btn--primary px-4 py-2 rounded-sm tls-type-label inline-flex items-center gap-2 disabled:opacity-50">
             <Plus className="w-3.5 h-3.5" aria-hidden="true" /> Liga anlegen
           </button>
         ) : null}
       </div>
 
       {canCreate ? (
-        <ol className="mb-8 grid gap-x-6 gap-y-2 text-sm text-white/70 sm:grid-cols-2" data-testid="league-steps" aria-label="So entsteht eine Liga">
+        <ol className="mb-8 grid gap-x-6 gap-y-2 tls-type-small text-white/70 sm:grid-cols-2" data-testid="league-steps" aria-label="So entsteht eine Liga">
           {STEPS.map((step, index) => (
             <li key={step} className="flex gap-3">
-              <span className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full border border-[#29B6E8]/50 text-[11px] font-bold tabular-nums text-[#29B6E8]">{index + 1}</span>
+              <span className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full border border-[#29B6E8]/50 tls-type-small tls-type-num text-[#29B6E8]">{index + 1}</span>
               <span className="min-w-0">{step}</span>
             </li>
           ))}
         </ol>
       ) : null}
 
-      {error ? <p className="text-sm text-warn" role="alert" data-testid="league-error">{error}</p> : null}
-      {data && canCreate && !games.length ? <p className="mb-4 text-sm text-white/60">Zuerst ein Spiel anlegen – unter <Link to="/admin/games" className="text-[#29B6E8] hover:underline">Spiele</Link>.</p> : null}
+      {error ? <p className="tls-type-small text-warn" role="alert" data-testid="league-error">{error}</p> : null}
+      {data && canCreate && !games.length ? <p className="mb-4 tls-type-small text-white/60">Zuerst ein Spiel anlegen – unter <Link to="/admin/games" className="text-[#29B6E8] hover:underline">Spiele</Link>.</p> : null}
       {data && !leagues.length ? (
-        <p className="border border-dashed border-white/15 rounded-sm px-4 py-6 text-sm text-white/60" data-testid="league-empty">
+        <p className="border border-dashed border-white/15 rounded-sm px-4 py-6 tls-type-body text-white/60" data-testid="league-empty">
           Noch keine Liga. Lege eine je Spiel an – etwa die CoD-Liga – und darin die erste Season.
         </p>
       ) : null}
@@ -227,9 +228,9 @@ export default function AdminLeaguesPage() {
             <header className="flex flex-wrap items-center justify-between gap-3 border-b border-white/10 px-4 py-3" style={accentStyle(league.accent_color)}>
               <LeagueEmblem src={league.emblem_url} size={40} testId={`league-emblem-${league.slug}`} />
               <div className="min-w-0 flex-1">
-                <h2 className="font-heading text-xl font-bold uppercase break-words">{league.name}</h2>
-                <p className="text-xs text-white/55">{league.game_name || "Spiel fehlt"} · /liga/{league.slug}{league.status === "archived" ? " · archiviert" : ""}</p>
-                {league.description ? <p className="mt-1 text-xs text-white/60 break-words">{league.description}</p> : null}
+                <h2 className="tls-type-section break-words">{league.name}</h2>
+                <p className="tls-type-small text-white/55">{league.game_name || "Spiel fehlt"} · /liga/{league.slug}{league.status === "archived" ? " · archiviert" : ""}</p>
+                {league.description ? <p className="mt-1 tls-type-small text-white/60 break-words">{league.description}</p> : null}
               </div>
               <div className="flex flex-wrap items-center gap-1">
                 {can(league, "manage") ? (
@@ -245,22 +246,22 @@ export default function AdminLeaguesPage() {
                 {can(league, "manage") ? (
                   <>
                     <button type="button" onClick={() => setSheet({ kind: "staff", league })} data-testid={`league-staff-${league.slug}`}
-                      className="tls-btn tls-btn--quiet ml-1 px-3 py-1.5 rounded-sm text-[11px] font-bold uppercase tracking-wider inline-flex items-center gap-1.5">
+                      className="tls-btn tls-btn--quiet ml-1 px-3 py-1.5 rounded-sm tls-type-label inline-flex items-center gap-1.5">
                       <Users className="w-3.5 h-3.5" aria-hidden="true" /> Zuständige
                     </button>
                     <button type="button" onClick={() => setSheet({ kind: "season", league })} data-testid={`season-add-${league.slug}`}
-                      className="tls-btn tls-btn--quiet ml-1 px-3 py-1.5 rounded-sm text-[11px] font-bold uppercase tracking-wider inline-flex items-center gap-1.5">
+                      className="tls-btn tls-btn--quiet ml-1 px-3 py-1.5 rounded-sm tls-type-label inline-flex items-center gap-1.5">
                       <Plus className="w-3.5 h-3.5" aria-hidden="true" /> Season anlegen
                     </button>
                   </>
                 ) : null}
                 {/* Gesamtwertung über Seasons (F.5, #2215): lesen jede Zuständigkeit, ändern „Season konfigurieren“. */}
                 <Link to={`/admin/leagues/${league.id}/gesamtwertung`} data-testid={`league-overall-link-${league.slug}`}
-                  className="tls-btn tls-btn--quiet ml-1 px-3 py-1.5 rounded-sm text-[11px] font-bold uppercase tracking-wider">Gesamtwertung</Link>
+                  className="tls-btn tls-btn--quiet ml-1 px-3 py-1.5 rounded-sm tls-type-label">Gesamtwertung</Link>
                 {/* Regelwerk (#1646): liga-weit, jede Season ohne eigenes erbt es. */}
                 {can(league, "rules") ? (
                   <Link to={`/admin/leagues/rules/league/${league.id}`} data-testid={`league-rules-link-${league.slug}`}
-                    className="tls-btn tls-btn--quiet ml-1 px-3 py-1.5 rounded-sm text-[11px] font-bold uppercase tracking-wider">Regelwerk</Link>
+                    className="tls-btn tls-btn--quiet ml-1 px-3 py-1.5 rounded-sm tls-type-label">Regelwerk</Link>
                 ) : null}
               </div>
             </header>
@@ -272,11 +273,11 @@ export default function AdminLeaguesPage() {
                       className="flex items-center gap-3 px-4 py-3 hover:bg-white/[0.03] focus-visible:outline focus-visible:outline-1 focus-visible:outline-[#29B6E8]">
                       <span className="min-w-0 flex-1">
                         <span className="block font-semibold text-white">{season.name}</span>
-                        <span className="block text-xs text-white/55">
+                        <span className="block tls-type-small text-white/55">
                           ab {viennaDate(season.start_date, { day: "2-digit", month: "2-digit", year: "numeric" })} · {season.weeks_total} Wochen · {STATUS_TEXT[season.status] || season.status}
                         </span>
                       </span>
-                      <span className={`shrink-0 rounded-sm px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider ${season.visibility === "off" ? "bg-white/5 text-white/55" : "bg-[#29B6E8]/15 text-[#29B6E8]"}`}>
+                      <span className={`shrink-0 rounded-sm px-2 py-0.5 tls-type-label ${season.visibility === "off" ? "bg-white/5 text-white/55" : "bg-[#29B6E8]/15 text-[#29B6E8]"}`}>
                         {VISIBILITY_SHORT[season.visibility] || season.visibility}
                       </span>
                       <ChevronRight className="w-4 h-4 shrink-0 text-white/40" aria-hidden="true" />
@@ -285,7 +286,7 @@ export default function AdminLeaguesPage() {
                 ))}
               </ul>
             ) : (
-              <p className="px-4 py-4 text-sm text-white/55">Noch keine Season.</p>
+              <p className="px-4 py-4 tls-type-small text-white/55">Noch keine Season.</p>
             )}
           </section>
         ))}

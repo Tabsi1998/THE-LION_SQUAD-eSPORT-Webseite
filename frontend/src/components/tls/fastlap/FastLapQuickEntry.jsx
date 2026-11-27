@@ -131,8 +131,8 @@ export function FastLapQuickEntry({ challenge, track, times, guests, onGuestCrea
       {/* Am Handy (#1941): die Überschrift ohne Trennstrich, das Abzeichen in einer Zeile - ist es zu eng, rückt es darunter. */}
       <div className="flex flex-wrap items-start justify-between gap-x-3 gap-y-2 mb-4">
         <div className="min-w-0">
-          <h2 className="font-heading font-bold uppercase text-lg leading-tight [hyphens:manual]">Schnelleingabe</h2>
-          <div className="text-xs text-white/45 mt-0.5 truncate">{track?.name || "Strecke wählen"}</div>
+          <h2 className="tls-type-section leading-tight [hyphens:manual]">Schnelleingabe</h2>
+          <div className="tls-type-small text-white/45 mt-0.5 truncate">{track?.name || "Strecke wählen"}</div>
         </div>
         <div className={`tls-attempt-chip whitespace-nowrap ${status.tone}`} data-testid="fl-quick-attempt" key={`${driver?.id || ""}:${used}`}>{status.text}</div>
       </div>
@@ -140,7 +140,7 @@ export function FastLapQuickEntry({ challenge, track, times, guests, onGuestCrea
       {onTrack.length > 0 && !driver && (
         <div className="mb-3 flex flex-wrap gap-1.5" data-testid="fl-quick-ontrack">
           {onTrack.filter((row) => row.track_id === track?.id).map((row) => (
-            <button key={row.id} type="button" onClick={() => setDriver(driverFromRow(row))} className="tls-btn tls-btn--secondary px-2.5 py-1 rounded-sm text-xs max-w-full truncate">
+            <button key={row.id} type="button" onClick={() => setDriver(driverFromRow(row))} className="tls-btn tls-btn--secondary px-2.5 py-1 rounded-sm tls-type-small max-w-full truncate">
               {row.display_name}{row.station ? ` · ${row.station}` : ""}
             </button>
           ))}
@@ -162,19 +162,19 @@ export function FastLapQuickEntry({ challenge, track, times, guests, onGuestCrea
             placeholder="1:24,587"
             data-testid="fl-quick-time"
             aria-describedby="fl-quick-preview"
-            className={`w-full bg-black border rounded-sm px-4 py-3 font-display text-4xl sm:text-5xl tabular-nums tracking-wide text-center focus:outline-none ${correcting ? "border-honor/60" : "border-white/15 focus:border-[#29B6E8]"}`}
+            className={`w-full bg-black border rounded-sm px-4 py-3 tls-type-title tls-type-num text-center focus:outline-none ${correcting ? "border-honor/60" : "border-white/15 focus:border-[#29B6E8]"}`}
           />
         </label>
-        <div id="fl-quick-preview" className={`mt-1 min-h-[1.25rem] text-center text-xs tabular-nums ${preview.text && !preview.ok ? "text-[#FFB4AE]" : "text-white/55"}`} aria-live="polite">
+        <div id="fl-quick-preview" className={`mt-1 min-h-[1.25rem] text-center tls-type-small tabular-nums ${preview.text && !preview.ok ? "text-[#FFB4AE]" : "text-white/55"}`} aria-live="polite">
           {correcting ? `Korrektur für ${last?.driverName || "die letzte Zeit"}${preview.ok ? ` · ${preview.text}` : ""}` : preview.ok ? `= ${preview.text}` : preview.text}
         </div>
 
         <div className="tls-keypad mt-3" role="group" aria-label="Ziffernblock">
           {KEYS.map((key) => (
-            <button key={key} type="button" className="tls-keypad__key font-display" onClick={() => press(key)} data-testid={`fl-key-${key === ":" ? "colon" : key === "," ? "comma" : key}`}>{key}</button>
+            <button key={key} type="button" className="tls-keypad__key tls-type-num" onClick={() => press(key)} data-testid={`fl-key-${key === ":" ? "colon" : key === "," ? "comma" : key}`}>{key}</button>
           ))}
           <button type="button" className="tls-keypad__key tls-keypad__key--wide" onClick={() => press("back")} aria-label="Letzte Ziffer löschen" data-testid="fl-key-back"><Delete className="w-6 h-6 mx-auto" /></button>
-          <button type="button" className="tls-keypad__key tls-keypad__key--wide text-sm uppercase tracking-wider" onClick={() => press("clear")} data-testid="fl-key-clear">Leeren</button>
+          <button type="button" className="tls-keypad__key tls-keypad__key--wide tls-type-small uppercase tracking-wider" onClick={() => press("clear")} data-testid="fl-key-clear">Leeren</button>
         </div>
 
         {/* Alle Versuche gefahren (#1941): Eintragen und „ungültig“ sind gesperrt - nur die Korrektur bleibt. */}
@@ -188,12 +188,12 @@ export function FastLapQuickEntry({ challenge, track, times, guests, onGuestCrea
             </button>
           )}
           {!correcting && (
-            <button type="button" disabled={submitting || !driver || !allowed} onClick={() => setReasonsOpen((open) => !open)} aria-expanded={reasonsOpen} data-testid="fl-quick-invalid" className="tls-btn tls-btn--danger py-2.5 rounded-sm font-bold uppercase tracking-wider text-xs inline-flex items-center justify-center gap-2 disabled:opacity-40">
+            <button type="button" disabled={submitting || !driver || !allowed} onClick={() => setReasonsOpen((open) => !open)} aria-expanded={reasonsOpen} data-testid="fl-quick-invalid" className="tls-btn tls-btn--danger py-2.5 rounded-sm tls-type-label inline-flex items-center justify-center gap-2 disabled:opacity-40">
               <Flag className="w-3.5 h-3.5" /> Ungültig
             </button>
           )}
           {last && (
-            <button type="button" disabled={submitting} onClick={() => { setCorrecting((value) => !value); setText(correcting ? "" : formatLapTime(last.time_ms).replace(".", ",")); }} data-testid="fl-quick-correct" className={`tls-btn tls-btn--quiet py-2.5 rounded-sm font-bold uppercase tracking-wider text-xs inline-flex items-center justify-center gap-2 disabled:opacity-40 ${correcting ? "col-span-2" : ""}`}>
+            <button type="button" disabled={submitting} onClick={() => { setCorrecting((value) => !value); setText(correcting ? "" : formatLapTime(last.time_ms).replace(".", ",")); }} data-testid="fl-quick-correct" className={`tls-btn tls-btn--quiet py-2.5 rounded-sm tls-type-label inline-flex items-center justify-center gap-2 disabled:opacity-40 ${correcting ? "col-span-2" : ""}`}>
               <RotateCcw className="w-3.5 h-3.5" /> {correcting ? "Abbrechen" : "Letzte korrigieren"}
             </button>
           )}
@@ -201,19 +201,19 @@ export function FastLapQuickEntry({ challenge, track, times, guests, onGuestCrea
         {reasonsOpen && !correcting && allowed && (
           <div className="mt-2 grid grid-cols-2 gap-1.5 tls-reveal" data-testid="fl-quick-reasons">
             {INVALID_REASONS.map((reason) => (
-              <button key={reason} type="button" disabled={submitting} onClick={() => save({ invalidReason: reason })} className="tls-btn tls-btn--danger py-2 rounded-sm text-xs">
+              <button key={reason} type="button" disabled={submitting} onClick={() => save({ invalidReason: reason })} className="tls-btn tls-btn--danger py-2 rounded-sm tls-type-small">
                 {reason}
               </button>
             ))}
-            <div className="col-span-2 text-[11px] text-white/45">Ohne getippte Zeit zählt die Runde als „ohne Zeit“ - als Versuch zählt sie immer.</div>
+            <div className="col-span-2 tls-type-small text-white/45">Ohne getippte Zeit zählt die Runde als „ohne Zeit“ - als Versuch zählt sie immer.</div>
           </div>
         )}
         {last && !correcting && (
-          <div className="mt-3 text-xs text-white/50 truncate" data-testid="fl-quick-last">
+          <div className="mt-3 tls-type-small text-white/50 truncate" data-testid="fl-quick-last">
             Zuletzt: <span className="text-white/80">{last.driverName}</span> · {last.is_invalid ? "ungültig" : showLapTime(last.time_ms)}
           </div>
         )}
-        <div className="mt-2 hidden sm:block text-[11px] text-white/35">Tastatur: Enter = eintragen · + = eintragen &amp; nächster Fahrer · / = Doppelpunkt</div>
+        <div className="mt-2 hidden sm:block tls-type-small text-quiet">Tastatur: Enter = eintragen · + = eintragen &amp; nächster Fahrer · / = Doppelpunkt</div>
       </form>
     </section>
   );

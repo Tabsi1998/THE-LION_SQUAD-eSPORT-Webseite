@@ -113,7 +113,8 @@ function ownStyledButtons(text) {
     const cls = m[1];
     if (/\btls-(btn|store|card)\b/.test(cls) || !/\bp[xy]-\d/.test(cls)) continue;
     const colorful = /\b(?:bg|border)-\[#[0-9A-Fa-f]{6}\]/.test(cls);
-    if (colorful || (/\bborder\b/.test(cls) && /\buppercase\b/.test(cls))) count += 1;
+    // GROSS kommt seit der Schrift-Treppe (#1302) auch vom Etikett (tls-type-label).
+    if (colorful || (/\bborder\b/.test(cls) && /\b(?:uppercase|tls-type-label)\b/.test(cls))) count += 1;
   }
   return count;
 }

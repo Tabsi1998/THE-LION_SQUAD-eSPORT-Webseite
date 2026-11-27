@@ -6,6 +6,7 @@ import { AdminLayout } from "@/components/tls/AdminLayout";
 import { useConfirm } from "@/components/tls/ConfirmDialog";
 import { viennaDateTime } from "@/lib/vienna";
 import { pushErrorLabel, pushStateLabel } from "@/lib/pushStatus";
+import { ShortCaps } from "@/components/tls/ShortCaps";
 
 // Push-Tests (#2119 ML8): in Alltagssprache - „angenommen“ (der Push-Dienst hat die Nachricht genommen) und „zugestellt“
 // (Apple oder Google haben sie ans Handy gegeben) statt Ticket und Receipt.
@@ -168,20 +169,20 @@ export default function AdminMobilePushPage() {
     <AdminLayout>
       <div className="flex flex-wrap items-end justify-between gap-4 mb-6">
         <div>
-          <span className="text-[11px] font-bold uppercase tracking-[0.3em] text-[#29B6E8]">System</span>
-          <h1 className="font-heading text-3xl md:text-4xl font-black uppercase mt-1">Push-Tests</h1>
+          <span className="tls-type-label text-[#29B6E8]">System</span>
+          <h1 className="tls-type-title mt-1"><ShortCaps>Push-Tests</ShortCaps></h1>
         </div>
         <div className="flex flex-wrap gap-2">
           <button
             onClick={checkAllReceipts}
             disabled={busy}
-            className="inline-flex items-center gap-2 border border-white/10 bg-[#121212] px-3 py-2 rounded-sm text-xs font-bold uppercase tracking-wider hover:border-[#29B6E8]/50 disabled:opacity-50"
+            className="inline-flex items-center gap-2 border border-white/10 bg-[#121212] px-3 py-2 rounded-sm tls-type-label hover:border-[#29B6E8]/50 disabled:opacity-50"
           >
             <BellRing className="w-4 h-4" /> Zustellung für alle prüfen
           </button>
           <button
             onClick={() => { loadUsers(); loadStatus(); }}
-            className="inline-flex items-center gap-2 border border-white/10 bg-[#121212] px-3 py-2 rounded-sm text-xs font-bold uppercase tracking-wider hover:border-[#29B6E8]/50"
+            className="inline-flex items-center gap-2 border border-white/10 bg-[#121212] px-3 py-2 rounded-sm tls-type-label hover:border-[#29B6E8]/50"
           >
             <RefreshCw className={`w-4 h-4 ${loading ? "animate-spin" : ""}`} /> Aktualisieren
           </button>
@@ -214,14 +215,14 @@ export default function AdminMobilePushPage() {
                   <Smartphone className={`w-5 h-5 mt-0.5 ${user.has_enabled_token ? "text-[#29B6E8]" : "text-white/25"}`} />
                   <div className="min-w-0 flex-1">
                     <div className="font-bold tls-wrap">{userLabel(user)}</div>
-                    <div className="text-xs text-white/45 tls-wrap">
+                    <div className="tls-type-small text-white/45 tls-wrap">
                       @{user.username || "-"} · {activeDevices(user.enabled_token_count)}
                       {Number(user.disabled_token_count) > 0 ? <span className="text-white/50"> · {oldDevices(user.disabled_token_count)}</span> : null}
                     </div>
-                    <div className="text-[11px] text-white/35 mt-1">Zuletzt angemeldet: {formatTime(user.latest_updated_at)}</div>
+                    <div className="tls-type-small text-quiet mt-1">Zuletzt angemeldet: {formatTime(user.latest_updated_at)}</div>
                     {/* Rot nur bei einem Fehler an einem aktiven Gerät (#2467). */}
                     {user.active_error ? (
-                      <div className="text-[11px] text-[#FF6B61] mt-1 tls-wrap" title={user.active_error}>{pushErrorLabel(user.active_error)}</div>
+                      <div className="tls-type-small text-[#FF6B61] mt-1 tls-wrap" title={user.active_error}>{pushErrorLabel(user.active_error)}</div>
                     ) : null}
                   </div>
                 </div>
@@ -237,18 +238,18 @@ export default function AdminMobilePushPage() {
           <div className="border border-white/10 bg-[#121212] rounded-sm p-4">
             <div className="flex flex-wrap items-start justify-between gap-3 mb-4">
               <div>
-                <div className="text-xs uppercase tracking-widest text-white/40">Zielgerät</div>
-                <h2 className="text-xl font-black">{userLabel(selectedUser)}</h2>
-                <p className="text-sm text-white/45">{selectedUser?.email || selectedUser?.id || "Kein Benutzer ausgewählt"}</p>
+                <div className="tls-type-label text-quiet">Zielgerät</div>
+                <h2 className="tls-type-section">{userLabel(selectedUser)}</h2>
+                <p className="tls-type-small text-white/45">{selectedUser?.email || selectedUser?.id || "Kein Benutzer ausgewählt"}</p>
               </div>
-              <span className={`inline-flex items-center gap-2 border px-3 py-2 rounded-sm text-xs font-bold uppercase tracking-wider ${status?.has_enabled_token ? "border-[#29B6E8]/40 text-[#29B6E8]" : "border-[#FFCC00]/40 text-[#FFD95A]"}`}>
+              <span className={`inline-flex items-center gap-2 border px-3 py-2 rounded-sm tls-type-label ${status?.has_enabled_token ? "border-[#29B6E8]/40 text-[#29B6E8]" : "border-[#FFCC00]/40 text-[#FFD95A]"}`}>
                 <CheckCircle2 className="w-4 h-4" /> {status?.enabled_count || 0} aktiv
               </span>
             </div>
 
             <div className="grid gap-3 md:grid-cols-2">
               <label>
-                <span className="block text-xs text-white/45 mb-1">Titel</span>
+                <span className="block tls-type-small text-white/45 mb-1">Titel</span>
                 <input
                   value={form.title}
                   onChange={(event) => setForm((current) => ({ ...current, title: event.target.value }))}
@@ -256,7 +257,7 @@ export default function AdminMobilePushPage() {
                 />
               </label>
               <label>
-                <span className="block text-xs text-white/45 mb-1">Text</span>
+                <span className="block tls-type-small text-white/45 mb-1">Text</span>
                 <input
                   value={form.body}
                   onChange={(event) => setForm((current) => ({ ...current, body: event.target.value }))}
@@ -268,51 +269,51 @@ export default function AdminMobilePushPage() {
               <button
                 onClick={sendTest}
                 disabled={!selected || busy}
-                className="inline-flex items-center gap-2 bg-[#29B6E8] text-black px-4 py-2 rounded-sm text-xs font-black uppercase tracking-wider disabled:opacity-50"
+                className="inline-flex items-center gap-2 bg-[#29B6E8] text-black px-4 py-2 rounded-sm tls-type-label disabled:opacity-50"
               >
                 <Send className="w-4 h-4" /> Test senden
               </button>
               <button
                 onClick={checkReceipts}
                 disabled={!selected || busy}
-                className="inline-flex items-center gap-2 border border-white/10 px-4 py-2 rounded-sm text-xs font-bold uppercase tracking-wider text-white/70 disabled:opacity-50"
+                className="inline-flex items-center gap-2 border border-white/10 px-4 py-2 rounded-sm tls-type-label text-white/70 disabled:opacity-50"
               >
                 <BellRing className="w-4 h-4" /> Zustellung prüfen
               </button>
             </div>
-            <p className="mt-3 text-xs text-white/45">Der Test landet als „Test: …“ im Postfach der Person und geht als Push an ihre aktiven Handys.</p>
+            <p className="mt-3 tls-type-small text-white/45">Der Test landet als „Test: …“ im Postfach der Person und geht als Push an ihre aktiven Handys.</p>
           </div>
 
           <div className="border border-white/10 bg-[#121212] rounded-sm overflow-hidden">
             <div className="p-4 border-b border-white/10">
-              <h3 className="font-bold uppercase tracking-wider text-sm">Angemeldete Handys</h3>
-              <p className="text-xs text-white/45 mt-1">„Angenommen“: der Push-Dienst hat die Nachricht genommen. „Zugestellt“: Apple oder Google haben sie ans Handy gegeben.</p>
+              <h3 className="tls-type-label">Angemeldete Handys</h3>
+              <p className="tls-type-small text-white/45 mt-1">„Angenommen“: der Push-Dienst hat die Nachricht genommen. „Zugestellt“: Apple oder Google haben sie ans Handy gegeben.</p>
             </div>
             <div className="md:hidden divide-y divide-white/5">
               {activeTokens.map((token, index) => (
                 <article key={`${token.token_preview}-card-${index}`} className="p-4 space-y-2">
                   <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0">
-                      <div className="font-mono text-xs text-white/65 truncate">{token.token_preview}</div>
-                      <div className="text-xs text-white/45 mt-1">{token.platform || "-"} · {token.enabled === false ? "inaktiv" : "aktiv"}</div>
+                      <div className="font-mono tls-type-small text-white/65 truncate">{token.token_preview}</div>
+                      <div className="tls-type-small text-white/45 mt-1">{token.platform || "-"} · {token.enabled === false ? "inaktiv" : "aktiv"}</div>
                     </div>
-                    <span className={`text-[10px] font-black uppercase tracking-wider border px-2 py-1 rounded-sm ${token.enabled === false ? "border-[#FFCC00]/40 text-[#FFD95A]" : "border-[#00FF88]/40 text-[#00FF88]"}`}>
+                    <span className={`tls-type-label border px-2 py-1 rounded-sm ${token.enabled === false ? "border-[#FFCC00]/40 text-[#FFD95A]" : "border-[#00FF88]/40 text-[#00FF88]"}`}>
                       {token.enabled === false ? "Aus" : "An"}
                     </span>
                   </div>
-                  <div className="grid grid-cols-2 gap-2 text-xs">
+                  <div className="grid grid-cols-2 gap-2 tls-type-small">
                     <div className="border border-white/10 bg-[#0A0A0A] rounded-sm p-2">
-                      <div className="text-white/35 uppercase tracking-wider text-[10px]">Angenommen</div>
+                      <div className="text-quiet tls-type-label">Angenommen</div>
                       <div>{pushStateLabel(token.last_ticket_status)}</div>
                       {token.last_ticket_error ? <div className="text-[#FF6B61] break-words" title={token.last_ticket_error}>{pushErrorLabel(token.last_ticket_error)}</div> : null}
                     </div>
                     <div className="border border-white/10 bg-[#0A0A0A] rounded-sm p-2">
-                      <div className="text-white/35 uppercase tracking-wider text-[10px]">Zugestellt</div>
+                      <div className="text-quiet tls-type-label">Zugestellt</div>
                       <div>{pushStateLabel(token.last_receipt_status)}</div>
                       {token.last_receipt_error ? <div className="text-[#FF6B61] break-words" title={token.last_receipt_error}>{pushErrorLabel(token.last_receipt_error)}</div> : null}
                     </div>
                   </div>
-                  <div className="text-[11px] text-white/40">Letzter Versand: {formatTime(token.last_sent_at)}</div>
+                  <div className="tls-type-small text-quiet">Letzter Versand: {formatTime(token.last_sent_at)}</div>
                 </article>
               ))}
               {!activeTokens.length && (
@@ -320,8 +321,8 @@ export default function AdminMobilePushPage() {
               )}
             </div>
             <div className="hidden md:block tls-swipe pb-0">
-              <table className="w-full text-sm min-w-[760px]">
-                <thead className="bg-[#0A0A0A] text-[11px] uppercase tracking-widest text-white/50">
+              <table className="w-full tls-type-small min-w-[760px]">
+                <thead className="bg-[#0A0A0A] tls-type-label text-white/50">
                   <tr>
                     <th className="text-left px-4 py-3">Gerät (Kennung)</th>
                     <th className="text-left px-4 py-3">System</th>
@@ -334,18 +335,18 @@ export default function AdminMobilePushPage() {
                 <tbody className="divide-y divide-white/5">
                   {activeTokens.map((token, index) => (
                     <tr key={`${token.token_preview}-${index}`}>
-                      <td className="px-4 py-3 font-mono text-xs text-white/65">{token.token_preview}</td>
+                      <td className="px-4 py-3 font-mono tls-type-small text-white/65">{token.token_preview}</td>
                       <td className="px-4 py-3">{token.platform || "-"}</td>
                       <td className="px-4 py-3">{token.enabled === false ? "Nein" : "Ja"}</td>
-                      <td className="px-4 py-3 text-xs">
+                      <td className="px-4 py-3 tls-type-small">
                         <div>{pushStateLabel(token.last_ticket_status)}</div>
                         {token.last_ticket_error ? <div className="text-[#FF6B61]" title={token.last_ticket_error}>{pushErrorLabel(token.last_ticket_error)}</div> : null}
                       </td>
-                      <td className="px-4 py-3 text-xs">
+                      <td className="px-4 py-3 tls-type-small">
                         <div>{pushStateLabel(token.last_receipt_status)}</div>
                         {token.last_receipt_error ? <div className="text-[#FF6B61]" title={token.last_receipt_error}>{pushErrorLabel(token.last_receipt_error)}</div> : null}
                       </td>
-                      <td className="px-4 py-3 text-white/50 text-xs">{formatTime(token.last_sent_at)}</td>
+                      <td className="px-4 py-3 text-white/50 tls-type-small">{formatTime(token.last_sent_at)}</td>
                     </tr>
                   ))}
                   {!activeTokens.length && (
@@ -365,7 +366,7 @@ export default function AdminMobilePushPage() {
                     aria-expanded={showOld}
                     aria-controls="push-old-devices-list"
                     data-testid="push-old-devices-toggle"
-                    className="inline-flex items-center gap-2 -mx-1 px-1 py-1 rounded-sm text-xs font-bold uppercase tracking-wider text-white/60 hover:text-white/85 focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#29B6E8]"
+                    className="inline-flex items-center gap-2 -mx-1 px-1 py-1 rounded-sm tls-type-label text-white/60 hover:text-white/85 focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#29B6E8]"
                   >
                     <ChevronDown className={`w-4 h-4 transition-transform duration-200 ease-out motion-reduce:transition-none ${showOld ? "rotate-180" : ""}`} />
                     Alte Geräte ({oldCount})
@@ -375,7 +376,7 @@ export default function AdminMobilePushPage() {
                     onClick={removeOld}
                     disabled={busy}
                     data-testid="push-old-devices-remove"
-                    className="inline-flex items-center gap-2 border border-white/10 px-3 py-2 rounded-sm text-xs font-bold uppercase tracking-wider text-white/60 hover:border-[#FF6B61]/50 hover:text-[#FF6B61] disabled:opacity-50"
+                    className="inline-flex items-center gap-2 border border-white/10 px-3 py-2 rounded-sm tls-type-label text-white/60 hover:border-[#FF6B61]/50 hover:text-[#FF6B61] disabled:opacity-50"
                   >
                     <Trash2 className="w-4 h-4" /> Alte Geräte entfernen
                   </button>
@@ -385,14 +386,14 @@ export default function AdminMobilePushPage() {
                     {oldTokens.map((token, index) => (
                       <li key={`${token.token_preview}-old-${index}`} className="px-4 py-3 flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1 text-white/55">
                         <div className="min-w-0">
-                          <div className="font-mono text-xs text-white/50 truncate">{token.token_preview}</div>
-                          <div className="text-xs mt-0.5">{token.platform || "-"} · <span>{OLD_DEVICE_TEXT}</span></div>
+                          <div className="font-mono tls-type-small text-white/50 truncate">{token.token_preview}</div>
+                          <div className="tls-type-small mt-0.5">{token.platform || "-"} · <span>{OLD_DEVICE_TEXT}</span></div>
                         </div>
-                        <div className="text-[11px] text-white/50">Abgemeldet: {formatTime(token.disabled_at || token.updated_at)}</div>
+                        <div className="tls-type-small text-white/50">Abgemeldet: {formatTime(token.disabled_at || token.updated_at)}</div>
                       </li>
                     ))}
                     {oldCount > oldTokens.length && (
-                      <li className="px-4 py-3 text-[11px] text-white/50">… und {oldCount - oldTokens.length} weitere</li>
+                      <li className="px-4 py-3 tls-type-small text-white/50">… und {oldCount - oldTokens.length} weitere</li>
                     )}
                 </ul>
               </div>

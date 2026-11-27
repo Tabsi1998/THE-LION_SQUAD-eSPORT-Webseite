@@ -23,10 +23,10 @@ export function AdventHint() {
     <div className="mb-8 flex flex-wrap items-center gap-4 rounded-sm border border-[#e9c46a]/30 bg-gradient-to-r from-[#e9c46a]/10 via-transparent to-transparent p-4 sm:p-5" data-testid="advent-hint" data-season-anchor="card">
       <span className={`tls-advcal tls-advcal--subtle shrink-0${entry.waiting ? " tls-advcal--waiting" : ""}`} aria-hidden="true"><DoorGlyph door={entry.door} /></span>
       <div className="min-w-[11rem] flex-1">
-        <div className="text-[11px] font-bold uppercase tracking-[0.22em] text-[#e9c46a]">Adventkalender</div>
-        <div className="mt-0.5 text-sm text-white/80">{hintText(entry)}</div>
+        <div className="tls-type-label text-[#e9c46a]">Adventkalender</div>
+        <div className="mt-0.5 tls-type-small text-white/80">{hintText(entry)}</div>
       </div>
-      <button type="button" onClick={openAdventCalendar} className="inline-flex items-center gap-1.5 rounded-sm border border-[#e9c46a]/50 px-4 py-2 text-[11px] font-bold uppercase tracking-wider text-[#e9c46a] transition hover:bg-[#e9c46a]/10" data-testid="advent-hint-link">
+      <button type="button" onClick={openAdventCalendar} className="inline-flex items-center gap-1.5 rounded-sm border border-[#e9c46a]/50 px-4 py-2 tls-type-label text-[#e9c46a] transition hover:bg-[#e9c46a]/10" data-testid="advent-hint-link">
         Zum Kalender <ArrowRight className="h-3.5 w-3.5" />
       </button>
     </div>

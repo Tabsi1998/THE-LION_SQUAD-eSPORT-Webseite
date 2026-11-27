@@ -212,31 +212,31 @@ export function TeamsPanel() {
     <div className="space-y-6" data-testid="profile-teams-tab">
       <div className="border border-white/10 bg-[#121212] rounded-sm p-5 flex items-center justify-between gap-4 flex-wrap">
         <div>
-          <div className="text-[11px] font-bold uppercase tracking-[0.3em] text-[#29B6E8]">Team-Verwaltung</div>
-          <h2 className="font-heading text-2xl md:text-3xl font-black uppercase mt-1">Meine Teams</h2>
-          <p className="text-sm text-white/55 mt-1">Teams sind deine Organisation, Co-Teams die feste Aufstellung für ein Spiel.</p>
+          <div className="tls-type-label text-[#29B6E8]">Team-Verwaltung</div>
+          <h2 className="tls-type-section mt-1">Meine Teams</h2>
+          <p className="tls-type-small text-white/55 mt-1">Teams sind deine Organisation, Co-Teams die feste Aufstellung für ein Spiel.</p>
         </div>
-        <Link to="/teams" className="inline-flex items-center gap-2 px-4 py-2 border border-[#29B6E8]/40 text-[#29B6E8] font-bold uppercase tracking-wider rounded-sm text-xs hover:bg-[#29B6E8]/10">
+        <Link to="/teams" className="inline-flex items-center gap-2 px-4 py-2 border border-[#29B6E8]/40 text-[#29B6E8] tls-type-label rounded-sm hover:bg-[#29B6E8]/10">
           <Plus className="w-3.5 h-3.5" /> Team erstellen
         </Link>
       </div>
 
       {invites.length > 0 && (
         <div className="border border-[#29B6E8]/25 bg-[#29B6E8]/5 rounded-sm p-5">
-          <div className="flex items-center gap-2 text-[11px] uppercase tracking-[0.3em] text-[#29B6E8] font-bold">
+          <div className="flex items-center gap-2 tls-type-label text-[#29B6E8]">
             <UserPlus className="w-4 h-4" /> Offene Team-Einladungen
           </div>
           <div className="mt-4 grid md:grid-cols-2 gap-3">
             {invites.map((invite) => (
               <div key={invite.id} className="border border-white/10 bg-[#121212] rounded-sm p-4">
-                <div className="text-[10px] uppercase tracking-widest text-white/45">Einladung von {invite.inviter?.display_name || invite.inviter?.username || "Teamleitung"}</div>
-                <div className="mt-1 font-heading font-black uppercase">{invite.team?.name || "Team"}</div>
-                {invite.team?.tag && <div className="text-xs text-[#29B6E8] font-bold">[{invite.team.tag}]</div>}
+                <div className="tls-type-small text-white/45">Einladung von {invite.inviter?.display_name || invite.inviter?.username || "Teamleitung"}</div>
+                <div className="mt-1 font-black">{invite.team?.name || "Team"}</div>
+                {invite.team?.tag && <div className="tls-type-small text-[#29B6E8] font-bold">[{invite.team.tag}]</div>}
                 <div className="mt-4 flex flex-wrap gap-2">
-                  <button type="button" onClick={() => actOnInvite(invite, "accept")} className="tls-btn tls-btn--primary inline-flex items-center gap-1.5 px-3 py-2 rounded-sm text-xs uppercase tracking-wider font-bold">
+                  <button type="button" onClick={() => actOnInvite(invite, "accept")} className="tls-btn tls-btn--primary inline-flex items-center gap-1.5 px-3 py-2 rounded-sm tls-type-label">
                     <Check className="w-3.5 h-3.5" /> Annehmen
                   </button>
-                  <button type="button" onClick={() => actOnInvite(invite, "decline")} className="inline-flex items-center gap-1.5 px-3 py-2 border border-white/15 text-white/60 rounded-sm text-xs uppercase tracking-wider font-bold hover:text-white">
+                  <button type="button" onClick={() => actOnInvite(invite, "decline")} className="inline-flex items-center gap-1.5 px-3 py-2 border border-white/15 text-white/60 rounded-sm tls-type-label hover:text-white">
                     <X className="w-3.5 h-3.5" /> Ablehnen
                   </button>
                 </div>
@@ -248,8 +248,8 @@ export function TeamsPanel() {
 
       {dissolved.length > 0 && (
         <div className="border border-white/10 bg-[#121212] rounded-sm p-5" data-testid="dissolved-teams">
-          <div className="text-[11px] uppercase tracking-[0.3em] text-white/55 font-bold">Aufgelöste Teams</div>
-          <p className="mt-1 text-sm text-white/55">Als frühere Teamleitung kannst du sie zurückholen – mit allen, die dabei waren, und einem neuen Beitrittscode.</p>
+          <div className="tls-type-label text-white/55">Aufgelöste Teams</div>
+          <p className="mt-1 tls-type-body text-white/55">Als frühere Teamleitung kannst du sie zurückholen – mit allen, die dabei waren, und einem neuen Beitrittscode.</p>
           <div className="mt-3 space-y-2">
             {dissolved.map((team) => <DissolvedTeamRow key={team.id} team={team} onRestored={() => { loadDissolved(); loadTeams(); }} />)}
           </div>
@@ -259,8 +259,8 @@ export function TeamsPanel() {
       {teams.length === 0 ? (
         <div className="border border-dashed border-white/15 rounded-sm p-12 text-center text-white/45">
           <Users className="w-10 h-10 mx-auto opacity-40 mb-3" />
-          <div className="font-heading font-bold text-lg">Noch kein Team</div>
-          <Link to="/teams" className="tls-btn tls-btn--primary mt-4 inline-flex px-4 py-2 font-bold uppercase tracking-wider rounded-sm text-xs">Team erstellen oder beitreten</Link>
+          <div className="tls-type-card">Noch kein Team</div>
+          <Link to="/teams" className="tls-btn tls-btn--primary mt-4 inline-flex px-4 py-2 tls-type-label rounded-sm">Team erstellen oder beitreten</Link>
         </div>
       ) : (
         <div className="grid lg:grid-cols-[300px_1fr] gap-5">
@@ -275,11 +275,11 @@ export function TeamsPanel() {
                 data-testid={`profile-team-${team.id}`}
               >
                 <div className="w-12 h-12 bg-[#0A0A0A] border border-white/10 rounded-sm overflow-hidden flex items-center justify-center shrink-0">
-                  {team.logo_url ? <img src={resolveMediaUrl(team.logo_url)} alt="" className="w-full h-full object-cover" /> : <span className="font-heading font-black text-[#29B6E8]">{team.tag}</span>}
+                  {team.logo_url ? <img src={resolveMediaUrl(team.logo_url)} alt="" className="w-full h-full object-cover" /> : <span className="font-black text-[#29B6E8]">{team.tag}</span>}
                 </div>
                 <div className="min-w-0">
-                  <div className="font-heading font-bold truncate">{team.name}</div>
-                  <div className="text-[10px] uppercase tracking-widest text-white/45">{TEAM_ROLE_LABELS[team.my_role] || team.my_role}{team.squad_count ? ` · ${team.squad_count} ${team.squad_count === 1 ? "Co-Team" : "Co-Teams"}` : ""}</div>
+                  <div className="font-bold truncate">{team.name}</div>
+                  <div className="tls-type-label text-white/45">{TEAM_ROLE_LABELS[team.my_role] || team.my_role}{team.squad_count ? ` · ${team.squad_count} ${team.squad_count === 1 ? "Co-Team" : "Co-Teams"}` : ""}</div>
                 </div>
               </button>
             ))}
@@ -296,16 +296,16 @@ export function TeamsPanel() {
                 )}
                 <div className="flex items-start justify-between gap-3 flex-wrap">
                   <div>
-                    <div className="text-[10px] uppercase tracking-widest text-[#29B6E8] font-bold">[{activeTeam.tag}]</div>
-                    <h3 className="font-heading text-2xl font-black uppercase">{activeTeam.name}</h3>
-                    <div className="text-xs text-white/50 mt-1">{activeTeam.members?.length || 0} Mitglieder · Deine Rolle: {TEAM_ROLE_LABELS[activeTeam.my_role] || activeTeam.my_role}</div>
-                    {canEditSquads && <div className="mt-2 text-xs text-[#29B6E8]">Du kannst für dieses Team Co-Teams erstellen und bearbeiten.</div>}
+                    <div className="tls-type-label text-[#29B6E8]">[{activeTeam.tag}]</div>
+                    <h3 className="tls-type-section">{activeTeam.name}</h3>
+                    <div className="tls-type-small text-white/50 mt-1">{activeTeam.members?.length || 0} Mitglieder · Deine Rolle: {TEAM_ROLE_LABELS[activeTeam.my_role] || activeTeam.my_role}</div>
+                    {canEditSquads && <div className="mt-2 tls-type-small text-[#29B6E8]">Du kannst für dieses Team Co-Teams erstellen und bearbeiten.</div>}
                   </div>
                   <div className="flex items-center gap-2">
                     <HelpLink thema="team-und-co-team" schritt="co-team-anlegen" />
-                    <Link to={`/teams/${activeTeam.id}`} className="px-3 py-2 border border-white/15 text-white/70 hover:text-white rounded-sm text-xs uppercase font-bold">Teamseite</Link>
+                    <Link to={`/teams/${activeTeam.id}`} className="px-3 py-2 border border-white/15 text-white/70 hover:text-white rounded-sm tls-type-label">Teamseite</Link>
                     {canEditSquads && (
-                      <button type="button" onClick={() => setEditing({ ...emptySquad, member_ids: activeTeam.member_ids || [] })} className="tls-btn tls-btn--primary px-3 py-2 rounded-sm text-xs uppercase font-bold inline-flex items-center gap-1">
+                      <button type="button" onClick={() => setEditing({ ...emptySquad, member_ids: activeTeam.member_ids || [] })} className="tls-btn tls-btn--primary px-3 py-2 rounded-sm tls-type-label inline-flex items-center gap-1">
                         <Plus className="w-3.5 h-3.5" /> Co-Team
                       </button>
                     )}
@@ -317,8 +317,8 @@ export function TeamsPanel() {
                     <div key={squad.id} className="border border-white/10 bg-[#0A0A0A] rounded-sm p-4">
                       <div className="flex items-start justify-between gap-2">
                         <div>
-                          <div className="text-[10px] uppercase tracking-widest text-[#FFD700]">{squadStatusLabel(squad.status)}</div>
-                          <h4 className="font-heading font-bold text-lg">{squad.name}</h4>
+                          <div className="tls-type-label text-[#FFD700]">{squadStatusLabel(squad.status)}</div>
+                          <h4 className="tls-type-card">{squad.name}</h4>
                         </div>
                         {canEditSquads && squad.can_edit !== false && (
                           <div className="flex gap-1">
@@ -327,15 +327,15 @@ export function TeamsPanel() {
                           </div>
                         )}
                       </div>
-                      <p className="text-xs text-white/55 mt-1" data-testid={`team-squad-game-${squad.id}`}>{squadGameLabel(squad)}</p>
+                      <p className="tls-type-small text-white/55 mt-1" data-testid={`team-squad-game-${squad.id}`}>{squadGameLabel(squad)}</p>
                       {canEditSquads && squad.can_edit === false ? (
-                        <p className="text-xs text-white/55 mt-1" data-testid={`team-squad-locked-${squad.id}`}>Spielt in einer laufenden Staffel: Kader und Rollen ändern jetzt nur die Teamleitung und die Liga-Leitung.</p>
+                        <p className="tls-type-small text-white/55 mt-1" data-testid={`team-squad-locked-${squad.id}`}>Spielt in einer laufenden Staffel: Kader und Rollen ändern jetzt nur die Teamleitung und die Liga-Leitung.</p>
                       ) : null}
-                      {squad.description && <p className="text-sm text-white/55 mt-2">{squad.description}</p>}
-                      <p className="text-xs text-white/55 mt-2 break-words" data-testid={`team-squad-roles-${squad.id}`}>{rolesSummary(squad, squad.members)}</p>
+                      {squad.description && <p className="tls-type-body text-white/55 mt-2">{squad.description}</p>}
+                      <p className="tls-type-small text-white/55 mt-2 break-words" data-testid={`team-squad-roles-${squad.id}`}>{rolesSummary(squad, squad.members)}</p>
                       {roleOf(squad, myId) ? (
                         <button type="button" onClick={() => resignRole(squad, roleOf(squad, myId))} data-testid={`team-squad-resign-${squad.id}`}
-                          className="tls-btn tls-btn--quiet mt-2 min-h-[44px] px-3 py-2 rounded-sm text-[10px] uppercase tracking-wider font-bold">
+                          className="tls-btn tls-btn--quiet mt-2 min-h-[44px] px-3 py-2 rounded-sm tls-type-label">
                           Rolle abgeben ({roleOf(squad, myId).label})
                         </button>
                       ) : null}
@@ -343,7 +343,7 @@ export function TeamsPanel() {
                         {(squad.members || []).map((m) => {
                           const role = roleOf(squad, m.id);
                           return (
-                            <span key={m.id} className={`px-2 py-1 border rounded-sm text-[10px] max-w-full truncate ${role ? "border-[#FFD700]/40 text-[#FFD700]" : "border-white/10 text-white/70"}`}>
+                            <span key={m.id} className={`px-2 py-1 border rounded-sm tls-type-small max-w-full truncate ${role ? "border-[#FFD700]/40 text-[#FFD700]" : "border-white/10 text-white/70"}`}>
                               {role && <abbr title={role.label} className="no-underline font-bold mr-1">{role.short}</abbr>}
                               {m.display_name || m.username}
                             </span>
@@ -367,7 +367,7 @@ export function TeamsPanel() {
         <div className="fixed inset-0 z-50 bg-black/75 backdrop-blur-sm p-4 overflow-y-auto">
           <form onSubmit={saveSquad} className="bg-[#121212] border border-white/10 rounded-sm w-full max-w-2xl mx-auto my-8">
             <div className="p-5 border-b border-white/10">
-              <h3 className="font-heading text-2xl font-black uppercase">{editing.id ? "Co-Team bearbeiten" : "Co-Team erstellen"}</h3>
+              <h3 className="tls-type-section">{editing.id ? "Co-Team bearbeiten" : "Co-Team erstellen"}</h3>
             </div>
             <div className="p-5 space-y-4">
               <Field label="Name"><Input value={editing.name} onChange={(v) => setEditing({ ...editing, name: v })} required testId="team-squad-name" /></Field>
@@ -380,20 +380,20 @@ export function TeamsPanel() {
                   {editing.game_id && !games.some((game) => game.id === editing.game_id) ? <option value={editing.game_id}>{editing.game || `${editing.game_id} (nicht in der Liste)`}</option> : null}
                   {selectableGames(games, editing.game_id).map((game) => <option key={game.id} value={game.id}>{gameOptionLabel(game)}</option>)}
                 </select>
-                <span className="block mt-1 text-xs text-white/45" data-testid="team-squad-game-hint">Hauptspiel oder Version: In der Liga zählen beide als dasselbe Spiel.</span>
+                <span className="block mt-1 tls-type-small text-white/45" data-testid="team-squad-game-hint">Hauptspiel oder Version: In der Liga zählen beide als dasselbe Spiel.</span>
               </Field>
               <Field label="Kader" group>
                 {/* Spielberechtigung (#2204): sagt vorab, was die Season verlangt - der Server prüft es beim Speichern. */}
-                {requirementHint(editing.league_requirement) ? <p className="mb-2 text-xs text-white/55" data-testid="team-squad-requirement">{requirementHint(editing.league_requirement)}</p> : null}
+                {requirementHint(editing.league_requirement) ? <p className="mb-2 tls-type-small text-white/55" data-testid="team-squad-requirement">{requirementHint(editing.league_requirement)}</p> : null}
                 <div className="grid sm:grid-cols-2 gap-2">
                   {(activeTeam.members || []).map((m) => {
                     const checked = (editing.member_ids || []).includes(m.id);
                     const role = checked ? roleOf(editing, m.id) : null;
                     return (
-                      <label key={m.id} className="flex items-center gap-2 border border-white/10 bg-[#0A0A0A] rounded-sm p-2 text-sm min-w-0">
+                      <label key={m.id} className="flex items-center gap-2 border border-white/10 bg-[#0A0A0A] rounded-sm p-2 tls-type-small min-w-0">
                         <input type="checkbox" checked={checked} disabled={Boolean(role)} onChange={() => toggleMember(m.id)} className="accent-[#29B6E8]" data-testid={`team-squad-member-${m.id}`} />
                         <span className="truncate">{m.display_name || m.username}</span>
-                        {role && <span className="ml-auto shrink-0 text-[10px] uppercase tracking-wider text-[#FFD700]">{role.label}</span>}
+                        {role && <span className="ml-auto shrink-0 tls-type-label text-[#FFD700]">{role.label}</span>}
                       </label>
                     );
                   })}
@@ -418,7 +418,7 @@ export function TeamsPanel() {
                     </Field>
                   ))}
                 </Row>
-                <p className="text-xs text-white/45">
+                <p className="tls-type-small text-white/45">
                   Captain und Vertreter vereinbaren in der Liga Termine, melden und bestätigen Ergebnisse. Ohne beide macht das die Teamleitung.
                   Wer eine Rolle hat, bleibt im Kader, bis du die Rolle jemand anderem gibst.
                 </p>
@@ -431,8 +431,8 @@ export function TeamsPanel() {
               </Field>
             </div>
             <div className="flex justify-end gap-2 p-5 border-t border-white/10">
-              <button type="button" onClick={() => setEditing(null)} className="px-4 py-2 border border-white/10 text-white/60 rounded-sm text-xs uppercase tracking-wider font-bold">Abbrechen</button>
-              <button disabled={saving} className="tls-btn tls-btn--primary px-5 py-2 rounded-sm text-xs uppercase tracking-wider font-bold disabled:opacity-50">{saving ? "Speichere…" : "Speichern"}</button>
+              <button type="button" onClick={() => setEditing(null)} className="px-4 py-2 border border-white/10 text-white/60 rounded-sm tls-type-label">Abbrechen</button>
+              <button disabled={saving} className="tls-btn tls-btn--primary px-5 py-2 rounded-sm tls-type-label disabled:opacity-50">{saving ? "Speichere…" : "Speichern"}</button>
             </div>
           </form>
         </div>

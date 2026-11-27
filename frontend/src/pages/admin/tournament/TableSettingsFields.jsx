@@ -22,7 +22,7 @@ export function SwissSettingsFields({ value, onChange, participants, testPrefix 
   const suggestion = recommendedSwissRounds(participants);
   return (
     <div className="space-y-3" data-testid={`${testPrefix}-settings`}>
-      <div className="text-[11px] font-bold uppercase tracking-widest text-white/60">Schweizer System</div>
+      <div className="tls-type-label text-white/60">Schweizer System</div>
       <SelectField label="Abschluss" value={value.end_rule} onChange={(next) => set("end_rule", next)} options={SWISS_END_RULE_OPTIONS}
         hint={END_RULE_HINTS[value.end_rule]} testId={`${testPrefix}-end-rule`} />
       {value.end_rule === "rounds" && (

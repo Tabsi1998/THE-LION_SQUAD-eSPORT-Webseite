@@ -15,6 +15,7 @@ import { SponsoringOfferPanel } from "@/pages/admin/sponsors/SponsoringOfferPane
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { toast } from "sonner";
 import { Archive, ArchiveRestore, Plus, Trash2, Pencil } from "lucide-react";
+import { ShortCaps } from "@/components/tls/ShortCaps";
 
 const TIERS = ["main", "platinum", "gold", "silver", "bronze"];
 const TIER_LABELS = { main: "Hauptsponsor", platinum: "Platin", gold: "Gold", silver: "Silber", bronze: "Bronze" };
@@ -101,12 +102,12 @@ export default function AdminSponsorsPage() {
     <AdminLayout>
       <div className="flex items-start justify-between gap-4 mb-6 flex-wrap">
         <div>
-          <span className="text-[11px] font-bold uppercase tracking-[0.3em] text-[#29B6E8]">Verein</span>
-          <h1 className="font-heading text-3xl md:text-4xl font-black uppercase mt-1">Sponsoren</h1>
-          <p className="mt-2 text-white/60 text-sm max-w-xl">
+          <span className="tls-type-label text-[#29B6E8]">Verein</span>
+          <h1 className="tls-type-title mt-1"><ShortCaps>Sponsoren</ShortCaps></h1>
+          <p className="mt-2 text-white/60 tls-type-body max-w-xl">
             Die Stufe bestimmt Größe und Reihenfolge. Die Laufzeit und „Öffentlich zeigen“ entscheiden, ob ein Sponsor zu sehen ist, die Haken, wo.
           </p>
-          <p className="mt-2 text-white/60 text-sm max-w-xl" data-testid="sponsor-vs-partner">
+          <p className="mt-2 text-white/60 tls-type-body max-w-xl" data-testid="sponsor-vs-partner">
             Sponsoren unterstützen den Verein mit Geld oder Sachleistungen. Befreundete Vereine und Veranstalter stehen unter <Link to="/admin/partners" className="text-[#29B6E8] underline-offset-2 hover:underline">Partner</Link>.
           </p>
         </div>
@@ -128,25 +129,25 @@ export default function AdminSponsorsPage() {
                 {shownLogo(s) ? (
                   <img src={resolveMediaUrl(shownLogo(s))} alt={s.name} className="w-14 h-14 object-contain rounded-sm bg-black/20 p-1" />
                 ) : (
-                  <div className="w-14 h-14 rounded-sm bg-[#29B6E8]/10 border border-[#29B6E8]/30 flex items-center justify-center font-display font-bold text-[#29B6E8]">
+                  <div className="w-14 h-14 rounded-sm bg-[#29B6E8]/10 border border-[#29B6E8]/30 flex items-center justify-center tls-type-num text-[#29B6E8]">
                     {s.name.slice(0, 2).toUpperCase()}
                   </div>
                 )}
                 <div className="min-w-0">
-                  <div className={`text-[10px] uppercase tracking-widest font-bold ${TIER_COLORS[s.tier] || "text-white/60"}`}>{TIER_LABELS[s.tier] || s.tier || "—"}</div>
-                  <div className="font-heading text-lg font-bold tls-wrap">{s.name}</div>
+                  <div className={`tls-type-label ${TIER_COLORS[s.tier] || "text-white/60"}`}>{TIER_LABELS[s.tier] || s.tier || "—"}</div>
+                  <div className="tls-type-card tls-wrap">{s.name}</div>
                   <div className="flex gap-1 mt-1 flex-wrap">
-                    <span className={`text-[9px] px-1.5 py-0.5 rounded-sm font-bold uppercase tracking-widest ${STATUS_CLASSES[effectiveSponsorStatus(s)] || STATUS_CLASSES.inactive}`}>
+                    <span className={`tls-type-label px-1.5 py-0.5 rounded-sm ${STATUS_CLASSES[effectiveSponsorStatus(s)] || STATUS_CLASSES.inactive}`}>
                       {STATUS_LABELS[effectiveSponsorStatus(s)] || effectiveSponsorStatus(s)}
                     </span>
-                    {s.show_on_home && <span className="text-[9px] px-1.5 py-0.5 bg-[#29B6E8]/15 text-[#29B6E8] rounded-sm font-bold uppercase tracking-widest">Startseite</span>}
-                    {s.show_on_footer && <span className="text-[9px] px-1.5 py-0.5 bg-white/10 text-white/70 rounded-sm font-bold uppercase tracking-widest">Fußzeile</span>}
-                    {s.show_on_events && <span className="text-[9px] px-1.5 py-0.5 bg-[#FFD700]/15 text-[#FFD700] rounded-sm font-bold uppercase tracking-widest">Events</span>}
-                    {s.show_on_tv && <span className="text-[9px] px-1.5 py-0.5 bg-[#9F7AEA]/15 text-[#BFA6FF] rounded-sm font-bold uppercase tracking-widest">TV</span>}
-                    {s.show_on_pdf && <span className="text-[9px] px-1.5 py-0.5 bg-[#29B6E8]/15 text-[#8EE6FF] rounded-sm font-bold uppercase tracking-widest">PDF</span>}
-                    {s.show_in_emails && <span className="text-[9px] px-1.5 py-0.5 bg-[#18C29C]/15 text-[#18C29C] rounded-sm font-bold uppercase tracking-widest">E-Mail</span>}
-                    {s.source === "dolibarr" && <span className="text-[9px] px-1.5 py-0.5 bg-[#29B6E8]/15 text-[#29B6E8] rounded-sm font-bold uppercase tracking-widest" data-testid={`sponsor-dolibarr-${s.id}`}>Dolibarr</span>}
-                    {imageSourceText(s.dolibarr_image_summary) && <span className="text-[9px] px-1.5 py-0.5 bg-[#29B6E8]/10 text-[#8EE6FF] rounded-sm font-bold uppercase tracking-widest" title={imageSourceText(s.dolibarr_image_summary)} data-testid={`sponsor-images-${s.id}`}>Bilder: Dolibarr</span>}
+                    {s.show_on_home && <span className="tls-type-label px-1.5 py-0.5 bg-[#29B6E8]/15 text-[#29B6E8] rounded-sm">Startseite</span>}
+                    {s.show_on_footer && <span className="tls-type-label px-1.5 py-0.5 bg-white/10 text-white/70 rounded-sm">Fußzeile</span>}
+                    {s.show_on_events && <span className="tls-type-label px-1.5 py-0.5 bg-[#FFD700]/15 text-[#FFD700] rounded-sm">Events</span>}
+                    {s.show_on_tv && <span className="tls-type-label px-1.5 py-0.5 bg-[#9F7AEA]/15 text-[#BFA6FF] rounded-sm">TV</span>}
+                    {s.show_on_pdf && <span className="tls-type-label px-1.5 py-0.5 bg-[#29B6E8]/15 text-[#8EE6FF] rounded-sm">PDF</span>}
+                    {s.show_in_emails && <span className="tls-type-label px-1.5 py-0.5 bg-[#18C29C]/15 text-[#18C29C] rounded-sm">E-Mail</span>}
+                    {s.source === "dolibarr" && <span className="tls-type-label px-1.5 py-0.5 bg-[#29B6E8]/15 text-[#29B6E8] rounded-sm" data-testid={`sponsor-dolibarr-${s.id}`}>Dolibarr</span>}
+                    {imageSourceText(s.dolibarr_image_summary) && <span className="tls-type-label px-1.5 py-0.5 bg-[#29B6E8]/10 text-[#8EE6FF] rounded-sm" title={imageSourceText(s.dolibarr_image_summary)} data-testid={`sponsor-images-${s.id}`}>Bilder: Dolibarr</span>}
                   </div>
                 </div>
               </div>
@@ -161,15 +162,15 @@ export default function AdminSponsorsPage() {
               </div>
             </div>
             {(s.contract_start || s.contract_end || s.contact_name) && (
-              <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-2 text-[11px] text-white/45">
+              <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-2 tls-type-small text-white/45">
                 {(s.contract_start || s.contract_end) && (
                   <div>Vertrag: {formatDate(s.contract_start) || "offen"} bis {formatDate(s.contract_end) || "offen"}</div>
                 )}
                 {s.contact_name && <div>Ansprechpartner: {s.contact_name}</div>}
               </div>
             )}
-            {s.description && <p className="mt-3 text-sm text-white/60 line-clamp-2">{s.description}</p>}
-            {s.link && <a href={s.link} target="_blank" rel="noreferrer" className="mt-3 block text-xs text-[#29B6E8] hover:underline truncate" title={s.link}>{s.link}</a>}
+            {s.description && <p className="mt-3 tls-type-body text-white/60 line-clamp-2">{s.description}</p>}
+            {s.link && <a href={s.link} target="_blank" rel="noreferrer" className="mt-3 block tls-type-small text-[#29B6E8] hover:underline truncate" title={s.link}>{s.link}</a>}
           </div>
         ))}
         {list.length === 0 && <div className="col-span-full text-center py-16 text-white/40 font-display tracking-widest">NOCH KEINE SPONSOREN</div>}
@@ -257,7 +258,7 @@ function SponsorForm({ sponsor, events = [], locked = new Set(), onClose, onSave
   return (
     <AdminSheet title={sponsor ? "Sponsor bearbeiten" : "Neuer Sponsor"} eyebrow="Verein" size="lg" onClose={onClose} onSubmit={save} saving={saving} submitTestId="sponsor-save" testId="sponsor-sheet">
       {locked.size > 0 && (
-        <p className="text-xs text-[#29B6E8] border border-[#29B6E8]/30 bg-[#29B6E8]/5 rounded-sm px-3 py-2" data-testid="sponsor-locked-hint">
+        <p className="tls-type-small text-[#29B6E8] border border-[#29B6E8]/30 bg-[#29B6E8]/5 rounded-sm px-3 py-2" data-testid="sponsor-locked-hint">
           Dieser Sponsor kommt aus Dolibarr: Name, Stufe, Laufzeit, E-Mail und Telefon werden dort gepflegt. Link, Platzierungen, Reihenfolge, Ansprechpartner und Texte bleiben hier. Logo und Banner kommen ab Vereinsmodul 1.9 aus Dolibarr; das Logo hier gilt nur, wo Dolibarr keines liefert.
         </p>
       )}
@@ -268,7 +269,7 @@ function SponsorForm({ sponsor, events = [], locked = new Set(), onClose, onSave
         </FormGrid>
         <ImageUpload value={form.logo_url} onChange={(v) => set("logo_url", v)} label="Logo" testId="sponsor-logo" variant="square" endpoint="/uploads/sponsor-logo" allowLibrary logo />
         {imageSourceText(sponsor?.dolibarr_image_summary) && (
-          <p className="text-xs text-white/60 border border-white/10 rounded-sm px-3 py-2" data-testid="sponsor-images-hint">
+          <p className="tls-type-small text-white/60 border border-white/10 rounded-sm px-3 py-2" data-testid="sponsor-images-hint">
             {imageSourceText(sponsor.dolibarr_image_summary)}. Die Website und die App zeigen die Fassung für dunklen Hintergrund, Mails und PDFs die helle;
             das Logo hier springt nur ein, wo Dolibarr keines liefert.
           </p>
@@ -293,7 +294,7 @@ function SponsorForm({ sponsor, events = [], locked = new Set(), onClose, onSave
 
       <FormSection title="Sichtbarkeit" hint="Die Haken gelten sofort. „Vorgabe der Stufe“ setzt sie auf einen Schlag.">
         <div className="flex justify-end">
-          <button type="button" onClick={() => applyTierDefaults()} className="px-3 py-1.5 border border-[#29B6E8]/40 text-[#29B6E8] text-[10px] font-bold uppercase tracking-wider rounded-sm hover:bg-[#29B6E8]/10">
+          <button type="button" onClick={() => applyTierDefaults()} className="px-3 py-1.5 border border-[#29B6E8]/40 text-[#29B6E8] tls-type-label rounded-sm hover:bg-[#29B6E8]/10">
             Vorgabe der Stufe
           </button>
         </div>
@@ -308,8 +309,8 @@ function SponsorForm({ sponsor, events = [], locked = new Set(), onClose, onSave
         </FormGrid>
         {form.show_on_events && (
           <div className="border border-white/10 rounded-sm p-3 bg-[#0A0A0A] space-y-2" data-testid="sponsor-event-scope">
-            <div className="text-[11px] font-bold uppercase tracking-widest text-white/60">Bei welchen Events</div>
-            <div className="flex flex-wrap gap-x-5 gap-y-2 text-sm">
+            <div className="tls-type-label text-white/60">Bei welchen Events</div>
+            <div className="flex flex-wrap gap-x-5 gap-y-2 tls-type-small">
               {[["all", "Bei allen Events"], ["selected", "Bei ausgewählten Events"]].map(([value, label]) => (
                 <label key={value} className="inline-flex items-center gap-2 cursor-pointer">
                   <input type="radio" name="sponsor-event-scope" value={value} checked={eventScope === value} onChange={() => setEventScope(value)} data-testid={`sponsor-event-scope-${value}`} className="accent-[#29B6E8]" />
@@ -317,12 +318,12 @@ function SponsorForm({ sponsor, events = [], locked = new Set(), onClose, onSave
                 </label>
               ))}
             </div>
-            <p className="text-[10px] text-white/40">Nur hier wird festgelegt, wo der Sponsor erscheint – das Event zeigt es nur an.</p>
+            <p className="tls-type-small text-quiet">Nur hier wird festgelegt, wo der Sponsor erscheint – das Event zeigt es nur an.</p>
           </div>
         )}
         {form.show_on_events && eventScope === "selected" && events.length > 0 && (
           <div className="border border-white/10 rounded-sm p-3 bg-[#0A0A0A]" data-testid="sponsor-event-list">
-            <div className="text-[11px] font-bold uppercase tracking-widest text-white/60 mb-2">Ausgewählte Events</div>
+            <div className="tls-type-label text-white/60 mb-2">Ausgewählte Events</div>
             <div className="max-h-28 overflow-y-auto space-y-1">
               {events.map((ev) => (
                 <CheckField
@@ -355,20 +356,20 @@ function SponsorPlacementPreview({ sponsor }) {
     <div className="border border-white/10 rounded-sm bg-[#080808] p-3" data-testid="sponsor-placement-preview">
       <div className="flex items-center justify-between gap-3">
         <div>
-          <div className="text-[11px] font-bold uppercase tracking-widest text-white/60">Vorschau Ausspielung</div>
-          <p className="mt-1 text-[10px] text-white/40">
+          <div className="tls-type-label text-white/60">Vorschau Ausspielung</div>
+          <p className="mt-1 tls-type-small text-quiet">
             Öffentlich sichtbar, wenn „Öffentlich zeigen“ an ist und die Laufzeit passt.
           </p>
         </div>
-        <span className={`text-[9px] px-2 py-1 rounded-sm font-bold uppercase tracking-widest ${visible ? STATUS_CLASSES.active : STATUS_CLASSES[status] || STATUS_CLASSES.inactive}`}>
+        <span className={`tls-type-label px-2 py-1 rounded-sm ${visible ? STATUS_CLASSES.active : STATUS_CLASSES[status] || STATUS_CLASSES.inactive}`}>
           {visible ? "Wird ausgespielt" : "Nicht öffentlich"}
         </span>
       </div>
       <div className="mt-3 flex flex-wrap gap-2">
         {enabled.length ? enabled.map(([key, label]) => (
-          <span key={key} className="text-[10px] px-2 py-1 border border-white/10 text-white/70 rounded-sm uppercase tracking-wider font-bold">{label}</span>
+          <span key={key} className="tls-type-label px-2 py-1 border border-white/10 text-white/70 rounded-sm">{label}</span>
         )) : (
-          <span className="text-xs text-white/35">Keine Platzierung aktiv.</span>
+          <span className="tls-type-small text-quiet">Keine Platzierung aktiv.</span>
         )}
       </div>
     </div>

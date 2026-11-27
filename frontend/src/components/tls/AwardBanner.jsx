@@ -63,17 +63,17 @@ export function AwardBanner({ award, size = "md", action = null, linkTo = null }
         )}
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2 flex-wrap">
-            <span className={`text-[10px] font-black uppercase tracking-widest ${tone.text}`} data-testid={`award-rank-${award.id}`}>{award.rank_label}</span>
-            {reward ? <span className={`text-[10px] font-bold uppercase tracking-widest border px-1.5 py-0.5 rounded-sm ${tone.border} ${tone.text}`}>{reward.kind_label}</span>
-              : tone.label && <span className={`text-[10px] font-bold uppercase tracking-widest border px-1.5 py-0.5 rounded-sm ${tone.border} ${tone.text}`}>{tone.label}</span>}
-            {award.team?.name && <span className="text-[10px] font-bold uppercase tracking-widest text-white/60 inline-flex items-center gap-1"><Users className="w-3 h-3" /> {award.team.name}</span>}
+            <span className={`tls-type-label ${tone.text}`} data-testid={`award-rank-${award.id}`}>{award.rank_label}</span>
+            {reward ? <span className={`tls-type-label border px-1.5 py-0.5 rounded-sm ${tone.border} ${tone.text}`}>{reward.kind_label}</span>
+              : tone.label && <span className={`tls-type-label border px-1.5 py-0.5 rounded-sm ${tone.border} ${tone.text}`}>{tone.label}</span>}
+            {award.team?.name && <span className="tls-type-small font-bold text-white/60 inline-flex items-center gap-1"><Users className="w-3 h-3" /> {award.team.name}</span>}
             {award.internal ? <InternalTag testId={`internal-tag-award-${award.id}`} /> : null}
           </div>
-          <div className={`font-heading font-black uppercase break-words ${hero ? "text-2xl md:text-3xl" : "text-base"}`}>{reward ? reward.name : award.tournament?.title || "Turnier"}</div>
-          <div className="text-xs text-white/60 mt-0.5 flex flex-wrap gap-x-2 gap-y-0.5">
+          <div className={`break-words ${hero ? "tls-type-section" : "tls-type-card"}`}>{reward ? reward.name : award.tournament?.title || "Turnier"}</div>
+          <div className="tls-type-small text-white/60 mt-0.5 flex flex-wrap gap-x-2 gap-y-0.5">
             {awardLines(award).map((line) => <span key={line}>{line}</span>)}
           </div>
-          {award.record && <div className={`mt-1 font-display tabular-nums ${tone.text} ${hero ? "text-lg" : "text-sm"}`} data-testid={`award-record-${award.id}`}>{award.record}</div>}
+          {award.record && <div className={`mt-1 tls-type-num ${tone.text} ${hero ? "tls-type-card" : "tls-type-small"}`} data-testid={`award-record-${award.id}`}>{award.record}</div>}
         </div>
         {action && <div className="shrink-0 self-start">{action}</div>}
       </div>

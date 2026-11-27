@@ -35,7 +35,7 @@ import { ruleFor, ruleHint } from "./leagueResultRules";
 // eigene Aufstellung. Die nächste Map erscheint, sobald die letzte einen Sieger hat - bis die Serie entschieden ist.
 // Die Gegenseite bestätigt mit einem Tipp und stellt dabei ihre eigene Aufstellung je Map auf.
 
-const chip = (active) => `inline-flex min-h-[40px] max-w-full items-center gap-1.5 rounded-sm border px-3 py-1.5 text-sm ${
+const chip = (active) => `inline-flex min-h-[40px] max-w-full items-center gap-1.5 rounded-sm border px-3 py-1.5 tls-type-small ${
   active ? "border-[#29B6E8] bg-[#29B6E8]/15 text-white" : "border-white/15 bg-[#0A0A0A] text-white/70 hover:border-white/35"}`;
 
 /** Teilnehmerliste einmal je Spiel (#2204): alle ankreuzen, die mindestens eine Map gespielt haben - nach oben offen. */
@@ -43,7 +43,7 @@ export function ParticipantsPicker({ roster = [], value = [], league, onChange, 
   return (
     <div className="space-y-1.5">
       <LineupPicker roster={roster} value={value} size={null} minimum={league?.lineup_min_players || 1} onChange={onChange} label={label} testId={testId} />
-      <p className="text-xs text-white/50" data-testid={`${testId}-hint`}>
+      <p className="tls-type-small text-white/50" data-testid={`${testId}-hint`}>
         Kreuze alle an, die mindestens eine Map gespielt haben. Mindestens {league?.lineup_min_players || 1}, bei Wechseln auch mehr. Wer fehlt, zählt nicht als Einsatz.
       </p>
     </div>
@@ -61,7 +61,7 @@ export function LineupPicker({ roster = [], value = [], size = 1, minimum = null
   const reasonId = useId();
   return (
     <div role="group" aria-label={label} data-testid={testId}>
-      <div className="mb-1.5 flex items-center justify-between gap-2 text-[11px] font-bold uppercase tracking-widest text-white/55">
+      <div className="mb-1.5 flex items-center justify-between gap-2 tls-type-label text-white/55">
         <span className="inline-flex items-center gap-1.5"><Users className="h-3.5 w-3.5" /> {label}</span>
         <span className={enough ? "text-ok" : "text-white/45"} data-testid={testId ? `${testId}-count` : undefined}>{open ? `${value.length} · mindestens ${minimum || 1}` : `${value.length}/${size}`}</span>
       </div>
@@ -94,7 +94,7 @@ export function LineupPicker({ roster = [], value = [], size = 1, minimum = null
         })}
       </div>
       {blocked.length > 0 && (
-        <ul id={reasonId} className="mt-1.5 space-y-0.5 text-xs text-warn" data-testid={testId ? `${testId}-blocked` : undefined}>
+        <ul id={reasonId} className="mt-1.5 space-y-0.5 tls-type-small text-warn" data-testid={testId ? `${testId}-blocked` : undefined}>
           {blocked.map((person) => (
             <li key={person.id} className="break-words [overflow-wrap:anywhere]">{open ? "Nicht eintragbar" : "Nicht aufstellbar"}: {person.name} – {person.reason}</li>
           ))}
@@ -120,22 +120,22 @@ function MapWinner({ game, league, onPick, staff = false }) {
   const mismatch = Boolean(auto) && Boolean(game.winner) && game.winner !== auto && !awarded;
   if (!staff && fromScores) {
     return (
-      <p role="status" className="flex min-h-[44px] min-w-0 items-start gap-2 rounded-sm border border-honor/50 bg-honor/10 px-3 py-2 text-sm font-bold text-honor" data-testid={`${testId}-auto`}>
+      <p role="status" className="flex min-h-[44px] min-w-0 items-start gap-2 rounded-sm border border-honor/50 bg-honor/10 px-3 py-2 tls-type-small font-bold text-honor" data-testid={`${testId}-auto`}>
         <Trophy className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
         {/* Lange Teamnamen brechen um statt abgeschnitten zu werden - der Sieger muss ganz lesbar sein. */}
         <span className="min-w-0 break-words [overflow-wrap:anywhere]">
           Sieger: {nameOf(auto)}
-          <span className="block text-xs font-normal text-white/55">aus den Punkten</span>
+          <span className="block tls-type-small font-normal text-white/55">aus den Punkten</span>
         </span>
       </p>
     );
   }
   if (!staff && !mismatch && !awarded) {
     if (tied && rule && !rule.draw_allowed) {
-      return <p role="status" className="text-xs text-warn" data-testid={`${testId}-no-draw`}>Gleichstand gibt es in diesem Modus nicht – bitte die Punkte prüfen.</p>;
+      return <p role="status" className="tls-type-small text-warn" data-testid={`${testId}-no-draw`}>Gleichstand gibt es in diesem Modus nicht – bitte die Punkte prüfen.</p>;
     }
     if (league.scores_required && !tied) {
-      return <p className="text-xs text-white/50" data-testid={`${testId}-pending`}>Den Sieger ergeben die Punkte – einfach beide eintragen.</p>;
+      return <p className="tls-type-small text-white/50" data-testid={`${testId}-pending`}>Den Sieger ergeben die Punkte – einfach beide eintragen.</p>;
     }
   }
   // Leitung (Ergebnis-Fenster): Die Knöpfe bleiben immer - zum Übergehen einer Regel mit Grund und für Altdaten. Der Sieger
@@ -144,21 +144,21 @@ function MapWinner({ game, league, onPick, staff = false }) {
   return (
     <div className="space-y-1.5">
       {mismatch ? (
-        <div role="status" className="flex flex-wrap items-center gap-x-3 gap-y-1 rounded-sm border border-warn/40 bg-warn/10 px-3 py-2 text-xs text-white" data-testid={`${testId}-mismatch`}>
+        <div role="status" className="flex flex-wrap items-center gap-x-3 gap-y-1 rounded-sm border border-warn/40 bg-warn/10 px-3 py-2 tls-type-small text-white" data-testid={`${testId}-mismatch`}>
           <span className="min-w-0 break-words [overflow-wrap:anywhere]">Der Sieger passt nicht zu den Punkten – mehr Punkte hat {nameOf(auto)}.</span>
           <button type="button" onClick={() => onPick(auto)} className="font-bold underline underline-offset-2 hover:text-white" data-testid={`${testId}-adopt`}>
             Sieger aus den Punkten übernehmen
           </button>
         </div>
       ) : null}
-      <p className="text-[11px] font-bold uppercase tracking-widest text-white/55" aria-hidden="true">
+      <p className="tls-type-label text-white/55" aria-hidden="true">
         {question}{fromScores ? " · aus den Punkten" : ""}
       </p>
       <div role="group" aria-label={tied ? `Gleichstand – Sieger Map ${game.position}` : `Sieger Map ${game.position}`} className="grid grid-cols-2 gap-2">
         {league.sides.map((side) => (
           <button key={side.registration_id} type="button" aria-pressed={game.winner === side.registration_id}
             onClick={() => onPick(side.registration_id)}
-            className={`min-h-[44px] min-w-0 rounded-sm border px-3 py-2 text-sm font-bold ${game.winner === side.registration_id ? "border-honor bg-honor/15 text-honor" : "border-white/15 text-white/70 hover:border-white/35"}`}
+            className={`min-h-[44px] min-w-0 rounded-sm border px-3 py-2 tls-type-small font-bold ${game.winner === side.registration_id ? "border-honor bg-honor/15 text-honor" : "border-white/15 text-white/70 hover:border-white/35"}`}
             data-testid={`${testId}-${side.registration_id}`}>
             <span className="block truncate">{game.winner === side.registration_id ? "Sieger: " : ""}{side.name}</span>
           </button>
@@ -181,18 +181,18 @@ export function GameEditor({ game, league, onChange, index, staff = false, games
   const set = (patch) => onChange({ ...game, ...patch });
   return (
     <fieldset className="min-w-0 space-y-3 rounded-sm border border-white/10 bg-[#0A0A0A] p-3 sm:p-4" data-testid={`league-game-${game.position}`}>
-      <legend className="inline-flex items-center gap-1.5 px-1 text-xs font-bold uppercase tracking-wider text-[#29B6E8]">
+      <legend className="inline-flex items-center gap-1.5 px-1 tls-type-label text-[#29B6E8]">
         {/* Modus-Symbol (#2266) aus dem Pool - ohne Bild das neutrale Symbol. */}
         {game.mode && fixedMode ? <ModeIcon src={modeIcon(league.pool, game.mode)} size="xs" testId={`league-game-${game.position}-mode-icon`} /> : null}
         Map {game.position}{game.mode && fixedMode ? ` · ${modeLabel(league.pool, game.mode)}` : ""}
       </legend>
-      {rule ? <p className="text-xs text-white/60" data-testid={`league-game-${game.position}-rule`}>Gewertet: {rule}</p> : null}
+      {rule ? <p className="tls-type-small text-white/60" data-testid={`league-game-${game.position}-rule`}>Gewertet: {rule}</p> : null}
       {plan ? (
         <div className="flex items-center gap-3 rounded-sm border border-[#00D26A]/40 bg-[#00D26A]/5 p-2" data-testid={`league-game-${game.position}-planned`}>
           {plan.map_image_url ? <LazyImg src={plan.map_image_url} alt="" sizes="64px" className="h-12 w-16 shrink-0 rounded-sm object-cover" /> : <span className="h-12 w-16 shrink-0 rounded-sm bg-white/5" />}
           <span className="min-w-0">
             <span className="block truncate font-bold text-white">{plan.map_name}</span>
-            <span className="block text-xs text-white/60">laut Veto{plannedRoleLabel(plan.role) ? ` (${plannedRoleLabel(plan.role)})` : ""} · {plan.mode_label || modeLabel(league.pool, game.mode)}</span>
+            <span className="block tls-type-small text-white/60">laut Veto{plannedRoleLabel(plan.role) ? ` (${plannedRoleLabel(plan.role)})` : ""} · {plan.mode_label || modeLabel(league.pool, game.mode)}</span>
           </span>
         </div>
       ) : null}
@@ -221,7 +221,7 @@ export function GameEditor({ game, league, onChange, index, staff = false, games
                 {item.image_url ? (
                   <LazyImg src={item.image_url} alt="" sizes="(min-width: 640px) 180px, 45vw" className={`h-16 w-full object-cover ${active ? "" : "opacity-70"}`} />
                 ) : <span className="block h-16 bg-white/5" />}
-                <span className="block truncate px-2 py-1.5 text-sm font-bold text-white">{item.name}</span>
+                <span className="block truncate px-2 py-1.5 tls-type-small font-bold text-white">{item.name}</span>
                 {active && <Check className="absolute right-1.5 top-1.5 h-4 w-4 rounded-full bg-[#29B6E8] p-0.5 text-black" aria-hidden="true" />}
               </button>
             );
@@ -231,7 +231,7 @@ export function GameEditor({ game, league, onChange, index, staff = false, games
       {showScores ? (
         <div className="grid grid-cols-2 gap-2">
           {league.sides.map((side) => (
-            <label key={side.registration_id} className="block min-w-0 text-xs text-white/55">
+            <label key={side.registration_id} className="block min-w-0 tls-type-small text-white/55">
               <span className="block truncate">{league.scores_required ? "Punkte (Pflicht)" : "Punkte"} {side.name}</span>
               <input inputMode="numeric" value={game.scores?.[side.registration_id] ?? ""} onChange={(event) => onChange(withScores(game, { ...game.scores, [side.registration_id]: event.target.value }, league))}
                 className="input mt-1 w-full" data-testid={`league-game-${game.position}-score-${side.registration_id}`} />
@@ -239,7 +239,7 @@ export function GameEditor({ game, league, onChange, index, staff = false, games
           ))}
         </div>
       ) : (
-        <button type="button" onClick={() => setShowScores(true)} className="text-xs font-bold text-white/55 underline underline-offset-2 hover:text-white">
+        <button type="button" onClick={() => setShowScores(true)} className="tls-type-small font-bold text-white/55 underline underline-offset-2 hover:text-white">
           Punkte eintragen (freiwillig)
         </button>
       )}
@@ -269,7 +269,7 @@ export function GamesSummary({ games = [], league }) {
         const scores = league.sides.map((side) => game.scores?.[side.registration_id]);
         const withScores = scores.some((value) => value !== undefined && value !== null && value !== "");
         return (
-          <li key={game.position} className="flex min-w-0 flex-wrap items-baseline gap-x-2 text-sm">
+          <li key={game.position} className="flex min-w-0 flex-wrap items-baseline gap-x-2 tls-type-small">
             <span className="font-bold text-white">Map {game.position}</span>
             <span className="text-white/75">{game.map_name || "Map"}{game.mode_label ? ` (${game.mode_label})` : ""}</span>
             <span className="text-honor">→ {winner || "?"}</span>
@@ -300,12 +300,12 @@ function ConfirmWithLineup({ league, state, busy, readOnly, onReport, onWrongRes
   return (
     <div className="mt-2 space-y-3">
       <GamesSummary games={proposal} league={league} />
-      {state?.proposal_by && <p className="text-xs opacity-80">gemeldet von {state.proposal_by}</p>}
-      <p className="text-xs opacity-80" data-testid="league-confirm-scores-hint">
+      {state?.proposal_by && <p className="tls-type-small opacity-80">gemeldet von {state.proposal_by}</p>}
+      <p className="tls-type-small opacity-80" data-testid="league-confirm-scores-hint">
         Es zählen die Punkte der ersten Meldung – stimmen sie nicht, bitte über „Stimmt nicht“ Einspruch einlegen.
       </p>
       {readOnly ? (
-        <p className="text-xs opacity-80" data-testid="match-report-lead-confirms">Bestätigen können Captain und Vertreter.</p>
+        <p className="tls-type-small opacity-80" data-testid="match-report-lead-confirms">Bestätigen können Captain und Vertreter.</p>
       ) : (
         <>
           {series ? <ParticipantsPicker roster={league.roster} value={list} league={league} onChange={setList} testId="league-confirm-participants" label="Wer hat bei euch gespielt?" /> : proposal.map((game) => (
@@ -313,12 +313,12 @@ function ConfirmWithLineup({ league, state, busy, readOnly, onReport, onWrongRes
               label={`Deine Aufstellung Map ${game.position}`} testId={`league-confirm-lineup-${game.position}`}
               onChange={(lineup) => setLineups((current) => followLineups(current, game.position, lineup))} />
           ))}
-          {error && <p className="text-sm text-warn" role="alert" data-testid="league-confirm-error">{error}</p>}
+          {error && <p className="tls-type-small text-warn" role="alert" data-testid="league-confirm-error">{error}</p>}
           <div className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap">
-            <button type="button" disabled={busy} onClick={confirm} className="tls-btn tls-btn--primary inline-flex min-h-[44px] items-center justify-center gap-2 px-4 py-2 rounded-sm text-xs uppercase tracking-wider font-bold disabled:opacity-50" data-testid="match-report-confirm">
+            <button type="button" disabled={busy} onClick={confirm} className="tls-btn tls-btn--primary inline-flex min-h-[44px] items-center justify-center gap-2 px-4 py-2 rounded-sm tls-type-label disabled:opacity-50" data-testid="match-report-confirm">
               <Check className="w-3.5 h-3.5" /> Stimmt
             </button>
-            <button type="button" disabled={busy} onClick={() => onWrongResult?.()} className="tls-btn tls-btn--quiet inline-flex min-h-[44px] items-center justify-center gap-2 px-4 py-2 rounded-sm text-xs uppercase tracking-wider font-bold disabled:opacity-50" data-testid="match-report-wrong">
+            <button type="button" disabled={busy} onClick={() => onWrongResult?.()} className="tls-btn tls-btn--quiet inline-flex min-h-[44px] items-center justify-center gap-2 px-4 py-2 rounded-sm tls-type-label disabled:opacity-50" data-testid="match-report-wrong">
               <X className="w-3.5 h-3.5" /> Stimmt nicht
             </button>
           </div>
@@ -369,33 +369,33 @@ export function LeagueReportForm({ league, state = null, busy = false, readOnly 
 
   return (
     <div className="space-y-4" data-testid="match-report" data-league="true">
-      <div className="text-xs text-[#29B6E8] font-bold uppercase tracking-wider flex items-center gap-2"><ClipboardCheck className="w-3.5 h-3.5" /> Ergebnis melden · Best of {league.best_of}</div>
+      <div className="tls-type-label text-[#29B6E8] flex items-center gap-2"><ClipboardCheck className="w-3.5 h-3.5" /> Ergebnis melden · Best of {league.best_of}</div>
       {status !== "open" && status !== "agreed" && (
-        <div className={`rounded-sm border px-4 py-3 text-sm ${status === "confirm" ? "border-warn/40 bg-warn/10 text-white" : "border-[#29B6E8]/35 bg-[#29B6E8]/10 text-[#BFE9F8]"}`} data-testid="match-report-state" data-status={status}>
+        <div className={`rounded-sm border px-4 py-3 tls-type-small ${status === "confirm" ? "border-warn/40 bg-warn/10 text-white" : "border-[#29B6E8]/35 bg-[#29B6E8]/10 text-[#BFE9F8]"}`} data-testid="match-report-state" data-status={status}>
           <p className="font-bold">{REPORT_STATE_TEXT[status]}</p>
           {status === "confirm" && <ConfirmWithLineup league={league} state={state} busy={busy} readOnly={readOnly || state?.can_confirm === false} onReport={onReport} onWrongResult={onWrongResult} />}
           {status !== "confirm" && (league.own_games || []).length > 0 && <div className="mt-2"><GamesSummary games={league.own_games} league={league} /></div>}
           {(status === "waiting" || status === "conflict") && !editing && !readOnly && (
-            <button type="button" onClick={() => setEditing(true)} className="mt-2 text-xs font-bold uppercase tracking-wider underline underline-offset-2 hover:text-white" data-testid="match-report-change">Meldung ändern</button>
+            <button type="button" onClick={() => setEditing(true)} className="mt-2 tls-type-label underline underline-offset-2 hover:text-white" data-testid="match-report-change">Meldung ändern</button>
           )}
         </div>
       )}
       {editing && !readOnly && (
         <form onSubmit={submit} className="space-y-4" data-testid="match-report-form" noValidate>
           {!league.pool ? (
-            <p className="text-sm text-warn" role="alert">Für diese Staffel ist noch kein Map-Pool hinterlegt – bitte die Turnierleitung fragen.</p>
+            <p className="tls-type-body text-warn" role="alert">Für diese Staffel ist noch kein Map-Pool hinterlegt – bitte die Turnierleitung fragen.</p>
           ) : (
             games.map((game, index) => <GameEditor key={game.position} index={index} game={game} games={games} league={league} onChange={(next) => change(game.position, next)} />)
           )}
           {series && league.pool ? <ParticipantsPicker roster={league.roster} value={list} league={league} onChange={setList} /> : null}
           <input value={note} onChange={(event) => setNote(event.target.value)} maxLength={1000} className="input" placeholder="Notiz für die Turnierleitung (freiwillig)" data-testid="match-report-note" />
-          <p className={`rounded-sm border px-3 py-2 text-sm font-bold ${sentence && !problem ? "border-[#29B6E8]/35 bg-[#29B6E8]/10 text-[#BFE9F8]" : "border-white/10 bg-white/5 text-white/45"}`} data-testid="match-report-sentence" aria-live="polite">
+          <p className={`rounded-sm border px-3 py-2 tls-type-small font-bold ${sentence && !problem ? "border-[#29B6E8]/35 bg-[#29B6E8]/10 text-[#BFE9F8]" : "border-white/10 bg-white/5 text-white/45"}`} data-testid="match-report-sentence" aria-live="polite">
             {problem || sentence}
           </p>
-          {error && <p className="text-sm text-warn" role="alert" data-testid="match-report-error">{error}</p>}
+          {error && <p className="tls-type-small text-warn" role="alert" data-testid="match-report-error">{error}</p>}
           <div className="flex flex-wrap items-center gap-3">
-            <button disabled={busy} className="tls-btn tls-btn--primary min-h-[44px] px-4 py-2 rounded-sm text-xs uppercase tracking-wider font-bold disabled:opacity-50" data-testid="match-report-submit">Ergebnis melden</button>
-            <p className="text-xs text-white/50">{series ? "Die Gegenseite bestätigt und trägt ein, wer bei ihr gespielt hat." : "Die Gegenseite bestätigt und stellt dabei ihre Aufstellung auf."} Ohne Antwort gilt dein Ergebnis nach 48 Stunden.</p>
+            <button disabled={busy} className="tls-btn tls-btn--primary min-h-[44px] px-4 py-2 rounded-sm tls-type-label disabled:opacity-50" data-testid="match-report-submit">Ergebnis melden</button>
+            <p className="tls-type-small text-white/50">{series ? "Die Gegenseite bestätigt und trägt ein, wer bei ihr gespielt hat." : "Die Gegenseite bestätigt und stellt dabei ihre Aufstellung auf."} Ohne Antwort gilt dein Ergebnis nach 48 Stunden.</p>
           </div>
         </form>
       )}

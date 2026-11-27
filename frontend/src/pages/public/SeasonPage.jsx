@@ -106,12 +106,12 @@ export default function SeasonPage() {
         <div className="relative max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-14">
           <div className="grid lg:grid-cols-[minmax(0,1fr)_22rem] gap-8 items-end">
             <div>
-              <span className="text-[11px] font-bold uppercase tracking-[0.3em] text-[#29B6E8]">{s.kind === "circuit" ? "Lions Circuit" : "TLS Jahreswertung"}</span>
-              <h1 className="mt-2 font-heading text-4xl md:text-6xl font-black uppercase leading-tight">{s.name}</h1>
+              <span className="tls-type-label text-[#29B6E8]">{s.kind === "circuit" ? "Lions Circuit" : "TLS Jahreswertung"}</span>
+              <h1 className="mt-2 tls-type-title leading-tight">{s.name}</h1>
               {s.description && <p className="mt-3 text-white/70 max-w-2xl">{s.description}</p>}
               <div className="mt-6 flex flex-wrap gap-2">
                 <StatusBadge status={s.status} size="lg"/>
-                {s.start_date && <span className="inline-flex items-center gap-2 text-xs uppercase tracking-wider font-bold border border-white/10 bg-black/25 px-3 py-1 rounded-sm text-white/60"><CalendarDays className="w-3.5 h-3.5" /> {viennaDate(s.start_date)}{s.end_date ? ` - ${viennaDate(s.end_date)}` : ""}</span>}
+                {s.start_date && <span className="inline-flex items-center gap-2 tls-type-label border border-white/10 bg-black/25 px-3 py-1 rounded-sm text-white/60"><CalendarDays className="w-3.5 h-3.5" /> {viennaDate(s.start_date)}{s.end_date ? ` - ${viennaDate(s.end_date)}` : ""}</span>}
               </div>
             </div>
             <div className="grid grid-cols-2 gap-2">
@@ -127,10 +127,10 @@ export default function SeasonPage() {
         <section className="mb-8">
           <div className="flex items-end justify-between gap-3 flex-wrap mb-4">
             <div>
-              <div className="text-[11px] uppercase tracking-[0.3em] font-bold text-[#29B6E8]">Übersicht</div>
-              <h2 className="mt-1 font-heading text-2xl md:text-3xl font-black uppercase">So funktioniert diese Jahreswertung</h2>
+              <div className="tls-type-label text-[#29B6E8]">Übersicht</div>
+              <h2 className="mt-1 tls-type-section">So funktioniert diese Jahreswertung</h2>
             </div>
-            <div className="inline-flex items-center gap-2 text-xs text-white/50 border border-white/10 bg-[#101010] rounded-sm px-3 py-2">
+            <div className="inline-flex items-center gap-2 tls-type-small text-white/50 border border-white/10 bg-[#101010] rounded-sm px-3 py-2">
               <CircleGauge className="w-4 h-4 text-[#29B6E8]" />
               Alle gewerteten Turniere, Fast Laps und Events
             </div>
@@ -144,10 +144,10 @@ export default function SeasonPage() {
           <section className="mb-8">
             <div className="flex items-end justify-between gap-3 flex-wrap mb-4">
               <div>
-                <div className="text-[11px] uppercase tracking-[0.3em] font-bold text-[#FFD700]">Rangliste</div>
-                <h2 className="mt-1 font-heading text-2xl md:text-3xl font-black uppercase">Top Teilnehmer</h2>
+                <div className="tls-type-label text-[#FFD700]">Rangliste</div>
+                <h2 className="mt-1 tls-type-section">Top Teilnehmer</h2>
               </div>
-              <div className="text-xs text-white/45">{totalRatings} Wertungen</div>
+              <div className="tls-type-small text-white/45">{totalRatings} Wertungen</div>
             </div>
             <div className="grid md:grid-cols-3 gap-3">
               {topThree.map((row) => <PodiumCard key={row.user_id} row={row} mine={isMine(row)} />)}
@@ -157,17 +157,17 @@ export default function SeasonPage() {
 
         <div className="border border-white/10 bg-[#121212] rounded-sm overflow-hidden">
           <div className="px-4 py-3 border-b border-white/10 flex items-center gap-2">
-            <Trophy className="w-4 h-4 text-[#FFD700]"/><h2 className="font-heading font-bold uppercase">Gesamtwertung</h2>
+            <Trophy className="w-4 h-4 text-[#FFD700]"/><h2 className="tls-type-section">Gesamtwertung</h2>
           </div>
           <div className="hidden md:block tls-swipe pb-0">
-            <table className="w-full text-sm min-w-[900px]">
-              <thead className="bg-[#0A0A0A] text-[11px] uppercase tracking-widest text-white/50">
+            <table className="w-full tls-type-small min-w-[900px]">
+              <thead className="bg-[#0A0A0A] tls-type-label text-white/50">
                 <tr><th className="text-left px-4 py-3 w-14">#</th><th className="text-left px-4 py-3">Teilnehmer</th><th className="text-left px-4 py-3">Quellen</th><th className="text-right px-4 py-3">Wertungen</th><th className="text-right px-4 py-3">Erfolge</th><th className="text-right px-4 py-3">Siege</th><th className="text-right px-4 py-3 font-display">Jahrespunkte</th></tr>
               </thead>
               <tbody className="divide-y divide-white/5">
                 {standings.map((r)=>(
                   <tr key={r.user_id} data-testid={`season-row-${r.user_id}`} data-mine={isMine(r) ? "true" : undefined} className={`${r.rank<=3 ? "bg-[#FFD700]/5" : ""}${isMine(r) ? " tls-you tls-you--inset" : ""}`}>
-                    <td className={`px-4 py-3 font-display font-bold ${rankColor(r.rank)}`}>{r.rank}</td>
+                    <td className={`px-4 py-3 tls-type-num ${rankColor(r.rank)}`}>{r.rank}</td>
                     <td className="px-4 py-3">
                       <PlayerIdentity row={r} mine={isMine(r)} />
                     </td>
@@ -177,10 +177,10 @@ export default function SeasonPage() {
                     <td className="px-4 py-3 text-right text-white/70">{r.events_count}</td>
                     <td className="px-4 py-3 text-right text-white/70">
                       <div className="font-bold text-white/80">{r.achievement_count || 0}</div>
-                      <div className="text-[10px] uppercase tracking-widest text-white/35">{formatPoints(r.profile_points || r.achievement_points || 0)} Profil</div>
+                      <div className="tls-type-label text-quiet">{formatPoints(r.profile_points || r.achievement_points || 0)} Profil</div>
                     </td>
                     <td className="px-4 py-3 text-right text-white/70">{r.wins}</td>
-                    <td className="px-4 py-3 text-right font-display font-bold text-[#29B6E8] text-lg">{formatPoints(r.points)}</td>
+                    <td className="px-4 py-3 text-right tls-type-card tls-type-num text-[#29B6E8]">{formatPoints(r.points)}</td>
                   </tr>
                 ))}
                 {standings.length === 0 && <tr><td colSpan="7" className="text-center py-10 text-white/40">Noch keine Ergebnisse</td></tr>}
@@ -189,13 +189,17 @@ export default function SeasonPage() {
           </div>
           <div className="md:hidden divide-y divide-white/5">
             {standings.map((r) => (
-              <div key={r.user_id} data-testid={`season-item-${r.user_id}`} className={`p-4 flex items-center gap-3${isMine(r) ? " tls-you tls-you--inset" : ""}`}>
-                <div className={`font-display text-2xl font-black w-10 ${rankColor(r.rank)}`}>#{r.rank}</div>
-                <PlayerIdentity row={r} mine={isMine(r)} />
-                <div className="ml-auto text-right">
-                  <div className="font-display text-2xl font-black text-[#29B6E8]">{formatPoints(r.points)}</div>
-                  <div className="text-[10px] uppercase tracking-widest text-white/40">{r.events_count} Wertungen · {r.wins} Siege</div>
-                  <div className="text-[10px] uppercase tracking-widest text-white/30">{r.achievement_count || 0} Achievements</div>
+              // Am Handy stehen die Etiketten unter dem Namen statt rechts daneben - der Name hat so Platz für ganze Wörter.
+              <div key={r.user_id} data-testid={`season-item-${r.user_id}`} className={`p-4 grid grid-cols-[2.5rem_minmax(0,1fr)_auto] items-center gap-x-3${isMine(r) ? " tls-you tls-you--inset" : ""}`}>
+                <div className={`row-span-2 tls-type-section tls-type-num ${rankColor(r.rank)}`}>#{r.rank}</div>
+                <div className="min-w-0">
+                  <PlayerIdentity row={r} mine={isMine(r)} />
+                </div>
+                <div className="text-right tls-type-section tls-type-num text-[#29B6E8]">{formatPoints(r.points)}</div>
+                <div className="col-span-2 col-start-2 pl-[52px] pt-1" data-testid={`season-item-facts-${r.user_id}`}>
+                  {/* Geschütztes Leerzeichen: die Zahl bleibt bei ihrem Wort („3 Siege“ bricht nicht zwischen 3 und Siege). */}
+                  <div className="tls-type-label text-quiet">{r.events_count}{"\u00a0"}Wertungen · {r.wins}{"\u00a0"}Siege</div>
+                  <div className="tls-type-label text-quiet">{r.achievement_count || 0}{"\u00a0"}Achievements</div>
                 </div>
               </div>
             ))}
@@ -205,10 +209,10 @@ export default function SeasonPage() {
         <section className="mt-8">
           <div className="flex items-end justify-between gap-3 flex-wrap mb-4">
             <div>
-              <div className="text-[11px] uppercase tracking-[0.3em] font-bold text-[#29B6E8]">Punkte</div>
-              <h2 className="mt-1 font-heading text-2xl md:text-3xl font-black uppercase">Wie du Punkte sammelst</h2>
+              <div className="tls-type-label text-[#29B6E8]">Punkte</div>
+              <h2 className="mt-1 tls-type-section">Wie du Punkte sammelst</h2>
             </div>
-            <div className="text-xs text-white/45">Jahreswertungspunkte und Profilpunkte bleiben getrennt nachvollziehbar.</div>
+            <div className="tls-type-small text-white/45">Jahreswertungspunkte und Profilpunkte bleiben getrennt nachvollziehbar.</div>
           </div>
           <div className="grid md:grid-cols-2 xl:grid-cols-5 gap-3">
             {POINT_SOURCES.map((item) => <PointSourceCard key={item.title} {...item} />)}
@@ -228,8 +232,8 @@ function StatCard({ icon: Icon, label, value }) {
   return (
     <div className="border border-white/10 bg-black/35 rounded-sm p-4">
       <Icon className="w-4 h-4 text-[#29B6E8]" />
-      <div className="mt-2 font-display text-3xl font-black">{value}</div>
-      <div className="text-[10px] uppercase tracking-widest text-white/45 font-bold">{label}</div>
+      <div className="mt-2 tls-type-title tls-type-num">{value}</div>
+      <div className="tls-type-label text-white/45">{label}</div>
     </div>
   );
 }
@@ -239,14 +243,14 @@ function OverviewCard({ icon: Icon, label, value, text, tone }) {
     <div className="border border-white/10 bg-[#121212] rounded-sm p-4 min-h-[142px]">
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
-          <div className="text-[10px] uppercase tracking-widest text-white/45 font-bold">{label}</div>
-          <div className="mt-2 font-heading text-xl font-black uppercase leading-tight">{value}</div>
+          <div className="tls-type-label text-white/45">{label}</div>
+          <div className="mt-2 tls-type-card tls-type-num leading-tight">{value}</div>
         </div>
         <div className={`w-10 h-10 shrink-0 rounded-sm border flex items-center justify-center ${TONE[tone] || TONE.white}`}>
           <Icon className="w-5 h-5" />
         </div>
       </div>
-      <p className="mt-3 text-sm text-white/55 leading-relaxed">{text}</p>
+      <p className="mt-3 tls-type-body text-white/55 leading-relaxed">{text}</p>
     </div>
   );
 }
@@ -259,10 +263,10 @@ function PlayerIdentity({ row, mine = false }) {
       </div>
       <div className="min-w-0">
         <div className="flex items-center gap-2 min-w-0">
-          <span className="font-bold truncate">{row.display_name}</span>
+          <span className="font-bold tls-wrap tls-wrap--name">{row.display_name}</span>
           {mine ? <span className="tls-you-tag">Du</span> : null}
         </div>
-        {row.username && <div className="text-xs text-white/40 truncate">@{row.username}</div>}
+        {row.username && <div className="tls-type-small text-quiet [overflow-wrap:anywhere]">@{row.username}</div>}
       </div>
     </div>
   );
@@ -270,17 +274,17 @@ function PlayerIdentity({ row, mine = false }) {
 
 function SourceBreakdown({ row }) {
   const items = (row.source_breakdown || []).filter((item) => Number(item.total_points || 0) > 0).slice(0, 3);
-  if (!items.length) return <span className="text-xs text-white/35">Keine Detaildaten</span>;
+  if (!items.length) return <span className="tls-type-small text-quiet">Keine Detaildaten</span>;
   return (
     <div className="flex flex-wrap gap-1.5 max-w-xs">
       {items.map((item) => (
-        <span key={item.source_type} className="inline-flex items-center gap-1 rounded-sm border border-white/10 bg-black/25 px-2 py-1 text-[10px] uppercase tracking-wider text-white/60">
+        <span key={item.source_type} className="inline-flex items-center gap-1 rounded-sm border border-white/10 bg-black/25 px-2 py-1 tls-type-label text-white/60">
           <span className="text-white/80">{item.label}</span>
-          <span className="font-display text-[#29B6E8]">{formatPoints(item.total_points)}</span>
+          <span className="tls-type-num text-[#29B6E8]">{formatPoints(item.total_points)}</span>
         </span>
       ))}
       {row.dropped_events > 0 && (
-        <span className="inline-flex items-center rounded-sm border border-[#FFD700]/20 bg-[#FFD700]/10 px-2 py-1 text-[10px] uppercase tracking-wider text-[#FFD700]">
+        <span className="inline-flex items-center rounded-sm border border-[#FFD700]/20 bg-[#FFD700]/10 px-2 py-1 tls-type-label text-[#FFD700]">
           {row.dropped_events} gestrichen
         </span>
       )}
@@ -292,7 +296,7 @@ function PodiumCard({ row, mine = false }) {
   const content = (
     <>
       <div className="flex items-center justify-between gap-4">
-        <div className={`font-display text-5xl font-black ${rankColor(row.rank)}`}>#{row.rank}</div>
+        <div className={`tls-type-hero tls-type-num ${rankColor(row.rank)}`}>#{row.rank}</div>
         <Trophy className={`w-7 h-7 ${rankColor(row.rank)}`} />
       </div>
       <div className="mt-5">
@@ -318,8 +322,8 @@ function PodiumCard({ row, mine = false }) {
 function MiniStat({ label, value }) {
   return (
     <div className="border border-white/10 bg-black/25 rounded-sm p-2">
-      <div className="font-display text-xl font-black text-white">{value}</div>
-      <div className="text-[9px] uppercase tracking-widest text-white/40">{label}</div>
+      <div className="tls-type-card tls-type-num text-white">{value}</div>
+      <div className="tls-type-label text-quiet">{label}</div>
     </div>
   );
 }
@@ -330,8 +334,8 @@ function PointSourceCard({ icon: Icon, title, text, tone }) {
       <div className={`w-10 h-10 rounded-sm border flex items-center justify-center ${TONE[tone] || TONE.white}`}>
         <Icon className="w-5 h-5" />
       </div>
-      <h3 className="mt-4 font-heading font-bold uppercase">{title}</h3>
-      <p className="mt-2 text-sm text-white/55 leading-relaxed">{text}</p>
+      <h3 className="mt-4 tls-type-card">{title}</h3>
+      <p className="mt-2 tls-type-body text-white/55 leading-relaxed">{text}</p>
     </div>
   );
 }
@@ -343,8 +347,8 @@ function InfoPanel({ icon: Icon, title, text }) {
         <Icon className="w-5 h-5 text-[#FFD700]" />
       </div>
       <div>
-        <h3 className="font-heading font-bold uppercase">{title}</h3>
-        <p className="mt-2 text-sm text-white/55 leading-relaxed">{text}</p>
+        <h3 className="tls-type-card">{title}</h3>
+        <p className="mt-2 tls-type-body text-white/55 leading-relaxed">{text}</p>
       </div>
     </div>
   );

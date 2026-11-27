@@ -372,7 +372,8 @@ test("Spielerprofil: ein Name mit 24 Zeichen kommt eine Stufe kleiner", async ()
   const name = await screen.findByTestId("profile-head-name");
   expect(name).toHaveTextContent("NachtfalkeDerSuperliga24");
   expect(name.className).toContain("tls-head-name tls-head-name--long");
-  expect(name.className).toContain("text-2xl sm:text-3xl lg:text-4xl");
+  // Seitentitel der Schrift-Treppe (#1302) - die kleinere Stufe am Handy kommt von tls-head-name--long (index.css).
+  expect(name.className).toContain("tls-type-title");
 });
 
 // Profile ohne Nullen (#1268): Kennzahlen nur über null, kein Reiter mit „(0)“ für andere, das eigene Profil behält

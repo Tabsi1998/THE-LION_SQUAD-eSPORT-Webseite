@@ -53,7 +53,7 @@ function TournamentDayFields({ rules, set, doubleUpHere }) {
           </div>
         ))}
         <button type="button" onClick={() => set("custom_bonuses", [...bonuses, emptyBonus()])} data-testid="series-rules-bonus-add"
-          className="tls-btn tls-btn--quiet px-3 py-2 rounded-sm text-xs font-bold uppercase tracking-wider inline-flex items-center gap-2">
+          className="tls-btn tls-btn--quiet px-3 py-2 rounded-sm tls-type-label inline-flex items-center gap-2">
           <Plus className="w-3.5 h-3.5" /> Sonderbonus
         </button>
       </div>

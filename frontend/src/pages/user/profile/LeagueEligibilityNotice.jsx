@@ -20,7 +20,7 @@ export function LeagueEligibilityNotice() {
     <ul className="space-y-2" data-testid="profile-league-eligibility" aria-live="polite">
       {notices.map(({ item, notice }) => (
         <li key={`${item.season_id}-${item.squad_id}`} data-tone={notice.tone} data-testid={`profile-league-eligibility-${item.season_id}`}
-          className={`flex items-start gap-2 rounded-sm border px-3 py-2 text-sm ${notice.tone === "warn" ? "border-warn/40 bg-warn/5 text-white" : "border-[#29B6E8]/30 bg-[#29B6E8]/5 text-white/80"}`}>
+          className={`flex items-start gap-2 rounded-sm border px-3 py-2 tls-type-small ${notice.tone === "warn" ? "border-warn/40 bg-warn/5 text-white" : "border-[#29B6E8]/30 bg-[#29B6E8]/5 text-white/80"}`}>
           {notice.tone === "warn"
             ? <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-warn" aria-hidden="true" />
             : <ShieldCheck className="mt-0.5 h-4 w-4 shrink-0 text-[#29B6E8]" aria-hidden="true" />}

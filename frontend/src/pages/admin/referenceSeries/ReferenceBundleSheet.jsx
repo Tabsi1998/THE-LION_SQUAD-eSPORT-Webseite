@@ -52,13 +52,13 @@ export function ReferenceBundleSheet({ onClose, onDone }) {
 
   return (
     <AdminSheet title="Referenzen bündeln" size="xl" onClose={onClose} cancelLabel="Schließen" testId="bundle-sheet">
-      <p className="text-sm text-white/60 leading-relaxed max-w-[65ch]">
+      <p className="tls-type-body text-white/60 leading-relaxed max-w-[65ch]">
         Referenzen ohne Saison, die zusammengehören – gleicher Veranstalter, gleiches Spiel, gleicher Modus und gleiche Bezeichnung. Bündeln legt Spur und Saisons an oder wählt vorhandene. Neue Saisons bleiben leer: keine Termine, keine Ergebnisse, nur Status, Team und der Platz der Referenz. Sichtbarkeit wird nie geöffnet, Adressen der Referenzen bleiben.
       </p>
-      {error && <p className="text-sm text-warn" role="alert" data-testid="bundle-error">{error}</p>}
-      {!proposals && !error && <p className="text-sm text-white/50" data-testid="bundle-loading">Suche Gruppen …</p>}
+      {error && <p className="tls-type-small text-warn" role="alert" data-testid="bundle-error">{error}</p>}
+      {!proposals && !error && <p className="tls-type-small text-white/50" data-testid="bundle-loading">Suche Gruppen …</p>}
       {proposals && groups.length === 0 && (
-        <p className="border border-dashed border-white/15 rounded-sm p-4 text-sm text-white/50" data-testid="bundle-empty">
+        <p className="border border-dashed border-white/15 rounded-sm p-4 tls-type-small text-white/50" data-testid="bundle-empty">
           Keine Gruppe offen. {proposals.unlinked > 0
             ? `${proposals.unlinked} ${proposals.unlinked === 1 ? "Referenz steht" : "Referenzen stehen"} ohne Saison allein – dafür braucht es keine Serie.`
             : "Jede Referenz gehört schon zu einer Saison."}
@@ -118,10 +118,10 @@ function GroupCard({ group, onDone }) {
   return (
     <section className="border border-white/10 rounded-sm bg-[#121212] p-4 space-y-4" aria-labelledby={`bundle-title-${group.key}`} data-testid="bundle-group">
       <div className="min-w-0">
-        <div className="flex items-center gap-x-2 gap-y-1 text-[10px] uppercase tracking-widest text-white/45 font-bold flex-wrap">
+        <div className="flex items-center gap-x-2 gap-y-1 tls-type-label text-white/45 flex-wrap">
           {meta.map((part, index) => <span key={part} className={index === 0 ? (fresh ? "text-[#29B6E8]" : "text-ok") : ""}>{part}</span>)}
         </div>
-        <h3 id={`bundle-title-${group.key}`} className="mt-1 font-heading text-xl font-black uppercase leading-tight break-words [overflow-wrap:anywhere]" data-testid="bundle-lineage-title">
+        <h3 id={`bundle-title-${group.key}`} className="mt-1 tls-type-card leading-tight break-words [overflow-wrap:anywhere]" data-testid="bundle-lineage-title">
           {fresh ? (title || "Neue Spur") : lineage.title}
         </h3>
       </div>
@@ -134,7 +134,7 @@ function GroupCard({ group, onDone }) {
       )}
 
       <div>
-        <h4 className="text-[11px] font-bold uppercase tracking-widest text-white/60 mb-1.5">Referenzen</h4>
+        <h4 className="tls-type-label text-white/60 mb-1.5">Referenzen</h4>
         <ul className="divide-y divide-white/5 border-y border-white/5">
           {group.references.map((ref) => {
             const season = seasonOf.get(ref.id);
@@ -156,7 +156,7 @@ function GroupCard({ group, onDone }) {
 
       {path.steps.length > 0 && (
         <div>
-          <h4 className="text-[11px] font-bold uppercase tracking-widest text-white/60 mb-1.5">Liga-Weg</h4>
+          <h4 className="tls-type-label text-white/60 mb-1.5">Liga-Weg</h4>
           <ol className="list-none m-0 p-0 grid grid-cols-2 sm:grid-cols-4 gap-2" aria-label="Liga-Weg der Vorschau" data-testid="bundle-path">
             {path.steps.map((step) => <PathStep key={step.key} step={step} kind={fresh ? kind : lineage.kind} />)}
           </ol>
@@ -165,13 +165,13 @@ function GroupCard({ group, onDone }) {
 
       {hints.length > 0 && (
         <div>
-          <h4 className="text-[11px] font-bold uppercase tracking-widest text-white/60 mb-1.5">Hinweise aus den Altdaten</h4>
+          <h4 className="tls-type-label text-white/60 mb-1.5">Hinweise aus den Altdaten</h4>
           <ul className="space-y-1.5" data-testid="bundle-hints">
             {hints.map((hint) => {
               const warn = WARN_HINTS.has(hint.code);
               const Icon = warn ? AlertTriangle : Info;
               return (
-                <li key={`${hint.code}-${hint.reference_ids.join("-")}`} className={`flex items-start gap-2 text-sm ${warn ? "text-warn" : "text-white/65"}`} data-testid={`bundle-hint-${hint.code}`}>
+                <li key={`${hint.code}-${hint.reference_ids.join("-")}`} className={`flex items-start gap-2 tls-type-small ${warn ? "text-warn" : "text-white/65"}`} data-testid={`bundle-hint-${hint.code}`}>
                   <Icon className="w-3.5 h-3.5 mt-[3px] shrink-0" aria-hidden="true" />
                   <span className="min-w-0 break-words [overflow-wrap:anywhere]"><span className="font-bold">{HINT_LABELS[hint.code] || hint.code}:</span> {hint.text}</span>
                 </li>
@@ -182,9 +182,9 @@ function GroupCard({ group, onDone }) {
       )}
 
       <div className="flex flex-wrap items-center justify-between gap-3 pt-1">
-        <span className="text-sm text-white/55 tabular-nums" data-testid="bundle-summary">{bundleSummary(group, selected)}</span>
+        <span className="tls-type-small text-white/55 tabular-nums" data-testid="bundle-summary">{bundleSummary(group, selected)}</span>
         <button type="button" onClick={bundle} disabled={saving || selected.size === 0} data-testid="bundle-confirm"
-          className="tls-btn tls-btn--primary px-5 py-2.5 rounded-sm text-xs font-bold uppercase tracking-wider disabled:opacity-50">
+          className="tls-btn tls-btn--primary px-5 py-2.5 rounded-sm tls-type-label disabled:opacity-50">
           {saving ? "Bündle …" : "Bündeln"}
         </button>
       </div>
@@ -196,11 +196,11 @@ function PathStep({ step, kind }) {
   const place = step.club?.rank;
   return (
     <li className="min-w-0 flex flex-col gap-1 p-2.5 rounded-sm border border-white/[0.07] bg-[#0A0A0A]" data-testid="bundle-step">
-      <span className="text-[11px] text-white/50 break-words [overflow-wrap:anywhere]">{step.season}{step.id ? "" : " · neu"}</span>
-      <span className="font-bold text-sm text-white break-words [overflow-wrap:anywhere]">{step.tier || (kind === "team_league" ? "Liga" : "Gesamt")}</span>
+      <span className="tls-type-small text-white/50 break-words [overflow-wrap:anywhere]">{step.season}{step.id ? "" : " · neu"}</span>
+      <span className="font-bold tls-type-small text-white break-words [overflow-wrap:anywhere]">{step.tier || (kind === "team_league" ? "Liga" : "Gesamt")}</span>
       <span className="flex flex-wrap items-baseline gap-x-1.5">
-        <span className={`font-display font-bold text-xl leading-none tabular-nums ${place === 1 ? "text-honor" : "text-white"}`}>{place ? `${place}.` : "–"}</span>
-        {step.note && <span className={`text-[10px] font-bold uppercase tracking-[0.06em] ${SEASON_NOTE_TONES[step.note] || "text-white/50"}`}>{step.note}</span>}
+        <span className={`tls-type-card tls-type-num leading-none ${place === 1 ? "text-honor" : "text-white"}`}>{place ? `${place}.` : "–"}</span>
+        {step.note && <span className={`tls-type-label ${SEASON_NOTE_TONES[step.note] || "text-white/50"}`}>{step.note}</span>}
       </span>
     </li>
   );
@@ -213,7 +213,7 @@ function VisibilityKept({ items }) {
   return (
     <ul className="mt-2 space-y-1.5" data-testid="bundle-visibility-kept">
       {items.map((entry) => (
-        <li key={entry.reference_id} className="flex items-start gap-2 text-sm text-white/70" data-testid={`bundle-visibility-kept-${entry.reference_id}`}>
+        <li key={entry.reference_id} className="flex items-start gap-2 tls-type-small text-white/70" data-testid={`bundle-visibility-kept-${entry.reference_id}`}>
           <Info className="w-3.5 h-3.5 mt-[3px] shrink-0 text-[#29B6E8]" aria-hidden="true" />
           <span className="min-w-0 break-words [overflow-wrap:anywhere]">
             <span className="font-bold text-white">{entry.title}:</span> {entry.text}{" "}
@@ -252,21 +252,21 @@ function BundleHistory({ bundles, onDone }) {
 
   return (
     <section aria-labelledby="bundle-history-title" data-testid="bundle-history">
-      <h3 id="bundle-history-title" className="text-[11px] font-bold uppercase tracking-widest text-white/60 mb-1.5">Zuletzt gebündelt</h3>
+      <h3 id="bundle-history-title" className="tls-type-label text-white/60 mb-1.5">Zuletzt gebündelt</h3>
       <ul className="divide-y divide-white/5 border-y border-white/5">
         {bundles.map((item) => (
           <li key={item.id} className="py-2" data-testid={`bundle-history-${item.id}`}>
             <div className="flex items-center justify-between gap-3">
               <span className="min-w-0">
                 <span className="block font-bold text-white break-words [overflow-wrap:anywhere]">{item.lineage_title}</span>
-                <span className="block text-xs text-white/50 tabular-nums">
+                <span className="block tls-type-small text-white/50 tabular-nums">
                   {[`${item.linked} ${item.linked === 1 ? "Referenz" : "Referenzen"}`, item.created_at ? viennaDateTime(item.created_at, { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" }) : "",
                     item.status === "undone" ? "zurückgenommen" : ""].filter(Boolean).join(" · ")}
                 </span>
               </span>
               {item.status === "active" && (
                 <button type="button" onClick={() => undo(item)} disabled={busy === item.id} data-testid={`bundle-undo-${item.id}`}
-                  className="tls-btn tls-btn--secondary shrink-0 px-3 py-1.5 rounded-sm text-[10px] font-bold uppercase tracking-wider inline-flex items-center gap-1.5 disabled:opacity-50">
+                  className="tls-btn tls-btn--secondary shrink-0 px-3 py-1.5 rounded-sm tls-type-label inline-flex items-center gap-1.5 disabled:opacity-50">
                   <Undo2 className="w-3.5 h-3.5" aria-hidden="true" /> {busy === item.id ? "Nehme zurück …" : "Rückgängig"}
                 </button>
               )}

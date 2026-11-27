@@ -31,8 +31,8 @@ export function StaffelRewards({ data, staffel }) {
             <li key={item.id} className="tls-staffel-rewards__row" data-testid={`${testId}-planned-${item.id}`}>
               <RewardArt reward={artFor(item)} size="sm" index={index} labelled={false} />
               <span className="min-w-0">
-                <span className="block text-sm font-bold text-white [overflow-wrap:anywhere]">{item.name}</span>
-                <span className="block text-xs text-white/60">{item.place_label} · {item.kind_label} · {item.recipients_label}</span>
+                <span className="block tls-type-small font-bold text-white [overflow-wrap:anywhere]">{item.name}</span>
+                <span className="block tls-type-small text-white/60">{item.place_label} · {item.kind_label} · {item.recipients_label}</span>
               </span>
             </li>
           ))}
@@ -64,14 +64,14 @@ export function StaffelRewards({ data, staffel }) {
             <li key={item.id} className="tls-staffel-rewards__row" data-testid={`${testId}-other-${item.id}`}>
               <RewardArt reward={artFor(item)} size="sm" play={play} index={index + 3} labelled={false} />
               <span className="min-w-0">
-                <span className="block text-sm font-bold text-white [overflow-wrap:anywhere]">{item.name} <span className="font-normal text-white/55">· {item.place_label}</span></span>
-                <span className="block text-xs text-white/60 [overflow-wrap:anywhere]">{(item.holders || []).map((row) => row.display_name).join(", ") || "Niemand"}</span>
+                <span className="block tls-type-small font-bold text-white [overflow-wrap:anywhere]">{item.name} <span className="font-normal text-white/55">· {item.place_label}</span></span>
+                <span className="block tls-type-small text-white/60 [overflow-wrap:anywhere]">{(item.holders || []).map((row) => row.display_name).join(", ") || "Niemand"}</span>
               </span>
             </li>
           ))}
         </ul>
       ) : null}
-      {everyone ? <p className="text-xs text-white/60" data-testid={`${testId}-everyone`}>{everyone}</p> : null}
+      {everyone ? <p className="tls-type-small text-white/60" data-testid={`${testId}-everyone`}>{everyone}</p> : null}
     </section>
   );
 }

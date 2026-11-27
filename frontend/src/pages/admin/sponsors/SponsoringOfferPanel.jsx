@@ -90,18 +90,18 @@ export function SponsoringOfferPanel() {
   return (
     <details className="mb-6 border border-white/10 bg-[#121212] rounded-sm p-4" data-testid="sponsoring-offer-panel">
       <summary className="cursor-pointer select-none">
-        <span className="font-heading font-bold uppercase">Sponsor werden</span>
-        <span className="block text-xs text-white/50 mt-1">Was Interessierte auf der Sponsoren-Seite sehen: Zahlen, was jede Stufe bekommt, „Unterlagen anfordern“ und die Mappe. Leer: die kleine Karte zum Kontaktformular. <Link to="/sponsors#sponsor-werden" target="_blank" className="text-[#29B6E8] hover:text-white">Ansehen</Link></span>
+        <span className="font-bold uppercase">Sponsor werden</span>
+        <span className="block tls-type-small text-white/50 mt-1">Was Interessierte auf der Sponsoren-Seite sehen: Zahlen, was jede Stufe bekommt, „Unterlagen anfordern“ und die Mappe. Leer: die kleine Karte zum Kontaktformular. <Link to="/sponsors#sponsor-werden" target="_blank" className="text-[#29B6E8] hover:text-white">Ansehen</Link></span>
       </summary>
-      <div className="mt-4 space-y-5 text-sm">
+      <div className="mt-4 space-y-5 tls-type-small">
         <label className="block">
-          <span className="text-[11px] font-bold uppercase tracking-widest text-white/65">Einleitung</span>
+          <span className="tls-type-label text-white/65">Einleitung</span>
           <textarea value={form.intro} onChange={(e) => set("intro", e.target.value)} maxLength={600} rows={3} data-testid="sponsoring-intro" className="mt-1 w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm" />
         </label>
 
         <div>
-          <div className="text-[11px] font-bold uppercase tracking-widest text-white/65">Zahlen – nur echte</div>
-          <p className="text-xs text-white/45 mt-1">Von der Website gezählt (Stand jetzt):</p>
+          <div className="tls-type-label text-white/65">Zahlen – nur echte</div>
+          <p className="tls-type-small text-white/45 mt-1">Von der Website gezählt (Stand jetzt):</p>
           <div className="mt-1 flex flex-wrap gap-x-5 gap-y-1">
             {Object.entries(data.auto_labels || {}).map(([key, label]) => (
               <label key={key} className="inline-flex items-center gap-2">
@@ -110,7 +110,7 @@ export function SponsoringOfferPanel() {
               </label>
             ))}
           </div>
-          <p className="text-xs text-white/45 mt-3">Selbst eingetragen (z. B. „2.400“ / „Besuche im Monat“ aus der Statistik):</p>
+          <p className="tls-type-small text-white/45 mt-3">Selbst eingetragen (z. B. „2.400“ / „Besuche im Monat“ aus der Statistik):</p>
           {form.numbers.map((row, index) => (
             <div key={index} className="mt-1 flex gap-2" data-testid={`sponsoring-number-${index}`}>
               <input value={row.value} onChange={(e) => setRow("numbers", index, { value: e.target.value })} maxLength={12} placeholder="2.400" aria-label="Zahl" className="w-24 bg-[#0A0A0A] border border-white/10 px-2 py-1.5 rounded-sm" />
@@ -118,11 +118,11 @@ export function SponsoringOfferPanel() {
               <button type="button" onClick={() => removeRow("numbers", index)} aria-label="Zahl entfernen" className="p-1.5 border border-white/10 rounded-sm text-white/60"><Trash2 className="w-3.5 h-3.5" /></button>
             </div>
           ))}
-          {form.numbers.length < 4 && <button type="button" onClick={() => set("numbers", [...form.numbers, { value: "", label: "" }])} data-testid="sponsoring-number-add" className="mt-2 inline-flex items-center gap-1 text-xs font-bold uppercase tracking-wider text-[#29B6E8]"><Plus className="w-3.5 h-3.5" /> Zahl</button>}
+          {form.numbers.length < 4 && <button type="button" onClick={() => set("numbers", [...form.numbers, { value: "", label: "" }])} data-testid="sponsoring-number-add" className="mt-2 inline-flex items-center gap-1 tls-type-label text-[#29B6E8]"><Plus className="w-3.5 h-3.5" /> Zahl</button>}
         </div>
 
         <div>
-          <div className="text-[11px] font-bold uppercase tracking-widest text-white/65">Stufen in der Tabelle</div>
+          <div className="tls-type-label text-white/65">Stufen in der Tabelle</div>
           <div className="mt-1 flex flex-wrap gap-x-5 gap-y-1">
             {tiers.map((tier) => (
               <label key={tier} className="inline-flex items-center gap-2">
@@ -134,14 +134,14 @@ export function SponsoringOfferPanel() {
         </div>
 
         <div>
-          <div className="text-[11px] font-bold uppercase tracking-widest text-white/65">Was jede Stufe bekommt</div>
+          <div className="tls-type-label text-white/65">Was jede Stufe bekommt</div>
           {form.benefits.map((row, index) => (
             <div key={index} className="mt-2 border border-white/10 rounded-sm p-2 space-y-2" data-testid={`sponsoring-benefit-${index}`}>
               <div className="flex gap-2">
                 <input value={row.label} onChange={(e) => setRow("benefits", index, { label: e.target.value })} maxLength={120} placeholder="Logo auf TV und Beamer bei jeder LAN" aria-label="Leistung" className="flex-1 bg-[#0A0A0A] border border-white/10 px-2 py-1.5 rounded-sm" />
                 <button type="button" onClick={() => removeRow("benefits", index)} aria-label="Leistung entfernen" className="p-1.5 border border-white/10 rounded-sm text-white/60"><Trash2 className="w-3.5 h-3.5" /></button>
               </div>
-              <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs">
+              <div className="flex flex-wrap gap-x-4 gap-y-1 tls-type-small">
                 {form.tiers.map((tier) => (
                   <label key={tier} className="inline-flex items-center gap-1.5">
                     <input type="checkbox" checked={row.tiers.includes(tier)} onChange={() => setRow("benefits", index, { tiers: toggle(row.tiers, tier) })} className="accent-[#29B6E8]" aria-label={`${row.label || "Leistung"}: ${TIER_LABELS[tier] || tier}`} />
@@ -151,24 +151,24 @@ export function SponsoringOfferPanel() {
               </div>
             </div>
           ))}
-          <button type="button" onClick={() => set("benefits", [...form.benefits, { label: "", tiers: [...form.tiers] }])} data-testid="sponsoring-benefit-add" className="mt-2 inline-flex items-center gap-1 text-xs font-bold uppercase tracking-wider text-[#29B6E8]"><Plus className="w-3.5 h-3.5" /> Leistung</button>
+          <button type="button" onClick={() => set("benefits", [...form.benefits, { label: "", tiers: [...form.tiers] }])} data-testid="sponsoring-benefit-add" className="mt-2 inline-flex items-center gap-1 tls-type-label text-[#29B6E8]"><Plus className="w-3.5 h-3.5" /> Leistung</button>
         </div>
 
         <div>
-          <div className="text-[11px] font-bold uppercase tracking-widest text-white/65">Mappe als PDF (optional)</div>
+          <div className="tls-type-label text-white/65">Mappe als PDF (optional)</div>
           {data.pdf_key ? (
-            <div className="mt-1 flex items-center gap-3 text-xs" data-testid="sponsoring-pdf">
+            <div className="mt-1 flex items-center gap-3 tls-type-small" data-testid="sponsoring-pdf">
               <span className="text-white/75">{data.pdf_name}</span>
               <button type="button" onClick={removePdf} disabled={busy} className="text-[#FF6B6B] hover:underline">Entfernen</button>
             </div>
           ) : null}
-          <label className="mt-2 inline-flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-[#29B6E8] cursor-pointer">
+          <label className="mt-2 inline-flex items-center gap-2 tls-type-label text-[#29B6E8] cursor-pointer">
             <Upload className="w-3.5 h-3.5" /> {data.pdf_key ? "Neue Mappe hochladen" : "Mappe hochladen"}
             <input type="file" accept="application/pdf" className="sr-only" onChange={(e) => uploadPdf(e.target.files?.[0])} data-testid="sponsoring-pdf-input" />
           </label>
         </div>
 
-        <button type="button" onClick={save} disabled={busy} data-testid="sponsoring-save" className="px-5 py-2 bg-[#29B6E8] text-black font-bold uppercase tracking-wider rounded-sm text-xs disabled:opacity-50">Speichern</button>
+        <button type="button" onClick={save} disabled={busy} data-testid="sponsoring-save" className="px-5 py-2 bg-[#29B6E8] text-black tls-type-label rounded-sm disabled:opacity-50">Speichern</button>
       </div>
     </details>
   );

@@ -8,6 +8,7 @@ import { Download, Plus, Trash2, Upload } from "lucide-react";
 import { formatMoment } from "@/components/tls/ModerationStandingCard";
 import ImageScanTab from "@/pages/admin/moderation/ImageScanTab";
 import { viennaDateTime } from "@/lib/vienna";
+import { ShortCaps } from "@/components/tls/ShortCaps";
 
 // Moderation (#417): drei Reiter - die Meldungen der Community, die Funde des Wortfilters
 // (zurückgehalten wartet auf eine Entscheidung, markiert steht nur da) und die Wortliste selbst.
@@ -63,11 +64,11 @@ export default function AdminModerationPage() {
   };
   return (
     <AdminLayout>
-      <span className="text-[11px] font-bold uppercase tracking-[0.3em] text-[#29B6E8]">Sicherheit</span>
-      <h1 className="font-heading text-3xl md:text-4xl font-black uppercase mt-1 mb-6">Moderation</h1>
+      <span className="tls-type-label text-[#29B6E8]">Sicherheit</span>
+      <h1 className="tls-type-title mt-1 mb-6"><ShortCaps>Moderation</ShortCaps></h1>
       <div className="flex flex-wrap gap-1 border-b border-white/10 mb-6">
         {TABS.map(([key, label]) => (
-          <button key={key} type="button" role="tab" aria-selected={tab === key} onClick={() => setTab(key)} data-testid={`moderation-tab-${key}`} className={`px-4 py-2 text-xs font-bold uppercase tracking-wider border-b-2 transition ${tab === key ? "border-[#29B6E8] text-[#29B6E8]" : "border-transparent text-white/50 hover:text-white"}`}>{label}</button>
+          <button key={key} type="button" role="tab" aria-selected={tab === key} onClick={() => setTab(key)} data-testid={`moderation-tab-${key}`} className={`px-4 py-2 tls-type-label border-b-2 transition ${tab === key ? "border-[#29B6E8] text-[#29B6E8]" : "border-transparent text-white/50 hover:text-white"}`}>{label}</button>
         ))}
       </div>
       {tab === "reports" && <ReportsTab />}
@@ -132,20 +133,20 @@ function PeopleTab() {
     <div className="grid lg:grid-cols-[20rem_minmax(0,1fr)] gap-4">
       <div className="border border-white/10 bg-[#121212] rounded-sm p-3">
         <div className="flex items-center justify-between gap-2 mb-2">
-          <div className="text-[11px] font-bold uppercase tracking-wider text-white/60">{people.length} Personen</div>
-          <a href="/api/moderation/people/export.csv" data-testid="people-export" className="inline-flex items-center gap-1 text-[11px] font-bold uppercase tracking-wider text-[#29B6E8] hover:text-white"><Download className="w-3 h-3" /> CSV</a>
+          <div className="tls-type-label text-white/60">{people.length} Personen</div>
+          <a href="/api/moderation/people/export.csv" data-testid="people-export" className="inline-flex items-center gap-1 tls-type-label text-[#29B6E8] hover:text-white"><Download className="w-3 h-3" /> CSV</a>
         </div>
-        {people.length === 0 ? <div className="text-sm text-white/40 py-6 text-center">Noch keine Treffer oder Maßnahmen.</div> : (
+        {people.length === 0 ? <div className="tls-type-small text-quiet py-6 text-center">Noch keine Treffer oder Maßnahmen.</div> : (
           <ul className="divide-y divide-white/5">
             {people.map((row) => (
               <li key={row.user_id}>
                 <button type="button" onClick={() => setSelected(row.user_id)} data-testid={`people-row-${row.user.username}`} className={`w-full text-left py-2 px-2 rounded-sm ${selected === row.user_id ? "bg-[#29B6E8]/10" : "hover:bg-white/[0.03]"}`}>
                   <div className="flex items-center justify-between gap-2">
-                    <span className="font-bold text-sm tls-wrap">{row.user.display_name || row.user.username}</span>
-                    {row.open_appeal && <span className="text-[10px] font-black uppercase tracking-widest text-[#FFD700]">Einspruch</span>}
-                    {row.protected && !row.open_appeal && <span className="text-[10px] font-bold uppercase tracking-widest text-white/45" data-testid={`people-protected-${row.user.username}`}>Admin-Konto</span>}
+                    <span className="font-bold tls-type-small tls-wrap">{row.user.display_name || row.user.username}</span>
+                    {row.open_appeal && <span className="tls-type-label text-[#FFD700]">Einspruch</span>}
+                    {row.protected && !row.open_appeal && <span className="tls-type-label text-white/45" data-testid={`people-protected-${row.user.username}`}>Admin-Konto</span>}
                   </div>
-                  <div className="text-[11px] text-white/50">{row.active_strikes} Treffer{row.active ? ` · ${row.active.label}` : ""}</div>
+                  <div className="tls-type-small text-white/50">{row.active_strikes} Treffer{row.active ? ` · ${row.active.label}` : ""}</div>
                 </button>
               </li>
             ))}
@@ -159,40 +160,40 @@ function PeopleTab() {
           <div className="border border-white/10 bg-[#121212] rounded-sm p-4">
             <div className="flex flex-wrap items-start justify-between gap-3">
               <div>
-                <div className="font-heading font-bold uppercase">{detail.user.display_name || detail.user.username} <span className="text-white/40 normal-case font-normal text-sm">@{detail.user.username}</span></div>
-                <div className="text-xs text-white/50 mt-1">{detail.active_strike_count} Treffer in den letzten {detail.settings?.strike_ttl_months} Monaten · {detail.sanctions.length} Maßnahmen · {detail.reports.length} Meldungen gegen die Person</div>
+                <div className="font-bold">{detail.user.display_name || detail.user.username} <span className="text-quiet tls-type-small font-normal">@{detail.user.username}</span></div>
+                <div className="tls-type-small text-white/50 mt-1">{detail.active_strike_count} Treffer in den letzten {detail.settings?.strike_ttl_months} Monaten · {detail.sanctions.length} Maßnahmen · {detail.reports.length} Meldungen gegen die Person</div>
               </div>
               {active ? (
                 <div className="text-right">
-                  <div className="text-[#FF9500] font-bold text-sm" data-testid="people-active">{active.label}</div>
-                  <div className="text-[11px] text-white/50">{active.chat_blocked_until ? `Chat bis ${formatMoment(active.chat_blocked_until)}` : active.open_until_decision ? "bis zur Entscheidung" : "ohne Einschränkung"}</div>
+                  <div className="text-[#FF9500] font-bold tls-type-small" data-testid="people-active">{active.label}</div>
+                  <div className="tls-type-small text-white/50">{active.chat_blocked_until ? `Chat bis ${formatMoment(active.chat_blocked_until)}` : active.open_until_decision ? "bis zur Entscheidung" : "ohne Einschränkung"}</div>
                 </div>
-              ) : <div className="text-[11px] text-white/45">keine laufende Maßnahme</div>}
+              ) : <div className="tls-type-small text-white/45">keine laufende Maßnahme</div>}
             </div>
             {active?.appeal && (
-              <div className="mt-3 border border-[#FFD700]/30 bg-[#FFD700]/5 rounded-sm p-3 text-sm" data-testid="people-appeal">
-                <div className="text-[11px] font-bold uppercase tracking-wider text-[#FFD700]">Einspruch vom {formatMoment(active.appeal.created_at)} · {active.appeal.status === "open" ? "offen" : `entschieden: ${active.appeal.decision === "lift" ? "aufgehoben" : "bleibt"}`}</div>
+              <div className="mt-3 border border-[#FFD700]/30 bg-[#FFD700]/5 rounded-sm p-3 tls-type-small" data-testid="people-appeal">
+                <div className="tls-type-label text-[#FFD700]">Einspruch vom {formatMoment(active.appeal.created_at)} · {active.appeal.status === "open" ? "offen" : `entschieden: ${active.appeal.decision === "lift" ? "aufgehoben" : "bleibt"}`}</div>
                 <p className="mt-1 whitespace-pre-wrap text-white/80">{active.appeal.message}</p>
                 {active.appeal.status === "open" && !locked && (
                   <div className="mt-2 flex flex-wrap gap-2">
-                    <button type="button" disabled={!!busy} onClick={() => run("appeal", () => api.post(`/moderation/sanctions/${active.id}/appeal-decision`, { decision: "lift", note: note || null }), "Einspruch angenommen – Maßnahme aufgehoben.")} data-testid={`appeal-lift-${active.id}`} className="px-3 py-1.5 border border-[#00FF88]/50 text-[#00FF88] rounded-sm text-[11px] font-bold uppercase tracking-wider disabled:opacity-40">Annehmen und aufheben</button>
-                    <button type="button" disabled={!!busy} onClick={() => run("appeal", () => api.post(`/moderation/sanctions/${active.id}/appeal-decision`, { decision: "keep", note: note || null }), "Einspruch abgelehnt – Maßnahme bleibt.")} data-testid={`appeal-keep-${active.id}`} className="px-3 py-1.5 border border-white/20 text-white/80 rounded-sm text-[11px] font-bold uppercase tracking-wider disabled:opacity-40">Ablehnen</button>
+                    <button type="button" disabled={!!busy} onClick={() => run("appeal", () => api.post(`/moderation/sanctions/${active.id}/appeal-decision`, { decision: "lift", note: note || null }), "Einspruch angenommen – Maßnahme aufgehoben.")} data-testid={`appeal-lift-${active.id}`} className="px-3 py-1.5 border border-[#00FF88]/50 text-[#00FF88] rounded-sm tls-type-label disabled:opacity-40">Annehmen und aufheben</button>
+                    <button type="button" disabled={!!busy} onClick={() => run("appeal", () => api.post(`/moderation/sanctions/${active.id}/appeal-decision`, { decision: "keep", note: note || null }), "Einspruch abgelehnt – Maßnahme bleibt.")} data-testid={`appeal-keep-${active.id}`} className="px-3 py-1.5 border border-white/20 text-white/80 rounded-sm tls-type-label disabled:opacity-40">Ablehnen</button>
                   </div>
                 )}
               </div>
             )}
             {locked ? (
-              <p className="mt-3 border border-white/10 bg-black/20 rounded-sm p-3 text-sm text-white/60" data-testid="people-locked">{PROTECTED_PERSON_TEXT}</p>
+              <p className="mt-3 border border-white/10 bg-black/20 rounded-sm p-3 tls-type-body text-white/60" data-testid="people-locked">{PROTECTED_PERSON_TEXT}</p>
             ) : (
             <>
             <div className="mt-3 grid md:grid-cols-2 gap-3">
               <div className="border border-white/10 rounded-sm p-3">
-                <div className="text-[11px] font-bold uppercase tracking-wider text-white/60 mb-2">Treffer eintragen</div>
+                <div className="tls-type-label text-white/60 mb-2">Treffer eintragen</div>
                 <input value={strikeNote} onChange={(e) => setStrikeNote(e.target.value)} placeholder="Was ist passiert? (steht im Hinweis an die Person)" data-testid="people-strike-note" className="w-full bg-black/40 border border-white/10 px-3 py-2 rounded-sm text-sm" />
-                <button type="button" disabled={!!busy} onClick={() => run("strike", () => api.post(`/moderation/people/${detail.user.id}/strikes`, { note: strikeNote || null }).then(() => setStrikeNote("")), "Treffer eingetragen – die Stufe wurde neu bestimmt.")} data-testid="people-strike-add" className="mt-2 px-3 py-1.5 border border-[#FFD700]/50 text-[#FFD700] rounded-sm text-[11px] font-bold uppercase tracking-wider disabled:opacity-40">Treffer eintragen</button>
+                <button type="button" disabled={!!busy} onClick={() => run("strike", () => api.post(`/moderation/people/${detail.user.id}/strikes`, { note: strikeNote || null }).then(() => setStrikeNote("")), "Treffer eingetragen – die Stufe wurde neu bestimmt.")} data-testid="people-strike-add" className="mt-2 px-3 py-1.5 border border-[#FFD700]/50 text-[#FFD700] rounded-sm tls-type-label disabled:opacity-40">Treffer eintragen</button>
               </div>
               <div className="border border-white/10 rounded-sm p-3">
-                <div className="text-[11px] font-bold uppercase tracking-wider text-white/60 mb-2">Stufe von Hand setzen</div>
+                <div className="tls-type-label text-white/60 mb-2">Stufe von Hand setzen</div>
                 <div className="flex flex-wrap gap-2">
                   <select value={sanction.action} onChange={(e) => setSanction((c) => ({ ...c, action: e.target.value }))} data-testid="people-sanction-action" className="bg-black/40 border border-white/10 px-2 py-2 rounded-sm text-sm">
                     {SANCTION_ACTIONS.map(([key, label]) => <option key={key} value={key}>{label}</option>)}
@@ -200,7 +201,7 @@ function PeopleTab() {
                   {sanction.action === "warning" && <input type="number" min="1" max="720" value={sanction.chat_hours} onChange={(e) => setSanction((c) => ({ ...c, chat_hours: e.target.value }))} placeholder="Stunden" aria-label="Chat-Sperre in Stunden" data-testid="people-sanction-hours" className="w-24 bg-black/40 border border-white/10 px-2 py-2 rounded-sm text-sm" />}
                 </div>
                 <input value={sanction.reason} onChange={(e) => setSanction((c) => ({ ...c, reason: e.target.value }))} placeholder="Grund (steht in der Benachrichtigung)" data-testid="people-sanction-reason" className="mt-2 w-full bg-black/40 border border-white/10 px-3 py-2 rounded-sm text-sm" />
-                <button type="button" disabled={!!busy || sanction.reason.trim().length < 3} onClick={() => run("sanction", () => api.post(`/moderation/people/${detail.user.id}/sanctions`, { action: sanction.action, reason: sanction.reason.trim(), ...(sanction.action === "warning" && sanction.chat_hours ? { chat_hours: Number(sanction.chat_hours) } : {}) }).then(() => setSanction((c) => ({ ...c, reason: "" }))), "Stufe gesetzt – die Person ist benachrichtigt.")} data-testid="people-sanction-set" className="mt-2 px-3 py-1.5 border border-[#FF9500]/50 text-[#FF9500] rounded-sm text-[11px] font-bold uppercase tracking-wider disabled:opacity-40">Stufe setzen</button>
+                <button type="button" disabled={!!busy || sanction.reason.trim().length < 3} onClick={() => run("sanction", () => api.post(`/moderation/people/${detail.user.id}/sanctions`, { action: sanction.action, reason: sanction.reason.trim(), ...(sanction.action === "warning" && sanction.chat_hours ? { chat_hours: Number(sanction.chat_hours) } : {}) }).then(() => setSanction((c) => ({ ...c, reason: "" }))), "Stufe gesetzt – die Person ist benachrichtigt.")} data-testid="people-sanction-set" className="mt-2 px-3 py-1.5 border border-[#FF9500]/50 text-[#FF9500] rounded-sm tls-type-label disabled:opacity-40">Stufe setzen</button>
               </div>
             </div>
             <div className="mt-3">
@@ -212,26 +213,26 @@ function PeopleTab() {
 
           <div className="grid md:grid-cols-2 gap-4">
             <div className="border border-white/10 bg-[#121212] rounded-sm p-4">
-              <div className="text-[11px] font-bold uppercase tracking-wider text-white/60 mb-2">Treffer</div>
-              {detail.strikes.length === 0 ? <div className="text-sm text-white/40">Keine.</div> : (
-                <ul className="space-y-2 text-sm">
+              <div className="tls-type-label text-white/60 mb-2">Treffer</div>
+              {detail.strikes.length === 0 ? <div className="tls-type-small text-quiet">Keine.</div> : (
+                <ul className="space-y-2 tls-type-small">
                   {detail.strikes.map((strike) => (
                     <li key={strike.id} className={`flex items-start justify-between gap-2 ${strike.revoked ? "opacity-50 line-through" : ""}`} data-testid={`people-strike-${strike.id}`}>
-                      <span><span className="text-white/45 text-xs">{formatMoment(strike.created_at)}</span> · {strike.source_label}{strike.note ? ` · ${strike.note}` : ""}{strike.revoked && strike.revoke_note ? ` (zurückgenommen: ${strike.revoke_note})` : ""}</span>
-                      {!strike.revoked && !locked && <button type="button" disabled={!!busy} onClick={() => run("revoke", () => api.post(`/moderation/strikes/${strike.id}/revoke`, { note: note || null }), "Treffer zurückgenommen.")} data-testid={`strike-revoke-${strike.id}`} className="text-[10px] font-bold uppercase tracking-wider text-white/50 hover:text-[#FF3B30] shrink-0">Zurücknehmen</button>}
+                      <span><span className="text-white/45 tls-type-small">{formatMoment(strike.created_at)}</span> · {strike.source_label}{strike.note ? ` · ${strike.note}` : ""}{strike.revoked && strike.revoke_note ? ` (zurückgenommen: ${strike.revoke_note})` : ""}</span>
+                      {!strike.revoked && !locked && <button type="button" disabled={!!busy} onClick={() => run("revoke", () => api.post(`/moderation/strikes/${strike.id}/revoke`, { note: note || null }), "Treffer zurückgenommen.")} data-testid={`strike-revoke-${strike.id}`} className="tls-type-label text-white/50 hover:text-[#FF3B30] shrink-0">Zurücknehmen</button>}
                     </li>
                   ))}
                 </ul>
               )}
             </div>
             <div className="border border-white/10 bg-[#121212] rounded-sm p-4">
-              <div className="text-[11px] font-bold uppercase tracking-wider text-white/60 mb-2">Maßnahmen</div>
-              {detail.sanctions.length === 0 ? <div className="text-sm text-white/40">Keine.</div> : (
-                <ul className="space-y-2 text-sm">
+              <div className="tls-type-label text-white/60 mb-2">Maßnahmen</div>
+              {detail.sanctions.length === 0 ? <div className="tls-type-small text-quiet">Keine.</div> : (
+                <ul className="space-y-2 tls-type-small">
                   {detail.sanctions.map((entry) => (
                     <li key={entry.id} className="flex items-start justify-between gap-2" data-testid={`people-sanction-${entry.id}`}>
-                      <span><span className="text-white/45 text-xs">{formatMoment(entry.created_at)}</span> · {entry.label} · {SANCTION_STATUS[entry.status] || entry.status}{entry.automatic ? "" : " · von Hand"}{entry.reason ? ` · ${entry.reason}` : ""}</span>
-                      {entry.status === "active" && !locked && <button type="button" disabled={!!busy} onClick={() => run("lift", () => api.post(`/moderation/sanctions/${entry.id}/lift`, { note: note || null }), "Maßnahme aufgehoben.")} data-testid={`sanction-lift-${entry.id}`} className="text-[10px] font-bold uppercase tracking-wider text-[#00FF88] shrink-0">Aufheben</button>}
+                      <span><span className="text-white/45 tls-type-small">{formatMoment(entry.created_at)}</span> · {entry.label} · {SANCTION_STATUS[entry.status] || entry.status}{entry.automatic ? "" : " · von Hand"}{entry.reason ? ` · ${entry.reason}` : ""}</span>
+                      {entry.status === "active" && !locked && <button type="button" disabled={!!busy} onClick={() => run("lift", () => api.post(`/moderation/sanctions/${entry.id}/lift`, { note: note || null }), "Maßnahme aufgehoben.")} data-testid={`sanction-lift-${entry.id}`} className="tls-type-label text-[#00FF88] shrink-0">Aufheben</button>}
                     </li>
                   ))}
                 </ul>
@@ -240,9 +241,9 @@ function PeopleTab() {
           </div>
           {detail.reports.length > 0 && (
             <div className="border border-white/10 bg-[#121212] rounded-sm p-4">
-              <div className="text-[11px] font-bold uppercase tracking-wider text-white/60 mb-2">Meldungen gegen die Person</div>
-              <ul className="space-y-1 text-sm">
-                {detail.reports.map((report) => <li key={report.id}><span className="text-white/45 text-xs">{formatMoment(report.created_at)}</span> · {categoryLabel(report.category)} · {STATUS_LABEL[report.status] || report.status}{report.resolution_note ? ` · ${report.resolution_note}` : ""}</li>)}
+              <div className="tls-type-label text-white/60 mb-2">Meldungen gegen die Person</div>
+              <ul className="space-y-1 tls-type-small">
+                {detail.reports.map((report) => <li key={report.id}><span className="text-white/45 tls-type-small">{formatMoment(report.created_at)}</span> · {categoryLabel(report.category)} · {STATUS_LABEL[report.status] || report.status}{report.resolution_note ? ` · ${report.resolution_note}` : ""}</li>)}
               </ul>
             </div>
           )}
@@ -261,7 +262,7 @@ function LevelsTab() {
     api.get("/moderation/levels").then(({ data }) => setSettings(data && Array.isArray(data.levels) ? data : { levels: [], strike_ttl_months: 12 })).catch(() => setSettings({ levels: [], strike_ttl_months: 12 }));
   }, []);
 
-  if (!settings) return <div className="text-white/40 text-sm">Lade Stufen …</div>;
+  if (!settings) return <div className="text-quiet tls-type-small">Lade Stufen …</div>;
   const setLevel = (index, key, value) => setSettings((c) => ({ ...c, levels: c.levels.map((level, i) => (i === index ? { ...level, [key]: value } : level)) }));
   const save = async () => {
     setBusy(true);
@@ -282,10 +283,10 @@ function LevelsTab() {
   return (
     <div className="max-w-3xl space-y-4">
       <div className="border border-white/10 bg-[#121212] rounded-sm p-4">
-        <p className="text-xs text-white/50 mb-3">Nach jedem Treffer wird die Stufe neu bestimmt; eine Maßnahme entsteht nur, wenn sie höher ist als die laufende. Die Sperre bis zur Entscheidung hebt immer ein Mensch auf.</p>
+        <p className="tls-type-small text-white/50 mb-3">Nach jedem Treffer wird die Stufe neu bestimmt; eine Maßnahme entsteht nur, wenn sie höher ist als die laufende. Die Sperre bis zur Entscheidung hebt immer ein Mensch auf.</p>
         <div className="space-y-2">
           {settings.levels.map((level, index) => (
-            <div key={index} className="flex flex-wrap items-center gap-2 text-sm" data-testid={`levels-row-${index}`}>
+            <div key={index} className="flex flex-wrap items-center gap-2 tls-type-small" data-testid={`levels-row-${index}`}>
               <span className="text-white/50">ab</span>
               <input type="number" min="1" max="50" value={level.strikes} onChange={(e) => setLevel(index, "strikes", e.target.value)} aria-label="Treffer" data-testid={`levels-strikes-${index}`} className="w-20 bg-black/40 border border-white/10 px-2 py-2 rounded-sm" />
               <span className="text-white/50">Treffern:</span>
@@ -303,14 +304,14 @@ function LevelsTab() {
           ))}
         </div>
         {settings.levels.length < 5 && (
-          <button type="button" onClick={() => setSettings((c) => ({ ...c, levels: [...c.levels, { strikes: (Number(c.levels[c.levels.length - 1]?.strikes) || 0) + 1, action: "warning", chat_hours: 24 }] }))} data-testid="levels-add" className="mt-3 inline-flex items-center gap-1 text-[11px] font-bold uppercase tracking-wider text-[#29B6E8] hover:text-white"><Plus className="w-3 h-3" /> Stufe hinzufügen</button>
+          <button type="button" onClick={() => setSettings((c) => ({ ...c, levels: [...c.levels, { strikes: (Number(c.levels[c.levels.length - 1]?.strikes) || 0) + 1, action: "warning", chat_hours: 24 }] }))} data-testid="levels-add" className="mt-3 inline-flex items-center gap-1 tls-type-label text-[#29B6E8] hover:text-white"><Plus className="w-3 h-3" /> Stufe hinzufügen</button>
         )}
-        <div className="mt-4 flex flex-wrap items-center gap-2 text-sm">
+        <div className="mt-4 flex flex-wrap items-center gap-2 tls-type-small">
           <span className="text-white/50">Treffer verfallen nach</span>
           <input type="number" min="1" max="60" value={settings.strike_ttl_months} onChange={(e) => setSettings((c) => ({ ...c, strike_ttl_months: e.target.value }))} aria-label="Verfall in Monaten" data-testid="levels-ttl" className="w-20 bg-black/40 border border-white/10 px-2 py-2 rounded-sm" />
           <span className="text-white/50">Monaten</span>
         </div>
-        <button type="button" onClick={save} disabled={busy} data-testid="levels-save" className="mt-4 px-5 py-2 bg-[#29B6E8] text-black font-bold uppercase tracking-wider rounded-sm text-xs disabled:opacity-50">{busy ? "Speichere…" : "Stufen speichern"}</button>
+        <button type="button" onClick={save} disabled={busy} data-testid="levels-save" className="mt-4 px-5 py-2 bg-[#29B6E8] text-black tls-type-label rounded-sm disabled:opacity-50">{busy ? "Speichere…" : "Stufen speichern"}</button>
       </div>
     </div>
   );
@@ -334,8 +335,8 @@ function ReportsTab() {
   return (
     <>
       <div className="flex flex-wrap gap-2 mb-5">
-        <button type="button" onClick={() => setFilter("")} className={`px-3 py-2 border rounded-sm text-xs font-bold uppercase ${!filter ? "border-[#29B6E8] text-[#29B6E8]" : "border-white/10 text-white/55"}`}>Alle</button>
-        {STATUS.map((status) => <button key={status} type="button" onClick={() => setFilter(status)} className={`px-3 py-2 border rounded-sm text-xs font-bold uppercase ${filter === status ? "border-[#29B6E8] text-[#29B6E8]" : "border-white/10 text-white/55"}`}>{STATUS_LABEL[status]}</button>)}
+        <button type="button" onClick={() => setFilter("")} className={`px-3 py-2 border rounded-sm tls-type-label ${!filter ? "border-[#29B6E8] text-[#29B6E8]" : "border-white/10 text-white/55"}`}>Alle</button>
+        {STATUS.map((status) => <button key={status} type="button" onClick={() => setFilter(status)} className={`px-3 py-2 border rounded-sm tls-type-label ${filter === status ? "border-[#29B6E8] text-[#29B6E8]" : "border-white/10 text-white/55"}`}>{STATUS_LABEL[status]}</button>)}
       </div>
       <div className="space-y-3">
         {reports.map((report) => <ReportCard key={report.id} report={report} onSaved={load} />)}
@@ -376,32 +377,32 @@ function ReportCard({ report, onSaved }) {
 
   return (
     <article className="border border-white/10 bg-[#121212] rounded-sm p-4" data-testid={`report-${report.id}`}>
-      <div className="text-xs font-bold uppercase tracking-wider text-[#FFD700]">{categoryLabel(report.category)} · {STATUS_LABEL[reportStatusOf(report.status)]}</div>
-      <div className="mt-1 font-bold text-sm text-white">Gegen {personName(report.target_user, "ein gelöschtes Konto")}</div>
-      <div className="mt-1 text-sm text-white/80 whitespace-pre-wrap break-words">{report.details}</div>
+      <div className="tls-type-label text-[#FFD700]">{categoryLabel(report.category)} · {STATUS_LABEL[reportStatusOf(report.status)]}</div>
+      <div className="mt-1 font-bold tls-type-small text-white">Gegen {personName(report.target_user, "ein gelöschtes Konto")}</div>
+      <div className="mt-1 tls-type-small text-white/80 whitespace-pre-wrap break-words">{report.details}</div>
       {report.message_excerpt && (
-        <blockquote className="mt-2 border-l-2 border-white/20 pl-3 text-sm text-white/60 whitespace-pre-wrap break-words" data-testid={`report-message-${report.id}`}>{report.message_excerpt}</blockquote>
+        <blockquote className="mt-2 border-l-2 border-white/20 pl-3 tls-type-small text-white/60 whitespace-pre-wrap break-words" data-testid={`report-message-${report.id}`}>{report.message_excerpt}</blockquote>
       )}
-      {report.resolution_note && <div className="mt-2 text-sm text-white/70" data-testid={`report-note-${report.id}`}><span className="text-white/45">Grund:</span> {report.resolution_note}</div>}
-      <div className="mt-2 text-[11px] text-white/35">Gemeldet von {personName(report.reporter, "einem gelöschten Konto")}{report.created_at ? ` · ${viennaDateTime(report.created_at)}` : ""}</div>
+      {report.resolution_note && <div className="mt-2 tls-type-small text-white/70" data-testid={`report-note-${report.id}`}><span className="text-white/45">Grund:</span> {report.resolution_note}</div>}
+      <div className="mt-2 tls-type-small text-quiet">Gemeldet von {personName(report.reporter, "einem gelöschten Konto")}{report.created_at ? ` · ${viennaDateTime(report.created_at)}` : ""}</div>
       <div className="mt-3 flex flex-wrap gap-2">
         {REPORT_STEPS[reportStatusOf(report.status)].map((next) => (
-          <button key={next} type="button" disabled={busy} aria-pressed={step === next} onClick={() => open(next)} data-testid={`report-step-${next}-${report.id}`} className={`min-h-10 px-3 py-2 border rounded-sm text-xs font-bold uppercase tracking-wider disabled:opacity-40 ${step === next ? "border-[#29B6E8] text-[#29B6E8]" : next === "justified" ? "border-[#FF9500]/50 text-[#FF9500]" : "border-white/15 text-white/70 hover:text-white"}`}>
+          <button key={next} type="button" disabled={busy} aria-pressed={step === next} onClick={() => open(next)} data-testid={`report-step-${next}-${report.id}`} className={`min-h-10 px-3 py-2 border rounded-sm tls-type-label disabled:opacity-40 ${step === next ? "border-[#29B6E8] text-[#29B6E8]" : next === "justified" ? "border-[#FF9500]/50 text-[#FF9500]" : "border-white/15 text-white/70 hover:text-white"}`}>
             {reportStepLabel(report.status, next)}
           </button>
         ))}
       </div>
       {step && (
         <form onSubmit={save} className="mt-3 border border-white/10 bg-black/20 rounded-sm p-3 space-y-2" data-testid={`report-decision-${report.id}`}>
-          <p className="text-xs text-white/60">{reportStepHint(report.status, step, target)}</p>
-          <label className="block text-[11px] font-bold uppercase tracking-wider text-white/60">
+          <p className="tls-type-small text-white/60">{reportStepHint(report.status, step, target)}</p>
+          <label className="block tls-type-label text-white/60">
             {needsReason ? "Grund" : "Grund (optional)"}
             <textarea value={reason} onChange={(event) => setReason(event.target.value)} rows={2} maxLength={2000} required={needsReason} data-testid={`report-reason-${report.id}`} className="mt-1 w-full bg-black/40 border border-white/10 px-3 py-2 rounded-sm text-sm font-normal normal-case tracking-normal text-white" />
           </label>
-          {report.resolution_note && !needsReason && <p className="text-[11px] text-white/45">Ohne neuen Text bleibt der bisherige Grund stehen.</p>}
+          {report.resolution_note && !needsReason && <p className="tls-type-small text-white/45">Ohne neuen Text bleibt der bisherige Grund stehen.</p>}
           <div className="flex flex-wrap gap-2">
-            <button type="submit" disabled={busy || (needsReason && !reason.trim())} data-testid={`report-save-${report.id}`} className="min-h-10 px-4 py-2 bg-[#29B6E8] text-black rounded-sm text-xs font-bold uppercase tracking-wider disabled:opacity-50">{busy ? "Speichere …" : "Speichern"}</button>
-            <button type="button" disabled={busy} onClick={() => setStep("")} data-testid={`report-cancel-${report.id}`} className="min-h-10 px-4 py-2 border border-white/15 text-white/70 rounded-sm text-xs font-bold uppercase tracking-wider">Abbrechen</button>
+            <button type="submit" disabled={busy || (needsReason && !reason.trim())} data-testid={`report-save-${report.id}`} className="min-h-10 px-4 py-2 bg-[#29B6E8] text-black rounded-sm tls-type-label disabled:opacity-50">{busy ? "Speichere …" : "Speichern"}</button>
+            <button type="button" disabled={busy} onClick={() => setStep("")} data-testid={`report-cancel-${report.id}`} className="min-h-10 px-4 py-2 border border-white/15 text-white/70 rounded-sm tls-type-label">Abbrechen</button>
           </div>
         </form>
       )}
@@ -445,7 +446,7 @@ function ItemsTab() {
     <>
       <div className="flex flex-wrap gap-2 mb-5">
         {[["", "Offen"], ["pending", "Wartet"], ["flagged", "Markiert"], ["released", "Freigegeben"], ["rejected", "Zurückgewiesen"], ["noted", "Gesehen"]].map(([key, label]) => (
-          <button key={key} type="button" onClick={() => setState(key)} data-testid={`items-filter-${key || "open"}`} className={`px-3 py-2 border rounded-sm text-xs font-bold uppercase ${state === key ? "border-[#29B6E8] text-[#29B6E8]" : "border-white/10 text-white/55"}`}>{label}</button>
+          <button key={key} type="button" onClick={() => setState(key)} data-testid={`items-filter-${key || "open"}`} className={`px-3 py-2 border rounded-sm tls-type-label ${state === key ? "border-[#29B6E8] text-[#29B6E8]" : "border-white/10 text-white/55"}`}>{label}</button>
         ))}
       </div>
       <div className="space-y-3">
@@ -453,9 +454,9 @@ function ItemsTab() {
           <article key={item.id} className="border border-white/10 bg-[#121212] rounded-sm p-4" data-testid={`moderation-item-${item.id}`}>
             <div className="flex flex-wrap justify-between gap-3">
               <div className="min-w-0">
-                <div className="text-xs font-bold uppercase tracking-wider text-[#FFD700]">{item.kind_label || item.kind} · {ITEM_STATE_LABEL[item.state] || item.state} · {item.action === "hold" ? "zurückgehalten" : "markiert"}</div>
-                <div className="mt-1 text-sm text-white/80 whitespace-pre-wrap break-words">{item.excerpt}</div>
-                <div className="mt-2 text-[11px] text-white/35">
+                <div className="tls-type-label text-[#FFD700]">{item.kind_label || item.kind} · {ITEM_STATE_LABEL[item.state] || item.state} · {item.action === "hold" ? "zurückgehalten" : "markiert"}</div>
+                <div className="mt-1 tls-type-small text-white/80 whitespace-pre-wrap break-words">{item.excerpt}</div>
+                <div className="mt-2 tls-type-small text-quiet">
                   {item.user?.display_name || item.user?.username || item.user_id}{item.user?.username ? ` (@${item.user.username})` : ""} · Treffer: {(item.matched || []).join(", ")} · {item.created_at && viennaDateTime(item.created_at)}
                   {item.note ? ` · Notiz: ${item.note}` : ""}
                 </div>
@@ -463,12 +464,12 @@ function ItemsTab() {
               <div className="flex flex-wrap gap-2 shrink-0 self-start">
                 {item.state === "pending" && (
                   <>
-                    <button type="button" disabled={busy === item.id} onClick={() => decide(item, "release")} data-testid={`item-release-${item.id}`} className="px-3 py-2 bg-[#00FF88] text-black rounded-sm text-xs font-bold uppercase disabled:opacity-50">Freigeben</button>
-                    <button type="button" disabled={busy === item.id} onClick={() => decide(item, "reject")} data-testid={`item-reject-${item.id}`} className="px-3 py-2 border border-[#FF3B30]/40 text-[#FF3B30] rounded-sm text-xs font-bold uppercase disabled:opacity-50">Zurückweisen</button>
+                    <button type="button" disabled={busy === item.id} onClick={() => decide(item, "release")} data-testid={`item-release-${item.id}`} className="px-3 py-2 bg-[#00FF88] text-black rounded-sm tls-type-label disabled:opacity-50">Freigeben</button>
+                    <button type="button" disabled={busy === item.id} onClick={() => decide(item, "reject")} data-testid={`item-reject-${item.id}`} className="px-3 py-2 border border-[#FF3B30]/40 text-[#FF3B30] rounded-sm tls-type-label disabled:opacity-50">Zurückweisen</button>
                   </>
                 )}
                 {item.state === "flagged" && (
-                  <button type="button" disabled={busy === item.id} onClick={() => decide(item, "noted")} data-testid={`item-noted-${item.id}`} className="px-3 py-2 border border-white/15 text-white/70 rounded-sm text-xs font-bold uppercase disabled:opacity-50">Gesehen</button>
+                  <button type="button" disabled={busy === item.id} onClick={() => decide(item, "noted")} data-testid={`item-noted-${item.id}`} className="px-3 py-2 border border-white/15 text-white/70 rounded-sm tls-type-label disabled:opacity-50">Gesehen</button>
                 )}
               </div>
             </div>
@@ -542,39 +543,39 @@ function WordFilterTab() {
     if (data) setImportText("");
   };
 
-  if (!view) return <div className="text-white/40 text-sm">Lade Wortfilter …</div>;
+  if (!view) return <div className="text-quiet tls-type-small">Lade Wortfilter …</div>;
   const entries = view.entries || [];
 
   return (
     <div className="space-y-6">
       <div className={`border rounded-sm p-4 ${view.enabled ? "border-[#29B6E8]/40 bg-[#29B6E8]/5" : "border-white/10 bg-[#0A0A0A]"}`} data-testid="word-filter-settings">
-        <label className="flex items-center gap-2 text-sm font-bold text-white/80">
+        <label className="flex items-center gap-2 tls-type-small font-bold text-white/80">
           <input type="checkbox" checked={!!view.enabled} disabled={busy} onChange={(e) => run(() => api.put("/moderation/word-filter", { enabled: e.target.checked }), e.target.checked ? "Wortfilter eingeschaltet." : "Wortfilter ausgeschaltet.")} data-testid="word-filter-enabled" className="accent-[#29B6E8]" />
           Wortfilter einschalten
         </label>
-        <p className="mt-2 text-xs text-white/50">Geprüft wird beim Senden in Direktnachrichten, Team-, Turnier- und Match-Chat sowie bei Profil-Bio, Anzeigename, Teamname und Benutzername. „Zurückhalten“: die Nachricht sieht nur der Absender („wird geprüft“), bis ihr freigebt oder zurückweist – zurückgewiesen zählt als Treffer; bei Namen und Bio wird die Änderung abgewiesen. „Nur markieren“: geht durch, steht aber in den Funden. Groß/Klein, Umlaute, Leetspeak (sch31ße) und Trennzeichen (s.c.h.e.i.ß.e) werden mitgeprüft; kurze Wörter nur als ganzes Wort.</p>
-        <div className="mt-2 text-[11px] text-white/40">{view.counts?.entries ?? entries.length} Einträge · {view.counts?.pending ?? 0} warten · {view.counts?.flagged ?? 0} markiert</div>
+        <p className="mt-2 tls-type-small text-white/50">Geprüft wird beim Senden in Direktnachrichten, Team-, Turnier- und Match-Chat sowie bei Profil-Bio, Anzeigename, Teamname und Benutzername. „Zurückhalten“: die Nachricht sieht nur der Absender („wird geprüft“), bis ihr freigebt oder zurückweist – zurückgewiesen zählt als Treffer; bei Namen und Bio wird die Änderung abgewiesen. „Nur markieren“: geht durch, steht aber in den Funden. Groß/Klein, Umlaute, Leetspeak (sch31ße) und Trennzeichen (s.c.h.e.i.ß.e) werden mitgeprüft; kurze Wörter nur als ganzes Wort.</p>
+        <div className="mt-2 tls-type-small text-quiet">{view.counts?.entries ?? entries.length} Einträge · {view.counts?.pending ?? 0} warten · {view.counts?.flagged ?? 0} markiert</div>
       </div>
 
       <form onSubmit={add} className="border border-white/10 bg-[#121212] rounded-sm p-4 grid sm:grid-cols-[1fr_auto_1fr_auto] gap-2 items-end" data-testid="word-filter-form">
-        <label className="block text-[11px] font-bold uppercase tracking-widest text-white/65">Wort oder Wendung
+        <label className="block tls-type-label text-white/65">Wort oder Wendung
           <input value={term} onChange={(e) => setTerm(e.target.value)} maxLength={60} data-testid="word-filter-term" className="mt-1 w-full bg-[#0A0A0A] border border-white/10 focus:border-[#29B6E8] px-3 py-2 rounded-sm text-white text-sm font-normal normal-case tracking-normal focus:outline-none" />
         </label>
-        <label className="block text-[11px] font-bold uppercase tracking-widest text-white/65">Wirkung
+        <label className="block tls-type-label text-white/65">Wirkung
           <select value={action} onChange={(e) => setAction(e.target.value)} data-testid="word-filter-action" className="mt-1 bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-white text-sm font-normal normal-case tracking-normal">
             <option value="hold">zurückhalten</option>
             <option value="flag">nur markieren</option>
           </select>
         </label>
-        <label className="block text-[11px] font-bold uppercase tracking-widest text-white/65">Notiz (optional)
+        <label className="block tls-type-label text-white/65">Notiz (optional)
           <input value={note} onChange={(e) => setNote(e.target.value)} maxLength={200} data-testid="word-filter-note" className="mt-1 w-full bg-[#0A0A0A] border border-white/10 focus:border-[#29B6E8] px-3 py-2 rounded-sm text-white text-sm font-normal normal-case tracking-normal focus:outline-none" />
         </label>
-        <button type="submit" disabled={busy || !term.trim()} data-testid="word-filter-add" className="px-4 py-2 bg-[#29B6E8] text-black font-bold uppercase tracking-wider rounded-sm text-xs inline-flex items-center gap-1 disabled:opacity-50"><Plus className="w-3.5 h-3.5" /> Eintragen</button>
+        <button type="submit" disabled={busy || !term.trim()} data-testid="word-filter-add" className="px-4 py-2 bg-[#29B6E8] text-black tls-type-label rounded-sm inline-flex items-center gap-1 disabled:opacity-50"><Plus className="w-3.5 h-3.5" /> Eintragen</button>
       </form>
 
       <div className="border border-white/10 bg-[#121212] rounded-sm overflow-hidden">
-        <table className="w-full text-sm" data-testid="word-filter-table">
-          <thead className="bg-[#0A0A0A] text-[11px] uppercase tracking-widest text-white/50">
+        <table className="w-full tls-type-small" data-testid="word-filter-table">
+          <thead className="bg-[#0A0A0A] tls-type-label text-white/50">
             <tr><th className="text-left px-4 py-3">Eintrag</th><th className="text-left px-4 py-3">Wirkung</th><th className="text-left px-4 py-3">Notiz</th><th className="px-4 py-3" /></tr>
           </thead>
           <tbody className="divide-y divide-white/5">
@@ -586,26 +587,26 @@ function WordFilterTab() {
                     {Object.entries(ACTION_LABEL).map(([key, label]) => <option key={key} value={key}>{label}</option>)}
                   </select>
                 </td>
-                <td className="px-4 py-2 text-xs text-white/50">{entry.note || ""}</td>
+                <td className="px-4 py-2 tls-type-small text-white/50">{entry.note || ""}</td>
                 <td className="px-4 py-2 text-right">
                   <button type="button" disabled={busy} onClick={() => run(() => api.delete(`/moderation/word-filter/entries/${entry.id}`), "Eintrag entfernt.")} data-testid={`word-filter-entry-delete-${entry.id}`} className="p-1.5 text-white/40 hover:text-[#FF3B30]"><Trash2 className="w-4 h-4" /></button>
                 </td>
               </tr>
             ))}
-            {!entries.length && <tr><td colSpan="4" className="px-4 py-8 text-center text-white/40 text-sm">Noch keine Einträge.</td></tr>}
+            {!entries.length && <tr><td colSpan="4" className="px-4 py-8 text-center text-quiet tls-type-small">Noch keine Einträge.</td></tr>}
           </tbody>
         </table>
       </div>
 
       <div className="border border-white/10 bg-[#121212] rounded-sm p-4 space-y-3" data-testid="word-filter-transfer">
         <div className="flex flex-wrap items-center gap-2">
-          <button type="button" onClick={exportList} data-testid="word-filter-export" className="px-3 py-2 border border-white/15 text-white/80 rounded-sm text-xs font-bold uppercase inline-flex items-center gap-1"><Download className="w-3.5 h-3.5" /> Export (JSON)</button>
-          <span className="text-xs text-white/45">Für ein Backup oder den zweiten Verein.</span>
+          <button type="button" onClick={exportList} data-testid="word-filter-export" className="px-3 py-2 border border-white/15 text-white/80 rounded-sm tls-type-label inline-flex items-center gap-1"><Download className="w-3.5 h-3.5" /> Export (JSON)</button>
+          <span className="tls-type-small text-white/45">Für ein Backup oder den zweiten Verein.</span>
         </div>
         <textarea value={importText} onChange={(e) => setImportText(e.target.value)} rows={4} placeholder='{"entries": [{"term": "…", "action": "hold"}]}' data-testid="word-filter-import-text" className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-white text-xs font-mono focus:outline-none focus:border-[#29B6E8]" />
         <div className="flex flex-wrap gap-2">
-          <button type="button" disabled={busy || !importText.trim()} onClick={() => importList(false)} data-testid="word-filter-import" className="px-3 py-2 border border-[#29B6E8]/40 text-[#29B6E8] rounded-sm text-xs font-bold uppercase inline-flex items-center gap-1 disabled:opacity-50"><Upload className="w-3.5 h-3.5" /> Einträge übernehmen</button>
-          <button type="button" disabled={busy || !importText.trim()} onClick={() => { if (window.confirm("Die ganze Liste durch den Import ersetzen?")) importList(true); }} data-testid="word-filter-import-replace" className="px-3 py-2 border border-[#FF3B30]/40 text-[#FF3B30] rounded-sm text-xs font-bold uppercase disabled:opacity-50">Liste ersetzen</button>
+          <button type="button" disabled={busy || !importText.trim()} onClick={() => importList(false)} data-testid="word-filter-import" className="px-3 py-2 border border-[#29B6E8]/40 text-[#29B6E8] rounded-sm tls-type-label inline-flex items-center gap-1 disabled:opacity-50"><Upload className="w-3.5 h-3.5" /> Einträge übernehmen</button>
+          <button type="button" disabled={busy || !importText.trim()} onClick={() => { if (window.confirm("Die ganze Liste durch den Import ersetzen?")) importList(true); }} data-testid="word-filter-import-replace" className="px-3 py-2 border border-[#FF3B30]/40 text-[#FF3B30] rounded-sm tls-type-label disabled:opacity-50">Liste ersetzen</button>
         </div>
       </div>
     </div>

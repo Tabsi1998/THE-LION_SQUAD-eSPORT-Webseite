@@ -12,6 +12,7 @@ import { AppLogsTab } from "./ops/AppLogsTab";
 import { useLiveRefresh } from "@/hooks/useLiveRefresh";
 import { RATING_LABELS, STATUS_LABELS, TONE_COLORS, describeRun, formatVital, ratingTone } from "@/lib/ops";
 import { viennaDateTime } from "@/lib/vienna";
+import { ShortCaps } from "@/components/tls/ShortCaps";
 
 // Betrieb (#233, #265): Server-Fehler als Gruppen mit Zähler, die langsamsten
 // Routen, Web Vitals je Seite von echten Besuchern und die Ampel der
@@ -54,7 +55,7 @@ function ReachabilityStrip({ reachability }) {
   if (!reachability?.targets) return null;
   const bad = reachability.overall === "disturbance";
   return (
-    <div className={`flex flex-wrap items-center gap-x-4 gap-y-1 border rounded-sm px-3 py-2 text-xs ${bad ? "border-warn/40 bg-warn/10" : "border-white/10 bg-[#121212] text-white/60"}`} data-testid="ops-reachability">
+    <div className={`flex flex-wrap items-center gap-x-4 gap-y-1 border rounded-sm px-3 py-2 tls-type-small ${bad ? "border-warn/40 bg-warn/10" : "border-white/10 bg-[#121212] text-white/60"}`} data-testid="ops-reachability">
       <span className="font-bold uppercase tracking-wider">Erreichbarkeit</span>
       {Object.keys(REACH_LABELS).map((key) => (
         <span key={key} className={reachability.targets[key]?.state === "down" ? "text-warn font-bold" : ""}>{reachText(key, reachability.targets[key])}</span>
@@ -214,9 +215,9 @@ export default function AdminOpsPage() {
     <AdminLayout>
       <div className="flex flex-wrap items-end justify-between gap-4 mb-6">
         <div>
-          <span className="text-[11px] font-bold uppercase tracking-[0.3em] text-[#29B6E8]">System</span>
-          <h1 className="font-heading text-3xl md:text-4xl font-black uppercase mt-1" data-testid="ops-title">Betrieb & Logs</h1>
-          <p className="text-sm text-white/55 mt-2 max-w-2xl">
+          <span className="tls-type-label text-[#29B6E8]">System</span>
+          <h1 className="tls-type-title mt-1" data-testid="ops-title"><ShortCaps>Betrieb & Logs</ShortCaps></h1>
+          <p className="tls-type-body text-white/55 mt-2 max-w-2xl">
             Alles, was der Betrieb meldet, an einem Ort: Fehler aus Server, Website und App, Auto-Checks, Alarme, App-Logs, E-Mail-Versand,
             Adminaktionen und Abgleiche. Ohne Namen, Adressen oder Tokens; Aufbewahrung unter Alarme.
           </p>
@@ -224,7 +225,7 @@ export default function AdminOpsPage() {
         <button
           type="button"
           onClick={load}
-          className="inline-flex min-h-[44px] items-center gap-2 border border-white/10 bg-[#121212] px-3 py-2 rounded-sm text-xs font-bold uppercase tracking-wider hover:border-[#29B6E8]/50"
+          className="inline-flex min-h-[44px] items-center gap-2 border border-white/10 bg-[#121212] px-3 py-2 rounded-sm tls-type-label hover:border-[#29B6E8]/50"
         >
           <RefreshCw className={`w-4 h-4 ${loading ? "animate-spin" : ""}`} /> Aktualisieren
         </button>
@@ -236,9 +237,9 @@ export default function AdminOpsPage() {
             key={tile.label}
             className={`border rounded-sm p-3 ${tile.tone === "danger" ? "border-[#FF3B30]/30 bg-[#FF3B30]/10" : tile.tone === "warn" ? "border-[#FFD95A]/30 bg-[#FFD95A]/10" : "border-white/10 bg-[#121212]"}`}
           >
-            <div className="text-[10px] uppercase tracking-widest text-white/40">{tile.label}</div>
-            <div className="font-display text-2xl font-bold">{tile.value}</div>
-            {tile.detail ? <div className="text-[11px] text-white/50 truncate" title={tile.detail}>{tile.detail}</div> : null}
+            <div className="tls-type-label text-quiet">{tile.label}</div>
+            <div className="tls-type-section tls-type-num">{tile.value}</div>
+            {tile.detail ? <div className="tls-type-small text-white/50 truncate" title={tile.detail}>{tile.detail}</div> : null}
           </div>
         ))}
       </div>
@@ -249,7 +250,7 @@ export default function AdminOpsPage() {
             key={item.key}
             type="button"
             onClick={() => setTab(item.key)}
-            className={`min-h-[44px] px-3 py-2 rounded-sm text-xs font-bold uppercase tracking-wider border ${tab === item.key ? "border-[#29B6E8] text-[#29B6E8] bg-[#29B6E8]/10" : "border-white/10 text-white/60 hover:border-white/30"}`}
+            className={`min-h-[44px] px-3 py-2 rounded-sm tls-type-label border ${tab === item.key ? "border-[#29B6E8] text-[#29B6E8] bg-[#29B6E8]/10" : "border-white/10 text-white/60 hover:border-white/30"}`}
           >
             {item.label}
           </button>
@@ -293,12 +294,12 @@ export default function AdminOpsPage() {
             <input value={searchDraft} onChange={(event) => setSearchDraft(event.target.value)} data-testid="ops-errors-search" aria-label="Suche"
               placeholder="Fehlerart, Seite, Stelle oder Kennung" maxLength={80}
               className="min-h-[44px] flex-1 min-w-0 bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-sm" />
-            <button type="submit" className="min-h-[44px] px-4 border border-white/10 rounded-sm text-xs font-bold uppercase tracking-wider hover:border-[#29B6E8]/50">Suchen</button>
+            <button type="submit" className="min-h-[44px] px-4 border border-white/10 rounded-sm tls-type-label hover:border-[#29B6E8]/50">Suchen</button>
           </form>
           {/* Mehrfachauswahl (#2447): offene Gruppen ankreuzen, dann „Ausgewählte als gelöst“. */}
           {openErrors.length ? (
             <div className="flex flex-wrap items-center gap-2 border border-white/10 bg-[#121212] rounded-sm p-2" data-testid="ops-errors-bulk">
-              <label className="inline-flex min-h-[44px] items-center gap-3 px-2 text-xs font-bold uppercase tracking-wider text-white/60 cursor-pointer">
+              <label className="inline-flex min-h-[44px] items-center gap-3 px-2 tls-type-label text-white/60 cursor-pointer">
                 <input
                   type="checkbox"
                   checked={picked.length > 0 && picked.length === openErrors.length}
@@ -314,7 +315,7 @@ export default function AdminOpsPage() {
                 onClick={resolvePicked}
                 disabled={!picked.length || resolvingMany}
                 data-testid="ops-errors-resolve-picked"
-                className="ml-auto inline-flex min-h-[44px] items-center gap-2 border border-ok/40 bg-ok/10 text-ok px-3 rounded-sm text-xs font-bold uppercase tracking-wider disabled:opacity-40"
+                className="ml-auto inline-flex min-h-[44px] items-center gap-2 border border-ok/40 bg-ok/10 text-ok px-3 rounded-sm tls-type-label disabled:opacity-40"
               >
                 <CheckCircle2 className="w-4 h-4" /> {resolvingMany ? "Markiere …" : "Ausgewählte als gelöst"}
               </button>
@@ -348,35 +349,35 @@ export default function AdminOpsPage() {
                     >
                       <div className="flex-1 min-w-0">
                         <div className="flex flex-wrap items-center gap-2">
-                          <span className={`inline-flex items-center gap-1 text-[10px] font-black uppercase tracking-widest px-2 py-0.5 rounded-sm border ${resolved ? "border-white/10 text-white/50" : "border-[#FF3B30]/40 bg-[#FF3B30]/10 text-[#FF6B61]"}`}>
+                          <span className={`inline-flex items-center gap-1 tls-type-label px-2 py-0.5 rounded-sm border ${resolved ? "border-white/10 text-white/50" : "border-[#FF3B30]/40 bg-[#FF3B30]/10 text-[#FF6B61]"}`}>
                             <AlertTriangle className="w-3 h-3" /> {row.error_type}
                           </span>
                           {SOURCE_LABELS[row.source] && row.source !== "server" ? (
-                            <span className="text-[10px] font-bold uppercase tracking-widest px-2 py-0.5 rounded-sm border border-brand/40 text-brand">{SOURCE_LABELS[row.source]}</span>
+                            <span className="tls-type-label px-2 py-0.5 rounded-sm border border-brand/40 text-brand">{SOURCE_LABELS[row.source]}</span>
                           ) : null}
-                          <span className="text-[11px] font-mono text-white/60 break-all">{`${row.method || ""} ${row.route || ""}`.trim()}</span>
-                          {isClient ? null : <span className="text-[11px] text-white/40">HTTP {row.status_code}</span>}
+                          <span className="tls-type-small font-mono text-white/60 break-all">{`${row.method || ""} ${row.route || ""}`.trim()}</span>
+                          {isClient ? null : <span className="tls-type-small text-quiet">HTTP {row.status_code}</span>}
                         </div>
-                        <div className="mt-1 text-sm font-semibold break-words font-mono">{row.message || topPlace(row) || "Ohne Stelle"}</div>
-                        <div className="mt-1 text-[11px] text-white/45">
+                        <div className="mt-1 tls-type-small font-semibold break-words font-mono">{row.message || topPlace(row) || "Ohne Stelle"}</div>
+                        <div className="mt-1 tls-type-small text-white/45">
                           {row.count}× · zuerst {formatTime(row.first_seen_at)} · zuletzt {formatTime(row.last_seen_at)}{isClient ? "" : ` · ${row.actor || ""}`}
                           {row.version ? ` · Version ${row.version}` : ""}
                           {resolved ? ` · gelöst ${formatTime(row.resolved_at)}` : ""}
                         </div>
                       </div>
-                      <div className="font-display text-2xl font-bold text-right md:w-16">{row.count}</div>
+                      <div className="tls-type-section tls-type-num text-right md:w-16">{row.count}</div>
                     </button>
                   </div>
                   {/* Direkt in der Zeile (#2447) - ohne Aufklappen. */}
                   <div className="flex shrink-0 items-start gap-2 px-4 pb-4 md:pt-4 md:pl-0">
                     {resolved ? (
                       <button type="button" onClick={() => setResolved(row, false)} data-testid={`ops-error-reopen-${row.fingerprint}`}
-                        className="inline-flex min-h-[44px] w-full md:w-auto items-center justify-center gap-2 border border-white/10 px-3 rounded-sm text-xs font-bold uppercase tracking-wider hover:border-[#29B6E8]/50">
+                        className="inline-flex min-h-[44px] w-full md:w-auto items-center justify-center gap-2 border border-white/10 px-3 rounded-sm tls-type-label hover:border-[#29B6E8]/50">
                         <RotateCcw className="w-4 h-4" /> Wieder öffnen
                       </button>
                     ) : (
                       <button type="button" onClick={() => setResolved(row, true)} data-testid={`ops-error-resolve-${row.fingerprint}`}
-                        className="inline-flex min-h-[44px] w-full md:w-auto items-center justify-center gap-2 border border-ok/40 bg-ok/10 text-ok px-3 rounded-sm text-xs font-bold uppercase tracking-wider">
+                        className="inline-flex min-h-[44px] w-full md:w-auto items-center justify-center gap-2 border border-ok/40 bg-ok/10 text-ok px-3 rounded-sm tls-type-label">
                         <CheckCircle2 className="w-4 h-4" /> Als gelöst markieren
                       </button>
                     )}
@@ -385,9 +386,9 @@ export default function AdminOpsPage() {
                 {isExpanded ? (
                   <div className="border-t border-white/10 p-4">
                     {row.stack ? (
-                      <pre className="text-[11px] leading-relaxed text-white/70 bg-[#0A0A0A] border border-white/10 rounded-sm p-3 tls-swipe max-h-96">{row.stack}</pre>
+                      <pre className="tls-type-small leading-relaxed text-white/70 bg-[#0A0A0A] border border-white/10 rounded-sm p-3 tls-swipe max-h-96">{row.stack}</pre>
                     ) : (
-                      <p className="text-sm text-white/50">{isClient ? "Ohne Code-Stelle – der Browser hat keine mitgeschickt." : "Keine Ausnahme – der Server hat diese Antwort bewusst gesendet."}</p>
+                      <p className="tls-type-small text-white/50">{isClient ? "Ohne Code-Stelle – der Browser hat keine mitgeschickt." : "Keine Ausnahme – der Server hat diese Antwort bewusst gesendet."}</p>
                     )}
                   </div>
                 ) : null}
@@ -395,15 +396,15 @@ export default function AdminOpsPage() {
             );
           })}
           {errors.length ? (
-            <p className="text-[11px] text-white/40">Die Prüfung „Fehlergruppen“ unter Checks zählt nur die offenen Gruppen des Servers – nach dem Lösen dort „Jetzt neu prüfen“, damit die Ampel gleich stimmt. Website und App stehen hier, färben die Ampel aber nicht.</p>
+            <p className="tls-type-small text-quiet">Die Prüfung „Fehlergruppen“ unter Checks zählt nur die offenen Gruppen des Servers – nach dem Lösen dort „Jetzt neu prüfen“, damit die Ampel gleich stimmt. Website und App stehen hier, färben die Ampel aber nicht.</p>
           ) : null}
         </div>
       ) : (
         <div className="space-y-4">
           <div className="border border-white/10 bg-[#121212] rounded-sm tls-swipe pb-0">
-            <table className="w-full text-sm">
+            <table className="w-full tls-type-small">
               <thead>
-                <tr className="text-[10px] uppercase tracking-widest text-white/40 border-b border-white/10">
+                <tr className="tls-type-label text-quiet border-b border-white/10">
                   <th className="text-left p-3">Route</th>
                   <th className="text-right p-3">Anfragen</th>
                   <th className="text-right p-3">Ø ms</th>
@@ -414,9 +415,9 @@ export default function AdminOpsPage() {
               <tbody>
                 {(slow?.routes || []).map((row) => (
                   <tr key={`${row.method} ${row.route}`} className={`border-b border-white/5 ${row.upload ? "text-white/50" : ""}`} data-testid={`ops-slow-${row.method}-${row.route}`}>
-                    <td className="p-3 font-mono text-xs">
+                    <td className="p-3 font-mono tls-type-small">
                       <span className="text-white/40 mr-2">{row.method}</span>{row.route}
-                      {row.upload ? <span className="ml-2 rounded-sm border border-[#29B6E8]/40 px-1.5 py-0.5 font-sans text-[10px] font-bold uppercase tracking-widest text-[#29B6E8]">Upload</span> : null}
+                      {row.upload ? <span className="ml-2 rounded-sm border border-[#29B6E8]/40 px-1.5 py-0.5 font-sans tls-type-label text-[#29B6E8]">Upload</span> : null}
                     </td>
                     <td className="p-3 text-right">{row.count}</td>
                     <td className="p-3 text-right">{row.avg_ms}</td>
@@ -434,7 +435,7 @@ export default function AdminOpsPage() {
               </tbody>
             </table>
           </div>
-          <p className="text-[11px] text-white/40">
+          <p className="tls-type-small text-quiet">
             Gemessen wird die Zeit im Backend je Anfrage; Bilder und Dateien, die nginx liefert, stehen hier nicht. Datei-Uploads (Kennzeichen „Upload“)
             dauern so lange wie die Leitung des Hochladenden – sie stehen am Ende und zählen nicht als langsam (Liste unter Alarme).
           </p>
@@ -462,17 +463,17 @@ function VitalsTab({ vitals, loading }) {
           const metric = vitals?.overall?.[name];
           return (
             <div key={name} className="border border-white/10 bg-[#121212] rounded-sm p-3">
-              <div className="text-[10px] uppercase tracking-widest text-white/40">{name} · p75 · alle Seiten</div>
-              <div className={`font-display text-2xl font-bold ${toneClass(ratingTone(metric?.rating))}`}>{metric ? formatVital(name, metric.p75) : "–"}</div>
-              <div className="text-[11px] text-white/50">{metric ? `${metric.count} Messungen · ${Math.round((metric.good_share || 0) * 100)} % gut` : "keine Messungen"}</div>
+              <div className="tls-type-small text-quiet">{name} · p75 · alle Seiten</div>
+              <div className={`tls-type-section tls-type-num ${toneClass(ratingTone(metric?.rating))}`}>{metric ? formatVital(name, metric.p75) : "–"}</div>
+              <div className="tls-type-small text-white/50">{metric ? `${metric.count} Messungen · ${Math.round((metric.good_share || 0) * 100)} % gut` : "keine Messungen"}</div>
             </div>
           );
         })}
       </div>
       <div className="border border-white/10 bg-[#121212] rounded-sm tls-swipe pb-0">
-        <table className="w-full text-sm">
+        <table className="w-full tls-type-small">
           <thead>
-            <tr className="text-[10px] uppercase tracking-widest text-white/40 border-b border-white/10">
+            <tr className="tls-type-small text-quiet border-b border-white/10">
               <th className="text-left p-3">Route</th>
               <th className="text-right p-3">Messungen</th>
               {VITAL_COLUMNS.map((name) => <th key={name} className="text-right p-3">{name} p75</th>)}
@@ -481,7 +482,7 @@ function VitalsTab({ vitals, loading }) {
           <tbody>
             {routes.map((row) => (
               <tr key={row.route} className="border-b border-white/5" data-testid={`ops-vitals-${row.route}`}>
-                <td className="p-3 font-mono text-xs">{row.route}</td>
+                <td className="p-3 font-mono tls-type-small">{row.route}</td>
                 <td className="p-3 text-right">{row.samples}</td>
                 {VITAL_COLUMNS.map((name) => {
                   const metric = row.metrics?.[name];
@@ -503,7 +504,7 @@ function VitalsTab({ vitals, loading }) {
           </tbody>
         </table>
       </div>
-      <p className="text-[11px] text-white/40">
+      <p className="tls-type-small text-quiet">
         LCP: größtes Element sichtbar (gut ≤ 2,5 s). INP: Reaktion auf Eingaben (gut ≤ 200 ms). CLS: Springen des Layouts (gut ≤ 0,1). TTFB: erstes Byte (gut ≤ 0,8 s).
         Werte der letzten {vitals?.days ?? 7} Tage, p75 = drei von vier Besuchen sind so schnell oder schneller. Ohne Adresse, Nutzer oder Cookies, {vitals?.retention_days ?? 30} Tage aufgehoben.
       </p>
@@ -518,14 +519,14 @@ function ChecksTab({ checks, loading, running, onRun }) {
   return (
     <div className="space-y-4" data-testid="ops-checks">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <p className="text-sm text-white/60" data-testid="ops-checks-summary">{describeRun(latest)}</p>
+        <p className="tls-type-small text-white/60" data-testid="ops-checks-summary">{describeRun(latest)}</p>
         <button
           type="button"
           onClick={onRun}
           disabled={running}
           data-testid="ops-checks-run"
           aria-busy={running}
-          className="inline-flex min-h-[44px] items-center gap-2 border border-[#29B6E8]/40 bg-[#29B6E8]/10 text-[#29B6E8] px-3 py-2 rounded-sm text-xs font-bold uppercase tracking-wider disabled:opacity-50"
+          className="inline-flex min-h-[44px] items-center gap-2 border border-[#29B6E8]/40 bg-[#29B6E8]/10 text-[#29B6E8] px-3 py-2 rounded-sm tls-type-label disabled:opacity-50"
         >
           <PlayCircle className={`w-4 h-4 ${running ? "animate-pulse" : ""}`} /> {running ? "Prüfe …" : "Jetzt neu prüfen"}
         </button>
@@ -537,9 +538,9 @@ function ChecksTab({ checks, loading, running, onRun }) {
             <div className="flex-1 min-w-0">
               <div className="flex flex-wrap items-baseline gap-x-3">
                 <span className="font-bold">{check.label}</span>
-                <span className={`text-sm ${toneClass(check.status)}`}>{check.value}</span>
+                <span className={`tls-type-small ${toneClass(check.status)}`}>{check.value}</span>
               </div>
-              {check.detail ? <div className="text-[11px] text-white/45">{check.detail}</div> : null}
+              {check.detail ? <div className="tls-type-small text-white/45">{check.detail}</div> : null}
             </div>
           </div>
         ))}
@@ -550,10 +551,10 @@ function ChecksTab({ checks, loading, running, onRun }) {
       <FileCleanupsPanel onChanged={onRun} />
       {history.length ? (
         <div className="border border-white/10 bg-[#121212] rounded-sm p-4" data-testid="ops-checks-history">
-          <div className="text-[10px] uppercase tracking-widest text-white/40 mb-2">Verlauf {checks?.history_days ?? 7} Tage · Läufe mit rot / gelb</div>
+          <div className="tls-type-small text-quiet mb-2">Verlauf {checks?.history_days ?? 7} Tage · Läufe mit rot / gelb</div>
           <div className="flex flex-wrap gap-2">
             {history.map((day) => (
-              <div key={day.day} className="border border-white/10 rounded-sm px-3 py-2 text-xs">
+              <div key={day.day} className="border border-white/10 rounded-sm px-3 py-2 tls-type-small">
                 <div className="text-white/50">{day.day.slice(5)}</div>
                 <div>
                   <span className={day.crit ? "text-[#FF6B61] font-bold" : "text-white/40"}>{day.crit} rot</span>
@@ -566,7 +567,7 @@ function ChecksTab({ checks, loading, running, onRun }) {
           </div>
         </div>
       ) : null}
-      <p className="text-[11px] text-white/40">
+      <p className="tls-type-small text-quiet">
         Rote Prüfungen und neue 5xx-Fehlergruppen schickt der Discord-Bot in den Betriebskanal (Verbindungen → Discord), höchstens eine Meldung je Prüfung und Stunde.
       </p>
     </div>

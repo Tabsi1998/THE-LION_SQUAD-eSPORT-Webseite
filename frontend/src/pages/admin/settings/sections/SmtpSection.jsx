@@ -10,13 +10,13 @@ export function SmtpSection({ smtp, setSmtp, smtpTestEmail, setSmtpTestEmail, sm
       <SetupGuide guideKey="smtp" />
       <div className="border border-white/10 bg-[#121212] rounded-sm p-5 space-y-3">
         <div className="flex items-center justify-between">
-          <div className="font-heading font-bold uppercase">Eigener SMTP-Server</div>
-          <label className="flex items-center gap-2 text-sm">
+          <div className="font-bold uppercase">Eigener SMTP-Server</div>
+          <label className="flex items-center gap-2 tls-type-small">
             <input type="checkbox" checked={smtp.enabled} onChange={(e) => setSmtp({ ...smtp, enabled: e.target.checked })} className="accent-[#29B6E8]" data-testid="smtp-enabled" />
             <span>Versand aktiv</span>
           </label>
         </div>
-        <div className="border border-[#29B6E8]/25 bg-[#29B6E8]/5 rounded-sm p-4 text-xs text-white/65">
+        <div className="border border-[#29B6E8]/25 bg-[#29B6E8]/5 rounded-sm p-4 tls-type-small text-white/65">
           <div className="font-bold uppercase tracking-widest text-[#29B6E8] mb-2">So geht es am einfachsten</div>
           <p>Du brauchst den Mailserver (Name oder IP), Port, Benutzer, Passwort und die Absender-Adresse. Die Verschlüsselung richtet sich nach dem Port: 465 = SSL/TLS, 25 = ohne, sonst STARTTLS. Eine IP aus dem eigenen Netz als Server geht auch.</p>
           <div className="mt-3 flex flex-col sm:flex-row gap-2">
@@ -29,7 +29,7 @@ export function SmtpSection({ smtp, setSmtp, smtpTestEmail, setSmtpTestEmail, sm
           </div>
         </div>
         <div>
-          <div className="text-[11px] font-bold uppercase tracking-widest text-white/60 mb-1.5">Provider</div>
+          <div className="tls-type-label text-white/60 mb-1.5">Provider</div>
           <select value={smtp.provider} onChange={(e) => setSmtp({ ...smtp, provider: e.target.value })} data-testid="smtp-provider" className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-sm">
             <option value="smtp">SMTP (eigener Server)</option>
             <option value="resend">Resend (API)</option>
@@ -37,37 +37,37 @@ export function SmtpSection({ smtp, setSmtp, smtpTestEmail, setSmtpTestEmail, sm
         </div>
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
           <div className="sm:col-span-2">
-            <div className="text-[11px] font-bold uppercase tracking-widest text-white/60 mb-1.5">SMTP Host</div>
+            <div className="tls-type-label text-white/60 mb-1.5">SMTP Host</div>
             <input value={smtp.smtp_host || ""} onChange={(e) => setSmtp({ ...smtp, smtp_host: e.target.value })} data-testid="smtp-host" className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-sm font-mono" placeholder="mail.example.com" />
           </div>
           <div>
-            <div className="text-[11px] font-bold uppercase tracking-widest text-white/60 mb-1.5">Port</div>
+            <div className="tls-type-label text-white/60 mb-1.5">Port</div>
             <input type="number" value={smtp.smtp_port || 587} onChange={(e) => setSmtp({ ...smtp, smtp_port: parseInt(e.target.value, 10) })} data-testid="smtp-port" className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-sm font-mono" />
           </div>
         </div>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <div>
-            <div className="text-[11px] font-bold uppercase tracking-widest text-white/60 mb-1.5">SMTP Anmeldung</div>
+            <div className="tls-type-label text-white/60 mb-1.5">SMTP Anmeldung</div>
             <select value={smtp.smtp_auth || "login"} onChange={(e) => setSmtp({ ...smtp, smtp_auth: e.target.value })} data-testid="smtp-auth" className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-sm">
               <option value="login">Mit Benutzer/Passwort (empfohlen)</option>
               <option value="auto">Automatisch (Altbestand)</option>
               <option value="none">Ohne Anmeldung (lokaler Relay)</option>
             </select>
-            <p className="mt-1 text-[11px] text-white/40">Für normalen Versand: Benutzer/Passwort auf Port 587.</p>
+            <p className="mt-1 tls-type-small text-quiet">Für normalen Versand: Benutzer/Passwort auf Port 587.</p>
           </div>
           <div>
-            <div className="text-[11px] font-bold uppercase tracking-widest text-white/60 mb-1.5">User</div>
+            <div className="tls-type-label text-white/60 mb-1.5">User</div>
             <input value={smtp.smtp_user || ""} onChange={(e) => setSmtp({ ...smtp, smtp_user: e.target.value })} data-testid="smtp-user" className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-sm font-mono" />
           </div>
           <div>
-            <div className="text-[11px] font-bold uppercase tracking-widest text-white/60 mb-1.5">Passwort {smtp.smtp_pass_masked && <span className="text-white/40 normal-case">(aktuell: {smtp.smtp_pass_masked})</span>}</div>
+            <div className="tls-type-label text-white/60 mb-1.5">Passwort {smtp.smtp_pass_masked && <span className="text-white/40 normal-case">(aktuell: {smtp.smtp_pass_masked})</span>}</div>
             <input type="password" value={smtp.smtp_pass || ""} onChange={(e) => setSmtp({ ...smtp, smtp_pass: e.target.value })} data-testid="smtp-pass" className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-sm font-mono" placeholder="••••••" />
-            {smtp.smtp_pass_masked && <button type="button" onClick={() => clearSmtpSecret().catch((e) => toast.error(formatApiError(e.response?.data?.detail)))} className="mt-2 text-[10px] uppercase font-bold text-[#FF6B6B]">Gespeichertes Passwort entfernen</button>}
+            {smtp.smtp_pass_masked && <button type="button" onClick={() => clearSmtpSecret().catch((e) => toast.error(formatApiError(e.response?.data?.detail)))} className="mt-2 tls-type-label text-[#FF6B6B]">Gespeichertes Passwort entfernen</button>}
           </div>
         </div>
         <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
           <div>
-            <div className="text-[11px] font-bold uppercase tracking-widest text-white/60 mb-1.5">Sicherheit</div>
+            <div className="tls-type-label text-white/60 mb-1.5">Sicherheit</div>
             <select value={smtp.smtp_security || "auto"} onChange={(e) => setSmtp({ ...smtp, smtp_security: e.target.value })} data-testid="smtp-security" className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-sm">
               <option value="auto">Auto nach Port</option>
               <option value="starttls">STARTTLS (587)</option>
@@ -76,24 +76,24 @@ export function SmtpSection({ smtp, setSmtp, smtpTestEmail, setSmtpTestEmail, sm
             </select>
           </div>
           <div>
-            <div className="text-[11px] font-bold uppercase tracking-widest text-white/60 mb-1.5">TLS Zertifikat</div>
-            <label className="h-[38px] flex items-center gap-2 bg-[#0A0A0A] border border-white/10 px-3 rounded-sm text-sm">
+            <div className="tls-type-label text-white/60 mb-1.5">TLS Zertifikat</div>
+            <label className="h-[38px] flex items-center gap-2 bg-[#0A0A0A] border border-white/10 px-3 rounded-sm tls-type-small">
               <input type="checkbox" checked={smtp.smtp_tls_verify !== false} onChange={(e) => setSmtp({ ...smtp, smtp_tls_verify: e.target.checked })} data-testid="smtp-tls-verify" className="accent-[#29B6E8]" />
               <span>Prüfen</span>
             </label>
           </div>
           <div>
-            <div className="text-[11px] font-bold uppercase tracking-widest text-white/60 mb-1.5">Absendername</div>
+            <div className="tls-type-label text-white/60 mb-1.5">Absendername</div>
             <input value={smtp.sender_name || ""} onChange={(e) => setSmtp({ ...smtp, sender_name: e.target.value })} data-testid="smtp-sender-name" className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-sm" placeholder="THE LION SQUAD" />
           </div>
           <div>
-            <div className="text-[11px] font-bold uppercase tracking-widest text-white/60 mb-1.5">Absender E-Mail</div>
+            <div className="tls-type-label text-white/60 mb-1.5">Absender E-Mail</div>
             <input type="email" value={smtp.sender_email || ""} onChange={(e) => setSmtp({ ...smtp, sender_email: e.target.value })} data-testid="smtp-sender-email" className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-sm" placeholder="noreply@lionsquad.at" />
           </div>
         </div>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <div>
-            <div className="text-[11px] font-bold uppercase tracking-widest text-white/60 mb-1.5">Technischer SMTP-Absender</div>
+            <div className="tls-type-label text-white/60 mb-1.5">Technischer SMTP-Absender</div>
             <input
               type="email"
               value={smtp.smtp_envelope_from || ""}
@@ -102,10 +102,10 @@ export function SmtpSection({ smtp, setSmtp, smtpTestEmail, setSmtpTestEmail, sm
               className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-sm font-mono"
               placeholder="office@lionsquad.at"
             />
-            <p className="mt-1 text-[11px] text-white/40">MAIL FROM / Return-Path. Leer = SMTP User.</p>
+            <p className="mt-1 tls-type-small text-quiet">MAIL FROM / Return-Path. Leer = SMTP User.</p>
           </div>
           <div>
-            <div className="text-[11px] font-bold uppercase tracking-widest text-white/60 mb-1.5">Antworten an</div>
+            <div className="tls-type-label text-white/60 mb-1.5">Antworten an</div>
             <input
               type="email"
               value={smtp.reply_to_email || ""}
@@ -114,13 +114,13 @@ export function SmtpSection({ smtp, setSmtp, smtpTestEmail, setSmtpTestEmail, sm
               className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-sm font-mono"
               placeholder="office@lionsquad.at"
             />
-            <p className="mt-1 text-[11px] text-white/40">Reply-To für Rückfragen.</p>
+            <p className="mt-1 tls-type-small text-quiet">Reply-To für Rückfragen.</p>
           </div>
         </div>
-        <p className="text-xs text-white/55" data-testid="smtp-shared-hint">Absender, „Antworten an“ und „Versand aktiv“ gelten für SMTP und Resend gemeinsam – im Resend-Abschnitt ist es dieselbe Einstellung.</p>
+        <p className="tls-type-small text-white/55" data-testid="smtp-shared-hint">Absender, „Antworten an“ und „Versand aktiv“ gelten für SMTP und Resend gemeinsam – im Resend-Abschnitt ist es dieselbe Einstellung.</p>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <div>
-            <div className="text-[11px] font-bold uppercase tracking-widest text-white/60 mb-1.5">Message-ID Domain</div>
+            <div className="tls-type-label text-white/60 mb-1.5">Message-ID Domain</div>
             <input
               value={smtp.message_id_domain || ""}
               onChange={(e) => setSmtp({ ...smtp, message_id_domain: e.target.value })}
@@ -128,10 +128,10 @@ export function SmtpSection({ smtp, setSmtp, smtpTestEmail, setSmtpTestEmail, sm
               className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-sm font-mono"
               placeholder="lionsquad.at"
             />
-            <p className="mt-1 text-[11px] text-white/40">Optional. Leer = Domain der Absender-E-Mail. Das ist nicht der SMTP Host.</p>
+            <p className="mt-1 tls-type-small text-quiet">Optional. Leer = Domain der Absender-E-Mail. Das ist nicht der SMTP Host.</p>
           </div>
           <div>
-            <div className="text-[11px] font-bold uppercase tracking-widest text-white/60 mb-1.5">HELO/EHLO Name</div>
+            <div className="tls-type-label text-white/60 mb-1.5">HELO/EHLO Name</div>
             <input
               value={smtp.smtp_helo_name || ""}
               onChange={(e) => setSmtp({ ...smtp, smtp_helo_name: e.target.value })}
@@ -139,13 +139,13 @@ export function SmtpSection({ smtp, setSmtp, smtpTestEmail, setSmtpTestEmail, sm
               className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-sm font-mono"
               placeholder="lionsquad.at"
             />
-            <p className="mt-1 text-[11px] text-white/40">Optional. Leer lassen ist erlaubt; dann nutzt die SMTP-Bibliothek ihren Standardnamen.</p>
+            <p className="mt-1 tls-type-small text-quiet">Optional. Leer lassen ist erlaubt; dann nutzt die SMTP-Bibliothek ihren Standardnamen.</p>
           </div>
-          <div className="text-xs text-white/45 flex items-end pb-1">
+          <div className="tls-type-small text-white/45 flex items-end pb-1">
             Hinweis: Diese Domain-Felder sind Mail-Identität, nicht Verbindung. Der SMTP Host darf weiterhin nur die IP sein.
           </div>
         </div>
-        <div className="border border-[#FFD700]/25 bg-[#FFD700]/5 rounded-sm p-4 text-xs text-white/60">
+        <div className="border border-[#FFD700]/25 bg-[#FFD700]/5 rounded-sm p-4 tls-type-small text-white/60">
           <div className="font-bold uppercase tracking-widest text-[#FFD700] mb-2">DNS Checkliste gegen Spam</div>
           <p>Gmail bewertet die öffentliche Ausgangs-IP deines Mailservers. Wichtig sind SPF, DKIM, DMARC, PTR/rDNS und die Mailserver-Logs. Der SMTP Host in dieser App darf trotzdem eine lokale IP sein.</p>
         </div>
@@ -153,7 +153,7 @@ export function SmtpSection({ smtp, setSmtp, smtpTestEmail, setSmtpTestEmail, sm
       </div>
 
       <div className="border border-white/10 bg-[#121212] rounded-sm p-5 space-y-3">
-        <div className="font-heading font-bold uppercase">SMTP Testmail</div>
+        <div className="font-bold uppercase">SMTP Testmail</div>
         <div className="flex flex-col sm:flex-row gap-2">
           <input type="email" placeholder="test@example.com" value={smtpTestEmail} onChange={(e) => setSmtpTestEmail(e.target.value)} data-testid="smtp-test-to" className="flex-1 bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-sm" />
           <button onClick={diagnoseSmtp} data-testid="smtp-diagnose" className="px-4 py-2 border border-[#FFD700] text-[#FFD700] font-bold uppercase tracking-wider rounded-sm inline-flex items-center justify-center gap-2"><AlertTriangle className="w-3.5 h-3.5" /> Diagnose</button>
@@ -161,7 +161,7 @@ export function SmtpSection({ smtp, setSmtp, smtpTestEmail, setSmtpTestEmail, sm
           <button onClick={sendSmtpTest} data-testid="smtp-test-send" className="px-4 py-2 border border-[#29B6E8] text-[#29B6E8] font-bold uppercase tracking-wider rounded-sm inline-flex items-center justify-center gap-2"><Send className="w-3.5 h-3.5" /> Senden</button>
         </div>
         {smtpDiag && (
-          <div data-testid="smtp-diagnose-result" className={`border rounded-sm p-4 text-xs space-y-3 ${smtpDiag.ok ? "border-[#00FF88]/25 bg-[#00FF88]/5" : "border-[#FF3B30]/25 bg-[#FF3B30]/5"}`}>
+          <div data-testid="smtp-diagnose-result" className={`border rounded-sm p-4 tls-type-small space-y-3 ${smtpDiag.ok ? "border-[#00FF88]/25 bg-[#00FF88]/5" : "border-[#FF3B30]/25 bg-[#FF3B30]/5"}`}>
             <div className="flex items-center gap-2 font-bold uppercase tracking-widest">
               {smtpDiag.ok ? <CheckCircle2 className="w-4 h-4 text-[#00FF88]" /> : <XCircle className="w-4 h-4 text-[#FF3B30]" />}
               Verbindung: {smtpDiag.ok ? "in Ordnung" : "Problem gefunden"}
@@ -203,7 +203,7 @@ export function SmtpSection({ smtp, setSmtp, smtpTestEmail, setSmtpTestEmail, sm
           </div>
         )}
         {smtpDeliverability && (
-          <div data-testid="smtp-deliverability-result" className={`border rounded-sm p-4 text-xs space-y-3 ${smtpDeliverability.ok ? "border-[#00FF88]/25 bg-[#00FF88]/5" : "border-[#FFD700]/25 bg-[#FFD700]/5"}`}>
+          <div data-testid="smtp-deliverability-result" className={`border rounded-sm p-4 tls-type-small space-y-3 ${smtpDeliverability.ok ? "border-[#00FF88]/25 bg-[#00FF88]/5" : "border-[#FFD700]/25 bg-[#FFD700]/5"}`}>
             <div className="flex items-center gap-2 font-bold uppercase tracking-widest">
               {smtpDeliverability.ok ? <CheckCircle2 className="w-4 h-4 text-[#00FF88]" /> : <AlertTriangle className="w-4 h-4 text-[#FFD700]" />}
               Zustellbarkeit: {smtpDeliverability.ok ? "die Grundlagen passen" : "bitte prüfen"}
@@ -228,8 +228,8 @@ export function SmtpSection({ smtp, setSmtp, smtpTestEmail, setSmtpTestEmail, sm
             )}
           </div>
         )}
-        <p className="text-xs text-white/50">„Senden“ schickt eine echte Testmail direkt über den Server, ohne Warteschlange. „Diagnose“ prüft nur die Verbindung, „Zustellbarkeit“ die DNS-Einträge eurer Domain.</p>
-        <p className="text-xs text-white/50">Hat der Mailserver ein selbst ausgestelltes Zertifikat, schalte bei „TLS Zertifikat“ das Prüfen aus. Besser ist ein gültiges Zertifikat am Mailserver.</p>
+        <p className="tls-type-small text-white/50">„Senden“ schickt eine echte Testmail direkt über den Server, ohne Warteschlange. „Diagnose“ prüft nur die Verbindung, „Zustellbarkeit“ die DNS-Einträge eurer Domain.</p>
+        <p className="tls-type-small text-white/50">Hat der Mailserver ein selbst ausgestelltes Zertifikat, schalte bei „TLS Zertifikat“ das Prüfen aus. Besser ist ein gültiges Zertifikat am Mailserver.</p>
       </div>
     </div>
   );

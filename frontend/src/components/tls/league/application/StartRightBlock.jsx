@@ -7,7 +7,7 @@ import { api, formatApiError } from "@/lib/api";
 import { useConfirm } from "@/components/tls/ConfirmDialog";
 import { declineText, rightLine } from "@/lib/leagueStartRights";
 
-const BUTTON = "inline-flex min-h-[44px] items-center rounded-sm px-3 py-2 text-xs font-bold uppercase tracking-wider disabled:opacity-50";
+const BUTTON = "inline-flex min-h-[44px] items-center rounded-sm px-3 py-2 tls-type-label disabled:opacity-50";
 
 export function StartRightBlock({ applicationId, carry, onChanged, testPrefix = "start-right" }) {
   const confirm = useConfirm();
@@ -40,7 +40,7 @@ export function StartRightBlock({ applicationId, carry, onChanged, testPrefix = 
   if (!line && !right.can_accept && !right.can_decline) return null;
   return (
     <div className="mt-1" data-testid={`${testPrefix}-${applicationId}`} data-state={right.state}>
-      {line ? <p className={`text-sm [overflow-wrap:anywhere] ${right.state === "offered" ? "font-semibold text-white" : "text-white/75"}`} data-testid={`${testPrefix}-line-${applicationId}`}>{line}</p> : null}
+      {line ? <p className={`tls-type-small [overflow-wrap:anywhere] ${right.state === "offered" ? "font-semibold text-white" : "text-white/75"}`} data-testid={`${testPrefix}-line-${applicationId}`}>{line}</p> : null}
       {right.can_accept || right.can_decline ? (
         <div className="mt-2 flex flex-wrap gap-2">
           {right.can_accept ? (

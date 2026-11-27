@@ -44,8 +44,8 @@ export default function F1ListPage() {
         <LazyImg src="https://images.unsplash.com/photo-1771440571270-e27b63085a48" priority className="absolute inset-0 w-full h-full object-cover opacity-20" alt="" sizes="100vw" />
         <div className="absolute inset-0 bg-gradient-to-b from-[#0A0A0A]/70 to-[#0A0A0A]" />
         <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
-          <span className="text-[11px] font-bold uppercase tracking-[0.3em] text-[#29B6E8]">Fast Lap Challenge</span>
-          <h1 className="mt-2 font-heading text-4xl md:text-6xl font-black uppercase">Speed. Rhythmus. Beste Runde.</h1>
+          <span className="tls-type-label text-[#29B6E8]">Fast Lap Challenge</span>
+          <h1 className="mt-2 tls-type-hero">Speed. Rhythmus. Beste Runde.</h1>
           <p className="mt-4 text-white/70 max-w-2xl">Zeitfahren mit Live-Ranglisten, mehreren Strecken und Gesamtwertung.</p>
         </div>
       </div>
@@ -85,15 +85,15 @@ function FastLapCard({ challenge: c }) {
         <div className="flex-1 min-w-0">
           <div className="flex flex-wrap items-center gap-2 mb-2">
             <PhaseBadge phase={c.public_phase} status={c.status} />
-            {c.is_championship && <span className="text-[10px] font-bold uppercase tracking-wider text-[#FFD700] border border-[#FFD700]/40 px-2 py-[3px] rounded-sm">Meisterschaft</span>}
-            {c.block_club_member_results && <span className="text-[10px] font-bold uppercase tracking-wider text-[#FFD700] border border-[#FFD700]/40 bg-[#FFD700]/10 px-2 py-[3px] rounded-sm">Externe Wertung</span>}
+            {c.is_championship && <span className="tls-type-label text-[#FFD700] border border-[#FFD700]/40 px-2 py-[3px] rounded-sm">Meisterschaft</span>}
+            {c.block_club_member_results && <span className="tls-type-label text-[#FFD700] border border-[#FFD700]/40 bg-[#FFD700]/10 px-2 py-[3px] rounded-sm">Externe Wertung</span>}
             {c.allow_club_reference_times !== false && c.show_club_reference_times !== false && (c.club_reference_count || 0) > 0 && (
-              <span className="text-[10px] font-bold uppercase tracking-wider text-white/65 border border-white/15 px-2 py-[3px] rounded-sm">Referenzzeiten</span>
+              <span className="tls-type-label text-white/65 border border-white/15 px-2 py-[3px] rounded-sm">Referenzzeiten</span>
             )}
           </div>
-          <h2 className="tls-card__title font-heading text-2xl font-bold break-words">{c.title}</h2>
-          {c.description && <p className="mt-1 text-sm text-white/60 line-clamp-2">{c.description}</p>}
-          <div className="mt-3 flex flex-wrap gap-5 text-xs text-white/60">
+          <h2 className="tls-card__title tls-type-section break-words">{c.title}</h2>
+          {c.description && <p className="mt-1 tls-type-body text-white/60 line-clamp-2">{c.description}</p>}
+          <div className="mt-3 flex flex-wrap gap-5 tls-type-small text-white/60">
             <span className="inline-flex items-center gap-1.5"><Flag className="w-3.5 h-3.5 text-[#29B6E8]" /> {c.track_count || 0} Strecken</span>
             <span className="inline-flex items-center gap-1.5"><Users className="w-3.5 h-3.5 text-[#29B6E8]" /> {c.participant_count || 0} Fahrer</span>
             {(c.club_reference_count || 0) > 0 && c.allow_club_reference_times !== false && c.show_club_reference_times !== false && (

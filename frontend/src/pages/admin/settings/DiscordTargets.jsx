@@ -119,21 +119,21 @@ export function DiscordTargets() {
   return (
     <div className="border border-white/10 bg-[#121212] rounded-sm p-5 space-y-5" data-testid="discord-targets">
       <div>
-        <div className="font-heading font-bold uppercase">Kanäle je Zweck</div>
-        <p className="mt-1 text-xs text-white/50">
+        <div className="font-bold uppercase">Kanäle je Zweck</div>
+        <p className="mt-1 tls-type-small text-white/50">
           Der Bot schickt alle Meldungen. Je Zweck ein Kanal aus der Liste (das sind die Kanäle, in denen der Bot schreiben darf) – ohne Liste die Kanal-ID.
           Ohne eigenen Kanal gehen News und Events in den Community-Kanal. Was nur Mitglieder oder der Vorstand sehen dürfen, geht nie in einen öffentlichen Kanal – egal, was hier steht.
         </p>
       </div>
       {botOff && (
-        <div className="border border-[#FFD700]/40 bg-[#FFD700]/10 rounded-sm p-3 text-xs text-white/80" data-testid="discord-targets-bot-off">
+        <div className="border border-[#FFD700]/40 bg-[#FFD700]/10 rounded-sm p-3 tls-type-small text-white/80" data-testid="discord-targets-bot-off">
           Der Bot ist aus – ohne Bot wird nichts gesendet. Unten im Bot-Kasten „Bot verbinden“ einschalten.
         </div>
       )}
       {!channels.ok && channels.text && (
-        <div className="flex flex-wrap items-center gap-2 text-xs text-white/50" data-testid="discord-channels-offline">
+        <div className="flex flex-wrap items-center gap-2 tls-type-small text-white/50" data-testid="discord-channels-offline">
           <span>{channels.text}</span>
-          <button type="button" onClick={loadChannels} className="inline-flex items-center gap-1 border border-white/15 px-2 py-1 rounded-sm text-[10px] font-bold uppercase tracking-wider text-white/70 hover:text-white">
+          <button type="button" onClick={loadChannels} className="inline-flex items-center gap-1 border border-white/15 px-2 py-1 rounded-sm tls-type-label text-white/70 hover:text-white">
             <RefreshCw className="w-3 h-3" /> Liste neu laden
           </button>
         </div>
@@ -147,12 +147,12 @@ export function DiscordTargets() {
           return (
             <div key={target} className={`border rounded-sm p-3 space-y-2 ${entry.private ? "border-[#FFD700]/25" : "border-white/10"}`} data-testid={`discord-target-${target}`}>
               <div className="flex flex-wrap items-center justify-between gap-2">
-                <div className="font-bold text-sm">{entry.label || target}</div>
-                <span className={`text-[10px] font-black uppercase tracking-widest ${entry.configured ? "text-[#00FF88]" : entry.private ? "text-[#FFD700]" : "text-white/45"}`} data-testid={`discord-target-${target}-state`}>
+                <div className="font-bold tls-type-small">{entry.label || target}</div>
+                <span className={`tls-type-label ${entry.configured ? "text-[#00FF88]" : entry.private ? "text-[#FFD700]" : "text-white/45"}`} data-testid={`discord-target-${target}-state`}>
                   {deliveryText(target, status)}
                 </span>
               </div>
-              <p className="text-xs text-white/45" data-testid={`discord-target-${target}-hint`}>{targetHint(target, data.bot?.roles?.member)}</p>
+              <p className="tls-type-small text-white/45" data-testid={`discord-target-${target}-hint`}>{targetHint(target, data.bot?.roles?.member)}</p>
               <div className="grid sm:grid-cols-[minmax(0,1fr)_auto] gap-2 items-start">
                 {channels.ok ? (
                   <select aria-label={`Kanal für ${entry.label || target}`} value={current} onChange={(e) => setDraft(target, e.target.value)}
@@ -169,19 +169,19 @@ export function DiscordTargets() {
                 )}
                 <div className="flex flex-wrap items-center gap-2">
                   <button type="button" onClick={() => saveTarget(target)} disabled={!!busy || drafts[target] === undefined} data-testid={`discord-target-${target}-save`}
-                    className="px-3 py-1.5 bg-[#29B6E8] text-black text-[10px] font-bold uppercase tracking-wider rounded-sm disabled:opacity-40">Speichern</button>
+                    className="px-3 py-1.5 bg-[#29B6E8] text-black tls-type-label rounded-sm disabled:opacity-40">Speichern</button>
                   <button type="button" onClick={() => testTarget(target)} disabled={!!busy} data-testid={`discord-target-${target}-test`}
-                    className="px-3 py-1.5 border border-[#5865F2]/60 text-[#b8c0ff] text-[10px] font-bold uppercase tracking-wider rounded-sm inline-flex items-center gap-1 disabled:opacity-40">
+                    className="px-3 py-1.5 border border-[#5865F2]/60 text-[#b8c0ff] tls-type-label rounded-sm inline-flex items-center gap-1 disabled:opacity-40">
                     <Send className="w-3 h-3" /> Test
                   </button>
                   {entry.configured && (
                     <button type="button" onClick={() => clearTarget(target)} disabled={!!busy} data-testid={`discord-target-${target}-clear`}
-                      className="px-3 py-1.5 border border-white/20 text-white/60 text-[10px] font-bold uppercase tracking-wider rounded-sm disabled:opacity-40">Entfernen</button>
+                      className="px-3 py-1.5 border border-white/20 text-white/60 tls-type-label rounded-sm disabled:opacity-40">Entfernen</button>
                   )}
                 </div>
               </div>
               {entry.last && (
-                <div className={`text-xs ${entry.last.status === "sent" ? "text-white/45" : "text-[#FF6B6B]"}`} data-testid={`discord-target-${target}-last`}>
+                <div className={`tls-type-small ${entry.last.status === "sent" ? "text-white/45" : "text-[#FF6B6B]"}`} data-testid={`discord-target-${target}-last`}>
                   {lastAttemptText(entry.last)}
                 </div>
               )}
@@ -190,17 +190,17 @@ export function DiscordTargets() {
         })}
       </div>
       <div>
-        <div className="font-heading font-bold uppercase text-sm">Was gemeldet wird</div>
+        <div className="tls-type-label">Was gemeldet wird</div>
         {(data.events || []).some((event) => event.routable) ? (
-          <p className="mt-1 text-xs text-white/45">Meldungen mit Spielbezug gehen je nach Regel an den Server des Spiels, an den Hauptserver oder an beide. Ohne eigenen Spielserver bleibt alles am Hauptserver. Mit „Spiel-Rolle anpingen“ beginnt die Meldung mit der Rolle des Spiels (etwa „CoD-Spieler“) – wer sie trägt, bekommt eine Benachrichtigung. Der Querverweis am Hauptserver pingt nie.</p>
+          <p className="mt-1 tls-type-small text-white/45">Meldungen mit Spielbezug gehen je nach Regel an den Server des Spiels, an den Hauptserver oder an beide. Ohne eigenen Spielserver bleibt alles am Hauptserver. Mit „Spiel-Rolle anpingen“ beginnt die Meldung mit der Rolle des Spiels (etwa „CoD-Spieler“) – wer sie trägt, bekommt eine Benachrichtigung. Der Querverweis am Hauptserver pingt nie.</p>
         ) : null}
         <div className="mt-2 grid sm:grid-cols-2 gap-x-6 gap-y-3">
           {(data.events || []).map((event) => (
             <div key={event.key} className="space-y-1" data-testid={`discord-event-${event.key}`}>
-              <label className="flex items-center gap-2 text-sm">
+              <label className="flex items-center gap-2 tls-type-small">
                 <input type="checkbox" checked={!!event.enabled} disabled={!!busy} onChange={(e) => toggleEvent(event.key, e.target.checked)} className="accent-[#29B6E8]" />
                 <span>{event.label}</span>
-                <span className="text-[10px] uppercase tracking-widest text-white/35">{status[event.target]?.label || event.target}</span>
+                <span className="tls-type-label text-quiet">{status[event.target]?.label || event.target}</span>
               </label>
               {event.routable ? (
                 <div className="pl-6 space-y-1">
@@ -211,8 +211,8 @@ export function DiscordTargets() {
                       <option key={rule.key} value={rule.key}>{rule.label}{rule.key === event.routing_default ? " (Vorgabe)" : ""}</option>
                     ))}
                   </select>
-                  <div className="text-[11px] text-white/45" data-testid={`discord-routing-preview-${event.key}`}>{event.routing_preview}</div>
-                  <label className="flex items-center gap-2 text-xs text-white/70">
+                  <div className="tls-type-small text-white/45" data-testid={`discord-routing-preview-${event.key}`}>{event.routing_preview}</div>
+                  <label className="flex items-center gap-2 tls-type-small text-white/70">
                     <input type="checkbox" checked={!!event.ping} disabled={!!busy || !event.enabled} onChange={(e) => setPing(event.key, e.target.checked)}
                       data-testid={`discord-ping-${event.key}`} className="accent-[#29B6E8]" />
                     <span>Spiel-Rolle anpingen</span>

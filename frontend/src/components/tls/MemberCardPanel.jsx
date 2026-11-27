@@ -81,7 +81,7 @@ export function MemberCardPanel() {
 
   const shown = offline || (card?.status === "valid" ? card : null);
   if (!shown) {
-    if (error) return <div className="mt-6 border border-white/10 rounded-sm bg-[#121212] p-5 text-sm text-white/60" data-testid="member-card-error">{error}</div>;
+    if (error) return <div className="mt-6 border border-white/10 rounded-sm bg-[#121212] p-5 tls-type-small text-white/60" data-testid="member-card-error">{error}</div>;
     return null;
   }
 
@@ -108,26 +108,26 @@ export function MemberCardPanel() {
         <div className="w-full max-w-[420px] mx-auto md:mx-0">{art({ offline: Boolean(offline), testId: "member-card-art" })}</div>
         <div className="flex flex-col items-center md:items-start gap-3 text-center md:text-left">
           {offline ? (
-            <div className="border border-white/10 rounded-sm bg-[#121212] p-4 text-sm text-white/70 max-w-sm" data-testid="member-card-offline">
+            <div className="border border-white/10 rounded-sm bg-[#121212] p-4 tls-type-small text-white/70 max-w-sm" data-testid="member-card-offline">
               <div className="inline-flex items-center gap-2 font-bold text-white"><WifiOff className="w-4 h-4 text-[#29B6E8]" /> Ohne Netz</div>
               <p className="mt-1">{standLine(offline)}. Der Prüfcode braucht Netz – er erscheint wieder, sobald du online bist.</p>
             </div>
           ) : (
             <>
               <div className="rounded-sm bg-white p-2" data-testid="member-card-qr-box"><BrandedQRCode value={card.verify_url} size={168} logoRatio={0.2} /></div>
-              <div className="text-sm text-white">{validUntilLine(card)}</div>
-              <div className="inline-flex items-start gap-1.5 text-xs text-white/50 max-w-sm"><QrCode className="w-3.5 h-3.5 shrink-0 mt-0.5" /> Ein Partner scannt den Code und sieht nur: gültig, Vorname, Mitgliedsart. Er erneuert sich alle paar Minuten – ein Foto davon gilt nicht.</div>
+              <div className="tls-type-small text-white">{validUntilLine(card)}</div>
+              <div className="inline-flex items-start gap-1.5 tls-type-small text-white/50 max-w-sm"><QrCode className="w-3.5 h-3.5 shrink-0 mt-0.5" /> Ein Partner scannt den Code und sieht nur: gültig, Vorname, Mitgliedsart. Er erneuert sich alle paar Minuten – ein Foto davon gilt nicht.</div>
             </>
           )}
           <div className="flex flex-wrap justify-center md:justify-start gap-2">
-            <button type="button" onClick={saveImage} disabled={busy} data-testid="member-card-save-image" className="tls-btn tls-btn--secondary inline-flex items-center gap-2 px-4 py-2 rounded-sm text-xs font-bold uppercase tracking-wider disabled:opacity-50">
+            <button type="button" onClick={saveImage} disabled={busy} data-testid="member-card-save-image" className="tls-btn tls-btn--secondary inline-flex items-center gap-2 px-4 py-2 rounded-sm tls-type-label disabled:opacity-50">
               <Download className="w-3.5 h-3.5" /> Als Bild speichern
             </button>
-            <button type="button" onClick={load} data-testid="member-card-refresh" className="tls-btn tls-btn--quiet inline-flex items-center gap-2 px-4 py-2 rounded-sm text-xs font-bold uppercase tracking-wider">
+            <button type="button" onClick={load} data-testid="member-card-refresh" className="tls-btn tls-btn--quiet inline-flex items-center gap-2 px-4 py-2 rounded-sm tls-type-label">
               <RefreshCw className="w-3.5 h-3.5" /> Code erneuern
             </button>
           </div>
-          <div className="inline-flex items-center gap-1.5 text-xs text-white/40"><Smartphone className="w-3.5 h-3.5" /> In der LionsAPP unter „Verein → Karte“ immer dabei.</div>
+          <div className="inline-flex items-center gap-1.5 tls-type-small text-quiet"><Smartphone className="w-3.5 h-3.5" /> In der LionsAPP unter „Verein → Karte“ immer dabei.</div>
         </div>
       </div>
       {/* Die Vorlage für das Bild: dieselbe Karte, groß, ohne Code - außerhalb des sichtbaren Bereichs. */}

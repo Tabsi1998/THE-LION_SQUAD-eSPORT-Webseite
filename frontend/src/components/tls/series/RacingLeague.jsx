@@ -44,7 +44,7 @@ function TeamCell({ row, index, rows, drivers, lead }) {
         {row.club_member && <span className="tls-standing-me">Verein</span>}
       </span>
       {names.length > 0 && (
-        <span className="mt-0.5 block text-[12px] leading-snug text-white/50">
+        <span className="mt-0.5 block tls-type-small leading-snug text-white/50">
           {names.map((item, position) => (
             <span key={item.key}>
               {position > 0 && ", "}
@@ -171,19 +171,19 @@ export function RacingLeague({ data }) {
       {/* Die Garage steht, sobald es Vereinsteams gibt; nur das Detail braucht einen öffentlichen Vereinsfahrer. */}
       {(garage.length > 0 || selected) && (
         <section className="mt-10" aria-labelledby="racing-garage-title" data-testid="racing-garage">
-          <h2 id="racing-garage-title" className="font-heading text-2xl font-black uppercase">Vereins-Garage</h2>
+          <h2 id="racing-garage-title" className="tls-type-section">Vereins-Garage</h2>
           <RacingGarageTeams garage={garage} rows={rows} drivers={drivers} selectedKey={selected?.key} onSelect={select} publicKeys={publicKeys} />
           {selected && <RacingDriverDetail ref={detailRef} row={selected} driver={drivers[selected.key]} rounds={rounds} flash={flash} qualifying={qualifying} qualiDuel={duel} />}
         </section>
       )}
 
       <section className="mt-12" aria-labelledby="racing-drivers-title" data-testid="racing-drivers">
-        <h2 id="racing-drivers-title" className="font-heading text-2xl font-black uppercase">Fahrerwertung</h2>
+        <h2 id="racing-drivers-title" className="tls-type-section">Fahrerwertung</h2>
         <SeriesRules rules={data.rules} />
-        {bonus && <p className="mt-2 text-sm text-white/70" data-testid="racing-bonus"><span className="text-white/45">Bonus </span>{bonus}</p>}
-        {sessionPoints.length > 0 && <p className="mt-2 text-sm text-white/70" data-testid="racing-session-points"><span className="text-white/45">Punkte je Lauf </span>{sessionPoints.join("; ")}</p>}
+        {bonus && <p className="mt-2 tls-type-small text-white/70" data-testid="racing-bonus"><span className="text-white/45">Bonus </span>{bonus}</p>}
+        {sessionPoints.length > 0 && <p className="mt-2 tls-type-small text-white/70" data-testid="racing-session-points"><span className="text-white/45">Punkte je Lauf </span>{sessionPoints.join("; ")}</p>}
         {/* Umgekehrte Startaufstellung je Lauf (#1960): „Sprint: Start in umgekehrter Quali-Reihenfolge (Top 8)“. */}
-        {sessionGrid.length > 0 && <p className="mt-2 text-sm text-white/70" data-testid="racing-session-grid"><span className="text-white/45">Startaufstellung </span>{sessionGrid.join("; ")}</p>}
+        {sessionGrid.length > 0 && <p className="mt-2 tls-type-small text-white/70" data-testid="racing-session-grid"><span className="text-white/45">Startaufstellung </span>{sessionGrid.join("; ")}</p>}
         {/* Regeländerung ab Runde X (#1960): Format ab Runde (#1930) und Regel-Versionen mit Tag und Hinweis. */}
         <RuleChanges changes={data.rule_changes} />
         {tables.length > 0 && (
@@ -212,8 +212,8 @@ export function RacingLeague({ data }) {
 
       {teamRows.length > 0 && (
         <section className="mt-12" aria-labelledby="racing-teams-title" data-testid="racing-teams">
-          <h2 id="racing-teams-title" className="font-heading text-2xl font-black uppercase">Teamwertung</h2>
-          {teamRule && <p className="mt-3 text-sm text-white/70" data-testid="racing-team-rule">{teamRule}</p>}
+          <h2 id="racing-teams-title" className="tls-type-section">Teamwertung</h2>
+          {teamRule && <p className="mt-3 tls-type-small text-white/70" data-testid="racing-team-rule">{teamRule}</p>}
           {/* Quelle („laut Veranstalter“ bzw. „berechnet“) und Modus der Teamwertung (#1960). */}
           <TeamSource teams={racing.teams} scoring={racing.team_scoring} rounds={rounds} />
           <SeriesStandings

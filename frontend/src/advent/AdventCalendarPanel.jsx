@@ -10,6 +10,7 @@ import { DOORS, doorVariant, opensLabel } from "./doors";
 import { sceneUrl } from "./scene";
 import { errorText, useAdventCalendar } from "./useAdventCalendar";
 import "./advent-calendar.css";
+import { ShortCaps } from "@/components/tls/ShortCaps";
 
 // Der Adventkalender (#641) mit seinen 24 Türchen - seit #963 kein eigener Seiteninhalt mehr, sondern das Innere des
 // Fensters, das sich vom Türchen neben dem Logo aus öffnet (AdventCalendarDialog). Der Server sagt, was offen ist; ein
@@ -46,7 +47,7 @@ export function Closed({ calendar, now = new Date() }) {
     <div className="tls-adv__frame" data-testid="advent-closed" data-reason={paused ? "empty" : "closed"}>
       <div className="relative overflow-hidden rounded-[9px] min-h-[340px] sm:min-h-[420px] flex items-end" style={{ backgroundImage: scene, backgroundSize: "cover", backgroundPosition: "50% 100%" }}>
         <div className="relative w-full p-6 sm:p-10 bg-gradient-to-t from-[#03060f]/95 via-[#03060f]/70 to-transparent">
-          <h2 className="font-serif text-3xl sm:text-4xl font-semibold text-[#fff6e0]" style={{ fontFamily: 'Georgia, "Noto Serif", "Times New Roman", serif' }}>{title}</h2>
+          <h2 className="font-serif tls-type-section text-[#fff6e0]" style={{ fontFamily: 'Georgia, "Noto Serif", "Times New Roman", serif' }}><ShortCaps>{title}</ShortCaps></h2>
           <p className="mt-3 max-w-xl text-white/75" data-testid="advent-closed-text">{text}</p>
         </div>
       </div>
@@ -97,8 +98,8 @@ export function AdventCalendarPanel({ titleId }) {
     <div className="tls-adv w-full" data-testid="advent-page" data-preview={previewing ? "1" : undefined}>
       <header className="mb-7 sm:mb-9 grid gap-5 lg:grid-cols-[minmax(0,1fr)_minmax(260px,340px)] lg:items-end">
         <div className="min-w-0">
-          <span className="inline-flex items-center gap-2 text-[11px] font-bold uppercase tracking-[0.3em] text-[#e9c46a]"><CalendarHeart className="w-4 h-4" /> Advent</span>
-          <h1 id={titleId} className="mt-2 text-4xl sm:text-5xl font-semibold text-[#fff6e0]" style={{ fontFamily: 'Georgia, "Noto Serif", "Times New Roman", serif' }} data-testid="advent-title">
+          <span className="inline-flex items-center gap-2 tls-type-label text-[#e9c46a]"><CalendarHeart className="w-4 h-4" /> Advent</span>
+          <h1 id={titleId} className="mt-2 tls-type-title text-[#fff6e0]" style={{ fontFamily: 'Georgia, "Noto Serif", "Times New Roman", serif' }} data-testid="advent-title">
             Adventkalender{calendar?.active ? ` ${calendar.year}` : ""}
           </h1>
           <p className="mt-3 max-w-2xl text-white/65">
@@ -107,7 +108,7 @@ export function AdventCalendarPanel({ titleId }) {
               : "Jeden Tag um 6 Uhr geht ein neues Türchen auf. Was du verpasst hast, holst du bis 6. Jänner nach."}
           </p>
           {previewing && (
-            <p className="mt-3 inline-flex items-start gap-2 rounded-sm border border-[#e9c46a]/40 bg-[#e9c46a]/10 px-3 py-2 text-sm text-[#ffd98a]" data-testid="advent-preview-note">
+            <p className="mt-3 inline-flex items-start gap-2 rounded-sm border border-[#e9c46a]/40 bg-[#e9c46a]/10 px-3 py-2 tls-type-body text-[#ffd98a]" data-testid="advent-preview-note">
               <Eye className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
               <span>
                 Vorschau: so sieht der Kalender am {calendar?.now ? viennaDate(calendar.now, { day: "numeric", month: "long" }) : "gewählten Tag"} aus. Öffnen zählt nicht, bei Verlosungen wird nicht mitgemacht.
@@ -119,15 +120,15 @@ export function AdventCalendarPanel({ titleId }) {
         {calendar?.active && (
           <div className="rounded-lg border border-[#e9c46a]/25 bg-white/[0.03] p-4" data-testid="advent-progress">
             <div className="flex items-baseline justify-between gap-3">
-              <span className="text-[11px] font-bold uppercase tracking-[0.22em] text-white/50">{signedIn ? "Gesammelt" : "Geöffnet"}</span>
+              <span className="tls-type-label text-white/50">{signedIn ? "Gesammelt" : "Geöffnet"}</span>
               <span className="font-semibold text-[#fff6e0] tabular-nums" data-testid="advent-count">{opened} von {DOORS}</span>
             </div>
             <div className="tls-adv__progress mt-3" role="progressbar" aria-valuemin={0} aria-valuemax={DOORS} aria-valuenow={opened} aria-label="Geöffnete Türchen">
               <div className="tls-adv__progress-bar" style={{ width: `${Math.min(100, (opened / DOORS) * 100)}%` }} />
             </div>
-            {complete && <p className="mt-3 text-sm text-[#e9c46a]" data-testid="advent-complete">Alle Türchen geöffnet – frohe Weihnachten!</p>}
+            {complete && <p className="mt-3 tls-type-small text-[#e9c46a]" data-testid="advent-complete">Alle Türchen geöffnet – frohe Weihnachten!</p>}
             {!signedIn && !complete && !previewing && (
-              <p className="mt-3 text-sm text-white/60" data-testid="advent-guest">
+              <p className="mt-3 tls-type-body text-white/60" data-testid="advent-guest">
                 Du schaust als Gast. Gesammelt wird mit Konto – dann zählt jedes Türchen für den Erfolg „Alle Türchen“.{" "}
                 <Link to="/login" className="inline-flex items-center gap-1 font-semibold text-[#e9c46a] hover:text-[#fff1b8]"><LogIn className="w-3.5 h-3.5" /> Anmelden</Link>
               </p>
@@ -147,7 +148,7 @@ export function AdventCalendarPanel({ titleId }) {
       {calendar?.active && (
         <>
           <AdventBoard calendar={calendar} busyDay={busyDay} onOpen={onOpen} onShow={onShow} onLocked={onLocked} />
-          <p className="mt-4 min-h-[1.5rem] text-center text-sm text-[#ffd98a]" role="status" aria-live="polite" data-testid="advent-note">{note}</p>
+          <p className="mt-4 min-h-[1.5rem] text-center tls-type-body text-[#ffd98a]" role="status" aria-live="polite" data-testid="advent-note">{note}</p>
         </>
       )}
       <DoorDialog door={shown} light={light} signedIn={signedIn} onClose={() => setDialogDay(null)} onAnswer={answer} onRaffle={raffle} />

@@ -11,7 +11,7 @@ import { asInstant, viennaDay, viennaTime } from "@/lib/vienna";
 //   steht „Kurze Pause“. Beim Weiterspielen fällt die Uhrzeit von selbst weg.
 // - Sponsor je Runde (#1125): „Runde 2 präsentiert von“ - nur Sponsoren mit dem Haken „TV / Anzeige“.
 
-const INPUT = "bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-sm";
+const INPUT = "bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm tls-type-small";
 
 /** „14:30“ als Zeitpunkt: heute in Wien, liegt es schon zurück, morgen. */
 export function pauseUntilFromClock(clock, now = Date.now()) {
@@ -44,11 +44,11 @@ export function PauseUntilControl({ tournament, onSaved }) {
   return (
     <div className="mt-2 flex flex-wrap items-center gap-2 border border-[#FFD700]/30 bg-[#FFD700]/5 rounded-sm px-3 py-2" data-testid="admin-tr-pause-until">
       <Clock className="w-4 h-4 text-[#FFD700]" />
-      <label className="text-xs font-bold uppercase tracking-wider text-white/70" htmlFor="pause-until-clock">Pause bis</label>
+      <label className="tls-type-label text-white/70" htmlFor="pause-until-clock">Pause bis</label>
       <input id="pause-until-clock" type="time" value={clock} onChange={(event) => setClock(event.target.value)} className={`${INPUT} py-1`} data-testid="admin-tr-pause-until-input" />
-      <button type="button" disabled={busy || !clock} onClick={() => save(pauseUntilFromClock(clock))} className="px-3 py-1.5 bg-[#FFD700] text-black rounded-sm text-[11px] uppercase tracking-wider font-bold disabled:opacity-40" data-testid="admin-tr-pause-until-save">Speichern</button>
-      <button type="button" disabled={busy || !tournament.paused_until} onClick={() => save(null)} className="px-3 py-1.5 border border-white/15 text-white/70 rounded-sm text-[11px] uppercase tracking-wider font-bold disabled:opacity-40" data-testid="admin-tr-pause-until-clear">Ohne Uhrzeit</button>
-      <span className="text-[11px] text-white/45">Der TV zeigt „Weiter um …“ mit Countdown. Beim Weiterspielen fällt die Uhrzeit weg.</span>
+      <button type="button" disabled={busy || !clock} onClick={() => save(pauseUntilFromClock(clock))} className="px-3 py-1.5 bg-[#FFD700] text-black rounded-sm tls-type-label disabled:opacity-40" data-testid="admin-tr-pause-until-save">Speichern</button>
+      <button type="button" disabled={busy || !tournament.paused_until} onClick={() => save(null)} className="px-3 py-1.5 border border-white/15 text-white/70 rounded-sm tls-type-label disabled:opacity-40" data-testid="admin-tr-pause-until-clear">Ohne Uhrzeit</button>
+      <span className="tls-type-small text-white/45">Der TV zeigt „Weiter um …“ mit Countdown. Beim Weiterspielen fällt die Uhrzeit weg.</span>
     </div>
   );
 }
@@ -121,24 +121,24 @@ export function RoundSponsorsPanel({ tournament, matches = [], stages = [], onSa
     <section className={league ? "" : "mt-4 border border-white/10 bg-[#0F0F0F] rounded-sm p-4"} data-testid="admin-tr-round-sponsors">
       <div className="flex flex-wrap items-start justify-between gap-3">
         {league ? (
-          <p className="min-w-0 flex-1 text-xs text-white/60 max-w-2xl" data-testid="admin-tr-round-sponsors-league">Wählst du für eine Spielwoche einen Sponsor, steht in der TV-Ansicht der Staffel oben „präsentiert von“ mit Logo – solange diese Spielwoche läuft.</p>
+          <p className="min-w-0 flex-1 tls-type-small text-white/60 max-w-2xl" data-testid="admin-tr-round-sponsors-league">Wählst du für eine Spielwoche einen Sponsor, steht in der TV-Ansicht der Staffel oben „präsentiert von“ mit Logo – solange diese Spielwoche läuft.</p>
         ) : (
           <div>
-            <h3 className="font-heading text-sm font-black uppercase inline-flex items-center gap-2"><Tv className="w-4 h-4 text-[#29B6E8]" /> Runde präsentiert von</h3>
-            <p className="mt-1 text-xs text-white/50 max-w-2xl">Wählst du für eine Runde einen Sponsor, steht am Turnierbaum-TV oben „Runde 2 präsentiert von“ mit Logo – solange diese Runde läuft. Ob das überhaupt läuft, steht unter <Link to="/admin/tv" className="text-[#29B6E8] hover:underline">TV &amp; Beamer</Link>.</p>
+            <h3 className="tls-type-label inline-flex items-center gap-2"><Tv className="w-4 h-4 text-[#29B6E8]" /> Runde präsentiert von</h3>
+            <p className="mt-1 tls-type-small text-white/50 max-w-2xl">Wählst du für eine Runde einen Sponsor, steht am Turnierbaum-TV oben „Runde 2 präsentiert von“ mit Logo – solange diese Runde läuft. Ob das überhaupt läuft, steht unter <Link to="/admin/tv" className="text-[#29B6E8] hover:underline">TV &amp; Beamer</Link>.</p>
           </div>
         )}
-        <button type="button" onClick={save} disabled={busy || !dirty} className={`inline-flex items-center gap-2 px-3 py-2 bg-[#29B6E8] text-black rounded-sm text-xs uppercase tracking-wider font-bold disabled:opacity-40${league ? " min-h-[44px] w-full justify-center sm:w-auto" : ""}`} data-testid="admin-tr-round-sponsors-save">
+        <button type="button" onClick={save} disabled={busy || !dirty} className={`inline-flex items-center gap-2 px-3 py-2 bg-[#29B6E8] text-black rounded-sm tls-type-label disabled:opacity-40${league ? " min-h-[44px] w-full justify-center sm:w-auto" : ""}`} data-testid="admin-tr-round-sponsors-save">
           <Save className="w-3.5 h-3.5" /> Speichern
         </button>
       </div>
       {sponsors && !sponsors.length ? (
-        <p className="mt-3 text-xs text-[#FFD700]" data-testid="admin-tr-round-sponsors-none">Noch kein Sponsor mit „TV / Anzeige“. Unter Sponsoren bei einem Sponsor den Haken „TV / Anzeige“ setzen.</p>
+        <p className="mt-3 tls-type-small text-[#FFD700]" data-testid="admin-tr-round-sponsors-none">Noch kein Sponsor mit „TV / Anzeige“. Unter Sponsoren bei einem Sponsor den Haken „TV / Anzeige“ setzen.</p>
       ) : (
         <div className="mt-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
           {rounds.map((round) => (
             <label key={round.key} className="block" data-testid={`admin-tr-round-sponsor-${round.key}`}>
-              <div className="text-[11px] font-bold uppercase tracking-widest text-white/60 mb-1">{round.label}</div>
+              <div className="tls-type-label text-white/60 mb-1">{round.label}</div>
               <select value={choice[round.key] || ""} onChange={(event) => setChoice((current) => {
                 const next = { ...current };
                 if (event.target.value) next[round.key] = event.target.value;

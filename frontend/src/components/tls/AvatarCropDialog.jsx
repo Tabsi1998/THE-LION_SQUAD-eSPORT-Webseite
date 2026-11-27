@@ -194,8 +194,8 @@ export function AvatarCropDialog({ file, busy = false, onCancel, onApply, onLoad
       >
         <div className="flex items-start justify-between gap-3 p-5 border-b border-white/10">
           <div>
-            <h2 id={titleId} className="font-heading text-xl font-black uppercase">Profilbild zuschneiden</h2>
-            <p className="mt-1 text-sm text-white/60">So erscheint dein Bild im runden Rahmen.</p>
+            <h2 id={titleId} className="tls-type-section">Profilbild zuschneiden</h2>
+            <p className="mt-1 tls-type-small text-white/60">So erscheint dein Bild im runden Rahmen.</p>
           </div>
           <button type="button" onClick={onCancel} disabled={locked} aria-label="Abbrechen und schließen" className="p-1 text-white/50 hover:text-white disabled:opacity-40">
             <X className="w-5 h-5" />
@@ -237,12 +237,12 @@ export function AvatarCropDialog({ file, busy = false, onCancel, onApply, onLoad
             {/* Außerhalb des Kreises abgedunkelt: so sieht man, was der runde Rahmen zeigt. */}
             <div aria-hidden="true" className="pointer-events-none absolute inset-0 rounded-full shadow-[0_0_0_9999px_rgba(0,0,0,0.6)] ring-2 ring-white/70" />
             {!dims && (
-              <div className="absolute inset-0 flex items-center justify-center text-[10px] uppercase tracking-widest font-bold text-white/45">
+              <div className="absolute inset-0 flex items-center justify-center tls-type-label text-white/45">
                 Lade Bild …
               </div>
             )}
           </div>
-          <p id={helpId} className="text-center text-xs text-white/50">
+          <p id={helpId} className="text-center tls-type-small text-white/50">
             Ziehen zum Verschieben, Mausrad oder zwei Finger zum Zoomen. Mit der Tastatur: Pfeiltasten verschieben,
             Plus und Minus zoomen, 0 setzt zurück.
           </p>
@@ -268,7 +268,7 @@ export function AvatarCropDialog({ file, busy = false, onCancel, onApply, onLoad
             <button type="button" onClick={() => zoomBy(ZOOM_STEP)} disabled={!dims || locked || crop.zoom >= AVATAR_MAX_ZOOM} aria-label="Vergrößern" className="tls-btn tls-btn--quiet inline-flex min-h-11 min-w-11 items-center justify-center rounded-sm disabled:opacity-40">
               <Plus className="w-4 h-4" />
             </button>
-            <span className="w-12 text-right text-xs tabular-nums text-white/50" aria-hidden="true">{zoomPercent}%</span>
+            <span className="w-12 text-right tls-type-small tls-type-num text-white/50" aria-hidden="true">{zoomPercent}%</span>
           </div>
 
           <div className="flex items-center justify-between gap-3">
@@ -277,19 +277,19 @@ export function AvatarCropDialog({ file, busy = false, onCancel, onApply, onLoad
               <div className="relative w-10 h-10 rounded-full overflow-hidden bg-[#0A0A0A] border border-white/15">
                 {url && dims && <CropImage url={url} dims={dims} crop={crop} />}
               </div>
-              <span className="text-[10px] uppercase tracking-widest font-bold text-white/40">Klein</span>
+              <span className="tls-type-label text-quiet">Klein</span>
             </div>
-            <button type="button" onClick={() => update(INITIAL_AVATAR_CROP)} disabled={!dims || locked} className="tls-btn tls-btn--quiet inline-flex min-h-11 items-center gap-2 px-3 py-2 rounded-sm text-xs font-bold uppercase tracking-wider disabled:opacity-40">
+            <button type="button" onClick={() => update(INITIAL_AVATAR_CROP)} disabled={!dims || locked} className="tls-btn tls-btn--quiet inline-flex min-h-11 items-center gap-2 px-3 py-2 rounded-sm tls-type-label disabled:opacity-40">
               <RotateCcw className="w-3.5 h-3.5" /> Zurücksetzen
             </button>
           </div>
         </div>
 
         <div className="p-5 border-t border-white/10 flex flex-col-reverse sm:flex-row gap-2 sm:justify-end">
-          <button type="button" onClick={onCancel} disabled={locked} className="tls-btn tls-btn--quiet min-h-11 px-4 py-2 rounded-sm text-xs font-bold uppercase tracking-wider disabled:opacity-50" data-testid={`${testId}-cancel`}>
+          <button type="button" onClick={onCancel} disabled={locked} className="tls-btn tls-btn--quiet min-h-11 px-4 py-2 rounded-sm tls-type-label disabled:opacity-50" data-testid={`${testId}-cancel`}>
             Abbrechen
           </button>
-          <button type="button" onClick={apply} disabled={!dims || locked} className="tls-btn tls-btn--primary inline-flex min-h-11 items-center justify-center gap-2 px-5 py-2 rounded-sm text-xs font-black uppercase tracking-wider disabled:opacity-50" data-testid={`${testId}-apply`}>
+          <button type="button" onClick={apply} disabled={!dims || locked} className="tls-btn tls-btn--primary inline-flex min-h-11 items-center justify-center gap-2 px-5 py-2 rounded-sm tls-type-label disabled:opacity-50" data-testid={`${testId}-apply`}>
             <Check className="w-4 h-4" /> {locked ? "Lädt hoch …" : "Übernehmen"}
           </button>
         </div>

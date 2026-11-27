@@ -32,7 +32,7 @@ function Avatar({ user }) {
   const url = user?.avatar_url ? resolveMediaUrl(user.avatar_url) : "";
   const initials = nameOf(user).slice(0, 2).toUpperCase();
   return (
-    <div className="w-10 h-10 shrink-0 rounded-sm border border-white/10 bg-[#0A0A0A] overflow-hidden flex items-center justify-center font-heading font-black text-sm text-[#29B6E8]">
+    <div className="w-10 h-10 shrink-0 rounded-sm border border-white/10 bg-[#0A0A0A] overflow-hidden flex items-center justify-center tls-type-small font-black text-[#29B6E8]">
       {url && !failed ? <img src={url} alt="" className="w-full h-full object-cover" onError={() => setFailed(true)} /> : <span>{initials}</span>}
     </div>
   );
@@ -44,22 +44,22 @@ function Person({ user }) {
       <Avatar user={user} />
       <div className="min-w-0">
         {user?.username ? (
-          <Link to={`/u/${encodeURIComponent(user.username)}`} className="block font-bold text-sm text-white truncate hover:text-[#29B6E8]">{nameOf(user)}</Link>
+          <Link to={`/u/${encodeURIComponent(user.username)}`} className="block font-bold tls-type-small text-white truncate hover:text-[#29B6E8]">{nameOf(user)}</Link>
         ) : (
-          <div className="font-bold text-sm text-white truncate">{nameOf(user)}</div>
+          <div className="font-bold tls-type-small text-white truncate">{nameOf(user)}</div>
         )}
-        {user?.username ? <div className="text-xs text-white/40 truncate">@{user.username}</div> : null}
+        {user?.username ? <div className="tls-type-small text-quiet truncate">@{user.username}</div> : null}
       </div>
     </div>
   );
 }
 
-const buttonBase = "px-3 py-1.5 rounded-sm text-[10px] uppercase tracking-wider font-bold inline-flex items-center gap-1 disabled:opacity-50";
+const buttonBase = "px-3 py-1.5 rounded-sm tls-type-label inline-flex items-center gap-1 disabled:opacity-50";
 
 function Section({ title, count, rows, empty, testIdPrefix, children }) {
   return (
     <section className="border border-white/10 bg-[#121212] rounded-sm overflow-hidden">
-      <div className="px-4 py-3 border-b border-white/10 font-heading font-black uppercase">{title} ({count})</div>
+      <div className="px-4 py-3 border-b border-white/10 font-black uppercase">{title} ({count})</div>
       <div className="divide-y divide-white/5">
         {rows.map((row) => (
           <div key={row.id} data-testid={`${testIdPrefix}-${row.id}`} className="p-4 flex flex-wrap items-center gap-3">
@@ -67,7 +67,7 @@ function Section({ title, count, rows, empty, testIdPrefix, children }) {
             <div className="flex flex-wrap gap-2">{children(row)}</div>
           </div>
         ))}
-        {rows.length === 0 ? <div className="p-6 text-sm text-white/35 text-center">{empty}</div> : null}
+        {rows.length === 0 ? <div className="p-6 tls-type-small text-quiet text-center">{empty}</div> : null}
       </div>
     </section>
   );
@@ -177,8 +177,8 @@ export function FriendsPanel({ onChanged }) {
         <div className="flex items-start gap-3">
           <UserPlus className="w-5 h-5 text-[#29B6E8] mt-1 shrink-0" />
           <div className="min-w-0 flex-1">
-            <h2 className="font-heading text-2xl md:text-3xl font-black uppercase">Freunde</h2>
-            <p className="text-sm text-white/55 mt-1">Suche einen Spieler und schicke die Anfrage direkt hier. In der Privatsphäre kannst du Nachrichten auf Freunde beschränken.</p>
+            <h2 className="tls-type-section">Freunde</h2>
+            <p className="tls-type-body text-white/55 mt-1">Suche einen Spieler und schicke die Anfrage direkt hier. In der Privatsphäre kannst du Nachrichten auf Freunde beschränken.</p>
             <div className="relative mt-4">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-white/35" />
               <input
@@ -199,13 +199,13 @@ export function FriendsPanel({ onChanged }) {
                     <div key={candidate.id} data-testid={`friends-candidate-${candidate.id}`} className="p-3 flex flex-wrap items-center gap-3">
                       <Person user={candidate} />
                       {relation.kind === "friend" ? (
-                        <span className="text-[10px] uppercase tracking-wider font-bold text-[#00FF88]">Befreundet</span>
+                        <span className="tls-type-label text-[#00FF88]">Befreundet</span>
                       ) : relation.kind === "sent" ? (
-                        <span className="text-[10px] uppercase tracking-wider font-bold text-white/50">Anfrage gesendet</span>
+                        <span className="tls-type-label text-white/50">Anfrage gesendet</span>
                       ) : relation.kind === "incoming" ? (
                         <button type="button" onClick={() => act(relation.row, "accept")} className={`${buttonBase} tls-btn tls-btn--primary`}><Check className="w-3 h-3" /> Anfrage annehmen</button>
                       ) : candidate.blocked_by_me ? (
-                        <span className="text-[10px] uppercase tracking-wider font-bold text-white/40">Blockiert</span>
+                        <span className="tls-type-label text-quiet">Blockiert</span>
                       ) : (
                         <button type="button" onClick={() => request(candidate)} disabled={busyId === candidate.id} data-testid={`friends-request-${candidate.id}`} className={`${buttonBase} tls-btn tls-btn--primary`}>
                           <UserPlus className="w-3 h-3" /> Anfrage senden
@@ -214,8 +214,8 @@ export function FriendsPanel({ onChanged }) {
                     </div>
                   );
                 })}
-                {!searching && candidates.length === 0 ? <div className="p-3 text-xs text-white/35">Keine passenden Spieler gefunden.</div> : null}
-                {searching && candidates.length === 0 ? <div className="p-3 text-xs text-white/35">Suche …</div> : null}
+                {!searching && candidates.length === 0 ? <div className="p-3 tls-type-small text-quiet">Keine passenden Spieler gefunden.</div> : null}
+                {searching && candidates.length === 0 ? <div className="p-3 tls-type-small text-quiet">Suche …</div> : null}
               </div>
             ) : null}
           </div>
@@ -247,7 +247,7 @@ export function FriendsPanel({ onChanged }) {
             </Section>
           </div>
           <details className="order-3 lg:col-start-1 group" data-testid="profile-friends-outgoing">
-            <summary className="cursor-pointer select-none text-xs uppercase tracking-wider font-bold text-white/55 hover:text-white mb-2">
+            <summary className="cursor-pointer select-none tls-type-label text-white/55 hover:text-white mb-2">
               Gesendet ({data.outgoing.length}) – aufklappen
             </summary>
             <Section title="Gesendet" count={data.outgoing.length} rows={data.outgoing} empty="Keine gesendeten offenen Anfragen." testIdPrefix="friends-outgoing">

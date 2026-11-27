@@ -40,15 +40,15 @@ export function EventProgramPanel({ eventId, program, failed, reload, onEmbed })
 
   if (!eventId) {
     return (
-      <p className="text-sm text-white/55" data-testid="event-program-new">
+      <p className="tls-type-small text-white/55" data-testid="event-program-new">
         Turniere und Fast Laps legst du hier an, sobald das Event gespeichert ist.
       </p>
     );
   }
   if (failed && !program) {
-    return <p className="text-sm text-white/55" data-testid="event-program-error">Das Programm lässt sich gerade nicht laden.</p>;
+    return <p className="tls-type-small text-white/55" data-testid="event-program-error">Das Programm lässt sich gerade nicht laden.</p>;
   }
-  if (!program) return <p className="text-sm text-white/45">Lade Programm …</p>;
+  if (!program) return <p className="tls-type-small text-white/45">Lade Programm …</p>;
 
   const add = async () => {
     const [kind, itemId] = choice.split(":");
@@ -90,7 +90,7 @@ export function EventProgramPanel({ eventId, program, failed, reload, onEmbed })
   return (
     <div className="space-y-3" data-testid="event-program-panel">
       {items.length === 0 ? (
-        <p className="border border-dashed border-white/15 rounded-sm p-4 text-sm text-white/50" data-testid="event-program-empty">
+        <p className="border border-dashed border-white/15 rounded-sm p-4 tls-type-small text-white/50" data-testid="event-program-empty">
           Noch keine Turniere oder Fast Laps in diesem Event.
         </p>
       ) : (
@@ -101,16 +101,16 @@ export function EventProgramPanel({ eventId, program, failed, reload, onEmbed })
               <li key={`${kind}-${item.id}`} className="flex flex-wrap items-center gap-x-3 gap-y-2 px-3 py-2.5" data-testid={`event-program-item-${item.id}`}>
                 <Icon className="w-4 h-4 text-[#9F7AEA] shrink-0" aria-hidden="true" />
                 <div className="min-w-0 flex-1">
-                  <Link to={KIND[kind].edit(item.id)} className="font-semibold text-sm hover:underline break-words">{item.title || "Ohne Titel"}</Link>
-                  <div className="text-xs text-white/45">{[KIND[kind].label, item.start_date ? viennaDate(item.start_date) : ""].filter(Boolean).join(" · ")}</div>
+                  <Link to={KIND[kind].edit(item.id)} className="font-semibold tls-type-small hover:underline break-words">{item.title || "Ohne Titel"}</Link>
+                  <div className="tls-type-small text-white/45">{[KIND[kind].label, item.start_date ? viennaDate(item.start_date) : ""].filter(Boolean).join(" · ")}</div>
                   {/* Nach einer Verschiebung (#2127, EV4): der Termin bleibt, aber er passt nicht mehr zum Event. */}
                   {item.outside && (
-                    <div className="mt-0.5 text-xs font-bold text-[#FF9F43]" data-testid={`event-program-outside-${item.id}`}>
+                    <div className="mt-0.5 tls-type-small font-bold text-[#FF9F43]" data-testid={`event-program-outside-${item.id}`}>
                       Liegt außerhalb des Events{program.event?.window ? ` (${program.event.window})` : ""} – Tag prüfen.
                     </div>
                   )}
                 </div>
-                <div className="flex items-center gap-3 text-[11px] font-bold uppercase tracking-wider">
+                <div className="flex items-center gap-3 tls-type-label">
                   {onEmbed && (
                     <button type="button" onClick={() => onEmbed(kind, item)} className="text-[#29B6E8] hover:text-white">Ins Programm</button>
                   )}
@@ -126,11 +126,11 @@ export function EventProgramPanel({ eventId, program, failed, reload, onEmbed })
 
       <div className="flex flex-col sm:flex-row sm:flex-wrap gap-2">
         <Link to={`/admin/tournaments/new?event=${encodeURIComponent(eventId)}`} data-testid="event-program-new-tournament"
-          className="inline-flex items-center justify-center gap-2 px-4 py-2.5 bg-[#9F7AEA] text-black font-bold uppercase tracking-wider text-xs rounded-sm hover:bg-[#7C5CE0]">
+          className="inline-flex items-center justify-center gap-2 px-4 py-2.5 bg-[#9F7AEA] text-black tls-type-label rounded-sm hover:bg-[#7C5CE0]">
           <Plus className="w-3.5 h-3.5" aria-hidden="true" /> Turnier in diesem Event
         </Link>
         <Link to={`/admin/f1/new?event=${encodeURIComponent(eventId)}`} data-testid="event-program-new-fastlap"
-          className="inline-flex items-center justify-center gap-2 px-4 py-2.5 border border-[#9F7AEA]/50 text-[#9F7AEA] font-bold uppercase tracking-wider text-xs rounded-sm hover:bg-[#9F7AEA]/10">
+          className="inline-flex items-center justify-center gap-2 px-4 py-2.5 border border-[#9F7AEA]/50 text-[#9F7AEA] tls-type-label rounded-sm hover:bg-[#9F7AEA]/10">
           <Plus className="w-3.5 h-3.5" aria-hidden="true" /> Fast Lap
         </Link>
       </div>
@@ -152,12 +152,12 @@ export function EventProgramPanel({ eventId, program, failed, reload, onEmbed })
             ))}
           </select>
           <button type="button" onClick={add} disabled={!choice || busy} data-testid="event-program-add-submit"
-            className="px-4 py-2 border border-white/15 rounded-sm text-xs font-bold uppercase tracking-wider text-white/75 hover:text-white disabled:opacity-40">
+            className="px-4 py-2 border border-white/15 rounded-sm tls-type-label text-white/75 hover:text-white disabled:opacity-40">
             Hinzufügen
           </button>
         </div>
       )}
-      <p className="text-xs text-white/45">
+      <p className="tls-type-small text-white/45">
         Neu Angelegtes übernimmt Ort, Tag, Partner und Discord-Einstellungen vom Event{program.event?.window ? ` (${program.event.window})` : ""}. Der Tag muss im Event liegen.
       </p>
     </div>
@@ -168,14 +168,14 @@ export function EventProgramPanel({ eventId, program, failed, reload, onEmbed })
 export function EventMembershipLine({ eventId, events = [], testId = "event-membership" }) {
   if (!eventId) {
     return (
-      <p className="text-xs text-white/50" data-testid={testId}>
+      <p className="tls-type-small text-white/50" data-testid={testId}>
         Gehört zu keinem Event. Zu einem Event kommt es im Event unter „Programm“.
       </p>
     );
   }
   const name = events.find((item) => item.id === eventId)?.name || "einem Event";
   return (
-    <p className="text-sm text-white/70" data-testid={testId}>
+    <p className="tls-type-small text-white/70" data-testid={testId}>
       Gehört zu <strong className="text-white">{name}</strong> –{" "}
       <Link to={`/admin/events/${encodeURIComponent(eventId)}`} className="text-[#9F7AEA] hover:underline">ändern im Event</Link>
     </p>

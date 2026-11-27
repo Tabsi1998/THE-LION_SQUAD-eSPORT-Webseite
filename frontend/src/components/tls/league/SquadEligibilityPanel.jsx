@@ -21,12 +21,12 @@ function untilText(value) {
 function PlayerLine({ player }) {
   return (
     <li className="min-w-0 py-1.5" data-testid={`squad-eligibility-player-${player.id}`} data-state={player.state}>
-      <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-0.5 text-sm">
+      <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-0.5 tls-type-small">
         {player.ok ? <Check className="h-3.5 w-3.5 shrink-0 text-ok" aria-hidden="true" /> : <AlertTriangle className="h-3.5 w-3.5 shrink-0 text-warn" aria-hidden="true" />}
         <span className="min-w-0 truncate font-semibold text-white">{player.name}</span>
-        <span className={player.ok ? "text-xs text-white/50" : "text-xs text-warn"}>{ELIGIBILITY_LABELS[player.state] || player.state}{player.ok && ageLabel(player.age) ? ` · ${ageLabel(player.age)}` : ""}</span>
+        <span className={player.ok ? "tls-type-small text-white/50" : "tls-type-small text-warn"}>{ELIGIBILITY_LABELS[player.state] || player.state}{player.ok && ageLabel(player.age) ? ` · ${ageLabel(player.age)}` : ""}</span>
       </div>
-      {!player.ok && player.reason ? <p className="mt-0.5 pl-5 text-xs text-white/60 [overflow-wrap:anywhere]">{player.reason}</p> : null}
+      {!player.ok && player.reason ? <p className="mt-0.5 pl-5 tls-type-small text-white/60 [overflow-wrap:anywhere]">{player.reason}</p> : null}
     </li>
   );
 }
@@ -44,13 +44,13 @@ function Transfers({ rows, teamId, squadId, canEdit, onChanged }) {
   };
   return (
     <div>
-      <p className="text-[11px] font-bold uppercase tracking-widest text-white/55">Transfers</p>
-      <ul className="mt-1 space-y-1 text-sm">
+      <p className="tls-type-label text-white/55">Transfers</p>
+      <ul className="mt-1 space-y-1 tls-type-small">
         {rows.map((row) => (
           <li key={row.id} className="flex min-w-0 flex-wrap items-center justify-between gap-2" data-testid={`squad-transfer-${row.id}`} data-status={row.status}>
             <span className="min-w-0 text-white/80 [overflow-wrap:anywhere]">{row.user_name}: {TRANSFER_LABELS[row.status] || row.status}{row.reason ? ` („${row.reason}“)` : ""}</span>
             {row.status === "pending" && canEdit ? (
-              <button type="button" onClick={() => withdraw(row)} className="tls-btn tls-btn--quiet min-h-[40px] rounded-sm px-3 py-1.5 text-[10px] font-bold uppercase tracking-wider" data-testid={`squad-transfer-withdraw-${row.id}`}>
+              <button type="button" onClick={() => withdraw(row)} className="tls-btn tls-btn--quiet min-h-[40px] rounded-sm px-3 py-1.5 tls-type-label" data-testid={`squad-transfer-withdraw-${row.id}`}>
                 Zurückziehen
               </button>
             ) : null}
@@ -84,22 +84,22 @@ function Candidates({ rows, rules, teamId, squadId, transfers, onChanged }) {
     <div className="space-y-3">
       {later.length ? (
         <div data-testid="squad-candidates-later">
-          <p className="text-[11px] font-bold uppercase tracking-widest text-white/55">Aufnehmbar, spielen erst mit der fehlenden Angabe</p>
-          <ul className="mt-1 space-y-1 text-sm">
+          <p className="tls-type-small font-bold text-white/55">Aufnehmbar, spielen erst mit der fehlenden Angabe</p>
+          <ul className="mt-1 space-y-1 tls-type-small">
             {later.map((row) => <li key={row.id} className="min-w-0 text-white/70 [overflow-wrap:anywhere]" data-testid={`squad-candidate-${row.id}`}>{row.name}: {row.reason}</li>)}
           </ul>
         </div>
       ) : null}
       {movers.length || blocked.length ? (
         <div>
-          <p className="text-[11px] font-bold uppercase tracking-widest text-white/55">Aus dem Team, noch nicht aufnehmbar</p>
-          <ul className="mt-1 space-y-1.5 text-sm">
+          <p className="tls-type-small font-bold text-white/55">Aus dem Team, noch nicht aufnehmbar</p>
+          <ul className="mt-1 space-y-1.5 tls-type-small">
             {movers.map((row) => (
               <li key={row.id} className="flex min-w-0 flex-wrap items-center justify-between gap-2" data-testid={`squad-candidate-${row.id}`}>
                 <span className="min-w-0 text-white/80 [overflow-wrap:anywhere]">{row.name}: {row.reason}</span>
-                {open.has(row.id) ? <span className="text-xs text-white/50">Antrag läuft</span> : (
+                {open.has(row.id) ? <span className="tls-type-small text-white/50">Antrag läuft</span> : (
                   <button type="button" disabled={!rules.transfer_open || busy === row.id} onClick={() => ask(row)} title={rules.transfer_open ? undefined : "Das Transferfenster ist gerade zu."}
-                    className="tls-btn tls-btn--secondary inline-flex min-h-[40px] items-center gap-1.5 rounded-sm px-3 py-1.5 text-[10px] font-bold uppercase tracking-wider disabled:opacity-50" data-testid={`squad-transfer-ask-${row.id}`}>
+                    className="tls-btn tls-btn--secondary inline-flex min-h-[40px] items-center gap-1.5 rounded-sm px-3 py-1.5 tls-type-label disabled:opacity-50" data-testid={`squad-transfer-ask-${row.id}`}>
                     <ArrowRightLeft className="h-3.5 w-3.5" aria-hidden="true" /> Transfer beantragen
                   </button>
                 )}
@@ -135,7 +135,7 @@ export function SquadEligibilityPanel({ teamId, squad }) {
   const consentOpen = seasons.some((season) => rulesConsentState(season.rules_doc) === "open");
   return (
     <details className="group mt-3 rounded-sm border border-white/10 bg-white/[0.02]" data-testid={`squad-eligibility-${squad.id}`} open={blocked > 0 || consentOpen}>
-      <summary className="tls-hit flex min-h-[44px] cursor-pointer list-none items-center gap-2 px-3 py-2 text-xs font-bold uppercase tracking-wider text-[#29B6E8] [&::-webkit-details-marker]:hidden">
+      <summary className="tls-hit flex min-h-[44px] cursor-pointer list-none items-center gap-2 px-3 py-2 tls-type-label text-[#29B6E8] [&::-webkit-details-marker]:hidden">
         <ShieldCheck className="h-4 w-4 shrink-0" aria-hidden="true" />
         <span className="min-w-0 flex-1">
           Spielberechtigung{blocked ? ` · ${blocked} ${blocked === 1 ? "Person darf" : "Personen dürfen"} nicht spielen` : ""}
@@ -148,7 +148,7 @@ export function SquadEligibilityPanel({ teamId, squad }) {
           <div key={season.season_id} className="space-y-3" data-testid={`squad-eligibility-season-${season.season_id}`}>
             {/* Regelwerk (#2269): gültige Fassung und der Stand der Zustimmung dieses Co-Teams. */}
             {season.rules_doc ? <LeagueRulesNote rules={season.rules_doc} testId={`squad-rules-${season.season_id}`} /> : null}
-            <ul className="space-y-0.5 text-xs text-white/60">
+            <ul className="space-y-0.5 tls-type-small text-white/60">
               {rulesLines(season.rules).map((line) => <li key={line} className="[overflow-wrap:anywhere]">{line}</li>)}
             </ul>
             <ul className="divide-y divide-white/5">
@@ -156,12 +156,12 @@ export function SquadEligibilityPanel({ teamId, squad }) {
             </ul>
             {/* #2313: Fehlende Angaben halten die Anmeldung nicht auf, sie sperren Check-in und Aufstellung. */}
             {season.players.some((player) => !player.ok) ? (
-              <p className="text-xs text-white/60" data-testid={`squad-eligibility-lock-${season.season_id}`}>
+              <p className="tls-type-small text-white/60" data-testid={`squad-eligibility-lock-${season.season_id}`}>
                 Wer nicht spielen darf, kann nicht einchecken und nicht aufgestellt werden. Fehlt eine Angabe, trägt die Person sie im eigenen Profil nach – dann geht es sofort.
               </p>
             ) : null}
             {season.players.some((player) => player.until) ? (
-              <p className="text-xs text-white/50">Wartezeit endet: {season.players.filter((player) => player.until).map((player) => `${player.name} ${untilText(player.until)}`).join(", ")}</p>
+              <p className="tls-type-small text-white/50">Wartezeit endet: {season.players.filter((player) => player.until).map((player) => `${player.name} ${untilText(player.until)}`).join(", ")}</p>
             ) : null}
             <Candidates rows={season.candidates} rules={season.rules} teamId={teamId} squadId={squad.id} transfers={season.transfers} onChanged={load} />
             <Transfers rows={season.transfers} teamId={teamId} squadId={squad.id} canEdit={season.can_edit} onChanged={load} />

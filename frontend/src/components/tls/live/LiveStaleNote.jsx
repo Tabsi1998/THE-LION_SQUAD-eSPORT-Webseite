@@ -31,7 +31,7 @@ function StaleCounter({ since, className, testId, hidden }) {
     return () => clearInterval(timer);
   }, []);
   return (
-    <p className={`flex items-start gap-2 text-xs text-white/60 ${className}`} aria-hidden={hidden || undefined} data-testid={testId}>
+    <p className={`flex items-start gap-2 tls-type-small text-white/60 ${className}`} aria-hidden={hidden || undefined} data-testid={testId}>
       <WifiOff className="mt-0.5 h-3.5 w-3.5 shrink-0 text-warn" aria-hidden="true" />
       <span className="min-w-0 [overflow-wrap:anywhere]">{staleText(Math.max(0, now - since))}</span>
     </p>

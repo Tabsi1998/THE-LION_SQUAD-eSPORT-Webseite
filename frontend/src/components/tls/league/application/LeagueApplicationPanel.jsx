@@ -18,7 +18,7 @@ import { StartRightBlock } from "./StartRightBlock";
 export function ApplicationStateBadge({ state, testId, label, tone }) {
   const info = APPLICATION_STATES[state] || APPLICATION_STATES.none;
   return (
-    <span data-testid={testId} className={`inline-flex shrink-0 rounded-sm border px-2 py-0.5 text-[11px] font-bold uppercase tracking-wider ${STATE_CLASS[tone] || STATE_CLASS[info.tone]}`}>{label || info.label}</span>
+    <span data-testid={testId} className={`inline-flex shrink-0 rounded-sm border px-2 py-0.5 tls-type-label ${STATE_CLASS[tone] || STATE_CLASS[info.tone]}`}>{label || info.label}</span>
   );
 }
 
@@ -34,31 +34,31 @@ function OwnSquadRow({ row, onWithdraw, onChanged }) {
           <ApplicationStateBadge state={row.state} label={teamBadge(application) || teamStateLabel(row.state, application)} tone={teamBadgeTone(application)}
             testId={`league-application-state-${row.squad_id}`} />
         </div>
-        {["submitted", "in_review"].includes(row.state) ? <p className="mt-1 text-sm text-white/75">Die Liga-Leitung prüft die Anmeldung und meldet sich.</p> : null}
+        {["submitted", "in_review"].includes(row.state) ? <p className="mt-1 tls-type-small text-white/75">Die Liga-Leitung prüft die Anmeldung und meldet sich.</p> : null}
         {/* Aus der Vorgänger-Season übernommen (F.2, #1627): woher, welche Liga, bis wann Abmelden geht. */}
-        {application?.carry_over ? <p className="mt-1 text-sm text-white/85" data-testid={`league-application-carry-${row.squad_id}`}>{carryLine(application.carry_over)}</p> : null}
-        {application?.staffel ? <p className="mt-1 text-sm text-white/75">{application.staffel_left ? `Nicht mehr in ${application.staffel}: Austritt oder Disqualifikation.` : `Spielt in ${application.staffel}.`}</p> : null}
+        {application?.carry_over ? <p className="mt-1 tls-type-small text-white/85" data-testid={`league-application-carry-${row.squad_id}`}>{carryLine(application.carry_over)}</p> : null}
+        {application?.staffel ? <p className="mt-1 tls-type-small text-white/75">{application.staffel_left ? `Nicht mehr in ${application.staffel}: Austritt oder Disqualifikation.` : `Spielt in ${application.staffel}.`}</p> : null}
         {startRight ? <StartRightBlock applicationId={application.id} carry={application.carry_over} onChanged={onChanged} testPrefix="league-start-right" /> : null}
         {/* Mit Startrecht steht dessen Satz da (Frist, zugesagt, nachgerückt) - im Modus „automatisch“ hat es keinen, dann bleibt dieser. */}
         {row.state === "accepted" && !application?.staffel && !rightLine(application?.carry_over) ? (
-          <p className="mt-1 text-sm text-white/75">{application?.carry_over ? "Ihr seid automatisch dabei. Die Staffel teilt die Liga-Leitung noch zu." : "Der Startplatz steht. Liga und Staffel teilt die Liga-Leitung noch zu."}</p>
+          <p className="mt-1 tls-type-small text-white/75">{application?.carry_over ? "Ihr seid automatisch dabei. Die Staffel teilt die Liga-Leitung noch zu." : "Der Startplatz steht. Liga und Staffel teilt die Liga-Leitung noch zu."}</p>
         ) : null}
-        {row.state === "waitlist" ? <p className="mt-1 text-sm text-white/75">Wird ein Platz frei, entscheidet die Liga-Leitung. Es rückt niemand von selbst nach.</p> : null}
-        {application?.decision_reason ? <p className="mt-1 text-sm text-white/75 [overflow-wrap:anywhere]">Grund: {application.decision_reason}</p> : null}
+        {row.state === "waitlist" ? <p className="mt-1 tls-type-body text-white/75">Wird ein Platz frei, entscheidet die Liga-Leitung. Es rückt niemand von selbst nach.</p> : null}
+        {application?.decision_reason ? <p className="mt-1 tls-type-small text-white/75 [overflow-wrap:anywhere]">Grund: {application.decision_reason}</p> : null}
         {/* Offene Punkte (#2313): Die Anmeldung läuft, gesperrt wird erst beim Check-in - bis dahin bleibt sichtbar, was fehlt.
             Der Kasten sagt zuerst, dass die Anmeldung zählt (#2322); die Folge beim Spiel steht im Satz vom Server. */}
         {application && (row.shortfall || row.warnings?.length) ? (
-          <div className="mt-2 rounded-sm border border-[#29B6E8]/30 bg-[#29B6E8]/5 p-2 text-sm text-white/80" data-testid={`league-application-open-${row.squad_id}`}>
+          <div className="mt-2 rounded-sm border border-[#29B6E8]/30 bg-[#29B6E8]/5 p-2 tls-type-small text-white/80" data-testid={`league-application-open-${row.squad_id}`}>
             <p className="font-semibold text-white/90">Die Anmeldung zählt – fehlende Angaben halten euch nicht aus der Liga.</p>
             {row.shortfall ? <p className="mt-1 [overflow-wrap:anywhere]">{row.shortfall}</p> : null}
-            {row.warnings?.length ? <ul className="mt-1 space-y-0.5 text-xs text-white/70">{row.warnings.map((text) => <li key={text} className="[overflow-wrap:anywhere]">{text}</li>)}</ul> : null}
-            {row.warnings?.length ? <p className="mt-1 text-xs text-white/60">Wer bis zum ersten Spiel nichts im Profil nachträgt, kann nicht einchecken und nicht aufgestellt werden.</p> : null}
+            {row.warnings?.length ? <ul className="mt-1 space-y-0.5 tls-type-small text-white/70">{row.warnings.map((text) => <li key={text} className="[overflow-wrap:anywhere]">{text}</li>)}</ul> : null}
+            {row.warnings?.length ? <p className="mt-1 tls-type-small text-white/60">Wer bis zum ersten Spiel nichts im Profil nachträgt, kann nicht einchecken und nicht aufgestellt werden.</p> : null}
           </div>
         ) : null}
       </div>
       {application?.can_withdraw ? (
         <button type="button" onClick={() => onWithdraw(row)} data-testid={`league-application-withdraw-${row.squad_id}`}
-          className="tls-btn tls-btn--quiet inline-flex min-h-[44px] items-center rounded-sm px-3 py-2 text-xs font-bold uppercase tracking-wider">{application.carry_over ? "Abmelden" : "Zurückziehen"}</button>
+          className="tls-btn tls-btn--quiet inline-flex min-h-[44px] items-center rounded-sm px-3 py-2 tls-type-label">{application.carry_over ? "Abmelden" : "Zurückziehen"}</button>
       ) : null}
     </li>
   );
@@ -114,36 +114,36 @@ export function LeagueApplicationPanel({ leagueSlug, seasonSlug, block }) {
         <div className="min-w-0">
           {/* Das „?“ steht neben der Überschrift, nicht darin - sie benennt den Abschnitt (aria-labelledby). */}
           <div className="flex items-center gap-2">
-            <h2 id="league-application-title" className="inline-flex items-center gap-2 font-heading text-xl font-bold uppercase">
+            <h2 id="league-application-title" className="inline-flex items-center gap-2 tls-type-section">
               <ClipboardCheck className="h-5 w-5 tls-league-accent" aria-hidden="true" /> Anmeldung
             </h2>
             <HelpLink thema="liga-captains" schritt="anmeldung-starten" />
           </div>
-          <p className="mt-1 text-sm text-white/85" data-testid="league-application-window">
+          <p className="mt-1 tls-type-small text-white/85" data-testid="league-application-window">
             {current.state ? windowLine(current) : "Aus der Vorgänger-Season übernommen: Eure Co-Teams sind automatisch dabei."}
           </p>
-          {afterStart ? <p className="mt-0.5 text-sm text-white/70" data-testid="league-application-after-start">{afterStart}</p> : null}
-          {seats ? <p className="mt-0.5 text-sm text-white/70" data-testid="league-application-seats">{seats}</p> : null}
-          {current.entry_policy === "members" ? <p className="mt-0.5 text-sm text-white/70" data-testid="league-application-policy">Nur für Vereinsmitglieder.</p> : null}
-          {current.waitlist && current.waitlist_note ? <p className="mt-0.5 text-sm text-white/60 [overflow-wrap:anywhere]" data-testid="league-application-waitlist-note">{current.waitlist_note}</p> : null}
+          {afterStart ? <p className="mt-0.5 tls-type-small text-white/70" data-testid="league-application-after-start">{afterStart}</p> : null}
+          {seats ? <p className="mt-0.5 tls-type-small text-white/70" data-testid="league-application-seats">{seats}</p> : null}
+          {current.entry_policy === "members" ? <p className="mt-0.5 tls-type-small text-white/70" data-testid="league-application-policy">Nur für Vereinsmitglieder.</p> : null}
+          {current.waitlist && current.waitlist_note ? <p className="mt-0.5 tls-type-body text-white/60 [overflow-wrap:anywhere]" data-testid="league-application-waitlist-note">{current.waitlist_note}</p> : null}
         </div>
         {canStartApplication(view) ? (
           <Link to={applyPath} data-testid="league-application-start"
-            className="tls-btn tls-btn--primary inline-flex min-h-[44px] items-center rounded-sm px-4 py-2.5 text-xs font-bold uppercase tracking-wider">Mit Co-Team anmelden</Link>
+            className="tls-btn tls-btn--primary inline-flex min-h-[44px] items-center rounded-sm px-4 py-2.5 tls-type-label">Mit Co-Team anmelden</Link>
         ) : null}
         {!signedIn && current.state === "open" ? (
           <Link to={`/login?next=${encodeURIComponent(applyPath)}`} data-testid="league-application-login"
-            className="tls-btn tls-btn--secondary inline-flex min-h-[44px] items-center gap-2 rounded-sm px-4 py-2.5 text-xs font-bold uppercase tracking-wider">
+            className="tls-btn tls-btn--secondary inline-flex min-h-[44px] items-center gap-2 rounded-sm px-4 py-2.5 tls-type-label">
             <LogIn className="h-4 w-4" aria-hidden="true" /> Anmelden, dann Team melden
           </Link>
         ) : null}
       </div>
       {problems.length ? (
-        <ul className="mt-3 space-y-1 text-sm text-warn" data-testid="league-application-season-problems">
+        <ul className="mt-3 space-y-1 tls-type-small text-warn" data-testid="league-application-season-problems">
           {problems.map((text) => <li key={text} className="flex gap-2"><AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" /> <span>{text}</span></li>)}
         </ul>
       ) : null}
-      {view?.hint ? <p className="mt-3 text-sm text-white/70" data-testid="league-application-hint">{view.hint}</p> : null}
+      {view?.hint ? <p className="mt-3 tls-type-body text-white/70" data-testid="league-application-hint">{view.hint}</p> : null}
       {rows.length ? (
         <ul className="mt-3" aria-label="Deine Co-Teams" data-testid="league-application-squads">
           {rows.map((row) => <OwnSquadRow key={row.squad_id} row={row} onWithdraw={withdraw} onChanged={load} />)}

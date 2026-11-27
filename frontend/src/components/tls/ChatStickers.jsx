@@ -99,7 +99,7 @@ export function ChatStickerPicker({ open, onClose, onPick, disabled = false }) {
                 role="tab"
                 aria-selected={selected}
                 onClick={() => setActivePackId(pack.id)}
-                className={`shrink-0 whitespace-nowrap rounded-sm border px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider ${selected ? "border-[#29B6E8]/60 bg-[#29B6E8]/10 text-[#29B6E8]" : "border-white/10 text-white/55 hover:text-white"}`}
+                className={`shrink-0 whitespace-nowrap rounded-sm border px-2.5 py-1 tls-type-label ${selected ? "border-[#29B6E8]/60 bg-[#29B6E8]/10 text-[#29B6E8]" : "border-white/10 text-white/55 hover:text-white"}`}
               >
                 {pack.name}
               </button>
@@ -131,9 +131,9 @@ export function ChatStickerPicker({ open, onClose, onPick, disabled = false }) {
           <Loader2 className="h-4 w-4 animate-spin text-[#29B6E8]" />
         </div>
       )}
-      {failed && <p role="alert" className="py-4 text-center text-xs text-[#FF6B61]">Sticker konnten nicht geladen werden.</p>}
+      {failed && <p role="alert" className="py-4 text-center tls-type-small text-[#FF6B61]">Sticker konnten nicht geladen werden.</p>}
       {packs !== null && searching && visible.length === 0 && (
-        <p className="py-4 text-center text-xs text-white/40">Kein Sticker passt zu „{query.trim()}“.</p>
+        <p className="py-4 text-center tls-type-small text-quiet">Kein Sticker passt zu „{query.trim()}“.</p>
       )}
     </div>
   );

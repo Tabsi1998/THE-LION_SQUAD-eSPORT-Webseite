@@ -112,17 +112,17 @@ export function GermanDateField({
     triggerRef.current?.focus();
   };
 
-  const selectCls = "bg-[#0A0A0A] border border-white/10 rounded-sm px-2 py-1.5 text-xs font-bold text-white focus:outline-none focus:border-[#29B6E8] cursor-pointer";
+  const selectCls = "bg-[#0A0A0A] border border-white/10 rounded-sm px-2 py-1.5 tls-type-small font-bold text-white focus:outline-none focus:border-[#29B6E8] cursor-pointer";
   const describedBy = [hint ? `${id}-hint` : null, description ? `${id}-description` : null, error ? `${id}-error` : null].filter(Boolean).join(" ") || undefined;
   const showClear = Boolean(value) && !disabled;
 
   return (
     <div className="block">
       {label && (
-        <label htmlFor={id} id={`${id}-label`} className="block text-[11px] font-bold uppercase tracking-widest text-white/65 mb-1.5">
+        <label htmlFor={id} id={`${id}-label`} className="block tls-type-label text-white/65 mb-1.5">
           <span className="flex items-center justify-between gap-3">
             <span>{label}</span>
-            {required && <span className="text-[9px] text-[#FFD700]">Pflichtfeld</span>}
+            {required && <span className="tls-type-small text-[#FFD700]">Pflichtfeld</span>}
           </span>
         </label>
       )}
@@ -205,7 +205,7 @@ export function GermanDateField({
           <div className="p-3">
             <div className="grid grid-cols-7 mb-1">
               {WEEKDAYS.map((d) => (
-                <div key={d} className="text-center text-[10px] font-bold uppercase tracking-wider text-white/40 py-1">{d}</div>
+                <div key={d} className="text-center tls-type-label text-quiet py-1">{d}</div>
               ))}
             </div>
             <div ref={gridRef} className="grid grid-cols-7 gap-0.5">
@@ -227,7 +227,7 @@ export function GermanDateField({
                     aria-pressed={isSelected}
                     aria-current={isToday ? "date" : undefined}
                     data-testid={testId ? `${testId}-day-${day}` : undefined}
-                    className={`h-9 rounded-sm text-sm tabular-nums transition ${
+                    className={`h-9 rounded-sm tls-type-small tabular-nums transition ${
                       isSelected
                         ? "bg-[#29B6E8] text-black font-black"
                         : isFuture
@@ -241,14 +241,14 @@ export function GermanDateField({
               })}
             </div>
             <div className="mt-2 pt-2 border-t border-white/8 flex items-center justify-between">
-              <span className="text-[10px] uppercase tracking-widest text-white/35">
+              <span className="tls-type-label text-quiet">
                 {value ? formatGermanDate(value) : "Kein Datum gewählt"}
               </span>
               {value && (
                 <button
                   type="button"
                   onClick={() => { onChange(""); setOpen(false); }}
-                  className="text-[10px] font-bold uppercase tracking-widest text-white/45 hover:text-[#FF3B30] transition"
+                  className="tls-type-label text-white/45 hover:text-[#FF3B30] transition"
                 >
                   Entfernen
                 </button>
@@ -257,9 +257,9 @@ export function GermanDateField({
           </div>
         </PopoverContent>
       </Popover>
-      {hint && <div id={`${id}-hint`} className="mt-1 text-xs text-white/45">{hint}</div>}
-      {description && <div id={`${id}-description`} className="mt-1 text-[10px] text-white/45">{description}</div>}
-      {error && <div id={`${id}-error`} role="alert" className="mt-1 text-xs text-[#FF8A80]">{error}</div>}
+      {hint && <div id={`${id}-hint`} className="mt-1 tls-type-small text-white/45">{hint}</div>}
+      {description && <div id={`${id}-description`} className="mt-1 tls-type-small text-white/45">{description}</div>}
+      {error && <div id={`${id}-error`} role="alert" className="mt-1 tls-type-small text-[#FF8A80]">{error}</div>}
     </div>
   );
 }

@@ -35,13 +35,13 @@ export function InvoiceDetailsTab({ onSaved }) {
     }
   };
 
-  if (error) return <div className="mt-6 border border-[#FF3B30]/40 bg-[#FF3B30]/10 rounded-sm p-4 text-sm" data-testid="invoice-details-error">{error}</div>;
-  if (!details) return <div className="mt-6 text-sm text-white/45" role="status">Lade Rechnungsangaben …</div>;
+  if (error) return <div className="mt-6 border border-[#FF3B30]/40 bg-[#FF3B30]/10 rounded-sm p-4 tls-type-small" data-testid="invoice-details-error">{error}</div>;
+  if (!details) return <div className="mt-6 tls-type-small text-white/45" role="status">Lade Rechnungsangaben …</div>;
 
   const ready = Boolean(details.terms?.complete && details.tax_confirmed);
   return (
     <div className="mt-6 space-y-4 max-w-4xl" data-testid="invoice-details">
-      <div className={`border rounded-sm p-4 text-sm ${details.write_capable ? "border-[#00FF88]/30" : "border-[#FF9500]/40 bg-[#FF9500]/5"}`} data-testid="invoice-details-write">
+      <div className={`border rounded-sm p-4 tls-type-small ${details.write_capable ? "border-[#00FF88]/30" : "border-[#FF9500]/40 bg-[#FF9500]/5"}`} data-testid="invoice-details-write">
         {details.write_capable
           ? "Rechnungen schreiben ist an: die Website legt Belege in Dolibarr an."
           : details.connected
@@ -50,28 +50,28 @@ export function InvoiceDetailsTab({ onSaved }) {
       </div>
 
       <section className="border border-white/10 bg-[#121212] rounded-sm p-4 space-y-3" data-testid="invoice-details-tax">
-        <div className="text-xs font-bold uppercase tracking-wider text-white/70">Steuersätze je Profil</div>
-        <div className="text-sm text-white/65 flex flex-wrap gap-x-4 gap-y-1">
+        <div className="tls-type-label text-white/70">Steuersätze je Profil</div>
+        <div className="tls-type-small text-white/65 flex flex-wrap gap-x-4 gap-y-1">
           {Object.entries(details.tax_rates || {}).map(([profile, rate]) => (
             <span key={profile}>{PROFILE_LABELS[profile] || profile}: <span className="text-white tabular-nums">{Number(rate).toLocaleString("de-AT")} %</span></span>
           ))}
         </div>
-        <label className="flex items-start gap-2 text-sm">
+        <label className="flex items-start gap-2 tls-type-small">
           <input type="checkbox" className="mt-0.5" checked={Boolean(details.tax_confirmed)} disabled={!!busy}
             onChange={(event) => save({ tax_confirmed: event.target.checked }, event.target.checked ? "Steuersätze als geprüft gemerkt." : "Bestätigung zurückgenommen – Belege bleiben Entwurf.")}
             data-testid="invoice-details-tax-confirmed" />
           <span>
             Steuersätze geprüft (Kassier oder Steuerberatung)
-            {details.tax_confirmed?.at && <span className="block text-xs text-white/45" data-testid="invoice-details-tax-by">{details.tax_confirmed.by || "bestätigt"} am {viennaDate(details.tax_confirmed.at)}</span>}
+            {details.tax_confirmed?.at && <span className="block tls-type-small text-white/45" data-testid="invoice-details-tax-by">{details.tax_confirmed.by || "bestätigt"} am {viennaDate(details.tax_confirmed.at)}</span>}
           </span>
         </label>
-        <label className="flex items-start gap-2 text-sm">
+        <label className="flex items-start gap-2 tls-type-small">
           <input type="checkbox" className="mt-0.5" checked={Boolean(details.invoice_auto_validate)} disabled={!!busy || (!details.invoice_auto_validate && !ready)}
             onChange={(event) => save({ invoice_auto_validate: event.target.checked }, event.target.checked ? "Rechnungen werden gleich freigegeben." : "Rechnungen bleiben Entwurf zur Prüfung.")}
             data-testid="invoice-details-auto-validate" />
           <span>
             Rechnungen gleich freigeben (sonst Entwurf zur Prüfung in Dolibarr)
-            {!ready && <span className="block text-xs text-[#FF9500]">erst mit vollständigen Angaben unten und geprüften Steuersätzen</span>}
+            {!ready && <span className="block tls-type-small text-[#FF9500]">erst mit vollständigen Angaben unten und geprüften Steuersätzen</span>}
           </span>
         </label>
       </section>

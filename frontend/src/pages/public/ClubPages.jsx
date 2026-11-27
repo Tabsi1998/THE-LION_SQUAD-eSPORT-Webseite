@@ -20,6 +20,7 @@ import { FileText } from "lucide-react";
 import { viennaDate } from "@/lib/vienna";
 import { statutesHref } from "@/lib/statutes";
 import { isDeputyPosition } from "@/lib/boardSeats";
+import { ShortCaps } from "@/components/tls/ShortCaps";
 
 const CORE = ["obmann", "kassier", "schriftfuehrer"];
 
@@ -77,8 +78,8 @@ export function BoardPage() {
     <PublicLayout>
       <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
         <Breadcrumbs items={[{ label: "Start", to: "/" }, { label: "Verein", to: "/about" }, { label: "Vorstand" }]} className="mb-6" />
-        <span className="text-[11px] font-bold uppercase tracking-[0.3em] text-[#29B6E8]">Organisation</span>
-        <h1 className="mt-2 font-heading text-4xl md:text-5xl font-black uppercase">Vorstand</h1>
+        <span className="tls-type-label text-[#29B6E8]">Organisation</span>
+        <h1 className="mt-2 tls-type-title"><ShortCaps>Vorstand</ShortCaps></h1>
         <p className="mt-4 text-white/70 max-w-2xl">
           Das Team hinter THE LION SQUAD — eSports. Ehrenamtlich, leidenschaftlich, mit klarem Fokus auf Community und Fairplay.
         </p>
@@ -98,7 +99,7 @@ export function BoardPage() {
             </Reveal>
             {sections.deputies.length > 0 && (
               <div>
-                <div className="text-[11px] font-bold uppercase tracking-[0.3em] text-white/50 mb-4">Stellvertretungen</div>
+                <div className="tls-type-label text-white/50 mb-4">Stellvertretungen</div>
                 <Reveal className="tls-reveal-grid grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4" data-testid="board-deputies">
                   {sections.deputies.map((seat) => <div key={seat.key} className="tls-reveal-item"><Seat seat={seat} size="sm" /></div>)}
                 </Reveal>
@@ -106,7 +107,7 @@ export function BoardPage() {
             )}
             {sections.rest.length > 0 && (
               <div>
-                <div className="text-[11px] font-bold uppercase tracking-[0.3em] text-white/50 mb-4">Weitere Funktionen</div>
+                <div className="tls-type-label text-white/50 mb-4">Weitere Funktionen</div>
                 <Reveal className="tls-reveal-grid grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4" data-testid="board-special">
                   {sections.rest.map((seat) => <div key={seat.key} className="tls-reveal-item"><Seat seat={seat} size="sm" /></div>)}
                 </Reveal>
@@ -142,36 +143,36 @@ function StatutesBox({ statutes }) {
   const others = available ? (statutes.versions || []).filter((v) => !current || v.id !== current.id) : [];
   return (
     <section id="statuten" className="mt-12 border border-white/10 bg-[#121212] rounded-sm p-5 md:p-6 scroll-mt-24" data-testid="board-statutes">
-      <h2 className="font-heading text-xl font-bold uppercase mb-2">Statuten</h2>
+      <h2 className="tls-type-section mb-2">Statuten</h2>
       {!available ? (
-        <p className="text-sm text-white/60">
+        <p className="tls-type-body text-white/60">
           THE LION SQUAD — eSports ist ein eingetragener österreichischer eSports-Verein. Statuten und ZVR-Nummer werden im Mitgliederbereich nach dem Anmelden angezeigt.
         </p>
       ) : (
         <div className="space-y-4">
-          <p className="text-sm text-white/70">Die Statuten sind die Regeln unseres Vereins – wer Mitglied wird, stimmt ihnen zu.</p>
+          <p className="tls-type-body text-white/70">Die Statuten sind die Regeln unseres Vereins – wer Mitglied wird, stimmt ihnen zu.</p>
           {current ? (
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3" data-testid="board-statutes-current">
               <div className="flex items-start gap-3 min-w-0">
                 <FileText className="w-5 h-5 text-[#29B6E8] shrink-0 mt-0.5" aria-hidden="true" />
                 <div className="min-w-0">
-                  <div className="text-sm text-white font-bold break-words">{fromDocuments ? current.title : `Geltende Fassung: Fassung ${current.version}`}</div>
-                  <div className="text-xs text-white/50">
+                  <div className="tls-type-small text-white font-bold break-words">{fromDocuments ? current.title : `Geltende Fassung: Fassung ${current.version}`}</div>
+                  <div className="tls-type-small text-white/50">
                     {fromDocuments ? `Stand ${formatDay(current.updated_at)}` : `beschlossen am ${formatDay(current.decided_on)} · gültig seit ${formatDay(current.valid_from)}`}
                   </div>
                 </div>
               </div>
-              <a href={statutesHref(statutes)} target="_blank" rel="noreferrer" data-testid={`board-statutes-pdf-${current.id}`} className="tls-btn tls-btn--secondary inline-flex w-full sm:w-auto justify-center items-center gap-2 px-4 py-2.5 font-bold uppercase tracking-wider text-xs rounded-sm">
+              <a href={statutesHref(statutes)} target="_blank" rel="noreferrer" data-testid={`board-statutes-pdf-${current.id}`} className="tls-btn tls-btn--secondary inline-flex w-full sm:w-auto justify-center items-center gap-2 px-4 py-2.5 tls-type-label rounded-sm">
                 <FileText className="w-4 h-4" /> Statuten (PDF)
               </a>
             </div>
           ) : (
-            <p className="text-sm text-white/60" data-testid="board-statutes-none">
+            <p className="tls-type-small text-white/60" data-testid="board-statutes-none">
               {statutes.state === "ambiguous" ? "Welche Fassung heute gilt, ist in der Vereinsverwaltung noch nicht eindeutig." : "Derzeit ist noch keine Fassung in Kraft."}
             </p>
           )}
           {others.length > 0 && (
-            <ul className="text-xs text-white/50 space-y-1" data-testid="board-statutes-archive">
+            <ul className="tls-type-small text-white/50 space-y-1" data-testid="board-statutes-archive">
               {others.map((v) => (
                 <li key={v.id} className="flex flex-wrap items-center gap-x-2">
                   <span>{statuteLine(v)}</span>
@@ -180,7 +181,7 @@ function StatutesBox({ statutes }) {
               ))}
             </ul>
           )}
-          {!fromDocuments && <p className="text-xs text-white/40">Die Fassungen kommen aus der Vereinsverwaltung; jede Datei wird gegen die Prüfsumme der Vereinsakte geprüft.</p>}
+          {!fromDocuments && <p className="tls-type-small text-quiet">Die Fassungen kommen aus der Vereinsverwaltung; jede Datei wird gegen die Prüfsumme der Vereinsakte geprüft.</p>}
         </div>
       )}
     </section>

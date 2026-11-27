@@ -24,7 +24,7 @@ const ICON_BUTTON = "p-1.5 rounded-sm text-white/50 hover:text-white hover:bg-wh
 function RoundNotes({ round, profile = null }) {
   if (round.kind !== "final" && round.counts !== false && !round.original_club_day && !round.status_note) return null;
   return (
-    <div className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px] text-white/45">
+    <div className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-1 tls-type-small text-white/45">
       {round.kind === "final" && <span className="uppercase tracking-widest font-bold text-[#29B6E8]">Finale</span>}
       {round.counts === false && <span data-testid="round-no-score">{noScoreText(round, profile) || "zählt nicht zur Wertung"}</span>}
       {round.original_club_day && <span data-testid="round-original">ursprünglich {dayLabel(round.original_club_day)}</span>}
@@ -35,7 +35,7 @@ function RoundNotes({ round, profile = null }) {
 
 function StateBadge({ state }) {
   return (
-    <span className={`inline-flex items-center px-2 py-0.5 border rounded-sm text-[10px] font-bold uppercase tracking-widest whitespace-nowrap ${STATE_TONES[state] || STATE_TONES.planned}`} data-testid="round-state">
+    <span className={`inline-flex items-center px-2 py-0.5 border rounded-sm tls-type-label whitespace-nowrap ${STATE_TONES[state] || STATE_TONES.planned}`} data-testid="round-state">
       {STATE_LABELS[state] || state}
     </span>
   );
@@ -44,7 +44,7 @@ function StateBadge({ state }) {
 // #2024: eigener Zustand „ohne Datum“ neben dem Status - ein offener Termin ist geplant, aber noch nicht festgelegt.
 function UndatedBadge() {
   return (
-    <span className="tls-undated-badge inline-flex items-center px-2 py-0.5 border border-dashed border-amber-300/50 rounded-sm text-[10px] font-bold uppercase tracking-widest whitespace-nowrap text-amber-200/90" data-testid="round-undated">
+    <span className="tls-undated-badge inline-flex items-center px-2 py-0.5 border border-dashed border-amber-300/50 rounded-sm tls-type-label whitespace-nowrap text-amber-200/90" data-testid="round-undated">
       ohne Datum
     </span>
   );
@@ -157,10 +157,10 @@ export function SeriesCalendarSection({ series }) {
     <section className="border border-white/10 rounded-sm bg-[#121212] p-4" data-testid="series-calendar" aria-labelledby="series-calendar-title">
       <div className="flex items-start justify-between gap-3 flex-wrap">
         <div className="min-w-0">
-          <h2 id="series-calendar-title" className="text-[11px] font-bold uppercase tracking-widest text-[#29B6E8]">Kalender</h2>
+          <h2 id="series-calendar-title" className="tls-type-label text-[#29B6E8]">Kalender</h2>
           {/* „N von M“ auch bei 0 (#2024): mit geplanter Zahl steht der Zähler schon im leeren Kalender. */}
           {(allRounds.length > 0 || planned) && (
-            <div className="mt-1 flex flex-wrap gap-x-3 gap-y-1 text-xs text-white/55" data-testid="series-calendar-counts">
+            <div className="mt-1 flex flex-wrap gap-x-3 gap-y-1 tls-type-small text-white/55" data-testid="series-calendar-counts">
               {allRounds.length > 0 && <span>{allRounds.length} {profile ? kindWord(profile, allRounds.length === 1 ? "round_one" : "round_many", "Termine") : "Termine"}</span>}
               {planned && <span data-testid="series-calendar-planned">{planned.count} von {planned.planned} {profile ? kindWord(profile, "round_dative", "Terminen") : "vorgesehenen"} angelegt</span>}
               {undated.length > 0 && <span className="text-amber-200/90" data-testid="series-calendar-undated">{undated.length} ohne Datum</span>}
@@ -172,47 +172,47 @@ export function SeriesCalendarSection({ series }) {
         </div>
         {board && <div className="flex items-center gap-2 flex-wrap">
           {undated.length > 0 && (
-            <button type="button" onClick={() => setSheet({ type: "dates" })} disabled={busy} data-testid="calendar-dates" className="tls-btn tls-btn--secondary px-3 py-2 rounded-sm text-xs font-bold uppercase tracking-wider inline-flex items-center gap-2">
+            <button type="button" onClick={() => setSheet({ type: "dates" })} disabled={busy} data-testid="calendar-dates" className="tls-btn tls-btn--secondary px-3 py-2 rounded-sm tls-type-label inline-flex items-center gap-2">
               <CalendarCheck className="w-3.5 h-3.5" /> Datum nachtragen ({undated.length})
             </button>
           )}
           {allRounds.length > 1 && (
-            <button type="button" onClick={() => run(() => api.post(`${base}/sort-by-date`, { expected_version: calendar?.version }), "Nach Datum geordnet.")} disabled={busy} data-testid="calendar-sort" className="tls-btn tls-btn--quiet px-3 py-2 rounded-sm text-xs font-bold uppercase tracking-wider inline-flex items-center gap-2">
+            <button type="button" onClick={() => run(() => api.post(`${base}/sort-by-date`, { expected_version: calendar?.version }), "Nach Datum geordnet.")} disabled={busy} data-testid="calendar-sort" className="tls-btn tls-btn--quiet px-3 py-2 rounded-sm tls-type-label inline-flex items-center gap-2">
               <ArrowDownUp className="w-3.5 h-3.5" /> Nach Datum ordnen
             </button>
           )}
           {planned?.missing > 0 && (
-            <button type="button" onClick={fillPlanned} disabled={busy} data-testid="calendar-fill-planned" className="tls-btn tls-btn--secondary px-3 py-2 rounded-sm text-xs font-bold uppercase tracking-wider inline-flex items-center gap-2">
+            <button type="button" onClick={fillPlanned} disabled={busy} data-testid="calendar-fill-planned" className="tls-btn tls-btn--secondary px-3 py-2 rounded-sm tls-type-label inline-flex items-center gap-2">
               <CalendarPlus className="w-3.5 h-3.5" /> Fehlende Termine anlegen ({planned.missing})
             </button>
           )}
-          <button type="button" onClick={() => setSheet({ type: "paste" })} data-testid="calendar-paste" className="tls-btn tls-btn--secondary px-3 py-2 rounded-sm text-xs font-bold uppercase tracking-wider inline-flex items-center gap-2">
+          <button type="button" onClick={() => setSheet({ type: "paste" })} data-testid="calendar-paste" className="tls-btn tls-btn--secondary px-3 py-2 rounded-sm tls-type-label inline-flex items-center gap-2">
             <ClipboardList className="w-3.5 h-3.5" /> Liste einfügen
           </button>
-          <button type="button" onClick={openNew} disabled={!calendar} data-testid="calendar-new" className="tls-btn tls-btn--secondary px-3 py-2 rounded-sm text-xs font-bold uppercase tracking-wider inline-flex items-center gap-2">
+          <button type="button" onClick={openNew} disabled={!calendar} data-testid="calendar-new" className="tls-btn tls-btn--secondary px-3 py-2 rounded-sm tls-type-label inline-flex items-center gap-2">
             <Plus className="w-3.5 h-3.5" /> Termin
           </button>
         </div>}
       </div>
 
-      {error && <p className="mt-3 text-sm text-red-300" role="alert">{error}</p>}
+      {error && <p className="mt-3 tls-type-small text-red-300" role="alert">{error}</p>}
 
       {hints.length > 0 && (
-        <div className="mt-3 border border-amber-400/40 bg-amber-400/10 rounded-sm p-3 text-sm text-amber-100" data-testid="calendar-hints" role="status">
+        <div className="mt-3 border border-amber-400/40 bg-amber-400/10 rounded-sm p-3 tls-type-small text-amber-100" data-testid="calendar-hints" role="status">
           <div className="flex items-center gap-2 font-bold"><AlertTriangle className="w-4 h-4 text-amber-300" /> Lücke im Kalender</div>
           <ul className="mt-1 space-y-0.5">{hints.map((hint) => <li key={hint.round_id}>{hint.text}</li>)}</ul>
         </div>
       )}
 
       {calendar && allRounds.length === 0 && (
-        <p className="mt-3 text-sm text-white/55" data-testid="calendar-empty">
+        <p className="mt-3 tls-type-small text-white/55" data-testid="calendar-empty">
           {board ? "Noch keine Termine. Einzeln mit „Termin“ oder alle auf einmal mit „Liste einfügen“." : "Noch keine Termine."}
         </p>
       )}
       {/* Geführter Ablauf (#2024): was noch fehlt, Schritt für Schritt - verschwindet, sobald alles da ist. */}
       {board && calendar && <GuideSteps steps={guideSteps({ rounds: allRounds, planned, plannedRounds: series.planned_rounds, profile })} />}
       {undated.length > 0 && allRounds.length > undated.length && (
-        <div className="mt-3 flex flex-wrap items-center gap-2 text-xs">
+        <div className="mt-3 flex flex-wrap items-center gap-2 tls-type-small">
           <button type="button" aria-pressed={filtering} onClick={() => setOnlyUndated((value) => !value)} data-testid="calendar-filter-undated"
             className={`px-2.5 py-1 rounded-sm border font-bold uppercase tracking-wider transition-colors active:scale-[0.97] ${filtering ? "border-amber-300/60 bg-amber-300/10 text-amber-200" : "border-white/10 text-white/55 hover:text-white"}`}>
             Nur ohne Datum ({undated.length})
@@ -224,9 +224,9 @@ export function SeriesCalendarSection({ series }) {
         <ol className="mt-3 divide-y divide-white/5" data-testid="calendar-rounds">
           {rounds.map((round) => (
             <li key={round.id} data-testid="calendar-round" data-state={round.state} className={`py-2.5 flex flex-wrap sm:flex-nowrap items-start gap-x-3 gap-y-1 ${hintIds.has(round.id) ? "bg-amber-400/[0.04]" : ""}`}>
-              <div className="min-w-12 max-w-[40%] shrink-0 pt-0.5 text-sm font-black tabular-nums text-white/80 [overflow-wrap:anywhere]">{roundLabel(round)}</div>
+              <div className="min-w-12 max-w-[40%] shrink-0 pt-0.5 tls-type-small tls-type-num text-white/80 [overflow-wrap:anywhere]">{roundLabel(round)}</div>
               <div className="min-w-0 flex-1">
-                <div className={`text-sm ${round.state === "cancelled" ? "text-white/45" : "text-white"}`}>
+                <div className={`tls-type-small ${round.state === "cancelled" ? "text-white/45" : "text-white"}`}>
                   <span className="tabular-nums">{roundWhen(round)}</span>
                   {places ? (round.venue || round.title || round.country_code) && <span className="text-white/60"> · <VenueWithFlag round={round} /></span>
                     : round.title && <span className="text-white/60 [overflow-wrap:anywhere]"> · {round.title}</span>}
@@ -252,8 +252,8 @@ export function SeriesCalendarSection({ series }) {
           {weekends.map((weekend) => (
             <li key={weekend.key} className="py-2.5" data-testid="calendar-weekend" data-state={weekend.state}>
               <div className="flex items-start gap-3">
-                <div className="min-w-12 shrink-0 whitespace-nowrap pt-0.5 text-sm font-black tabular-nums text-white/80">{roundLabel(weekend.lead)}</div>
-                <div className={`min-w-0 flex-1 text-sm ${weekend.state === "cancelled" ? "text-white/45" : "text-white"}`}>
+                <div className="min-w-12 shrink-0 whitespace-nowrap pt-0.5 tls-type-small font-black tabular-nums text-white/80">{roundLabel(weekend.lead)}</div>
+                <div className={`min-w-0 flex-1 tls-type-small ${weekend.state === "cancelled" ? "text-white/45" : "text-white"}`}>
                   <span className="tabular-nums">{dayLabel(weekend.lead.club_day) || "Termin offen"}</span>
                   {(weekend.venue || weekend.title || weekend.country_code) && <span className="text-white/60"> · <VenueWithFlag round={weekend} /></span>}
                 </div>
@@ -265,9 +265,9 @@ export function SeriesCalendarSection({ series }) {
                   // Handy: Lauf, Zeit und Status in einer Zeile, die Knöpfe darunter; ab sm alles in einer Zeile.
                   return (
                     <li key={round.id} data-testid="calendar-round" data-state={round.state} className={`grid grid-cols-[6.5rem_minmax(0,1fr)_auto] sm:grid-cols-[7rem_minmax(0,1fr)_auto_auto] items-center gap-x-3 gap-y-1 ${hintIds.has(round.id) ? "bg-amber-400/[0.04]" : ""}`}>
-                      <span className={`text-[11px] font-bold uppercase tracking-[0.1em] [overflow-wrap:anywhere] ${round.state === "cancelled" ? "text-white/40 line-through" : "text-white/75"}`} data-testid="calendar-session">{round.session || "Rennen"}</span>
+                      <span className={`tls-type-label [overflow-wrap:anywhere] ${round.state === "cancelled" ? "text-quiet line-through" : "text-white/75"}`} data-testid="calendar-session">{round.session || "Rennen"}</span>
                       <span className="min-w-0">
-                        <span className={`block text-sm tabular-nums ${round.state === "cancelled" ? "text-white/45" : "text-white/85"}`}>{round.club_day !== weekend.lead.club_day ? roundWhen(round) : round.time || "ohne Uhrzeit"}</span>
+                        <span className={`block tls-type-small tabular-nums ${round.state === "cancelled" ? "text-white/45" : "text-white/85"}`}>{round.club_day !== weekend.lead.club_day ? roundWhen(round) : round.time || "ohne Uhrzeit"}</span>
                         <RoundNotes round={round} profile={profile} />
                       </span>
                       <StateBadge state={round.state} />
@@ -283,13 +283,13 @@ export function SeriesCalendarSection({ series }) {
       )}
 
       {board && archived.length > 0 && (
-        <details className="mt-3 text-sm text-white/55" data-testid="calendar-archived">
-          <summary className="cursor-pointer text-xs font-bold uppercase tracking-wider">Archiviert ({archived.length})</summary>
+        <details className="mt-3 tls-type-small text-white/55" data-testid="calendar-archived">
+          <summary className="cursor-pointer tls-type-label">Archiviert ({archived.length})</summary>
           <ul className="mt-2 space-y-1">
             {archived.map((round) => (
               <li key={round.id} className="flex items-center gap-3">
                 <span className="flex-1 min-w-0">{(round.code || "Termin")}{round.session ? ` ${round.session}` : ""} · {roundWhen(round)}{round.venue ? ` · ${round.venue}` : ""}</span>
-                <button type="button" disabled={busy} onClick={() => run(() => api.post(`${base}/${round.id}/restore`, { expected_version: calendar?.version }), "Termin zurückgeholt.")} className="tls-btn tls-btn--quiet px-3 py-1.5 rounded-sm text-[11px] font-bold uppercase tracking-wider inline-flex items-center gap-1.5">
+                <button type="button" disabled={busy} onClick={() => run(() => api.post(`${base}/${round.id}/restore`, { expected_version: calendar?.version }), "Termin zurückgeholt.")} className="tls-btn tls-btn--quiet px-3 py-1.5 rounded-sm tls-type-label inline-flex items-center gap-1.5">
                   <ArchiveRestore className="w-3.5 h-3.5" /> Zurückholen
                 </button>
               </li>

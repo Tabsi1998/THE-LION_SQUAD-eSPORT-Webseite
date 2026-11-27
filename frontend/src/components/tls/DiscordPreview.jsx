@@ -55,24 +55,24 @@ export function DiscordPreview({ kind, item, skip, onSkipChange }) {
   return (
     <div className="border border-[#5865F2]/25 bg-[#5865F2]/5 rounded-sm p-3 space-y-3" data-testid="discord-preview">
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <div className="text-xs font-bold uppercase tracking-widest text-[#b8c0ff] inline-flex items-center gap-2"><MessageSquare className="w-3.5 h-3.5" /> Discord</div>
-        <button type="button" onClick={load} disabled={loading} data-testid="discord-preview-load" className="px-3 py-1.5 border border-[#5865F2]/60 text-[#b8c0ff] text-[10px] font-bold uppercase tracking-wider rounded-sm disabled:opacity-40">
+        <div className="tls-type-label text-[#b8c0ff] inline-flex items-center gap-2"><MessageSquare className="w-3.5 h-3.5" /> Discord</div>
+        <button type="button" onClick={load} disabled={loading} data-testid="discord-preview-load" className="px-3 py-1.5 border border-[#5865F2]/60 text-[#b8c0ff] tls-type-label rounded-sm disabled:opacity-40">
           {loading ? "Lade …" : "So sieht die Meldung aus"}
         </button>
       </div>
-      <label className="flex items-center gap-2 text-sm">
+      <label className="flex items-center gap-2 tls-type-small">
         <input type="checkbox" checked={!!skip} onChange={(e) => { onSkipChange(e.target.checked); setPreview(null); }} data-testid="discord-skip" className="accent-[#5865F2]" />
         <span>Ohne Discord veröffentlichen</span>
       </label>
-      {error && <div className="text-xs text-[#FF6B6B]">{error}</div>}
+      {error && <div className="tls-type-small text-[#FF6B6B]">{error}</div>}
       {preview && (
         <>
-          <div className={`text-xs ${preview.would_send ? "text-[#00FF88]" : "text-[#FFD700]"}`} data-testid="discord-preview-verdict">
+          <div className={`tls-type-small ${preview.would_send ? "text-[#00FF88]" : "text-[#FFD700]"}`} data-testid="discord-preview-verdict">
             {preview.would_send ? `Geht beim Veröffentlichen an: ${TARGET_NAMES[preview.target] || preview.target}.` : (SKIP_REASONS[preview.reason] || "Wird nicht gesendet.")}
           </div>
           <DiscordMessagePreview embed={embed} buttons={preview.buttons} testId="discord-preview-message" embedTestId="discord-preview-embed" />
           {preview.scheduled_event && (
-            <div className={`text-xs ${preview.scheduled_event.would_create ? "text-[#00FF88]" : "text-white/50"}`} data-testid="discord-preview-scheduled">
+            <div className={`tls-type-small ${preview.scheduled_event.would_create ? "text-[#00FF88]" : "text-white/50"}`} data-testid="discord-preview-scheduled">
               {scheduledEventText(preview.scheduled_event)}
             </div>
           )}

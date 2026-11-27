@@ -10,8 +10,8 @@ export function DeadlineFields({ form, onChange }) {
   const fields = DEADLINE_FIELDS.filter((field) => visible[field.key]);
   return (
     <div className="space-y-2" data-testid="tr-edit-deadlines">
-      <div className="text-[11px] font-bold uppercase tracking-widest text-white/60">Fristen</div>
-      <p className="text-xs text-white/45">
+      <div className="tls-type-label text-white/60">Fristen</div>
+      <p className="tls-type-small text-white/45">
         Nach „Nicht erschienen“ schlägt die Seite der Turnierleitung „kampflos verloren“ vor – sie bestätigt oder verlängert.
         Meldet nur eine Seite und widerspricht die andere nicht, gilt das Ergebnis nach der Frist (in Spielwochen spätestens
         zum Ende der Woche). Vor Ort bestätigt die Turnierleitung. Leer heißt Standard.

@@ -12,7 +12,7 @@ export function LearnedSpellings({ items, removed = 0, onRemove, hint, testId })
       {items.length > 0 && (
         <ul className="flex flex-wrap gap-1.5" data-testid={testId}>
           {items.map((item) => (
-            <li key={item.key} className="inline-flex items-center gap-1.5 pl-2.5 pr-1 min-h-[32px] border border-white/10 rounded-sm text-xs text-white/85">
+            <li key={item.key} className="inline-flex items-center gap-1.5 pl-2.5 pr-1 min-h-[32px] border border-white/10 rounded-sm tls-type-small text-white/85">
               {item.label}
               <button type="button" onClick={() => onRemove(item.key)} aria-label={`„${item.key}“ entfernen`}
                 className="tls-hit p-1 text-white/40 hover:text-white"><X className="w-3.5 h-3.5" /></button>
@@ -21,7 +21,7 @@ export function LearnedSpellings({ items, removed = 0, onRemove, hint, testId })
         </ul>
       )}
       {removed > 0 && (
-        <p className="mt-1 text-xs text-amber-200" data-testid={testId ? `${testId}-removed` : undefined}>
+        <p className="mt-1 tls-type-small text-amber-200" data-testid={testId ? `${testId}-removed` : undefined}>
           {removed === 1 ? "1 Schreibweise wird" : `${removed} Schreibweisen werden`} beim Speichern entfernt.
         </p>
       )}

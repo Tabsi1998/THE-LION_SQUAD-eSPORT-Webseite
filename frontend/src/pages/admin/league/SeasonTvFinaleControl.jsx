@@ -62,17 +62,17 @@ export function SeasonTvFinaleControl({ seasonId, canSteer = false }) {
     }
   };
 
-  if (!state) return error ? <p className="text-sm text-warn" role="alert" data-testid="tv-finale-error">{error}</p> : null;
+  if (!state) return error ? <p className="tls-type-small text-warn" role="alert" data-testid="tv-finale-error">{error}</p> : null;
   const blocked = Boolean(state.reason);
   const last = state.step > 0 && state.step >= state.count;
   return (
     <FormSection title="Saisonfinale am TV" id="tv-finale" className="scroll-mt-24" testId="tv-finale-control"
       hint="Nach dem Sieger-Moment: je Liga N die Auf- und Absteiger am Turnierbaum-TV aller abgeschlossenen Staffeln dieser Season.">
-      <p className="flex items-start gap-2 text-sm text-white/80" role="status" data-testid="tv-finale-status">
+      <p className="flex items-start gap-2 tls-type-small text-white/80" role="status" data-testid="tv-finale-status">
         <MonitorPlay className="mt-0.5 h-4 w-4 shrink-0 text-[#29B6E8]" aria-hidden="true" /> {finaleStatus(state)}
       </p>
       {!blocked && state.labels?.length ? (
-        <ol className="mt-2 flex flex-wrap gap-2 text-xs" aria-label="Reihenfolge am TV" data-testid="tv-finale-labels">
+        <ol className="mt-2 flex flex-wrap gap-2 tls-type-small" aria-label="Reihenfolge am TV" data-testid="tv-finale-labels">
           {state.labels.map((label, index) => (
             <li key={label} className={`rounded-sm border px-2 py-1 font-bold uppercase tracking-wider ${index + 1 === state.step ? "border-honor/60 text-honor" : "border-white/15 text-white/60"}`}>
               {index + 1}. {label}
@@ -80,22 +80,22 @@ export function SeasonTvFinaleControl({ seasonId, canSteer = false }) {
           ))}
         </ol>
       ) : null}
-      {stale ? <p className="mt-2 text-sm text-white/80" role="status" data-testid="tv-finale-stale">{stale}</p> : null}
-      {error ? <p className="mt-2 text-sm text-warn" role="alert" data-testid="tv-finale-error">{error}</p> : null}
+      {stale ? <p className="mt-2 tls-type-small text-white/80" role="status" data-testid="tv-finale-stale">{stale}</p> : null}
+      {error ? <p className="mt-2 tls-type-small text-warn" role="alert" data-testid="tv-finale-error">{error}</p> : null}
       {canSteer ? (
         <div className="mt-3 flex flex-wrap items-center gap-3">
           <button type="button" onClick={() => press("next")} disabled={blocked || last || Boolean(busy)} data-testid="tv-finale-next"
-            className="tls-btn tls-btn--primary inline-flex min-h-11 items-center gap-2 rounded-sm px-4 py-2 text-xs font-bold uppercase tracking-wider disabled:opacity-40">
+            className="tls-btn tls-btn--primary inline-flex min-h-11 items-center gap-2 rounded-sm px-4 py-2 tls-type-label disabled:opacity-40">
             <ChevronRight className="h-4 w-4" aria-hidden="true" /> {busy === "next" ? "Schalte …" : "Weiter"}
           </button>
           <button type="button" onClick={() => press("end")} disabled={!state.step || Boolean(busy)} data-testid="tv-finale-end"
-            className="tls-btn tls-btn--secondary inline-flex min-h-11 items-center gap-2 rounded-sm px-4 py-2 text-xs font-bold uppercase tracking-wider disabled:opacity-40">
+            className="tls-btn tls-btn--secondary inline-flex min-h-11 items-center gap-2 rounded-sm px-4 py-2 tls-type-label disabled:opacity-40">
             <Square className="h-4 w-4" aria-hidden="true" /> {busy === "end" ? "Schalte …" : "Ende"}
           </button>
-          {last ? <span className="text-xs text-white/55" data-testid="tv-finale-last">Letzte Liga N – mit „Ende“ zurück zum gewohnten Bild.</span> : null}
+          {last ? <span className="tls-type-small text-white/55" data-testid="tv-finale-last">Letzte Liga N – mit „Ende“ zurück zum gewohnten Bild.</span> : null}
         </div>
       ) : (
-        <p className="mt-2 text-xs text-white/55" data-testid="tv-finale-readonly">Weiter und Ende drückt, wer für diese Liga „Spiele betreuen“ hat.</p>
+        <p className="mt-2 tls-type-small text-white/55" data-testid="tv-finale-readonly">Weiter und Ende drückt, wer für diese Liga „Spiele betreuen“ hat.</p>
       )}
     </FormSection>
   );

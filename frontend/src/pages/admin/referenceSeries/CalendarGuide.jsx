@@ -33,11 +33,11 @@ export function guideSteps({ rounds, planned, plannedRounds, profile }) {
 export function GuideSteps({ steps }) {
   if (!steps.length) return null;
   return (
-    <ol className="mt-3 grid gap-1.5 sm:grid-cols-3 text-sm" data-testid="calendar-steps" aria-label="Nächste Schritte">
+    <ol className="mt-3 grid gap-1.5 sm:grid-cols-3 tls-type-small" data-testid="calendar-steps" aria-label="Nächste Schritte">
       {steps.map((step, index) => (
         <li key={step.key} data-done={step.done ? "true" : "false"}
           className={`tls-guide-step flex items-start gap-2 rounded-sm border px-3 py-2 ${step.done ? "border-white/5 text-white/40" : "border-[#29B6E8]/30 bg-[#29B6E8]/5 text-white/85"}`}>
-          <span aria-hidden="true" className={`tls-guide-step__mark mt-0.5 inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-[11px] font-black ${step.done ? "bg-emerald-400/15 text-emerald-300" : "bg-[#29B6E8]/20 text-[#29B6E8]"}`}>
+          <span aria-hidden="true" className={`tls-guide-step__mark mt-0.5 inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full tls-type-small font-black ${step.done ? "bg-emerald-400/15 text-emerald-300" : "bg-[#29B6E8]/20 text-[#29B6E8]"}`}>
             {step.done ? <Check className="h-3 w-3" /> : index + 1}
           </span>
           <span className="min-w-0 [overflow-wrap:anywhere]">
@@ -50,7 +50,7 @@ export function GuideSteps({ steps }) {
   );
 }
 
-const SMALL_INPUT = `${INPUT_CLASS} !py-1.5 text-sm`;
+const SMALL_INPUT = `${INPUT_CLASS} !py-1.5 tls-type-small`;
 
 /** Vorschläge der Reihe nach: der nächste Standard-Wochentag nach dem letzten Termin mit Datum, dann je eine Woche. */
 export function suggestDays(rounds, open, weekday, today) {
@@ -96,13 +96,13 @@ export function DatesSheet({ series, rounds, today, version, profile, onClose, o
   return (
     <AdminSheet title="Datum nachtragen" eyebrow={series.lineage?.title} onClose={onClose} onSubmit={save} saving={saving}
       submitLabel={items.length ? `${items.length} übernehmen` : "Übernehmen"} submitTestId="dates-save" testId="dates-sheet">
-      <p className="text-sm text-white/60">
+      <p className="tls-type-body text-white/60">
         Alle {kindWord(profile, "round_many", "Termine")} ohne Datum. Trag nur ein, was feststeht – der Rest bleibt offen. Ohne Uhrzeit gilt
         {series.default_time ? ` die Standard-Uhrzeit (${series.default_time} Uhr)` : " die gemerkte Uhrzeit"}.
       </p>
       {open.some((round) => suggestions[round.id]) && (
         <button type="button" onClick={suggestAll} data-testid="dates-suggest-all"
-          className="tls-btn tls-btn--quiet self-start px-3 py-1.5 rounded-sm text-[11px] font-bold uppercase tracking-wider inline-flex items-center gap-1.5">
+          className="tls-btn tls-btn--quiet self-start px-3 py-1.5 rounded-sm tls-type-label inline-flex items-center gap-1.5">
           <Wand2 className="w-3.5 h-3.5" /> Vorschläge einsetzen
         </button>
       )}
@@ -112,12 +112,12 @@ export function DatesSheet({ series, rounds, today, version, profile, onClose, o
           const value = values[round.id] || { day: "", time: "" };
           return (
             <li key={round.id} className="tls-dates-row py-2 grid grid-cols-[4rem_minmax(0,1fr)] sm:grid-cols-[4rem_minmax(0,1fr)_7rem] items-center gap-x-2 gap-y-1" style={{ "--tls-row-i": index }} data-testid="dates-row">
-              <span className="text-sm font-black tabular-nums text-white/80 [overflow-wrap:anywhere]">{roundLabel(round)}</span>
+              <span className="tls-type-small tls-type-num text-white/80 [overflow-wrap:anywhere]">{roundLabel(round)}</span>
               <input type="date" aria-label={`Tag ${one} ${roundLabel(round)}`} value={value.day} onChange={(event) => set(round.id, "day", event.target.value)} data-testid="dates-day" className={SMALL_INPUT} />
               <input type="time" aria-label={`Uhrzeit ${one} ${roundLabel(round)}`} value={value.time} placeholder={round.time || ""} onChange={(event) => set(round.id, "time", event.target.value)} data-testid="dates-time" className={`${SMALL_INPUT} col-start-2 sm:col-start-auto`} />
               {suggestion && !value.day && (
                 <button type="button" onClick={() => set(round.id, "day", suggestion)} data-testid="dates-suggest"
-                  className="col-start-2 justify-self-start text-[11px] text-[#29B6E8] underline-offset-2 hover:underline">
+                  className="col-start-2 justify-self-start tls-type-small text-[#29B6E8] underline-offset-2 hover:underline">
                   Vorschlag: {dayLabel(suggestion)}
                 </button>
               )}

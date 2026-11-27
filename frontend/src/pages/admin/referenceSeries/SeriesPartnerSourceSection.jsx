@@ -94,15 +94,15 @@ function SourceForm({ url, state, onSaved, onCancel }) {
           disabled={!platform} testId="partner-source-partner" hint="Partner dieser Saison – ohne Partner verlinkt der Hinweis die Plattform."
           options={[["", "Ohne Partner – Link zur Plattform"], ...partners.map((partner) => [partner.id, partner.role === "organizer" ? `${partner.name} (Veranstalter)` : partner.name])]} />
       </div>
-      {listError && <p className="text-sm text-amber-200" role="alert" data-testid="partner-source-list-error">{listError}</p>}
+      {listError && <p className="tls-type-small text-amber-200" role="alert" data-testid="partner-source-list-error">{listError}</p>}
       <div className="flex flex-wrap items-center gap-2">
         <button type="button" onClick={save} disabled={!ready || saving} data-testid="partner-source-save"
-          className="tls-btn tls-btn--primary px-4 py-2 rounded-sm text-xs font-bold uppercase tracking-wider disabled:opacity-50">
+          className="tls-btn tls-btn--primary px-4 py-2 rounded-sm tls-type-label disabled:opacity-50">
           Quelle speichern
         </button>
         {onCancel && (
           <button type="button" onClick={onCancel} data-testid="partner-source-cancel"
-            className="tls-btn tls-btn--quiet px-4 py-2 rounded-sm text-xs font-bold uppercase tracking-wider">
+            className="tls-btn tls-btn--quiet px-4 py-2 rounded-sm tls-type-label">
             Abbrechen
           </button>
         )}
@@ -128,20 +128,20 @@ function PreviewItem({ item, picked, onToggle }) {
       </span>
       <div className="min-w-0 flex-1 space-y-1">
         <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
-          <span className="text-sm font-bold tabular-nums text-white">{dayLabel(item.club_day) || "Tag offen"}</span>
-          <span className="text-sm text-white/80 break-words [overflow-wrap:anywhere]">{item.name}</span>
-          {item.double_up && <span className="inline-flex px-1.5 py-0.5 border border-white/15 rounded-sm text-[10px] font-bold uppercase tracking-widest text-white/70">Double Up</span>}
-          <span className={`inline-flex px-1.5 py-0.5 border rounded-sm text-[10px] font-bold uppercase tracking-widest whitespace-nowrap ${state.tone}`}>{state.label}</span>
+          <span className="tls-type-small font-bold tabular-nums text-white">{dayLabel(item.club_day) || "Tag offen"}</span>
+          <span className="tls-type-small text-white/80 break-words [overflow-wrap:anywhere]">{item.name}</span>
+          {item.double_up && <span className="inline-flex px-1.5 py-0.5 border border-white/15 rounded-sm tls-type-label text-white/70">Double Up</span>}
+          <span className={`inline-flex px-1.5 py-0.5 border rounded-sm tls-type-label whitespace-nowrap ${state.tone}`}>{state.label}</span>
         </div>
-        <div className="text-xs text-white/60">{targetText(item)}</div>
-        {counts && <div className="text-xs text-white/45 tabular-nums">{counts}</div>}
+        <div className="tls-type-small text-white/60">{targetText(item)}</div>
+        {counts && <div className="tls-type-small text-white/45 tabular-nums">{counts}</div>}
         {problems.length > 0 && (
-          <ul className="text-xs text-red-200 space-y-0.5" data-testid="partner-item-problems">
+          <ul className="tls-type-small text-red-200 space-y-0.5" data-testid="partner-item-problems">
             {problems.map((text, index) => <li key={index}>{text}</li>)}
           </ul>
         )}
         {lines.length > 0 && (
-          <details className="text-xs text-white/70" data-testid="partner-item-changes">
+          <details className="tls-type-small text-white/70" data-testid="partner-item-changes">
             <summary className="cursor-pointer text-white/60 hover:text-white">Abweichungen ansehen ({lines.length})</summary>
             <ul className="mt-1.5 space-y-1 border-l border-white/10 pl-3">
               {lines.map((line) => (
@@ -219,27 +219,27 @@ export function SeriesPartnerSourceSection({ series, onChanged }) {
     <section className="border border-white/10 rounded-sm bg-[#121212] p-4" aria-labelledby="series-partner-source-heading" data-testid="series-partner-source">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="min-w-0">
-          <h2 id="series-partner-source-heading" className="text-[11px] font-bold uppercase tracking-widest text-[#29B6E8]">Partner-Plattform</h2>
-          <p className="mt-1 text-sm text-white/60">Turniertage mit Runden, Lobbys und Punkten von der Plattform des Partners holen – als Entwurf, veröffentlicht wird nichts.</p>
+          <h2 id="series-partner-source-heading" className="tls-type-label text-[#29B6E8]">Partner-Plattform</h2>
+          <p className="mt-1 tls-type-body text-white/60">Turniertage mit Runden, Lobbys und Punkten von der Plattform des Partners holen – als Entwurf, veröffentlicht wird nichts.</p>
         </div>
         {source && !editing && (
           <div className="flex flex-wrap items-center gap-2">
             <button type="button" onClick={fetchNow} disabled={Boolean(busy)} data-testid="partner-source-fetch"
-              className="tls-btn tls-btn--primary px-4 py-2 rounded-sm text-xs font-bold uppercase tracking-wider inline-flex items-center gap-2 disabled:opacity-50">
+              className="tls-btn tls-btn--primary px-4 py-2 rounded-sm tls-type-label inline-flex items-center gap-2 disabled:opacity-50">
               <CloudDownload className="w-3.5 h-3.5" aria-hidden="true" /> {busy === "fetch" ? "Holt …" : "Jetzt holen"}
             </button>
             <button type="button" onClick={() => setEditing(true)} disabled={Boolean(busy)} data-testid="partner-source-edit"
-              className="tls-btn tls-btn--quiet px-3 py-2 rounded-sm text-xs font-bold uppercase tracking-wider inline-flex items-center gap-2 disabled:opacity-50">
+              className="tls-btn tls-btn--quiet px-3 py-2 rounded-sm tls-type-label inline-flex items-center gap-2 disabled:opacity-50">
               <Pencil className="w-3.5 h-3.5" aria-hidden="true" /> Quelle ändern
             </button>
           </div>
         )}
       </div>
-      {failed && <p className="mt-3 text-sm text-white/60" role="alert">{failed}</p>}
+      {failed && <p className="mt-3 tls-type-small text-white/60" role="alert">{failed}</p>}
       {state && source && !editing && (
-        <p className="mt-3 text-sm text-white/75 break-words" data-testid="partner-source-summary">
+        <p className="mt-3 tls-type-small text-white/75 break-words" data-testid="partner-source-summary">
           {[choice?.label || source.platform, sourceHost(source.base_url), `Serie ${source.series_name || source.series_ref}`].join(" · ")}
-          <span className="block text-xs text-white/45 mt-0.5">Serienseite: „Daten von {partner?.name || choice?.provider || "Partner"}“{partner ? " mit Link zur Partnerseite" : " mit Link zur Plattform"}</span>
+          <span className="block tls-type-small text-white/45 mt-0.5">Serienseite: „Daten von {partner?.name || choice?.provider || "Partner"}“{partner ? " mit Link zur Partnerseite" : " mit Link zur Plattform"}</span>
         </p>
       )}
       {state && (!source || editing) && (
@@ -247,12 +247,12 @@ export function SeriesPartnerSourceSection({ series, onChanged }) {
           onSaved={(saved) => { setState((current) => ({ ...current, source: saved })); setEditing(false); setPreview(null); }} />
       )}
       {fetchError && (
-        <p className="mt-3 border border-red-400/40 bg-red-400/10 rounded-sm px-3 py-2 text-sm text-red-100" role="alert" data-testid="partner-source-error">{fetchError}</p>
+        <p className="mt-3 border border-red-400/40 bg-red-400/10 rounded-sm px-3 py-2 tls-type-small text-red-100" role="alert" data-testid="partner-source-error">{fetchError}</p>
       )}
       {preview && !editing && (
         <div className="mt-4" data-testid="partner-source-preview">
           {preview.length === 0 ? (
-            <p className="text-sm text-white/55" data-testid="partner-source-empty">Beim Partner stehen in dieser Serie noch keine Turniere.</p>
+            <p className="tls-type-small text-white/55" data-testid="partner-source-empty">Beim Partner stehen in dieser Serie noch keine Turniere.</p>
           ) : (
             <ol className="divide-y divide-white/5 border-y border-white/10">
               {preview.map((item) => <PreviewItem key={item.ref} item={item} picked={picked.includes(item.ref)} onToggle={toggle} />)}
@@ -260,10 +260,10 @@ export function SeriesPartnerSourceSection({ series, onChanged }) {
           )}
           <div className="mt-3 flex flex-wrap items-center gap-3">
             <button type="button" onClick={apply} disabled={!selectedCount || Boolean(busy)} data-testid="partner-source-apply"
-              className="tls-btn tls-btn--primary px-4 py-2 rounded-sm text-xs font-bold uppercase tracking-wider disabled:opacity-50">
+              className="tls-btn tls-btn--primary px-4 py-2 rounded-sm tls-type-label disabled:opacity-50">
               {busy === "apply" ? "Übernimmt …" : `Übernehmen (${selectedCount})`}
             </button>
-            <span className="text-xs text-white/50">Ergebnisse kommen als Entwurf. Ein vorhandenes Ergebnis wird nur ersetzt, wenn du es anhakst – ein veröffentlichtes bekommt einen Entwurf daneben.</span>
+            <span className="tls-type-small text-white/50">Ergebnisse kommen als Entwurf. Ein vorhandenes Ergebnis wird nur ersetzt, wenn du es anhakst – ein veröffentlichtes bekommt einen Entwurf daneben.</span>
           </div>
         </div>
       )}

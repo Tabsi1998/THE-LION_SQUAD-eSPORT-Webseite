@@ -31,11 +31,11 @@ export function OwnDisputes({ match, userId }) {
       {rows.map((row, index) => {
         const done = Boolean(row.resolved_at);
         return (
-          <div key={`${row.at || ""}-${index}`} className={`rounded-sm border px-4 py-3 text-sm ${done ? "border-white/15 bg-white/5" : "border-warn/40 bg-warn/10"}`} data-testid="match-own-dispute" data-state={done ? row.decision || "change" : "open"}>
+          <div key={`${row.at || ""}-${index}`} className={`rounded-sm border px-4 py-3 tls-type-small ${done ? "border-white/15 bg-white/5" : "border-warn/40 bg-warn/10"}`} data-testid="match-own-dispute" data-state={done ? row.decision || "change" : "open"}>
             <div className="flex items-start gap-3">
               {done ? <CheckCircle2 className="mt-0.5 w-4 h-4 shrink-0 text-[#29B6E8]" /> : <AlertTriangle className="mt-0.5 w-4 h-4 shrink-0 text-warn" />}
               <div className="min-w-0">
-                <p className="text-[11px] font-bold uppercase tracking-widest text-white/55">
+                <p className="tls-type-label text-white/55">
                   Deine Meldung · {disputeReasonLabel(row.category)}{row.at ? ` · ${formatWhen(row.at)}` : ""}
                 </p>
                 {row.reason ? <p className="mt-1 text-white/70 [overflow-wrap:anywhere]">„{row.reason}“</p> : null}

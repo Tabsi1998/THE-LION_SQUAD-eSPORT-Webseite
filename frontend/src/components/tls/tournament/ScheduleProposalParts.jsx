@@ -17,7 +17,7 @@ const ACCEPT = "border border-[#00D26A]/45 text-[#00D26A] hover:bg-[#00D26A]/10"
 const DECLINE = "tls-btn--danger";
 // Zur Auswahl mit Wochentag: „Do 12.11. 20:00 Uhr“ - so vergleicht man Tage auf einen Blick.
 const dayTime = (value) => (value ? `${shortWhen(value)} Uhr` : "ohne Zeit");
-const TEXT_BUTTON = "tls-btn shrink-0 min-h-11 px-3 py-2 rounded-sm text-[10px] uppercase tracking-wider font-bold disabled:opacity-50";
+const TEXT_BUTTON = "tls-btn shrink-0 min-h-11 px-3 py-2 rounded-sm tls-type-label disabled:opacity-50";
 
 /**
  * Ein bis drei Felder für Datum und Uhrzeit, jedes mit eigenem Fehler. „+ weiteren Termin“ fügt eins hinzu, das X entfernt
@@ -61,14 +61,14 @@ export function ProposalTimesEditor({ values, onChange, errors = [], hints = [],
                 </button>
               )}
             </div>
-            {error && <p id={errorId} role="alert" className="mt-1 text-xs text-warn [overflow-wrap:anywhere]" data-testid={`${testId}-fehler-${index + 1}`}>{error}</p>}
-            {hint && <p id={hintId} className="mt-1 text-xs text-white/60 [overflow-wrap:anywhere]" data-testid={`${testId}-hinweis-${index + 1}`}>{hint}</p>}
+            {error && <p id={errorId} role="alert" className="mt-1 tls-type-small text-warn [overflow-wrap:anywhere]" data-testid={`${testId}-fehler-${index + 1}`}>{error}</p>}
+            {hint && <p id={hintId} className="mt-1 tls-type-small text-white/60 [overflow-wrap:anywhere]" data-testid={`${testId}-hinweis-${index + 1}`}>{hint}</p>}
           </div>
         );
       })}
       {values.length < MAX_PROPOSAL_TIMES && (
         <button type="button" onClick={add} disabled={disabled} data-testid={`${testId}-weiter`}
-          className="tls-btn min-h-11 w-full inline-flex items-center justify-center gap-1.5 rounded-sm border border-dashed border-white/20 px-3 text-xs font-bold text-[#29B6E8] hover:border-[#29B6E8]/60 hover:text-white disabled:opacity-50">
+          className="tls-btn min-h-11 w-full inline-flex items-center justify-center gap-1.5 rounded-sm border border-dashed border-white/20 px-3 tls-type-small font-bold text-[#29B6E8] hover:border-[#29B6E8]/60 hover:text-white disabled:opacity-50">
           <Plus className="w-3.5 h-3.5" aria-hidden="true" /> weiteren Termin
         </button>
       )}
@@ -93,11 +93,11 @@ function CounterForm({ bundleKey, min, busy, onCounter, onClose, hintsFor, offer
   };
   return (
     <div className="mt-3 border-t border-white/10 pt-3 space-y-3" data-testid={`match-counter-${bundleKey}`}>
-      <p className="text-xs text-white/55">Euer Gegenvorschlag – bis zu {MAX_PROPOSAL_TIMES} Termine.</p>
+      <p className="tls-type-small text-white/55">Euer Gegenvorschlag – bis zu {MAX_PROPOSAL_TIMES} Termine.</p>
       <ProposalTimesEditor values={times} onChange={change} errors={errors} hints={hintsFor ? hintsFor(times, offered) : []} min={min} label="Gegenvorschlag" testId={`match-counter-at-${bundleKey}`} disabled={busy} />
       <input aria-label="Antwort oder Grund" value={note} onChange={(event) => setNote(event.target.value)} maxLength={500} className="input" placeholder="Antwort / Grund (optional)" />
       <div className="flex flex-wrap gap-2">
-        <button type="button" disabled={busy} onClick={submit} data-testid={`match-counter-send-${bundleKey}`} className="tls-btn tls-btn--secondary min-h-11 px-3 py-2 rounded-sm text-[10px] uppercase tracking-wider font-bold disabled:opacity-50">{proposeButtonLabel(times.length, true)}</button>
+        <button type="button" disabled={busy} onClick={submit} data-testid={`match-counter-send-${bundleKey}`} className="tls-btn tls-btn--secondary min-h-11 px-3 py-2 rounded-sm tls-type-label disabled:opacity-50">{proposeButtonLabel(times.length, true)}</button>
         <button type="button" disabled={busy} onClick={onClose} className={`${TEXT_BUTTON} tls-btn--quiet`}>Abbrechen</button>
       </div>
     </div>
@@ -166,11 +166,11 @@ export function ScheduleProposalList({ proposals, page, userId, canManage, fixed
         <div key={bundle.key} className="border border-white/10 bg-[#0A0A0A] rounded-sm p-3" data-testid={`match-proposal-group-${bundle.groupId}`}>
           <div className="flex items-start justify-between gap-3">
             <div className="min-w-0">
-              <div className="text-sm font-bold">{own ? `${count} Termine vorgeschlagen` : `${count} Termine zur Auswahl`}</div>
-              <div className="text-xs text-white/45 mt-1 [overflow-wrap:anywhere]" data-testid={`match-proposal-group-status-${bundle.groupId}`}>
+              <div className="tls-type-small font-bold">{own ? `${count} Termine vorgeschlagen` : `${count} Termine zur Auswahl`}</div>
+              <div className="tls-type-small text-white/45 mt-1 [overflow-wrap:anywhere]" data-testid={`match-proposal-group-status-${bundle.groupId}`}>
                 {actorName(first)} · {own ? "wartet auf die Gegenseite" : `${first.kind === "counter" ? "Gegenvorschlag – " : ""}${answer ? "einen annehmen" : "offen"}`}
               </div>
-              {first.note && <div className="text-xs text-white/60 mt-2 [overflow-wrap:anywhere]">{first.note}</div>}
+              {first.note && <div className="tls-type-small text-white/60 mt-2 [overflow-wrap:anywhere]">{first.note}</div>}
             </div>
             {own && canManage && (
               <button type="button" disabled={busy} onClick={() => onGroupDecide(first, "withdraw")} data-testid={`match-proposal-group-withdraw-${bundle.groupId}`} className={`${TEXT_BUTTON} tls-btn--quiet`}>Zurückziehen</button>
@@ -179,11 +179,11 @@ export function ScheduleProposalList({ proposals, page, userId, canManage, fixed
           <ul className="mt-3 space-y-2">
             {bundle.proposals.map((proposal) => (
               <li key={proposal.id} className="flex items-center justify-between gap-3 rounded-sm border border-white/10 bg-[#121212] px-3 py-1.5 min-h-11" data-testid={`match-proposal-${proposal.id}`}>
-                <span className="text-sm font-bold min-w-0 [overflow-wrap:anywhere]">{dayTime(proposal.scheduled_at)}</span>
+                <span className="tls-type-small font-bold min-w-0 [overflow-wrap:anywhere]">{dayTime(proposal.scheduled_at)}</span>
                 {agree && (
                   <button type="button" disabled={busy} onClick={() => onDecide(proposal, "accept")} aria-label={`${dayTime(proposal.scheduled_at)} annehmen`}
                     data-testid={`match-proposal-accept-${proposal.id}`}
-                    className={`tls-btn shrink-0 min-h-11 px-3 inline-flex items-center gap-1.5 rounded-sm text-[10px] uppercase tracking-wider font-bold disabled:opacity-50 ${ACCEPT}`}>
+                    className={`tls-btn shrink-0 min-h-11 px-3 inline-flex items-center gap-1.5 rounded-sm tls-type-label disabled:opacity-50 ${ACCEPT}`}>
                     <Check className="w-3.5 h-3.5" aria-hidden="true" /> Annehmen
                   </button>
                 )}
@@ -211,9 +211,9 @@ export function ScheduleProposalList({ proposals, page, userId, canManage, fixed
       <div key={rowId} className="border border-white/10 bg-[#0A0A0A] rounded-sm p-3" data-testid={`match-proposal-${rowId}`}>
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0">
-            <div className="text-sm font-bold">{formatDateTime(p.scheduled_at)}</div>
-            <div className="text-xs text-white/45 mt-1 [overflow-wrap:anywhere]" data-testid={`match-proposal-status-${rowId}`}>{actorName(p)} · {own ? "wartet auf die Gegenseite" : proposalStatusLabel(p)}</div>
-            {p.note && <div className="text-xs text-white/60 mt-2 [overflow-wrap:anywhere]">{p.note}</div>}
+            <div className="tls-type-small font-bold">{formatDateTime(p.scheduled_at)}</div>
+            <div className="tls-type-small text-white/45 mt-1 [overflow-wrap:anywhere]" data-testid={`match-proposal-status-${rowId}`}>{actorName(p)} · {own ? "wartet auf die Gegenseite" : proposalStatusLabel(p)}</div>
+            {p.note && <div className="tls-type-small text-white/60 mt-2 [overflow-wrap:anywhere]">{p.note}</div>}
           </div>
           {answer && (
             <div className="flex gap-1 shrink-0">

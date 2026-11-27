@@ -26,7 +26,7 @@ import { ExternalMediaNotice } from "@/components/tls/ExternalMediaNotice";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { gameLabel } from "@/lib/gameLabels";
 import { seoTextPreview } from "@/lib/textPreview";
-import { headNameClass, isLongHeadName } from "@/lib/headName";
+import { headNameClass } from "@/lib/headName";
 import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 import { useSubmissionGuard } from "@/hooks/useSubmissionGuard";
 import {
@@ -48,6 +48,7 @@ import { LeagueMomentHint } from "@/components/tls/league/LeagueMomentHint";
 import { RewardChip } from "@/components/tls/rewards/RewardChip";
 import { EmblemRow, TrophyCabinet } from "@/components/tls/rewards/TrophyCabinet";
 import { InternalTag } from "@/components/tls/InternalTag";
+import { ShortCaps } from "@/components/tls/ShortCaps";
 
 // Öffentliches Profil, Umbau 24.09.: Banner als echtes Banner mit überlappendem Avatar, eine Zeile
 // mit Level, Rolle und verknüpften Konten, eine Zahlenleiste und dieselben Reiter wie in der App (#1149): Übersicht,
@@ -390,23 +391,23 @@ export default function PublicProfilePage() {
     return (
       <PublicLayout>
         <div className="max-w-3xl mx-auto px-4 sm:px-6 py-12 space-y-6" data-testid="profile-own-private">
-          <h1 className={`font-heading text-3xl md:text-4xl font-black uppercase ${headNameClass(user.display_name || user.username)}`}>{user.display_name || user.username}</h1>
+          <h1 className={`tls-type-title ${headNameClass(user.display_name || user.username)}`}>{user.display_name || user.username}</h1>
           <div className="flex items-center justify-between gap-4 border border-white/10 bg-[#121212] rounded-sm px-4 py-3" data-testid="profile-as-others">
-            <span><span className="block font-bold text-sm">So sehen dich andere</span><span className="block text-xs text-white/50">{asOthers ? "Nur, was deine Privatsphäre allen zeigt." : "Aus: du siehst auch „Nur für dich“."}</span></span>
+            <span><span className="block font-bold tls-type-small">So sehen dich andere</span><span className="block tls-type-small text-white/50">{asOthers ? "Nur, was deine Privatsphäre allen zeigt." : "Aus: du siehst auch „Nur für dich“."}</span></span>
             <AsOthersSwitch on={asOthers} onChange={setAsOthers} />
           </div>
           {asOthers ? null : <PrivateBox />}
           <div className="border border-dashed border-white/15 rounded-sm px-6 py-10 text-center text-white/55">
             <Lock className="w-7 h-7 mx-auto mb-3 opacity-60" />
             <p className="font-bold text-white/80">Dein Profil ist privat</p>
-            <p className="mt-1 text-sm">Andere sehen dein Profil nicht. Öffentlich stellst du es unter <Link to="/mein-bereich/datenschutz" className="text-[#29B6E8] hover:underline">Mein Bereich → Datenschutz</Link>.</p>
+            <p className="mt-1 tls-type-body">Andere sehen dein Profil nicht. Öffentlich stellst du es unter <Link to="/mein-bereich/datenschutz" className="text-[#29B6E8] hover:underline">Mein Bereich → Datenschutz</Link>.</p>
           </div>
         </div>
       </PublicLayout>
     );
   }
   if (!profile) return <PublicLayout><div className="p-20 text-center">
-    <h1 className="font-heading text-3xl uppercase">Spieler nicht gefunden</h1>
+    <h1 className="tls-type-title"><ShortCaps>Spieler nicht gefunden</ShortCaps></h1>
     <Link to="/" className="inline-block mt-4 text-[#29B6E8] hover:underline">← Zurück zur Startseite</Link>
   </div></PublicLayout>;
 
@@ -600,22 +601,22 @@ export default function PublicProfilePage() {
                 {profile.avatar_url ? (
                   <img src={resolveMediaUrl(profile.avatar_url)} alt={displayName} className="w-full h-full object-cover" />
                 ) : (
-                  <div className="w-full h-full bg-gradient-to-br from-[#29B6E8]/20 to-[#121212] flex items-center justify-center font-display font-black text-5xl text-[#29B6E8]">
+                  <div className="w-full h-full bg-gradient-to-br from-[#29B6E8]/20 to-[#121212] flex items-center justify-center tls-type-hero tls-type-num text-[#29B6E8]">
                     {(displayName || "?").slice(0, 2).toUpperCase()}
                   </div>
                 )}
               </LevelAvatarFrame>
             </div>
             <div className="tls-tilt__mid pointer-events-auto flex-1 min-w-0 md:pb-1">
-              <div className="flex flex-wrap items-center gap-2 text-[11px] font-bold uppercase tracking-[0.3em] text-[#29B6E8]">
+              <div className="flex flex-wrap items-center gap-2 tls-type-label text-[#29B6E8]">
                 <span>THE LION SQUAD · Spieler</span>
                 {isPrivate && <span className="inline-flex items-center gap-1 text-white/40"><Lock className="w-3 h-3" /> Privat</span>}
               </div>
               {/* Langer Name (#1218): höchstens zwei Zeilen, eine Stufe kleiner, erst dann „…“. */}
-              <h1 className={`mt-1 font-heading ${isLongHeadName(displayName) ? "text-2xl sm:text-3xl lg:text-4xl" : "text-3xl sm:text-4xl lg:text-5xl"} font-black uppercase tracking-tight ${headNameClass(displayName)}`} title={displayName} data-testid="profile-head-name">
+              <h1 className={`mt-1 tls-type-title ${headNameClass(displayName)}`} title={displayName} data-testid="profile-head-name">
                 {displayName}
               </h1>
-              <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-2 text-sm text-white/55" data-testid="profile-identity">
+              <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-2 tls-type-small text-white/55" data-testid="profile-identity">
                 <span>@{profile.username}</span>
                 {/* Titel neben dem Namen (F.4, #2214): eine gewählte Belohnung der Art „Titel“. */}
                 <RewardChip award={profile.featured_title} testId="profile-featured-title" />
@@ -623,7 +624,7 @@ export default function PublicProfilePage() {
                 <AccountLevelPill level={level.level} />
                 <ClubProfileHint profile={profile} />
                 {liveStream && (
-                  <span className="inline-flex items-center gap-1 px-2 py-0.5 border border-[#FF3B30]/50 text-[#FF3B30] text-[10px] uppercase tracking-widest rounded-sm font-bold" data-testid="profile-live-pill">
+                  <span className="inline-flex items-center gap-1 px-2 py-0.5 border border-[#FF3B30]/50 text-[#FF3B30] tls-type-label rounded-sm" data-testid="profile-live-pill">
                     <Radio className="w-3 h-3 animate-live" /> Live
                   </span>
                 )}
@@ -637,36 +638,36 @@ export default function PublicProfilePage() {
                   <button
                     type="button"
                     onClick={openMessage}
-                    className="tls-btn tls-btn--primary inline-flex items-center gap-2 px-4 py-2 rounded-sm text-xs uppercase tracking-wider font-bold"
+                    className="tls-btn tls-btn--primary inline-flex items-center gap-2 px-4 py-2 rounded-sm tls-type-label"
                   >
                     <MessageSquare className="w-3.5 h-3.5" /> Nachricht
                   </button>
                   {relationship.status === "accepted" ? (
-                    <button type="button" onClick={() => updateFriendship("remove")} className="tls-btn tls-btn--secondary inline-flex items-center gap-2 px-4 py-2 rounded-sm text-xs uppercase tracking-wider font-bold">
+                    <button type="button" onClick={() => updateFriendship("remove")} className="tls-btn tls-btn--secondary inline-flex items-center gap-2 px-4 py-2 rounded-sm tls-type-label">
                       <UserCheck className="w-3.5 h-3.5" /> Freunde
                     </button>
                   ) : relationship.incoming ? (
                     <>
-                      <button type="button" onClick={() => updateFriendship("accept")} className="tls-btn tls-btn--secondary inline-flex items-center gap-2 px-4 py-2 rounded-sm text-xs uppercase tracking-wider font-bold">
+                      <button type="button" onClick={() => updateFriendship("accept")} className="tls-btn tls-btn--secondary inline-flex items-center gap-2 px-4 py-2 rounded-sm tls-type-label">
                         <UserCheck className="w-3.5 h-3.5" /> Annehmen
                       </button>
-                      <button type="button" onClick={() => updateFriendship("decline")} className="tls-btn tls-btn--quiet inline-flex items-center gap-2 px-4 py-2 rounded-sm text-xs uppercase tracking-wider font-bold">
+                      <button type="button" onClick={() => updateFriendship("decline")} className="tls-btn tls-btn--quiet inline-flex items-center gap-2 px-4 py-2 rounded-sm tls-type-label">
                         <X className="w-3.5 h-3.5" /> Ablehnen
                       </button>
                     </>
                   ) : relationship.outgoing ? (
-                    <button type="button" onClick={() => updateFriendship("remove")} className="tls-btn tls-btn--quiet inline-flex items-center gap-2 px-4 py-2 rounded-sm text-xs uppercase tracking-wider font-bold">
+                    <button type="button" onClick={() => updateFriendship("remove")} className="tls-btn tls-btn--quiet inline-flex items-center gap-2 px-4 py-2 rounded-sm tls-type-label">
                       <UserPlus className="w-3.5 h-3.5" /> Anfrage offen
                     </button>
                   ) : (
-                    <button type="button" onClick={() => updateFriendship("request")} className="tls-btn tls-btn--quiet inline-flex items-center gap-2 px-4 py-2 rounded-sm text-xs uppercase tracking-wider font-bold">
+                    <button type="button" onClick={() => updateFriendship("request")} className="tls-btn tls-btn--quiet inline-flex items-center gap-2 px-4 py-2 rounded-sm tls-type-label">
                       <UserPlus className="w-3.5 h-3.5" /> Freund hinzufügen
                     </button>
                   )}
                 </>
               )}
               {isOwnProfile && (
-                <Link to="/mein-bereich/profil" data-testid="profile-settings" aria-label="Profil bearbeiten" title="Profil bearbeiten" className="tls-btn tls-btn--secondary inline-flex items-center gap-2 px-4 py-2 rounded-sm text-xs uppercase tracking-wider font-bold">
+                <Link to="/mein-bereich/profil" data-testid="profile-settings" aria-label="Profil bearbeiten" title="Profil bearbeiten" className="tls-btn tls-btn--secondary inline-flex items-center gap-2 px-4 py-2 rounded-sm tls-type-label">
                   <Settings className="w-3.5 h-3.5" /> Einstellungen
                 </Link>
               )}
@@ -674,14 +675,14 @@ export default function PublicProfilePage() {
                 type="button"
                 onClick={() => setShowHighlight(true)}
                 data-testid="highlight-card-open"
-                className="tls-btn tls-btn--secondary inline-flex items-center gap-2 px-4 py-2 rounded-sm text-xs uppercase tracking-wider font-bold"
+                className="tls-btn tls-btn--secondary inline-flex items-center gap-2 px-4 py-2 rounded-sm tls-type-label"
               >
                 <Sparkles className="w-3.5 h-3.5" /> Highlight-Karte
               </button>
             </div>
           </div>
 
-          {profile.bio && <p className="mt-4 max-w-3xl text-white/80 text-base leading-relaxed" data-testid="profile-bio">{profile.bio}</p>}
+          {profile.bio && <p className="mt-4 max-w-3xl text-white/80 tls-type-body leading-relaxed" data-testid="profile-bio">{profile.bio}</p>}
 
           <div className="mt-5 grid gap-4 lg:grid-cols-[minmax(0,26rem)_minmax(0,1fr)] lg:items-center">
             <div data-testid="profile-level-progress">
@@ -689,7 +690,7 @@ export default function PublicProfilePage() {
             </div>
             {accounts.verifiedCount > 0 && (
               <a href="#konten" onClick={() => setTab("overview")} data-testid="profile-accounts-count"
-                className="inline-flex items-center gap-1.5 self-start lg:justify-self-end text-xs font-bold uppercase tracking-wider text-[#00FF88] hover:text-white">
+                className="inline-flex items-center gap-1.5 self-start lg:justify-self-end tls-type-label text-[#00FF88] hover:text-white">
                 <BadgeCheck className="w-4 h-4" /> {accounts.verifiedCount === 1 ? "1 Konto verknüpft" : `${accounts.verifiedCount} Konten verknüpft`}
               </a>
             )}
@@ -704,8 +705,8 @@ export default function PublicProfilePage() {
           {isOwnProfile && (
             <div className="mb-6 flex items-center justify-between gap-4 border border-white/10 bg-[#121212] rounded-sm px-4 py-3 max-w-xl" data-testid="profile-as-others">
               <span>
-                <span className="block font-bold text-sm">So sehen dich andere</span>
-                <span className="block text-xs text-white/50">{asOthers ? "Nur, was deine Privatsphäre allen zeigt – ohne Anmeldung." : "Aus: du siehst alles, auch „Nur für dich“."}</span>
+                <span className="block font-bold tls-type-small">So sehen dich andere</span>
+                <span className="block tls-type-small text-white/50">{asOthers ? "Nur, was deine Privatsphäre allen zeigt – ohne Anmeldung." : "Aus: du siehst alles, auch „Nur für dich“."}</span>
               </span>
               <AsOthersSwitch on={asOthers} onChange={setAsOthers} />
             </div>
@@ -718,7 +719,7 @@ export default function PublicProfilePage() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex gap-1 tls-swipe pb-0">
           {tabs.map(([k, l]) => (
             <button key={k} onClick={() => setTab(k)} data-testid={`profile-tab-${k}`}
-              className={`px-4 py-3 text-xs font-bold uppercase tracking-wider whitespace-nowrap transition ${activeTab === k ? "text-[#29B6E8] border-b-2 border-[#29B6E8]" : "text-white/60 hover:text-white"}`}>
+              className={`px-4 py-3 tls-type-label whitespace-nowrap transition ${activeTab === k ? "text-[#29B6E8] border-b-2 border-[#29B6E8]" : "text-white/60 hover:text-white"}`}>
               {l}
             </button>
           ))}
@@ -771,7 +772,7 @@ export default function PublicProfilePage() {
               )}
 
               {achievementsHidden && (
-                <div className="border border-dashed border-white/15 rounded-sm px-4 py-3 text-sm text-white/50 flex items-center gap-2" data-testid="profile-achievements-private">
+                <div className="border border-dashed border-white/15 rounded-sm px-4 py-3 tls-type-small text-white/50 flex items-center gap-2" data-testid="profile-achievements-private">
                   <Lock className="w-3.5 h-3.5 shrink-0" /> {displayName} zeigt Erfolge nicht öffentlich.
                 </div>
               )}
@@ -784,10 +785,10 @@ export default function PublicProfilePage() {
                       <div key={a.code} className="flex items-center gap-3 p-3 border border-white/10 rounded-sm bg-[#121212]" style={{ boxShadow: `inset 2px 0 0 ${a.material_color || a.level_color}` }}>
                         <Badge material={a.material} level={a.level} rank={a.rank} art={a.art} icon={a.icon || a.group_icon} size="md" title={a.name} />
                         <div className="min-w-0 flex-1">
-                          <div className="text-[10px] font-bold uppercase tracking-widest" style={{ color: a.level_color }}>{a.level_name}</div>
-                          <div className="font-semibold truncate text-sm">{a.name}</div>
+                          <div className="tls-type-small font-bold" style={{ color: a.level_color }}>{a.level_name}</div>
+                          <div className="font-semibold truncate tls-type-small">{a.name}</div>
                         </div>
-                        <div className="text-[10px] text-white/40 tabular-nums">+{a.points}</div>
+                        <div className="tls-type-small tls-type-num text-quiet">+{a.points}</div>
                       </div>
                     ))}
                   </div>
@@ -817,8 +818,8 @@ export default function PublicProfilePage() {
               {!hasOverviewContent && (
                 <div className="border border-dashed border-white/15 rounded-sm px-6 py-14 text-center" data-testid="profile-overview-empty">
                   <Trophy className="w-8 h-8 mx-auto mb-3 text-white/25" />
-                  <div className="font-heading text-xl font-bold uppercase text-white/70">Noch keine Erfolge</div>
-                  <p className="mt-2 text-sm text-white/45 max-w-md mx-auto">Turniere, Fast Laps und Achievements erscheinen hier, sobald {displayName} mitspielt.</p>
+                  <div className="tls-type-card text-white/70">Noch keine Erfolge</div>
+                  <p className="mt-2 tls-type-small text-white/45 max-w-md mx-auto">Turniere, Fast Laps und Achievements erscheinen hier, sobald {displayName} mitspielt.</p>
                 </div>
               )}
             </div>
@@ -841,8 +842,8 @@ export default function PublicProfilePage() {
             {achievementsHidden ? (
               <div className="border border-dashed border-white/15 rounded-sm px-6 py-14 text-center" data-testid="profile-achievements-private">
                 <Lock className="w-8 h-8 mx-auto mb-3 text-white/25" />
-                <div className="font-heading text-xl font-bold uppercase text-white/70">Erfolge sind privat</div>
-                <p className="mt-2 text-sm text-white/45 max-w-md mx-auto">{displayName} zeigt Erfolge nicht öffentlich.</p>
+                <div className="tls-type-card text-white/70">Erfolge sind privat</div>
+                <p className="mt-2 tls-type-small text-white/45 max-w-md mx-auto">{displayName} zeigt Erfolge nicht öffentlich.</p>
               </div>
             ) : (
               <>
@@ -852,8 +853,8 @@ export default function PublicProfilePage() {
                       <div key={row.key} className="border border-white/10 rounded-sm bg-[#121212] px-3 py-2.5" data-testid={`profile-category-bar-${row.key}`}>
                         <div className="flex items-center gap-2">
                           <AchievementIcon name={row.icon} fallback="trophy" className="w-3.5 h-3.5 shrink-0" style={{ color: row.accent }} />
-                          <span className="font-heading font-bold uppercase text-sm truncate">{row.label}</span>
-                          <span className="ml-auto text-[10px] uppercase tracking-widest text-white/50 tabular-nums shrink-0">{row.earned} von {row.total}</span>
+                          <span className="tls-type-label truncate">{row.label}</span>
+                          <span className="ml-auto tls-type-label text-white/50 tabular-nums shrink-0">{row.earned} von {row.total}</span>
                         </div>
                         <div className="mt-2 h-1 bg-white/5 rounded-sm overflow-hidden">
                           <div className="h-full" style={{ width: `${row.total ? Math.round((row.earned / row.total) * 100) : 0}%`, backgroundColor: row.accent }} />
@@ -861,7 +862,7 @@ export default function PublicProfilePage() {
                       </div>
                     ))}
                     {hiddenFound > 0 && (
-                      <div className="border border-[#A855F7]/30 rounded-sm bg-[#0F0A16] px-3 py-2.5 text-sm text-[#c084fc]" data-testid="profile-hidden-found">
+                      <div className="border border-[#A855F7]/30 rounded-sm bg-[#0F0A16] px-3 py-2.5 tls-type-small text-[#c084fc]" data-testid="profile-hidden-found">
                         {hiddenFound === 1 ? "Ein geheimer Erfolg gefunden" : `${hiddenFound} geheime Erfolge gefunden`}
                       </div>
                     )}
@@ -879,7 +880,7 @@ export default function PublicProfilePage() {
             keine Referenzen (die sind die Turnier-Historie). Das eigene Profil wählt hier Banner, Titel und bis zu drei Embleme. */}
         {activeTab === "awards" && (
           <div className="space-y-4" data-testid="public-profile-awards">
-            <h2 className="font-heading text-2xl font-bold uppercase flex items-center gap-2"><Trophy className="w-5 h-5 text-[#FFD700]" /> Trophäen</h2>
+            <h2 className="tls-type-section flex items-center gap-2"><Trophy className="w-5 h-5 text-[#FFD700]" /> Trophäen</h2>
             <TrophyCabinet awards={awards} testId="profile-trophies"
               owner={ownMode ? {
                 featuredId: profile.featured_award?.id, titleId: profile.featured_title?.id,
@@ -896,7 +897,7 @@ export default function PublicProfilePage() {
         {activeTab === "honours" && ownMode && <HonoursPanel />}
         {activeTab === "honours" && !ownMode && honours.length > 0 && (
           <div className="space-y-3" data-testid="public-profile-honours">
-            <h2 className="font-heading text-2xl font-bold uppercase flex items-center gap-2"><Award className="w-5 h-5 text-[#FFD700]" /> Ehrungen</h2>
+            <h2 className="tls-type-section flex items-center gap-2"><Award className="w-5 h-5 text-[#FFD700]" /> Ehrungen</h2>
             <ul className="grid gap-3 md:grid-cols-2">
               {honours.map((honour) => <HonourCard key={`${honour.kind}-${honour.given_on}-${honour.title}`} honour={honour} />)}
             </ul>
@@ -925,7 +926,7 @@ export default function PublicProfilePage() {
                         type="button"
                         onClick={() => setReferenceFilter(key)}
                         data-testid={`profile-reference-filter-${key}`}
-                        className={`px-3 py-1.5 border rounded-sm text-[10px] font-bold uppercase tracking-wider transition ${referenceFilter === key ? "border-[#29B6E8] text-[#29B6E8] bg-[#29B6E8]/10" : "border-white/15 text-white/60 hover:text-white"}`}
+                        className={`px-3 py-1.5 border rounded-sm tls-type-label transition ${referenceFilter === key ? "border-[#29B6E8] text-[#29B6E8] bg-[#29B6E8]/10" : "border-white/15 text-white/60 hover:text-white"}`}
                       >
                         {label}
                       </button>
@@ -962,15 +963,15 @@ export default function PublicProfilePage() {
                       <div className="min-w-0">
                         {/* Umbrechen statt abschneiden: am Handy rutscht das Etikett unter den Titel (#2521). */}
                         <div className="flex flex-wrap items-center gap-x-2 gap-y-1 min-w-0">
-                          <div className="min-w-0 max-w-full text-[10px] uppercase tracking-widest text-[#29B6E8] font-bold truncate">{f.challenge?.title || "—"}</div>
+                          <div className="min-w-0 max-w-full tls-type-label text-[#29B6E8] truncate">{f.challenge?.title || "—"}</div>
                           {/* Vereinsintern (#2521): eine Bestzeit aus einer Challenge, die Gäste nicht sehen. */}
                           {f.internal ? <InternalTag testId={`internal-tag-fastlap-${f.challenge?.id || i}`} /> : null}
                         </div>
-                        <div className="font-heading text-lg font-bold truncate">{f.track?.name || "—"}{f.track?.country ? ` · ${f.track.country}` : ""}</div>
+                        <div className="tls-type-card truncate">{f.track?.name || "—"}{f.track?.country ? ` · ${f.track.country}` : ""}</div>
                       </div>
                       <div className="flex items-center gap-3 shrink-0">
-                        {f.is_leader && <span className="text-[10px] uppercase tracking-widest text-[#FFD700] font-bold">Pole</span>}
-                        <span className="font-display text-xl font-bold tabular-nums">{showLapTime(f.time_str)}</span>
+                        {f.is_leader && <span className="tls-type-label text-[#FFD700]">Pole</span>}
+                        <span className="tls-type-card tls-type-num">{showLapTime(f.time_str)}</span>
                       </div>
                     </div>
                   ))}
@@ -985,9 +986,9 @@ export default function PublicProfilePage() {
             {teams.length ? (
               teams.map((tm) => (
                 <Link key={tm.id} to={`/teams/${tm.id}`} className="tls-card border border-white/10 rounded-sm p-4 bg-[#121212]">
-                  <div className="text-[10px] uppercase tracking-widest text-[#29B6E8] font-bold">[{tm.tag}]</div>
-                  <div className="font-heading text-xl font-bold">{tm.name}</div>
-                  {tm.description && <p className="mt-2 text-sm text-white/60 line-clamp-2">{tm.description}</p>}
+                  <div className="tls-type-label text-[#29B6E8]">[{tm.tag}]</div>
+                  <div className="tls-type-card">{tm.name}</div>
+                  {tm.description && <p className="mt-2 tls-type-body text-white/60 line-clamp-2">{tm.description}</p>}
                 </Link>
               ))
             ) : <EmptyState text="Noch kein Team" action={ownMode ? { to: "/teams", label: "Teams entdecken" } : null} testId="profile-teams-empty" />}
@@ -1005,9 +1006,9 @@ function PinnedAwardCard({ award }) {
     <div className="flex items-center gap-3 p-3 border rounded-sm bg-[#121212]" style={{ borderColor: `${color}55`, boxShadow: `inset 0 0 0 1px ${color}14` }} data-testid={`profile-pinned-${award.code}`}>
       <Badge material={award.material} level={award.level} rank={award.rank} art={award.art} icon={award.icon || award.group_icon} size="lg" title={award.name} />
       <div className="min-w-0 flex-1">
-        <div className="text-[10px] font-bold uppercase tracking-widest truncate" style={{ color }}>{award.material_name || award.level_name}</div>
-        <div className="font-semibold truncate text-sm">{award.name}</div>
-        <div className="text-[10px] text-white/40 truncate">{award.group_name}</div>
+        <div className="tls-type-small font-bold truncate" style={{ color }}>{award.material_name || award.level_name}</div>
+        <div className="font-semibold truncate tls-type-small">{award.name}</div>
+        <div className="tls-type-small text-quiet truncate">{award.group_name}</div>
       </div>
     </div>
   );
@@ -1017,13 +1018,13 @@ function SectionTitle({ icon: Icon, color = "#29B6E8", kicker, title, action = n
   return (
     <div className="flex items-end justify-between gap-3 flex-wrap mb-4">
       <div>
-        {kicker && <div className="text-[11px] uppercase tracking-[0.3em] font-bold" style={{ color }}>{kicker}</div>}
-        <h2 className="mt-1 font-heading text-2xl font-bold uppercase flex items-center gap-2">
+        {kicker && <div className="tls-type-label" style={{ color }}>{kicker}</div>}
+        <h2 className="mt-1 tls-type-section flex items-center gap-2">
           <Icon className="w-5 h-5" style={{ color }} /> {title}
         </h2>
       </div>
       {action && (
-        <button type="button" onClick={action.onClick} className="text-xs font-bold uppercase tracking-wider text-[#29B6E8] hover:text-white">
+        <button type="button" onClick={action.onClick} className="tls-type-label text-[#29B6E8] hover:text-white">
           {action.label} →
         </button>
       )}
@@ -1035,10 +1036,10 @@ function TwitchLiveCard({ channel, url, stream, hasConsent }) {
   return (
     <section data-testid="public-profile-twitch-embed" className="border border-[#9146FF]/40 rounded-sm bg-[#121212] overflow-hidden min-w-0">
       <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-3 border-b border-white/10">
-        <h2 className="font-heading text-xl font-bold uppercase flex items-center gap-2">
+        <h2 className="tls-type-section flex items-center gap-2">
           <SocialIcon kind="twitch" className="w-5 h-5 text-[#9146FF]" /> Live auf Twitch
         </h2>
-        <span className="inline-flex items-center gap-1.5 px-2 py-0.5 border border-[#FF3B30]/50 text-[#FF3B30] text-[10px] uppercase tracking-widest rounded-sm font-bold">
+        <span className="inline-flex items-center gap-1.5 px-2 py-0.5 border border-[#FF3B30]/50 text-[#FF3B30] tls-type-label rounded-sm">
           <Radio className="w-3 h-3 animate-live" /> Live{stream.viewer_count ? ` · ${stream.viewer_count} Zuschauer` : ""}
         </span>
       </div>
@@ -1064,9 +1065,9 @@ function TwitchLiveCard({ channel, url, stream, hasConsent }) {
           />
         </div>
       )}
-      <div className="px-4 py-3 flex flex-wrap items-center justify-between gap-2 text-xs text-white/55">
+      <div className="px-4 py-3 flex flex-wrap items-center justify-between gap-2 tls-type-small text-white/55">
         <span className="truncate min-w-0">{stream.title || "Stream läuft"}</span>
-        <a href={url} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-[#9146FF] hover:text-white font-bold uppercase tracking-wider text-[10px]">
+        <a href={url} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-[#9146FF] hover:text-white tls-type-label">
           Bei Twitch öffnen <ExternalLink className="w-3 h-3" />
         </a>
       </div>
@@ -1084,8 +1085,8 @@ function TwitchChannelCard({ channel, url, stats }) {
           <SocialIcon kind="twitch" className="w-5 h-5" />
         </span>
         <span className="min-w-0 flex-1">
-          <span className="block font-bold text-sm text-white truncate group-hover:text-[#b88cff]">{channel}</span>
-          <span className="block text-[11px] text-white/50 truncate">Twitch · gerade offline{hours > 0 ? ` · ${hours} Std. in ${stats.twitch_live_sessions || 0} Streams` : ""}</span>
+          <span className="block font-bold tls-type-small text-white truncate group-hover:text-[#b88cff]">{channel}</span>
+          <span className="block tls-type-small text-white/50 truncate">Twitch · gerade offline{hours > 0 ? ` · ${hours} Std. in ${stats.twitch_live_sessions || 0} Streams` : ""}</span>
         </span>
         <ExternalLink className="w-4 h-4 text-white/40 shrink-0" aria-hidden="true" />
       </a>
@@ -1107,17 +1108,17 @@ function HighlightCard({ item }) {
       <div className="relative flex items-start justify-between gap-3">
         <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-2">
-            <span className="text-[10px] font-bold uppercase tracking-widest" style={{ color: tone.color }}>{tone.label} · {referenceKindLabel(item.kind)}</span>
+            <span className="tls-type-label" style={{ color: tone.color }}>{tone.label} · {referenceKindLabel(item.kind)}</span>
             {item.internal ? <InternalTag testId={`internal-tag-highlight-${item.id}`} /> : null}
           </div>
-          <div className="mt-1 font-heading text-lg font-black uppercase leading-tight break-words">{item.title || "Referenz"}</div>
-          <div className="mt-1 text-xs text-white/50 flex flex-wrap gap-x-2 gap-y-0.5">
+          <div className="mt-1 tls-type-card leading-tight break-words">{item.title || "Referenz"}</div>
+          <div className="mt-1 tls-type-small text-white/50 flex flex-wrap gap-x-2 gap-y-0.5">
             {item.subtitle && <span className="break-words">{item.subtitle}</span>}
             {date && <span>{date}</span>}
             {item.time_str && <span className="tabular-nums text-white/70">{showLapTime(item.time_str)}</span>}
           </div>
         </div>
-        <div className="font-display font-black text-4xl tabular-nums leading-none shrink-0" style={{ color: tone.color }}>#{item.rank}</div>
+        <div className="tls-type-title tls-type-num leading-none shrink-0" style={{ color: tone.color }}>#{item.rank}</div>
       </div>
     </div>
   );
@@ -1131,8 +1132,8 @@ export function AccountsCard({ groups }) {
   return (
     <section id="konten" className="border border-white/10 rounded-sm bg-[#121212] p-4 space-y-4 scroll-mt-24" data-testid="public-profile-accounts">
       <div>
-        <h2 className="font-heading text-xl font-bold uppercase flex items-center gap-2"><Globe className="w-4 h-4 text-[#29B6E8]" /> Konten</h2>
-        <p className="text-[11px] text-white/45 mt-1 flex items-center gap-1"><BadgeCheck className="w-3.5 h-3.5 text-[#00FF88] shrink-0" /> per Anmeldung bei der Plattform bestätigt – der Link führt zum echten Konto.</p>
+        <h2 className="tls-type-section flex items-center gap-2"><Globe className="w-4 h-4 text-[#29B6E8]" /> Konten</h2>
+        <p className="tls-type-small text-white/45 mt-1 flex items-center gap-1"><BadgeCheck className="w-3.5 h-3.5 text-[#00FF88] shrink-0" /> per Anmeldung bei der Plattform bestätigt – der Link führt zum echten Konto.</p>
       </div>
       {groups.socials.length > 0 && <AccountGroup title="Socials" icon={Globe} color="#29B6E8" entries={groups.socials} testId="public-profile-socials" />}
       {groups.games.length > 0 && <AccountGroup title="Spielkonten" icon={Gamepad2} color="#FFD700" entries={groups.games} testId="public-profile-gaming-ids" />}
@@ -1143,7 +1144,7 @@ export function AccountsCard({ groups }) {
 function AccountGroup({ title, icon: Icon, color, entries, testId }) {
   return (
     <div data-testid={testId}>
-      <h3 className="text-[10px] uppercase tracking-widest text-white/40 font-bold mb-2 flex items-center gap-2"><Icon className="w-3.5 h-3.5" style={{ color }} /> {title}</h3>
+      <h3 className="tls-type-label text-quiet mb-2 flex items-center gap-2"><Icon className="w-3.5 h-3.5" style={{ color }} /> {title}</h3>
       <div className="grid gap-2">{entries.map((entry) => <AccountRow key={`${entry.key}:${entry.value}`} entry={entry} />)}</div>
     </div>
   );
@@ -1157,11 +1158,11 @@ function AccountRow({ entry }) {
         <SocialIcon kind={entry.key} className="w-5 h-5" />
       </span>
       <span className="min-w-0 flex-1">
-        <span className="flex items-center gap-1.5 font-bold text-white text-sm">
+        <span className="flex items-center gap-1.5 font-bold text-white tls-type-small">
           <span className="truncate">{entry.title}</span>
           {entry.verified && <BadgeCheck className="w-4 h-4 text-[#00FF88] shrink-0" aria-label="verifiziert" data-testid={`profile-account-${entry.key}-verified`}><title>{verifiedTitle}</title></BadgeCheck>}
         </span>
-        <span className="block text-[11px] text-white/50 truncate">{entry.detail}</span>
+        <span className="block tls-type-small text-white/50 truncate">{entry.detail}</span>
       </span>
       {entry.url ? <ExternalLink className="w-4 h-4 text-white/40 shrink-0" aria-hidden="true" /> : <Copy className="w-4 h-4 text-white/40 shrink-0" aria-hidden="true" />}
     </>
@@ -1186,7 +1187,7 @@ export function ClubProfileHint({ profile }) {
       to={`/members/${encodeURIComponent(slug)}`}
       data-testid="profile-club-hint"
       title="Zum Vereinsprofil"
-      className="inline-flex items-center gap-1 max-w-full px-2 py-0.5 border border-honor/40 text-honor text-[10px] uppercase tracking-widest rounded-sm font-bold hover:bg-honor/10 focus-visible:bg-honor/10 transition"
+      className="inline-flex items-center gap-1 max-w-full px-2 py-0.5 border border-honor/40 text-honor tls-type-label rounded-sm hover:bg-honor/10 focus-visible:bg-honor/10 transition"
     >
       <Crown className="w-3 h-3 shrink-0" aria-hidden="true" />
       <span className="truncate">{label}</span>
@@ -1209,7 +1210,7 @@ function AboutCard({ profile, joinedDate }) {
   if (!rows.length) return null;
   return (
     <section className="border border-white/10 rounded-sm bg-[#121212] p-4" data-testid="public-profile-info">
-      <h2 className="font-heading text-xl font-bold uppercase flex items-center gap-2">
+      <h2 className="tls-type-section flex items-center gap-2">
         <Info className="w-4 h-4 text-[#29B6E8] shrink-0" /> <span className="min-w-0 [overflow-wrap:anywhere]">Über {profile.display_name || profile.username}</span>
       </h2>
       <dl className="mt-3 space-y-2">
@@ -1219,8 +1220,8 @@ function AboutCard({ profile, joinedDate }) {
               <row.icon className="w-4 h-4" />
             </span>
             <div className="min-w-0">
-              <dt className="text-[10px] uppercase tracking-widest text-white/40 font-bold">{row.label}</dt>
-              <dd className="text-sm text-white/90 break-words">{row.value}</dd>
+              <dt className="tls-type-label text-quiet">{row.label}</dt>
+              <dd className="tls-type-small text-white/90 break-words">{row.value}</dd>
             </div>
           </div>
         ))}
@@ -1241,7 +1242,7 @@ function SetupCard({ profile }) {
   if (!groups.length) return null;
   return (
     <section className="border border-white/10 rounded-sm bg-[#121212] p-4" data-testid="public-profile-setup">
-      <h2 className="font-heading text-xl font-bold uppercase flex items-center gap-2">
+      <h2 className="tls-type-section flex items-center gap-2">
         <Gamepad2 className="w-4 h-4 text-[#FFD700]" /> Setup & Games
       </h2>
       <div className="mt-3 space-y-3">
@@ -1251,11 +1252,11 @@ function SetupCard({ profile }) {
               <span className={`w-7 h-7 rounded-sm border flex items-center justify-center shrink-0 ${PROFILE_TONES[group.tone] || PROFILE_TONES.white}`}>
                 <group.icon className="w-3.5 h-3.5" />
               </span>
-              <span className="text-[10px] uppercase tracking-widest text-white/40 font-bold">{group.label}</span>
+              <span className="tls-type-label text-quiet">{group.label}</span>
             </div>
             <div className="flex flex-wrap gap-1.5">
               {group.items.map((item) => (
-                <span key={item} className="inline-flex max-w-full items-center break-words rounded-sm border border-white/10 bg-white/[0.03] px-2 py-1 text-xs text-white/75">{item}</span>
+                <span key={item} className="inline-flex max-w-full items-center break-words rounded-sm border border-white/10 bg-white/[0.03] px-2 py-1 tls-type-small text-white/75">{item}</span>
               ))}
             </div>
           </div>
@@ -1268,14 +1269,14 @@ function SetupCard({ profile }) {
 function TeamsCard({ teams }) {
   return (
     <section className="border border-white/10 rounded-sm bg-[#121212] p-4" data-testid="public-profile-teams">
-      <h2 className="font-heading text-xl font-bold uppercase flex items-center gap-2">
+      <h2 className="tls-type-section flex items-center gap-2">
         <Users className="w-4 h-4 text-[#29B6E8]" /> Teams
       </h2>
       <div className="mt-3 grid gap-2">
         {teams.map((tm) => (
           <Link key={tm.id} to={`/teams/${tm.id}`} className="flex items-center gap-3 border border-white/10 bg-[#0A0A0A] rounded-sm px-3 py-2 hover:border-[#29B6E8]/60 transition min-w-0">
-            <span className="text-[10px] uppercase tracking-widest text-[#29B6E8] font-bold shrink-0">[{tm.tag}]</span>
-            <span className="font-heading font-bold truncate">{tm.name}</span>
+            <span className="tls-type-label text-[#29B6E8] shrink-0">[{tm.tag}]</span>
+            <span className="font-bold truncate">{tm.name}</span>
           </Link>
         ))}
       </div>
@@ -1318,13 +1319,13 @@ function ReferenceRow({ item, expanded = false }) {
         </div>
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2 flex-wrap">
-            <span className={`text-[10px] font-bold uppercase tracking-widest ${isFastlap || isSeason ? "text-[#FFD700]" : "text-[#29B6E8]"}`}>{referenceKindLabel(item.kind)}</span>
-            {isSeason && item.points != null && <span className="text-[10px] font-bold uppercase tracking-widest text-[#FFD700] border border-[#FFD700]/35 px-1.5 py-0.5 rounded-sm">{item.points} Jahrespunkte</span>}
-            {item.time_str && <span className="text-[10px] font-bold uppercase tracking-widest text-white/70 border border-white/10 px-1.5 py-0.5 rounded-sm break-all">{showLapTime(item.time_str)}</span>}
+            <span className={`tls-type-label ${isFastlap || isSeason ? "text-[#FFD700]" : "text-[#29B6E8]"}`}>{referenceKindLabel(item.kind)}</span>
+            {isSeason && item.points != null && <span className="tls-type-label text-[#FFD700] border border-[#FFD700]/35 px-1.5 py-0.5 rounded-sm">{item.points} Jahrespunkte</span>}
+            {item.time_str && <span className="tls-type-label text-white/70 border border-white/10 px-1.5 py-0.5 rounded-sm break-all">{showLapTime(item.time_str)}</span>}
             {item.internal ? <InternalTag testId={`internal-tag-reference-${item.id}`} /> : null}
           </div>
-          <div className="mt-1 font-heading text-base font-bold break-words">{item.title || "Referenz"}</div>
-          <div className="text-xs text-white/50 mt-0.5 flex items-center gap-x-2 gap-y-1 flex-wrap">
+          <div className="mt-1 tls-type-card break-words">{item.title || "Referenz"}</div>
+          <div className="tls-type-small text-white/50 mt-0.5 flex items-center gap-x-2 gap-y-1 flex-wrap">
             {item.subtitle && <span className="break-words">{item.subtitle}</span>}
             {date && <span>{date}</span>}
             {expanded && item.status && <StatusBadge status={item.status} />}
@@ -1334,8 +1335,8 @@ function ReferenceRow({ item, expanded = false }) {
       </div>
       <div className="flex items-center justify-between gap-3 sm:justify-end sm:shrink-0 sm:text-right w-full sm:w-auto border-t border-white/10 pt-3 sm:border-0 sm:pt-0">
         <div>
-          <div className="font-display text-xl font-bold tabular-nums" style={{ color: rankColor }}>{rank}</div>
-          <div className="text-[10px] uppercase tracking-widest text-white/35 font-bold">Rang</div>
+          <div className="tls-type-card tls-type-num" style={{ color: rankColor }}>{rank}</div>
+          <div className="tls-type-label text-quiet">Rang</div>
         </div>
         {target && <ExternalLink className="w-4 h-4 text-white/30 shrink-0" />}
       </div>
@@ -1353,8 +1354,8 @@ function QuickStat({ icon: Icon, label, value, color = "#FFFFFF", glory = false,
       className={`border border-white/10 rounded-sm bg-[#121212] px-3 py-3 min-w-0 ${glorious ? "tls-stat-glory" : ""}`}
       style={glorious ? { "--glory-c": color } : undefined}
     >
-      <div className="flex items-center gap-1.5 text-[10px] uppercase tracking-widest text-white/40 min-w-0"><Icon className="w-3 h-3 shrink-0" /> <span className="truncate">{label}</span></div>
-      <div className="mt-1 font-display font-bold text-xl sm:text-2xl tabular-nums break-words" style={{ color }}><CountUp value={value} /></div>
+      <div className="flex items-center gap-1.5 tls-type-label text-quiet min-w-0"><Icon className="w-3 h-3 shrink-0" /> <span className="truncate">{label}</span></div>
+      <div className="mt-1 tls-type-section tls-type-num break-words" style={{ color }}><CountUp value={value} /></div>
     </div>
   );
 }
@@ -1368,11 +1369,11 @@ function TournamentRow({ t, expanded = false }) {
           <StatusBadge status={t.status} />
           {/* Vereinsintern (#2521): eine Teilnahme, die Gäste nicht sehen. */}
           {t.internal ? <InternalTag testId={`internal-tag-tournament-${t.id}`} /> : null}
-          {t.final_position === 1 && <span className="text-[10px] font-bold uppercase tracking-widest text-[#FFD700] border border-[#FFD700]/40 px-1.5 py-0.5 rounded-sm">Sieger</span>}
-          {t.final_position > 1 && t.final_position <= 3 && <span className="text-[10px] font-bold uppercase tracking-widest text-[#CD7F32] border border-[#CD7F32]/40 px-1.5 py-0.5 rounded-sm">Top 3</span>}
+          {t.final_position === 1 && <span className="tls-type-label text-[#FFD700] border border-[#FFD700]/40 px-1.5 py-0.5 rounded-sm">Sieger</span>}
+          {t.final_position > 1 && t.final_position <= 3 && <span className="tls-type-label text-[#CD7F32] border border-[#CD7F32]/40 px-1.5 py-0.5 rounded-sm">Top 3</span>}
         </div>
-        <div className="mt-1 font-heading text-base font-bold truncate">{t.title}</div>
-        <div className="text-xs text-white/50 mt-0.5 flex items-center gap-2 flex-wrap">
+        <div className="mt-1 tls-type-card truncate">{t.title}</div>
+        <div className="tls-type-small text-white/50 mt-0.5 flex items-center gap-2 flex-wrap">
           {t.game && <span>{gameLabel(t.game)}</span>}
           {date && <span>· {viennaDate(date)}</span>}
           {expanded && t.final_position && <span>· Endplatz: <span className="text-white">{t.final_position}</span></span>}
@@ -1385,7 +1386,7 @@ function TournamentRow({ t, expanded = false }) {
 
 function EmptyState({ text, action = null, testId }) {
   return (
-    <div className="py-12 text-center text-white/40 font-display tracking-widest text-sm" data-testid={testId}>
+    <div className="py-12 text-center text-quiet tls-type-label" data-testid={testId}>
       {text}
       {action && <> – <Link to={action.to} className="text-[#29B6E8] hover:underline">{action.label}</Link></>}
     </div>

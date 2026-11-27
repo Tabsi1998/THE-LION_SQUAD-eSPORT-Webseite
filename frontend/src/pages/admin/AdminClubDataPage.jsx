@@ -6,6 +6,7 @@ import { useAuth } from "@/context/AuthContext";
 import { setCachedBranding } from "@/lib/brandingEvents";
 import { buildDirtyPayload, hasPayloadChanges } from "@/lib/dirtyPayload";
 import { LegalTab } from "./settings/LegalSettings";
+import { ShortCaps } from "@/components/tls/ShortCaps";
 
 // Vereinsdaten (#509): eine eigene Seite unter Verein - vorher hieß dieselbe Sache im Menü „Vereinsdaten“,
 // als Reiter „Rechtliches“ und in der Überschrift „Vereinsdaten für Impressum und Datenschutz“ und lag
@@ -74,16 +75,16 @@ export default function AdminClubDataPage() {
 
   return (
     <AdminLayout>
-      <span className="text-[11px] font-bold uppercase tracking-[0.3em] text-[#FFD700]">Verein</span>
-      <h1 className="font-heading text-3xl md:text-4xl font-black uppercase mt-1 mb-2" data-testid="club-data-title">Vereinsdaten</h1>
-      <p className="text-sm text-white/55 mb-6 max-w-3xl">
+      <span className="tls-type-label text-[#FFD700]">Verein</span>
+      <h1 className="tls-type-title mt-1 mb-2" data-testid="club-data-title"><ShortCaps>Vereinsdaten</ShortCaps></h1>
+      <p className="tls-type-body text-white/55 mb-6 max-w-3xl">
         Name, ZVR, Anschrift, Vertretung und die Texte für Impressum, Datenschutz und Nutzungsbedingungen – die eine Stelle dafür.
         Kontakt, Impressum und Datenschutz auf der Website lesen von hier; mit Dolibarr-Anbindung kommen die Vereinsdaten wahlweise aus dem Vereinsmodul.
       </p>
       {loaded ? (
         <LegalTab brand={brand} setBrandField={setBrandField} setCanonicalLegalText={setCanonicalLegalText} saveBrand={saveBrand} saving={saving} clubOnly={clubOnly} />
       ) : (
-        <div className="text-sm text-white/45" data-testid="club-data-loading">Lade Vereinsdaten …</div>
+        <div className="tls-type-small text-white/45" data-testid="club-data-loading">Lade Vereinsdaten …</div>
       )}
     </AdminLayout>
   );

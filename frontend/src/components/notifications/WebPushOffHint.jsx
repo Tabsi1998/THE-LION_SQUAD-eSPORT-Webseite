@@ -58,7 +58,7 @@ export function WebPushOffHint({ user, show = true, className = "", testId = "we
       to={WEB_PUSH_OFF_LINK}
       data-testid={testId}
       aria-label={`${WEB_PUSH_OFF_TEXT} – ${WEB_PUSH_OFF_ACTION}`}
-      className={`inline-flex items-center gap-2 min-h-[44px] px-3 py-2 border border-white/10 rounded-sm text-xs text-white/55 hover:text-white hover:border-white/25 ${className}`.trim()}
+      className={`inline-flex items-center gap-2 min-h-[44px] px-3 py-2 border border-white/10 rounded-sm tls-type-small text-white/55 hover:text-white hover:border-white/25 ${className}`.trim()}
     >
       <BellOff className="w-4 h-4 shrink-0" aria-hidden="true" />
       <span>{WEB_PUSH_OFF_TEXT} – <span className="font-bold text-[#29B6E8]">{WEB_PUSH_OFF_ACTION}</span></span>

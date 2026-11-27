@@ -27,7 +27,7 @@ export function rulesPendingText(row) {
   return `Seit ${row.label || "der letzten Fassung"} ${count === 1 ? "hat sich" : "haben sich"} ${places} geändert, die im Regelwerk stehen. Prüfen, freigeben und wählen, ob die Teams neu zustimmen. Bis dahin gilt die bisherige Fassung.`;
 }
 
-const BUTTON = "tls-btn tls-btn--secondary mt-3 inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-sm px-4 py-2 text-xs font-bold uppercase tracking-wider md:mt-0 md:w-auto";
+const BUTTON = "tls-btn tls-btn--secondary mt-3 inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-sm px-4 py-2 tls-type-label md:mt-0 md:w-auto";
 
 export function DutyAttention({ duty, testId = "duty-attention" }) {
   const ended = duty?.ended_live || [];
@@ -43,8 +43,8 @@ export function DutyAttention({ duty, testId = "duty-attention" }) {
         <li key={`incident-${row.match_id}`} className="rounded-sm border border-warn/40 bg-[#121212] p-4 md:flex md:items-center md:gap-4" data-testid={`duty-incident-${row.match_id}`} data-code={row.code}>
           <Scale className="hidden h-5 w-5 shrink-0 text-warn md:block" aria-hidden="true" />
           <div className="min-w-0 flex-1">
-            <div className="font-heading font-bold text-white [overflow-wrap:anywhere]">{row.code === "in_review" ? "Map in Klärung" : "Serie feststellen"}: {row.label}</div>
-            <div className="mt-1 text-sm text-white/70 [overflow-wrap:anywhere]">{row.title} · {incidentReviewText(row)}</div>
+            <div className="font-bold text-white [overflow-wrap:anywhere]">{row.code === "in_review" ? "Map in Klärung" : "Serie feststellen"}: {row.label}</div>
+            <div className="mt-1 tls-type-small text-white/70 [overflow-wrap:anywhere]">{row.title} · {incidentReviewText(row)}</div>
           </div>
           <Link to={row.url} data-testid={`duty-incident-open-${row.match_id}`} className={BUTTON}>
             {row.code === "in_review" ? "Entscheiden" : "Spiel öffnen"} <ArrowRight className="w-3.5 h-3.5" aria-hidden="true" />
@@ -55,8 +55,8 @@ export function DutyAttention({ duty, testId = "duty-attention" }) {
         <li key={`rules-${row.season_id}`} className="rounded-sm border border-warn/40 bg-[#121212] p-4 md:flex md:items-center md:gap-4" data-testid={`duty-rules-${row.season_id}`} data-kind={row.kind}>
           <ScrollText className="hidden h-5 w-5 shrink-0 text-warn md:block" aria-hidden="true" />
           <div className="min-w-0 flex-1">
-            <div className="font-heading font-bold text-white [overflow-wrap:anywhere]">Regelwerk muss freigegeben werden: {row.league_name} {row.season_name}</div>
-            <div className="mt-1 text-sm text-white/70">{rulesPendingText(row)}</div>
+            <div className="font-bold text-white [overflow-wrap:anywhere]">Regelwerk muss freigegeben werden: {row.league_name} {row.season_name}</div>
+            <div className="mt-1 tls-type-small text-white/70">{rulesPendingText(row)}</div>
           </div>
           <Link to={row.admin_url} data-testid={`duty-rules-open-${row.season_id}`} className={BUTTON}>
             Regelwerk öffnen <ArrowRight className="w-3.5 h-3.5" aria-hidden="true" />
@@ -67,8 +67,8 @@ export function DutyAttention({ duty, testId = "duty-attention" }) {
         <li key={`ended-${row.id}`} className="rounded-sm border border-warn/40 bg-[#121212] p-4 md:flex md:items-center md:gap-4" data-testid={`duty-ended-${row.id}`}>
           <Flag className="hidden h-5 w-5 shrink-0 text-warn md:block" aria-hidden="true" />
           <div className="min-w-0 flex-1">
-            <div className="font-heading font-bold text-white [overflow-wrap:anywhere]">{row.title}</div>
-            <div className="mt-1 text-sm text-white/70">{endedLiveText(row)}</div>
+            <div className="font-bold text-white [overflow-wrap:anywhere]">{row.title}</div>
+            <div className="mt-1 tls-type-small text-white/70">{endedLiveText(row)}</div>
           </div>
           <Link to={row.admin_url} data-testid={`duty-ended-open-${row.id}`} className={BUTTON}>
             {/* Eine Staffel (Paket D, #2262) führt auf ihre Staffel-Seite - dort heißt sie Staffel, nicht Turnier. */}
@@ -80,14 +80,14 @@ export function DutyAttention({ duty, testId = "duty-attention" }) {
         <li key={`checkin-${row.match_id}`} className="rounded-sm border border-honor/45 bg-[#121212] p-4 md:flex md:items-center md:gap-4" data-testid={`duty-checkin-${row.match_id}`}>
           <ClipboardX className="hidden h-5 w-5 shrink-0 text-honor md:block" aria-hidden="true" />
           <div className="min-w-0 flex-1">
-            <div className="font-heading font-bold text-white [overflow-wrap:anywhere]">Check-in abgelaufen: {row.label}</div>
-            <div className="mt-1 text-sm text-white/70 [overflow-wrap:anywhere]">
+            <div className="font-bold text-white [overflow-wrap:anywhere]">Check-in abgelaufen: {row.label}</div>
+            <div className="mt-1 tls-type-small text-white/70 [overflow-wrap:anywhere]">
               {row.title} · {(row.missing || []).join(" und ") || "eine Seite"} nicht eingecheckt, Fenster bis {shortWhen(row.due_at)}.
               {" "}Kampflos werten, Seite nachtragen oder verlängern – gewertet wird nichts von selbst.
             </div>
           </div>
           <Link to={row.lead_url || row.url} data-testid={`duty-checkin-open-${row.match_id}`}
-            className="tls-btn tls-btn--secondary mt-3 inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-sm px-4 py-2 text-xs font-bold uppercase tracking-wider md:mt-0 md:w-auto">
+            className="tls-btn tls-btn--secondary mt-3 inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-sm px-4 py-2 tls-type-label md:mt-0 md:w-auto">
             Entscheiden <ArrowRight className="w-3.5 h-3.5" aria-hidden="true" />
           </Link>
         </li>
@@ -96,8 +96,8 @@ export function DutyAttention({ duty, testId = "duty-attention" }) {
         <li key={`overdue-${row.match_id}`} className="rounded-sm border border-[#FF3B30]/40 bg-[#121212] p-4 md:flex md:items-center md:gap-4" data-testid={`duty-overdue-${row.match_id}`}>
           <AlarmClock className="hidden h-5 w-5 shrink-0 text-[#FF3B30] md:block" aria-hidden="true" />
           <div className="min-w-0 flex-1">
-            <div className="font-heading font-bold text-white [overflow-wrap:anywhere]">Überfällig: {row.label}</div>
-            <div className="mt-1 text-sm text-white/70 [overflow-wrap:anywhere]">
+            <div className="font-bold text-white [overflow-wrap:anywhere]">Überfällig: {row.label}</div>
+            <div className="mt-1 tls-type-small text-white/70 [overflow-wrap:anywhere]">
               {row.title} · angesetzt {shortWhen(row.scheduled_at)}, nie gemeldet. Ergebnis eintragen, kampflos werten oder neuen Termin setzen.
             </div>
           </div>

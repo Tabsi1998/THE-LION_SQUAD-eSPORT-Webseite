@@ -15,13 +15,14 @@ import { isSelectable, submittedToast, teamStateLabel } from "@/lib/leagueApplic
 import { platformLines, platformShort } from "@/lib/leaguePlatform";
 import { dayNoon, viennaDate } from "@/lib/vienna";
 import "@/components/tls/league/public/league.css";
+import { ShortCaps } from "@/components/tls/ShortCaps";
 
 const STEPS = ["Co-Team", "Prüfung", "Zustimmen", "Einreichen"];
 // Je Schritt der passende Abschnitt der Hilfe (#2295).
 const HELP_STEPS = ["co-team-auswahl", "passt-alles", "regelwerk", "einreichen"];
 const DAY = { day: "2-digit", month: "2-digit", year: "numeric" };
-const QUIET = "tls-btn tls-btn--quiet inline-flex min-h-[44px] items-center justify-center gap-1.5 rounded-sm px-4 py-2.5 text-xs font-bold uppercase tracking-wider";
-const PRIMARY = "tls-btn tls-btn--primary inline-flex min-h-[44px] items-center justify-center rounded-sm px-5 py-2.5 text-xs font-bold uppercase tracking-wider disabled:opacity-50";
+const QUIET = "tls-btn tls-btn--quiet inline-flex min-h-[44px] items-center justify-center gap-1.5 rounded-sm px-4 py-2.5 tls-type-label";
+const PRIMARY = "tls-btn tls-btn--primary inline-flex min-h-[44px] items-center justify-center rounded-sm px-5 py-2.5 tls-type-label disabled:opacity-50";
 
 function Stepper({ step }) {
   return (
@@ -49,7 +50,7 @@ function SquadChoice({ rows, chosen, onChoose }) {
                 <input type="radio" name="apply-squad" className="mt-1 accent-[#29B6E8]" checked={chosen === row.squad_id} disabled={!free} onChange={() => onChoose(row.squad_id)} data-testid={`apply-squad-${row.squad_id}`} />
                 <span className="min-w-0 flex-1">
                   <span className="block font-semibold text-white [overflow-wrap:anywhere]">{row.display_name}</span>
-                  <span className="block text-xs text-white/55">{row.member_count} Spieler im Kader</span>
+                  <span className="block tls-type-small text-white/55">{row.member_count} Spieler im Kader</span>
                 </span>
                 {free ? null : <ApplicationStateBadge state={row.state} label={teamStateLabel(row.state, row.application)} />}
               </label>
@@ -67,11 +68,11 @@ function PlatformNote({ platform }) {
   const own = (platform?.divisions || []).filter((division) => division.differs);
   if (!lines.length && !own.length) return null;
   return (
-    <div className="rounded-sm border border-white/10 bg-[#0A0A0A] p-3 text-sm text-white/75" data-testid="apply-platform">
+    <div className="rounded-sm border border-white/10 bg-[#0A0A0A] p-3 tls-type-small text-white/75" data-testid="apply-platform">
       <p className="font-semibold text-white/85">Plattform in dieser Season</p>
       {lines.length ? <ul className="mt-1 space-y-0.5">{lines.map((line) => <li key={line} className="[overflow-wrap:anywhere]">{line}</li>)}</ul> : null}
       {own.length ? (
-        <p className="mt-1 text-xs text-white/55 [overflow-wrap:anywhere]">
+        <p className="mt-1 tls-type-small text-white/55 [overflow-wrap:anywhere]">
           Abweichend: {own.map((division) => `${division.label}: ${platformShort(division)}`).join(" · ")}. In welche Liga das Co-Team kommt, entscheidet die Liga-Leitung.
         </p>
       ) : null}
@@ -85,15 +86,15 @@ function OpenPoints({ row }) {
   if (!warnings.length && !row.shortfall) return null;
   return (
     <div className="rounded-sm border border-[#29B6E8]/30 bg-[#29B6E8]/5 p-3" data-testid="apply-warnings">
-      <p className="flex items-start gap-2 text-sm font-semibold text-white/90">
+      <p className="flex items-start gap-2 tls-type-small font-semibold text-white/90">
         <Info className="mt-0.5 h-4 w-4 shrink-0 text-[#29B6E8]" aria-hidden="true" />
         <span>Die Anmeldung geht trotzdem. Bis zum ersten Spiel noch nachtragen:</span>
       </p>
-      {row.shortfall ? <p className="mt-2 text-sm text-white/85 [overflow-wrap:anywhere]" data-testid="apply-shortfall">{row.shortfall}</p> : null}
+      {row.shortfall ? <p className="mt-2 tls-type-small text-white/85 [overflow-wrap:anywhere]" data-testid="apply-shortfall">{row.shortfall}</p> : null}
       {warnings.length ? (
-        <ul className="mt-2 space-y-1 text-sm text-white/75">{warnings.map((text) => <li key={text} className="[overflow-wrap:anywhere]">{text}</li>)}</ul>
+        <ul className="mt-2 space-y-1 tls-type-small text-white/75">{warnings.map((text) => <li key={text} className="[overflow-wrap:anywhere]">{text}</li>)}</ul>
       ) : null}
-      <p className="mt-2 text-xs text-white/60">
+      <p className="mt-2 tls-type-small text-white/60">
         Wer etwas offen hat, kann nicht einchecken und nicht aufgestellt werden. Jeder trägt es im eigenen Profil nach. Wir erinnern die Spieler und dich jetzt und noch einmal vor dem ersten Spiel.
       </p>
     </div>
@@ -109,13 +110,13 @@ function CheckStep({ row, seasonProblems, platform }) {
       {problems.length ? (
         <div className="rounded-sm border border-warn/40 bg-warn/5 p-3" data-testid="apply-problems">
           <p className="font-semibold text-warn">So geht die Anmeldung noch nicht:</p>
-          <ul className="mt-2 space-y-2 text-sm text-white/85">
+          <ul className="mt-2 space-y-2 tls-type-small text-white/85">
             {problems.map((text) => <li key={text} className="flex gap-2 [overflow-wrap:anywhere]"><AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-warn" aria-hidden="true" /> <span>{text}</span></li>)}
           </ul>
-          <Link to={`/teams?team=${encodeURIComponent(row.team_id)}`} data-testid="apply-team-link" className="mt-3 inline-flex items-center gap-1 text-sm font-semibold text-[#29B6E8] hover:underline">Kader und Rollen ändern</Link>
+          <Link to={`/teams?team=${encodeURIComponent(row.team_id)}`} data-testid="apply-team-link" className="mt-3 inline-flex items-center gap-1 tls-type-small font-semibold text-[#29B6E8] hover:underline">Kader und Rollen ändern</Link>
         </div>
       ) : (
-        <p className="flex items-center gap-2 rounded-sm border border-ok/40 bg-ok/5 p-3 text-sm text-white/90" data-testid="apply-check-ok">
+        <p className="flex items-center gap-2 rounded-sm border border-ok/40 bg-ok/5 p-3 tls-type-small text-white/90" data-testid="apply-check-ok">
           <Check className="h-4 w-4 shrink-0 text-ok" aria-hidden="true" /> {open ? `${row.display_name} kann angemeldet werden.` : `${row.display_name} erfüllt die Vorgaben dieser Season.`}
         </p>
       )}
@@ -129,21 +130,21 @@ function ConsentStep({ rules, privacy, acceptRules, acceptPrivacy, onRules, onPr
     <div className="space-y-5">
       <div className="rounded-sm border border-white/10 bg-[#0A0A0A] p-3">
         <p className="font-semibold text-white [overflow-wrap:anywhere]">{rules.title}</p>
-        <p className="text-sm text-white/65" data-testid="apply-rules-version">{rules.label} · gültig ab {viennaDate(dayNoon(rules.valid_from), DAY)}</p>
+        <p className="tls-type-small text-white/65" data-testid="apply-rules-version">{rules.label} · gültig ab {viennaDate(dayNoon(rules.valid_from), DAY)}</p>
         <div className="mt-2 flex flex-wrap gap-2">
           <a href={rules.url} target="_blank" rel="noopener noreferrer" data-testid="apply-rules-link" className={QUIET}><ExternalLink className="h-4 w-4" aria-hidden="true" /> Regeln lesen</a>
           <a href={`${API}${rules.pdf_url.replace(/^\/api/, "")}`} target="_blank" rel="noopener noreferrer" className={QUIET}><FileText className="h-4 w-4" aria-hidden="true" /> PDF</a>
         </div>
-        <label className="mt-3 flex min-h-[44px] items-start gap-2 text-sm text-white/90">
+        <label className="mt-3 flex min-h-[44px] items-start gap-2 tls-type-small text-white/90">
           <input type="checkbox" className="mt-1 accent-[#29B6E8]" checked={acceptRules} onChange={(event) => onRules(event.target.checked)} data-testid="apply-accept-rules" />
           <span>Ich habe die Regeln gelesen und stimme für mein Co-Team zu.</span>
         </label>
       </div>
       <div className="rounded-sm border border-white/10 bg-[#0A0A0A] p-3">
         <p className="font-semibold text-white">Datenschutz</p>
-        <p className="mt-1 whitespace-pre-line text-sm text-white/70 [overflow-wrap:anywhere]" data-testid="apply-privacy-text">{privacy.text}</p>
-        <a href={privacy.url} target="_blank" rel="noopener noreferrer" data-testid="apply-privacy-link" className="mt-1 inline-flex items-center gap-1 text-sm font-semibold text-[#29B6E8] hover:underline">Datenschutzerklärung <ExternalLink className="h-3.5 w-3.5" aria-hidden="true" /></a>
-        <label className="mt-3 flex min-h-[44px] items-start gap-2 text-sm text-white/90">
+        <p className="mt-1 whitespace-pre-line tls-type-body text-white/70 [overflow-wrap:anywhere]" data-testid="apply-privacy-text">{privacy.text}</p>
+        <a href={privacy.url} target="_blank" rel="noopener noreferrer" data-testid="apply-privacy-link" className="mt-1 inline-flex items-center gap-1 tls-type-small font-semibold text-[#29B6E8] hover:underline">Datenschutzerklärung <ExternalLink className="h-3.5 w-3.5" aria-hidden="true" /></a>
+        <label className="mt-3 flex min-h-[44px] items-start gap-2 tls-type-small text-white/90">
           <input type="checkbox" className="mt-1 accent-[#29B6E8]" checked={acceptPrivacy} onChange={(event) => onPrivacy(event.target.checked)} data-testid="apply-accept-privacy" />
           <span>Ich habe den Hinweis gelesen und stimme zu.</span>
         </label>
@@ -156,15 +157,15 @@ function ConsentStep({ rules, privacy, acceptRules, acceptPrivacy, onRules, onPr
 function Summary({ row, rules, auto }) {
   return (
     <div className="space-y-3" data-testid="apply-summary">
-      <dl className="space-y-2 rounded-sm border border-white/10 bg-[#0A0A0A] p-3 text-sm">
-        <div><dt className="text-xs uppercase tracking-wider text-white/50">Co-Team</dt><dd className="font-semibold text-white [overflow-wrap:anywhere]">{row.display_name}</dd></div>
-        <div><dt className="text-xs uppercase tracking-wider text-white/50">Regeln</dt><dd className="text-white/85">{rules.label}, zugestimmt</dd></div>
-        <div><dt className="text-xs uppercase tracking-wider text-white/50">Datenschutz</dt><dd className="text-white/85">zugestimmt</dd></div>
+      <dl className="space-y-2 rounded-sm border border-white/10 bg-[#0A0A0A] p-3 tls-type-small">
+        <div><dt className="tls-type-label text-white/50">Co-Team</dt><dd className="font-semibold text-white [overflow-wrap:anywhere]">{row.display_name}</dd></div>
+        <div><dt className="tls-type-label text-white/50">Regeln</dt><dd className="text-white/85">{rules.label}, zugestimmt</dd></div>
+        <div><dt className="tls-type-label text-white/50">Datenschutz</dt><dd className="text-white/85">zugestimmt</dd></div>
       </dl>
       {auto ? (
-        <p className="text-sm text-white/70" data-testid="apply-summary-auto">Ist ein Startplatz frei, seid ihr mit dem Einreichen angemeldet. Sind alle vergeben oder wartet schon jemand, kommt ihr auf die Warteliste. Liga und Staffel teilt die Liga-Leitung zu, gibt es nur eine Staffel, steht ihr gleich darin. Zurückziehen geht dann bis zum Check-in, solange noch kein Spielplan steht. Du bekommst eine Nachricht.</p>
+        <p className="tls-type-body text-white/70" data-testid="apply-summary-auto">Ist ein Startplatz frei, seid ihr mit dem Einreichen angemeldet. Sind alle vergeben oder wartet schon jemand, kommt ihr auf die Warteliste. Liga und Staffel teilt die Liga-Leitung zu, gibt es nur eine Staffel, steht ihr gleich darin. Zurückziehen geht dann bis zum Check-in, solange noch kein Spielplan steht. Du bekommst eine Nachricht.</p>
       ) : (
-        <p className="text-sm text-white/70">Einreichen heißt noch nicht, dass ihr dabei seid: Die Liga-Leitung prüft die Anmeldung, nimmt sie an oder lehnt sie ab und teilt Liga und Staffel zu. Du bekommst eine Nachricht.</p>
+        <p className="tls-type-body text-white/70">Einreichen heißt noch nicht, dass ihr dabei seid: Die Liga-Leitung prüft die Anmeldung, nimmt sie an oder lehnt sie ab und teilt Liga und Staffel zu. Du bekommst eine Nachricht.</p>
       )}
     </div>
   );
@@ -230,15 +231,15 @@ export default function LeagueApplyPage() {
   const back = <Link to={backPath} className={`${QUIET} mt-4`}><ArrowLeft className="h-4 w-4" aria-hidden="true" /> Zur Ligaseite</Link>;
 
   if (missing) {
-    return shell(<div data-testid="apply-missing"><h1 className="font-heading text-3xl font-black uppercase">Liga nicht gefunden</h1><p className="mt-3 text-white/60">Diese Season gibt es nicht oder sie ist (noch) nicht sichtbar.</p>{back}</div>);
+    return shell(<div data-testid="apply-missing"><h1 className="tls-type-title"><ShortCaps>Liga nicht gefunden</ShortCaps></h1><p className="mt-3 text-white/60">Diese Season gibt es nicht oder sie ist (noch) nicht sichtbar.</p>{back}</div>);
   }
   if (!view) return shell(<SkeletonDetailHeader label="Lade Anmeldung" />);
   if (view.application?.state !== "open") {
-    return shell(<div data-testid="apply-closed"><h1 className="font-heading text-3xl font-black uppercase">Anmeldung nicht offen</h1><p className="mt-3 text-white/70">{view.season_problems?.[0] || "Für diese Season gibt es keine Selbstanmeldung."}</p>{back}</div>);
+    return shell(<div data-testid="apply-closed"><h1 className="tls-type-title"><ShortCaps>Anmeldung nicht offen</ShortCaps></h1><p className="mt-3 text-white/70">{view.season_problems?.[0] || "Für diese Season gibt es keine Selbstanmeldung."}</p>{back}</div>);
   }
   const rows = (view.squads || []).filter((row) => row.can_apply);
   if (!rows.length) {
-    return shell(<div data-testid="apply-none"><h1 className="font-heading text-3xl font-black uppercase">Mit Co-Team anmelden</h1><p className="mt-3 text-white/70">{view.hint || "Anmelden dürfen Captain und Vertreter eines Co-Teams für dieses Spiel. Du bist bei keinem eingetragen."}</p>{back}</div>);
+    return shell(<div data-testid="apply-none"><h1 className="tls-type-title"><ShortCaps>Mit Co-Team anmelden</ShortCaps></h1><p className="mt-3 text-white/70">{view.hint || "Anmelden dürfen Captain und Vertreter eines Co-Teams für dieses Spiel. Du bist bei keinem eingetragen."}</p>{back}</div>);
   }
   const row = rows.find((item) => item.squad_id === chosen);
   const blocked = Boolean((view.season_problems || []).length || row?.problems?.length);
@@ -247,11 +248,11 @@ export default function LeagueApplyPage() {
 
   return shell(
     <>
-      <h1 className="font-heading text-3xl font-black uppercase">Mit Co-Team anmelden</h1>
+      <h1 className="tls-type-title"><ShortCaps>Mit Co-Team anmelden</ShortCaps></h1>
       <Stepper step={step} />
       <section key={step} className="tls-apply-step mt-6" aria-labelledby="apply-step-title">
         <div className="mb-3 flex items-start justify-between gap-2">
-          <h2 id="apply-step-title" ref={heading} tabIndex={-1} className="font-heading text-xl font-bold uppercase outline-none">{titles[step]}</h2>
+          <h2 id="apply-step-title" ref={heading} tabIndex={-1} className="tls-type-section outline-none">{titles[step]}</h2>
           <HelpLink thema="liga-captains" schritt={HELP_STEPS[step]} />
         </div>
         {step === 0 ? <SquadChoice rows={rows} chosen={chosen} onChoose={setChosen} /> : null}

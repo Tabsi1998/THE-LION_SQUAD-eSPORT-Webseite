@@ -24,12 +24,12 @@ export function TeamSquads({ team, userId, canManage = false, enabled = false })
   return (
     <section data-testid="team-squads">
       <div className="mb-4 flex flex-wrap items-end justify-between gap-3">
-        <h2 className="font-heading text-2xl font-bold uppercase flex items-center gap-2">
+        <h2 className="tls-type-section flex items-center gap-2">
           <Shield className="w-5 h-5 text-[#29B6E8]" aria-hidden="true" /> Co-Teams
         </h2>
         {canManage || holdsRole ? (
           <Link to={`/teams?team=${encodeURIComponent(teamId)}`} data-testid="team-squads-manage"
-            className="tls-btn tls-btn--secondary inline-flex min-h-11 items-center px-4 py-2 rounded-sm text-xs uppercase tracking-wider font-bold">
+            className="tls-btn tls-btn--secondary inline-flex min-h-11 items-center px-4 py-2 rounded-sm tls-type-label">
             Co-Teams verwalten
           </Link>
         ) : null}
@@ -40,12 +40,12 @@ export function TeamSquads({ team, userId, canManage = false, enabled = false })
           return (
             <li key={squad.id} className="min-w-0 border border-white/10 bg-[#121212] rounded-sm p-4" data-testid={`team-squad-${squad.id}`}>
               <div className="flex min-w-0 items-start justify-between gap-2">
-                <div className="min-w-0 font-heading text-lg font-bold [overflow-wrap:anywhere]">{squad.name}</div>
-                {mine ? <span className="shrink-0 rounded-sm border border-honor/40 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-honor">Du: {mine.label}</span> : null}
+                <div className="min-w-0 tls-type-card [overflow-wrap:anywhere]">{squad.name}</div>
+                {mine ? <span className="shrink-0 rounded-sm border border-honor/40 px-2 py-0.5 tls-type-label text-honor">Du: {mine.label}</span> : null}
               </div>
-              {squad.game || squad.game_id ? <p className="mt-1 text-xs text-white/60 break-words" data-testid={`team-squad-game-line-${squad.id}`}>{squadGameLabel(squad)}</p> : null}
-              <p className="mt-1 text-xs text-white/60 break-words" data-testid={`team-squad-roles-line-${squad.id}`}>{rolesSummary(squad, squad.members)}</p>
-              <p className="mt-1 text-xs text-white/40">{(squad.members || []).length} im Kader</p>
+              {squad.game || squad.game_id ? <p className="mt-1 tls-type-small text-white/60 break-words" data-testid={`team-squad-game-line-${squad.id}`}>{squadGameLabel(squad)}</p> : null}
+              <p className="mt-1 tls-type-small text-white/60 break-words" data-testid={`team-squad-roles-line-${squad.id}`}>{rolesSummary(squad, squad.members)}</p>
+              <p className="mt-1 tls-type-small text-quiet">{(squad.members || []).length} im Kader</p>
             </li>
           );
         })}

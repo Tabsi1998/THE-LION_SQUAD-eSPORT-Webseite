@@ -6,6 +6,7 @@ import { SkeletonTable } from "@/components/tls/Skeleton";
 import { averageLabel } from "@/lib/feedback";
 import { viennaDate } from "@/lib/vienna";
 import { FeedbackReport } from "./feedback/FeedbackReport";
+import { ShortCaps } from "@/components/tls/ShortCaps";
 
 // Alle Rückmeldungen auf einen Blick (#2131): bisher nur je Turnier oder Event. Die Grenze von drei gilt auch hier -
 // darunter steht nur die Zahl. Ein Klick zeigt die Auswertung der Veranstaltung, wie auf ihrer Seite. Ohne Namen.
@@ -30,11 +31,11 @@ export default function AdminFeedbackPage() {
   const summary = data?.summary;
   return (
     <AdminLayout>
-      <span className="text-[11px] font-bold uppercase tracking-[0.3em] text-[#29B6E8]">eSports</span>
-      <h1 className="font-heading text-3xl md:text-4xl font-black uppercase mt-1">Rückmeldungen</h1>
-      <p className="mt-2 mb-5 text-sm text-white/60 max-w-2xl">Was Teilnehmende nach Turnieren und Events sagen, ohne Namen. Unter {data?.min_for_details ?? 3} Antworten steht nur die Zahl: Bei zwei Leuten wüsste man sonst, wer was geschrieben hat.</p>
+      <span className="tls-type-label text-[#29B6E8]">eSports</span>
+      <h1 className="tls-type-title mt-1"><ShortCaps>Rückmeldungen</ShortCaps></h1>
+      <p className="mt-2 mb-5 tls-type-body text-white/60 max-w-2xl">Was Teilnehmende nach Turnieren und Events sagen, ohne Namen. Unter {data?.min_for_details ?? 3} Antworten steht nur die Zahl: Bei zwei Leuten wüsste man sonst, wer was geschrieben hat.</p>
 
-      {error && <div className="mb-4 border border-live/40 bg-live/10 rounded-sm p-3 text-sm" data-testid="feedback-overview-error">{error}</div>}
+      {error && <div className="mb-4 border border-live/40 bg-live/10 rounded-sm p-3 tls-type-small" data-testid="feedback-overview-error">{error}</div>}
       {!data && !error && <SkeletonTable rows={4} columns={4} label="Lade Rückmeldungen" />}
 
       {data && (
@@ -50,7 +51,7 @@ export default function AdminFeedbackPage() {
           <div className="flex gap-1 mb-4" role="group" aria-label="Art">
             {KIND_FILTERS.map(([value, label]) => (
               <button key={value} type="button" aria-pressed={kind === value} onClick={() => { setKind(value); setOpen(""); }} data-testid={`feedback-filter-${value || "all"}`}
-                className={`px-3 py-2 border rounded-sm text-[11px] font-bold uppercase tracking-wider ${kind === value ? "border-[#29B6E8] text-[#29B6E8] bg-[#29B6E8]/10" : "border-white/15 text-white/55 hover:text-white"}`}>
+                className={`px-3 py-2 border rounded-sm tls-type-label ${kind === value ? "border-[#29B6E8] text-[#29B6E8] bg-[#29B6E8]/10" : "border-white/15 text-white/55 hover:text-white"}`}>
                 {label}
               </button>
             ))}
@@ -59,7 +60,7 @@ export default function AdminFeedbackPage() {
           {items.length === 0 ? (
             <div className="border border-white/10 bg-[#121212] rounded-sm p-8 text-center" data-testid="feedback-overview-empty">
               <MessageSquareText className="w-8 h-8 text-white/20 mx-auto mb-2" aria-hidden="true" />
-              <p className="text-sm text-white/50">Noch keine Rückmeldungen. Gefragt wird am Tag nach einem Turnier oder Event.</p>
+              <p className="tls-type-small text-white/50">Noch keine Rückmeldungen. Gefragt wird am Tag nach einem Turnier oder Event.</p>
             </div>
           ) : (
             <ul className="space-y-2" data-testid="feedback-overview-list">
@@ -71,15 +72,15 @@ export default function AdminFeedbackPage() {
                     <div className="p-4 flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4">
                       <div className="flex-1 min-w-0">
                         <div className="font-bold break-words">{item.title}</div>
-                        <div className="text-xs text-white/50">{KIND_LABEL[item.kind] || item.kind}{item.day ? ` · ${viennaDate(item.day)}` : ""}{item.declined ? ` · ${item.declined} wollten nichts sagen` : ""}</div>
+                        <div className="tls-type-small text-white/50">{KIND_LABEL[item.kind] || item.kind}{item.day ? ` · ${viennaDate(item.day)}` : ""}{item.declined ? ` · ${item.declined} wollten nichts sagen` : ""}</div>
                       </div>
                       <div className="flex items-center gap-4 shrink-0">
-                        <div className="text-sm text-white/70">{item.count === 1 ? "1 Antwort" : `${item.count} Antworten`}</div>
+                        <div className="tls-type-small text-white/70">{item.count === 1 ? "1 Antwort" : `${item.count} Antworten`}</div>
                         {item.details
-                          ? <div className="inline-flex items-center gap-1 font-heading font-black text-honor" data-testid={`feedback-average-${item.target_id}`}>{averageLabel(item.average)} <Star className="w-4 h-4 fill-honor" aria-hidden="true" /></div>
-                          : <div className="text-xs text-white/40" data-testid={`feedback-few-${item.target_id}`}>zu wenige</div>}
+                          ? <div className="inline-flex items-center gap-1 font-black text-honor" data-testid={`feedback-average-${item.target_id}`}>{averageLabel(item.average)} <Star className="w-4 h-4 fill-honor" aria-hidden="true" /></div>
+                          : <div className="tls-type-small text-quiet" data-testid={`feedback-few-${item.target_id}`}>zu wenige</div>}
                         {item.details && (
-                          <button type="button" aria-expanded={expanded} onClick={() => setOpen(expanded ? "" : key)} data-testid={`feedback-open-${item.target_id}`} className="text-[11px] uppercase tracking-wider font-bold text-[#29B6E8] hover:underline">
+                          <button type="button" aria-expanded={expanded} onClick={() => setOpen(expanded ? "" : key)} data-testid={`feedback-open-${item.target_id}`} className="tls-type-label text-[#29B6E8] hover:underline">
                             {expanded ? "Zuklappen" : "Auswertung"}
                           </button>
                         )}
@@ -91,7 +92,7 @@ export default function AdminFeedbackPage() {
               })}
             </ul>
           )}
-          {data.total > items.length && <p className="mt-3 text-xs text-white/45" data-testid="feedback-overview-more">Angezeigt: die neuesten {items.length} von {data.total}.</p>}
+          {data.total > items.length && <p className="mt-3 tls-type-small text-white/45" data-testid="feedback-overview-more">Angezeigt: die neuesten {items.length} von {data.total}.</p>}
         </>
       )}
     </AdminLayout>
@@ -101,8 +102,8 @@ export default function AdminFeedbackPage() {
 function Tile({ label, testId, children }) {
   return (
     <div className="border border-white/10 rounded-sm bg-[#121212] p-4" data-testid={testId}>
-      <div className="font-heading text-2xl font-black text-white">{children}</div>
-      <div className="text-[11px] uppercase tracking-widest text-white/45 mt-1">{label}</div>
+      <div className="tls-type-section text-white">{children}</div>
+      <div className="tls-type-label text-white/45 mt-1">{label}</div>
     </div>
   );
 }

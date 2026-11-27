@@ -123,7 +123,7 @@ function WeekendHead({ groups, columns, label, extraColumn, roundHref }) {
   const cancelled = (round) => (round.state === "cancelled" ? "line-through text-white/25" : "");
   const sub = groups.filter((group) => group.rounds.length > 1).flatMap((group) => group.rounds);
   return (
-    <thead className="text-[11px] uppercase tracking-[0.12em] text-white/50">
+    <thead className="tls-type-label text-white/50">
       <tr>
         <th scope="col" rowSpan={2} className="text-left pl-4 pr-1 py-2.5 w-16 font-semibold align-bottom border-b border-white/10">#</th>
         <th scope="col" rowSpan={2} className="text-left px-2 py-2.5 font-semibold align-bottom border-b border-white/10">Name</th>
@@ -151,7 +151,7 @@ function WeekendHead({ groups, columns, label, extraColumn, roundHref }) {
       </tr>
       <tr>
         {sub.map((round) => (
-          <th key={round.id} scope="col" title={round.session || "Rennen"} className={`px-2 pb-2 pt-0 text-right font-semibold text-[10px] text-white/40 border-b border-white/10 ${cancelled(round)}`} data-testid="series-session-head">
+          <th key={round.id} scope="col" title={round.session || "Rennen"} className={`px-2 pb-2 pt-0 text-right font-semibold tls-type-small text-quiet border-b border-white/10 ${cancelled(round)}`} data-testid="series-session-head">
             <HeadLink href={roundHref?.(round, true)} title={`Ergebnis ${round.session || "Rennen"}`}>{sessionAbbr(round)}</HeadLink>
           </th>
         ))}
@@ -166,9 +166,9 @@ function DesktopTable({ rows, columns, groups, topN, cutAfter, label, view }) {
   return (
     // eslint-disable-next-line jsx-a11y/no-noninteractive-tabindex -- eine scrollbare Fläche muss per Tastatur erreichbar sein (axe: scrollable-region-focusable)
     <div role="region" aria-label={label} tabIndex={0} className="tls-standings hidden md:block border border-white/10 rounded-md bg-[var(--tls-surface-1)] tls-swipe pb-0 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#29B6E8]" data-testid="series-table">
-      <table className="w-full text-sm tabular-nums">
+      <table className="w-full tls-type-small tabular-nums">
         {groups ? <WeekendHead groups={groups} columns={columns} label={label} extraColumn={extraColumn} roundHref={view.roundHref} /> : (
-        <thead className="text-[11px] uppercase tracking-[0.12em] text-white/50">
+        <thead className="tls-type-label text-white/50">
           <tr className="border-b border-white/10">
             <th scope="col" className="text-left pl-4 pr-1 py-2.5 w-16 font-semibold">#</th>
             <th scope="col" className="text-left px-2 py-2.5 font-semibold">Name</th>
@@ -189,7 +189,7 @@ function DesktopTable({ rows, columns, groups, topN, cutAfter, label, view }) {
               <tr className="tls-standing-row tls-series-row" style={{ "--i": Math.min(index, 12) }} data-testid="series-row" data-club={row.club_member ? "true" : undefined} data-mine={row.club_member ? "true" : undefined}>
                 <td className="pl-4 pr-1 py-2.5 align-middle">
                   <span className="flex items-center gap-1.5">
-                    <span className="font-display text-base font-bold text-white w-5 text-right">{row.rank}</span>
+                    <span className="tls-type-card tls-type-num text-white w-5 text-right">{row.rank}</span>
                     <Move row={row} since={view.since} />
                   </span>
                 </td>
@@ -199,7 +199,7 @@ function DesktopTable({ rows, columns, groups, topN, cutAfter, label, view }) {
                     {view.renderResult(resultIn(row, round.id), columnName(round, roundIndex), row)}
                   </td>
                 ))}
-                <td className={`${extraColumn ? "px-2" : "pr-4 pl-2"} py-2.5 text-right align-middle font-display text-base font-bold text-white`}>{view.renderPoints(row)}</td>
+                <td className={`${extraColumn ? "px-2" : "pr-4 pl-2"} py-2.5 text-right align-middle tls-type-card tls-type-num text-white`}>{view.renderPoints(row)}</td>
                 {extraColumn && <td className="pr-4 pl-2 py-2.5 text-right align-middle tabular-nums text-white/60">{extraColumn.cell(row)}</td>}
               </tr>
               {cutAfter === row.key && <Cutline topN={topN} span={span} />}
@@ -223,17 +223,17 @@ function MobileCards({ rows, allCount, columns, topN, expanded, onExpand, view }
             <li className="tls-standing-row tls-series-row border border-white/10 rounded-md bg-[var(--tls-surface-1)] px-3 py-2.5" style={{ "--i": Math.min(index, 12) }} data-testid="series-card" data-mine={row.club_member ? "true" : undefined}>
               <div className="flex items-center gap-3">
                 <span className="flex items-center gap-1 w-12 shrink-0">
-                  <span className="font-display text-lg font-bold text-white tabular-nums">{row.rank}</span>
+                  <span className="tls-type-card tls-type-num text-white">{row.rank}</span>
                   <Move row={row} since={view.since} />
                 </span>
                 <span className="min-w-0 flex-1">{view.renderName(row, index)}</span>
                 <span className="flex flex-col items-end shrink-0">
-                  <span className="font-display text-lg font-bold text-white tabular-nums">{view.renderPoints(row)}</span>
-                  {extraColumn && <span className="text-[11px] tabular-nums text-white/50">{extraColumn.cell(row)}</span>}
+                  <span className="tls-type-card tls-type-num text-white">{view.renderPoints(row)}</span>
+                  {extraColumn && <span className="tls-type-small tabular-nums text-white/50">{extraColumn.cell(row)}</span>}
                 </span>
               </div>
               {columns.length > 0 && (
-                <div className="mt-1.5 pl-[3.75rem] flex flex-wrap gap-x-3 gap-y-0.5 text-[12px] tabular-nums text-white/60">
+                <div className="mt-1.5 pl-[3.75rem] flex flex-wrap gap-x-3 gap-y-0.5 tls-type-small tabular-nums text-white/60">
                   {columns.map((round, roundIndex) => {
                     const name = columnName(round, roundIndex);
                     const result = resultIn(row, round.id);
@@ -257,7 +257,7 @@ function MobileCards({ rows, allCount, columns, topN, expanded, onExpand, view }
         ))}
       </ol>
       {!expanded && shown.length < allCount && (
-        <button type="button" onClick={onExpand} className="mt-3 w-full min-h-[44px] border border-white/15 rounded-md text-sm font-semibold text-white/80 hover:border-[#29B6E8]/60 hover:text-white" data-testid="series-expand">
+        <button type="button" onClick={onExpand} className="mt-3 w-full min-h-[44px] border border-white/15 rounded-md tls-type-small font-semibold text-white/80 hover:border-[#29B6E8]/60 hover:text-white" data-testid="series-expand">
           Ganze Tabelle zeigen ({allCount})
         </button>
       )}
@@ -299,7 +299,7 @@ export function SeriesStandings({
     since: kindWord(profile, "since_previous", "seit der Runde davor"),
   };
 
-  if (!all.length) return <p className="mt-3 text-sm text-white/55" data-testid="series-no-table">Noch keine Ergebnisse – die Tabelle erscheint {kindWord(profile, "after_first", "nach der ersten gewerteten Runde")}.</p>;
+  if (!all.length) return <p className="mt-3 tls-type-small text-white/55" data-testid="series-no-table">Noch keine Ergebnisse – die Tabelle erscheint {kindWord(profile, "after_first", "nach der ersten gewerteten Runde")}.</p>;
   return (
     <div className="mt-4">
       {hasClub && (
@@ -308,7 +308,7 @@ export function SeriesStandings({
             type="button"
             aria-pressed={clubOnly}
             onClick={() => setClubOnly((value) => !value)}
-            className={`min-h-[36px] px-3 rounded-md border text-[12px] font-bold uppercase tracking-[0.12em] transition-colors ${clubOnly ? "border-[#29B6E8]/70 bg-[#29B6E8]/10 text-[#29B6E8]" : "border-white/15 text-white/65 hover:text-white hover:border-white/30"}`}
+            className={`min-h-[36px] px-3 rounded-md border tls-type-label transition-colors ${clubOnly ? "border-[#29B6E8]/70 bg-[#29B6E8]/10 text-[#29B6E8]" : "border-white/15 text-white/65 hover:text-white hover:border-white/30"}`}
             data-testid="series-filter-club"
           >
             {filterLabel}

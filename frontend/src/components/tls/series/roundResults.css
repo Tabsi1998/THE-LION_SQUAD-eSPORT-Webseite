@@ -23,7 +23,7 @@
 }
 .tls-round-fact[data-tone="honor"][data-key="winner"] { border-color: rgb(var(--tls-honor-rgb) / 0.35); }
 .tls-round-fact[data-key="best_club"] { border-color: rgb(var(--tls-brand-rgb) / 0.4); }
-.tls-round-fact__label { font-size: 10px; font-weight: 700; letter-spacing: 0.16em; text-transform: uppercase; }
+.tls-round-fact__label { font-size: var(--tls-type-label-size); font-weight: 700; letter-spacing: 0.16em; text-transform: uppercase; }
 .tls-round-fact[data-tone="honor"] .tls-round-fact__label { color: var(--tls-honor); }
 .tls-round-fact[data-tone="pole"] .tls-round-fact__label { color: rgb(var(--tls-pole-rgb)); }
 .tls-round-fact[data-tone="fastest"] .tls-round-fact__label { color: rgb(var(--tls-fastest-rgb)); }
@@ -33,9 +33,9 @@
 @media (min-width: 768px) {
   .tls-round-facts { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 12.5rem), 1fr)); gap: 12px; margin-inline: 0; padding-inline: 0; }
   .tls-round-fact { max-width: none; padding: 0.875rem 1rem; }
-  .tls-round-fact__label { font-size: 11px; letter-spacing: 0.18em; }
+  .tls-round-fact__label { font-size: var(--tls-type-label-size); letter-spacing: 0.18em; }
   .tls-round-fact__value { font-size: 17px; }
-  .tls-round-fact__sub { font-size: 13px; }
+  .tls-round-fact__sub { font-size: var(--tls-type-small-size); }
 }
 
 /* Reiter je Lauf: eine Leiste, die gewählte Linie in Cyan. Wenige Reiter teilen sich die Breite, viele wischen. */
@@ -48,7 +48,7 @@
 }
 .tls-round-tab[aria-selected="true"] { color: #fff; border-bottom-color: var(--tls-brand); }
 .tls-round-tab:focus-visible { outline: 2px solid var(--tls-brand); outline-offset: -2px; border-radius: 4px 4px 0 0; }
-.tls-round-tab__time { font-size: 13px; font-weight: 500; color: var(--tls-quiet); font-variant-numeric: tabular-nums; }
+.tls-round-tab__time { font-size: var(--tls-type-small-size); font-weight: 500; color: var(--tls-quiet); font-variant-numeric: tabular-nums; }
 @media (hover: hover) and (pointer: fine) {
   .tls-round-tab:not([aria-selected="true"]):hover { color: #fff; }
 }
@@ -87,18 +87,18 @@
 .tls-round-pos[data-medal="gold"] { background: var(--tls-honor); color: var(--tls-surface-0); }
 .tls-round-pos[data-medal="silver"] { background: var(--tls-silver); color: var(--tls-surface-0); }
 .tls-round-pos[data-medal="bronze"] { background: var(--tls-bronze); color: var(--tls-surface-0); }
-.tls-round-pos[data-out="true"] { background: transparent; color: var(--tls-quiet); font-size: 13px; letter-spacing: 0.04em; }
+.tls-round-pos[data-out="true"] { background: transparent; color: var(--tls-quiet); font-size: var(--tls-type-label-size); letter-spacing: 0.04em; }
 .tls-round-number { font-family: 'Rajdhani', 'Bahnschrift Condensed', sans-serif; font-weight: 700; font-size: 20px; line-height: 1; color: var(--tls-text-muted); }
 .tls-round-team { font-style: italic; color: var(--tls-text-muted); }
 .tls-round-points { font-family: 'Rajdhani', 'Bahnschrift Condensed', sans-serif; font-size: 18px; font-weight: 700; text-align: right; }
-.tls-round-move { display: inline-flex; align-items: center; gap: 1px; margin-left: 0.35rem; font-size: 13px; font-weight: 600; }
+.tls-round-move { display: inline-flex; align-items: center; gap: 1px; margin-left: 0.35rem; font-size: var(--tls-type-small-size); font-weight: 600; }
 .tls-round-move[data-dir="up"] { color: var(--tls-brand); }
 .tls-round-move[data-dir="down"] { color: var(--tls-quiet); }
 
 /* Abzeichen: Pole, schnellste Runde, Fahrer des Tages, Ausfall, Strafsekunden - ausgeschrieben. */
 .tls-round-badge {
   display: inline-flex; align-items: center; gap: 0.25rem; padding: 1px 7px; border-radius: 4px; white-space: nowrap;
-  font-size: 11px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; line-height: 1.5;
+  font-size: var(--tls-type-label-size); font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; line-height: 1.5;
   color: var(--tls-surface-0);
 }
 .tls-round-badge svg { width: 11px; height: 11px; }
@@ -130,7 +130,7 @@
 .tls-round-item[data-out="true"] { opacity: 0.6; }
 .tls-round-item .tls-round-pos { width: 30px; height: 30px; flex: 0 0 30px; font-size: 15px; }
 .tls-round-item .tls-round-number { flex: 0 0 28px; font-size: 17px; }
-.tls-round-item .tls-round-badge { padding: 0 5px; font-size: 10px; border-radius: 3px; }
+.tls-round-item .tls-round-badge { padding: 0 5px; font-size: var(--tls-type-label-size); border-radius: 3px; }
 .tls-round-item__main { font-family: 'Rajdhani', 'Bahnschrift Condensed', sans-serif; font-weight: 700; font-size: 16px; line-height: 1.2; }
 .tls-round-item__sub { font-size: 12px; color: var(--tls-text-muted); }
 

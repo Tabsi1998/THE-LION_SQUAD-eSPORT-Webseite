@@ -84,9 +84,9 @@ export function PrizeFormSheet({ prize, onClose, onSaved }) {
       testId="prize-form-sheet"
     >
       {editing ? (
-        <div className="rounded-sm border border-white/10 bg-black/20 p-3 text-sm">
+        <div className="rounded-sm border border-white/10 bg-black/20 p-3 tls-type-small">
           <div className="font-semibold">{prize.fastlap_challenge_title || prize.tournament_title || "Gewinn"}</div>
-          <div className="text-xs text-white/50">{prize.recipient_label || prize.display_name || "—"} · Platz {prize.place}</div>
+          <div className="tls-type-small text-white/50">{prize.recipient_label || prize.display_name || "—"} · Platz {prize.place}</div>
         </div>
       ) : (
         <>
@@ -117,7 +117,7 @@ export function PrizeFormSheet({ prize, onClose, onSaved }) {
           : "Leer lassen: 90 Tage ab „Bereit“. Ein Datum gilt bis zum Ende dieses Tages."}
       />
       {editing && prize.pickup_deadline_custom && deadline && ["pending", "ready"].includes(prize.status) && (
-        <button type="button" onClick={() => setDeadline("")} data-testid="prize-form-deadline-reset" className="text-xs font-bold uppercase tracking-wider text-[#29B6E8] hover:underline">
+        <button type="button" onClick={() => setDeadline("")} data-testid="prize-form-deadline-reset" className="tls-type-label text-[#29B6E8] hover:underline">
           Frist zurück auf 90 Tage ab „Bereit“
         </button>
       )}

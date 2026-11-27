@@ -16,7 +16,7 @@ export function SeriesPartners({ partners }) {
     <div className="mt-5 flex flex-col gap-2.5" data-testid="series-partners">
       {organizers.length > 0 && (
         <div className="flex flex-wrap items-center gap-x-4 gap-y-2" data-testid="series-organizers">
-          <span className="text-[11px] font-bold uppercase tracking-[0.2em] text-white/50">Veranstaltet von</span>
+          <span className="tls-type-label text-white/50">Veranstaltet von</span>
           {organizers.map((partner) => (
             <Link
               key={partner.id}
@@ -35,7 +35,7 @@ export function SeriesPartners({ partners }) {
         </div>
       )}
       {contributors.length > 0 && (
-        <p className="m-0 text-sm text-white/60 break-words" data-testid="series-contributors">
+        <p className="m-0 tls-type-small text-white/60 break-words" data-testid="series-contributors">
           <span className="text-white/45">Mit </span>
           {contributors.map((partner, index) => (
             <Fragment key={partner.id}>

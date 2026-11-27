@@ -39,7 +39,7 @@ export function gameCode(game) {
 
 function Plaque({ game, size = "md" }) {
   return (
-    <span className={`inline-flex self-start shrink-0 items-center justify-center rounded-sm border border-white/25 bg-black/55 font-heading font-black tracking-wider text-white ${size === "sm" ? "h-6 min-w-6 px-1 text-[9px]" : "h-7 min-w-7 px-1.5 text-[10px]"}`} aria-hidden="true">
+    <span className={`inline-flex self-start shrink-0 items-center justify-center rounded-sm border border-white/25 bg-black/55 tls-type-small font-black text-white ${size === "sm" ? "h-6 min-w-6 px-1" : "h-7 min-w-7 px-1.5"}`} aria-hidden="true">
       {gameCode(game)}
     </span>
   );
@@ -48,11 +48,11 @@ function Plaque({ game, size = "md" }) {
 function DiscordLink({ server, testId }) {
   if (!server?.available) return null;
   if (server.member === true) {
-    return <span data-testid={`${testId}-joined`} className="inline-flex items-center gap-1 text-xs font-semibold text-[#43B581]"><Check className="w-3.5 h-3.5" /> Du bist dabei</span>;
+    return <span data-testid={`${testId}-joined`} className="inline-flex items-center gap-1 tls-type-small font-semibold text-[#43B581]"><Check className="w-3.5 h-3.5" /> Du bist dabei</span>;
   }
   if (!server.invite_url) return null;
   return (
-    <a href={server.invite_url} target="_blank" rel="noopener noreferrer" data-testid={`${testId}-join`} className="inline-flex items-center gap-1.5 text-xs font-semibold text-[#B8C0FF] hover:text-white transition">
+    <a href={server.invite_url} target="_blank" rel="noopener noreferrer" data-testid={`${testId}-join`} className="inline-flex items-center gap-1.5 tls-type-small font-semibold text-[#B8C0FF] hover:text-white transition">
       <PlatformIcon kind="discord" className="w-3.5 h-3.5" /> Discord des Spiels
     </a>
   );
@@ -76,8 +76,8 @@ export function GamesShelf({ games, joined = {}, testIdPrefix = "games-shelf", f
                   <span className="absolute inset-0 bg-gradient-to-b from-transparent via-[#0A0A0A]/30 to-[#0A0A0A]/95" />
                   <span className="absolute inset-x-3 bottom-3 flex flex-col gap-1.5">
                     <Plaque game={game} />
-                    <span className="tls-card__title font-bold text-sm sm:text-[15px] leading-tight break-words">{game.name}</span>
-                    <span className="text-xs text-white/70">{gameCountLine(game)}</span>
+                    <span className="tls-card__title font-bold tls-type-small leading-tight break-words">{game.name}</span>
+                    <span className="tls-type-small text-white/70">{gameCountLine(game)}</span>
                   </span>
                 </Link>
                 {server ? <DiscordLink server={server} testId={`${testIdPrefix}-${game.id}-discord`} /> : null}
@@ -88,9 +88,9 @@ export function GamesShelf({ games, joined = {}, testIdPrefix = "games-shelf", f
       )}
       {fun.length > 0 && (
         <div className="mt-5 flex flex-wrap items-center gap-2" data-testid={`${testIdPrefix}-fun`}>
-          <span className="text-[11px] font-bold uppercase tracking-[0.2em] text-white/45 mr-1">{funTitle}</span>
+          <span className="tls-type-label text-white/45 mr-1">{funTitle}</span>
           {fun.map((game) => (
-            <span key={game.id} data-testid={`${testIdPrefix}-${game.id}`} className="inline-flex items-center gap-2 rounded-full bg-white/[0.06] border border-white/10 py-1 pl-1 pr-3 text-sm font-semibold">
+            <span key={game.id} data-testid={`${testIdPrefix}-${game.id}`} className="inline-flex items-center gap-2 rounded-full bg-white/[0.06] border border-white/10 py-1 pl-1 pr-3 tls-type-small font-semibold">
               <Plaque game={game} size="sm" /> {game.name}
               {game.discord?.available && game.discord.invite_url ? (
                 <a href={game.discord.invite_url} target="_blank" rel="noopener noreferrer" aria-label={`Discord: ${game.name}`} className="text-[#B8C0FF] hover:text-white" data-testid={`${testIdPrefix}-${game.id}-discord-join`}>

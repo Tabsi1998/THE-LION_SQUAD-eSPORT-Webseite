@@ -467,28 +467,28 @@ export default function AdminTournamentEditPage() {
   const canLockTournament = isTournamentLead && ["completed", "results_published", "archived", "cancelled"].includes(t.status);
   const toolActions = [
     t.can_assign_stations && stations.length > 0 && (
-      <button key="stations" type="button" onClick={() => selectTab("matchplan")} data-testid="admin-tr-plan-schedule" className="px-3 py-2 border border-[#29B6E8]/50 text-[#29B6E8] font-bold uppercase tracking-wider rounded-sm text-xs hover:bg-[#29B6E8]/10 inline-flex items-center gap-2">
+      <button key="stations" type="button" onClick={() => selectTab("matchplan")} data-testid="admin-tr-plan-schedule" className="px-3 py-2 border border-[#29B6E8]/50 text-[#29B6E8] tls-type-label rounded-sm hover:bg-[#29B6E8]/10 inline-flex items-center gap-2">
         <Zap className="w-3.5 h-3.5" /> Planen
       </button>
     ),
     t.can_use_staff_tools && (
-      <button key="planning" type="button" onClick={() => runPlanningCheck()} data-testid="admin-tr-planning-check" className="px-3 py-2 border border-[#FFD700]/50 text-[#FFD700] font-bold uppercase tracking-wider rounded-sm text-xs hover:bg-[#FFD700]/10 inline-flex items-center gap-2">
+      <button key="planning" type="button" onClick={() => runPlanningCheck()} data-testid="admin-tr-planning-check" className="px-3 py-2 border border-[#FFD700]/50 text-[#FFD700] tls-type-label rounded-sm hover:bg-[#FFD700]/10 inline-flex items-center gap-2">
         <Eye className="w-3.5 h-3.5" /> Planung prüfen
       </button>
     ),
     canLockTournament && (
-      <button key="lock" type="button" onClick={() => setTournamentLock(!t.locked_at)} data-testid="admin-tr-lock" className={`px-3 py-2 border font-bold uppercase tracking-wider rounded-sm text-xs ${t.locked_at ? "border-[#00FF88]/40 text-[#00FF88] hover:bg-[#00FF88]/10" : "border-[#FFD700]/50 text-[#FFD700] hover:bg-[#FFD700]/10"}`}>
+      <button key="lock" type="button" onClick={() => setTournamentLock(!t.locked_at)} data-testid="admin-tr-lock" className={`px-3 py-2 border tls-type-label rounded-sm ${t.locked_at ? "border-[#00FF88]/40 text-[#00FF88] hover:bg-[#00FF88]/10" : "border-[#FFD700]/50 text-[#FFD700] hover:bg-[#FFD700]/10"}`}>
         {t.locked_at ? "Entsperren" : "Sperren"}
       </button>
     ),
     isTournamentLead && ["results_published", "archived"].includes(t.status) && (
-      <button key="recheck" type="button" onClick={() => recheckResults()} data-testid="admin-tr-recheck-results" className="px-3 py-2 border border-[#29B6E8]/50 text-[#29B6E8] font-bold uppercase tracking-wider rounded-sm text-xs hover:bg-[#29B6E8]/10 inline-flex items-center gap-2">
+      <button key="recheck" type="button" onClick={() => recheckResults()} data-testid="admin-tr-recheck-results" className="px-3 py-2 border border-[#29B6E8]/50 text-[#29B6E8] tls-type-label rounded-sm hover:bg-[#29B6E8]/10 inline-flex items-center gap-2">
         <RefreshCw className="w-3.5 h-3.5" /> Abschluss nachholen
       </button>
     ),
     // Nach dem Ende bleibt der Baum (#2120): daran hängen Platzierungen, Punkte und Gewinne.
     t.can_manage_structure && !FINISHED_STATUSES.has(t.status) && (
-      <button key="reset" type="button" onClick={reset} data-testid="admin-tr-reset" className="px-3 py-2 border border-[#FF3B30]/40 text-[#FF3B30] font-bold uppercase tracking-wider rounded-sm text-xs hover:bg-[#FF3B30]/10 inline-flex items-center gap-2">
+      <button key="reset" type="button" onClick={reset} data-testid="admin-tr-reset" className="px-3 py-2 border border-[#FF3B30]/40 text-[#FF3B30] tls-type-label rounded-sm hover:bg-[#FF3B30]/10 inline-flex items-center gap-2">
         <RefreshCw className="w-3.5 h-3.5" /> Zurücksetzen
       </button>
     ),
@@ -506,15 +506,15 @@ export default function AdminTournamentEditPage() {
       <div className="mb-6 space-y-4">
         <div className="flex items-start justify-between flex-wrap gap-3">
           <div>
-            <Link to="/admin/tournaments" className="text-[11px] font-bold uppercase tracking-[0.3em] text-[#29B6E8] hover:text-white">← Turniere</Link>
-            <h1 className="font-heading text-3xl md:text-4xl font-black uppercase mt-1 break-words">{t.title}</h1>
+            <Link to="/admin/tournaments" className="tls-type-label text-[#29B6E8] hover:text-white">← Turniere</Link>
+            <h1 className="tls-type-title mt-1 break-words">{t.title}</h1>
             <div className="mt-2 flex items-center gap-3 flex-wrap">
               <StatusBadge status={t.status} />
-              {t.locked_at && <span className="px-2 py-1 border border-[#FFD700]/40 text-[#FFD700] text-[10px] font-bold uppercase tracking-widest rounded-sm">Gesperrt</span>}
-              <span className="text-white/60 text-sm">{formatTournamentDisplay(t)}</span>
-              <Link to={`/tournaments/${t.slug || t.id}`} target="_blank" className="text-[#29B6E8] text-xs uppercase tracking-wider font-bold hover:text-white inline-flex items-center gap-1"><Eye className="w-3 h-3" /> Öffentliche Seite</Link>
+              {t.locked_at && <span className="px-2 py-1 border border-[#FFD700]/40 text-[#FFD700] tls-type-label rounded-sm">Gesperrt</span>}
+              <span className="text-white/60 tls-type-small">{formatTournamentDisplay(t)}</span>
+              <Link to={`/tournaments/${t.slug || t.id}`} target="_blank" className="text-[#29B6E8] tls-type-label hover:text-white inline-flex items-center gap-1"><Eye className="w-3 h-3" /> Öffentliche Seite</Link>
               {/* TV & Beamer (#1110): der Link für den Hallen-Bildschirm, Turnier schon gewählt. */}
-              <Link to={`/admin/tv?view=bracket&target=${encodeURIComponent(t.id)}`} data-testid="tournament-tv-link" className="text-[#29B6E8] text-xs uppercase tracking-wider font-bold hover:text-white inline-flex items-center gap-1"><Tv className="w-3 h-3" /> TV-Link</Link>
+              <Link to={`/admin/tv?view=bracket&target=${encodeURIComponent(t.id)}`} data-testid="tournament-tv-link" className="text-[#29B6E8] tls-type-label hover:text-white inline-flex items-center gap-1"><Tv className="w-3 h-3" /> TV-Link</Link>
             </div>
           </div>
           {/* Hier steht nur, was das Turnier weiterschiebt: der nächste Schritt,
@@ -526,19 +526,19 @@ export default function AdminTournamentEditPage() {
                 type="button"
                 onClick={() => setTournStatus(primaryAction.status)}
                 data-testid="admin-tr-primary-action"
-                className="px-4 py-2 bg-[#29B6E8] text-black font-bold uppercase tracking-wider rounded-sm text-sm hover:bg-[#1E95C2] inline-flex items-center gap-2"
+                className="px-4 py-2 bg-[#29B6E8] text-black font-bold uppercase tracking-wider rounded-sm tls-type-small hover:bg-[#1E95C2] inline-flex items-center gap-2"
               >
                 <Zap className="w-3.5 h-3.5" /> {primaryAction.label}
               </button>
             )}
             {isTournamentLead && t.format === "swiss" && !tournamentOver && !bracket?.swiss?.complete && (
-              <button type="button" onClick={generateSwissRound} data-testid="admin-tr-swiss-next" className="px-4 py-2 border border-[#29B6E8] text-[#29B6E8] font-bold uppercase tracking-wider rounded-sm text-sm hover:bg-[#29B6E8]/10">Schweizer Runde</button>
+              <button type="button" onClick={generateSwissRound} data-testid="admin-tr-swiss-next" className="px-4 py-2 border border-[#29B6E8] text-[#29B6E8] font-bold uppercase tracking-wider rounded-sm tls-type-small hover:bg-[#29B6E8]/10">Schweizer Runde</button>
             )}
             {isTournamentLead && swissUndo && (
-              <button type="button" onClick={() => undoSwissRound(swissUndo)} data-testid="admin-tr-swiss-undo" className="tls-btn tls-btn--secondary px-4 py-2 font-bold uppercase tracking-wider rounded-sm text-sm">Runde {swissUndo.round} zurücknehmen</button>
+              <button type="button" onClick={() => undoSwissRound(swissUndo)} data-testid="admin-tr-swiss-undo" className="tls-btn tls-btn--secondary px-4 py-2 font-bold uppercase tracking-wider rounded-sm tls-type-small">Runde {swissUndo.round} zurücknehmen</button>
             )}
             {isTournamentLead && t.format === "groups" && !tournamentOver && (
-              <button type="button" onClick={generateGroups} data-testid="admin-tr-groups" className="px-4 py-2 border border-[#29B6E8] text-[#29B6E8] font-bold uppercase tracking-wider rounded-sm text-sm hover:bg-[#29B6E8]/10">Gruppen generieren</button>
+              <button type="button" onClick={generateGroups} data-testid="admin-tr-groups" className="px-4 py-2 border border-[#29B6E8] text-[#29B6E8] font-bold uppercase tracking-wider rounded-sm tls-type-small hover:bg-[#29B6E8]/10">Gruppen generieren</button>
             )}
             {canOperateTournament && (
               <div>
@@ -546,7 +546,7 @@ export default function AdminTournamentEditPage() {
                   {!visibleStatusOptions.some(([value]) => value === t.status) && <option key={t.status} value={t.status}>{TOURNAMENT_STATUS_OPTIONS.find(([value]) => value === t.status)?.[1] || t.status}</option>}
                   {visibleStatusOptions.map(([s, label]) => <option key={s} value={s}>{label}</option>)}
                 </select>
-                <div className="mt-1 max-w-[16rem] text-[10px] text-white/40">Operativ durch Turnierleitung; Zeitautomatik nur wenn ausdrücklich aktiviert.</div>
+                <div className="mt-1 max-w-[16rem] tls-type-small text-quiet">Operativ durch Turnierleitung; Zeitautomatik nur wenn ausdrücklich aktiviert.</div>
                 {/* „Pause bis“ (#1123): nur beim Status „Pausiert“ - der TV zählt bis dahin herunter. */}
                 <PauseUntilControl tournament={t} onSaved={load} />
               </div>
@@ -556,7 +556,7 @@ export default function AdminTournamentEditPage() {
 
         {/* Schweizer System (#1559): Runde X von Y, abgeschlossen, automatisch - der Stand kommt mit dem Baum vom Server. */}
         {t.format === "swiss" && swissStateText(bracket?.swiss) && (
-          <p className="text-sm text-white/70" role="status" data-testid="admin-tr-swiss-state" data-complete={bracket.swiss.complete ? "true" : undefined}>
+          <p className="tls-type-small text-white/70" role="status" data-testid="admin-tr-swiss-state" data-complete={bracket.swiss.complete ? "true" : undefined}>
             {swissStateText(bracket.swiss)}
           </p>
         )}
@@ -578,7 +578,7 @@ export default function AdminTournamentEditPage() {
                 target="_blank"
                 rel="noreferrer"
                 data-testid={`admin-tr-download-${item.key}`}
-                className={`px-3 py-2 border text-xs uppercase font-bold rounded-sm text-center ${item.highlight ? "border-[#FFD700]/40 text-[#FFD700] hover:bg-[#FFD700]/10" : "border-white/20 text-white/80 hover:border-[#29B6E8]/40"}`}
+                className={`px-3 py-2 border tls-type-label rounded-sm text-center ${item.highlight ? "border-[#FFD700]/40 text-[#FFD700] hover:bg-[#FFD700]/10" : "border-white/20 text-white/80 hover:border-[#29B6E8]/40"}`}
               >
                 {item.label}
               </a>
@@ -604,7 +604,7 @@ export default function AdminTournamentEditPage() {
             key={s}
             data-testid={`admin-tr-tab-${s}`}
             onClick={() => selectTab(s)}
-            className={`px-4 py-3 text-xs font-bold uppercase tracking-wider whitespace-nowrap ${activeTab === s ? "text-[#29B6E8] border-b-2 border-[#29B6E8]" : "text-white/60 hover:text-white"}`}
+            className={`px-4 py-3 tls-type-label whitespace-nowrap ${activeTab === s ? "text-[#29B6E8] border-b-2 border-[#29B6E8]" : "text-white/60 hover:text-white"}`}
           >
             {label}
           </button>
@@ -615,8 +615,8 @@ export default function AdminTournamentEditPage() {
         <div className="space-y-4">
         {checkInTools && (
           <div className="flex flex-wrap items-center justify-between gap-3 rounded-sm border border-brand/30 bg-brand/5 p-4" data-testid="admin-tr-checkin-link">
-            <p className="min-w-0 flex-1 text-sm text-white/70">Abgehakt wird in der Turnierleitung – am Handy, mit Suche und Zähler „wer ist da“. Hier bleiben Freigeben, Ablehnen und das PDF.</p>
-            <Link to={`/tournaments/${t.slug || t.id}/leitung?reiter=checkin`} className="tls-btn tls-btn--primary inline-flex min-h-[44px] items-center gap-2 rounded-sm px-4 py-2 text-xs font-bold uppercase tracking-wider">
+            <p className="min-w-0 flex-1 tls-type-body text-white/70">Abgehakt wird in der Turnierleitung – am Handy, mit Suche und Zähler „wer ist da“. Hier bleiben Freigeben, Ablehnen und das PDF.</p>
+            <Link to={`/tournaments/${t.slug || t.id}/leitung?reiter=checkin`} className="tls-btn tls-btn--primary inline-flex min-h-[44px] items-center gap-2 rounded-sm px-4 py-2 tls-type-label">
               <UserCheck className="h-4 w-4" aria-hidden="true" /> Zum Check-in
             </Link>
           </div>
@@ -625,7 +625,7 @@ export default function AdminTournamentEditPage() {
         {isTournamentLead && canAssignSquads(t) && (
           <div className="flex flex-wrap items-center justify-between gap-3 rounded-sm border border-white/10 bg-[#121212] p-4">
             {/* T9 (#2109): ein Turnier im Format Liga nimmt auch ganze Teams - Co-Teams sind hier ein Angebot. */}
-            <p className="min-w-0 flex-1 text-sm text-white/60" data-testid="admin-tr-squad-hint">
+            <p className="min-w-0 flex-1 tls-type-body text-white/60" data-testid="admin-tr-squad-hint">
               Optional: Co-Team zuteilen – Teams melden sich hier auch als ganzes Team an. Captain und Vertreter eines Co-Teams vergibt die Teamleitung im Profil.
             </p>
             <SquadAssignDialog tournament={t} onAssigned={load} />
@@ -666,7 +666,7 @@ export default function AdminTournamentEditPage() {
               <option key={value} value={value}>{label} ({registrationCounts[value] || 0})</option>
             ))}
           </select>
-          <div className="flex items-center justify-end rounded-sm border border-white/10 bg-[#121212] px-3 py-2 text-xs font-bold uppercase tracking-wider text-white/55">
+          <div className="flex items-center justify-end rounded-sm border border-white/10 bg-[#121212] px-3 py-2 tls-type-label text-white/55">
             {filteredRegistrations.length} / {regs.length} sichtbar
           </div>
         </div>
@@ -676,9 +676,9 @@ export default function AdminTournamentEditPage() {
               <div key={r.id} className="p-4 space-y-3">
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0">
-                    <div className="text-[10px] uppercase tracking-widest text-white/35">#{i + 1}</div>
-                    <div className="mt-1 font-heading font-bold uppercase break-words">{r.display_name || r.user?.display_name || r.ingame_name}</div>
-                    <div className="mt-1 text-xs text-white/45 break-all">{r.discord || "Kein Discord"}</div>
+                    <div className="tls-type-label text-quiet">#{i + 1}</div>
+                    <div className="mt-1 font-bold break-words">{r.display_name || r.user?.display_name || r.ingame_name}</div>
+                    <div className="mt-1 tls-type-small text-white/45 break-all">{r.discord || "Kein Discord"}</div>
                     <EventGateMark mark={r.event_gate} />
                     <LineupMark info={lineups[r.id]} /><OnsiteMark via={r.registered_via} />
                   </div>
@@ -691,14 +691,14 @@ export default function AdminTournamentEditPage() {
                     </select>
                   )}
                   {seedEditable && (
-                    <div className="col-span-2 flex items-center justify-between gap-2 text-[10px] font-bold uppercase tracking-wider text-white/50">
+                    <div className="col-span-2 flex items-center justify-between gap-2 tls-type-label text-white/50">
                       <span aria-hidden="true">Setzplatz</span>
                       <SeedField key={`${r.id}-${r.seed ?? ""}`} registration={r} onSave={(seed) => saveSeed(r.id, seed)} testId={`admin-reg-seed-mobile-${r.id}`} />
                     </div>
                   )}
                   <ParticipantRemovalActions tournament={t} registration={r} onDone={load} compact />
                   {t.can_manage_participants && !inFixedBracket.has(r.id) && (
-                    <button type="button" onClick={() => deleteParticipant(r)} className="px-2 py-2 border border-[#FF3B30]/40 text-[#FF3B30] rounded-sm text-[10px] font-bold uppercase hover:bg-[#FF3B30]/10">Entfernen</button>
+                    <button type="button" onClick={() => deleteParticipant(r)} className="px-2 py-2 border border-[#FF3B30]/40 text-[#FF3B30] rounded-sm tls-type-label hover:bg-[#FF3B30]/10">Entfernen</button>
                   )}
                 </div>
               </div>
@@ -706,8 +706,8 @@ export default function AdminTournamentEditPage() {
             {filteredRegistrations.length === 0 && <div className="text-center py-10 text-white/40">{regs.length === 0 ? "Keine Anmeldungen" : "Keine Anmeldungen für diesen Filter"}</div>}
           </div>
           <div className="hidden md:block tls-swipe pb-0">
-          <table className="w-full text-sm min-w-[640px]">
-            <thead className="bg-[#0A0A0A] text-[11px] uppercase tracking-widest text-white/50">
+          <table className="w-full tls-type-small min-w-[640px]">
+            <thead className="bg-[#0A0A0A] tls-type-label text-white/50">
               <tr>
                 <th className="text-left px-4 py-3">#</th>
                 <th className="text-left px-4 py-3">Spieler</th>
@@ -738,7 +738,7 @@ export default function AdminTournamentEditPage() {
                       )}
                       <ParticipantRemovalActions tournament={t} registration={r} onDone={load} />
                       {t.can_manage_participants && !inFixedBracket.has(r.id) && (
-                        <button type="button" onClick={() => deleteParticipant(r)} className="px-2 py-1 border border-[#FF3B30]/40 text-[#FF3B30] rounded-sm text-[10px] font-bold uppercase hover:bg-[#FF3B30]/10">Entfernen</button>
+                        <button type="button" onClick={() => deleteParticipant(r)} className="px-2 py-1 border border-[#FF3B30]/40 text-[#FF3B30] rounded-sm tls-type-label hover:bg-[#FF3B30]/10">Entfernen</button>
                       )}
                     </div>
                   </td>
@@ -819,12 +819,12 @@ export default function AdminTournamentEditPage() {
         <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-4">
           {groups.map((g) => (
             <div key={g.id} className="border border-white/10 rounded-sm bg-[#121212] p-4">
-              <div className="text-[10px] uppercase tracking-widest text-[#29B6E8] font-bold">Gruppe</div>
-              <h3 className="font-heading text-lg font-bold">{g.name}</h3>
+              <div className="tls-type-label text-[#29B6E8]">Gruppe</div>
+              <h3 className="tls-type-card">{g.name}</h3>
               <div className="mt-3 space-y-1.5">
                 {(g.participant_ids || []).map((pid) => {
                   const r = bracket?.registrations.find((x) => x.id === pid);
-                  return <div key={pid} className="text-sm text-white/80 truncate">{r?.display_name || "—"}</div>;
+                  return <div key={pid} className="tls-type-small text-white/80 truncate">{r?.display_name || "—"}</div>;
                 })}
               </div>
             </div>
@@ -888,5 +888,5 @@ function SeedField({ registration, onSave, testId }) {
 // Turnier nur mit Event-Anmeldung (#875): ob die Event-Anmeldung (noch) reicht - nur für die Turnierleitung.
 function EventGateMark({ mark }) {
   if (!mark) return null;
-  return <div className={`mt-1 text-[11px] ${mark.ok ? "text-white/40" : "text-[#FFD700]"}`} data-testid="admin-reg-event-gate">{mark.label}</div>;
+  return <div className={`mt-1 tls-type-small ${mark.ok ? "text-quiet" : "text-[#FFD700]"}`} data-testid="admin-reg-event-gate">{mark.label}</div>;
 }

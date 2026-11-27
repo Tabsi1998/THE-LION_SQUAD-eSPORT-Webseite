@@ -88,7 +88,7 @@ function TierOrderField({ tiers, value, onChange }) {
       {list.length > 0 && (
         <ol className="space-y-1" data-testid="lineage-tier-order">
           {list.map((tier, index) => (
-            <li key={tier} className="flex items-center gap-2 border border-white/10 bg-[#0A0A0A] rounded-sm px-3 py-1.5 text-sm" data-testid={`lineage-tier-${index}`}>
+            <li key={tier} className="flex items-center gap-2 border border-white/10 bg-[#0A0A0A] rounded-sm px-3 py-1.5 tls-type-small" data-testid={`lineage-tier-${index}`}>
               <span className="w-5 text-white/40 tabular-nums">{index + 1}.</span>
               <span className="flex-1 min-w-0 truncate">{tier}</span>
               <button type="button" onClick={() => onChange(moveTier(list, index, -1))} disabled={index === 0} aria-label={`${tier} höher`} data-testid={`lineage-tier-${index}-up`} className="p-1 text-white/50 hover:text-[#29B6E8] disabled:opacity-30"><ArrowUp className="w-4 h-4" /></button>
@@ -98,7 +98,7 @@ function TierOrderField({ tiers, value, onChange }) {
         </ol>
       )}
       {custom && (
-        <button type="button" onClick={() => onChange(null)} data-testid="lineage-tier-reset" className="mt-2 text-xs uppercase tracking-wider font-bold text-[#29B6E8] hover:underline">Vorgabe aus den Namen</button>
+        <button type="button" onClick={() => onChange(null)} data-testid="lineage-tier-reset" className="mt-2 tls-type-label text-[#29B6E8] hover:underline">Vorgabe aus den Namen</button>
       )}
     </FieldLabel>
   );

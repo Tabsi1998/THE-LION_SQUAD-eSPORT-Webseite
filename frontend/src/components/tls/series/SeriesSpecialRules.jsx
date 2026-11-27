@@ -17,7 +17,7 @@ export function AdjustmentMark({ row, rounds = [] }) {
   if (!sum || !(row?.adjustments || []).length) return null;
   const title = adjustmentTitle(row, rounds);
   return (
-    <span className={`ml-1.5 text-[11px] font-bold tabular-nums cursor-help underline decoration-dotted underline-offset-[3px] ${sum < 0 ? "text-red-300 decoration-red-300/50" : "text-emerald-300 decoration-emerald-300/50"}`}
+    <span className={`ml-1.5 tls-type-small font-bold tabular-nums cursor-help underline decoration-dotted underline-offset-[3px] ${sum < 0 ? "text-red-300 decoration-red-300/50" : "text-emerald-300 decoration-emerald-300/50"}`}
       title={title} data-testid="series-adjustment">
       <span aria-hidden="true">{adjustmentText(sum)}</span>
       <span className="sr-only">{` (${title})`}</span>
@@ -30,14 +30,14 @@ export function AdjustmentList({ row, rounds = [], className = "" }) {
   const items = row?.adjustments || [];
   if (!items.length) return null;
   return (
-    <ul className={`space-y-0.5 text-sm text-white/70 ${className}`} aria-label="Anpassungen" data-testid="series-adjustments">
+    <ul className={`space-y-0.5 tls-type-small text-white/70 ${className}`} aria-label="Anpassungen" data-testid="series-adjustments">
       {items.map((item, index) => (
         <li key={`${item.day}-${index}`} className="flex gap-2 min-w-0">
           <span className={`shrink-0 font-bold tabular-nums ${Number(item.points) < 0 ? "text-red-300" : "text-emerald-300"}`}>{adjustmentText(item.points)}</span>
           <span className="min-w-0 [overflow-wrap:anywhere]">
             {adjustmentDetail(item, rounds)}
             {/* #2000: zählt auch fürs Team - für welches bzw. warum für keines. */}
-            {adjustmentTeamText(item) && <span className="block text-xs text-white/50" data-testid="series-adjustment-team">{adjustmentTeamText(item)}</span>}
+            {adjustmentTeamText(item) && <span className="block tls-type-small text-white/50" data-testid="series-adjustment-team">{adjustmentTeamText(item)}</span>}
           </span>
         </li>
       ))}
@@ -53,7 +53,7 @@ export function DriverAdjustmentMarks({ row, rows = [], rounds = [] }) {
   return (
     <span className="mt-0.5 flex flex-col items-end gap-0.5">
       {marks.map((mark) => (
-        <span key={mark.key} className={`text-[11px] font-bold tabular-nums whitespace-nowrap cursor-help underline decoration-dotted underline-offset-[3px] ${mark.negative ? "text-red-300 decoration-red-300/50" : "text-emerald-300 decoration-emerald-300/50"}`}
+        <span key={mark.key} className={`tls-type-small font-bold tabular-nums whitespace-nowrap cursor-help underline decoration-dotted underline-offset-[3px] ${mark.negative ? "text-red-300 decoration-red-300/50" : "text-emerald-300 decoration-emerald-300/50"}`}
           title={mark.title} data-testid="racing-driver-adjustment">
           <span aria-hidden="true">{mark.text}</span>
           <span className="sr-only">{` (${mark.title})`}</span>
@@ -69,7 +69,7 @@ export function SeasonNotice({ series, successor }) {
   const next = successorLink(successor);
   if (!text && !next) return null;
   return (
-    <div className="mt-6 border border-amber-400/30 bg-amber-400/[0.06] rounded-md px-4 py-3 text-sm text-white/80 flex flex-wrap items-center gap-x-4 gap-y-2" role="note" data-testid="series-season-notice">
+    <div className="mt-6 border border-amber-400/30 bg-amber-400/[0.06] rounded-md px-4 py-3 tls-type-small text-white/80 flex flex-wrap items-center gap-x-4 gap-y-2" role="note" data-testid="series-season-notice">
       {text && (
         <span className="flex items-start gap-2 min-w-0" data-testid="series-cancelled">
           <AlertTriangle className="w-4 h-4 mt-0.5 shrink-0 text-amber-300" aria-hidden="true" />
@@ -91,8 +91,8 @@ export function RuleChanges({ changes }) {
   if (!lines.length) return null;
   return (
     <section className="mt-5 border-l-2 border-[#29B6E8]/50 pl-3" aria-label="Regeländerungen" data-testid="series-rule-changes">
-      <h3 className="text-[11px] font-bold uppercase tracking-[0.16em] text-white/45">Regeländerungen</h3>
-      <ul className="mt-1.5 space-y-1 text-sm">
+      <h3 className="tls-type-label text-white/45">Regeländerungen</h3>
+      <ul className="mt-1.5 space-y-1 tls-type-small">
         {lines.map((line) => (
           <li key={line.key} className="flex flex-col sm:flex-row sm:gap-3 min-w-0" data-testid="series-rule-change">
             <span className="shrink-0 sm:w-44 font-semibold text-white tabular-nums">{line.head}</span>
@@ -110,17 +110,17 @@ export function TeamSource({ teams, scoring, rounds = [] }) {
   if (!teams) return null;
   const deviations = (teams.rows || []).map(teamDeviationText).filter(Boolean);
   return (
-    <div className="mt-2 text-sm" data-testid="racing-team-source">
+    <div className="mt-2 tls-type-small" data-testid="racing-team-source">
       <p className="text-white/70">
         <span className="text-white/45">Quelle </span>{teamSourceLabel(teams, rounds)}
         <span className="text-white/45"> · Modus </span>{teamModeLabel(scoring)}
       </p>
       {/* Aktuelle Besetzung (#1960): Gesamt und Zellensumme weichen gewollt voneinander ab - so sagt es die Tabelle. */}
-      {scoring?.mode === "current_lineup" && <p className="mt-1 text-[12px] text-white/55" data-testid="racing-team-lineup-note">{LINEUP_TOTAL_TEXT}</p>}
+      {scoring?.mode === "current_lineup" && <p className="mt-1 tls-type-small text-white/55" data-testid="racing-team-lineup-note">{LINEUP_TOTAL_TEXT}</p>}
       {deviations.length > 0 && (
         <details className="mt-1 text-white/55" data-testid="racing-team-deviations">
-          <summary className="cursor-pointer text-[12px] hover:text-white">{`Eigene Rechnung weicht bei ${deviations.length === 1 ? "einem Team" : `${deviations.length} Teams`} ab`}</summary>
-          <ul className="mt-1 space-y-0.5 text-[12px] tabular-nums">
+          <summary className="cursor-pointer tls-type-small hover:text-white">{`Eigene Rechnung weicht bei ${deviations.length === 1 ? "einem Team" : `${deviations.length} Teams`} ab`}</summary>
+          <ul className="mt-1 space-y-0.5 tls-type-small tabular-nums">
             {deviations.map((line) => <li key={line}>{line}</li>)}
           </ul>
         </details>
@@ -135,7 +135,7 @@ export function SessionRuleNotes({ session }) {
   const grid = gridWords(session?.grid_source, session?.reverse_top);
   if (!grid && !noScoreText(session)) return null;
   return (
-    <div className="mb-3 flex flex-col gap-1 text-sm" data-testid="round-session-rules">
+    <div className="mb-3 flex flex-col gap-1 tls-type-small" data-testid="round-session-rules">
       <NoScoreNote round={session} className="!text-sm" />
       {grid && <span className="text-white/65" data-testid="round-session-grid">{grid}</span>}
     </div>
@@ -147,5 +147,5 @@ export function SessionRuleNotes({ session }) {
 export function NoScoreNote({ round, label = "", className = "", profile = null }) {
   const text = noScoreText(round, profile);
   if (!text) return null;
-  return <span className={`block text-[11px] text-amber-200/80 [overflow-wrap:anywhere] ${className}`} data-testid="series-no-score">{label ? `${label}: ${text}` : text}</span>;
+  return <span className={`block tls-type-small text-amber-200/80 [overflow-wrap:anywhere] ${className}`} data-testid="series-no-score">{label ? `${label}: ${text}` : text}</span>;
 }

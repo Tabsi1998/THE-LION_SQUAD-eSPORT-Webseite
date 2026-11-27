@@ -209,8 +209,8 @@ export function AchievementGroupsView({
     return (
       <div className="space-y-4" data-testid="achievement-groups" data-sort="rarity">
         <div className="flex items-baseline justify-between">
-          <h2 className="font-heading text-xl md:text-2xl font-bold uppercase">Die seltensten zuerst</h2>
-          <span className="text-[10px] uppercase tracking-widest text-white/40">{ordered.length} Gruppen</span>
+          <h2 className="tls-type-section">Die seltensten zuerst</h2>
+          <span className="tls-type-label text-quiet">{ordered.length} Gruppen</span>
         </div>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
           {ordered.map((g) => <GroupCard key={g.code} group={g} earnedOnly={earnedOnly} rarity={rarity} pins={pins} share={share} />)}
@@ -238,14 +238,14 @@ export function AchievementGroupsView({
             <div className="flex items-baseline justify-between mb-4 gap-3 flex-wrap">
               <div className="flex items-center gap-2 flex-wrap">
                 <AchievementIcon name={meta.icon} fallback="trophy" className="w-4 h-4" style={{ color: meta.accent }} />
-                <h2 className="font-heading text-xl md:text-2xl font-bold uppercase">{meta.label}</h2>
+                <h2 className="tls-type-section">{meta.label}</h2>
                 {isClub && clubTeaser && (
-                  <span className="text-[9px] font-bold uppercase tracking-widest px-1.5 py-0.5 rounded-sm border border-[#FFD700]/40 text-[#FFD700]/90" data-testid="club-showcase-badge">
+                  <span className="tls-type-label px-1.5 py-0.5 rounded-sm border border-[#FFD700]/40 text-[#FFD700]/90" data-testid="club-showcase-badge">
                     Für Vereinsmitglieder
                   </span>
                 )}
               </div>
-              <span className="text-[10px] uppercase tracking-widest text-white/40">
+              <span className="tls-type-label text-quiet">
                 {byCat[cat].length} Gruppen{cat === "hidden" && hidden ? ` · ${hidden.earned} von ${hidden.total} gefunden` : ""}
               </span>
             </div>
@@ -264,11 +264,11 @@ export function AchievementGroupsView({
 // Die Vereins-Vitrine (#619) für alle, die (noch) nicht Mitglied sind.
 function ClubShowcaseNote({ className = "" }) {
   return (
-    <div className={`border border-[#FFD700]/25 bg-[#FFD700]/5 rounded-sm px-4 py-3 text-sm text-white/70 flex items-center gap-3 flex-wrap ${className}`} data-testid="club-showcase-note">
+    <div className={`border border-[#FFD700]/25 bg-[#FFD700]/5 rounded-sm px-4 py-3 tls-type-small text-white/70 flex items-center gap-3 flex-wrap ${className}`} data-testid="club-showcase-note">
       <span className="flex-1 min-w-[16rem]">
         Diese Vitrine gehört dem Verein: die Stufen gibt es nur für Mitglieder – für Jahre im Rudel, die Mitgliedskarte, Vereinsabende und Ehrenamt.
       </span>
-      <Link to="/membership/join" className="tls-btn tls-btn--secondary shrink-0 text-[10px] font-bold uppercase tracking-widest px-3 py-1.5 rounded-sm">
+      <Link to="/membership/join" className="tls-btn tls-btn--secondary shrink-0 tls-type-label px-3 py-1.5 rounded-sm">
         Mitglied werden
       </Link>
     </div>
@@ -285,7 +285,7 @@ export function AchievementCategoryGroups({ category, groups = [], rarity = null
   const showHiddenCard = category === "hidden" && Boolean(hidden && Number(hidden.total || 0) > 0);
   if (!ordered.length && !showHiddenCard) {
     return (
-      <div className="border border-dashed border-white/10 rounded-sm p-6 text-center text-sm text-white/50" data-testid={`achievement-category-${category}-empty`}>
+      <div className="border border-dashed border-white/10 rounded-sm p-6 text-center tls-type-small text-white/50" data-testid={`achievement-category-${category}-empty`}>
         In dieser Kategorie gibt es noch keine Erfolge.
       </div>
     );
@@ -320,12 +320,12 @@ function HiddenSummaryCard({ hidden }) {
       </div>
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-2 flex-wrap">
-          <div className="font-heading text-base md:text-lg font-bold uppercase">Geheim</div>
-          <span className="text-[10px] font-bold uppercase tracking-widest px-1.5 py-0.5 rounded-sm border border-[#A855F7]/50 text-[#c084fc]" data-testid="achievement-hidden-count">
+          <div className="tls-type-card">Geheim</div>
+          <span className="tls-type-label px-1.5 py-0.5 rounded-sm border border-[#A855F7]/50 text-[#c084fc]" data-testid="achievement-hidden-count">
             {earned} von {total} gefunden
           </span>
         </div>
-        <div className="mt-1 text-xs text-white/55">
+        <div className="mt-1 tls-type-small text-white/55">
           {remaining === 0
             ? "Alle gefunden. Du kennst jede Ecke dieser Seite."
             : `${remaining === total ? "Sie zeigen sich erst, wenn du sie gefunden hast" : `${remaining} warten noch`} – zu ungewöhnlichen Zeiten, an ungewöhnlichen Orten, mit ungewöhnlichen Zahlen.`}
@@ -344,7 +344,7 @@ function retiredText(reason) {
 function RetiredChip({ reason, testId, describedBy }) {
   return (
     <span
-      className="text-[9px] font-bold uppercase tracking-widest px-1.5 py-0.5 rounded-sm border border-white/15 text-white/45"
+      className="tls-type-label px-1.5 py-0.5 rounded-sm border border-white/15 text-white/45"
       title={retiredText(reason)}
       aria-describedby={describedBy}
       data-testid={testId}
@@ -356,7 +356,7 @@ function RetiredChip({ reason, testId, describedBy }) {
 
 function RetiredReason({ reason, id, testId }) {
   return (
-    <div id={id} className="mt-1 text-[11px] text-white/45" data-testid={testId}>
+    <div id={id} className="mt-1 tls-type-small text-white/45" data-testid={testId}>
       {retiredText(reason)}
     </div>
   );
@@ -406,22 +406,22 @@ function GroupCard({ group, earnedOnly = false, rarity = null, pins = null, shar
           : <ListBadge tier={nextLocked || group.tiers[0]} group={group} earned={false} size="lg" percent={isNegative ? 0 : Number(nextLocked?.percent || 0)} />}
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 flex-wrap">
-            <div className="font-heading text-base md:text-lg font-bold uppercase truncate">{group.name}</div>
+            <div className="tls-type-card truncate">{group.name}</div>
             {hasAny && (
               <span
-                className="text-[10px] font-bold uppercase tracking-widest px-1.5 py-0.5 rounded-sm border"
+                className="tls-type-label px-1.5 py-0.5 rounded-sm border"
                 style={{ color: LEVEL_META[highest.level].color, borderColor: LEVEL_META[highest.level].color + "55" }}
               >
                 {isNegative ? "Geheim" : highestLabel}
               </span>
             )}
             {!earnedOnly && !hasAny && nextLocked && (
-              <span className="text-[10px] font-bold uppercase tracking-widest px-1.5 py-0.5 rounded-sm border border-white/10 text-white/50">
+              <span className="tls-type-label px-1.5 py-0.5 rounded-sm border border-white/10 text-white/50">
                 Locked
               </span>
             )}
             {group.member_only && !isNegative && (
-              <span className="text-[9px] font-bold uppercase tracking-widest px-1.5 py-0.5 rounded-sm border border-[#FFD700]/35 text-[#FFD700]/85">
+              <span className="tls-type-label px-1.5 py-0.5 rounded-sm border border-[#FFD700]/35 text-[#FFD700]/85">
                 Verein
               </span>
             )}
@@ -432,9 +432,9 @@ function GroupCard({ group, earnedOnly = false, rarity = null, pins = null, shar
               </>
             )}
           </div>
-          <div className="mt-1 text-xs text-white/55 line-clamp-1">{group.description}</div>
+          <div className="mt-1 tls-type-small text-white/55 line-clamp-1">{group.description}</div>
           {rare?.top && (
-            <div className="mt-1 text-[10px] uppercase tracking-widest text-white/40 tabular-nums" data-testid={`achievement-rarity-${group.code}`}>
+            <div className="mt-1 tls-type-small text-quiet tabular-nums" data-testid={`achievement-rarity-${group.code}`}>
               <span style={{ color: accent }}>{formatPercent(rare.top.percent)}</span> haben {rare.top.material_name || "die höchste Stufe"}
               {Number(rare.holders || 0) > 0 && <span className="text-white/30"> · {rare.holders} mit mindestens einer Stufe</span>}
             </div>
@@ -445,15 +445,15 @@ function GroupCard({ group, earnedOnly = false, rarity = null, pins = null, shar
               <div className="flex-1 h-1 bg-white/5 rounded-sm overflow-hidden max-w-[200px]">
                 <div className={`h-full ${nextLocked.percent >= 80 ? "tls-near-fill" : ""}`} style={{ width: `${nextLocked.percent}%`, backgroundColor: accent, color: accent }} />
               </div>
-              <span className="text-[10px] text-white/40 tabular-nums">{nextLocked.current}/{nextLocked.target}</span>
+              <span className="tls-type-small text-quiet tabular-nums">{nextLocked.current}/{nextLocked.target}</span>
               {nextLocked.percent >= 80 && (
-                <span className="tls-near-chip text-[9px] font-black uppercase tracking-widest shrink-0" style={{ color: accent }}>Fast geschafft!</span>
+                <span className="tls-near-chip tls-type-label shrink-0" style={{ color: accent }}>Fast geschafft!</span>
               )}
             </div>
           )}
         </div>
         <div className="flex items-center gap-2 shrink-0">
-          <span className="text-[10px] uppercase tracking-widest text-white/40 hidden sm:inline">
+          <span className="tls-type-label text-quiet hidden sm:inline">
             {earnedOnly ? group.earned_count : (isNegative ? `${group.earned_count} geheim` : `${group.earned_count}/${group.tier_count}`)}
           </span>
           <ChevronDown className={`w-4 h-4 text-white/40 transition-transform ${open ? "rotate-180" : ""}`} />
@@ -504,23 +504,23 @@ function TierRow({ tier, group, accent, isNegative = false, rarityPercent, pins 
       <ListBadge tier={tier} group={group} earned={tier.earned} size="md" percent={Number(tier.percent || 0)} />
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-2 flex-wrap">
-          <span className="text-[10px] font-bold uppercase tracking-widest" style={{ color: lvl.color }}>
+          <span className="tls-type-label" style={{ color: lvl.color }}>
             {isNegative ? "Geheim" : label}
           </span>
-          <span className={`text-sm font-semibold truncate ${tier.earned ? "text-white" : "text-white/55"}`}>{tier.name}</span>
+          <span className={`tls-type-small font-semibold truncate ${tier.earned ? "text-white" : "text-white/55"}`}>{tier.name}</span>
           {tier.member_only && (
-            <span className="text-[9px] font-bold uppercase tracking-widest px-1.5 py-0.5 rounded-sm border border-[#FFD700]/35 text-[#FFD700]/85">
+            <span className="tls-type-label px-1.5 py-0.5 rounded-sm border border-[#FFD700]/35 text-[#FFD700]/85">
               Verein
             </span>
           )}
           {tier.condition_status === "planned" && !tier.earned && (
-            <span className="text-[9px] font-bold uppercase tracking-widest px-1.5 py-0.5 rounded-sm border border-white/10 text-white/35">
+            <span className="tls-type-label px-1.5 py-0.5 rounded-sm border border-white/10 text-quiet">
               geplant
             </span>
           )}
           {tier.retired && !group?.retired && <RetiredChip reason={tier.retired_reason} testId={`achievement-retired-${tier.code}`} describedBy={`achievement-tier-retired-reason-${tier.code}`} />}
         </div>
-        <div className="text-xs text-white/65 mt-0.5">{tier.description}</div>
+        <div className="tls-type-small text-white/65 mt-0.5">{tier.description}</div>
         {tier.retired && (
           <RetiredReason reason={tier.retired_reason} id={`achievement-tier-retired-reason-${tier.code}`} testId={`achievement-tier-retired-reason-${tier.code}`} />
         )}
@@ -529,30 +529,30 @@ function TierRow({ tier, group, accent, isNegative = false, rarityPercent, pins 
             <div className="flex-1 h-1 bg-white/5 rounded-sm overflow-hidden">
               <div className={`h-full ${tier.percent >= 80 ? "tls-near-fill" : ""}`} style={{ width: `${tier.percent}%`, backgroundColor: accent, color: accent }} />
             </div>
-            <span className="text-[10px] text-white/40 tabular-nums">{tier.current}/{tier.target}</span>
+            <span className="tls-type-small text-quiet tabular-nums">{tier.current}/{tier.target}</span>
             {tier.percent >= 80 && (
-              <span className="tls-near-chip text-[9px] font-black uppercase tracking-widest shrink-0" style={{ color: accent }}>Fast geschafft!</span>
+              <span className="tls-near-chip tls-type-label shrink-0" style={{ color: accent }}>Fast geschafft!</span>
             )}
           </div>
         )}
         {!tier.earned && tier.condition_status === "planned" && !tier.manual_only && (
-          <div className="mt-1 text-[10px] uppercase tracking-widest text-white/30">Automatisierung geplant</div>
+          <div className="mt-1 tls-type-label text-quiet">Automatisierung geplant</div>
         )}
         {!tier.earned && tier.manual_only && (
-          <div className="mt-1 text-[10px] uppercase tracking-widest text-white/30">Wird manuell vergeben</div>
+          <div className="mt-1 tls-type-label text-quiet">Wird manuell vergeben</div>
         )}
       </div>
       <div className="shrink-0 text-right">
         {tier.earned ? (
-          <div className="text-[10px] uppercase tracking-widest text-white/70">
+          <div className="tls-type-label text-white/70">
             +{tier.points} Pkt.
             {tier.earned_at && <div className="text-white/45">{viennaDate(tier.earned_at)}</div>}
           </div>
         ) : (
-          <div className="text-[10px] uppercase tracking-widest text-white/50">+{tier.points}</div>
+          <div className="tls-type-label text-white/50">+{tier.points}</div>
         )}
         {hasRarity && (
-          <div className="mt-0.5 text-[10px] tracking-widest text-white/35 tabular-nums" data-testid={`achievement-tier-rarity-${tier.code}`}>
+          <div className="mt-0.5 tls-type-label text-quiet tabular-nums" data-testid={`achievement-tier-rarity-${tier.code}`}>
             {formatPercent(rarityPercent)} haben das
           </div>
         )}
@@ -565,7 +565,7 @@ function TierRow({ tier, group, accent, isNegative = false, rarityPercent, pins 
             aria-label={pinned ? `${tier.name} lösen` : `${tier.name} anheften`}
             title={pinned ? "Vom Profil lösen" : pinFull ? `Höchstens ${pins.max || 6} angeheftet` : "Im Profil anheften"}
             data-testid={`achievement-pin-${tier.code}`}
-            className={`mt-1.5 inline-flex items-center gap-1 text-[9px] font-bold uppercase tracking-widest px-1.5 py-1 rounded-sm border transition ${pinned ? "border-[#FFD700]/60 text-[#FFD700] bg-[#FFD700]/10" : "border-white/15 text-white/50 hover:text-white hover:border-white/40"} disabled:opacity-35 disabled:cursor-not-allowed`}
+            className={`mt-1.5 inline-flex items-center gap-1 tls-type-label px-1.5 py-1 rounded-sm border transition ${pinned ? "border-[#FFD700]/60 text-[#FFD700] bg-[#FFD700]/10" : "border-white/15 text-white/50 hover:text-white hover:border-white/40"} disabled:opacity-35 disabled:cursor-not-allowed`}
           >
             {pinned ? <PinOff className="w-3 h-3" /> : <Pin className="w-3 h-3" />}
             {pinned ? "Angeheftet" : "Anheften"}
@@ -578,7 +578,7 @@ function TierRow({ tier, group, accent, isNegative = false, rarityPercent, pins 
             aria-label={`${tier.name} teilen`}
             title="Teilen-Karte öffnen oder Link kopieren"
             data-testid={`achievement-share-${tier.code}`}
-            className="tls-btn tls-btn--quiet mt-1.5 ml-1 inline-flex items-center gap-1 text-[9px] font-bold uppercase tracking-widest px-1.5 py-1 rounded-sm"
+            className="tls-btn tls-btn--quiet mt-1.5 ml-1 inline-flex items-center gap-1 tls-type-label px-1.5 py-1 rounded-sm"
           >
             <Share2 className="w-3 h-3" /> Teilen
           </button>

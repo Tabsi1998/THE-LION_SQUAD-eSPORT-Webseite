@@ -50,10 +50,10 @@ export function SeasonStatistics({ lineageSlug, seasonSlug }) {
   const ranked = useMemo(() => (active ? rankBy(rows, active) : rows.map((row) => ({ row, rank: null }))), [rows, active]);
   const hasTeams = (data?.teams || []).length > 0;
 
-  if (failed && !data) return <p className="mt-6 text-sm text-white/55" data-testid="season-stats-error">Die Statistik lässt sich gerade nicht laden.</p>;
+  if (failed && !data) return <p className="mt-6 tls-type-small text-white/55" data-testid="season-stats-error">Die Statistik lässt sich gerade nicht laden.</p>;
   if (!data) return <div className="mt-6"><SkeletonLines lines={5} /></div>;
   if (!rows.length || !metrics.length) {
-    return <p className="mt-6 text-sm text-white/55" data-testid="season-stats-empty">Noch keine Ergebnisse – die Statistik erscheint nach der ersten gewerteten Runde.</p>;
+    return <p className="mt-6 tls-type-body text-white/55" data-testid="season-stats-empty">Noch keine Ergebnisse – die Statistik erscheint nach der ersten gewerteten Runde.</p>;
   }
   const label = scope === "teams" ? "Team" : "Fahrer";
   return (
@@ -80,7 +80,7 @@ export function SeasonStatistics({ lineageSlug, seasonSlug }) {
             </button>
             <ol className="mt-1 space-y-0.5">
               {leaders(rows, key).map(({ row, rank }) => (
-                <li key={row.key} className="flex items-baseline gap-2 text-[13px] min-w-0" data-mine={mine(row) ? "true" : undefined}>
+                <li key={row.key} className="flex items-baseline gap-2 tls-type-small min-w-0" data-mine={mine(row) ? "true" : undefined}>
                   <span className="w-4 shrink-0 text-white/45 tabular-nums">{rank}</span>
                   <span className={`min-w-0 flex-1 truncate ${mine(row) ? "text-[#29B6E8] font-semibold" : "text-white/85"}`}>{row.team && row.key === row.team ? row.team : nameOf(row)}</span>
                   <CountUp className="shrink-0 font-bold" value={metricText(row, key)} />
@@ -93,7 +93,7 @@ export function SeasonStatistics({ lineageSlug, seasonSlug }) {
 
       {/* eslint-disable-next-line jsx-a11y/no-noninteractive-tabindex -- eine scrollbare Fläche muss per Tastatur erreichbar sein (axe: scrollable-region-focusable) */}
       <div className="tls-round-table tls-swipe mt-5 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#29B6E8]" role="region" aria-label={`Statistik je ${label}`} tabIndex={0} data-testid="season-stats-table">
-        <table className="text-sm min-w-[640px]">
+        <table className="tls-type-small min-w-[640px]">
           <thead>
             <tr>
               <th scope="col" className="w-12">#</th>

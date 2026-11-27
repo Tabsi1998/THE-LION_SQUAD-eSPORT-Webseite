@@ -7,10 +7,10 @@ import { emptyRound, roundPoints, roundsTotal } from "@/lib/tournamentDays";
 // Vorschlag, im Double Up der Partner („mit …“) und die Sonderboni der Saison als Chips. Unter „Mehr“ je Runde der Platz
 // in der Lobby samt Bots und die Lobby - ohne Punkte zählt der Platz nach dem Rundenschema.
 
-const SMALL_INPUT = `${INPUT_CLASS} !py-1.5 text-sm`;
-const LABEL = "text-[10px] font-bold uppercase tracking-widest text-white/45";
+const SMALL_INPUT = `${INPUT_CLASS} !py-1.5 tls-type-small`;
+const LABEL = "tls-type-label text-white/45";
 const INVALID = "!border-red-400/80";
-const CHIP = "px-2 py-1 rounded-sm border text-[10px] font-bold uppercase tracking-wider transition-colors active:scale-[0.97]";
+const CHIP = "px-2 py-1 rounded-sm border tls-type-label transition-colors active:scale-[0.97]";
 const CHIP_ON = "border-[#29B6E8] bg-[#29B6E8]/15 text-[#29B6E8]";
 const CHIP_OFF = "border-white/10 text-white/50 hover:text-white";
 
@@ -64,7 +64,7 @@ export function DayRoundsDetails({ row, number, count, invalid, onChange }) {
   if (!count) return null;
   return (
     <div className="mt-2 tls-swipe pb-0" data-testid="result-row-day-details">
-      <table className="text-sm">
+      <table className="tls-type-small">
         <thead>
           <tr className={LABEL}>
             <th scope="col" className="pr-2 text-left font-bold">Runde</th>
@@ -90,7 +90,7 @@ export function DayRoundsDetails({ row, number, count, invalid, onChange }) {
           ))}
         </tbody>
       </table>
-      <p className="mt-1 text-[11px] text-white/45">Platz in der Lobby samt Bots. Ohne Punkte zählt der Platz nach den Rundenpunkten der Saison.</p>
+      <p className="mt-1 tls-type-small text-white/45">Platz in der Lobby samt Bots. Ohne Punkte zählt der Platz nach den Rundenpunkten der Saison.</p>
     </div>
   );
 }
@@ -119,7 +119,7 @@ export function BonusChips({ row, bonuses, open, number, onChange }) {
 /** Double Up für das ganze Blatt: Zweierteams teilen Platz und Punkte. */
 export function DoubleUpToggle({ value, onChange }) {
   return (
-    <label className="flex items-center gap-2 text-xs text-white/75" data-testid="result-double-up">
+    <label className="flex items-center gap-2 tls-type-small text-white/75" data-testid="result-double-up">
       <input type="checkbox" checked={value} onChange={(event) => onChange(event.target.checked)} data-testid="result-double-up-toggle" className="accent-[#29B6E8]" />
       <span><span className="font-bold text-white/90">Double Up</span> – Zweierteams, beide bekommen denselben Platz und dieselben Punkte</span>
     </label>

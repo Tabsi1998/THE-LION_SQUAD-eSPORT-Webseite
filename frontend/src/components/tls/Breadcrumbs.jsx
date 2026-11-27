@@ -12,7 +12,7 @@ import { ChevronRight, Home } from "lucide-react";
 export function Breadcrumbs({ items = [], className = "" }) {
   if (!items.length) return null;
   return (
-    <nav aria-label="Breadcrumb" className={`text-xs ${className}`} data-testid="breadcrumbs">
+    <nav aria-label="Breadcrumb" className={`tls-type-small ${className}`} data-testid="breadcrumbs">
       <ol className="flex items-center flex-wrap gap-1 text-white/50">
         {items.map((item, idx) => {
           const isLast = idx === items.length - 1;

@@ -17,6 +17,7 @@ import { seoTextPreview } from "@/lib/textPreview";
 import { asInstant, viennaDate } from "@/lib/vienna";
 import { PublicLoadingState } from "@/components/tls/PublicLoadingState";
 import { PartnerSeries } from "@/components/tls/PartnerSeries";
+import { ShortCaps } from "@/components/tls/ShortCaps";
 
 // Partnerseite (#469 Teil 1): Kopf mit Logo, Art, „Partner seit“ und Kanal-Symbolen; links der
 // laufende Twitch-Stream (nur wenn live), der Text über den Partner, seine Tools und Projekte
@@ -81,7 +82,7 @@ export default function PartnerDetailPage() {
     return (
       <PublicLayout>
         <div className="p-20 text-center" data-testid="partner-missing">
-          <h1 className="font-heading text-3xl uppercase">Partner nicht gefunden</h1>
+          <h1 className="tls-type-title"><ShortCaps>Partner nicht gefunden</ShortCaps></h1>
           <Link to="/partners" className="inline-block mt-4 text-[#29B6E8] hover:underline">← Alle Partner</Link>
         </div>
       </PublicLayout>
@@ -118,7 +119,7 @@ export default function PartnerDetailPage() {
             )}
           </div>
           <div className="p-6 md:p-8 min-w-0">
-            <div className="flex flex-wrap items-center gap-2 text-[10px] uppercase tracking-widest font-bold text-[#29B6E8]">
+            <div className="flex flex-wrap items-center gap-2 tls-type-label text-[#29B6E8]">
               <span>{partner.kind || "Partner"}</span>
               {since && <span className="text-white/40">· Partner seit {since}</span>}
               {live && (
@@ -127,7 +128,7 @@ export default function PartnerDetailPage() {
                 </span>
               )}
             </div>
-            <h1 className="mt-2 font-heading font-black uppercase text-3xl md:text-5xl leading-tight break-words">{partner.name}</h1>
+            <h1 className="mt-2 tls-type-title leading-tight break-words">{partner.name}</h1>
             {partner.description && <p className="mt-4 text-white/70 leading-relaxed max-w-2xl">{partner.description}</p>}
             {channels.length > 0 && (
               <div className="mt-5 flex flex-wrap gap-2" data-testid="partner-channel-icons">
@@ -205,8 +206,8 @@ export default function PartnerDetailPage() {
                         <div className="w-20 h-16 rounded-sm bg-[#0A0A0A] border border-white/10 flex items-center justify-center shrink-0"><Newspaper className="w-5 h-5 text-white/30" /></div>
                       )}
                       <div className="min-w-0">
-                        <div className="font-heading font-bold leading-tight line-clamp-2">{post.title}</div>
-                        {formatDate(post.published_at || post.created_at) && <div className="mt-1 text-[11px] text-white/45 inline-flex items-center gap-1"><Calendar className="w-3 h-3" /> {formatDate(post.published_at || post.created_at)}</div>}
+                        <div className="font-bold leading-tight line-clamp-2">{post.title}</div>
+                        {formatDate(post.published_at || post.created_at) && <div className="mt-1 tls-type-small text-white/45 inline-flex items-center gap-1"><Calendar className="w-3 h-3" /> {formatDate(post.published_at || post.created_at)}</div>}
                       </div>
                     </Link>
                   ))}
@@ -217,8 +218,8 @@ export default function PartnerDetailPage() {
             {!hasMain && (
               <div className="border border-dashed border-white/15 rounded-sm px-6 py-14 text-center" data-testid="partner-empty">
                 <Handshake className="w-8 h-8 mx-auto mb-3 text-white/25" />
-                <div className="font-heading text-xl font-bold uppercase text-white/70">Mehr folgt</div>
-                <p className="mt-2 text-sm text-white/45 max-w-md mx-auto">Kanäle, Projekte und gemeinsame News von {partner.name} erscheinen hier, sobald sie eingetragen sind.</p>
+                <div className="tls-type-card text-white/70">Mehr folgt</div>
+                <p className="mt-2 tls-type-body text-white/45 max-w-md mx-auto">Kanäle, Projekte und gemeinsame News von {partner.name} erscheinen hier, sobald sie eingetragen sind.</p>
               </div>
             )}
           </div>
@@ -226,11 +227,11 @@ export default function PartnerDetailPage() {
           <aside className="space-y-4 min-w-0" data-testid="partner-sidebar">
             {channels.length > 0 && <ChannelsCard channels={channels} twitch={twitch} discord={discord} />}
             <section className="border border-white/10 rounded-sm bg-[#121212] p-4" data-testid="partner-cooperation">
-              <h2 className="font-heading text-lg font-bold uppercase flex items-center gap-2"><Users className="w-4 h-4 text-[#29B6E8]" /> Zusammenarbeit</h2>
-              <p className="mt-2 text-sm text-white/55">Gemeinsame Events, Turniere und Community-Projekte mit {partner.name} laufen über den Verein.</p>
-              <Link to="/contact" className="mt-3 inline-flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-widest text-[#29B6E8] hover:text-white">Kontakt aufnehmen <ArrowRight className="w-3 h-3" /></Link>
+              <h2 className="tls-type-section flex items-center gap-2"><Users className="w-4 h-4 text-[#29B6E8]" /> Zusammenarbeit</h2>
+              <p className="mt-2 tls-type-small text-white/55">Gemeinsame Events, Turniere und Community-Projekte mit {partner.name} laufen über den Verein.</p>
+              <Link to="/contact" className="mt-3 inline-flex items-center gap-1.5 tls-type-label text-[#29B6E8] hover:text-white">Kontakt aufnehmen <ArrowRight className="w-3 h-3" /></Link>
             </section>
-            <Link to="/partners" className="inline-flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-widest text-white/40 hover:text-white">← Alle Partner</Link>
+            <Link to="/partners" className="inline-flex items-center gap-1.5 tls-type-label text-quiet hover:text-white">← Alle Partner</Link>
           </aside>
         </div>
       </section>
@@ -242,9 +243,9 @@ export default function PartnerDetailPage() {
 function SharedCard({ to, testId, kicker, title, date }) {
   return (
     <Link to={to} data-testid={testId} className="tls-card border border-white/10 rounded-sm bg-[#121212] p-3 min-w-0">
-      <div className="text-[10px] uppercase tracking-widest font-bold text-[#29B6E8]">{kicker}</div>
-      <div className="mt-1 font-heading font-bold leading-tight break-words">{title}</div>
-      {formatDate(date) && <div className="mt-1 text-[11px] text-white/45 inline-flex items-center gap-1"><Calendar className="w-3 h-3" /> {formatDate(date)}</div>}
+      <div className="tls-type-label text-[#29B6E8]">{kicker}</div>
+      <div className="mt-1 font-bold leading-tight break-words">{title}</div>
+      {formatDate(date) && <div className="mt-1 tls-type-small text-white/45 inline-flex items-center gap-1"><Calendar className="w-3 h-3" /> {formatDate(date)}</div>}
     </Link>
   );
 }
@@ -252,8 +253,8 @@ function SharedCard({ to, testId, kicker, title, date }) {
 function SectionTitle({ icon: Icon, color = "#29B6E8", kicker, title }) {
   return (
     <div className="mb-4">
-      {kicker && <div className="text-[11px] uppercase tracking-[0.3em] font-bold" style={{ color }}>{kicker}</div>}
-      <h2 className="mt-1 font-heading text-2xl font-bold uppercase flex items-center gap-2"><Icon className="w-5 h-5" style={{ color }} /> {title}</h2>
+      {kicker && <div className="tls-type-label" style={{ color }}>{kicker}</div>}
+      <h2 className="mt-1 tls-type-section flex items-center gap-2"><Icon className="w-5 h-5" style={{ color }} /> {title}</h2>
     </div>
   );
 }
@@ -262,10 +263,10 @@ function TwitchLiveSection({ channel, twitch, hasConsent }) {
   return (
     <section data-testid="partner-twitch-live" className="border border-[#9146FF]/40 rounded-sm bg-[#121212] overflow-hidden min-w-0">
       <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-3 border-b border-white/10">
-        <h2 className="font-heading text-xl font-bold uppercase flex items-center gap-2">
+        <h2 className="tls-type-section flex items-center gap-2">
           <ChannelIcon kind="twitch" className="w-5 h-5 text-[#9146FF]" /> Live auf Twitch
         </h2>
-        <span className="inline-flex items-center gap-1.5 px-2 py-0.5 border border-[#FF3B30]/50 text-[#FF3B30] text-[10px] uppercase tracking-widest rounded-sm font-bold">
+        <span className="inline-flex items-center gap-1.5 px-2 py-0.5 border border-[#FF3B30]/50 text-[#FF3B30] tls-type-label rounded-sm">
           <Radio className="w-3 h-3 animate-live" /> Live · {twitch.viewer_count || 0} Zuschauer
         </span>
       </div>
@@ -278,9 +279,9 @@ function TwitchLiveSection({ channel, twitch, hasConsent }) {
           <ExternalMediaNotice service="Twitch" reason="Der Twitch-Player wird erst nach Zustimmung zu externen Medien geladen." url={channel.url} accent="#9146FF" compact testId="partner-twitch-consent-notice" />
         </div>
       )}
-      <div className="px-4 py-3 flex flex-wrap items-center justify-between gap-2 text-xs text-white/55">
+      <div className="px-4 py-3 flex flex-wrap items-center justify-between gap-2 tls-type-small text-white/55">
         <span className="truncate min-w-0">{twitch.title || "Stream läuft"}{twitch.game_name ? ` · ${twitch.game_name}` : ""}</span>
-        <a href={channel.url} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-[#9146FF] hover:text-white font-bold uppercase tracking-wider text-[10px]">Bei Twitch öffnen <ExternalLink className="w-3 h-3" /></a>
+        <a href={channel.url} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-[#9146FF] hover:text-white tls-type-label">Bei Twitch öffnen <ExternalLink className="w-3 h-3" /></a>
       </div>
     </section>
   );
@@ -289,7 +290,7 @@ function TwitchLiveSection({ channel, twitch, hasConsent }) {
 function ChannelsCard({ channels, twitch, discord }) {
   return (
     <section className="border border-white/10 rounded-sm bg-[#121212] p-4" data-testid="partner-channels">
-      <h2 className="font-heading text-lg font-bold uppercase flex items-center gap-2"><Radio className="w-4 h-4 text-[#29B6E8]" /> Kanäle</h2>
+      <h2 className="tls-type-section flex items-center gap-2"><Radio className="w-4 h-4 text-[#29B6E8]" /> Kanäle</h2>
       <div className="mt-3 grid gap-2">
         {channels.map((channel, index) => {
           const detail = channelDetail(channel, twitch, discord);
@@ -308,11 +309,11 @@ function ChannelsCard({ channels, twitch, discord }) {
                 <ChannelIcon kind={channel.key} className="w-5 h-5" />
               </span>
               <span className="min-w-0 flex-1">
-                <span className="block font-bold text-sm text-white truncate">{channel.label}</span>
-                {detail.text && <span className="block text-[11px] truncate" style={{ color: detail.tone || "rgba(255,255,255,0.5)" }}>{detail.text}</span>}
+                <span className="block font-bold tls-type-small text-white truncate">{channel.label}</span>
+                {detail.text && <span className="block tls-type-small truncate" style={{ color: detail.tone || "rgba(255,255,255,0.5)" }}>{detail.text}</span>}
               </span>
               {channel.key === "discord" && discord?.enabled ? (
-                <span className="text-[10px] font-bold uppercase tracking-wider text-[#5865F2] shrink-0">Beitreten</span>
+                <span className="tls-type-label text-[#5865F2] shrink-0">Beitreten</span>
               ) : (
                 <ExternalLink className="w-4 h-4 text-white/40 shrink-0" aria-hidden="true" />
               )}
@@ -329,16 +330,16 @@ function ToolCard({ tool, active, onEmbed }) {
     <div className={`border rounded-sm bg-[#121212] overflow-hidden flex flex-col ${active ? "border-[#FFD700]/60" : "border-white/10"}`} data-testid={`partner-tool-${tool.id}`}>
       {tool.image_url && <LazyImg src={tool.image_url} alt="" sizes="(min-width: 768px) 45vw, 100vw" className="w-full h-36 object-cover border-b border-white/10" />}
       <div className="p-4 flex-1 min-w-0">
-        <div className="font-heading font-bold text-lg leading-tight break-words">{tool.title}</div>
-        {tool.description && <p className="mt-1 text-sm text-white/55">{tool.description}</p>}
+        <div className="tls-type-card leading-tight break-words">{tool.title}</div>
+        {tool.description && <p className="mt-1 tls-type-body text-white/55">{tool.description}</p>}
       </div>
       <div className="px-4 pb-4 flex flex-wrap gap-2">
         {onEmbed && (
-          <button type="button" onClick={onEmbed} data-testid={`partner-tool-embed-${tool.id}`} className={`inline-flex items-center gap-1.5 px-3 py-1.5 border rounded-sm text-[10px] font-bold uppercase tracking-wider transition ${active ? "border-[#FFD700] text-[#FFD700]" : "border-white/15 text-white/70 hover:text-[#FFD700] hover:border-[#FFD700]/60"}`}>
+          <button type="button" onClick={onEmbed} data-testid={`partner-tool-embed-${tool.id}`} className={`inline-flex items-center gap-1.5 px-3 py-1.5 border rounded-sm tls-type-label transition ${active ? "border-[#FFD700] text-[#FFD700]" : "border-white/15 text-white/70 hover:text-[#FFD700] hover:border-[#FFD700]/60"}`}>
             <Eye className="w-3.5 h-3.5" /> {active ? "Ausblenden" : "Hier ansehen"}
           </button>
         )}
-        <a href={tool.url} target="_blank" rel="noopener noreferrer" data-testid={`partner-tool-open-${tool.id}`} className="tls-btn tls-btn--quiet inline-flex items-center gap-1.5 px-3 py-1.5 rounded-sm text-[10px] font-bold uppercase tracking-wider">
+        <a href={tool.url} target="_blank" rel="noopener noreferrer" data-testid={`partner-tool-open-${tool.id}`} className="tls-btn tls-btn--quiet inline-flex items-center gap-1.5 px-3 py-1.5 rounded-sm tls-type-label">
           Öffnen <ExternalLink className="w-3.5 h-3.5" />
         </a>
       </div>
@@ -350,17 +351,17 @@ function ToolCard({ tool, active, onEmbed }) {
 function ToolEmbed({ tool, hasConsent, onClose }) {
   return (
     <div className="mt-4 border border-[#FFD700]/40 rounded-sm bg-[#0A0A0A] overflow-hidden" data-testid="partner-tool-embed">
-      <div className="flex items-center justify-between gap-3 px-4 py-2 border-b border-white/10 text-xs">
+      <div className="flex items-center justify-between gap-3 px-4 py-2 border-b border-white/10 tls-type-small">
         <span className="font-bold text-white/80 truncate">{tool.title}</span>
         <div className="flex items-center gap-3 shrink-0">
-          <a href={tool.url} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-[#29B6E8] hover:text-white font-bold uppercase tracking-wider text-[10px]">Direkt öffnen <ExternalLink className="w-3 h-3" /></a>
+          <a href={tool.url} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-[#29B6E8] hover:text-white tls-type-label">Direkt öffnen <ExternalLink className="w-3 h-3" /></a>
           <button type="button" onClick={onClose} aria-label="Einbettung schließen" className="text-white/50 hover:text-white"><X className="w-4 h-4" /></button>
         </div>
       </div>
       {hasConsent("external_media") ? (
         <>
           <iframe title={tool.title} src={tool.url} className="block w-full border-0 h-[70vh] min-h-[420px] bg-white" sandbox="allow-scripts allow-same-origin allow-popups allow-forms" loading="lazy" />
-          <p className="px-4 py-2 text-[11px] text-white/40">Bleibt der Rahmen leer, lässt die Seite des Partners das Einbetten nicht zu – dann „Direkt öffnen“.</p>
+          <p className="px-4 py-2 tls-type-small text-quiet">Bleibt der Rahmen leer, lässt die Seite des Partners das Einbetten nicht zu – dann „Direkt öffnen“.</p>
         </>
       ) : (
         <div className="p-4">

@@ -15,21 +15,21 @@ export function MediaDetailSheet({ item, onClose, onCopy, onRotateLeft, onRotate
     <div className="ml-auto flex flex-wrap justify-end gap-2">
       {isImg && canRotate && (
         <>
-          <button type="button" onClick={onRotateLeft} data-testid="media-rotate-left" className="px-4 py-2 border border-white/10 hover:bg-white/5 text-xs font-bold uppercase tracking-wider rounded-sm inline-flex items-center gap-2">
+          <button type="button" onClick={onRotateLeft} data-testid="media-rotate-left" className="px-4 py-2 border border-white/10 hover:bg-white/5 tls-type-label rounded-sm inline-flex items-center gap-2">
             <RotateCcw className="w-3.5 h-3.5" /> Links
           </button>
-          <button type="button" onClick={onRotateRight} data-testid="media-rotate-right" className="px-4 py-2 border border-white/10 hover:bg-white/5 text-xs font-bold uppercase tracking-wider rounded-sm inline-flex items-center gap-2">
+          <button type="button" onClick={onRotateRight} data-testid="media-rotate-right" className="px-4 py-2 border border-white/10 hover:bg-white/5 tls-type-label rounded-sm inline-flex items-center gap-2">
             <RotateCw className="w-3.5 h-3.5" /> Rechts
           </button>
         </>
       )}
-      <button type="button" onClick={onCopy} data-testid="media-copy-url" className="px-4 py-2 border border-white/10 hover:bg-white/5 text-xs font-bold uppercase tracking-wider rounded-sm inline-flex items-center gap-2">
+      <button type="button" onClick={onCopy} data-testid="media-copy-url" className="px-4 py-2 border border-white/10 hover:bg-white/5 tls-type-label rounded-sm inline-flex items-center gap-2">
         <Copy className="w-3.5 h-3.5" /> Adresse kopieren
       </button>
-      <a href={fullUrl} download={item.original_filename || item.filename} className="px-4 py-2 border border-white/10 hover:bg-white/5 text-xs font-bold uppercase tracking-wider rounded-sm inline-flex items-center gap-2">
+      <a href={fullUrl} download={item.original_filename || item.filename} className="px-4 py-2 border border-white/10 hover:bg-white/5 tls-type-label rounded-sm inline-flex items-center gap-2">
         <Download className="w-3.5 h-3.5" /> Herunterladen
       </a>
-      <button type="button" onClick={onDelete} data-testid="media-delete" className="px-4 py-2 bg-[#FF3B30]/15 text-[#FF3B30] border border-[#FF3B30]/40 hover:bg-[#FF3B30]/25 text-xs font-bold uppercase tracking-wider rounded-sm inline-flex items-center gap-2">
+      <button type="button" onClick={onDelete} data-testid="media-delete" className="px-4 py-2 bg-[#FF3B30]/15 text-[#FF3B30] border border-[#FF3B30]/40 hover:bg-[#FF3B30]/25 tls-type-label rounded-sm inline-flex items-center gap-2">
         <Trash2 className="w-3.5 h-3.5" /> Löschen
       </button>
     </div>
@@ -47,68 +47,68 @@ export function MediaDetailSheet({ item, onClose, onCopy, onRotateLeft, onRotate
         ) : (
           <div className="flex flex-col items-center gap-3 text-white/50 py-12">
             <FileText className="w-16 h-16" />
-            <span className="text-sm font-mono uppercase">.{item.ext || "file"}</span>
-            <a href={fullUrl} target="_blank" rel="noreferrer" className="text-[#29B6E8] underline text-xs inline-flex items-center gap-1">
+            <span className="tls-type-label font-mono">.{item.ext || "file"}</span>
+            <a href={fullUrl} target="_blank" rel="noreferrer" className="text-[#29B6E8] underline tls-type-small inline-flex items-center gap-1">
               <ExternalLink className="w-3 h-3" /> Datei öffnen
             </a>
           </div>
         )}
       </div>
 
-      <div className="grid grid-cols-2 gap-4 text-xs">
+      <div className="grid grid-cols-2 gap-4 tls-type-small">
         <div>
-          <div className="uppercase text-[10px] text-white/40 tracking-widest">Größe</div>
+          <div className="tls-type-label text-quiet">Größe</div>
           <div className="text-white/80">{fmtBytes(item.size)}</div>
         </div>
         <div>
-          <div className="uppercase text-[10px] text-white/40 tracking-widest">Geändert</div>
+          <div className="tls-type-label text-quiet">Geändert</div>
           <div className="text-white/80">{viennaDateTime(item.mtime)}</div>
         </div>
         {item.width && item.height ? (
           <div>
-            <div className="uppercase text-[10px] text-white/40 tracking-widest">Abmessungen</div>
+            <div className="tls-type-label text-quiet">Abmessungen</div>
             <div className="text-white/80" data-testid="media-sheet-dimensions">{item.width} × {item.height} px</div>
           </div>
         ) : null}
         <div>
-          <div className="uppercase text-[10px] text-white/40 tracking-widest">Bereich</div>
+          <div className="tls-type-label text-quiet">Bereich</div>
           <div className="text-white/80">{MEDIA_SCOPE_LABELS[item.media_scope] || MEDIA_SCOPE_LABELS.legacy}</div>
         </div>
         <div>
-          <div className="uppercase text-[10px] text-white/40 tracking-widest">Verwendung</div>
+          <div className="tls-type-label text-quiet">Verwendung</div>
           <div className="text-white/80">{item.usage_count || 0}× verwendet{item.tracked ? "" : " · nicht erfasst"}</div>
         </div>
         {item.original_filename && (
           <div className="col-span-2">
-            <div className="uppercase text-[10px] text-white/40 tracking-widest">Originalname</div>
+            <div className="tls-type-label text-quiet">Originalname</div>
             <div className="text-white/80 font-mono break-all">{item.original_filename}</div>
           </div>
         )}
         {item.duplicate_count > 1 && (
           <div className="col-span-2">
-            <div className="uppercase text-[10px] text-white/40 tracking-widest">Duplikate</div>
+            <div className="tls-type-label text-quiet">Duplikate</div>
             <div className="mt-1 flex flex-wrap gap-1">
               {(item.duplicate_filenames || []).map((name) => (
-                <span key={name} className="rounded-sm border border-[#FFD700]/25 bg-[#FFD700]/5 px-2 py-1 font-mono text-[10px] text-[#FFD700]">{name}</span>
+                <span key={name} className="rounded-sm border border-[#FFD700]/25 bg-[#FFD700]/5 px-2 py-1 font-mono tls-type-small text-[#FFD700]">{name}</span>
               ))}
             </div>
             {onKeepDuplicate && (
-              <button type="button" onClick={onKeepDuplicate} data-testid="media-duplicate-keep" className="tls-btn tls-btn--quiet mt-2 min-h-11 rounded-sm text-xs font-bold uppercase tracking-wider">
+              <button type="button" onClick={onKeepDuplicate} data-testid="media-duplicate-keep" className="tls-btn tls-btn--quiet mt-2 min-h-11 rounded-sm tls-type-label">
                 Diese Datei behalten, Kopien ersetzen
               </button>
             )}
           </div>
         )}
         <div className="col-span-2">
-          <div className="uppercase text-[10px] text-white/40 tracking-widest">Adresse</div>
-          <code className="text-white/80 font-mono text-[11px] break-all">{fullUrl}</code>
+          <div className="tls-type-label text-quiet">Adresse</div>
+          <code className="text-white/80 font-mono tls-type-small break-all">{fullUrl}</code>
         </div>
       </div>
 
       {(item.references || []).length > 0 && (
         <div className="border border-white/10 rounded-sm p-3" data-testid="media-sheet-references">
-          <div className="uppercase text-[10px] text-white/40 tracking-widest font-bold mb-2">Verwendet in</div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
+          <div className="tls-type-label text-quiet mb-2">Verwendet in</div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 tls-type-small">
             {item.references.map((ref, idx) => (
               <div key={`${ref.collection}-${ref.id}-${ref.field}-${idx}`} className="border border-white/10 bg-black/20 rounded-sm px-3 py-2">
                 <div className="font-bold text-white/75">{ref.label || ref.id || ref.collection}</div>

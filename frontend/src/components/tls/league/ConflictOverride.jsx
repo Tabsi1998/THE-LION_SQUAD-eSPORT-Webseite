@@ -18,7 +18,7 @@ export function overrideMissing(needed, text) {
 }
 
 export function OwnTeamNote({ testId }) {
-  return <p className="text-xs font-semibold text-white/80" data-testid={testId}>{OWN_TEAM}</p>;
+  return <p className="tls-type-small font-semibold text-white/80" data-testid={testId}>{OWN_TEAM}</p>;
 }
 
 export function ConflictReasonField({ value, onChange, testId }) {

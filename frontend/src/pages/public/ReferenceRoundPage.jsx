@@ -106,10 +106,10 @@ export default function ReferenceRoundPage() {
                   <ResultList session={session} playKey={playKey} />
                 </>
               ) : (
-                <p className="py-10 text-center text-sm text-white/60 border border-white/10 rounded-[10px]" data-testid="round-empty">{emptyText(session)}</p>
+                <p className="py-10 text-center tls-type-small text-white/60 border border-white/10 rounded-[10px]" data-testid="round-empty">{emptyText(session)}</p>
               )}
             </section>
-            <footer className="flex flex-wrap justify-between gap-3 text-sm text-white/55">
+            <footer className="flex flex-wrap justify-between gap-3 tls-type-small text-white/55">
               {current.own_teams?.length > 0 && session?.rows?.some((row) => row.own) && (
                 <span data-testid="round-own-teams">Vereinsteams hervorgehoben: {current.own_teams.join(", ")}</span>
               )}

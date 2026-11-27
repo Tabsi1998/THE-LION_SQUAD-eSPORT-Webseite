@@ -51,8 +51,8 @@ export function AdminSheet({ title, eyebrow, accent = "#29B6E8", size = "md", on
       >
         <div className="flex items-start justify-between gap-3 border-b border-white/10 px-4 py-4 md:px-6">
           <div className="min-w-0">
-            {eyebrow && <div className="text-[11px] font-bold uppercase tracking-[0.3em]" style={{ color: accent }}>{eyebrow}</div>}
-            <h2 className="font-heading text-xl md:text-2xl font-black uppercase break-words">{title}</h2>
+            {eyebrow && <div className="tls-type-label" style={{ color: accent }}>{eyebrow}</div>}
+            <h2 className="tls-type-section break-words">{title}</h2>
           </div>
           <button type="button" onClick={onClose} aria-label="Schließen" data-testid={`${testId}-close`} className="shrink-0 p-2 text-white/50 hover:text-white transition">
             <X className="w-5 h-5" />
@@ -60,12 +60,12 @@ export function AdminSheet({ title, eyebrow, accent = "#29B6E8", size = "md", on
         </div>
         <div className="flex-1 min-w-0 overflow-y-auto px-4 py-4 md:px-6 md:py-5 space-y-5">{children}</div>
         <div className="flex flex-wrap items-center gap-3 border-t border-white/10 bg-[#0A0A0A]/95 px-4 py-3 md:px-6" data-testid={`${testId}-actions`}>
-          <button type="button" onClick={onClose} data-testid={`${testId}-cancel`} className="inline-flex items-center px-4 py-2.5 border border-white/10 text-white/60 hover:text-white text-xs uppercase tracking-wider font-bold rounded-sm transition">
+          <button type="button" onClick={onClose} data-testid={`${testId}-cancel`} className="inline-flex items-center px-4 py-2.5 border border-white/10 text-white/60 hover:text-white tls-type-label rounded-sm transition">
             {cancelLabel}
           </button>
           {footer}
           {onSubmit && (
-            <button type="submit" disabled={saving || submitDisabled} data-testid={submitTestId} style={{ backgroundColor: accent }} className="ml-auto inline-flex items-center gap-2 px-5 py-2.5 text-black text-xs uppercase tracking-wider font-bold rounded-sm hover:opacity-90 disabled:opacity-50 transition">
+            <button type="submit" disabled={saving || submitDisabled} data-testid={submitTestId} style={{ backgroundColor: accent }} className="ml-auto inline-flex items-center gap-2 px-5 py-2.5 text-black tls-type-label rounded-sm hover:opacity-90 disabled:opacity-50 transition">
               {saving ? savingLabel : submitLabel}
             </button>
           )}

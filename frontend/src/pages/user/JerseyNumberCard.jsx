@@ -50,7 +50,7 @@ function CheckChip({ view, testId }) {
       data-testid={testId}
       data-tone={view.tone}
       aria-live="polite"
-      className={`tls-reveal inline-flex items-center gap-1.5 max-w-full px-2.5 py-1 border rounded-sm text-xs font-bold ${TONE[view.tone] || TONE.busy}`}
+      className={`tls-reveal inline-flex items-center gap-1.5 max-w-full px-2.5 py-1 border rounded-sm tls-type-small font-bold ${TONE[view.tone] || TONE.busy}`}
     >
       <Icon className={`w-3.5 h-3.5 shrink-0 ${view.tone === "busy" ? "animate-spin motion-reduce:animate-none" : ""}`} aria-hidden="true" />
       <span className="min-w-0 break-words">{view.text}</span>
@@ -67,7 +67,7 @@ export function FreeGrid({ view, value, onPick, testId }) {
   for (let n = view.range.min; n <= view.range.max; n += 1) numbers.push(n);
   return (
     <div className="mt-3" data-testid={testId}>
-      <div className="text-[11px] font-bold uppercase tracking-widest text-white/50 mb-1.5">Frei: {view.free_count} – zum Auswählen antippen</div>
+      <div className="tls-type-label text-white/50 mb-1.5">Frei: {view.free_count} – zum Auswählen antippen</div>
       <div className="grid grid-cols-6 min-[380px]:grid-cols-8 sm:grid-cols-10 gap-1.5" role="group" aria-label="Nummern im Bereich">
         {numbers.map((n) => {
           const open = free.has(n);
@@ -81,7 +81,7 @@ export function FreeGrid({ view, value, onPick, testId }) {
               aria-label={open ? `${n} wählen` : `${n} nicht frei`}
               onClick={() => onPick(n)}
               data-testid={`${testId}-${n}`}
-              className={`h-9 min-w-0 rounded-sm border font-heading text-sm font-black tabular-nums transition-colors duration-fast ${
+              className={`h-9 min-w-0 rounded-sm border tls-type-small tls-type-num transition-colors duration-fast ${
                 picked ? "border-honor bg-honor/15 text-honor" : open ? "border-white/15 text-white/85 hover:border-honor/60 hover:text-honor" : "border-white/5 text-white/20 line-through cursor-not-allowed"
               }`}
             >
@@ -129,16 +129,16 @@ function ChooseForm({ view, onChosen }) {
   return (
     <form onSubmit={submit} className="mt-4" data-testid="jersey-choose-form">
       {view.again && (
-        <p className="mb-3 text-sm border border-brand/40 bg-brand/10 text-white/80 rounded-sm p-3" data-testid="jersey-again">
+        <p className="mb-3 tls-type-small border border-brand/40 bg-brand/10 text-white/80 rounded-sm p-3" data-testid="jersey-again">
           Der Vorstand hat deine Nummer freigegeben – such dir einmal eine neue aus.
         </p>
       )}
-      <p className="text-sm text-white/70">
+      <p className="tls-type-small text-white/70">
         Such dir eine Nummer von {view.range.min} bis {view.range.max} aus. Jede gibt es im Verein nur einmal.
         {view.reserved?.length ? ` Nicht wählbar: ${view.reserved.join(", ")}.` : ""}
       </p>
       {noneLeft ? (
-        <p className="mt-3 text-sm text-honor" data-testid="jersey-none-left">Gerade ist keine Nummer frei. Melde dich beim Vorstand – er findet eine Lösung.</p>
+        <p className="mt-3 tls-type-small text-honor" data-testid="jersey-none-left">Gerade ist keine Nummer frei. Melde dich beim Vorstand – er findet eine Lösung.</p>
       ) : (
         <div className="mt-3 flex flex-col sm:flex-row sm:items-center gap-3">
           <label className="sr-only" htmlFor="jersey-number-input">Deine Nummer</label>
@@ -152,7 +152,7 @@ function ChooseForm({ view, onChosen }) {
             placeholder={`${view.range.min}–${view.range.max}`}
             aria-describedby="jersey-number-check"
             data-testid="jersey-input"
-            className={`${inputClass} w-28 px-3 py-2 text-center font-heading text-3xl font-black tabular-nums`}
+            className={`${inputClass} w-28 px-3 py-2 text-center tls-type-title tls-type-num`}
           />
           <div id="jersey-number-check" className="min-h-[1.75rem] flex items-center min-w-0">
             <CheckChip view={check.view} testId="jersey-check" />
@@ -161,14 +161,14 @@ function ChooseForm({ view, onChosen }) {
             type="submit"
             disabled={!ready}
             data-testid="jersey-choose"
-            className="tls-btn tls-btn--primary sm:ml-auto inline-flex items-center justify-center gap-2 px-4 py-2 rounded-sm text-xs font-bold uppercase tracking-wider disabled:opacity-50"
+            className="tls-btn tls-btn--primary sm:ml-auto inline-flex items-center justify-center gap-2 px-4 py-2 rounded-sm tls-type-label disabled:opacity-50"
           >
             {busy ? "Lege fest …" : "Nummer festlegen"}
           </button>
         </div>
       )}
       {!noneLeft && <FreeGrid view={view} value={check.local.value} onPick={(n) => setInput(String(n))} testId="jersey-grid" />}
-      <p className="mt-3 text-xs text-white/45">Einmal festgelegt, ändert sie nur noch der Vorstand.</p>
+      <p className="mt-3 tls-type-small text-white/45">Einmal festgelegt, ändert sie nur noch der Vorstand.</p>
     </form>
   );
 }
@@ -199,7 +199,7 @@ function RequestForm({ view, onSent, onCancel }) {
   return (
     <form onSubmit={submit} className="tls-reveal mt-4 space-y-3 border border-white/10 rounded-sm p-4" data-testid="jersey-request-form">
       <div className="flex flex-col sm:flex-row sm:items-center gap-3">
-        <label className="block text-[11px] font-bold uppercase tracking-widest text-white/60" htmlFor="jersey-wish-input">
+        <label className="block tls-type-label text-white/60" htmlFor="jersey-wish-input">
           Wunschnummer <span className="normal-case tracking-normal font-normal text-white/40">(optional)</span>
         </label>
         <input
@@ -211,12 +211,12 @@ function RequestForm({ view, onSent, onCancel }) {
           autoComplete="off"
           aria-describedby="jersey-wish-check"
           data-testid="jersey-wish"
-          className={`${inputClass} w-24 px-3 py-1.5 text-center font-heading text-xl font-black tabular-nums`}
+          className={`${inputClass} w-24 px-3 py-1.5 text-center tls-type-card tls-type-num`}
         />
         <div id="jersey-wish-check" className="min-w-0"><CheckChip view={check.view} testId="jersey-wish-check" /></div>
       </div>
       <FreeGrid view={view} value={check.local.value} onPick={(n) => setWished(String(n))} testId="jersey-wish-grid" />
-      <label className="block text-[11px] font-bold uppercase tracking-widest text-white/60">
+      <label className="block tls-type-label text-white/60">
         Warum eine andere?
         <textarea
           value={reason}
@@ -228,12 +228,12 @@ function RequestForm({ view, onSent, onCancel }) {
           className={`${inputClass} mt-1.5 w-full px-3 py-2 text-sm normal-case tracking-normal font-normal`}
         />
       </label>
-      <p className="text-xs text-white/45">Ohne Wunsch gibt dir der Vorstand die Wahl frei, und du suchst dir selbst eine neue aus.</p>
+      <p className="tls-type-small text-white/45">Ohne Wunsch gibt dir der Vorstand die Wahl frei, und du suchst dir selbst eine neue aus.</p>
       <div className="flex flex-wrap gap-2">
-        <button type="submit" disabled={!ready} data-testid="jersey-request-send" className="tls-btn tls-btn--primary px-4 py-2 rounded-sm text-xs font-bold uppercase tracking-wider disabled:opacity-50">
+        <button type="submit" disabled={!ready} data-testid="jersey-request-send" className="tls-btn tls-btn--primary px-4 py-2 rounded-sm tls-type-label disabled:opacity-50">
           {busy ? "Sende …" : "Antrag senden"}
         </button>
-        <button type="button" onClick={onCancel} disabled={busy} className="tls-btn tls-btn--quiet px-4 py-2 rounded-sm text-xs font-bold uppercase tracking-wider">Abbrechen</button>
+        <button type="button" onClick={onCancel} disabled={busy} className="tls-btn tls-btn--quiet px-4 py-2 rounded-sm tls-type-label">Abbrechen</button>
       </div>
     </form>
   );
@@ -259,8 +259,8 @@ export default function JerseyNumberCard() {
 
   return (
     <div className="mt-6 border border-white/10 rounded-sm bg-[#121212] p-5" data-testid="jersey-card">
-      <h2 className="font-heading text-lg font-black uppercase inline-flex items-center gap-2"><Shirt className="w-4 h-4 text-honor" /> Meine Nummer</h2>
-      <p className="mt-1 text-xs text-white/45">Zum Beispiel fürs Trikot. Sehen können sie nur du und der Vorstand.</p>
+      <h2 className="tls-type-section inline-flex items-center gap-2"><Shirt className="w-4 h-4 text-honor" /> Meine Nummer</h2>
+      <p className="mt-1 tls-type-small text-white/45">Zum Beispiel fürs Trikot. Sehen können sie nur du und der Vorstand.</p>
 
       {view.number === null || view.number === undefined ? (
         view.can_choose ? <ChooseForm view={view} onChosen={chosen} /> : null
@@ -268,7 +268,7 @@ export default function JerseyNumberCard() {
         <div className="mt-4">
           <div className="flex flex-wrap items-end gap-x-5 gap-y-2">
             <div
-              className="tls-glow tls-jersey-number font-heading text-6xl font-black leading-none text-honor tabular-nums"
+              className="tls-glow tls-jersey-number tls-type-hero tls-type-num leading-none text-honor"
               data-tone="honor"
               data-glow={fresh ? "on" : undefined}
               data-fresh={fresh ? "1" : undefined}
@@ -276,26 +276,26 @@ export default function JerseyNumberCard() {
             >
               {view.number}
             </div>
-            <div className="pb-1 text-xs text-white/55">
+            <div className="pb-1 tls-type-small text-white/55">
               {view.set_by === "board" ? "Vom Vorstand eingetragen" : view.set_by === "dolibarr" ? "Aus der Mitgliederverwaltung" : "Von dir gewählt"}
               {view.chosen_at ? ` am ${day(view.chosen_at)}` : ""}
             </div>
           </div>
           {sync && sync.state !== "ok" && sync.state !== "off" && (
-            <p className={`mt-3 text-xs ${SYNC_WARN.has(sync.state) ? "text-warn" : "text-white/50"}`} data-testid="jersey-sync">{sync.text}</p>
+            <p className={`mt-3 tls-type-small ${SYNC_WARN.has(sync.state) ? "text-warn" : "text-white/50"}`} data-testid="jersey-sync">{sync.text}</p>
           )}
           {view.open_request ? (
-            <p className="mt-4 text-sm border-l-2 border-honor/50 pl-3 text-white/75" data-testid="jersey-open-request">
+            <p className="mt-4 tls-type-small border-l-2 border-honor/50 pl-3 text-white/75" data-testid="jersey-open-request">
               Dein Antrag liegt beim Vorstand ({jerseyRequestLine(view.open_request)}, eingereicht am {day(view.open_request.received_at)}).
             </p>
           ) : asking ? (
             <RequestForm view={view} onCancel={() => setAsking(false)} onSent={() => { setAsking(false); load(); }} />
           ) : (
             <div className="mt-4 flex flex-wrap items-center gap-3">
-              <button type="button" onClick={() => setAsking(true)} data-testid="jersey-ask" className="tls-btn tls-btn--secondary px-4 py-2 rounded-sm text-xs font-bold uppercase tracking-wider">
+              <button type="button" onClick={() => setAsking(true)} data-testid="jersey-ask" className="tls-btn tls-btn--secondary px-4 py-2 rounded-sm tls-type-label">
                 Andere Nummer beantragen
               </button>
-              <span className="text-xs text-white/45">Ändern geht nur über den Vorstand.</span>
+              <span className="tls-type-small text-white/45">Ändern geht nur über den Vorstand.</span>
             </div>
           )}
         </div>
@@ -303,11 +303,11 @@ export default function JerseyNumberCard() {
 
       {requests.some((row) => row.status !== "received") && (
         <div className="mt-5 space-y-2" data-testid="jersey-requests">
-          <div className="text-[11px] font-bold uppercase tracking-widest text-white/60">Frühere Anträge</div>
+          <div className="tls-type-label text-white/60">Frühere Anträge</div>
           {requests.filter((row) => row.status !== "received").slice(0, 3).map((row) => (
-            <div key={row.id} className="text-sm border-l-2 border-white/15 pl-3">
+            <div key={row.id} className="tls-type-small border-l-2 border-white/15 pl-3">
               <div className="text-white/75">{jerseyRequestLine(row)}</div>
-              <div className="text-xs text-white/45">{row.status_label}{row.decision_reason ? ` – ${row.decision_reason}` : ""}{row.decided_at ? ` · ${day(row.decided_at)}` : ""}</div>
+              <div className="tls-type-small text-white/45">{row.status_label}{row.decision_reason ? ` – ${row.decision_reason}` : ""}{row.decided_at ? ` · ${day(row.decided_at)}` : ""}</div>
             </div>
           ))}
         </div>

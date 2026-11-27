@@ -54,11 +54,11 @@ function LegalArticle({ title, intro, updatedAt, children }) {
     <PublicLayout>
       <article className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
         <Breadcrumbs items={[{ label: title }]} />
-        <p className="mt-4 text-[11px] font-bold uppercase tracking-[0.3em] text-[#29B6E8]">Rechtliches</p>
-        <h1 className="font-heading text-4xl md:text-5xl font-black uppercase mt-2">{title}</h1>
+        <p className="mt-4 tls-type-label text-[#29B6E8]">Rechtliches</p>
+        <h1 className="tls-type-title mt-2">{title}</h1>
         <p className="mt-3 text-white/60 max-w-2xl">{intro}</p>
-        {formattedUpdatedAt && <p className="mt-2 text-xs text-white/40">Stand: {formattedUpdatedAt}</p>}
-        <div className="mt-10 space-y-8 text-sm leading-relaxed text-white/75">{children}</div>
+        {formattedUpdatedAt && <p className="mt-2 tls-type-small text-quiet">Stand: {formattedUpdatedAt}</p>}
+        <div className="mt-10 space-y-8 tls-type-body leading-relaxed text-white/75">{children}</div>
       </article>
     </PublicLayout>
   );
@@ -67,7 +67,7 @@ function LegalArticle({ title, intro, updatedAt, children }) {
 function Section({ title, children, id }) {
   return (
     <section className="border-t border-white/10 pt-6" id={id}>
-      <h2 className="font-heading text-2xl font-black uppercase text-white">{title}</h2>
+      <h2 className="tls-type-section text-white">{title}</h2>
       <div className="mt-3 space-y-3">{children}</div>
     </section>
   );

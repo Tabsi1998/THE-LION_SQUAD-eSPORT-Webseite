@@ -15,7 +15,7 @@ const root = path.join(process.cwd(), "src");
 const PUBLIC_PAGES = [
   "HomePage", "NewsPage", "NewsDetailPage", "EventsPage", "EventDetailPage", "EventLivePage", "EventLeadPage",
   "CalendarPage", "VereinPage", "AboutPage", "ClubPages", "ContactPage", "GalleryPage", "GalleryAlbumPage", "FaqPage",
-  "HelpTopicPage",
+  "HelpTopicPage", "SeasonPage",
 ].map((name) => `pages/public/${name}.jsx`);
 
 const COMPONENTS = [
@@ -60,8 +60,8 @@ const ALLOWED = [
   { file: "components/tls/UserMenu.jsx", needle: "max-w-[10rem] truncate", why: "eigener Name im Kopf: einzeilig, ganz im title, im aria-label und im Menü" },
   { file: "components/tls/EventRecap.jsx", needle: "line-clamp-2\">{recap.report.excerpt}", why: "Vorschau: Anriss des Berichts" },
   { file: "components/tls/LiveStreamSlider.jsx", needle: "line-clamp-2 font-semibold text-white\" title={activeStream.title", why: "Vorschau: Titel des fremden Twitch-Streams, ganz im title" },
-  { file: "components/tls/LiveStreamSlider.jsx", needle: "truncate text-xs text-white/50\" title={stream.title", why: "Vorschau: Titel des fremden Twitch-Streams, ganz im title" },
-  { file: "components/tls/AdminLayout.jsx", needle: "block truncate text-[10px] font-normal text-quiet", why: "Vorschau: Suchhinweis unter dem Menüpunkt" },
+  { file: "components/tls/LiveStreamSlider.jsx", needle: "truncate tls-type-small text-white/50\" title={stream.title", why: "Vorschau: Titel des fremden Twitch-Streams, ganz im title" },
+  { file: "components/tls/AdminLayout.jsx", needle: "block truncate tls-type-small font-normal text-quiet", why: "Vorschau: Suchhinweis unter dem Menüpunkt" },
   { file: "pages/admin/achievements/CatalogTab.jsx", needle: "truncate\">{g.description", why: "Vorschau: Beschreibung" },
   { file: "pages/admin/AdminAppReleasesPage.jsx", needle: "truncate max-w-[16rem]\" title={row.sha256", why: "technisch: Prüfsumme, ganz im title" },
   { file: "pages/admin/AdminBenefitsPage.jsx", needle: "line-clamp-3\">{b.description}", why: "Vorschau: Beschreibung" },
@@ -75,7 +75,7 @@ const ALLOWED = [
   { file: "pages/admin/AdminPartnersPage.jsx", needle: "truncate max-w-full\" title={p.link}", why: "technisch: Link, ganz im title" },
   { file: "pages/admin/AdminSponsorsPage.jsx", needle: "line-clamp-2\">{s.description}", why: "Vorschau: Beschreibung" },
   { file: "pages/admin/AdminSponsorsPage.jsx", needle: "hover:underline truncate\" title={s.link}", why: "technisch: Link, ganz im title" },
-  { file: "pages/admin/GameMatchDataFields.jsx", needle: "truncate text-xs text-white/70\" title={rule}", why: "Vorschau: Regeltext, ganz im title" },
+  { file: "pages/admin/GameMatchDataFields.jsx", needle: "truncate tls-type-small text-white/70\" title={rule}", why: "Vorschau: Regeltext, ganz im title" },
   { file: "pages/admin/media/parts.jsx", needle: "truncate\">{event.mime", why: "technisch: Dateityp" },
   { file: "pages/admin/settings/DiscordGuildsPanel.jsx", needle: "hover:text-white truncate\" title={guild.invite_url}", why: "technisch: Einladungslink, ganz im title" },
 ];

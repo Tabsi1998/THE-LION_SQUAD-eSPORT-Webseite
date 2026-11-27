@@ -289,12 +289,13 @@ test("ein Name mit 24 Zeichen kommt eine Stufe kleiner, ein kurzer Name nicht", 
   expect(long).toHaveTextContent("NachtfalkeDerSuperliga24");
   expect(long).toHaveAttribute("title", "NachtfalkeDerSuperliga24");
   expect(long.className).toContain("tls-head-name tls-head-name--long");
-  expect(long.className).toContain("text-4xl md:text-6xl");
+  // Seitentitel der Schrift-Treppe (#1302) - die kleinere Stufe am Handy kommt von tls-head-name--long (index.css).
+  expect(long.className).toContain("tls-type-title");
   unmount();
   profileData = { ...PODIUM_PROFILE, references: [], reference_stats: {} };
   renderProfile();
   const short = await screen.findByTestId("member-head-name");
   expect(short.className).toContain("tls-head-name");
   expect(short.className).not.toContain("tls-head-name--long");
-  expect(short.className).toContain("text-5xl md:text-7xl");
+  expect(short.className).toContain("tls-type-title");
 });

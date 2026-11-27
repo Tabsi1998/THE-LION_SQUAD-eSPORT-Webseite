@@ -250,7 +250,7 @@ test.describe("Liga: Season-Seite mit Reitern", () => {
       await expect(page.getByTestId("reminder-rules-week-percent")).toHaveValue("50");
       await expect(page.getByTestId("reminder-rules-veto-idle")).toHaveValue("20");
       await expect(page.getByTestId("reminder-rules-veto-left")).toHaveValue("5");
-      await expect(page.getByTestId("reminder-rules-result-box")).toContainText("24 h nach dem Termin");
+      await expect(page.getByTestId("reminder-rules-result-box")).toContainText("24 Std. nach dem Termin");
       await expect(page.getByTestId("reminder-rules-discord")).not.toBeChecked();
       await noSideScroll(page);
       // Fürs Bild hoch genug, dass der ganze Kasten unter der festen Kopfleiste steht (die Sprungmarke hält Abstand zu ihr).

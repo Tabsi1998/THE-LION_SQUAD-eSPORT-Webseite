@@ -211,10 +211,10 @@ export function ChallengeSettingsForm({ challenge, onSaved }) {
         {challenge.status === "results_published" && (
           <div className="border border-[#FFD700]/25 bg-[#FFD700]/5 rounded-sm p-3 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
             <div>
-              <div className="text-[11px] font-bold uppercase tracking-widest text-[#FFD700]">Gewinnabholung</div>
-              <div className="text-xs text-white/55 mt-0.5">Erzeugt fehlende Gewinn-Einträge aus der aktuellen Fast-Lap-Wertung.</div>
+              <div className="tls-type-label text-[#FFD700]">Gewinnabholung</div>
+              <div className="tls-type-small text-white/55 mt-0.5">Erzeugt fehlende Gewinn-Einträge aus der aktuellen Fast-Lap-Wertung.</div>
             </div>
-            <button type="button" disabled={creatingPrizes} onClick={createPrizePickups} className="px-4 py-2 bg-[#FFD700] text-black font-bold uppercase tracking-wider rounded-sm text-xs disabled:opacity-50">
+            <button type="button" disabled={creatingPrizes} onClick={createPrizePickups} className="px-4 py-2 bg-[#FFD700] text-black tls-type-label rounded-sm disabled:opacity-50">
               {creatingPrizes ? "Erzeuge..." : "Gewinne erzeugen"}
             </button>
           </div>
@@ -236,14 +236,14 @@ function FastLapPrizeEditor({ value, onChange }) {
     <div className="border border-[#FFD700]/20 bg-[#FFD700]/5 rounded-sm p-4 space-y-3">
       <div className="flex items-center justify-between gap-3">
         <div>
-          <div className="text-[11px] font-bold uppercase tracking-widest text-[#FFD700]">Preise</div>
-          <div className="text-xs text-white/50 mt-0.5">Wird bei Ergebnisveröffentlichung als Gewinnabholung angelegt.</div>
+          <div className="tls-type-label text-[#FFD700]">Preise</div>
+          <div className="tls-type-small text-white/50 mt-0.5">Wird bei Ergebnisveröffentlichung als Gewinnabholung angelegt.</div>
         </div>
         <button
           type="button"
           onClick={() => onChange([...prizes, { place: prizes.length + 1, label: "", value: "" }])}
           data-testid="f1-edit-prize-add"
-          className="text-xs font-bold uppercase tracking-wider text-[#29B6E8] hover:text-white"
+          className="tls-type-label text-[#29B6E8] hover:text-white"
         >
           + Platz hinzufügen
         </button>
@@ -283,7 +283,7 @@ function FastLapPrizeEditor({ value, onChange }) {
           </button>
         </div>
       ))}
-      {prizes.length === 0 && <div className="text-xs text-white/40">Noch keine Preise hinterlegt.</div>}
+      {prizes.length === 0 && <div className="tls-type-small text-quiet">Noch keine Preise hinterlegt.</div>}
     </div>
   );
 }
@@ -293,7 +293,7 @@ function FastLapSeasonWeightField({ value, onChange }) {
   const isPreset = F1_SEASON_WEIGHT_OPTIONS.some(([optionValue]) => optionValue === normalized);
   return (
     <label className="block border border-[#29B6E8]/20 bg-[#29B6E8]/5 rounded-sm p-3">
-      <div className="text-[11px] font-bold uppercase tracking-widest text-[#29B6E8] mb-1.5">Jahreswertung</div>
+      <div className="tls-type-label text-[#29B6E8] mb-1.5">Jahreswertung</div>
       <div className="grid sm:grid-cols-[1fr_120px] gap-2">
         <select value={isPreset ? normalized : "__custom"} onChange={(e)=>onChange(e.target.value === "__custom" ? value : e.target.value)} className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-sm">
           {F1_SEASON_WEIGHT_OPTIONS.map(([v, l]) => <option key={v} value={v}>{l}</option>)}
@@ -301,7 +301,7 @@ function FastLapSeasonWeightField({ value, onChange }) {
         </select>
         <input type="number" step="0.05" min="0" value={value ?? ""} onChange={(e)=>onChange(e.target.value)} className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-sm" aria-label="Jahreswertungs-Faktor" />
       </div>
-      <div className="text-[11px] text-white/45 mt-1.5">
+      <div className="tls-type-small text-white/45 mt-1.5">
         Bestimmt, wie stark diese Fast-Lap Challenge in die Jahreswertung eingeht. 0 bedeutet: keine Jahrespunkte.
       </div>
     </label>

@@ -31,7 +31,7 @@ test("eine Season ohne gespeicherte Werte zeigt die Vorgaben, Speichern schickt 
   expect(screen.getByTestId("reminder-rules-veto-idle")).toHaveValue(20);
   expect(screen.getByTestId("reminder-rules-veto-left")).toHaveValue(5);
   expect(screen.getByTestId("reminder-rules-discord")).not.toBeChecked();
-  expect(screen.getByTestId("reminder-rules-result-box")).toHaveTextContent("24 h nach dem Termin");
+  expect(screen.getByTestId("reminder-rules-result-box")).toHaveTextContent("24 Std. nach dem Termin");
   fireEvent.change(screen.getByTestId("reminder-rules-early"), { target: { value: "12" } });
   fireEvent.click(screen.getByTestId("reminder-rules-discord"));
   fireEvent.click(screen.getByTestId("reminder-rules-save"));

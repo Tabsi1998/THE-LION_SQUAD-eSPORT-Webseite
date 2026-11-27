@@ -57,3 +57,9 @@ test("ohne Anmeldung keine Ecken", async () => {
   await screen.findByTestId("season-row-u-me");
   expect(document.querySelectorAll(".tls-you, .tls-you-tag")).toHaveLength(0);
 });
+
+test("am Handy bleibt jede Zahl bei ihrem Wort - kein Umbruch zwischen 3 und Siege", async () => {
+  renderPage();
+  const facts = await screen.findByTestId("season-item-facts-u-1");
+  expect(facts.textContent).toBe("3 Wertungen · 1 Siege0 Achievements");
+});

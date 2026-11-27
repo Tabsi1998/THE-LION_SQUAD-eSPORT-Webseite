@@ -15,6 +15,7 @@ import { hasLeagueStaff, mfaSetupPath, needsSecondFactor } from "@/lib/permissio
 import { capabilityWords } from "@/pages/admin/league/LeagueStaffSheet";
 import { Link } from "react-router-dom";
 import { ArrowRight } from "lucide-react";
+import { ShortCaps } from "@/components/tls/ShortCaps";
 
 export default function AdminDutyPage() {
   const [data, setData] = useState(null);
@@ -41,21 +42,21 @@ export default function AdminDutyPage() {
   return (
     <AdminLayout>
       <div className="mb-6">
-        <span className="text-[11px] font-bold uppercase tracking-[0.3em] text-[#29B6E8]">Deine Arbeit</span>
-        <h1 className="font-heading text-3xl md:text-4xl font-black uppercase mt-1" data-testid="duty-heading">Mein Dienst</h1>
+        <span className="tls-type-label text-[#29B6E8]">Deine Arbeit</span>
+        <h1 className="tls-type-title mt-1" data-testid="duty-heading"><ShortCaps>Mein Dienst</ShortCaps></h1>
       </div>
 
       {failed && !data && (
-        <p className="rounded-sm border border-warn/30 bg-warn/5 px-4 py-3 text-sm text-white/70" data-testid="duty-error">
+        <p className="rounded-sm border border-warn/30 bg-warn/5 px-4 py-3 tls-type-small text-white/70" data-testid="duty-error">
           Dein Dienst konnte nicht geladen werden. Versuch es gleich noch einmal.
         </p>
       )}
-      {!data && !failed && <p className="text-sm text-white/45" data-testid="duty-loading">Lade deinen Dienst …</p>}
+      {!data && !failed && <p className="tls-type-small text-white/45" data-testid="duty-loading">Lade deinen Dienst …</p>}
 
       {/* Was die Leitung entscheiden muss (#2194): nach dem Ende noch „Live“, überfällige Liga-Spiele. */}
       {hasDutyAttention(data) && (
         <section className="mb-8" aria-labelledby="duty-attention-heading">
-          <h2 id="duty-attention-heading" className="font-heading font-bold uppercase text-lg mb-3">Braucht deine Entscheidung</h2>
+          <h2 id="duty-attention-heading" className="tls-type-section mb-3">Braucht deine Entscheidung</h2>
           <DutyAttention duty={data} />
         </section>
       )}
@@ -63,7 +64,7 @@ export default function AdminDutyPage() {
       {/* Leitstand je Season (E.4, Nr. 152): Hier steht nur die eigene Liste - alles Offene der Season sammelt der Leitstand. */}
       {desks.length > 0 && (
         <section className="mb-8" aria-labelledby="duty-desks-heading" data-testid="duty-desks">
-          <h2 id="duty-desks-heading" className="font-heading font-bold uppercase text-lg mb-3">Leitstand der Seasons</h2>
+          <h2 id="duty-desks-heading" className="tls-type-section mb-3">Leitstand der Seasons</h2>
           <ul className="divide-y divide-white/5 rounded-sm border border-white/10 bg-[#121212]">
             {desks.map((row) => (
               <li key={row.season_id}>
@@ -71,11 +72,11 @@ export default function AdminDutyPage() {
                   className="flex min-h-11 items-center justify-between gap-3 px-4 py-3 hover:bg-white/[0.03] focus-visible:outline focus-visible:outline-1 focus-visible:outline-[#29B6E8]">
                   <span className="min-w-0">
                     <span className="block font-semibold text-white [overflow-wrap:anywhere]">{row.league_name} · {row.season_name}</span>
-                    <span className="block text-xs text-white/55">
+                    <span className="block tls-type-small text-white/55">
                       {row.total ? `${row.mine === 1 ? "1 Aufgabe" : `${row.mine} Aufgaben`} für dich, ${row.total} offen in der Season` : "Alles erledigt"}
                     </span>
                   </span>
-                  <span className="inline-flex shrink-0 items-center gap-1 text-xs font-bold uppercase tracking-wider text-[#29B6E8]">
+                  <span className="inline-flex shrink-0 items-center gap-1 tls-type-label text-[#29B6E8]">
                     Leitstand <ArrowRight className="h-3.5 w-3.5" aria-hidden="true" />
                   </span>
                 </Link>
@@ -94,11 +95,11 @@ export default function AdminDutyPage() {
 
       {data && (assignments.length > 0 || (!data.moderation && series.length === 0 && !leagueDuty)) && (
         <section className="mb-8" aria-labelledby="duty-assignments-heading">
-          <h2 id="duty-assignments-heading" className="font-heading font-bold uppercase text-lg mb-3">Deine Einsätze</h2>
+          <h2 id="duty-assignments-heading" className="tls-type-section mb-3">Deine Einsätze</h2>
           {assignments.length > 0 ? (
             <DutyList rows={assignments} testId="duty-assignments" />
           ) : (
-            <p className="text-sm text-white/50" data-testid="duty-empty">
+            <p className="tls-type-small text-white/50" data-testid="duty-empty">
               {nothing ? "Gerade hast du keinen Einsatz. Sobald dich die Turnierleitung einträgt, steht er hier." : "Gerade hast du keinen eigenen Einsatz."}
             </p>
           )}
@@ -107,9 +108,9 @@ export default function AdminDutyPage() {
 
       {series.length > 0 && (
         <section className="mb-8" aria-labelledby="duty-series-heading">
-          <h2 id="duty-series-heading" className="font-heading font-bold uppercase text-lg mb-3">Meine Serien</h2>
+          <h2 id="duty-series-heading" className="tls-type-section mb-3">Meine Serien</h2>
           {needsSecondFactor(user) && (
-            <p className="mb-3 rounded-sm border border-warn/30 bg-warn/5 px-4 py-3 text-sm text-white/70" data-testid="duty-series-mfa">
+            <p className="mb-3 rounded-sm border border-warn/30 bg-warn/5 px-4 py-3 tls-type-small text-white/70" data-testid="duty-series-mfa">
               Captains brauchen die Zwei-Faktor-Anmeldung. <Link to={mfaSetupPath("/admin/dienst")} className="underline hover:text-white">Jetzt einrichten</Link>
             </p>
           )}
@@ -119,9 +120,9 @@ export default function AdminDutyPage() {
 
       {leagueDuty && (
         <section className="mb-8" aria-labelledby="duty-leagues-heading" data-testid="duty-leagues">
-          <h2 id="duty-leagues-heading" className="font-heading font-bold uppercase text-lg mb-3">Meine Ligen</h2>
+          <h2 id="duty-leagues-heading" className="tls-type-section mb-3">Meine Ligen</h2>
           {needsSecondFactor(user) ? (
-            <p className="mb-3 rounded-sm border border-warn/30 bg-warn/5 px-4 py-3 text-sm text-white/70" data-testid="duty-leagues-mfa">
+            <p className="mb-3 rounded-sm border border-warn/30 bg-warn/5 px-4 py-3 tls-type-small text-white/70" data-testid="duty-leagues-mfa">
               Zuständige brauchen die Zwei-Faktor-Anmeldung. <Link to={mfaSetupPath("/admin/dienst")} className="underline hover:text-white">Jetzt einrichten</Link>
             </p>
           ) : null}
@@ -131,7 +132,7 @@ export default function AdminDutyPage() {
                 <li key={league.id}>
                   <Link to="/admin/leagues" className="block px-4 py-3 hover:bg-white/[0.03] focus-visible:outline focus-visible:outline-1 focus-visible:outline-[#29B6E8]" data-testid={`duty-league-${league.id}`}>
                     <span className="block font-semibold text-white break-words">{league.name}</span>
-                    <span className="block text-xs text-white/55">{capabilityWords(league.capabilities)}</span>
+                    <span className="block tls-type-small text-white/55">{capabilityWords(league.capabilities)}</span>
                   </Link>
                 </li>
               ))}
@@ -142,7 +143,7 @@ export default function AdminDutyPage() {
 
       {leadToday.length > 0 && (
         <section aria-labelledby="duty-today-heading">
-          <h2 id="duty-today-heading" className="font-heading font-bold uppercase text-lg mb-3">Heute in allen Turnieren</h2>
+          <h2 id="duty-today-heading" className="tls-type-section mb-3">Heute in allen Turnieren</h2>
           <DutyList rows={leadToday} testId="duty-lead-today" />
         </section>
       )}

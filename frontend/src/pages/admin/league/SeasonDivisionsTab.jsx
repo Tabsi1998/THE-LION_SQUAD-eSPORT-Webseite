@@ -71,7 +71,7 @@ export function DivisionSheet({ division, season, nextLevel, divisionsLocked = f
         hint={`„Liga ${level}“ zählt die Seite von selbst – hier nur ein Zusatz. Anzeige: „Liga ${level}${nickname.trim() ? ` · ${nickname.trim()}` : ""}“.`}
         testId="division-nickname" />
       {repeats ? (
-        <p className="-mt-2 text-xs text-warn" data-testid="division-nickname-repeat">
+        <p className="-mt-2 tls-type-small text-warn" data-testid="division-nickname-repeat">
           „Liga {level}“ steht schon von selbst davor – so hieße es „Liga {level} · {nickname.trim()}“. Lass das Feld leer oder nimm einen Beinamen wie „Elite“.
         </p>
       ) : null}
@@ -79,7 +79,7 @@ export function DivisionSheet({ division, season, nextLevel, divisionsLocked = f
         <SelectField label="Stand" value={status} onChange={setStatus} options={ACTIVE_STATUS_OPTIONS} disabled={divisionsLocked}
           hint={divisionsLocked ? DIVISIONS_LOCKED_HINT : "Archiviert: nicht mehr auf der Ligaseite, Staffeln und Ergebnisse bleiben erhalten."} testId="division-status" />
       ) : null}
-      <p className="text-xs text-white/55">Leer lassen heißt: wie die Season. Nur was diese Liga anders macht, eintragen.</p>
+      <p className="tls-type-small text-white/55">Leer lassen heißt: wie die Season. Nur was diese Liga anders macht, eintragen.</p>
       <FormGrid>
         <SelectField label="Best of" value={form.best_of} onChange={(value) => set("best_of", value)}
           options={[["", `wie Season (Best of ${season.best_of})`], ...BEST_OF_OPTIONS]} testId="override-best-of" />
@@ -95,7 +95,7 @@ export function DivisionSheet({ division, season, nextLevel, divisionsLocked = f
       </FormGrid>
       <DivisionPlatformFields form={form} set={set} seasonId={season.id} />
       {mapPoints ? (
-        <p className="text-xs text-white/55" data-testid="override-points-maps">
+        <p className="tls-type-small text-white/55" data-testid="override-points-maps">
           Punkte: wie die Season – je gewonnene Map ein Punkt. Eigene Punkte für Sieg, Remis und Niederlage gibt es dann nicht.
         </p>
       ) : (
@@ -123,8 +123,8 @@ function ZoneFields({ zones, onChange, effective, level, staffelCount = 0, cross
     .filter(Boolean).join(" ");
   return (
     <fieldset className="space-y-2" data-testid="division-zones">
-      <legend className="text-xs font-bold uppercase tracking-wider text-white/70">Auf- und Abstieg je Staffel</legend>
-      <p className="text-xs text-white/55">
+      <legend className="tls-type-small font-bold text-white/70">Auf- und Abstieg je Staffel</legend>
+      <p className="tls-type-small text-white/55">
         Ergibt sich beim Abschluss aus dem Endstand und gilt für die nächste Season. Ausgeschiedene stehen hinten und belegen zuerst die Abstiegsplätze.
         {edge ? ` ${edge}` : level === 1 ? " Liga 1 ist die oberste: Ein Aufstieg zählt hier nicht." : ""}
       </p>
@@ -139,14 +139,14 @@ function ZoneFields({ zones, onChange, effective, level, staffelCount = 0, cross
       {/* Zielregel über Staffeln hinweg (#1627): nur, wo sie gilt. */}
       {cross.promote_best || cross.relegate_worst ? (
         <div className="space-y-2" data-testid="zones-cross">
-          <p className="pt-1 text-xs font-bold uppercase tracking-wider text-white/70">Dazu über alle Staffeln dieser Liga</p>
-          <p className="text-xs text-white/55">
+          <p className="pt-1 tls-type-small font-bold text-white/70">Dazu über alle Staffeln dieser Liga</p>
+          <p className="tls-type-small text-white/55">
             Etwa „Platz 1 jeder Staffel und die zwei besten Zweiten“. Kandidat ist je Staffel der erste Platz nach den Aufsteigern und den Relegationsplätzen, unten
             entsprechend. Verglichen wird nach Punkten je Spiel, dann nach Map-Differenz je Spiel; bei Gleichstand entscheidet die Leitung, ohne Los. Fest steht es erst, wenn
             alle Staffeln der Liga abgeschlossen sind. Leer oder 0: nur die Plätze je Staffel.
           </p>
           {crossLocked ? (
-            <p className="text-xs text-warn" data-testid="zones-cross-locked">
+            <p className="tls-type-small text-warn" data-testid="zones-cross-locked">
               Gesperrt: In dieser Liga ist schon eine Staffel abgeschlossen. Ändern geht erst, wenn alle abgeschlossenen Staffeln dieser Liga im Reiter „Abschluss“ wieder geöffnet sind.
             </p>
           ) : null}
@@ -168,16 +168,16 @@ function ZoneFields({ zones, onChange, effective, level, staffelCount = 0, cross
 
 export function SyncResults({ rows }) {
   if (!rows) return null;
-  if (!rows.length) return <p className="text-sm text-white/55" data-testid="sync-results">Noch keine Staffel – nichts zu übertragen.</p>;
+  if (!rows.length) return <p className="tls-type-small text-white/55" data-testid="sync-results">Noch keine Staffel – nichts zu übertragen.</p>;
   return (
     <ul className="space-y-2" data-testid="sync-results" aria-live="polite">
       {rows.map((row) => {
         const summary = syncSummary(row);
         return (
-          <li key={row.tournament_id} className="rounded-sm border border-white/10 bg-[#0A0A0A] px-3 py-2 text-sm">
+          <li key={row.tournament_id} className="rounded-sm border border-white/10 bg-[#0A0A0A] px-3 py-2 tls-type-small">
             <div className="font-semibold text-white">{row.title}</div>
-            <div className="text-xs text-white/65">{summary.head}{summary.applied.length ? ` · ${summary.applied.join(", ")}` : ""}</div>
-            {summary.skipped.map((text) => <div key={text} className="mt-1 text-xs text-warn">Nicht übertragen – {text}</div>)}
+            <div className="tls-type-small text-white/65">{summary.head}{summary.applied.length ? ` · ${summary.applied.join(", ")}` : ""}</div>
+            {summary.skipped.map((text) => <div key={text} className="mt-1 tls-type-small text-warn">Nicht übertragen – {text}</div>)}
           </li>
         );
       })}
@@ -195,33 +195,33 @@ export function SeasonDivisionsTab({ data, form, set, canSeason, formProps, staf
       <section id="staffeln" className="scroll-mt-24 space-y-4 rounded-sm border border-white/10 bg-[#121212] p-4 md:p-5" aria-label="Ligen und Staffeln" data-testid="season-divisions">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div className="min-w-0">
-            <h2 className="font-heading text-xl font-bold uppercase">Ligen und Staffeln</h2>
-            <p className="mt-0.5 text-xs text-white/50">Liga 1, 2 … sind die Stufen der Season. In jeder entstehen Staffeln – je Staffel ein Liga-Turnier mit den Vorgaben der Season.</p>
+            <h2 className="tls-type-section">Ligen und Staffeln</h2>
+            <p className="mt-0.5 tls-type-small text-white/50">Liga 1, 2 … sind die Stufen der Season. In jeder entstehen Staffeln – je Staffel ein Liga-Turnier mit den Vorgaben der Season.</p>
           </div>
           {canSeason ? (
             <button type="button" onClick={onAddDivision} disabled={Boolean(data.divisions_locked)} data-testid="division-add"
-              className="tls-btn tls-btn--quiet px-3 py-1.5 rounded-sm text-[11px] font-bold uppercase tracking-wider inline-flex items-center gap-1.5 disabled:opacity-50">
+              className="tls-btn tls-btn--quiet px-3 py-1.5 rounded-sm tls-type-label inline-flex items-center gap-1.5 disabled:opacity-50">
               <Plus className="w-3.5 h-3.5" aria-hidden="true" /> Liga {(data.divisions.at(-1)?.level || 0) + 1} anlegen
             </button>
           ) : null}
         </div>
-        {canSeason && data.divisions_locked ? <p className="text-xs text-warn" data-testid="divisions-locked">{DIVISIONS_LOCKED_HINT}</p> : null}
-        {!data.divisions.length ? <p className="text-sm text-white/55">Noch keine Liga. Lege Liga 1 an – darin entstehen die Staffeln.</p> : null}
+        {canSeason && data.divisions_locked ? <p className="tls-type-small text-warn" data-testid="divisions-locked">{DIVISIONS_LOCKED_HINT}</p> : null}
+        {!data.divisions.length ? <p className="tls-type-small text-white/55">Noch keine Liga. Lege Liga 1 an – darin entstehen die Staffeln.</p> : null}
         {data.divisions.map((division) => (
           <div key={division.id} className="border-t border-white/10 pt-4 first:border-t-0 first:pt-0" data-testid={`division-${division.level}`}>
             <div className="flex flex-wrap items-start justify-between gap-2">
               <div className="min-w-0">
                 <h3 className="font-bold text-white [overflow-wrap:anywhere]">
                   {division.label}
-                  {division.status === "archived" ? <span className="ml-2 rounded-sm bg-white/5 px-2 py-0.5 align-middle text-[10px] font-bold uppercase tracking-wider text-white/55" data-testid={`division-archived-${division.level}`}>Archiviert</span> : null}
+                  {division.status === "archived" ? <span className="ml-2 rounded-sm bg-white/5 px-2 py-0.5 align-middle tls-type-label text-white/55" data-testid={`division-archived-${division.level}`}>Archiviert</span> : null}
                 </h3>
                 {nicknameRepeatsLevel(division.nickname) ? (
-                  <p className="text-xs text-warn" data-testid={`division-nickname-repeat-${division.level}`}>Der Beiname wiederholt die Stufe. Über den Stift leeren oder ändern.</p>
+                  <p className="tls-type-small text-warn" data-testid={`division-nickname-repeat-${division.level}`}>Der Beiname wiederholt die Stufe. Über den Stift leeren oder ändern.</p>
                 ) : null}
-                <p className="text-xs text-white/55">{settingsLine(division.settings)}{Object.keys(division.overrides || {}).length ? " · weicht von der Season ab" : ""}</p>
-                <p className="text-xs text-white/55">{division.calendar.active_weeks} Spielwochen – höchstens {division.calendar.max_teams_per_staffel} Teams je Staffel</p>
+                <p className="tls-type-small text-white/55">{settingsLine(division.settings)}{Object.keys(division.overrides || {}).length ? " · weicht von der Season ab" : ""}</p>
+                <p className="tls-type-small text-white/55">{division.calendar.active_weeks} Spielwochen – höchstens {division.calendar.max_teams_per_staffel} Teams je Staffel</p>
                 {division.zones_effective ? (
-                  <p className="text-xs text-white/55" data-testid={`division-zones-${division.level}`}>Auf- und Abstieg: {zonesLine(division.zones_effective)}</p>
+                  <p className="tls-type-small text-white/55" data-testid={`division-zones-${division.level}`}>Auf- und Abstieg: {zonesLine(division.zones_effective)}</p>
                 ) : null}
               </div>
               {canSeason ? (
@@ -237,28 +237,28 @@ export function SeasonDivisionsTab({ data, form, set, canSeason, formProps, staf
                   {/* Mit Playoffs oder Relegation stehen die Staffeln ab dem ersten Abschluss fest (#2404) - der Server sagt es je Liga. */}
                   <button type="button" onClick={() => onCreateStaffel(division)} data-testid={`staffel-add-${division.level}`}
                     disabled={Boolean(division.staffeln_locked)} aria-describedby={division.staffeln_locked ? `staffeln-locked-${division.level}` : undefined}
-                    className="tls-btn tls-btn--primary px-3 py-1.5 rounded-sm text-[11px] font-bold uppercase tracking-wider inline-flex items-center gap-1.5 disabled:opacity-40 disabled:cursor-not-allowed">
+                    className="tls-btn tls-btn--primary px-3 py-1.5 rounded-sm tls-type-label inline-flex items-center gap-1.5 disabled:opacity-40 disabled:cursor-not-allowed">
                     <Plus className="w-3.5 h-3.5" aria-hidden="true" /> Staffel anlegen
                   </button>
                 </div>
               ) : null}
             </div>
             {canSeason && division.staffeln_locked ? (
-              <p className="mt-2 text-xs text-white/60" id={`staffeln-locked-${division.level}`} data-testid={`staffeln-locked-${division.level}`}>{STAFFELN_LOCKED}</p>
+              <p className="mt-2 tls-type-small text-white/60" id={`staffeln-locked-${division.level}`} data-testid={`staffeln-locked-${division.level}`}>{STAFFELN_LOCKED}</p>
             ) : null}
             {division.staffeln.length ? (
               <ul className="mt-3 divide-y divide-white/5 rounded-sm border border-white/10 bg-[#0A0A0A]">
                 {division.staffeln.map((staffel) => (
                   <li key={staffel.tournament_id} className="flex flex-wrap items-center gap-x-3 gap-y-1 px-3 py-2" data-testid={`staffel-${division.level}-${staffel.staffel}`}>
                     <span className="font-semibold text-white">Staffel {staffel.staffel}</span>
-                    <span className="text-xs text-white/55 tabular-nums">{staffel.participant_count} von {staffel.max_participants} Teams</span>
+                    <span className="tls-type-small text-white/55 tabular-nums">{staffel.participant_count} von {staffel.max_participants} Teams</span>
                     {/* Stand aus der Season statt „Entwurf“ (#2453), dazu was fehlt - dieselbe Ableitung wie die Ablaufleiste im Überblick. */}
                     <StaffelStandBadge tournament={asStaffel(staffel, season)} season={season} now={now} testId={`staffel-stand-${division.level}-${staffel.staffel}`} />
                     <StaffelNeedsHint tournament={asStaffel(staffel, season)} season={season} now={now} testId={`staffel-needs-${division.level}-${staffel.staffel}`} />
                     <span className="ml-auto inline-flex flex-wrap items-center gap-x-3 gap-y-1">
                       {/* Staffel-Seite der Liga-Verwaltung (#2262): dort teilst du die Co-Teams zu und bedienst die Staffel. */}
                       <Link to={staffelAdminUrl(staffel.tournament_id)} data-testid={`staffel-open-${division.level}-${staffel.staffel}`}
-                        className="inline-flex min-h-[44px] items-center gap-1 text-xs font-bold uppercase tracking-wider text-[#29B6E8] hover:text-white">
+                        className="inline-flex min-h-[44px] items-center gap-1 tls-type-label text-[#29B6E8] hover:text-white">
                         Staffel öffnen <ArrowRight className="w-3.5 h-3.5" aria-hidden="true" />
                       </Link>
                       {/* Staffel löschen (#2106) nur vor dem Start - die Sperre prüft der Server. */}
@@ -272,7 +272,7 @@ export function SeasonDivisionsTab({ data, form, set, canSeason, formProps, staf
                   </li>
                 ))}
               </ul>
-            ) : <p className="mt-2 text-xs text-white/50">Noch keine Staffel.</p>}
+            ) : <p className="mt-2 tls-type-small text-white/50">Noch keine Staffel.</p>}
           </div>
         ))}
       </section>
@@ -291,7 +291,7 @@ export function SeasonDivisionsTab({ data, form, set, canSeason, formProps, staf
         <FormSection title="Vorgaben auf Staffeln übertragen" testId="season-sync" id="uebertragen" className="scroll-mt-24"
           hint="Regeltext und Map-Pool immer, auch bei gesperrten Staffeln; die Antwortfrist auf Terminvorschläge auch während der Season, nur nicht bei gesperrten; Termine und Kalender nur vor dem Start; Best of, Teamgröße, Mindestkader, Punkte und Fristen nur vor dem ersten Ergebnis. Die Sichtbarkeit gilt schon beim Speichern.">
           <button type="button" onClick={onSync} disabled={syncing || !staffelCount} data-testid="season-sync-run"
-            className="tls-btn tls-btn--quiet px-4 py-2 rounded-sm text-[11px] font-bold uppercase tracking-wider inline-flex items-center gap-1.5 disabled:opacity-50">
+            className="tls-btn tls-btn--quiet px-4 py-2 rounded-sm tls-type-label inline-flex items-center gap-1.5 disabled:opacity-50">
             <ArrowRightLeft className="w-3.5 h-3.5" aria-hidden="true" /> {syncing ? "Übertrage …" : "Vorgaben übertragen"}
           </button>
           <SyncResults rows={syncRows} />

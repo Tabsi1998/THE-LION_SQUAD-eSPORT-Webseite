@@ -34,8 +34,8 @@ export function VideoEmbed({ url, title = "Video", className = "" }) {
     <div className={`border border-white/10 bg-[#0A0A0A] rounded-sm overflow-hidden ${className}`} data-testid="video-embed">
       <div className="flex items-center gap-2 px-4 py-2 border-b border-white/10 bg-[#121212]">
         <PlayCircle className="w-4 h-4 text-[#FF3B30]" />
-        <span className="text-xs font-bold uppercase tracking-widest text-white/70 truncate">Video</span>
-        <a href={watchUrl} target="_blank" rel="noopener noreferrer" data-testid="video-embed-external" className="ml-auto text-[10px] uppercase tracking-widest text-white/60 hover:text-white inline-flex items-center gap-1">
+        <span className="tls-type-label text-white/70 truncate">Video</span>
+        <a href={watchUrl} target="_blank" rel="noopener noreferrer" data-testid="video-embed-external" className="ml-auto tls-type-label text-white/60 hover:text-white inline-flex items-center gap-1">
           <ExternalLink className="w-3 h-3" /> Auf YouTube
         </a>
       </div>

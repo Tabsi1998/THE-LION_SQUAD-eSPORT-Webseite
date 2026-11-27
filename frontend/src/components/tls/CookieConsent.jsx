@@ -137,8 +137,8 @@ export function CookieConsentProvider({ children }) {
           >
             <div className="flex items-start justify-between gap-3">
               <div className="min-w-0">
-                <h2 id="cookie-sheet-title" className="font-heading text-sm sm:text-base font-black uppercase">Cookies und eingebettete Inhalte</h2>
-                <p className="mt-1 text-xs sm:text-sm text-white/70">
+                <h2 id="cookie-sheet-title" className="tls-type-section">Cookies und eingebettete Inhalte</h2>
+                <p className="mt-1 tls-type-body text-white/70">
                   Nötiges ist immer an. Karten, Videos und Statistik nur, wenn du willst. Mehr in der <Link to="/privacy" className="text-[#29B6E8] underline underline-offset-2 hover:text-white">Datenschutzerklärung</Link>.
                 </p>
               </div>
@@ -148,15 +148,15 @@ export function CookieConsentProvider({ children }) {
             </div>
             {/* Zwei gleich große, gleich gestaltete Knöpfe - niemand wird zu einem der beiden gedrängt. */}
             <div className="mt-3 grid grid-cols-2 gap-2" data-testid="cookie-choices">
-              <button type="button" onClick={() => save(DEFAULT_CONSENT)} data-testid="cookie-essential-only" className="tls-btn tls-btn--secondary w-full px-3 py-2.5 rounded-sm text-xs font-bold uppercase tracking-wider">
+              <button type="button" onClick={() => save(DEFAULT_CONSENT)} data-testid="cookie-essential-only" className="tls-btn tls-btn--secondary w-full px-3 py-2.5 rounded-sm tls-type-label">
                 Nur Nötiges
               </button>
-              <button type="button" onClick={() => save(ALL_OPTIONAL)} data-testid="cookie-allow-all" className="tls-btn tls-btn--secondary w-full px-3 py-2.5 rounded-sm text-xs font-bold uppercase tracking-wider">
+              <button type="button" onClick={() => save(ALL_OPTIONAL)} data-testid="cookie-allow-all" className="tls-btn tls-btn--secondary w-full px-3 py-2.5 rounded-sm tls-type-label">
                 Alle erlauben
               </button>
             </div>
             <button type="button" onClick={() => setDetails((value) => !value)} aria-expanded={details} aria-controls="cookie-sheet-details" data-testid="cookie-details-toggle"
-              className="mt-3 inline-flex items-center gap-1 text-xs font-bold text-white/65 hover:text-white underline-offset-4 hover:underline">
+              className="mt-3 inline-flex items-center gap-1 tls-type-small font-bold text-white/65 hover:text-white underline-offset-4 hover:underline">
               Einzeln wählen <ChevronDown className={`w-3.5 h-3.5 transition-transform ${details ? "rotate-180" : ""}`} />
             </button>
             {details && (
@@ -172,13 +172,13 @@ export function CookieConsentProvider({ children }) {
                   />
                 ))}
                 <div className="py-3">
-                  <button type="button" onClick={() => save(draft)} data-testid="cookie-save-selection" className="tls-btn tls-btn--quiet w-full px-3 py-2.5 rounded-sm text-xs font-bold uppercase tracking-wider">
+                  <button type="button" onClick={() => save(draft)} data-testid="cookie-save-selection" className="tls-btn tls-btn--quiet w-full px-3 py-2.5 rounded-sm tls-type-label">
                     Auswahl speichern
                   </button>
                 </div>
               </div>
             )}
-            <p className="mt-2 text-[11px] text-white/60">Deine Wahl gilt sechs Monate. Ändern kannst du sie jederzeit über „Cookie-Einstellungen“ in der Fußzeile.</p>
+            <p className="mt-2 tls-type-small text-white/60">Deine Wahl gilt sechs Monate. Ändern kannst du sie jederzeit über „Cookie-Einstellungen“ in der Fußzeile.</p>
           </section>
         </div>
       )}
@@ -191,8 +191,8 @@ function ConsentRow({ title, text, checked, locked = false, onChange }) {
   return (
     <div className="py-3 flex items-center justify-between gap-4">
       <div className="min-w-0">
-        <div className="font-heading font-black uppercase text-sm">{title}</div>
-        <div className="mt-0.5 text-xs text-white/50">{text}</div>
+        <div className="tls-type-label">{title}</div>
+        <div className="mt-0.5 tls-type-small text-white/50">{text}</div>
       </div>
       <button
         type="button"

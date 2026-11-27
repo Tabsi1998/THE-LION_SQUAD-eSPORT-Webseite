@@ -26,8 +26,8 @@ import { EquipmentSubcategoriesSheet } from "./EquipmentSubcategoriesSheet";
 import { toast } from "sonner";
 
 const ICON_BUTTON = "p-1.5 rounded-sm text-white/60 hover:text-[#29B6E8] disabled:opacity-30 disabled:hover:text-white/60 focus-visible:outline focus-visible:outline-1 focus-visible:outline-[#29B6E8]";
-const CHIP = "inline-flex items-center gap-1.5 rounded-sm border px-2.5 py-1 text-xs focus-visible:outline focus-visible:outline-1 focus-visible:outline-[#29B6E8]";
-const SMALL_BUTTON = "tls-btn tls-btn--quiet inline-flex items-center gap-1.5 rounded-sm px-2.5 py-1 text-[11px] font-bold uppercase tracking-wider disabled:opacity-50";
+const CHIP = "inline-flex items-center gap-1.5 rounded-sm border px-2.5 py-1 tls-type-small focus-visible:outline focus-visible:outline-1 focus-visible:outline-[#29B6E8]";
+const SMALL_BUTTON = "tls-btn tls-btn--quiet inline-flex items-center gap-1.5 rounded-sm px-2.5 py-1 tls-type-label disabled:opacity-50";
 const THUMB_SIZES = "96px";
 
 function listsText(count) {
@@ -60,23 +60,23 @@ function WithoutWeaponNotice({ rows, weapons, classes, onAssign }) {
   const more = rows.length > 5 ? ` und ${rows.length - 5} weitere` : "";
   const toggle = (setter) => (id) => setter((list) => (list.includes(id) ? list.filter((key) => key !== id) : [...list, id]));
   const chip = (key, label, checked, onToggle, testId) => (
-    <label key={key} className="inline-flex max-w-full cursor-pointer items-center gap-2 rounded-sm border border-white/15 bg-[#0A0A0A] px-2.5 py-1 text-xs text-white/80">
+    <label key={key} className="inline-flex max-w-full cursor-pointer items-center gap-2 rounded-sm border border-white/15 bg-[#0A0A0A] px-2.5 py-1 tls-type-small text-white/80">
       <input type="checkbox" checked={checked} onChange={onToggle} className="accent-[#29B6E8]" data-testid={testId} />
       <span className="break-words">{label}</span>
     </label>
   );
   return (
     <section className="mt-5 space-y-2 rounded-sm border border-warn/30 bg-warn/5 p-3" aria-label="Aufsätze ohne Waffe" data-testid="equipment-without-weapon">
-      <p className="text-sm font-semibold text-warn">Diese Aufsätze passen noch zu keiner Waffe</p>
-      <p className="text-xs text-white/70 break-words">{names}{more}. An einer Waffe einzeln sperren lassen sie sich erst mit Zuordnung.</p>
+      <p className="tls-type-small font-semibold text-warn">Diese Aufsätze passen noch zu keiner Waffe</p>
+      <p className="tls-type-small text-white/70 break-words">{names}{more}. An einer Waffe einzeln sperren lassen sie sich erst mit Zuordnung.</p>
       {weapons.length || classes.length ? (
         <button type="button" onClick={() => setOpen((value) => !value)} aria-expanded={open} aria-controls="equipment-assign-choice"
           data-testid="equipment-assign-open"
-          className="flex w-fit items-center gap-1.5 rounded-sm text-[11px] font-bold uppercase tracking-wider text-[#29B6E8] hover:text-white focus-visible:outline focus-visible:outline-1 focus-visible:outline-[#29B6E8]">
+          className="flex w-fit items-center gap-1.5 rounded-sm tls-type-label text-[#29B6E8] hover:text-white focus-visible:outline focus-visible:outline-1 focus-visible:outline-[#29B6E8]">
           <ChevronDown className={`h-3.5 w-3.5 transition-transform duration-fast ${open ? "rotate-180" : ""}`} aria-hidden="true" />
           Waffen wählen{picked ? ` · ${picked} gewählt` : ""}
         </button>
-      ) : <p className="text-xs text-white/60">Noch keine Waffe angelegt.</p>}
+      ) : <p className="tls-type-small text-white/60">Noch keine Waffe angelegt.</p>}
       {/* Ziel von aria-controls: der Behälter steht immer da, zugeklappt verborgen (Codex zu #2306). */}
       <div id="equipment-assign-choice" hidden={!open} className="space-y-2">
         {open ? (<>
@@ -90,21 +90,21 @@ function WithoutWeaponNotice({ rows, weapons, classes, onAssign }) {
           ) : null}
           {shownClasses.length ? (
             <div className="flex flex-wrap items-center gap-2" data-testid="equipment-assign-classes">
-              <span className="text-[11px] text-white/55">Waffenklassen</span>
+              <span className="tls-type-small text-white/55">Waffenklassen</span>
               {shownClasses.map((klass) => chip(klass.key, klass.label, chosenClasses.includes(klass.key), () => toggle(setChosenClasses)(klass.key), `equipment-assign-class-${klass.key}`))}
             </div>
           ) : null}
           {shownWeapons.length ? (
             <div className="flex max-h-48 flex-wrap items-center gap-2 overflow-y-auto pr-1">
-              {classes.length ? <span className="text-[11px] text-white/55">Waffen</span> : null}
+              {classes.length ? <span className="tls-type-small text-white/55">Waffen</span> : null}
               {shownWeapons.map((weapon) => chip(weapon.id, weapon.name, chosen.includes(weapon.id), () => toggle(setChosen)(weapon.id), `equipment-assign-${weapon.id}`))}
             </div>
           ) : null}
-          {!shownClasses.length && !shownWeapons.length ? <p className="text-xs text-white/60">Nichts gefunden.</p> : null}
+          {!shownClasses.length && !shownWeapons.length ? <p className="tls-type-small text-white/60">Nichts gefunden.</p> : null}
         </>) : null}
       </div>
       <button type="button" disabled={!picked} onClick={() => onAssign(chosen, chosenClasses)} data-testid="equipment-assign"
-        className="tls-btn tls-btn--primary rounded-sm px-3 py-1.5 text-[11px] font-bold uppercase tracking-wider disabled:opacity-50">
+        className="tls-btn tls-btn--primary rounded-sm px-3 py-1.5 tls-type-label disabled:opacity-50">
         {rows.length === 1 ? "Dem Aufsatz zuordnen" : `Allen ${rows.length} Aufsätzen zuordnen`}
       </button>
     </section>
@@ -122,15 +122,15 @@ function ItemRow({ item, role, weaponNames, classNames, selecting, selected, onS
       ) : null}
       <EquipmentThumb src={item.image_url} sizes={THUMB_SIZES} className="w-20 shrink-0 sm:w-24" />
       <div className="min-w-0 flex-1">
-        <p className="text-sm font-semibold leading-snug text-white break-words" data-testid="equipment-row-name">{item.name}</p>
-        <p className="mt-0.5 text-[11px] text-white/60" data-testid="equipment-row-meta">
+        <p className="tls-type-small font-semibold leading-snug text-white break-words" data-testid="equipment-row-name">{item.name}</p>
+        <p className="mt-0.5 tls-type-small text-white/60" data-testid="equipment-row-meta">
           {status !== "active" ? <span className="font-semibold text-warn">{status === "inactive" ? "Inaktiv · " : "Archiviert · "}</span> : null}
           {listsText(item.in_lists)}
         </p>
         {role === "attachment" ? (fitsText(item, weaponNames, classNames)
-          ? <p className="mt-0.5 text-[11px] text-white/60 break-words">{fitsText(item, weaponNames, classNames)}</p>
-          : <p className="mt-0.5 text-[11px] font-semibold text-warn">keiner Waffe zugeordnet – passt zu keiner</p>) : null}
-        {item.note ? <p className="mt-0.5 text-[11px] italic text-white/50 break-words">{item.note}</p> : null}
+          ? <p className="mt-0.5 tls-type-small text-white/60 break-words">{fitsText(item, weaponNames, classNames)}</p>
+          : <p className="mt-0.5 tls-type-small font-semibold text-warn">keiner Waffe zugeordnet – passt zu keiner</p>) : null}
+        {item.note ? <p className="mt-0.5 tls-type-small italic text-white/50 break-words">{item.note}</p> : null}
       </div>
       <div className="flex shrink-0 flex-col items-end sm:flex-row sm:items-center">
         <button type="button" className={ICON_BUTTON} onClick={() => onEdit(item)} aria-label={`${item.name} bearbeiten`} data-testid={`equipment-edit-${item.id}`}>
@@ -172,8 +172,8 @@ function SubGroup({ id, sub, rows, total, open, onToggle, onAdd, full, searching
         ) : null}
         <FoldButton open={open} onToggle={onToggle} controls={id} testId={`equipment-sub-toggle-${sub ? sub.key : "ohne"}`} className="flex-1">
           <SubcategoryIcon src={sub?.icon_url} />
-          <span className={`min-w-0 break-words text-xs font-bold uppercase tracking-widest ${sub ? "text-[#29B6E8]" : "text-white/60"}`}>{label}</span>
-          <span className="shrink-0 text-[11px] tabular-nums text-white/50" data-testid="equipment-sub-count">
+          <span className={`min-w-0 break-words tls-type-label ${sub ? "text-[#29B6E8]" : "text-white/60"}`}>{label}</span>
+          <span className="shrink-0 tls-type-small tabular-nums text-white/50" data-testid="equipment-sub-count">
             {searching && rows.length !== total ? `${rows.length} von ${total}` : total}
           </span>
         </FoldButton>
@@ -185,7 +185,7 @@ function SubGroup({ id, sub, rows, total, open, onToggle, onAdd, full, searching
       </div>
       <FoldBody id={id} open={open} className="border-t border-white/10 p-2.5">
           {rows.length ? children : (
-            <p className="text-xs text-white/55">
+            <p className="tls-type-small text-white/55">
               {searching ? "Nichts gefunden." : "Noch kein Eintrag – über „Hinzufügen“ oder „Auswählen“ und „Verschieben“ zuordnen."}
             </p>
           )}
@@ -205,9 +205,9 @@ function MoveBar({ selected, categories, onMove, onCancel }) {
       : !subs.length ? `„${category?.label}“ hat noch keine Unterkategorien.` : "";
   return (
     <div className="sticky bottom-0 z-10 -mx-1 mt-4 flex flex-wrap items-center gap-2 border-t border-white/10 bg-[#121212]/95 px-3 py-3 backdrop-blur" data-testid="equipment-move-bar">
-      <span className="text-xs font-semibold text-white tabular-nums">{countText(selected.length, "Eintrag", "Einträge")} gewählt</span>
-      {problem ? <span className="min-w-0 flex-1 basis-48 text-xs text-white/60" role="status">{problem}</span> : (
-        <label className="flex min-w-0 flex-1 basis-56 items-center gap-2 text-xs text-white/70">
+      <span className="tls-type-small font-semibold text-white tabular-nums">{countText(selected.length, "Eintrag", "Einträge")} gewählt</span>
+      {problem ? <span className="min-w-0 flex-1 basis-48 tls-type-small text-white/60" role="status">{problem}</span> : (
+        <label className="flex min-w-0 flex-1 basis-56 items-center gap-2 tls-type-small text-white/70">
           <span className="shrink-0">Nach</span>
           <select value={target} onChange={(event) => setTarget(event.target.value)} aria-label="Ziel-Unterkategorie" data-testid="equipment-move-target"
             className="min-w-0 flex-1 rounded-sm border border-white/15 bg-[#0A0A0A] px-2 py-1.5 text-sm text-white focus-visible:outline focus-visible:outline-1 focus-visible:outline-[#29B6E8]">
@@ -217,7 +217,7 @@ function MoveBar({ selected, categories, onMove, onCancel }) {
         </label>
       )}
       <button type="button" disabled={Boolean(problem)} onClick={() => onMove(target || null)} data-testid="equipment-move"
-        className="tls-btn tls-btn--primary inline-flex items-center gap-1.5 rounded-sm px-3 py-1.5 text-[11px] font-bold uppercase tracking-wider disabled:opacity-50">
+        className="tls-btn tls-btn--primary inline-flex items-center gap-1.5 rounded-sm px-3 py-1.5 tls-type-label disabled:opacity-50">
         <FolderInput className="h-3.5 w-3.5" aria-hidden="true" /> Verschieben
       </button>
       <button type="button" onClick={onCancel} className={SMALL_BUTTON} data-testid="equipment-move-cancel">
@@ -309,7 +309,7 @@ export function EquipmentLibrary({ gameId, onDirtyChange }) {
   const assignable = items.filter((item) => weaponNames.has(item.id) && statusOf(item) !== "archived");
 
   if (error) return <p className="mt-6 text-white/60" role="alert" data-testid="equipment-missing">{error}</p>;
-  if (!data) return <p className="mt-6 text-sm text-white/60">Lade Ausrüstung …</p>;
+  if (!data) return <p className="mt-6 tls-type-small text-white/60">Lade Ausrüstung …</p>;
 
   const itemRow = (category, item) => (
     <ItemRow key={item.id} item={item} role={category.role} weaponNames={weaponNames} classNames={classNames}
@@ -320,21 +320,21 @@ export function EquipmentLibrary({ gameId, onDirtyChange }) {
   return (
     <section aria-label="Ausrüstung" data-testid="equipment-library">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <p className="max-w-2xl text-sm text-white/65">
+        <p className="max-w-2xl tls-type-body text-white/65">
           Waffen, Aufsätze und übrige Ausrüstung mit Bild, geordnet in Kategorien und Unterkategorien. Seasons sperren daraus, was nicht
           gespielt werden darf; spätere Änderungen hier ändern keine gespeicherte Sperrliste.
         </p>
         <div className="flex flex-wrap items-center gap-2">
           <button type="button" onClick={() => setCategoriesOpen(true)} data-testid="equipment-categories"
-            className="tls-btn tls-btn--quiet inline-flex items-center gap-2 rounded-sm px-3 py-2 text-xs font-bold uppercase tracking-wider">
+            className="tls-btn tls-btn--quiet inline-flex items-center gap-2 rounded-sm px-3 py-2 tls-type-label">
             <Layers className="h-3.5 w-3.5" /> Kategorien
           </button>
           <button type="button" onClick={() => setImporting(true)} disabled={full} data-testid="equipment-import"
-            className="tls-btn tls-btn--quiet inline-flex items-center gap-2 rounded-sm px-3 py-2 text-xs font-bold uppercase tracking-wider disabled:opacity-50">
+            className="tls-btn tls-btn--quiet inline-flex items-center gap-2 rounded-sm px-3 py-2 tls-type-label disabled:opacity-50">
             <Copy className="h-3.5 w-3.5" /> Aus Spiel übernehmen
           </button>
           <button type="button" onClick={() => setEditing({ category: only || "" })} disabled={full || !categories.length} data-testid="equipment-add"
-            className="tls-btn tls-btn--primary inline-flex items-center gap-2 rounded-sm px-4 py-2 text-xs font-bold uppercase tracking-wider disabled:opacity-50">
+            className="tls-btn tls-btn--primary inline-flex items-center gap-2 rounded-sm px-4 py-2 tls-type-label disabled:opacity-50">
             <Plus className="h-3.5 w-3.5" /> Eintrag hinzufügen
           </button>
         </div>
@@ -342,9 +342,9 @@ export function EquipmentLibrary({ gameId, onDirtyChange }) {
 
       {!categories.length ? (
         <div className="mt-6 rounded-sm border border-dashed border-white/15 px-4 py-6" data-testid="equipment-no-categories">
-          <p className="text-sm text-white/75">Für dieses Spiel gibt es noch keine Kategorien. Lege fest, welche Arten von Ausrüstung es hat – etwa Waffen, Aufsätze und Perks.</p>
+          <p className="tls-type-body text-white/75">Für dieses Spiel gibt es noch keine Kategorien. Lege fest, welche Arten von Ausrüstung es hat – etwa Waffen, Aufsätze und Perks.</p>
           <button type="button" onClick={() => setCategoriesOpen(true)} data-testid="equipment-categories-start"
-            className="tls-btn tls-btn--primary mt-3 rounded-sm px-4 py-2 text-xs font-bold uppercase tracking-wider">Kategorien festlegen</button>
+            className="tls-btn tls-btn--primary mt-3 rounded-sm px-4 py-2 tls-type-label">Kategorien festlegen</button>
         </div>
       ) : (
         <>
@@ -357,13 +357,13 @@ export function EquipmentLibrary({ gameId, onDirtyChange }) {
                 className="w-full rounded-sm border border-white/15 bg-[#0A0A0A] py-2 pl-8 pr-3 text-sm text-white placeholder:text-white/45 focus-visible:outline focus-visible:outline-1 focus-visible:outline-[#29B6E8]" />
             </label>
             {archivedCount ? (
-              <label className="inline-flex items-center gap-2 text-xs text-white/70">
+              <label className="inline-flex items-center gap-2 tls-type-small text-white/70">
                 <input type="checkbox" checked={showArchived} onChange={(event) => setShowArchived(event.target.checked)} className="accent-[#29B6E8]" data-testid="equipment-show-archived" />
                 Archivierte zeigen ({archivedCount})
               </label>
             ) : null}
             <button type="button" onClick={() => (selecting ? stopSelecting() : setSelecting(true))} aria-pressed={selecting} data-testid="equipment-select-mode"
-              className={`tls-btn tls-btn--quiet inline-flex items-center gap-2 rounded-sm px-3 py-2 text-xs font-bold uppercase tracking-wider ${selecting ? "text-[#29B6E8]" : ""}`}>
+              className={`tls-btn tls-btn--quiet inline-flex items-center gap-2 rounded-sm px-3 py-2 tls-type-label ${selecting ? "text-[#29B6E8]" : ""}`}>
               <ListChecks className="h-3.5 w-3.5" aria-hidden="true" /> {selecting ? "Auswahl beenden" : "Auswählen"}
             </button>
             <FoldAll onAll={fold.setAll} testId="equipment" />
@@ -395,11 +395,11 @@ export function EquipmentLibrary({ gameId, onDirtyChange }) {
               return (
                 <div key={category.key} data-testid={`equipment-group-${category.key}`}>
                   <div className={`${catOpen ? "mb-3" : ""} flex flex-wrap items-center justify-between gap-2 border-b border-white/10 pb-2`}>
-                    <h2 className="min-w-0 flex-1 font-heading text-lg font-bold uppercase">
+                    <h2 className="min-w-0 flex-1 tls-type-section">
                       <FoldButton open={catOpen} onToggle={() => fold.toggle(catKey, catBase)} controls={bodyId} testId={`equipment-fold-${category.key}`}
                         className="w-full">
                         <span className="min-w-0 break-words">{category.label}</span>
-                        <span className="text-[11px] font-semibold normal-case tracking-normal text-white/50 tabular-nums" data-testid={`equipment-count-${category.key}`}>
+                        <span className="tls-type-small font-semibold text-white/50 tabular-nums" data-testid={`equipment-count-${category.key}`}>
                           {ROLE_LABELS[category.role]} · {searching && rows.length !== all.length ? `${rows.length} von ${all.length}` : countText(all.length, "Eintrag", "Einträge")}
                           {subs.length ? ` · ${countText(subs.length, "Unterkategorie", "Unterkategorien")}` : ""}
                         </span>
@@ -417,14 +417,14 @@ export function EquipmentLibrary({ gameId, onDirtyChange }) {
                   {!subs.length ? (
                     <FoldBody id={bodyId} open={catOpen} className="pb-6">
                       {rows.length ? <ItemGrid rows={rows}>{rows.map((item) => itemRow(category, item))}</ItemGrid> : (
-                        <p className="rounded-sm border border-dashed border-white/15 px-3 py-3 text-sm text-white/60">
+                        <p className="rounded-sm border border-dashed border-white/15 px-3 py-3 tls-type-small text-white/60">
                           {searching ? "Nichts gefunden." : "Noch kein Eintrag."}
                         </p>
                       )}
                     </FoldBody>
                   ) : !sections.length ? (
                     <FoldBody id={bodyId} open={catOpen} className="pb-6">
-                      <p className="rounded-sm border border-dashed border-white/15 px-3 py-3 text-sm text-white/60">Nichts gefunden.</p>
+                      <p className="rounded-sm border border-dashed border-white/15 px-3 py-3 tls-type-small text-white/60">Nichts gefunden.</p>
                     </FoldBody>
                   ) : (
                     <FoldBody id={bodyId} open={catOpen} className="space-y-2 pb-6">

@@ -31,8 +31,8 @@ export default function MemberNewsPage() {
             empty={(
               <div className="border border-dashed border-white/15 rounded-sm p-12 text-center text-white/50">
                 <Newspaper className="w-10 h-10 mx-auto opacity-40 mb-3" />
-                <div className="font-heading font-bold text-lg">Keine internen News</div>
-                <div className="text-sm mt-1">Aktuell gibt es keine vereinsinternen Beiträge.</div>
+                <div className="tls-type-card">Keine internen News</div>
+                <div className="tls-type-small mt-1">Aktuell gibt es keine vereinsinternen Beiträge.</div>
               </div>
             )}
           >
@@ -45,13 +45,13 @@ export default function MemberNewsPage() {
                 data-testid={`member-news-${n.slug}`}
                 className="block border border-[#FFD700]/15 hover:border-[#FFD700]/40 rounded-sm bg-[#121212] p-5 transition group"
               >
-                <div className="flex items-center gap-2 text-[10px] uppercase tracking-widest font-bold">
+                <div className="flex items-center gap-2 tls-type-label">
                   <span className="text-[#FFD700]">{newsCategoryLabel(n.category)}</span>
                   {n.pinned && <Pin className="w-3 h-3 text-[#FFD700]" />}
                   <span className="text-white/30 ml-auto">{viennaDate(n.created_at)}</span>
                 </div>
-                <h3 className="mt-2 font-heading font-black text-xl group-hover:text-[#FFD700] transition">{n.title}</h3>
-                {n.excerpt && <p className="mt-2 text-sm text-white/65 line-clamp-2">{n.excerpt}</p>}
+                <h3 className="mt-2 tls-type-card group-hover:text-[#FFD700] transition">{n.title}</h3>
+                {n.excerpt && <p className="mt-2 tls-type-body text-white/65 line-clamp-2">{n.excerpt}</p>}
               </Link>
             ))}
           </div>

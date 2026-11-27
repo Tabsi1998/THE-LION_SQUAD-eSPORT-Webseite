@@ -64,20 +64,20 @@ export function AchievementsTab({ achData, achInsights, completeness, evaluateAc
   return (
     <div className="space-y-6" data-testid="profile-achievements-tab">
       <AchievementLevelHeader level={achData?.level} earnedPercent={achInsights?.earnedPercent ?? completeness?.score ?? 0} onLevelChange={onLevelChange}>
-        <button type="button" onClick={evaluateAchievements} disabled={evaluatingAchievements} data-testid="profile-achievements-evaluate" className="inline-flex items-center gap-2 px-4 py-2 border border-[#A855F7]/50 text-[#c084fc] font-bold uppercase tracking-wider rounded-sm text-xs hover:bg-[#A855F7]/10 disabled:opacity-50">
+        <button type="button" onClick={evaluateAchievements} disabled={evaluatingAchievements} data-testid="profile-achievements-evaluate" className="inline-flex items-center gap-2 px-4 py-2 border border-[#A855F7]/50 text-[#c084fc] tls-type-label rounded-sm hover:bg-[#A855F7]/10 disabled:opacity-50">
           <RefreshCw className={`w-3.5 h-3.5 ${evaluatingAchievements ? "animate-spin" : ""}`} /> Aktualisieren
         </button>
       </AchievementLevelHeader>
 
       {achData && (
-        <div className={`flex items-center gap-2 text-xs px-4 py-2.5 border rounded-sm ${publicSwitch ? "border-[#FFD700]/40 text-[#FFD700]/90 bg-[#FFD700]/5" : "border-white/10 text-white/50"}`} data-testid="achievement-visibility-note">
+        <div className={`flex items-center gap-2 tls-type-small px-4 py-2.5 border rounded-sm ${publicSwitch ? "border-[#FFD700]/40 text-[#FFD700]/90 bg-[#FFD700]/5" : "border-white/10 text-white/50"}`} data-testid="achievement-visibility-note">
           {publicSwitch ? <EyeOff className="w-3.5 h-3.5 shrink-0" /> : <Eye className="w-3.5 h-3.5 shrink-0" />}
           <span className="flex-1">
             {publicSwitch
               ? "Deine Erfolge sind privat: andere sehen weder Angeheftete noch Stufen, und du stehst auf keiner Rangliste."
               : "Deine Erfolge sind öffentlich: Angeheftete und erreichte Stufen stehen in deinem Profil, die Verein-Kategorie sehen nur Mitglieder."}
           </span>
-          <Link to="/mein-bereich/datenschutz" className="tls-btn tls-btn--quiet inline-flex min-h-11 shrink-0 items-center px-3 py-2 rounded-sm font-bold uppercase tracking-widest text-[10px]">Ändern</Link>
+          <Link to="/mein-bereich/datenschutz" className="tls-btn tls-btn--quiet inline-flex min-h-11 shrink-0 items-center px-3 py-2 rounded-sm tls-type-label">Ändern</Link>
         </div>
       )}
 

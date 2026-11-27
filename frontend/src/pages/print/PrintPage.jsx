@@ -49,7 +49,7 @@ function Choice({ legend, name, value, options, onChange }) {
   return (
     <fieldset className="flex flex-wrap items-center gap-x-3 gap-y-1">
       <legend className="sr-only">{legend}</legend>
-      <span className="text-[11px] font-bold uppercase tracking-wider text-white/55" aria-hidden="true">{legend}</span>
+      <span className="tls-type-label text-white/55" aria-hidden="true">{legend}</span>
       {options.map(([key, label]) => (
         <label key={key} className="inline-flex min-h-11 items-center gap-2 text-sm text-white/85 cursor-pointer">
           <input type="radio" name={name} value={key} checked={value === key} onChange={() => onChange(key)} className="h-4 w-4 accent-[var(--tls-cyan)]" />
@@ -190,7 +190,7 @@ function PrintView({ scope }) {
                 <ArrowLeft className="w-3.5 h-3.5" aria-hidden="true" /> Zurück
               </Link>
               <div className="min-w-0">
-                <div className="text-[11px] font-bold uppercase tracking-[0.2em] text-white/55">Druckansicht</div>
+                <div className="tls-type-label text-white/55">Druckansicht</div>
                 <div className="truncate font-bold">{name || "…"}</div>
               </div>
             </div>
@@ -201,7 +201,7 @@ function PrintView({ scope }) {
           <div className="flex flex-wrap items-center gap-x-6 gap-y-1">
             <fieldset className="flex flex-wrap items-center gap-x-3 gap-y-1">
               <legend className="sr-only">Was gedruckt wird</legend>
-              <span className="text-[11px] font-bold uppercase tracking-wider text-white/55" aria-hidden="true">Teile</span>
+              <span className="tls-type-label text-white/55" aria-hidden="true">Teile</span>
               {partOptions.map((part) => (
                 <label key={part.key} className="inline-flex min-h-11 items-center gap-2 text-sm text-white/85 cursor-pointer">
                   <input type="checkbox" checked={parts.includes(part.key)} onChange={() => togglePart(part.key)} data-testid={`print-part-${part.key}`} className="h-4 w-4 accent-[var(--tls-cyan)]" />

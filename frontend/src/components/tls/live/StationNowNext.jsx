@@ -22,20 +22,20 @@ export function StationNowNext({ station, stationKey }) {
     <div className="mt-3 grid gap-2 rounded-md border border-white/10 bg-[var(--tls-surface-2)] p-3 sm:grid-cols-2" data-testid={`schedule-now-${stationKey}`}>
       {running ? (
         <div className="min-w-0">
-          <div className="flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-widest text-live"><Radio className="h-3.5 w-3.5" aria-hidden="true" /> Jetzt</div>
-          <div className="mt-0.5 text-xs text-white/50 [overflow-wrap:anywhere]">{queueWhat(running)}</div>
-          <div className="text-sm font-bold text-white [overflow-wrap:anywhere]">{stationWho(running)}</div>
+          <div className="flex items-center gap-1.5 tls-type-label text-live"><Radio className="h-3.5 w-3.5" aria-hidden="true" /> Jetzt</div>
+          <div className="mt-0.5 tls-type-small text-white/50 [overflow-wrap:anywhere]">{queueWhat(running)}</div>
+          <div className="tls-type-small font-bold text-white [overflow-wrap:anywhere]">{stationWho(running)}</div>
           <MatchClock startedAt={running.started_at} durationMinutes={running.duration_minutes} pausedAt={running.paused_at} pausedSeconds={running.paused_seconds} testId={`schedule-clock-${running.match_id}`} className="mt-1" />
         </div>
       ) : null}
       {next ? (
         <div className={`min-w-0 ${running ? "sm:border-l sm:border-white/10 sm:pl-3" : ""}`}>
-          <div className={`flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-widest ${next.state === "called" ? "text-brand" : "text-white/50"}`}>
+          <div className={`flex items-center gap-1.5 tls-type-label ${next.state === "called" ? "text-brand" : "text-white/50"}`}>
             {next.state === "called" ? <BellRing className="h-3.5 w-3.5" aria-hidden="true" /> : null} Als Nächstes
           </div>
-          <div className="mt-0.5 text-xs text-white/50 [overflow-wrap:anywhere]">{queueWhat(next)}</div>
-          <div className="text-sm font-bold text-white [overflow-wrap:anywhere]">{stationWho(next)}</div>
-          <div className={`text-xs ${next.state === "called" ? "text-brand" : "text-white/60"}`}>{nextLine(next)}</div>
+          <div className="mt-0.5 tls-type-small text-white/50 [overflow-wrap:anywhere]">{queueWhat(next)}</div>
+          <div className="tls-type-small font-bold text-white [overflow-wrap:anywhere]">{stationWho(next)}</div>
+          <div className={`tls-type-small ${next.state === "called" ? "text-brand" : "text-white/60"}`}>{nextLine(next)}</div>
         </div>
       ) : null}
     </div>

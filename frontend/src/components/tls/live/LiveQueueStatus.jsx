@@ -48,8 +48,8 @@ export function LiveQueueStatus({ tournamentId, eventId = null, matchId = null, 
     <div className={`flex items-start gap-3 rounded-sm border px-4 py-3 ${box} ${className}`} role="status" aria-live="polite" data-tone={line.tone} data-testid="live-queue-status">
       <Icon className={`mt-0.5 h-5 w-5 shrink-0 ${iconClass}`} aria-hidden="true" />
       <div className="min-w-0">
-        <div className="font-heading text-base font-black uppercase text-white [overflow-wrap:anywhere]">{line.title}</div>
-        {line.detail ? <div className="mt-0.5 text-sm text-white/70">{line.detail}</div> : null}
+        <div className="tls-type-card text-white [overflow-wrap:anywhere]">{line.title}</div>
+        {line.detail ? <div className="mt-0.5 tls-type-small text-white/70">{line.detail}</div> : null}
         <LiveStaleNote since={staleSince} className="mt-1.5" testId="live-queue-status-stale" inRegion />
       </div>
     </div>

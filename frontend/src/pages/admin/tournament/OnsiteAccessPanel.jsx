@@ -73,25 +73,25 @@ export function OnsiteAccessPanel({ tournamentId }) {
     <section className="border border-[#29B6E8]/25 bg-[#29B6E8]/5 rounded-sm p-4" data-testid="onsite-access-panel">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="min-w-0">
-          <h3 className="inline-flex items-center gap-2 font-heading text-lg font-bold uppercase"><QrCode className="w-4 h-4 text-[#29B6E8]" /> Vor-Ort-Anmeldung über QR</h3>
-          <p className="mt-1 max-w-2xl text-sm text-white/65">
+          <h3 className="inline-flex items-center gap-2 tls-type-card"><QrCode className="w-4 h-4 text-[#29B6E8]" /> Vor-Ort-Anmeldung über QR</h3>
+          <p className="mt-1 max-w-2xl tls-type-body text-white/65">
             Auch Nicht-Mitglieder (z. B. Begleitpersonen) melden sich über den QR-Code am TV oder am Aushang an. Danach sehen sie
             dieses Turnier – sonst nichts aus dem Mitgliederbereich.
           </p>
         </div>
-        <span className={`shrink-0 text-xs font-bold uppercase tracking-wider ${state.enabled ? "text-ok" : "text-white/50"}`} data-testid="onsite-access-state">{stateText}</span>
+        <span className={`shrink-0 tls-type-label ${state.enabled ? "text-ok" : "text-white/50"}`} data-testid="onsite-access-state">{stateText}</span>
       </div>
-      <p className="mt-3 text-xs text-white/60" data-testid="onsite-access-window">
+      <p className="mt-3 tls-type-small text-white/60" data-testid="onsite-access-window">
         Zeitfenster: {windowText(state.window)}{state.explicit === null || state.explicit === undefined ? ` · Vorgabe (${state.default ? "an bei Turnieren vor Ort" : "aus bei Online-Turnieren"})` : ""}
       </p>
       <div className="mt-4 flex flex-wrap items-center gap-2">
-        <button type="button" onClick={toggle} disabled={busy} data-testid="onsite-access-toggle" className={`tls-btn ${state.enabled ? "tls-btn--quiet" : "tls-btn--primary"} inline-flex min-h-[40px] items-center px-4 py-2 rounded-sm text-xs font-bold uppercase tracking-wider disabled:opacity-50`}>
+        <button type="button" onClick={toggle} disabled={busy} data-testid="onsite-access-toggle" className={`tls-type-label tls-btn ${state.enabled ? "tls-btn--quiet" : "tls-btn--primary"} inline-flex min-h-[40px] items-center px-4 py-2 rounded-sm disabled:opacity-50`}>
           {state.enabled ? "Abschalten" : "Einschalten"}
         </button>
-        <button type="button" onClick={renew} disabled={busy} data-testid="onsite-access-renew" className="tls-btn tls-btn--quiet inline-flex min-h-[40px] items-center gap-2 px-4 py-2 rounded-sm text-xs font-bold uppercase tracking-wider disabled:opacity-50">
+        <button type="button" onClick={renew} disabled={busy} data-testid="onsite-access-renew" className="tls-btn tls-btn--quiet inline-flex min-h-[40px] items-center gap-2 px-4 py-2 rounded-sm tls-type-label disabled:opacity-50">
           <RefreshCw className="w-3.5 h-3.5" /> Neuer Code
         </button>
-        <Link to={`/admin/tournaments/${tournamentId}/aushang`} data-testid="onsite-access-poster" className="tls-btn tls-btn--secondary inline-flex min-h-[40px] items-center gap-2 px-4 py-2 rounded-sm text-xs font-bold uppercase tracking-wider">
+        <Link to={`/admin/tournaments/${tournamentId}/aushang`} data-testid="onsite-access-poster" className="tls-btn tls-btn--secondary inline-flex min-h-[40px] items-center gap-2 px-4 py-2 rounded-sm tls-type-label">
           <Printer className="w-3.5 h-3.5" /> Aushang drucken
         </Link>
       </div>
@@ -103,7 +103,7 @@ export function OnsiteAccessPanel({ tournamentId }) {
 export function OnsiteMark({ via }) {
   if (via !== "onsite") return null;
   return (
-    <span className="ml-2 inline-flex items-center gap-1 border border-[#29B6E8]/40 text-[#29B6E8] rounded-sm px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wider align-middle" title="Über den QR-Code vor Ort angemeldet" data-testid="onsite-mark">
+    <span className="ml-2 inline-flex items-center gap-1 border border-[#29B6E8]/40 text-[#29B6E8] rounded-sm px-1.5 py-0.5 tls-type-label align-middle" title="Über den QR-Code vor Ort angemeldet" data-testid="onsite-mark">
       <QrCode className="w-3 h-3" aria-hidden="true" /> Vor Ort
     </span>
   );

@@ -21,7 +21,7 @@ import { LeagueWeeks } from "@/pages/admin/tournament/matchplan/MatchPlanRemote"
 // Ein leerer Start (Paket D, #2262): Dann gilt wieder, was die Spielwoche vorgibt - kein „Planer“ wie im Turnier.
 const LEAGUE_EMPTY_HINT = "Leer: Es gilt wieder die Regel der Spielwoche – vereinbart, Heimrecht oder Standardzeit.";
 
-const BUTTON = "tls-btn inline-flex min-h-[44px] items-center justify-center gap-2 rounded-sm px-4 text-xs font-bold uppercase tracking-wider";
+const BUTTON = "tls-btn inline-flex min-h-[44px] items-center justify-center gap-2 rounded-sm px-4 tls-type-label";
 
 function Downloads({ tournament }) {
   return (
@@ -86,8 +86,8 @@ function BeforeStartTools({ tournament, matches, onReload, children }) {
   };
   return (
     <section className="space-y-3 rounded-sm border border-white/10 bg-[#121212] p-4" aria-labelledby="staffel-preview-title" data-testid="staffel-preview-tools">
-      <h3 id="staffel-preview-title" className="text-[11px] font-bold uppercase tracking-[0.25em] text-[#29B6E8]">Vorschau</h3>
-      <p className="text-sm text-white/70">
+      <h3 id="staffel-preview-title" className="tls-type-label text-[#29B6E8]">Vorschau</h3>
+      <p className="tls-type-small text-white/70">
         {preview ? `Die Vorschau hat ${preview} Spiele.` : "Noch keine Vorschau – sie entsteht mit den zugeteilten Teams."} Spielwochen, Fristen und Termine stehen mit „Liga starten“ fest.
       </p>
       {preview ? (
@@ -135,8 +135,8 @@ export function StaffelScheduleTab({ tournament, registrations = [], matches = [
     <div className="space-y-4">
       <div className="flex flex-col gap-3 rounded-sm border border-white/10 bg-[#121212] p-4 md:flex-row md:items-center md:justify-between">
         <div className="min-w-0">
-          <h2 className="font-heading text-xl font-black uppercase">Spielplan</h2>
-          <p className="mt-1 text-sm text-white/60">
+          <h2 className="tls-type-section">Spielplan</h2>
+          <p className="mt-1 tls-type-small text-white/60">
             Wochentag, Uhrzeit und Sperrwochen gibt die Season vor.{" "}
             <Link to={seasonAnchorUrl(tournament.league_context?.season_id, "termine")} className="inline-flex min-h-[44px] items-center gap-1 font-bold text-[#29B6E8] hover:text-white"
               data-testid="staffel-season-dates">
@@ -154,7 +154,7 @@ export function StaffelScheduleTab({ tournament, registrations = [], matches = [
               <Redraw tournament={tournament} stage={leagueStage} matches={matches} onChanged={redrawn} />
             </BeforeStartTools>
           )
-          : <p className="rounded-sm border border-white/10 bg-[#121212] p-4 text-sm text-white/70" data-testid="staffel-preview-note">Spielwochen, Fristen und Termine stehen mit „Liga starten“ fest. Die Vorschau mischt, wer in dieser Liga „Season konfigurieren“ hat.</p>
+          : <p className="rounded-sm border border-white/10 bg-[#121212] p-4 tls-type-body text-white/70" data-testid="staffel-preview-note">Spielwochen, Fristen und Termine stehen mit „Liga starten“ fest. Die Vorschau mischt, wer in dieser Liga „Season konfigurieren“ hat.</p>
       ) : (
         <div id="termine" className="scroll-mt-24 min-w-0 space-y-4">
           {/* Nach dem Start, bis Spieltag 1 beginnt (Fabian zu Paket B): neu auslosen über den Spielwochen. */}
@@ -162,7 +162,7 @@ export function StaffelScheduleTab({ tournament, registrations = [], matches = [
           <LeagueWeeks tournament={tournament} matches={matches} registrations={registrations} matchdays={matchdays} error={error}
             canEdit={canEdit} editor={editor} variant="staffel" />
           {matches.some((match) => match.viewer_involved) ? (
-            <p className="text-xs text-white/60" data-testid="staffel-own-matches">
+            <p className="tls-type-small text-white/60" data-testid="staffel-own-matches">
               An einem Spiel bist du selbst beteiligt: Den Termin setzt dort eine zweite Person. Als Captain oder Vertreter nutzt du Vorschlag und Zustimmung auf der Matchseite.
             </p>
           ) : null}

@@ -173,7 +173,7 @@ export default function FaqClip({ slug, schritt }) {
       {hasClip ? (
         <button type="button" onClick={toggle} data-testid={`help-step-clip-toggle-${schritt.id}`}
           aria-label={active ? `Animation „${titel}“ anhalten` : `Animation „${titel}“ abspielen`}
-          className="absolute bottom-2 right-2 inline-flex min-h-[44px] min-w-[44px] items-center justify-center gap-1.5 rounded-sm border border-white/15 bg-black/75 px-3 text-xs font-bold uppercase tracking-wider text-white transition-colors duration-150 hover:border-[#29B6E8] hover:text-[#29B6E8] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#29B6E8]">
+          className="absolute bottom-2 right-2 inline-flex min-h-[44px] min-w-[44px] items-center justify-center gap-1.5 rounded-sm border border-white/15 bg-black/75 px-3 tls-type-label text-white transition-colors duration-150 hover:border-[#29B6E8] hover:text-[#29B6E8] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#29B6E8]">
           {active ? <Pause className="h-4 w-4" aria-hidden="true" /> : <Play className="h-4 w-4" aria-hidden="true" />}
           {active ? null : <span aria-hidden="true">Abspielen</span>}
         </button>

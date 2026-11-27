@@ -44,7 +44,7 @@ export function BrandSection({ brand, siteBanners, bannerForm, editingBannerId, 
         <BrandField label="Play-Store-Link (LionsAPP)" value={brand.play_store_url} onChange={(v) => setBrandField("play_store_url", v)} placeholder="https://play.google.com/store/apps/details?id=at.lionsquad.app" hint="leer lassen, bis die App öffentlich ist" testId="brand-play-store-url" />
         {/* App-Store-Link (#1084): wie Google Play - ohne Link steht im Footer „bald im App Store“. */}
         <BrandField label="App-Store-Link (LionsAPP, iOS)" value={brand.app_store_url} onChange={(v) => setBrandField("app_store_url", v)} placeholder="https://apps.apple.com/at/app/lionsapp/id…" hint="leer lassen, bis die App im App Store ist" testId="brand-app-store-url" />
-        <div className="border border-white/10 bg-[#0A0A0A] rounded-sm p-3 text-xs text-white/60 flex flex-col md:flex-row md:items-center gap-3" data-testid="brand-favicon-universal">
+        <div className="border border-white/10 bg-[#0A0A0A] rounded-sm p-3 tls-type-small text-white/60 flex flex-col md:flex-row md:items-center gap-3" data-testid="brand-favicon-universal">
           <div className="flex-1">
             <div className="font-bold text-white/80 uppercase tracking-wider">Standard-Favicon für hell und dunkel</div>
             <p className="mt-1">
@@ -54,20 +54,20 @@ export function BrandSection({ brand, siteBanners, bannerForm, editingBannerId, 
                 : "Erzeugt wird das weiße Logo (Favicon dunkel, sonst Maskottchen) auf einem Kreis in der Akzentfarbe."}
             </p>
           </div>
-          <button type="button" onClick={generateUniversalFavicon} disabled={generatingFavicon} data-testid="brand-favicon-generate" className="px-4 py-2 border border-[#29B6E8]/45 text-[#29B6E8] rounded-sm text-xs font-bold uppercase tracking-wider disabled:opacity-50 whitespace-nowrap">
+          <button type="button" onClick={generateUniversalFavicon} disabled={generatingFavicon} data-testid="brand-favicon-generate" className="px-4 py-2 border border-[#29B6E8]/45 text-[#29B6E8] rounded-sm tls-type-label disabled:opacity-50 whitespace-nowrap">
             {generatingFavicon ? "Erzeuge..." : "Aus Logo und Akzentfarbe erzeugen"}
           </button>
         </div>
-        <div className="border border-[#29B6E8]/20 bg-[#29B6E8]/5 rounded-sm p-3 text-xs text-white/60">
+        <div className="border border-[#29B6E8]/20 bg-[#29B6E8]/5 rounded-sm p-3 tls-type-small text-white/60">
           Standardbilder werden verwendet, wenn eine Seite kein eigenes Bild hat. SEO nutzt Beitrags-/Event-/Turnierbild zuerst, danach den Teilen-Banner, danach Logo oder Maskottchen. QR-Codes verwenden das QR-Logo in der Mitte, mit Maskottchen als Fallback.
         </div>
         <div className="border border-white/10 bg-[#0A0A0A] rounded-sm p-4 space-y-4">
           <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-3">
             <div>
-              <div className="font-heading font-bold uppercase">Banner-Manager</div>
-              <p className="text-xs text-white/50 mt-1">Mehrere Hinweise mit Templates, Zielbereichen, Priorität, Vorschau und Klick-/Sichtungsstatistik.</p>
+              <div className="font-bold uppercase">Banner-Manager</div>
+              <p className="tls-type-small text-white/50 mt-1">Mehrere Hinweise mit Templates, Zielbereichen, Priorität, Vorschau und Klick-/Sichtungsstatistik.</p>
             </div>
-            <button type="button" onClick={resetBannerForm} className="inline-flex items-center justify-center gap-2 px-3 py-2 border border-[#29B6E8]/45 text-[#29B6E8] rounded-sm text-xs font-bold uppercase tracking-wider">
+            <button type="button" onClick={resetBannerForm} className="inline-flex items-center justify-center gap-2 px-3 py-2 border border-[#29B6E8]/45 text-[#29B6E8] rounded-sm tls-type-label">
               <Plus className="w-3.5 h-3.5" /> Neuer Banner
             </button>
           </div>
@@ -75,8 +75,8 @@ export function BrandSection({ brand, siteBanners, bannerForm, editingBannerId, 
           <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1.08fr)_minmax(26rem,0.92fr)] gap-4">
             <div className="border border-white/10 bg-[#121212] rounded-sm p-4 space-y-3">
               <div className="flex items-center justify-between gap-3">
-                <div className="font-bold uppercase tracking-widest text-xs text-white/65">{editingBannerId ? "Banner bearbeiten" : "Neuer Banner"}</div>
-                <label className="flex items-center gap-2 text-sm">
+                <div className="tls-type-label text-white/65">{editingBannerId ? "Banner bearbeiten" : "Neuer Banner"}</div>
+                <label className="flex items-center gap-2 tls-type-small">
                   <input type="checkbox" checked={!!bannerForm.enabled} onChange={(e) => setBannerField("enabled", e.target.checked)} className="accent-[#29B6E8]" />
                   <span>Aktiv</span>
                 </label>
@@ -104,8 +104,8 @@ export function BrandSection({ brand, siteBanners, bannerForm, editingBannerId, 
                 <BrandSelect label="Zielgruppe" value={bannerForm.audience} onChange={(v) => setBannerField("audience", v)} testId="site-banner-audience" options={[["all", "Alle Besucher"], ["logged_in", "Eingeloggt"], ["members", "Vereinsmitglieder"], ["admins", "Admins"]]} />
               </div>
               {/* Wo der Banner läuft (#245): mindestens ein Kanal; in der App oben über den Tabs. */}
-              <div className="flex flex-wrap items-center gap-4 text-sm" data-testid="site-banner-channels">
-                <span className="text-[11px] font-bold uppercase tracking-widest text-white/60">Läuft auf</span>
+              <div className="flex flex-wrap items-center gap-4 tls-type-small" data-testid="site-banner-channels">
+                <span className="tls-type-label text-white/60">Läuft auf</span>
                 {[["web", "Webseite"], ["app", "App"]].map(([channel, label]) => (
                   <label key={channel} className="inline-flex items-center gap-2">
                     <input
@@ -122,7 +122,7 @@ export function BrandSection({ brand, siteBanners, bannerForm, editingBannerId, 
                     {label}
                   </label>
                 ))}
-                {(bannerForm.channels || ["web"]).includes("app") && <span className="text-xs text-[#29B6E8]">Läuft auch in der App – oben über den Tabs.</span>}
+                {(bannerForm.channels || ["web"]).includes("app") && <span className="tls-type-small text-[#29B6E8]">Läuft auch in der App – oben über den Tabs.</span>}
               </div>
               <BannerScopePicker value={bannerForm.scope} onChange={(v) => setBannerField("scope", v)} />
               {bannerForm.scope === "custom" && <BrandField label="Eigener URL-Pfad" value={bannerForm.path} onChange={(v) => setBannerField("path", v)} testId="site-banner-path" placeholder="/tournaments/gamers-heaven" />}
@@ -146,24 +146,24 @@ export function BrandSection({ brand, siteBanners, bannerForm, editingBannerId, 
             <div className="space-y-4">
               <BannerPreview banner={bannerForm} />
               <div className="border border-white/10 bg-[#121212] rounded-sm p-4">
-                <div className="font-bold uppercase tracking-widest text-xs text-white/65 mb-3">Banner</div>
+                <div className="tls-type-label text-white/65 mb-3">Banner</div>
                 <div className="space-y-2 max-h-[31rem] overflow-y-auto pr-1">
                   {siteBanners.map((banner) => (
                     <div key={banner.id} className="border border-white/10 bg-black/20 rounded-sm p-3">
                       <div className="flex items-start justify-between gap-3">
                         <div className="min-w-0">
-                          <div className="font-bold text-sm tls-wrap">{banner.title || banner.text}</div>
-                          <div className="text-[11px] text-white/45 tls-wrap">{banner.scope} · {banner.position} · Prio {banner.priority}</div>
-                          <div className="mt-1 text-[11px] text-white/45">Views {banner.stats?.impressions || 0} · Klicks {banner.stats?.clicks || 0}</div>
+                          <div className="font-bold tls-type-small tls-wrap">{banner.title || banner.text}</div>
+                          <div className="tls-type-small text-white/45 tls-wrap">{banner.scope} · {banner.position} · Prio {banner.priority}</div>
+                          <div className="mt-1 tls-type-small text-white/45">Views {banner.stats?.impressions || 0} · Klicks {banner.stats?.clicks || 0}</div>
                         </div>
                         <div className="flex gap-1 shrink-0">
-                          <button type="button" onClick={() => editBanner(banner)} className="px-2 py-1 border border-[#29B6E8]/35 text-[#29B6E8] rounded-sm text-[11px] font-bold uppercase">Edit</button>
-                          <button type="button" onClick={() => deleteSiteBanner(banner)} className="px-2 py-1 border border-[#FF3B30]/35 text-[#FF3B30] rounded-sm text-[11px] font-bold uppercase"><Trash2 className="w-3 h-3" /></button>
+                          <button type="button" onClick={() => editBanner(banner)} className="px-2 py-1 border border-[#29B6E8]/35 text-[#29B6E8] rounded-sm tls-type-label">Edit</button>
+                          <button type="button" onClick={() => deleteSiteBanner(banner)} className="px-2 py-1 border border-[#FF3B30]/35 text-[#FF3B30] rounded-sm tls-type-label"><Trash2 className="w-3 h-3" /></button>
                         </div>
                       </div>
                     </div>
                   ))}
-                  {siteBanners.length === 0 && <div className="text-sm text-white/35 py-6 text-center">Noch keine separaten Banner angelegt.</div>}
+                  {siteBanners.length === 0 && <div className="tls-type-small text-quiet py-6 text-center">Noch keine separaten Banner angelegt.</div>}
                 </div>
               </div>
               {/* Automatische Banner (#2352): nur lesbar, mit Zahlen und dem Weg zur Stelle, wo man sie schaltet. */}
@@ -171,7 +171,7 @@ export function BrandSection({ brand, siteBanners, bannerForm, editingBannerId, 
             </div>
           </div>
         </div>
-        <p className="text-xs text-white/45" data-testid="brand-legal-hint">Impressum, Datenschutz und Vereinsdaten liegen unter <Link to="/admin/club" className="text-[#29B6E8] hover:underline">Verein → Vereinsdaten</Link>.</p>
+        <p className="tls-type-small text-white/45" data-testid="brand-legal-hint">Impressum, Datenschutz und Vereinsdaten liegen unter <Link to="/admin/club" className="text-[#29B6E8] hover:underline">Verein → Vereinsdaten</Link>.</p>
         <button onClick={saveBrand} disabled={imageUploadBusy || savingBrand} data-testid="brand-save" className="px-5 py-2 bg-[#29B6E8] text-black font-bold uppercase tracking-wider rounded-sm disabled:opacity-50">{savingBrand ? "Speichere..." : "Speichern"}</button>
       </div>
     </div>

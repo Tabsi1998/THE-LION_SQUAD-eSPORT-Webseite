@@ -139,6 +139,119 @@ table tr.tls-you > :last-child { background-position: top right, top right, bott
    eckigen Initialen-Kästchen in Baum und Listen („DU“ für „Der unglaublich …“). */
 .tls-you-tag {
   flex: none; display: inline-flex; align-items: center; padding: 1px 7px; border-radius: 999px;
-  font-size: 11px; font-weight: 700; line-height: 1.35; letter-spacing: 0.02em; text-transform: none;
+  font-size: var(--tls-type-label-size); font-weight: 700; line-height: 1.35; letter-spacing: 0.02em; text-transform: none;
   color: var(--tls-brand); background: rgb(var(--tls-brand-rgb) / 0.12);
+}
+
+/* Schrift-Treppe (#1302, Fabians Variante B): jede Schrift gehört zu einer von acht Stufen - Bühne, Seitentitel,
+   Abschnitt, Kartentitel, Text, Klein, Etikett und Zahl. Die breite Vereinsschrift Unbounded steht nur auf der Bühne und
+   in Seitentiteln, alles andere in Outfit, Zahlen in Rajdhani (#1304, Variante A: Ziffern gleich breit, fonts.css).
+   Größe am PC (ab 1440 px) / am Handy (390 px), dazwischen gleitend mit clamp() - kein Sprung bei 768 oder 1024 px,
+   über 1440 px wächst nur der Rand. Kleinste Stufe für Lesetext ist „Klein“ mit 14 px; 12 px hat nur das Etikett
+   (kurz, GROSS, #1232). Großbuchstaben nur für Kurzes (#1303): Etikett, Knöpfe und Bühne; Seitentitel bis 18 Zeichen
+   über shortCaps() (lib/typography.js). styles/type.test.js hält die Werte fest und wacht über freie Größen.
+
+   tls-type-hero     Bühne        Unbounded 800  64 / 40 px  GROSS, nur 2-4 Wörter
+   tls-type-title    Seitentitel  Unbounded 700  44 / 30 px
+   tls-type-section  Abschnitt    Outfit 800     24 / 20 px  normal geschrieben
+   tls-type-card     Kartentitel  Outfit 700     19 / 17 px
+   tls-type-body     Text         Outfit 400     17 / 16 px  Zeilenabstand 1,6, Absätze höchstens etwa 70 Zeichen
+   tls-type-small    Klein        Outfit 500     14 px       Datum, Ort, Hinweise
+   tls-type-label    Etikett      Outfit 700     12 px       GROSS, leicht gesperrt (0,12 em), 1-3 Wörter
+   tls-type-num      Zahl         Rajdhani 700   Größe von der Stelle - allein wie der Text drumherum, zusammen mit einer
+                                                 Stufe deren Größe: Liste „tls-type-card tls-type-num“ (17 px), Kachel
+                                                 „tls-type-title tls-type-num“ (30 px), Anzeigetafel „tls-type-hero
+                                                 tls-type-num“ (bis 64 px). Einheiten klein daneben (tls-type-small).
+   Die Größen stehen auch als Variablen (--tls-type-*-size) für eigene Bausteine in CSS. */
+:root {
+  --tls-font-stage: 'Unbounded', 'Arial Black', 'Segoe UI Black', sans-serif;
+  --tls-font-text: 'Outfit', 'Segoe UI', -apple-system, BlinkMacSystemFont, sans-serif;
+  --tls-font-num: 'Rajdhani', 'Bahnschrift Condensed', 'Arial Narrow', sans-serif;
+  /* clamp(Handy, gleitend zwischen 390 und 1440 px, PC) */
+  --tls-type-hero-size: clamp(2.5rem, calc(1.9429rem + 2.2857vw), 4rem);
+  --tls-type-title-size: clamp(1.875rem, calc(1.55rem + 1.3333vw), 2.75rem);
+  --tls-type-section-size: clamp(1.25rem, calc(1.1571rem + 0.381vw), 1.5rem);
+  --tls-type-card-size: clamp(1.0625rem, calc(1.0161rem + 0.1905vw), 1.1875rem);
+  --tls-type-body-size: clamp(1rem, calc(0.9768rem + 0.0952vw), 1.0625rem);
+  --tls-type-small-size: 0.875rem;
+  --tls-type-label-size: 0.75rem;
+}
+
+/* In der Komponenten-Ebene: eine Tailwind-Klasse an einer einzelnen Stelle (`leading-none`, `font-semibold`,
+   `text-white/60`) gewinnt weiter. */
+@layer components {
+  .tls-type-hero {
+    font-family: var(--tls-font-stage);
+    font-size: var(--tls-type-hero-size);
+    font-weight: 800;
+    line-height: 1.02;
+    letter-spacing: -0.01em;
+    text-transform: uppercase;
+  }
+  .tls-type-title {
+    font-family: var(--tls-font-stage);
+    font-size: var(--tls-type-title-size);
+    font-weight: 700;
+    line-height: 1.1;
+    letter-spacing: normal;
+    text-transform: none;
+  }
+  .tls-type-section {
+    font-family: var(--tls-font-text);
+    font-size: var(--tls-type-section-size);
+    font-weight: 800;
+    line-height: 1.2;
+    letter-spacing: normal;
+    text-transform: none;
+  }
+  .tls-type-card {
+    font-family: var(--tls-font-text);
+    font-size: var(--tls-type-card-size);
+    font-weight: 700;
+    line-height: 1.3;
+    letter-spacing: normal;
+    text-transform: none;
+  }
+  .tls-type-body {
+    font-family: var(--tls-font-text);
+    font-size: var(--tls-type-body-size);
+    font-weight: 400;
+    line-height: 1.6;
+    letter-spacing: normal;
+    text-transform: none;
+  }
+  .tls-type-small {
+    font-family: var(--tls-font-text);
+    font-size: var(--tls-type-small-size);
+    font-weight: 500;
+    line-height: 1.45;
+    letter-spacing: normal;
+    text-transform: none;
+  }
+  .tls-type-label {
+    font-family: var(--tls-font-text);
+    font-size: var(--tls-type-label-size);
+    font-weight: 700;
+    line-height: 1.35;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+  }
+  /* Nach den anderen Stufen: zusammen mit einer Stufe kommt deren Größe, Schrift und Ziffern von hier. */
+  .tls-type-num {
+    font-family: var(--tls-font-num);
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+    line-height: 1;
+    letter-spacing: normal;
+    text-transform: none;
+  }
+  /* Rundenzeiten (#1304, LapTime): „1:24,“ in der Größe der Stelle, die Tausendstel „587“ eine Stufe kleiner und ruhiger. */
+  .tls-lap__fraction {
+    font-size: max(var(--tls-type-label-size), 0.8em);
+    font-weight: 600;
+    opacity: 0.8;
+  }
+  /* Absätze höchstens etwa 70 Zeichen breit; ein `max-w-*` an der Stelle geht vor. Mittig gesetzter Text bleibt mittig. */
+  :where(p).tls-type-body { max-width: 70ch; }
+  :where(.text-center) > :where(p).tls-type-body, :where(p).tls-type-body:where(.text-center) { margin-inline: auto; }
 }

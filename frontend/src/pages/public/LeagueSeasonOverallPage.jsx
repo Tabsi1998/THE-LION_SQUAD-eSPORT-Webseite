@@ -46,7 +46,7 @@ function Row({ row, index, columns, kind, leader, testId }) {
             {row.climbed ? <ArrowUp className="tls-overall-up h-3.5 w-3.5 shrink-0" aria-label="In der Wertung nach vorn gekommen" /> : null}
           </span>
           {row.lead_decision ? (
-            <span className="mt-0.5 block text-[11px] text-white/50">{row.lead_decision.method_label || "Entscheid"}: {row.lead_decision.reason}</span>
+            <span className="mt-0.5 block tls-type-small text-white/50">{row.lead_decision.method_label || "Entscheid"}: {row.lead_decision.reason}</span>
           ) : null}
         </td>
         {row.seasons.map((cell, at) => (
@@ -109,7 +109,7 @@ function StandingTable({ block, kind, columns, testId }) {
           ))}
         </StaggerIn>
       </table>
-      {!rows.length ? <p className="px-4 py-8 text-center text-sm text-white/50">Noch niemand in der Wertung.</p> : null}
+      {!rows.length ? <p className="px-4 py-8 text-center tls-type-small text-white/50">Noch niemand in der Wertung.</p> : null}
     </div>
   );
 }
@@ -128,8 +128,8 @@ function Level({ block, data, leagueSlug, seasonSlug }) {
     <section className="mt-8" aria-labelledby={`${testId}-head`} data-testid={testId}>
       <div className="flex flex-wrap items-end justify-between gap-3 border-b border-white/10 pb-3">
         <div className="min-w-0">
-          <h2 id={`${testId}-head`} className="font-heading text-2xl font-black uppercase [overflow-wrap:anywhere] hyphens-auto md:text-3xl">{block.label}</h2>
-          <p className="mt-1 flex items-center gap-1.5 text-xs text-white/60" data-testid={`${testId}-state`}>
+          <h2 id={`${testId}-head`} className="tls-type-section [overflow-wrap:anywhere] hyphens-auto">{block.label}</h2>
+          <p className="mt-1 flex items-center gap-1.5 tls-type-small text-white/60" data-testid={`${testId}-state`}>
             {block.closed ? <Lock className="h-3.5 w-3.5 shrink-0" aria-hidden="true" /> : null}
             {stateLine(block, (value) => viennaDate(value, LONG_DAY))}
           </p>
@@ -155,10 +155,10 @@ function Level({ block, data, leagueSlug, seasonSlug }) {
         <li>– nicht dabei · ausg. ausgeschieden (0 Punkte)</li>
         {kind === "players" ? <li>Spieler bekommen die Punkte ihres Co-Teams, wenn sie mindestens ein Spiel gespielt haben.</li> : null}
       </ul>
-      <p className="mt-2 text-[11px] text-white/55" data-testid={`${testId}-rules`}>{rulesLine(block.settings || data.settings)} {tiebreakLine(block.settings || data.settings)}</p>
+      <p className="mt-2 tls-type-small text-white/55" data-testid={`${testId}-rules`}>{rulesLine(block.settings || data.settings)} {tiebreakLine(block.settings || data.settings)}</p>
       <div className="mt-3 flex flex-wrap gap-2">
         <a href={`${API}/leagues/${leagueSlug}/${seasonSlug}/overall.pdf?level=${block.level}`} target="_blank" rel="noopener noreferrer"
-          className="tls-btn tls-btn--quiet inline-flex min-h-[44px] items-center gap-1.5 rounded-sm px-3 py-2 text-xs font-bold uppercase tracking-wider"
+          className="tls-btn tls-btn--quiet inline-flex min-h-[44px] items-center gap-1.5 rounded-sm px-3 py-2 tls-type-label"
           data-testid={`${testId}-pdf`}>
           <Download className="h-4 w-4" aria-hidden="true" /> PDF
         </a>
@@ -188,7 +188,7 @@ function Overall({ data }) {
   useEffect(() => { load(); }, [load]);
   useApiInvalidation(load, ["leagues"]);
   if (failed && !view) {
-    return <p className="mt-10 text-sm text-white/60" role="status" data-testid="overall-missing">Für diese Season gibt es keine Gesamtwertung.</p>;
+    return <p className="mt-10 tls-type-small text-white/60" role="status" data-testid="overall-missing">Für diese Season gibt es keine Gesamtwertung.</p>;
   }
   if (!view) return <div className="tls-league-skeleton mt-10" aria-busy="true" aria-label="Lade Gesamtwertung" />;
   const levels = view.levels || [];
@@ -196,8 +196,8 @@ function Overall({ data }) {
   return (
     <div className="mt-8" data-testid="overall">
       <div className="flex flex-wrap items-baseline justify-between gap-2">
-        <p className="text-sm text-white/70">
-          <span className="font-bold uppercase tracking-wider text-white">{view.period.name}</span>
+        <p className="tls-type-small text-white/70">
+          <span className="font-bold text-white">{view.period.name}</span>
           {" · "}{view.seasons.map((row) => row.name).join(", ") || "noch keine Season"}
         </p>
       </div>
@@ -212,7 +212,7 @@ function Overall({ data }) {
         </div>
       ) : null}
       {active ? <Level key={active.level} block={active} data={view} leagueSlug={leagueSlug} seasonSlug={seasonSlug} />
-        : <p className="mt-8 text-sm text-white/60" data-testid="overall-empty">Noch keine abgeschlossene Season – die Gesamtwertung beginnt mit dem ersten Endstand.</p>}
+        : <p className="mt-8 tls-type-body text-white/60" data-testid="overall-empty">Noch keine abgeschlossene Season – die Gesamtwertung beginnt mit dem ersten Endstand.</p>}
     </div>
   );
 }

@@ -226,18 +226,18 @@ export default function AdminGamePage() {
 
   return (
     <AdminLayout>
-      <Link to="/admin/games" data-testid="game-page-back" className="inline-flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider text-white/50 hover:text-[#29B6E8]">
+      <Link to="/admin/games" data-testid="game-page-back" className="inline-flex items-center gap-1.5 tls-type-label text-white/50 hover:text-[#29B6E8]">
         <ArrowLeft className="w-3.5 h-3.5" aria-hidden="true" /> Spiele
       </Link>
       {missing ? <p className="mt-6 text-white/60" data-testid="game-page-missing">{missing}</p> : null}
       {game ? (
         <>
           <div className="mt-3 mb-5 min-w-0">
-            <span className="text-[11px] font-bold uppercase tracking-[0.3em] text-[#29B6E8]">Spiele</span>
-            <h1 className="font-heading text-3xl md:text-4xl font-black uppercase mt-1 [overflow-wrap:anywhere]" data-testid="game-page-title">{gameLabel(game)}</h1>
-            <p className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-white/55">
+            <span className="tls-type-label text-[#29B6E8]">Spiele</span>
+            <h1 className="tls-type-title mt-1 [overflow-wrap:anywhere]" data-testid="game-page-title">{gameLabel(game)}</h1>
+            <p className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 tls-type-small text-white/55">
               <span>{gameKindLabel(game.kind)}</span>
-              {isArchivedGame(game) ? <span className="text-[11px] font-bold uppercase tracking-widest text-warn" data-testid="game-page-archived">Archiviert – beim Anlegen nicht zur Wahl</span> : null}
+              {isArchivedGame(game) ? <span className="tls-type-small font-bold text-warn" data-testid="game-page-archived">Archiviert – beim Anlegen nicht zur Wahl</span> : null}
             </p>
           </div>
           <AdminTabBar tabs={GAME_TABS} active={tab} dirty={dirty} onSelect={selectTab} idBase={idBase} label="Bereiche des Spiels" testPrefix="game" />

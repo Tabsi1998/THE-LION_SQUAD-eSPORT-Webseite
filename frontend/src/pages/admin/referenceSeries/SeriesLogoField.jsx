@@ -13,7 +13,7 @@ export function SeriesLogoField({ value, onChange, testId, hint, inherited = "" 
       <ImageUpload value={value} onChange={onChange} testId={testId} variant="square" endpoint="/uploads/logo" allowLibrary logo logoPreview={false} />
       <LogoSurfaces src={shown} testId={testId} />
       {!value && inherited && (
-        <p className="mt-1.5 text-xs text-white/55" data-testid={`${testId}-inherited`}>Vorschau zeigt das Logo der Spur.</p>
+        <p className="mt-1.5 tls-type-small text-white/55" data-testid={`${testId}-inherited`}>Vorschau zeigt das Logo der Spur.</p>
       )}
     </FieldLabel>
   );

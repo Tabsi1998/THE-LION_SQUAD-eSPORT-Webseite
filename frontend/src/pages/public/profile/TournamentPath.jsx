@@ -39,8 +39,8 @@ export function PathSteps({ path, testId }) {
           <li key={`${step.label}-${index}`} className="relative pl-6 pb-3" data-testid="tournament-path-step">
             <span className="absolute left-[5px] top-4 bottom-0 w-0.5 bg-white/10" aria-hidden="true" />
             <span className={`absolute left-0 top-1 w-3 h-3 rounded-full border-2 bg-[#0A0A0A] ${tone.dot}`} aria-hidden="true" />
-            <div className="font-bold text-sm">{step.label}</div>
-            <div className="text-xs text-white/55">
+            <div className="font-bold tls-type-small">{step.label}</div>
+            <div className="tls-type-small text-white/55">
               <span className={`font-bold tabular-nums ${tone.result}`}>{step.kind === "duel" && step.opponent === "Freilos" ? `${step.result || "weiter"} · Freilos` : step.result}</span>
               {step.kind === "duel" && step.opponent && step.opponent !== "Freilos" ? <span> gegen {step.opponent}</span> : null}
               {tone.word ? <span className="sr-only"> ({tone.word})</span> : null}
@@ -51,8 +51,8 @@ export function PathSteps({ path, testId }) {
       })}
       <li className="relative pl-6" data-testid="tournament-path-final">
         <span className="absolute left-0 top-1 w-3 h-3 rounded-full bg-white/80" aria-hidden="true" />
-        <div className="font-bold text-sm">{final.rank ? `${final.rank}. Platz${final.participant_count ? ` von ${final.participant_count}` : ""}` : "Teilgenommen"}</div>
-        <div className="text-xs text-white/45">{[path?.team_name, path?.date ? viennaDate(path.date) : null].filter(Boolean).join(" · ")}</div>
+        <div className="font-bold tls-type-small">{final.rank ? `${final.rank}. Platz${final.participant_count ? ` von ${final.participant_count}` : ""}` : "Teilgenommen"}</div>
+        <div className="tls-type-small text-white/45">{[path?.team_name, path?.date ? viennaDate(path.date) : null].filter(Boolean).join(" · ")}</div>
       </li>
     </ol>
   );
@@ -86,18 +86,18 @@ export function ReferenceWithPath({ item, username, own = false, publicView = fa
         type="button"
         onClick={toggle}
         aria-expanded={open}
-        className="mt-1 inline-flex items-center gap-1 text-[11px] font-bold uppercase tracking-widest text-[#29B6E8] hover:text-white"
+        className="mt-1 inline-flex items-center gap-1 tls-type-label text-[#29B6E8] hover:text-white"
         data-testid={`reference-path-toggle-${item.id}`}
       >
         <ChevronDown className={`w-3.5 h-3.5 transition-transform ${open ? "rotate-180" : ""}`} /> {open ? "Weg ausblenden" : own ? "Dein Weg" : "Weg ansehen"}
       </button>
       {open ? (
         <div className="mt-2 ml-1 border-l border-white/10 pl-4 py-2" data-testid={`tournament-path-${item.id}`}>
-          {state === "loading" ? <div className="text-xs text-white/40">Lade den Weg …</div> : null}
-          {state === "error" ? <div className="text-xs text-white/45">Für dieses Turnier gibt es keinen Weg zum Anzeigen.</div> : null}
+          {state === "loading" ? <div className="tls-type-small text-quiet">Lade den Weg …</div> : null}
+          {state === "error" ? <div className="tls-type-small text-white/45">Für dieses Turnier gibt es keinen Weg zum Anzeigen.</div> : null}
           {state === "ready" && path ? (
             <>
-              {path.steps?.length ? null : <p className="text-xs text-white/45 mb-2">Keine gewerteten Spiele – nur der Endplatz.</p>}
+              {path.steps?.length ? null : <p className="tls-type-small text-white/45 mb-2">Keine gewerteten Spiele – nur der Endplatz.</p>}
               <PathSteps path={path} testId={`tournament-path-steps-${item.id}`} />
               {own && path.share ? <div className="mt-3"><ResultShareButton options={path.share} testId={`reference-share-${item.id}`} /></div> : null}
             </>
@@ -139,15 +139,15 @@ export function RecordCard({ username, publicView = false }) {
   if (!rows.length) return null;
   return (
     <section className="border border-white/10 rounded-sm bg-[#121212] p-4" data-testid="profile-record">
-      <div className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-[0.3em] text-[#29B6E8]"><Swords className="w-3.5 h-3.5" /> Bilanz gegen</div>
+      <div className="flex items-center gap-2 tls-type-label text-[#29B6E8]"><Swords className="w-3.5 h-3.5" /> Bilanz gegen</div>
       <ul className="mt-3 space-y-3">
         {rows.map((row) => {
           const games = Math.max(1, row.games || row.wins + row.losses + (row.draws || 0));
           const to = row.kind === "team" ? (row.team_id ? `/teams/${row.team_id}` : null) : (row.username ? `/u/${encodeURIComponent(row.username)}` : null);
-          const name = <span className="font-semibold text-sm truncate block">{row.name}</span>;
+          const name = <span className="font-semibold tls-type-small truncate block">{row.name}</span>;
           return (
             <li key={row.key} className="grid grid-cols-[2rem_minmax(0,1fr)_auto] gap-3 items-center" aria-label={recordLabel(row)} data-testid={`profile-record-${row.key}`}>
-              <span className={`w-8 h-8 ${row.kind === "team" ? "rounded-sm" : "rounded-full"} border border-white/15 bg-white/5 flex items-center justify-center text-[11px] font-bold text-white/70`}>{row.tag ? String(row.tag).slice(0, 3).toUpperCase() : initials(row.name)}</span>
+              <span className={`tls-type-small w-8 h-8 ${row.kind === "team" ? "rounded-sm" : "rounded-full"} border border-white/15 bg-white/5 flex items-center justify-center font-bold text-white/70`}>{row.tag ? String(row.tag).slice(0, 3).toUpperCase() : initials(row.name)}</span>
               <div className="min-w-0">
                 {to ? <Link to={to} className="hover:text-[#29B6E8]">{name}</Link> : name}
                 <div className="mt-1 h-1.5 rounded-full overflow-hidden flex bg-white/15" aria-hidden="true">
@@ -155,7 +155,7 @@ export function RecordCard({ username, publicView = false }) {
                   <span className="bg-white/40" style={{ width: `${((row.draws || 0) / games) * 100}%` }} />
                 </div>
               </div>
-              <span className="font-heading font-bold tabular-nums text-sm" aria-hidden="true">
+              <span className="tls-type-small tls-type-num" aria-hidden="true">
                 <span className="text-[#29B6E8]">{row.wins}</span><span className="text-white/35"> : </span><span className="text-white/45">{row.losses}</span>
               </span>
             </li>

@@ -375,11 +375,11 @@ export function TournamentEditForm({ tournament, stages = [], onSaved, onRebuild
             <TextField label="Check-in endet" type="datetime-local" value={f.check_in_until} onChange={(v)=>set("check_in_until",v)} testId="tr-edit-checkin-until"/>
             {/* Planung prüfen (#1938): widersprüchliche Zeiten wie beim Anlegen - gespeichert wird trotzdem. */}
             {timeWarnings.length > 0 && (
-              <div className="rounded-sm border border-[#FFD700]/30 bg-[#FFD700]/5 p-4 text-sm text-[#FFD700]" role="status" data-testid="tr-edit-planning-warnings">
+              <div className="rounded-sm border border-[#FFD700]/30 bg-[#FFD700]/5 p-4 tls-type-small text-[#FFD700]" role="status" data-testid="tr-edit-planning-warnings">
                 <div className="flex items-start gap-3">
                   <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0" aria-hidden="true" />
                   <div className="space-y-1">
-                    <div className="text-[11px] font-bold uppercase tracking-widest">Planung prüfen</div>
+                    <div className="tls-type-label">Planung prüfen</div>
                     {timeWarnings.map((warning) => <div key={warning}>{warning}</div>)}
                   </div>
                 </div>
@@ -432,8 +432,8 @@ export function TournamentEditForm({ tournament, stages = [], onSaved, onRebuild
           {/* Spielwochen nur online und hybrid (#2111, T1) - vor Ort plant der Stationsplaner Runden an einem Tag. */}
           {show && rules.matchdays && (
             <div className="border border-[#29B6E8]/20 bg-[#29B6E8]/5 rounded-sm p-4 space-y-3" data-testid="tr-edit-matchdays">
-              <div className="text-[11px] font-bold uppercase tracking-widest text-[#29B6E8]">Spielwochen</div>
-              <p className="text-xs text-white/55">
+              <div className="tls-type-label text-[#29B6E8]">Spielwochen</div>
+              <p className="tls-type-small text-white/55">
                 Ein Spieltag ist ein Zeitraum, kein Zeitpunkt. Beide Seiten dürfen darin Termine vorschlagen;
                 was die Gegenseite annimmt, gilt. Schlägt nur die Heimseite vor, gilt ihre Zeit. Wählt niemand,
                 greift die Standardzeit unten.
@@ -518,18 +518,18 @@ export function TournamentEditForm({ tournament, stages = [], onSaved, onRebuild
           </FormSection>
           {CUSTOM_BRACKET_FORMATS.has(f.format) && (
             <div className="border border-[#29B6E8]/20 bg-[#29B6E8]/5 rounded-sm p-4 space-y-3">
-              <div className="text-[11px] font-bold uppercase tracking-widest text-[#29B6E8]">Freier Turnierbaum</div>
+              <div className="tls-type-label text-[#29B6E8]">Freier Turnierbaum</div>
               <FormGrid cols={3}>
                 {f.format === "ffa_custom_bracket" && <TextField label="Spielgröße" type="number" value={structure.match_size} onChange={(v)=>setStructureField("match_size", v)} testId="tr-edit-stage-size"
                   hint={presets.runSize ? <span data-testid="tr-edit-stage-size-source">vom Spiel: {presets.runSize} je Lauf {runWhere}</span> : null} />}
                 {f.format === "ffa_custom_bracket" && <TextField label="Qualifizierte" type="number" value={structure.qualifiers_per_match} onChange={(v)=>setStructureField("qualifiers_per_match", v)} testId="tr-edit-stage-qualifiers" />}
               </FormGrid>
               <label className="block">
-                <div className="text-[11px] font-bold uppercase tracking-widest text-white/60 mb-1.5">Schema</div>
+                <div className="tls-type-label text-white/60 mb-1.5">Schema</div>
                 <textarea value={structure.schema} onChange={(e)=>setStructureField("schema", e.target.value)} rows={12} className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-sm font-mono" data-testid="tr-edit-structure-schema" />
               </label>
               {f.format === "ffa_custom_bracket" && (
-                <p className="text-xs text-white/45" data-testid="tr-edit-structure-auto-hint">
+                <p className="tls-type-small text-white/45" data-testid="tr-edit-structure-auto-hint">
                   Leer lassen für die Automatik: Die Teilnehmer werden gleichmäßig auf Läufe bis zur Spielgröße verteilt
                   (nie ein Lauf mit nur einem Spieler), die Besten kommen Ebene für Ebene weiter, bis ein Finale von höchstens
                   Spielgröße übrig ist. Kleinere Läufe schicken anteilig weniger weiter.
@@ -554,7 +554,7 @@ export function TournamentEditForm({ tournament, stages = [], onSaved, onRebuild
               ))}
             </FormGrid>
           )}
-          {show && <p className="text-xs text-white/45">Ohne eigenes Bild zeigt die Website je Platz ein Banner aus Platz, Bilanz und Turniername. Ein Bild gilt für den jeweiligen Platz dieses Turniers und wandert bei einer Korrektur der Ergebnisse mit.</p>}
+          {show && <p className="tls-type-small text-white/45">Ohne eigenes Bild zeigt die Website je Platz ein Banner aus Platz, Bilanz und Turniername. Ein Bild gilt für den jeweiligen Platz dieses Turniers und wandert bei einer Korrektur der Ergebnisse mit.</p>}
           <Txt label="Beschreibung" value={f.description} onChange={(v)=>set("description",v)} testId="tr-edit-desc"/>
           {/* Den Regeltext einer Staffel pflegt die Season (Seitenleiste) - jedes Übertragen setzt ihn neu. */}
           {show && <Txt label="Regeln" value={f.rules} onChange={(v)=>set("rules",v)} testId="tr-edit-rules"/>}
@@ -566,7 +566,7 @@ export function TournamentEditForm({ tournament, stages = [], onSaved, onRebuild
           <Txt label="Preise" value={f.prize_pool} onChange={(v)=>set("prize_pool",v)} testId="tr-edit-prizes"/>
           <div className="border border-[#FFD700]/20 bg-[#FFD700]/5 rounded-sm p-3 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             {/* Erst ab „Beendet“ (#2123, TA23): vorher gäbe es Gewinne und „Gewinn vorgemerkt“ für einen Zwischenstand. */}
-            <p className="text-xs text-white/55" data-testid="tr-edit-create-prizes-hint">
+            <p className="tls-type-small text-white/55" data-testid="tr-edit-create-prizes-hint">
               {prizesFinished
                 ? "Erzeugt die Einträge für die Gewinnabholung aus der Rangfolge. Nach einer Korrektur kommen fehlende dazu; Gewinne, deren Platz nicht mehr stimmt, stehen unter „Gewinne“ zum Prüfen. Sonderpreise vergebt ihr dort von Hand."
                 : "Gewinne entstehen, sobald das Turnier beendet ist – vorher stünde nur ein Zwischenstand fest."}
@@ -576,7 +576,7 @@ export function TournamentEditForm({ tournament, stages = [], onSaved, onRebuild
               onClick={createPrizePickups}
               disabled={!prizesFinished || !((f.prize_places || []).length)}
               data-testid="tr-edit-create-prizes"
-              className="inline-flex items-center justify-center gap-2 rounded-sm border border-[#FFD700]/40 px-4 py-2 text-xs font-bold uppercase tracking-wider text-[#FFD700] hover:bg-[#FFD700]/10 disabled:opacity-50"
+              className="inline-flex items-center justify-center gap-2 rounded-sm border border-[#FFD700]/40 px-4 py-2 tls-type-label text-[#FFD700] hover:bg-[#FFD700]/10 disabled:opacity-50"
             >
               <RefreshCw className="h-4 w-4" />
               Gewinne erzeugen
@@ -587,7 +587,7 @@ export function TournamentEditForm({ tournament, stages = [], onSaved, onRebuild
         <FormSection title="Streaming und externe Links" collapsible accent="#9146FF">
           <FormGrid>
             {f.event_id ? (
-              <div className="text-sm text-white/70 self-end pb-2" data-testid="tr-edit-location-event">Ort: vom Event{f.location ? ` (${f.location})` : ""}</div>
+              <div className="tls-type-small text-white/70 self-end pb-2" data-testid="tr-edit-location-event">Ort: vom Event{f.location ? ` (${f.location})` : ""}</div>
             ) : (
               <TextField label="Ort" value={f.location} onChange={(v)=>set("location",v)} testId="tr-edit-location"/>
             )}
@@ -606,18 +606,18 @@ export function TournamentEditForm({ tournament, stages = [], onSaved, onRebuild
         </FormSection>
       </FormColumns>
       {hasFormChanges && (
-        <div className="mt-5 rounded-sm border border-[#FFD700]/30 bg-[#FFD700]/5 px-4 py-3 text-sm text-[#FFD700]" data-testid="tr-edit-unsaved">
+        <div className="mt-5 rounded-sm border border-[#FFD700]/30 bg-[#FFD700]/5 px-4 py-3 tls-type-small text-[#FFD700]" data-testid="tr-edit-unsaved">
           {staffel ? "Ungespeicherte Änderungen an der Staffel." : "Ungespeicherte Änderungen im Turnierformular."}
         </div>
       )}
       <FormActions onSubmitClick={() => save()} submitTestId="tr-edit-save" icon={null} hint={hasFormChanges ? "Ungespeicherte Änderungen" : undefined}>
         {staffel ? null : structureFixed ? (
           // Der Baum steht (#2120, TA17): „Struktur anwenden“ ersetzte hier alle echten Spiele samt Ergebnissen.
-          <span className="text-xs text-white/50 self-center" data-testid="tr-edit-structure-fixed">{FIXED_FIELD_HINT}</span>
+          <span className="tls-type-small text-white/50 self-center" data-testid="tr-edit-structure-fixed">{FIXED_FIELD_HINT}</span>
         ) : rules.structureRebuild ? (
           // Ohne Turnierbaum zum Vorausbauen (Schweizer System, Zeitfahren, Rennserie) endete der Knopf mit einem Fehler
           // (#2111, TA4).
-          <button onClick={() => save({ rebuildPreview: true })} type="button" data-testid="tr-edit-save-rebuild" className="px-5 py-2.5 border border-[#FFD700]/50 text-[#FFD700] text-xs font-bold uppercase tracking-wider rounded-sm hover:bg-[#FFD700]/10">
+          <button onClick={() => save({ rebuildPreview: true })} type="button" data-testid="tr-edit-save-rebuild" className="px-5 py-2.5 border border-[#FFD700]/50 text-[#FFD700] tls-type-label rounded-sm hover:bg-[#FFD700]/10">
             Speichern & Struktur anwenden
           </button>
         ) : null}
@@ -648,7 +648,7 @@ export function modeLabel(options, value) {
 export function SelectField({ label, value, onChange, options, testId }) {
   return (
     <label className="block">
-      <div className="text-[11px] font-bold uppercase tracking-widest text-white/60 mb-1.5">{label}</div>
+      <div className="tls-type-label text-white/60 mb-1.5">{label}</div>
       <select value={value || ""} onChange={(e) => onChange(e.target.value)} data-testid={testId} className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-white">
         {options.map(([v, l]) => <option key={v} value={v}>{l}</option>)}
       </select>
@@ -704,9 +704,9 @@ export function EmptyBracketNotice({ tournament }) {
   const { title, detail, action } = emptyBracketReason(tournament);
   return (
     <div className="text-center py-14 px-6 space-y-2">
-      <div className="text-white/60 font-display tracking-widest uppercase">{title}</div>
-      <p className="text-white/40 text-sm max-w-lg mx-auto">{detail}</p>
-      {action && <p className="text-[#29B6E8]/70 text-sm">{action}</p>}
+      <div className="text-white/60 tls-type-num">{title}</div>
+      <p className="text-quiet tls-type-small max-w-lg mx-auto">{detail}</p>
+      {action && <p className="text-[#29B6E8]/70 tls-type-small">{action}</p>}
     </div>
   );
 }
@@ -722,14 +722,14 @@ function RulePresetPicker({ form, onApply }) {
             key={preset.key}
             type="button"
             onClick={() => onApply(preset)}
-            className={`px-3 py-2 border rounded-sm text-xs uppercase tracking-wider font-bold ${activeKey === preset.key ? "border-[#29B6E8] bg-[#29B6E8]/10 text-[#29B6E8]" : "border-white/10 text-white/60 hover:text-white"}`}
+            className={`px-3 py-2 border rounded-sm tls-type-label ${activeKey === preset.key ? "border-[#29B6E8] bg-[#29B6E8]/10 text-[#29B6E8]" : "border-white/10 text-white/60 hover:text-white"}`}
           >
             {preset.label}
           </button>
         ))}
       </div>
-      <div className="mt-2 text-xs text-white/55">{ruleModeSummary(form)}</div>
-      {warnings.length > 0 && <div className="mt-2 text-xs text-[#FFD700]">{warnings.join(" ")}</div>}
+      <div className="mt-2 tls-type-small text-white/55">{ruleModeSummary(form)}</div>
+      {warnings.length > 0 && <div className="mt-2 tls-type-small text-[#FFD700]">{warnings.join(" ")}</div>}
     </div>
   );
 }
@@ -739,7 +739,7 @@ function SeasonWeightField({ value, onChange }) {
   const isPreset = TOURNAMENT_SEASON_WEIGHT_OPTIONS.some(([optionValue]) => optionValue === normalized);
   return (
     <label className="block md:col-span-3">
-      <div className="text-[11px] font-bold uppercase tracking-widest text-white/60 mb-1.5">Jahreswertung</div>
+      <div className="tls-type-label text-white/60 mb-1.5">Jahreswertung</div>
       <div className="grid sm:grid-cols-[1fr_120px] gap-2">
         <select value={isPreset ? normalized : "__custom"} onChange={(e) => onChange(e.target.value === "__custom" ? value : e.target.value)} className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-white">
           {TOURNAMENT_SEASON_WEIGHT_OPTIONS.map(([v, l]) => <option key={v} value={v}>{l}</option>)}
@@ -747,7 +747,7 @@ function SeasonWeightField({ value, onChange }) {
         </select>
         <input type="number" step="0.05" min="0" value={value ?? ""} onChange={(e)=>onChange(e.target.value)} data-testid="tr-edit-season-weight" className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-sm" aria-label="Jahreswertungs-Faktor" />
       </div>
-      <div className="text-[11px] text-white/40 mt-1.5">
+      <div className="tls-type-small text-quiet mt-1.5">
         Das hier bestimmt Major/Normal/Mini: Die Jahreswertung nimmt Platzierungs- oder Teilnahmepunkte und multipliziert sie mit diesem Faktor. 0 bedeutet: Dieses Turnier gibt keine Jahrespunkte.
       </div>
     </label>
@@ -764,7 +764,7 @@ function SeasonWeightField({ value, onChange }) {
 export function ActionGroup({ title, count, testId, children }) {
   return (
     <details className="group" data-testid={testId}>
-      <summary className="cursor-pointer list-none inline-flex items-center gap-2 rounded-sm border border-white/10 bg-[#121212] px-3 py-2 text-[10px] font-bold uppercase tracking-widest text-white/60 hover:border-[#29B6E8]/50 hover:text-white">
+      <summary className="cursor-pointer list-none inline-flex items-center gap-2 rounded-sm border border-white/10 bg-[#121212] px-3 py-2 tls-type-label text-white/60 hover:border-[#29B6E8]/50 hover:text-white">
         {title}
         <span className="text-white/35 tabular-nums">{count}</span>
         <span className="text-[#29B6E8] transition-transform group-open:rotate-90">→</span>

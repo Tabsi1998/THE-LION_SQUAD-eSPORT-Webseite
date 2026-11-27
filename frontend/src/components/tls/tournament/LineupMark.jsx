@@ -27,7 +27,7 @@ export function LineupMark({ info }) {
   if (!info) return null;
   const names = (rows) => rows.map((row) => row.name).join(", ");
   return (
-    <div className="mt-1 text-[11px] text-white/55" data-testid="admin-reg-lineup">
+    <div className="mt-1 tls-type-small text-white/55" data-testid="admin-reg-lineup">
       {info.lineup_set ? (
         <>
           <span className="text-white/75">Spielt: {names(info.starters)}</span>

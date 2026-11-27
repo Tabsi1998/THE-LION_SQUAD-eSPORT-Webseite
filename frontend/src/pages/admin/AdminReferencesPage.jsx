@@ -21,6 +21,7 @@ import { podiumItems, yearOf } from "@/lib/referencesOverview";
 import { bestPlacement } from "@/components/tls/references/referenceParts";
 import { seasonOf, seasonOptions } from "@/lib/seasonClose";
 import { anyPlacement, countKey, hasMoreDetails, lastReference, likeLastTime, quickDate, quickStatus } from "@/lib/referenceQuickEntry";
+import { ShortCaps } from "@/components/tls/ShortCaps";
 
 // Referenzen (#409): eine Referenz ist eine Turnierteilnahme des Vereins mit Einträgen - entweder
 // ein Team (Spieler treten gemeinsam an, eine Platzierung) oder mehrere Einzelstarter mit je
@@ -286,10 +287,10 @@ export default function AdminReferencesPage() {
     <AdminLayout>
       <div className="flex items-start justify-between gap-4 mb-6 flex-wrap">
         <div>
-          <span className="text-[11px] font-bold uppercase tracking-[0.3em] text-[#29B6E8]">Verein</span>
-          <h1 className="font-heading text-3xl md:text-4xl font-black uppercase mt-1">Referenzen</h1>
-          <p className="mt-2 text-white/60 text-sm max-w-xl">Turnierteilnahmen des Vereins: je Teilnahme ein Team oder mehrere Einzelstarter mit eigener Platzierung. Plattform, Format, Liga und Saison sind Felder – nicht mehr Teil des Titels.</p>
-          <p className="mt-3 border border-[#29B6E8]/30 bg-[#29B6E8]/5 rounded-sm px-4 py-3 text-sm text-white/75 max-w-xl" data-testid="reference-hint">
+          <span className="tls-type-label text-[#29B6E8]">Verein</span>
+          <h1 className="tls-type-title mt-1"><ShortCaps>Referenzen</ShortCaps></h1>
+          <p className="mt-2 text-white/60 tls-type-body max-w-xl">Turnierteilnahmen des Vereins: je Teilnahme ein Team oder mehrere Einzelstarter mit eigener Platzierung. Plattform, Format, Liga und Saison sind Felder – nicht mehr Teil des Titels.</p>
+          <p className="mt-3 border border-[#29B6E8]/30 bg-[#29B6E8]/5 rounded-sm px-4 py-3 tls-type-body text-white/75 max-w-xl" data-testid="reference-hint">
             Einzelne Turniere und Cups hier – Ligen und Saisons unter <Link to="/admin/reference-series" className="text-[#29B6E8] font-semibold underline-offset-2 hover:underline">Serien</Link>, deren Referenz entsteht beim Abschluss automatisch.
           </p>
         </div>
@@ -331,7 +332,7 @@ export default function AdminReferencesPage() {
               {REFERENCE_STATUS_FILTERS.map(([value, label]) => <option key={value} value={value}>{label}</option>)}
             </select>
           </div>
-          <div className="mt-2 text-xs text-white/45" data-testid="reference-filter-count">{filtered.length} von {items.length} Referenzen</div>
+          <div className="mt-2 tls-type-small text-white/45" data-testid="reference-filter-count">{filtered.length} von {items.length} Referenzen</div>
         </div>
       )}
 
@@ -340,7 +341,7 @@ export default function AdminReferencesPage() {
           <div key={item.id} className={`border border-white/10 rounded-sm bg-[#121212] p-4 ${item.is_active === false ? "opacity-70" : ""}`} data-testid={`reference-row-${item.id}`}>
             <div className="flex items-start justify-between gap-3">
               <div className="min-w-0">
-                <div className="flex items-center gap-2 text-[10px] uppercase tracking-widest text-white/45 font-bold flex-wrap">
+                <div className="flex items-center gap-2 tls-type-small text-white/45 font-bold flex-wrap">
                   <span>{item.game_name || item.game?.display_name || item.game?.name || "Spiel offen"}</span>
                   <span className={(item.status || "completed") === "active" ? "text-[#00D26A]" : (item.status || "completed") === "planned" ? "text-[#29B6E8]" : "text-white/45"}>{statusLabel[item.status || "completed"]}</span>
                   {item.medal && <span className="text-[#FFD700]">{medalLabel[item.medal]}</span>}
@@ -348,7 +349,7 @@ export default function AdminReferencesPage() {
                   {item.visibility !== "public" && <span className="text-[#29B6E8]">{visibilityLabel[item.visibility] || item.visibility}</span>}
                   {item.is_active === false && <span className="text-[#FF3B30]">Archiviert</span>}
                 </div>
-                <h2 className="mt-1 font-heading text-xl font-black uppercase leading-tight">{item.display_title || item.title}</h2>
+                <h2 className="mt-1 tls-type-section leading-tight">{item.display_title || item.title}</h2>
                 <div className="mt-1 flex flex-wrap gap-1.5">
                   {(item.platforms || []).map((platform) => <Chip key={platform}>{platform}</Chip>)}
                   {item.format && <Chip>{item.format}</Chip>}
@@ -357,7 +358,7 @@ export default function AdminReferencesPage() {
                   {item.organizer && <Chip muted>{item.organizer}</Chip>}
                   <SeasonBadge item={item} lineages={lineages} />
                 </div>
-                <ul className="mt-2 space-y-1 text-sm text-white/65">
+                <ul className="mt-2 space-y-1 tls-type-small text-white/65">
                   {(item.entries || []).map((entry) => (
                     <li key={entry.id} className="flex items-center gap-2">
                       {entry.kind === "solo" ? <User className="w-3.5 h-3.5 text-[#29B6E8] shrink-0" /> : <Users className="w-3.5 h-3.5 text-[#29B6E8] shrink-0" />}
@@ -393,9 +394,9 @@ export default function AdminReferencesPage() {
 
       {visible.pages > 1 && (
         <nav className="mt-4 flex items-center justify-between gap-3" aria-label="Seiten der Referenzliste" data-testid="reference-pages">
-          <button type="button" onClick={() => setPage(visible.page - 1)} disabled={visible.page <= 1} data-testid="reference-page-back" className="px-3 py-2 border border-white/15 rounded-sm text-xs font-bold uppercase tracking-wider text-white/70 hover:text-white disabled:opacity-40">Zurück</button>
-          <span className="text-xs text-white/55 tabular-nums" data-testid="reference-page-info">Seite {visible.page} von {visible.pages}</span>
-          <button type="button" onClick={() => setPage(visible.page + 1)} disabled={visible.page >= visible.pages} data-testid="reference-page-next" className="px-3 py-2 border border-white/15 rounded-sm text-xs font-bold uppercase tracking-wider text-white/70 hover:text-white disabled:opacity-40">Weiter</button>
+          <button type="button" onClick={() => setPage(visible.page - 1)} disabled={visible.page <= 1} data-testid="reference-page-back" className="px-3 py-2 border border-white/15 rounded-sm tls-type-label text-white/70 hover:text-white disabled:opacity-40">Zurück</button>
+          <span className="tls-type-small text-white/55 tabular-nums" data-testid="reference-page-info">Seite {visible.page} von {visible.pages}</span>
+          <button type="button" onClick={() => setPage(visible.page + 1)} disabled={visible.page >= visible.pages} data-testid="reference-page-next" className="px-3 py-2 border border-white/15 rounded-sm tls-type-label text-white/70 hover:text-white disabled:opacity-40">Weiter</button>
         </nav>
       )}
 
@@ -408,8 +409,8 @@ function Stat({ label, value, tone }) {
   const color = tone === "gold" ? "text-[#FFD700]" : tone === "bronze" ? "text-[#CD7F32]" : "text-[#29B6E8]";
   return (
     <div className="border border-white/10 rounded-sm bg-[#121212] p-4">
-      <div className="text-[10px] uppercase tracking-widest text-white/45 font-bold">{label}</div>
-      <div className={`mt-1 font-display text-3xl font-black ${color}`}>{value}</div>
+      <div className="tls-type-label text-white/45">{label}</div>
+      <div className={`mt-1 tls-type-title tls-type-num ${color}`}>{value}</div>
     </div>
   );
 }
@@ -419,14 +420,14 @@ function SeasonBadge({ item, lineages }) {
   const season = seasonOf(item, lineages);
   if (!season) return null;
   return (
-    <Link to={`/admin/reference-series/${season.seriesId}`} data-testid={`reference-season-${item.id}`} className="inline-flex items-center gap-1 px-2 py-0.5 border border-[#29B6E8]/30 bg-[#29B6E8]/10 hover:bg-[#29B6E8]/20 rounded-sm text-[10px] uppercase tracking-widest font-bold text-[#29B6E8]">
+    <Link to={`/admin/reference-series/${season.seriesId}`} data-testid={`reference-season-${item.id}`} className="inline-flex items-center gap-1 px-2 py-0.5 border border-[#29B6E8]/30 bg-[#29B6E8]/10 hover:bg-[#29B6E8]/20 rounded-sm tls-type-label text-[#29B6E8]">
       <Flag className="w-3 h-3" aria-hidden="true" /> aus Saison {season.label}
     </Link>
   );
 }
 
 function Chip({ children, muted = false }) {
-  return <span className={`px-2 py-0.5 border rounded-sm text-[10px] uppercase tracking-widest font-bold ${muted ? "border-white/10 text-white/40" : "border-[#29B6E8]/30 bg-[#29B6E8]/10 text-[#29B6E8]"}`}>{children}</span>;
+  return <span className={`px-2 py-0.5 border rounded-sm tls-type-label ${muted ? "border-white/10 text-quiet" : "border-[#29B6E8]/30 bg-[#29B6E8]/10 text-[#29B6E8]"}`}>{children}</span>;
 }
 
 function helpersToForm(helpers) {
@@ -495,11 +496,11 @@ function ReferenceHelperAdmin({ helpers, onSaved }) {
 
   return (
     <details className="mb-6 border border-white/10 bg-[#121212] rounded-sm">
-      <summary className="cursor-pointer px-4 py-3 text-sm font-bold uppercase tracking-wider text-white/75 hover:text-[#29B6E8]">
+      <summary className="cursor-pointer px-4 py-3 tls-type-label text-white/75 hover:text-[#29B6E8]">
         Vorschlagslisten verwalten
       </summary>
       <div className="border-t border-white/10 p-4 space-y-4">
-        <p className="text-sm text-white/55 max-w-3xl">
+        <p className="tls-type-body text-white/55 max-w-3xl">
           Was hier steht, erscheint als Vorschlag im Formular. Automatisch erkannte Werte aus gespeicherten Referenzen kommen dazu. Plattformen im Format <span className="font-mono text-white/80">Kürzel = Anzeige</span>, z.B. <span className="font-mono text-white/80">XBO = Xbox</span>.
         </p>
         <div className="grid md:grid-cols-2 xl:grid-cols-3 gap-3">
@@ -570,7 +571,7 @@ function ShowcaseAdmin({ items }) {
 function HelperTextArea({ label, value, onChange, rows = 5 }) {
   return (
     <label className="block">
-      <div className="text-[11px] font-bold uppercase tracking-widest text-white/60 mb-1.5">{label}</div>
+      <div className="tls-type-label text-white/60 mb-1.5">{label}</div>
       <textarea rows={rows} value={value || ""} onChange={(e) => onChange(e.target.value)} className={`${INPUT_CLASS} text-sm font-mono leading-relaxed`} />
     </label>
   );
@@ -615,19 +616,19 @@ function ReferenceCheckAdmin({ items, onEdit }) {
 
   return (
     <details className="mb-6 border border-white/10 bg-[#121212] rounded-sm" data-testid="reference-checks">
-      <summary className="cursor-pointer px-4 py-3 text-sm font-bold uppercase tracking-wider text-white/75 hover:text-[#29B6E8]">
+      <summary className="cursor-pointer px-4 py-3 tls-type-label text-white/75 hover:text-[#29B6E8]">
         Auffälligkeiten <span className={findings.length ? "text-warn" : "text-white/40"} data-testid="reference-checks-count">({findings.length})</span>
       </summary>
       <div className="border-t border-white/10 p-4 space-y-4">
-        <p className="text-sm text-white/55 max-w-3xl">
+        <p className="tls-type-body text-white/55 max-w-3xl">
           Beim Speichern wird geprüft, ob Datum und Platzierung zusammenpassen. Gespeichert wird trotzdem – hier stehen alle Referenzen mit Hinweis, auch alte. Geprüft: {data.checked ?? 0}.
         </p>
-        {findings.length === 0 && <div className="text-sm text-white/45" data-testid="reference-checks-empty">Keine Auffälligkeiten.</div>}
+        {findings.length === 0 && <div className="tls-type-small text-white/45" data-testid="reference-checks-empty">Keine Auffälligkeiten.</div>}
         <ul className="space-y-2">
           {findings.map((item) => (
             <li key={item.id} className="border border-white/10 bg-[#0A0A0A] rounded-sm p-3 flex items-start justify-between gap-3" data-testid={`reference-check-${item.id}`}>
               <div className="min-w-0">
-                <div className="font-semibold text-sm">{item.title || "Ohne Titel"}{item.start_date && <span className="ml-2 text-xs text-white/45">{formatDate(item.start_date)}</span>}</div>
+                <div className="font-semibold tls-type-small">{item.title || "Ohne Titel"}{item.start_date && <span className="ml-2 tls-type-small text-white/45">{formatDate(item.start_date)}</span>}</div>
                 <FieldWarnings messages={(item.warnings || []).map((warning) => warning.message)} />
               </div>
               <button type="button" onClick={() => onEdit(item.id)} data-testid={`reference-check-edit-${item.id}`} className="p-1.5 text-white/40 hover:text-[#29B6E8] shrink-0" aria-label="Referenz bearbeiten"><Pencil className="w-4 h-4" /></button>
@@ -648,7 +649,7 @@ function ReferenceCheckAdmin({ items, onEdit }) {
 
 function RefLink({ href, label }) {
   if (!href) return null;
-  return <a href={href} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-[10px] uppercase tracking-widest text-[#29B6E8] hover:underline">{label}<ExternalLink className="w-3 h-3" /></a>;
+  return <a href={href} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 tls-type-label text-[#29B6E8] hover:underline">{label}<ExternalLink className="w-3 h-3" /></a>;
 }
 
 function formToPayload(form) {
@@ -711,7 +712,7 @@ function FieldWarnings({ messages, testId }) {
   return (
     <div className="mt-1 space-y-0.5" role="status" data-testid={testId}>
       {messages.map((message) => (
-        <div key={message} className="flex items-start gap-1.5 text-xs text-warn">
+        <div key={message} className="flex items-start gap-1.5 tls-type-small text-warn">
           <AlertTriangle className="w-3.5 h-3.5 mt-px shrink-0" aria-hidden="true" />
           <span>{message}</span>
         </div>
@@ -802,14 +803,14 @@ function ReferenceForm({ reference, games, memberProfiles, partners = [], lineag
   return (
     <AdminSheet title={isNew ? "Neue Referenz" : "Referenz bearbeiten"} eyebrow="Verein" size="xl" onClose={onClose} onSubmit={save} saving={saving} submitTestId="reference-save" testId="reference-sheet">
       {season?.seasonEnd && (
-        <p className="border border-[#29B6E8]/30 bg-[#29B6E8]/5 rounded-sm px-3 py-2 text-sm text-white/75" data-testid="reference-season-end">
+        <p className="border border-[#29B6E8]/30 bg-[#29B6E8]/5 rounded-sm px-3 py-2 tls-type-body text-white/75" data-testid="reference-season-end">
           Referenz des Saisonabschlusses: Ihr Endplatz wird in der Saison gepflegt – <Link to={`/admin/reference-series/${season.seriesId}`} className="text-[#29B6E8] font-semibold underline-offset-2 hover:underline">zur Saison</Link>, dort „Saison abschließen“.
         </p>
       )}
 
       <FormSection title="Turnier" hint="Für ein Tagesturnier reicht, was hier steht. Veranstalter, Liga, Format und mehr unter „Weitere Angaben“.">
         {last && (
-          <button type="button" onClick={() => setForm((current) => likeLastTime(current, last))} data-testid="reference-like-last" className="w-full sm:w-auto inline-flex items-center gap-2 px-3 py-2 border border-[#29B6E8]/45 rounded-sm text-left text-xs font-bold text-[#29B6E8] hover:bg-[#29B6E8]/10">
+          <button type="button" onClick={() => setForm((current) => likeLastTime(current, last))} data-testid="reference-like-last" className="w-full sm:w-auto inline-flex items-center gap-2 px-3 py-2 border border-[#29B6E8]/45 rounded-sm text-left tls-type-small font-bold text-[#29B6E8] hover:bg-[#29B6E8]/10">
             <History className="w-3.5 h-3.5 shrink-0" aria-hidden="true" />
             <span className="min-w-0"><span className="uppercase tracking-wider">Wie letztes Mal</span> <span className="font-normal text-white/55 normal-case tracking-normal">– Spiel, Veranstalter und Team von „{last.display_title || last.title}“</span></span>
           </button>
@@ -824,7 +825,7 @@ function ReferenceForm({ reference, games, memberProfiles, partners = [], lineag
 
       <FormSection title="Wer und Platz" hint="Ein Team oder ein Spieler aus den Vereinsprofilen. Beides ist in derselben Teilnahme möglich.">
         {form.entries.length === 0 && (
-          <div className="border border-dashed border-white/15 rounded-sm p-4 text-sm text-white/45" data-testid="reference-entries-empty">Noch kein Eintrag – lege ein Team oder einen Einzelstarter an.</div>
+          <div className="border border-dashed border-white/15 rounded-sm p-4 tls-type-small text-white/45" data-testid="reference-entries-empty">Noch kein Eintrag – lege ein Team oder einen Einzelstarter an.</div>
         )}
         {form.entries.map((entry, index) => (
           <QuickEntry
@@ -839,8 +840,8 @@ function ReferenceForm({ reference, games, memberProfiles, partners = [], lineag
           />
         ))}
         <div className="flex flex-wrap gap-2">
-          <button type="button" onClick={() => addEntry("team")} data-testid="reference-add-team" className="inline-flex items-center gap-2 px-3 py-2 border border-[#29B6E8]/45 rounded-sm text-xs uppercase tracking-wider font-bold text-[#29B6E8] hover:bg-[#29B6E8]/10"><Users className="w-3.5 h-3.5" /> Team hinzufügen</button>
-          <button type="button" onClick={() => addEntry("solo")} data-testid="reference-add-solo" className="inline-flex items-center gap-2 px-3 py-2 border border-[#29B6E8]/45 rounded-sm text-xs uppercase tracking-wider font-bold text-[#29B6E8] hover:bg-[#29B6E8]/10"><User className="w-3.5 h-3.5" /> Einzelstarter hinzufügen</button>
+          <button type="button" onClick={() => addEntry("team")} data-testid="reference-add-team" className="inline-flex items-center gap-2 px-3 py-2 border border-[#29B6E8]/45 rounded-sm tls-type-label text-[#29B6E8] hover:bg-[#29B6E8]/10"><Users className="w-3.5 h-3.5" /> Team hinzufügen</button>
+          <button type="button" onClick={() => addEntry("solo")} data-testid="reference-add-solo" className="inline-flex items-center gap-2 px-3 py-2 border border-[#29B6E8]/45 rounded-sm tls-type-label text-[#29B6E8] hover:bg-[#29B6E8]/10"><User className="w-3.5 h-3.5" /> Einzelstarter hinzufügen</button>
         </div>
       </FormSection>
 
@@ -869,7 +870,7 @@ function ReferenceForm({ reference, games, memberProfiles, partners = [], lineag
                   type="button"
                   onClick={() => togglePlatform(platform.key)}
                   data-testid={`reference-platform-${platform.key}`}
-                  className={`px-2.5 py-1 border rounded-sm text-[11px] font-bold uppercase tracking-wider ${form.platforms.includes(platform.key) ? "border-[#29B6E8] bg-[#29B6E8]/15 text-[#29B6E8]" : "border-white/10 bg-[#121212] text-white/60 hover:border-white/30"}`}
+                  className={`px-2.5 py-1 border rounded-sm tls-type-label ${form.platforms.includes(platform.key) ? "border-[#29B6E8] bg-[#29B6E8]/15 text-[#29B6E8]" : "border-white/10 bg-[#121212] text-white/60 hover:border-white/30"}`}
                 >
                   {platform.label}
                 </button>
@@ -881,7 +882,7 @@ function ReferenceForm({ reference, games, memberProfiles, partners = [], lineag
                 onBlur={addPlatform}
                 placeholder="Weitere …"
                 data-testid="reference-platform-input"
-                className="bg-[#0A0A0A] border border-white/10 focus:border-[#29B6E8] px-2.5 py-1 rounded-sm text-[11px] text-white focus:outline-none w-28"
+                className="bg-[#0A0A0A] border border-white/10 focus:border-[#29B6E8] px-2.5 py-1 rounded-sm tls-type-small text-white focus:outline-none w-28"
               />
             </div>
           </FieldLabel>
@@ -946,7 +947,7 @@ function QuickEntry({ entry, index, profiles, suggestions, onChange, onRemove, w
   return (
     <div className="border border-white/10 bg-[#0A0A0A] rounded-sm p-4 space-y-3" data-testid={`reference-entry-${index}`}>
       <div className="flex items-start justify-between gap-3">
-        <div className="flex items-center gap-2 text-[11px] font-bold uppercase tracking-widest text-[#29B6E8]">
+        <div className="flex items-center gap-2 tls-type-label text-[#29B6E8]">
           {isSolo ? <User className="w-3.5 h-3.5" /> : <Users className="w-3.5 h-3.5" />} Eintrag {index + 1} · {isSolo ? "Einzelstarter" : "Team"}
         </div>
         <button type="button" onClick={onRemove} aria-label="Eintrag entfernen" data-testid={`reference-entry-${index}-remove`} className="p-1 text-white/40 hover:text-[#FF3B30]"><Trash2 className="w-4 h-4" /></button>
@@ -980,7 +981,7 @@ function EntryDetails({ entry, index, suggestions, onChange }) {
   const who = isSolo ? "Einzelstarter" : (entry.team_name || "Team");
   return (
     <div className="border border-white/10 bg-[#0A0A0A] rounded-sm p-3 space-y-3" data-testid={`reference-entry-${index}-details`}>
-      <div className="text-[11px] font-bold uppercase tracking-widest text-white/55">Eintrag {index + 1} · {who}</div>
+      <div className="tls-type-label text-white/55">Eintrag {index + 1} · {who}</div>
       <TextField label={isSolo ? "Externer Spieler (falls kein Vereinsprofil)" : "Weitere externe Spieler"} value={entry.lineup_text} onChange={(v) => onChange({ lineup_text: v })} placeholder={isSolo ? "Name" : "Name 1, Name 2, Name 3"} testId={`reference-entry-${index}-lineup`} />
       <FormGrid>
         <TextField label="Bezeichnung der Platzierung" value={entry.placement_label} onChange={(v) => onChange({ placement_label: v })} placeholder="z.B. Podium" suggestions={suggestions.placementLabels} testId={`reference-entry-${index}-label`} />
@@ -1000,25 +1001,25 @@ function MemberPicker({ profiles, selectedIds, frozenMembers, onToggle, single =
     <div className="border border-white/10 bg-[#121212] rounded-sm p-3">
       <div className="flex items-start justify-between gap-3 mb-3">
         <div>
-          <div className="text-[11px] font-bold uppercase tracking-widest text-white/60">Vereinsspieler</div>
-          <div className="text-xs text-white/45 mt-1">{single ? "Eine Person." : "Mehrfachauswahl."} Namen werden beim Speichern eingefroren, damit alte Referenzen erhalten bleiben.</div>
+          <div className="tls-type-label text-white/60">Vereinsspieler</div>
+          <div className="tls-type-small text-white/45 mt-1">{single ? "Eine Person." : "Mehrfachauswahl."} Namen werden beim Speichern eingefroren, damit alte Referenzen erhalten bleiben.</div>
         </div>
-        <div className="text-xs text-[#29B6E8] font-bold">{selected.size} ausgewählt</div>
+        <div className="tls-type-small text-[#29B6E8] font-bold">{selected.size} ausgewählt</div>
       </div>
       <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-2 max-h-48 overflow-y-auto pr-1">
         {sorted.map((profile) => (
-          <label key={profile.id} className={`flex items-center gap-2 border rounded-sm px-3 py-2 text-sm cursor-pointer ${selected.has(profile.id) ? "border-[#29B6E8]/60 bg-[#29B6E8]/10 text-white" : "border-white/10 bg-[#0A0A0A] text-white/65 hover:border-white/25"}`}>
+          <label key={profile.id} className={`flex items-center gap-2 border rounded-sm px-3 py-2 tls-type-small cursor-pointer ${selected.has(profile.id) ? "border-[#29B6E8]/60 bg-[#29B6E8]/10 text-white" : "border-white/10 bg-[#0A0A0A] text-white/65 hover:border-white/25"}`}>
             <input type={single ? "radio" : "checkbox"} checked={selected.has(profile.id)} onChange={() => onToggle(profile.id)} onClick={single && selected.has(profile.id) ? () => onToggle(profile.id) : undefined} data-testid={`${testIdPrefix}-member-${profile.id}`} className="accent-[#29B6E8]" />
             <span className="min-w-0">
               <span className="block tls-wrap font-semibold">{memberName(profile)}</span>
-              {profile.is_active === false && <span className="block text-[10px] uppercase tracking-widest text-[#FFD700]">inaktiv</span>}
+              {profile.is_active === false && <span className="block tls-type-label text-[#FFD700]">inaktiv</span>}
             </span>
           </label>
         ))}
-        {sorted.length === 0 && <div className="text-sm text-white/40">Keine Vereinsprofile vorhanden.</div>}
+        {sorted.length === 0 && <div className="tls-type-small text-quiet">Keine Vereinsprofile vorhanden.</div>}
       </div>
       {missing.length > 0 && (
-        <div className="mt-3 text-xs text-white/45">
+        <div className="mt-3 tls-type-small text-white/45">
           Gespeicherte ehemalige Profile: {missing.map((member) => member.display_name || member.profile_id).join(", ")}
         </div>
       )}

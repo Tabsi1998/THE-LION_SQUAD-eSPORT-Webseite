@@ -92,14 +92,14 @@ export function LiveStreamSlider() {
                 <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-[#FF3B30] opacity-75" />
                 <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-[#FF3B30]" />
               </span>
-              <span className="text-[11px] font-bold uppercase tracking-[0.3em] text-[#FF3B30]">Live aus dem Rudel</span>
+              <span className="tls-type-label text-[#FF3B30]">Live aus dem Rudel</span>
               <Radio className="h-4 w-4 text-[#9146FF]" />
             </div>
-            <h2 className="mt-2 font-display text-3xl font-black uppercase tracking-normal text-white sm:text-5xl">
+            <h2 className="mt-2 tls-type-section text-white">
               {memberName} ist live
             </h2>
           </div>
-          <div className="flex flex-wrap items-center gap-3 text-[11px] font-bold uppercase tracking-widest text-white/55">
+          <div className="flex flex-wrap items-center gap-3 tls-type-label text-white/55">
             <span className="inline-flex items-center gap-1.5">
               <Users className="h-3.5 w-3.5 text-[#29B6E8]" />
               {(activeStream.viewer_count || 0).toLocaleString("de-DE")} Zuschauer
@@ -140,7 +140,7 @@ export function LiveStreamSlider() {
             )}
             <div className="border-t border-white/10 bg-[#101010] p-4">
               <div className="line-clamp-2 font-semibold text-white" title={activeStream.title || undefined}>{activeStream.title || "Live-Stream"}</div>
-              <div className="mt-2 flex flex-wrap items-center gap-2 text-[11px] font-bold uppercase tracking-widest">
+              <div className="mt-2 flex flex-wrap items-center gap-2 tls-type-small font-bold">
                 {activeStream.game_name && <span className="text-[#9146FF]">{activeStream.game_name}</span>}
                 {memberHref && (
                   <Link to={memberHref} className="text-[#29B6E8] hover:text-white">
@@ -159,7 +159,7 @@ export function LiveStreamSlider() {
           <div className="flex min-h-[380px] flex-col overflow-hidden border border-[#9146FF]/35 bg-[#0A0A0A]">
             <div className="flex items-center gap-2 border-b border-white/10 px-4 py-3">
               <MessageSquareText className="h-4 w-4 text-[#9146FF]" />
-              <span className="font-display text-sm font-black uppercase tracking-widest text-white">Live-Chat</span>
+              <span className="tls-type-label text-white">Live-Chat</span>
             </div>
             {canEmbed ? (
               <iframe
@@ -169,7 +169,7 @@ export function LiveStreamSlider() {
                 title={`Twitch Chat von ${displayName}`}
               />
             ) : (
-              <div className="flex h-[360px] items-center justify-center px-5 text-center text-sm text-white/55">
+              <div className="flex h-[360px] items-center justify-center px-5 text-center tls-type-small text-white/55">
                 Der Chat wird nach Zustimmung für externe Medien geladen.
               </div>
             )}
@@ -190,9 +190,9 @@ export function LiveStreamSlider() {
                     isActive ? "border-[#9146FF] bg-[#9146FF]/15" : "border-white/10 bg-[#121212] hover:border-[#9146FF]/50"
                   }`}
                 >
-                  <div className="text-sm font-bold text-white">{stream.member_profile?.gamertag || stream.display_name || stream.username}</div>
-                  <div className="mt-1 truncate text-xs text-white/50" title={stream.title || undefined}>{stream.title || "Live-Stream"}</div>
-                  <div className="mt-2 text-[10px] font-bold uppercase tracking-widest text-[#FF3B30]">Live</div>
+                  <div className="tls-type-small font-bold text-white">{stream.member_profile?.gamertag || stream.display_name || stream.username}</div>
+                  <div className="mt-1 truncate tls-type-small text-white/50" title={stream.title || undefined}>{stream.title || "Live-Stream"}</div>
+                  <div className="mt-2 tls-type-label text-[#FF3B30]">Live</div>
                 </button>
               );
             })}

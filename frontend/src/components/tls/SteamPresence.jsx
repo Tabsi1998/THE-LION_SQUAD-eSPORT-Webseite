@@ -19,7 +19,7 @@ export function SteamPresence({ data }) {
   const canJoin = data.me?.linked && !data.me?.opted_in;
   return (
     <div className="space-y-3" data-testid="steam-presence">
-      <div className="text-sm text-white/70" data-testid="steam-presence-summary">{steamSummary(data)}</div>
+      <div className="tls-type-small text-white/70" data-testid="steam-presence-summary">{steamSummary(data)}</div>
       {players.length > 0 && (
         <div className="space-y-2">
           {players.map((player) => (
@@ -29,7 +29,7 @@ export function SteamPresence({ data }) {
               </span>
               <span className="min-w-0">
                 <span className="block font-bold text-white truncate group-hover:text-[#29B6E8] transition">{player.display_name || player.username}</span>
-                <span className={`block text-xs truncate ${player.state === "playing" ? "text-[#66c0f4]" : "text-white/45"}`}>
+                <span className={`block tls-type-small truncate ${player.state === "playing" ? "text-[#66c0f4]" : "text-white/45"}`}>
                   {player.state === "playing" && <Gamepad2 className="inline w-3 h-3 mr-1 -mt-0.5" />}{player.state_text}
                 </span>
               </span>
@@ -38,7 +38,7 @@ export function SteamPresence({ data }) {
         </div>
       )}
       {canJoin && (
-        <div className="text-xs text-white/45" data-testid="steam-presence-join">
+        <div className="tls-type-small text-white/45" data-testid="steam-presence-join">
           Auch dabei sein: <Link to="/mein-bereich/profil?tab=socials" className="text-[#29B6E8] hover:underline">Mein Bereich → Profil → Socials → „Meinen Steam-Status im Mitgliederbereich zeigen“</Link>.
         </div>
       )}

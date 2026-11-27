@@ -10,8 +10,8 @@ export function SwitchRow({ label, description, hint, checked, onCheckedChange, 
     >
       <div className="min-w-0">
         <div className="font-bold text-white">{label}</div>
-        {description ? <div className="text-sm text-white/60 mt-1">{description}</div> : null}
-        {hint ? <div className="text-[11px] text-[#FFD700] mt-1">{hint}</div> : null}
+        {description ? <div className="tls-type-small text-white/60 mt-1">{description}</div> : null}
+        {hint ? <div className="tls-type-small text-[#FFD700] mt-1">{hint}</div> : null}
       </div>
       <ProfileSwitch label={label} checked={checked} onCheckedChange={onCheckedChange} disabled={disabled} testId={testId} className="mt-1" />
     </div>
@@ -55,7 +55,7 @@ export function AutosaveStatus({ status, message, onRetry, testId = "profile-aut
   }[status] || "";
   const tone = status === "error" || status === "invalid" ? "text-warn" : status === "saved" ? "text-ok" : "text-white/50";
   return (
-    <div role="status" aria-live="polite" data-testid={testId} data-status={status} className={`flex flex-wrap items-center gap-2 text-xs ${tone}`}>
+    <div role="status" aria-live="polite" data-testid={testId} data-status={status} className={`flex flex-wrap items-center gap-2 tls-type-small ${tone}`}>
       <span>{text}</span>
       {status === "error" && message ? <span className="text-white/60">{message}</span> : null}
       {status === "error" && onRetry ? (

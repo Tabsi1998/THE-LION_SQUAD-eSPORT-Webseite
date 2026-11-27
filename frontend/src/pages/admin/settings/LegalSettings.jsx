@@ -59,17 +59,17 @@ export function LegalTab({ brand, setBrandField, setCanonicalLegalText, saveBran
     <div className="max-w-4xl space-y-4">
       <div className="border border-white/10 bg-[#121212] rounded-sm p-5 space-y-5">
         <div>
-          <div className="font-heading font-bold uppercase">Vereinsdaten für Impressum und Datenschutz</div>
-          <p className="text-xs text-white/50 mt-1">Dies ist die zentrale Datenquelle für /contact, /imprint und /privacy. ZVR, Adresse, Kontakt und vertretungsbefugte Person bitte ausschließlich hier mit den echten Vereinsdaten pflegen – oder aus Dolibarr übernehmen.</p>
+          <div className="font-bold">Vereinsdaten für Impressum und Datenschutz</div>
+          <p className="tls-type-small text-white/50 mt-1">Dies ist die zentrale Datenquelle für /contact, /imprint und /privacy. ZVR, Adresse, Kontakt und vertretungsbefugte Person bitte ausschließlich hier mit den echten Vereinsdaten pflegen – oder aus Dolibarr übernehmen.</p>
         </div>
         {/* Vereinsdaten aus Dolibarr (#326): Name, ZVR, Behörde, Anschrift, Telefon, Obmann/Obfrau – Redaktionelles bleibt von Hand. */}
         <div className={`border rounded-sm p-4 space-y-2 ${legalFromDolibarr ? "border-[#29B6E8]/40 bg-[#29B6E8]/5" : "border-white/10"}`} data-testid="legal-dolibarr">
-          <div className="flex flex-wrap items-center justify-between gap-2 text-sm text-white/80 font-bold">
+          <div className="flex flex-wrap items-center justify-between gap-2 tls-type-small text-white/80 font-bold">
             <span data-testid="legal-dolibarr-title">{legalFromDolibarr ? "Vereinsdaten kommen aus Dolibarr" : "Vereinsdaten von Hand"}</span>
-            <Link to="/admin/dolibarr?tab=features" className="text-[11px] uppercase tracking-wider text-[#29B6E8] hover:underline font-bold" data-testid="legal-dolibarr-features">Schalter: Dolibarr → Funktionen →</Link>
+            <Link to="/admin/dolibarr?tab=features" className="tls-type-small text-[#29B6E8] hover:underline font-bold" data-testid="legal-dolibarr-features">Schalter: Dolibarr → Funktionen →</Link>
           </div>
-          <p className="text-xs text-white/50">Name, ZVR, Vereinsbehörde, Anschrift, Telefon und die vertretungsbefugte Person kommen dann aus dem Vereinsmodul (stündlich nachgelesen). Datenschutz-E-Mail, inhaltlich Verantwortlicher, Hosting, UID und Zusatztexte bleiben hier. Ändert sich der Obmann in Dolibarr, stimmt das Impressum von selbst – wenn die Person der Nennung zugestimmt hat; sonst bleibt der Eintrag von Hand.</p>
-          <div className="flex flex-wrap items-center gap-3 text-xs" data-testid="legal-dolibarr-state">
+          <p className="tls-type-small text-white/50">Name, ZVR, Vereinsbehörde, Anschrift, Telefon und die vertretungsbefugte Person kommen dann aus dem Vereinsmodul (stündlich nachgelesen). Datenschutz-E-Mail, inhaltlich Verantwortlicher, Hosting, UID und Zusatztexte bleiben hier. Ändert sich der Obmann in Dolibarr, stimmt das Impressum von selbst – wenn die Person der Nennung zugestimmt hat; sonst bleibt der Eintrag von Hand.</p>
+          <div className="flex flex-wrap items-center gap-3 tls-type-small" data-testid="legal-dolibarr-state">
             {!dolibarrPublic ? <span className="text-white/40">Lade Stand …</span>
               : dolibarrPublic.unavailable ? <span className="text-[#FFD700]">Dolibarr-Stand nicht abrufbar (Anbindung fehlt oder kein Zugriff).</span>
               : !dolibarrPublic.has_data ? <span className="text-[#FFD700]">Noch nichts aus Dolibarr gelesen – „Jetzt nachlesen“ oder auf den stündlichen Abgleich warten.</span>
@@ -81,7 +81,7 @@ export function LegalTab({ brand, setBrandField, setCanonicalLegalText, saveBran
                   {dolibarrPublic.error && <span className="text-[#FF3B30]">Letzter Abgleich fehlgeschlagen ({dolibarrPublic.error_text || dolibarrPublic.error}) – alter Stand bleibt.</span>}
                 </>
               )}
-            <button type="button" onClick={refreshDolibarrPublic} disabled={dolibarrPublicBusy || dolibarrPublic?.unavailable} data-testid="legal-dolibarr-refresh" className="px-3 py-1 border border-white/20 text-white/80 rounded-sm text-[11px] font-bold uppercase tracking-wider disabled:opacity-40">Jetzt nachlesen</button>
+            <button type="button" onClick={refreshDolibarrPublic} disabled={dolibarrPublicBusy || dolibarrPublic?.unavailable} data-testid="legal-dolibarr-refresh" className="px-3 py-1 border border-white/20 text-white/80 rounded-sm tls-type-label disabled:opacity-40">Jetzt nachlesen</button>
           </div>
         </div>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -112,9 +112,9 @@ export function LegalTab({ brand, setBrandField, setCanonicalLegalText, saveBran
           <BrandField label="UID-Nummer falls vorhanden" value={brand.vat_number} onChange={(v) => setBrandField("vat_number", v)} testId="legal-vat" {...systemOnly} />
           <BrandField label="Turnierbedingungen URL" value={brand.tournament_terms_url} onChange={(v) => setBrandField("tournament_terms_url", v)} testId="legal-terms-url" {...systemOnly} />
         </div>
-        <label className="flex items-start gap-2 text-sm text-white/75">
+        <label className="flex items-start gap-2 tls-type-small text-white/75">
           <input type="checkbox" checked={!!brand.paid_tournaments_enabled} onChange={(e) => setBrandField("paid_tournaments_enabled", e.target.checked)} disabled={clubOnly} data-testid="legal-paid-tournaments" className="accent-[#29B6E8] mt-1" />
-          <span>Preisturniere oder Turniere mit Startgeld können stattfinden.{clubOnly ? <span className="ml-2 text-xs text-[#29B6E8]">ändert System</span> : null}</span>
+          <span>Preisturniere oder Turniere mit Startgeld können stattfinden.{clubOnly ? <span className="ml-2 tls-type-small text-[#29B6E8]">ändert System</span> : null}</span>
         </label>
         <LegalTextArea label="Zusätzliche rechtliche Hinweise (optional)" value={mergedLegacyText(brand.legal_extra, brand.imprint)} onChange={(v) => setCanonicalLegalText("legal_extra", "imprint", v)} testId="legal-extra" rows={5} {...systemOnly} />
         <LegalTextArea label="Zusätzliche Datenschutzhinweise (optional)" value={mergedLegacyText(brand.privacy_extra, brand.privacy_policy)} onChange={(v) => setCanonicalLegalText("privacy_extra", "privacy_policy", v)} testId="privacy-extra" rows={6} {...systemOnly} />

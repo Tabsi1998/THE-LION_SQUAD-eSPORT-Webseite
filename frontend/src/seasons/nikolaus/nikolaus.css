@@ -19,8 +19,8 @@
 .tls-nikolaus-widget-card .tls-nikolaus-card::after { top: -7px; bottom: auto; left: 1.4rem; right: auto; transform: rotate(-135deg); }
 .tls-nikolaus-menu { display: grid; grid-template-columns: 2.4rem 1fr; grid-template-rows: auto auto; column-gap: 0.75rem; align-items: center; width: 100%; padding: 0.45rem 0.75rem; border-radius: 0.4rem; background: rgba(214, 69, 65, 0.1); border: 1px solid rgba(255, 200, 87, 0.3); color: #fbe9d0; text-align: left; cursor: pointer; }
 .tls-nikolaus-menu__boot { grid-row: 1 / span 2; display: flex; justify-content: center; }
-.tls-nikolaus-menu__title { grid-column: 2; grid-row: 1; font-size: 0.8rem; font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase; color: #ffc857; }
-.tls-nikolaus-menu__text { grid-column: 2; grid-row: 2; font-size: 0.8rem; color: rgba(251, 233, 208, 0.8); }
+.tls-nikolaus-menu__title { grid-column: 2; grid-row: 1; font-size: var(--tls-type-label-size); font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase; color: #ffc857; }
+.tls-nikolaus-menu__text { grid-column: 2; grid-row: 2; font-size: var(--tls-type-small-size); color: rgba(251, 233, 208, 0.8); }
 
 .tls-nikolaus-boot { display: block; padding: 0; margin: 0; border: 0; background: none; line-height: 0; cursor: pointer; transform-origin: 60% 100%; animation: tls-nikolaus-idle 9s ease-in-out 3s infinite; }
 .tls-nikolaus-boot:hover { filter: drop-shadow(0 0 8px rgba(255, 200, 140, 0.35)); }
@@ -63,10 +63,10 @@
   100% { transform: scale(1) rotate(0deg); opacity: 1; }
 }
 .tls-nikolaus-card__body { min-width: 0; }
-.tls-nikolaus-card__title { font-size: 0.68rem; letter-spacing: 0.18em; text-transform: uppercase; color: #ffc857; }
+.tls-nikolaus-card__title { font-size: var(--tls-type-label-size); letter-spacing: 0.18em; text-transform: uppercase; color: #ffc857; }
 .tls-nikolaus-card__name { margin-top: 0.1rem; font-size: 1.05rem; font-weight: 700; }
-.tls-nikolaus-card__text { margin: 0.15rem 0 0; font-size: 0.85rem; line-height: 1.35; color: rgba(255, 244, 230, 0.85); }
-.tls-nikolaus-card__link { display: inline-block; margin-top: 0.35rem; font-size: 0.85rem; font-weight: 700; color: #29B6E8; text-decoration: underline; }
+.tls-nikolaus-card__text { margin: 0.15rem 0 0; font-size: var(--tls-type-small-size); line-height: 1.35; color: rgba(255, 244, 230, 0.85); }
+.tls-nikolaus-card__link { display: inline-block; margin-top: 0.35rem; font-size: var(--tls-type-small-size); font-weight: 700; color: #29B6E8; text-decoration: underline; }
 .tls-nikolaus-card__close { position: absolute; top: 0.35rem; right: 0.4rem; width: 1.7rem; height: 1.7rem; border: 0; border-radius: 50%; background: rgba(255, 255, 255, 0.06); color: #fff4e6; font-size: 1.05rem; line-height: 1; cursor: pointer; }
 .tls-nikolaus-card__close:hover { background: rgba(255, 255, 255, 0.14); }
 .tls-nikolaus-card__close:focus-visible { outline: 2px solid #ffc857; outline-offset: 2px; }
@@ -78,13 +78,13 @@
   0% { opacity: 0; transform: translate(-50%, 14px); }
   100% { opacity: 1; transform: translate(-50%, 0); }
 }
-.tls-nikolaus-hint__title { font-size: 0.7rem; letter-spacing: 0.18em; text-transform: uppercase; color: #ffc857; }
+.tls-nikolaus-hint__title { font-size: var(--tls-type-label-size); letter-spacing: 0.18em; text-transform: uppercase; color: #ffc857; }
 .tls-nikolaus-hint__text { margin: 0.15rem 0 0; font-size: 0.92rem; line-height: 1.35; }
 .tls-nikolaus-hint__actions { display: flex; align-items: center; gap: 0.9rem; margin-top: 0.45rem; }
-.tls-nikolaus-hint__button { padding: 0.3rem 0.8rem; border: 0; border-radius: 999px; background: #d4282c; color: #fff; font-size: 0.82rem; font-weight: 700; cursor: pointer; }
+.tls-nikolaus-hint__button { padding: 0.3rem 0.8rem; border: 0; border-radius: 999px; background: #d4282c; color: #fff; font-size: var(--tls-type-small-size); font-weight: 700; cursor: pointer; }
 .tls-nikolaus-hint__button:hover { background: #e2363a; }
 .tls-nikolaus-hint__button:focus-visible, .tls-nikolaus-hint__close:focus-visible { outline: 2px solid #ffc857; outline-offset: 2px; }
-.tls-nikolaus-hint__link { font-size: 0.82rem; font-weight: 700; color: #29B6E8; text-decoration: underline; }
+.tls-nikolaus-hint__link { font-size: var(--tls-type-small-size); font-weight: 700; color: #29B6E8; text-decoration: underline; }
 .tls-nikolaus-hint__close { position: absolute; top: 0.35rem; right: 0.4rem; width: 1.7rem; height: 1.7rem; border: 0; border-radius: 50%; background: rgba(255, 255, 255, 0.06); color: #fff4e6; font-size: 1.05rem; line-height: 1; cursor: pointer; }
 
 @media (prefers-reduced-motion: reduce) {

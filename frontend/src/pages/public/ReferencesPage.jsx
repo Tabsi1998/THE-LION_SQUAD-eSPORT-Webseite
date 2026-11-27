@@ -141,7 +141,7 @@ export function ReferenceDetailPage() {
         {cover && <img src={resolveMediaUrl(cover)} alt="" className="absolute inset-0 w-full h-full object-cover opacity-25" />}
         <div className="absolute inset-0 bg-gradient-to-t from-[#0A0A0A] via-[#0A0A0A]/85 to-[#0A0A0A]/40" />
         <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12 md:py-16">
-          <Link to="/references" className="text-xs uppercase tracking-widest font-bold text-[#29B6E8] hover:text-white">← Erfolge &amp; Referenzen</Link>
+          <Link to="/references" className="tls-type-label text-[#29B6E8] hover:text-white">← Erfolge &amp; Referenzen</Link>
           <div className="mt-6 grid md:grid-cols-[auto_minmax(0,1fr)] gap-6 md:gap-10 items-start">
             <PlacementBadge placement={bestPlacement(item)} medal={medal} size="xl" />
             <div className="min-w-0">
@@ -150,11 +150,11 @@ export function ReferenceDetailPage() {
                 <Badge>{statusLabels[item.status || "completed"] || item.status}</Badge>
                 {medal && <Badge className={`${MEDAL[medal].soft} ${MEDAL[medal].text}`}>{MEDAL[medal].label}</Badge>}
               </div>
-              <h1 className="mt-3 font-heading text-4xl md:text-5xl xl:text-6xl font-black uppercase leading-[0.95] break-words max-w-5xl">{displayTitle(item)}</h1>
-              {byline && <p className="mt-3 text-lg text-white/70" data-testid="reference-detail-organizer">{byline}</p>}
+              <h1 className="mt-3 tls-type-title leading-[0.95] break-words max-w-5xl">{displayTitle(item)}</h1>
+              {byline && <p className="mt-3 tls-type-body text-white/70" data-testid="reference-detail-organizer">{byline}</p>}
               <FieldChips item={item} className="mt-4" />
               {item.season_link && (
-                <Link to={referenceHref(item)} data-testid="reference-detail-season" className="tls-btn tls-btn--secondary mt-4 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-sm text-[11px] uppercase tracking-widest font-bold">
+                <Link to={referenceHref(item)} data-testid="reference-detail-season" className="tls-btn tls-btn--secondary mt-4 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-sm tls-type-label">
                   <Flag className="w-3.5 h-3.5" aria-hidden="true" /> aus Saison {item.season_link.label}
                 </Link>
               )}
@@ -220,8 +220,8 @@ function MetaList({ item }) {
     <div className="border border-white/10 bg-[#121212] rounded-sm divide-y divide-white/5" data-testid="reference-detail-meta">
       {rows.map(([label, value]) => (
         <div key={label} className="px-4 py-2.5 flex items-start justify-between gap-3">
-          <span className="text-[10px] uppercase tracking-widest text-white/40 font-bold pt-0.5">{label}</span>
-          <span className="text-sm text-white/80 text-right">{value}</span>
+          <span className="tls-type-label text-quiet pt-0.5">{label}</span>
+          <span className="tls-type-small text-white/80 text-right">{value}</span>
         </div>
       ))}
     </div>
@@ -231,14 +231,14 @@ function MetaList({ item }) {
 function TextBlock({ title, text, tone }) {
   return (
     <div className={`border rounded-sm p-5 ${tone === "gold" ? "border-[#FFD700]/25 bg-[#FFD700]/10" : "border-white/10 bg-[#121212]"}`}>
-      <h2 className={`font-heading text-xl font-black uppercase ${tone === "gold" ? "text-[#FFD700]" : "text-white"}`}>{title}</h2>
-      <p className="mt-3 text-sm md:text-base text-white/70 leading-relaxed whitespace-pre-line">{text}</p>
+      <h2 className={`tls-type-section ${tone === "gold" ? "text-[#FFD700]" : "text-white"}`}>{title}</h2>
+      <p className="mt-3 tls-type-body text-white/70 leading-relaxed whitespace-pre-line">{text}</p>
     </div>
   );
 }
 
 function Badge({ children, className = "border-white/10 bg-white/5 text-white/55" }) {
-  return <span className={`inline-flex items-center gap-1 px-2 py-1 rounded-sm border text-[10px] uppercase tracking-widest font-bold ${className}`}>{children}</span>;
+  return <span className={`inline-flex items-center gap-1 px-2 py-1 rounded-sm border tls-type-label ${className}`}>{children}</span>;
 }
 
 export { displayTitle, entriesOf };

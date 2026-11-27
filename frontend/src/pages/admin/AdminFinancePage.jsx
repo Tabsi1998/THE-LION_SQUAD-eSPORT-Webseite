@@ -10,6 +10,7 @@ import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { ATTENTION_ORDER, PAYMENT_TONE, csvFilename, formatCents, parseEuro, shownOf, sourceName, sourcesFrom, summaryLines, syncLine } from "@/lib/billing";
 import { viennaDate, viennaDateTime } from "@/lib/vienna";
 import { InvoiceDetailsTab } from "./finance/InvoiceDetailsTab";
+import { ShortCaps } from "@/components/tls/ShortCaps";
 
 // Finanzübersicht (#322): Rechnungsaufträge nach Status - was fehlt, was wartet, was frei zu
 // geben ist; angelegte Belege mit ihrem Zahlungsstand aus Dolibarr (#321); Prüffälle, die nur die
@@ -36,7 +37,7 @@ function AttentionBar({ counts, labels, active, onPick }) {
   if (!counts || !labels) return null;
   const total = ATTENTION_ORDER.reduce((sum, key) => sum + Number(counts[key] || 0), 0);
   return (
-    <div className="mt-4 flex flex-wrap items-center gap-2 text-xs" data-testid="finance-attention">
+    <div className="mt-4 flex flex-wrap items-center gap-2 tls-type-small" data-testid="finance-attention">
       <span className="uppercase tracking-wider text-white/45 font-bold mr-1">Was hängt</span>
       {ATTENTION_ORDER.map((key) => {
         const count = Number(counts[key] || 0);
@@ -172,17 +173,17 @@ export default function AdminFinancePage() {
     <AdminLayout>
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div>
-          <h1 className="font-heading text-3xl font-black uppercase inline-flex items-center gap-3"><Wallet className="w-7 h-7 text-[#FFD700]" /> Finanzübersicht</h1>
-          <p className="mt-2 text-sm text-white/60 max-w-2xl">Rechnungsaufträge aus kostenpflichtigen Anmeldungen. Jede verbindliche Anmeldung mit Preis wird hier zu einem Auftrag; die Rechnung entsteht in Dolibarr, Zahlungen bucht ihr dort – die Website liest nach und meldet, was nicht zusammenpasst.</p>
+          <h1 className="tls-type-title inline-flex items-center gap-3"><Wallet className="w-7 h-7 text-[#FFD700]" /> <ShortCaps>Finanzübersicht</ShortCaps></h1>
+          <p className="mt-2 tls-type-body text-white/60 max-w-2xl">Rechnungsaufträge aus kostenpflichtigen Anmeldungen. Jede verbindliche Anmeldung mit Preis wird hier zu einem Auftrag; die Rechnung entsteht in Dolibarr, Zahlungen bucht ihr dort – die Website liest nach und meldet, was nicht zusammenpasst.</p>
         </div>
         {tab === "overview" && <div className="flex flex-wrap gap-2">
-          <button type="button" disabled={!!busy} onClick={() => run("run", () => api.post("/admin/finance/orders/run"), "Aufträge einsortiert.")} className="inline-flex items-center gap-2 px-4 py-2 border border-white/20 text-white/80 font-bold uppercase tracking-wider rounded-sm text-xs disabled:opacity-40" data-testid="finance-run">
+          <button type="button" disabled={!!busy} onClick={() => run("run", () => api.post("/admin/finance/orders/run"), "Aufträge einsortiert.")} className="inline-flex items-center gap-2 px-4 py-2 border border-white/20 text-white/80 tls-type-label rounded-sm disabled:opacity-40" data-testid="finance-run">
             <RefreshCw className="w-3.5 h-3.5" /> Jetzt prüfen
           </button>
-          <button type="button" disabled={!!busy} onClick={() => run("reconcile", () => api.post("/admin/finance/reconcile"), (r) => `Abgeglichen: ${r?.data?.looked ?? 0} Belege gelesen, ${r?.data?.cases ?? 0} Prüffälle.`)} className="inline-flex items-center gap-2 px-4 py-2 border border-white/20 text-white/80 font-bold uppercase tracking-wider rounded-sm text-xs disabled:opacity-40" data-testid="finance-reconcile">
+          <button type="button" disabled={!!busy} onClick={() => run("reconcile", () => api.post("/admin/finance/reconcile"), (r) => `Abgeglichen: ${r?.data?.looked ?? 0} Belege gelesen, ${r?.data?.cases ?? 0} Prüffälle.`)} className="inline-flex items-center gap-2 px-4 py-2 border border-white/20 text-white/80 tls-type-label rounded-sm disabled:opacity-40" data-testid="finance-reconcile">
             <RefreshCw className="w-3.5 h-3.5" /> Alles abgleichen
           </button>
-          <button type="button" disabled={!data || exporting || periodBackwards} onClick={downloadCsv} className="inline-flex items-center gap-2 px-4 py-2 border border-white/20 text-white/80 font-bold uppercase tracking-wider rounded-sm text-xs disabled:opacity-40" data-testid="finance-csv">
+          <button type="button" disabled={!data || exporting || periodBackwards} onClick={downloadCsv} className="inline-flex items-center gap-2 px-4 py-2 border border-white/20 text-white/80 tls-type-label rounded-sm disabled:opacity-40" data-testid="finance-csv">
             <Download className="w-3.5 h-3.5" /> {exporting ? "Export läuft …" : "CSV"}
           </button>
         </div>}
@@ -191,7 +192,7 @@ export default function AdminFinancePage() {
       <div className="mt-5 flex gap-1 border-b border-white/10" role="tablist" data-testid="finance-tabs">
         {FINANCE_TABS.map(([key, label]) => (
           <button key={key} type="button" role="tab" aria-selected={tab === key} onClick={() => selectTab(key)} data-testid={`finance-tab-${key}`}
-            className={`px-4 py-2 text-xs font-bold uppercase tracking-wider border-b-2 transition ${tab === key ? "border-[#29B6E8] text-[#29B6E8]" : "border-transparent text-white/50 hover:text-white"}`}>
+            className={`px-4 py-2 tls-type-label border-b-2 transition ${tab === key ? "border-[#29B6E8] text-[#29B6E8]" : "border-transparent text-white/50 hover:text-white"}`}>
             {label}
           </button>
         ))}
@@ -199,7 +200,7 @@ export default function AdminFinancePage() {
 
       {tab === "rechnungsangaben" && <InvoiceDetailsTab onSaved={load} />}
 
-      {tab === "overview" && error && <div className="mt-6 border border-[#FF3B30]/40 bg-[#FF3B30]/10 rounded-sm p-4 text-sm" data-testid="finance-error">{error}</div>}
+      {tab === "overview" && error && <div className="mt-6 border border-[#FF3B30]/40 bg-[#FF3B30]/10 rounded-sm p-4 tls-type-small" data-testid="finance-error">{error}</div>}
       {tab === "overview" && !data && !error && <SkeletonTable rows={4} columns={5} className="mt-6" label="Lade Finanzübersicht" />}
 
       {tab === "overview" && data && (
@@ -212,7 +213,7 @@ export default function AdminFinancePage() {
             <Stat label="Prüffälle offen" value={data.cases_open || 0} tone={data.cases_open ? "text-[#FF3B30]" : "text-white"} testId="finance-cases-count" />
           </div>
 
-          <div className={`mt-4 border rounded-sm p-4 text-sm flex items-start gap-3 ${data.dolibarr?.write_capable ? "border-[#00FF88]/30" : "border-[#FFD700]/40 bg-[#FFD700]/5"}`} data-testid="finance-dolibarr">
+          <div className={`mt-4 border rounded-sm p-4 tls-type-small flex items-start gap-3 ${data.dolibarr?.write_capable ? "border-[#00FF88]/30" : "border-[#FFD700]/40 bg-[#FFD700]/5"}`} data-testid="finance-dolibarr">
             {data.dolibarr?.write_capable ? <CheckCircle2 className="w-4 h-4 text-[#00FF88] mt-0.5" /> : <AlertTriangle className="w-4 h-4 text-[#FFD700] mt-0.5" />}
             <div>
               {data.dolibarr?.write_capable
@@ -222,19 +223,19 @@ export default function AdminFinancePage() {
                   : "Für Rechnungen fehlt der Schreibzugriff – den schaltet System unter Dolibarr → Funktionen ein. Aufträge bleiben bis dahin hier stehen."}
               {data.dolibarr?.write_capable && data.pdfs?.unconfirmed > 0 && (
                 // Rechnungs-PDF (#840): Belege von vor der Umstellung einmal nachziehen - danach macht es der Abgleich.
-                <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-2 text-xs" data-testid="finance-pdfs">
+                <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-2 tls-type-small" data-testid="finance-pdfs">
                   <span className={data.pdfs.failed ? "text-[#FFD700]" : "text-white/60"}>
                     {data.pdfs.unconfirmed === 1 ? "1 freigegebener Beleg" : `${data.pdfs.unconfirmed} freigegebene Belege`} ohne bestätigtes PDF
                     {data.pdfs.failed ? ` – bei ${data.pdfs.failed} ist das Erzeugen gescheitert, der Grund steht am Auftrag` : ""}.
                   </span>
-                  <button type="button" disabled={!!busy} onClick={() => run("pdfs", () => api.post("/admin/finance/pdfs/build-missing"), (r) => r?.data?.summary || "Erledigt.")} className="inline-flex items-center gap-2 px-3 py-1.5 border border-white/20 text-white/80 font-bold uppercase tracking-wider rounded-sm text-[11px] disabled:opacity-40" data-testid="finance-pdfs-build">
+                  <button type="button" disabled={!!busy} onClick={() => run("pdfs", () => api.post("/admin/finance/pdfs/build-missing"), (r) => r?.data?.summary || "Erledigt.")} className="inline-flex items-center gap-2 px-3 py-1.5 border border-white/20 text-white/80 tls-type-label rounded-sm disabled:opacity-40" data-testid="finance-pdfs-build">
                     <FileText className="w-3.5 h-3.5" /> Fehlende PDFs nachziehen
                   </button>
                 </div>
               )}
               {data.dolibarr?.write_capable && (
                 // Gutschrift-Entwurf bei Abmeldung (#843): Vorgabe aus; freigeben tut immer der Kassier in Dolibarr.
-                <label className="mt-2 flex items-start gap-2 text-xs text-white/70 cursor-pointer" data-testid="finance-credit-draft">
+                <label className="mt-2 flex items-start gap-2 tls-type-small text-white/70 cursor-pointer" data-testid="finance-credit-draft">
                   <input type="checkbox" className="mt-0.5" checked={!!data.dolibarr?.credit_note_draft_on_cancel} disabled={!!busy}
                     onChange={(ev) => run("credit-draft", () => api.put("/admin/finance/settings", { credit_note_draft_on_cancel: ev.target.checked }),
                       (r) => (r?.data?.credit_note_draft_on_cancel ? "Gutschrift-Entwürfe bei Abmeldung an." : "Gutschrift-Entwürfe bei Abmeldung aus."))}
@@ -245,13 +246,13 @@ export default function AdminFinancePage() {
                 </label>
               )}
               {data.dolibarr?.write_capable && !data.dolibarr?.terms_complete && (
-                <div className="mt-1 text-xs text-[#FF9500]" data-testid="finance-terms-hint">Rechnungskonditionen (Zahlungsziel, Zahlungsart, Bankkonto) fehlen noch – Belege bleiben Entwurf. <button type="button" onClick={() => selectTab("rechnungsangaben")} className="text-[#29B6E8] hover:underline" data-testid="finance-terms-hint-link">Unter Rechnungsangaben eintragen</button>.</div>
+                <div className="mt-1 tls-type-small text-[#FF9500]" data-testid="finance-terms-hint">Rechnungskonditionen (Zahlungsziel, Zahlungsart, Bankkonto) fehlen noch – Belege bleiben Entwurf. <button type="button" onClick={() => selectTab("rechnungsangaben")} className="text-[#29B6E8] hover:underline" data-testid="finance-terms-hint-link">Unter Rechnungsangaben eintragen</button>.</div>
               )}
             </div>
           </div>
 
           {/* Filter (#322): nach Art, Veranstaltung und Person - die Summen unten gelten für die Auswahl. */}
-          <div className="mt-6 flex flex-wrap items-end gap-3 text-xs" data-testid="finance-filters">
+          <div className="mt-6 flex flex-wrap items-end gap-3 tls-type-small" data-testid="finance-filters">
             <label className="flex flex-col gap-1">
               <span className="uppercase tracking-wider text-white/45 font-bold">Art</span>
               <select value={filters.kind} onChange={(ev) => setFilters((f) => ({ ...f, kind: ev.target.value, source: "" }))} className="bg-[#0A0A0A] border border-white/10 px-2 py-1.5 rounded-sm" data-testid="finance-filter-kind">
@@ -283,7 +284,7 @@ export default function AdminFinancePage() {
               </label>
             </div>
           </div>
-          <p className={`mt-2 text-[11px] ${periodBackwards ? "text-[#FF9500]" : "text-white/40"}`} data-testid="finance-export-hint">
+          <p className={`mt-2 tls-type-small ${periodBackwards ? "text-[#FF9500]" : "text-quiet"}`} data-testid="finance-export-hint">
             {periodBackwards ? "Der Zeitraum beginnt nach seinem Ende." : "Der CSV-Export enthält alle Belege dieser Auswahl, ohne Grenze. Der Zeitraum gilt für den Tag, an dem der Beleg angelegt wurde; ohne Zeitraum alle."}
           </p>
 
@@ -291,16 +292,16 @@ export default function AdminFinancePage() {
 
           {data.summary && (
             <div className="mt-4 border border-white/10 rounded-sm bg-[#121212] p-4" data-testid="finance-source-summary">
-              <div className="text-[10px] uppercase tracking-[0.25em] text-white/45 font-bold">Summen der Veranstaltung · {data.summary.orders} Aufträge{data.summary.cancelled_orders ? `, ${data.summary.cancelled_orders} storniert` : ""}</div>
+              <div className="tls-type-small text-white/45 font-bold">Summen der Veranstaltung · {data.summary.orders} Aufträge{data.summary.cancelled_orders ? `, ${data.summary.cancelled_orders} storniert` : ""}</div>
               <div className={`mt-2 grid gap-2 sm:grid-cols-3 ${data.summary.waived_cents > 0 ? "lg:grid-cols-7" : "lg:grid-cols-6"}`}>
                 {summaryLines(data.summary).map((line) => (
                   <div key={line.key} data-testid={`finance-sum-${line.key}`}>
-                    <div className="font-display font-bold tabular-nums text-white">{line.value}</div>
-                    <div className="text-[11px] uppercase tracking-widest text-white/45">{line.label}</div>
+                    <div className="tls-type-num text-white">{line.value}</div>
+                    <div className="tls-type-label text-white/45">{line.label}</div>
                   </div>
                 ))}
               </div>
-              <p className="mt-2 text-[11px] text-white/40">Gutschrift und Erstattung sind zwei Dinge: Die Gutschrift gleicht den Beleg in Dolibarr aus, erstattet ist erst, was ihr hier mit Tag und Referenz festgehalten habt.</p>
+              <p className="mt-2 tls-type-small text-quiet">Gutschrift und Erstattung sind zwei Dinge: Die Gutschrift gleicht den Beleg in Dolibarr aus, erstattet ist erst, was ihr hier mit Tag und Referenz festgehalten habt.</p>
             </div>
           )}
 
@@ -308,33 +309,33 @@ export default function AdminFinancePage() {
           {(!!cases.length || data.cases_resolved > 0 || caseView === "resolved") && (
             <div className="mt-8" data-testid="finance-cases">
               <div className="flex flex-wrap items-center justify-between gap-3">
-                <h2 className="font-heading text-xl font-black uppercase text-[#FF3B30]">Prüffälle</h2>
+                <h2 className="tls-type-section text-[#FF3B30]">Prüffälle</h2>
                 <div className="flex gap-1" role="group" aria-label="Welche Prüffälle">
                   {[["open", `Offen · ${data.cases_open || 0}`], ["resolved", `Erledigt · ${data.cases_resolved || 0}`]].map(([key, label]) => (
                     <button key={key} type="button" aria-pressed={caseView === key} onClick={() => setCaseView(key)} data-testid={`finance-cases-${key}`}
-                      className={`px-3 py-1.5 border rounded-sm text-[11px] font-bold uppercase tracking-wider ${caseView === key ? "border-[#29B6E8] text-[#29B6E8] bg-[#29B6E8]/10" : "border-white/15 text-white/55 hover:text-white"}`}>
+                      className={`px-3 py-1.5 border rounded-sm tls-type-label ${caseView === key ? "border-[#29B6E8] text-[#29B6E8] bg-[#29B6E8]/10" : "border-white/15 text-white/55 hover:text-white"}`}>
                       {label}
                     </button>
                   ))}
                 </div>
               </div>
               {caseView === "resolved" ? <ResolvedCases data={resolved} onOpen={openDetail} /> : (<>
-              <p className="mt-1 text-xs text-white/45">Hier ist Buchung und Beleg auseinandergelaufen. Die Website ändert nichts still – ihr entscheidet in Dolibarr und erledigt den Fall hier mit Grund.</p>
-              {!cases.length && <div className="mt-3 text-sm text-white/50" data-testid="finance-cases-none">Keine offenen Prüffälle in dieser Auswahl.</div>}
+              <p className="mt-1 tls-type-small text-white/45">Hier ist Buchung und Beleg auseinandergelaufen. Die Website ändert nichts still – ihr entscheidet in Dolibarr und erledigt den Fall hier mit Grund.</p>
+              {!cases.length && <div className="mt-3 tls-type-small text-white/50" data-testid="finance-cases-none">Keine offenen Prüffälle in dieser Auswahl.</div>}
               <div className="mt-3 space-y-3">
                 {cases.map((item) => (
-                  <div key={item.id} className="border border-[#FF3B30]/30 bg-[#FF3B30]/5 rounded-sm p-4 text-sm" data-testid={`finance-case-${item.id}`}>
+                  <div key={item.id} className="border border-[#FF3B30]/30 bg-[#FF3B30]/5 rounded-sm p-4 tls-type-small" data-testid={`finance-case-${item.id}`}>
                     <div className="flex flex-wrap items-start justify-between gap-3">
                       <div>
                         <div className="font-bold text-white">{item.label} <span className="text-white/50 font-normal">· {sourceName(item)} · {item.person || item.user_id} · {item.total}</span></div>
-                        <div className="mt-1 text-xs text-white/70">{item.todo}</div>
+                        <div className="mt-1 tls-type-small text-white/70">{item.todo}</div>
                         <CaseFacts item={item} />
                       </div>
-                      <button type="button" onClick={() => openDetail(item.order_id)} className="text-[11px] uppercase tracking-wider font-bold text-[#29B6E8] hover:underline">Auftrag ansehen</button>
+                      <button type="button" onClick={() => openDetail(item.order_id)} className="tls-type-label text-[#29B6E8] hover:underline">Auftrag ansehen</button>
                     </div>
                     <div className="mt-3 flex flex-wrap items-center gap-2">
                       <input value={caseReason[item.id] || ""} onChange={(ev) => setCaseReason((c) => ({ ...c, [item.id]: ev.target.value }))} placeholder="Grund, z. B. „Gutschrift GA2026-0003 angelegt, 20 € am 24.09. überwiesen“" className="flex-1 min-w-[min(16rem,100%)] bg-[#0A0A0A] border border-white/10 px-2 py-1.5 rounded-sm text-xs" aria-label="Grund für die Erledigung" data-testid={`finance-case-reason-${item.id}`} />
-                      <button type="button" disabled={!!busy || (caseReason[item.id] || "").trim().length < 3} onClick={() => run(`case-${item.id}`, () => api.post(`/admin/finance/cases/${item.id}/resolve`, { reason: caseReason[item.id].trim() }), "Prüffall erledigt.")} className="px-3 py-1.5 border border-[#00FF88]/50 text-[#00FF88] rounded-sm text-[11px] font-bold uppercase tracking-wider disabled:opacity-40" data-testid={`finance-case-resolve-${item.id}`}>
+                      <button type="button" disabled={!!busy || (caseReason[item.id] || "").trim().length < 3} onClick={() => run(`case-${item.id}`, () => api.post(`/admin/finance/cases/${item.id}/resolve`, { reason: caseReason[item.id].trim() }), "Prüffall erledigt.")} className="px-3 py-1.5 border border-[#00FF88]/50 text-[#00FF88] rounded-sm tls-type-label disabled:opacity-40" data-testid={`finance-case-resolve-${item.id}`}>
                         Erledigt
                       </button>
                     </div>
@@ -346,8 +347,8 @@ export default function AdminFinancePage() {
           )}
 
           <TableScroll label="Offene Rechnungsaufträge" testId="finance-open-scroll" className="mt-6">
-            <table className="w-full min-w-[46rem] text-sm">
-              <thead className="bg-[#0A0A0A] text-[11px] uppercase tracking-widest text-white/50">
+            <table className="w-full min-w-[46rem] tls-type-small">
+              <thead className="bg-[#0A0A0A] tls-type-label text-white/50">
                 <tr>
                   <th className="text-left px-4 py-3">Angebot</th>
                   <th className="text-left px-4 py-3">Person</th>
@@ -361,36 +362,36 @@ export default function AdminFinancePage() {
                   <tr key={row.id} data-testid={`finance-order-${row.id}`}>
                     <td className="px-4 py-3">
                       {row.source?.slug ? <Link to={row.source.kind === "tournament" ? `/tournaments/${row.source.slug}` : `/events/${row.source.slug}`} className="text-white hover:text-[#29B6E8]">{row.source.name}</Link> : sourceName(row)}
-                      <div className="text-[11px] text-white/40">{viennaDateTime(row.created_at, { dateStyle: "medium", timeStyle: "short" })}</div>
+                      <div className="tls-type-small text-quiet">{viennaDateTime(row.created_at, { dateStyle: "medium", timeStyle: "short" })}</div>
                       {Array.isArray(row.invoice_text) && (
                         <InvoiceTextEditor row={row} busy={busy} onSave={(text) => run(`text-${row.id}`, () => api.put(`/admin/finance/orders/${row.id}/text`, { extra_text: text }), "Rechnungstext gespeichert.")} />
                       )}
                     </td>
                     <td className="px-4 py-3 text-white/80">{row.person || row.user_id}</td>
-                    <td className="px-4 py-3 text-right font-display font-bold tabular-nums">{row.total}</td>
+                    <td className="px-4 py-3 text-right tls-type-num">{row.total}</td>
                     <td className={`px-4 py-3 ${STATUS_TONE[row.status] || "text-white/70"}`}>
                       {labels[row.status] || row.status}
-                      {row.note && <div className="text-[11px] text-white/40">{row.note}</div>}
+                      {row.note && <div className="tls-type-small text-quiet">{row.note}</div>}
                     </td>
                     <td className="px-4 py-3 text-right">
                       {row.status === "held" && (
                         <div className="flex flex-col items-end gap-1.5">
-                          <button type="button" disabled={!!busy} onClick={() => run(row.id, () => api.post(`/admin/finance/orders/${row.id}/release`), "Auftrag freigegeben.")} className="px-3 py-1.5 border border-[#29B6E8]/50 text-[#29B6E8] rounded-sm text-[11px] font-bold uppercase tracking-wider disabled:opacity-40" data-testid={`finance-release-${row.id}`}>
+                          <button type="button" disabled={!!busy} onClick={() => run(row.id, () => api.post(`/admin/finance/orders/${row.id}/release`), "Auftrag freigegeben.")} className="px-3 py-1.5 border border-[#29B6E8]/50 text-[#29B6E8] rounded-sm tls-type-label disabled:opacity-40" data-testid={`finance-release-${row.id}`}>
                             Freigeben
                           </button>
                           {!!row.removed_invoices?.length && (
                             // Entwurf in Dolibarr gelöscht (#2226): neu abrechnen oder den Auftrag beenden - beides entscheidet die Finanzverwaltung.
                             <>
-                              <button type="button" disabled={!!busy} onClick={() => run(row.id, () => api.post(`/admin/finance/orders/${row.id}/dismiss`), "Keine neue Rechnung – Auftrag beendet.")} className="text-[11px] uppercase tracking-wider font-bold text-white/60 hover:text-white disabled:opacity-40" data-testid={`finance-dismiss-${row.id}`}>
+                              <button type="button" disabled={!!busy} onClick={() => run(row.id, () => api.post(`/admin/finance/orders/${row.id}/dismiss`), "Keine neue Rechnung – Auftrag beendet.")} className="tls-type-label text-white/60 hover:text-white disabled:opacity-40" data-testid={`finance-dismiss-${row.id}`}>
                                 Keine neue Rechnung
                               </button>
-                              <button type="button" onClick={() => openDetail(row.id)} className="text-[11px] uppercase tracking-wider font-bold text-[#29B6E8] hover:underline" data-testid={`finance-detail-${row.id}`}>Details</button>
+                              <button type="button" onClick={() => openDetail(row.id)} className="tls-type-label text-[#29B6E8] hover:underline" data-testid={`finance-detail-${row.id}`}>Details</button>
                             </>
                           )}
                         </div>
                       )}
                       {row.status === "failed" && (
-                        <button type="button" disabled={!!busy} onClick={() => run(row.id, () => api.post(`/admin/finance/orders/${row.id}/retry`), "Auftrag neu gestartet.")} className="px-3 py-1.5 border border-[#FF3B30]/50 text-[#FF3B30] rounded-sm text-[11px] font-bold uppercase tracking-wider disabled:opacity-40" data-testid={`finance-retry-${row.id}`}>
+                        <button type="button" disabled={!!busy} onClick={() => run(row.id, () => api.post(`/admin/finance/orders/${row.id}/retry`), "Auftrag neu gestartet.")} className="px-3 py-1.5 border border-[#FF3B30]/50 text-[#FF3B30] rounded-sm tls-type-label disabled:opacity-40" data-testid={`finance-retry-${row.id}`}>
                           Erneut versuchen
                         </button>
                       )}
@@ -398,12 +399,12 @@ export default function AdminFinancePage() {
                         <div className="flex flex-col items-end gap-1.5" data-testid={`finance-assign-${row.id}`}>
                           <div className="flex items-center gap-1.5">
                             <input value={thirdpartyInput[row.id] || ""} onChange={(ev) => setThirdpartyInput((current) => ({ ...current, [row.id]: ev.target.value }))} inputMode="numeric" placeholder="Nr. in Dolibarr" className="w-28 bg-[#0A0A0A] border border-white/10 px-2 py-1.5 rounded-sm text-xs" aria-label="Geschäftspartner-Nummer" />
-                            <button type="button" disabled={!!busy || !/^\d+$/.test(thirdpartyInput[row.id] || "")} onClick={() => run(row.id, () => api.post(`/admin/finance/orders/${row.id}/thirdparty`, { thirdparty_id: Number(thirdpartyInput[row.id]) }), "Geschäftspartner zugeordnet.")} className="px-3 py-1.5 border border-[#29B6E8]/50 text-[#29B6E8] rounded-sm text-[11px] font-bold uppercase tracking-wider disabled:opacity-40">
+                            <button type="button" disabled={!!busy || !/^\d+$/.test(thirdpartyInput[row.id] || "")} onClick={() => run(row.id, () => api.post(`/admin/finance/orders/${row.id}/thirdparty`, { thirdparty_id: Number(thirdpartyInput[row.id]) }), "Geschäftspartner zugeordnet.")} className="px-3 py-1.5 border border-[#29B6E8]/50 text-[#29B6E8] rounded-sm tls-type-label disabled:opacity-40">
                               Zuordnen
                             </button>
                           </div>
                           {row.status === "waiting_review" && (
-                            <button type="button" disabled={!!busy} onClick={() => run(row.id, () => api.post(`/admin/finance/orders/${row.id}/new-thirdparty`), "Neuer Geschäftspartner angelegt.")} className="text-[11px] uppercase tracking-wider font-bold text-white/60 hover:text-white">
+                            <button type="button" disabled={!!busy} onClick={() => run(row.id, () => api.post(`/admin/finance/orders/${row.id}/new-thirdparty`), "Neuer Geschäftspartner angelegt.")} className="tls-type-label text-white/60 hover:text-white">
                               Trotzdem neu anlegen
                             </button>
                           )}
@@ -417,22 +418,22 @@ export default function AdminFinancePage() {
             </table>
           </TableScroll>
           {data.open_total > data.open.length && (
-            <p className="mt-2 text-xs text-warn" data-testid="finance-open-count">Angezeigt: {shownOf(data.open.length, data.open_total)} offenen Aufträgen – die ältesten zuerst.</p>
+            <p className="mt-2 tls-type-small text-warn" data-testid="finance-open-count">Angezeigt: {shownOf(data.open.length, data.open_total)} offenen Aufträgen – die ältesten zuerst.</p>
           )}
 
           {filters.attention && !data.invoiced?.length && (
-            <div className="mt-8 text-sm text-white/50" data-testid="finance-attention-empty">Kein Beleg in dieser Auswahl.</div>
+            <div className="mt-8 tls-type-small text-white/50" data-testid="finance-attention-empty">Kein Beleg in dieser Auswahl.</div>
           )}
           {!!data.invoiced?.length && (
             <div className="mt-8">
-              <h2 className="font-heading text-xl font-black uppercase">{filters.attention ? `Angelegte Rechnungen · ${capitalize(data.attention_labels?.[filters.attention] || "")}` : "Angelegte Rechnungen"}</h2>
-              <p className="mt-1 text-xs text-white/45">Nummer, Freigabe und Zahlungen kommen aus Dolibarr; offene Belege liest die Website alle zehn Minuten nach, bezahlte einmal am Tag. Der Stand daneben sagt, wie frisch das ist.</p>
-              <p className={`mt-1 text-xs ${data.invoiced_total > data.invoiced.length ? "text-warn" : "text-white/45"}`} data-testid="finance-invoiced-count">
+              <h2 className="tls-type-section">{filters.attention ? `Angelegte Rechnungen · ${capitalize(data.attention_labels?.[filters.attention] || "")}` : "Angelegte Rechnungen"}</h2>
+              <p className="mt-1 tls-type-small text-white/45">Nummer, Freigabe und Zahlungen kommen aus Dolibarr; offene Belege liest die Website alle zehn Minuten nach, bezahlte einmal am Tag. Der Stand daneben sagt, wie frisch das ist.</p>
+              <p className={`mt-1 tls-type-small ${data.invoiced_total > data.invoiced.length ? "text-warn" : "text-white/45"}`} data-testid="finance-invoiced-count">
                 Angezeigt: {shownOf(data.invoiced.length, data.invoiced_total)} Rechnungen{data.invoiced_total > data.invoiced.length ? " – die zuletzt geänderten. Vollständig ist der CSV-Export." : "."}
               </p>
               <TableScroll label="Angelegte Rechnungen" testId="finance-invoiced-scroll" className="mt-3">
-                <table className="w-full min-w-[52rem] text-sm">
-                  <thead className="bg-[#0A0A0A] text-[11px] uppercase tracking-widest text-white/50">
+                <table className="w-full min-w-[52rem] tls-type-small">
+                  <thead className="bg-[#0A0A0A] tls-type-label text-white/50">
                     <tr>
                       <th className="text-left px-4 py-3">Rechnung</th>
                       <th className="text-left px-4 py-3">Angebot</th>
@@ -449,11 +450,11 @@ export default function AdminFinancePage() {
                         <tr key={row.id} data-testid={`finance-invoice-${row.id}`}>
                           <td className="px-4 py-3 font-mono text-white">
                             {row.invoice_ref || "–"}
-                            {row.booking_state === "cancelled" && <div className="text-[11px] text-[#FF3B30] font-sans">Buchung storniert</div>}
+                            {row.booking_state === "cancelled" && <div className="tls-type-small text-[#FF3B30] font-sans">Buchung storniert</div>}
                           </td>
                           <td className="px-4 py-3 text-white/80">{sourceName(row)}</td>
                           <td className="px-4 py-3 text-white/80">{row.person || row.user_id}</td>
-                          <td className="px-4 py-3 text-right font-display font-bold tabular-nums">{row.total}</td>
+                          <td className="px-4 py-3 text-right tls-type-num">{row.total}</td>
                           <td className="px-4 py-3">
                             <div className={PAYMENT_TONE[row.payment_state] || "text-white/80"} data-testid={`finance-payment-${row.id}`}>
                               {row.payment_label || (row.paid ? "bezahlt" : INVOICE_STATUS[row.invoice_status] || row.invoice_status)}
@@ -463,15 +464,15 @@ export default function AdminFinancePage() {
                             </div>
                             <CloseInfo order={row} />
                             {(row.credited_cents > 0 || row.refunded_cents > 0) && (
-                              <div className="text-[11px] text-white/50">{row.credited_cents > 0 ? `gutgeschrieben ${formatCents(row.credited_cents, row.currency)}` : ""}{row.credited_cents > 0 && row.refunded_cents > 0 ? " · " : ""}{row.refunded_cents > 0 ? `erstattet ${formatCents(row.refunded_cents, row.currency)}` : ""}</div>
+                              <div className="tls-type-small text-white/50">{row.credited_cents > 0 ? `gutgeschrieben ${formatCents(row.credited_cents, row.currency)}` : ""}{row.credited_cents > 0 && row.refunded_cents > 0 ? " · " : ""}{row.refunded_cents > 0 ? `erstattet ${formatCents(row.refunded_cents, row.currency)}` : ""}</div>
                             )}
-                            <div className={`text-[11px] ${sync.tone}`}>{sync.text}</div>
+                            <div className={`tls-type-small ${sync.tone}`}>{sync.text}</div>
                           </td>
                           <td className="px-4 py-3 text-right">
                             <div className="flex flex-col items-end gap-1.5">
-                              <button type="button" onClick={() => openDetail(row.id)} className="text-[11px] uppercase tracking-wider font-bold text-[#29B6E8] hover:underline" data-testid={`finance-detail-${row.id}`}>Details</button>
+                              <button type="button" onClick={() => openDetail(row.id)} className="tls-type-label text-[#29B6E8] hover:underline" data-testid={`finance-detail-${row.id}`}>Details</button>
                               {row.dolibarr_url && (
-                                <a href={row.dolibarr_url} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-[11px] uppercase tracking-wider font-bold text-white/60 hover:text-white" data-testid={`finance-dolibarr-${row.id}`}>
+                                <a href={row.dolibarr_url} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 tls-type-label text-white/60 hover:text-white" data-testid={`finance-dolibarr-${row.id}`}>
                                   In Dolibarr <ExternalLink className="w-3 h-3" aria-hidden="true" />
                                 </a>
                               )}
@@ -501,7 +502,7 @@ export default function AdminFinancePage() {
 function CloseInfo({ order }) {
   if (!order.close_reason && !order.close_note) return null;
   return (
-    <div className="mt-1 text-[11px] text-white/60 max-w-[24rem] whitespace-pre-wrap break-words" data-testid={`finance-close-${order.id}`}>
+    <div className="mt-1 tls-type-small text-white/60 max-w-[24rem] whitespace-pre-wrap break-words" data-testid={`finance-close-${order.id}`}>
       {order.close_reason && <div>Grund: {order.close_reason}</div>}
       {order.close_note && <div>Anmerkung: {order.close_note}</div>}
     </div>
@@ -520,26 +521,26 @@ function CaseFacts({ item }) {
   // Gutschrift-Entwurf bei Abmeldung (#843): was die Website angelegt oder gefunden hat - oder warum nicht.
   if (d.credit_note) bits.push(d.credit_note);
   if (!bits.length) return null;
-  return <div className="mt-1 text-[11px] text-white/50" data-testid={`finance-case-facts-${item.id}`}>{bits.join(" · ")}</div>;
+  return <div className="mt-1 tls-type-small text-white/50" data-testid={`finance-case-facts-${item.id}`}>{bits.join(" · ")}</div>;
 }
 
 // Erledigte Prüffälle (#2131): was es war, wer es wann erledigt hat und mit welchem Grund - nur zum Nachlesen.
 function ResolvedCases({ data, onOpen }) {
   if (!data) return <SkeletonTable rows={2} columns={3} className="mt-3" label="Lade erledigte Prüffälle" />;
   const rows = data.cases || [];
-  if (!rows.length) return <div className="mt-3 text-sm text-white/50" data-testid="finance-resolved-none">Keine erledigten Prüffälle in dieser Auswahl.</div>;
+  if (!rows.length) return <div className="mt-3 tls-type-small text-white/50" data-testid="finance-resolved-none">Keine erledigten Prüffälle in dieser Auswahl.</div>;
   return (
     <div className="mt-3 space-y-3" data-testid="finance-resolved">
-      <p className="text-xs text-white/45">Angezeigt: {shownOf(rows.length, data.total)} erledigten Fällen, der zuletzt erledigte zuerst.</p>
+      <p className="tls-type-small text-white/45">Angezeigt: {shownOf(rows.length, data.total)} erledigten Fällen, der zuletzt erledigte zuerst.</p>
       {rows.map((item) => (
-        <div key={item.id} className="border border-white/10 bg-[#121212] rounded-sm p-4 text-sm" data-testid={`finance-resolved-${item.id}`}>
+        <div key={item.id} className="border border-white/10 bg-[#121212] rounded-sm p-4 tls-type-small" data-testid={`finance-resolved-${item.id}`}>
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div className="min-w-0">
               <div className="font-bold text-white">{item.label} <span className="text-white/50 font-normal">· {sourceName(item)} · {item.person || item.user_id} · {item.total}</span></div>
-              <div className="mt-1 text-xs text-white/70">Erledigt {viennaDateTime(item.resolved_at, { dateStyle: "short", timeStyle: "short" })} von {item.resolved_by_name}{item.resolution ? `: ${item.resolution}` : ""}</div>
+              <div className="mt-1 tls-type-small text-white/70">Erledigt {viennaDateTime(item.resolved_at, { dateStyle: "short", timeStyle: "short" })} von {item.resolved_by_name}{item.resolution ? `: ${item.resolution}` : ""}</div>
               <CaseFacts item={item} />
             </div>
-            <button type="button" onClick={() => onOpen(item.order_id)} className="text-[11px] uppercase tracking-wider font-bold text-[#29B6E8] hover:underline">Auftrag ansehen</button>
+            <button type="button" onClick={() => onOpen(item.order_id)} className="tls-type-label text-[#29B6E8] hover:underline">Auftrag ansehen</button>
           </div>
         </div>
       ))}
@@ -576,37 +577,37 @@ function OrderDetail({ detail, busy, paymentLabels, onClose, onResync, onRefund 
     <div className="mt-8 border border-[#29B6E8]/40 rounded-sm bg-[#121212] p-5" data-testid="finance-detail">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <div className="text-[10px] uppercase tracking-[0.25em] text-[#29B6E8] font-bold">Auftrag</div>
-          <h2 className="font-heading text-xl font-black uppercase mt-1 break-words">{sourceName(order)} · {order.person || order.user_id}</h2>
-          <div className="text-xs text-white/50 mt-1">
+          <div className="tls-type-label text-[#29B6E8]">Auftrag</div>
+          <h2 className="tls-type-section mt-1 break-words">{sourceName(order)} · {order.person || order.user_id}</h2>
+          <div className="tls-type-small text-white/50 mt-1">
             {order.invoice_ref ? `Beleg ${order.invoice_ref} · ` : ""}{paymentLabels[order.payment_state] || order.status_label}
             {registration ? ` · Anmeldung ${registration.status_label || registration.status}${registration.seat_count ? `, ${registration.seat_count} Personen` : ""}` : ""}
           </div>
           <CloseInfo order={order} />
           {order.pdf_missing && (
-            <div className="mt-2 text-xs text-[#FFD700]" data-testid="finance-detail-pdf-missing">
+            <div className="mt-2 tls-type-small text-[#FFD700]" data-testid="finance-detail-pdf-missing">
               PDF fehlt: {order.pdf_error_text || order.pdf_error} Der Abgleich versucht es stündlich wieder, „Fehlende PDFs nachziehen“ sofort.
             </div>
           )}
         </div>
         <div className="flex gap-2">
           {order.status === "invoiced" && (
-            <button type="button" disabled={!!busy} onClick={onResync} className="px-3 py-1.5 border border-white/20 text-white/80 rounded-sm text-[11px] font-bold uppercase tracking-wider disabled:opacity-40" data-testid="finance-resync">In Dolibarr nachlesen</button>
+            <button type="button" disabled={!!busy} onClick={onResync} className="px-3 py-1.5 border border-white/20 text-white/80 rounded-sm tls-type-label disabled:opacity-40" data-testid="finance-resync">In Dolibarr nachlesen</button>
           )}
-          <button type="button" onClick={onClose} className="px-3 py-1.5 border border-white/20 text-white/60 rounded-sm text-[11px] font-bold uppercase tracking-wider">Schließen</button>
+          <button type="button" onClick={onClose} className="px-3 py-1.5 border border-white/20 text-white/60 rounded-sm tls-type-label">Schließen</button>
         </div>
       </div>
 
       <div className="mt-4 grid gap-4 lg:grid-cols-2">
         <div>
-          <div className="text-[11px] uppercase tracking-widest text-white/45 font-bold">Positionen (eingefroren)</div>
-          <ul className="mt-2 text-sm divide-y divide-white/5">
+          <div className="tls-type-label text-white/45">Positionen (eingefroren)</div>
+          <ul className="mt-2 tls-type-small divide-y divide-white/5">
             {positions.map((line) => (
               <li key={line.key} className="py-1.5 flex justify-between gap-3"><span>{line.label} <span className="text-white/40">× {line.quantity}</span></span><span className="tabular-nums">{formatCents(line.total_cents, order.currency)}</span></li>
             ))}
             <li className="py-1.5 flex justify-between gap-3 font-bold"><span>Summe</span><span className="tabular-nums">{order.total}</span></li>
           </ul>
-          <div className="mt-3 grid grid-cols-2 gap-2 text-xs" data-testid="finance-detail-sums">
+          <div className="mt-3 grid grid-cols-2 gap-2 tls-type-small" data-testid="finance-detail-sums">
             <div><span className="text-white/45">bezahlt</span> <span className="tabular-nums text-white">{formatCents(sums.paid_cents, order.currency)}</span></div>
             <div><span className="text-white/45">gutgeschrieben</span> <span className="tabular-nums text-white">{formatCents(sums.credited_cents, order.currency)}</span></div>
             {sums.waived_cents > 0 && <div><span className="text-white/45">erlassen</span> <span className="tabular-nums text-white">{formatCents(sums.waived_cents, order.currency)}</span></div>}
@@ -615,8 +616,8 @@ function OrderDetail({ detail, busy, paymentLabels, onClose, onResync, onRefund 
           </div>
         </div>
         <div>
-          <div className="text-[11px] uppercase tracking-widest text-white/45 font-bold">Verlauf</div>
-          <ol className="mt-2 text-xs space-y-1.5" data-testid="finance-detail-timeline">
+          <div className="tls-type-label text-white/45">Verlauf</div>
+          <ol className="mt-2 tls-type-small space-y-1.5" data-testid="finance-detail-timeline">
             {timeline.map((item, index) => (
               <li key={`${item.at}-${index}`} className="flex gap-3">
                 <span className="text-white/40 shrink-0 tabular-nums w-28" data-testid="finance-timeline-at">{timelineMoment(item.at)}</span>
@@ -630,9 +631,9 @@ function OrderDetail({ detail, busy, paymentLabels, onClose, onResync, onRefund 
 
       {canRefund && (
         <div className="mt-5 border-t border-white/10 pt-4" data-testid="finance-refund-form">
-          <div className="text-[11px] uppercase tracking-widest text-white/45 font-bold">Erstattung festhalten</div>
-          <p className="mt-1 text-xs text-white/50">Erst überweisen (oder bar zurückgeben), dann hier eintragen. Höchstens {formatCents(sums.refundable_cents, order.currency)} – bezahlt abzüglich schon erstattet. Die Gutschrift dazu legt ihr in Dolibarr an.</p>
-          <div className="mt-2 grid gap-2 sm:grid-cols-2 lg:grid-cols-5 text-xs">
+          <div className="tls-type-label text-white/45">Erstattung festhalten</div>
+          <p className="mt-1 tls-type-small text-white/50">Erst überweisen (oder bar zurückgeben), dann hier eintragen. Höchstens {formatCents(sums.refundable_cents, order.currency)} – bezahlt abzüglich schon erstattet. Die Gutschrift dazu legt ihr in Dolibarr an.</p>
+          <div className="mt-2 grid gap-2 sm:grid-cols-2 lg:grid-cols-5 tls-type-small">
             <input value={refund.amount} onChange={(ev) => editRefund({ amount: ev.target.value })} placeholder="Betrag, z. B. 20,00" inputMode="decimal" className="bg-[#0A0A0A] border border-white/10 px-2 py-1.5 rounded-sm" aria-label="Erstattungsbetrag in Euro" />
             <input type="date" value={refund.paid_on} onChange={(ev) => editRefund({ paid_on: ev.target.value })} className="bg-[#0A0A0A] border border-white/10 px-2 py-1.5 rounded-sm" aria-label="Tag der Rückzahlung" />
             <input value={refund.reference} onChange={(ev) => editRefund({ reference: ev.target.value })} placeholder="Referenz (Überweisung, Gutschrift)" className="bg-[#0A0A0A] border border-white/10 px-2 py-1.5 rounded-sm" aria-label="Referenz der Rückzahlung" />
@@ -644,7 +645,7 @@ function OrderDetail({ detail, busy, paymentLabels, onClose, onResync, onRefund 
               </select>
             ) : <span />}
           </div>
-          <button type="button" disabled={!!busy || !refundOk} onClick={saveRefund} className="mt-2 px-3 py-1.5 border border-[#00FF88]/50 text-[#00FF88] rounded-sm text-[11px] font-bold uppercase tracking-wider disabled:opacity-40" data-testid="finance-refund-save">
+          <button type="button" disabled={!!busy || !refundOk} onClick={saveRefund} className="mt-2 px-3 py-1.5 border border-[#00FF88]/50 text-[#00FF88] rounded-sm tls-type-label disabled:opacity-40" data-testid="finance-refund-save">
             Erstattung eintragen
           </button>
         </div>
@@ -660,14 +661,14 @@ function InvoiceTextEditor({ row, busy, onSave }) {
   const [text, setText] = useState(row.extra_text || "");
   useEffect(() => { setText(row.extra_text || ""); }, [row.extra_text]);
   return (
-    <details className="mt-1 text-[11px]" open={open} onToggle={(ev) => setOpen(ev.currentTarget.open)} data-testid={`finance-text-${row.id}`}>
+    <details className="mt-1 tls-type-small" open={open} onToggle={(ev) => setOpen(ev.currentTarget.open)} data-testid={`finance-text-${row.id}`}>
       <summary className="cursor-pointer text-white/55 hover:text-white uppercase tracking-wider font-bold">Rechnungstext{row.extra_text ? " · mit Zusatz" : ""}</summary>
       <div className="mt-2 space-y-2">
         {row.invoice_text.map((line, index) => (
           <pre key={index} className="whitespace-pre-wrap font-sans text-white/70 border border-white/10 rounded-sm px-2 py-1.5 bg-black/20" data-testid={`finance-text-line-${row.id}-${index}`}>{line}</pre>
         ))}
         <textarea value={text} onChange={(ev) => setText(ev.target.value)} rows={2} maxLength={500} placeholder="Zusatz für die Rechnung, z. B. „inkl. Essen und Getränke“ oder „Tisch 4 reserviert“" className="w-full bg-[#0A0A0A] border border-white/10 px-2 py-1.5 rounded-sm text-xs" aria-label="Zusatztext für die Rechnung" />
-        <button type="button" disabled={!!busy || text.trim() === (row.extra_text || "")} onClick={() => onSave(text)} className="px-3 py-1.5 border border-[#29B6E8]/50 text-[#29B6E8] rounded-sm text-[11px] font-bold uppercase tracking-wider disabled:opacity-40" data-testid={`finance-text-save-${row.id}`}>
+        <button type="button" disabled={!!busy || text.trim() === (row.extra_text || "")} onClick={() => onSave(text)} className="px-3 py-1.5 border border-[#29B6E8]/50 text-[#29B6E8] rounded-sm tls-type-label disabled:opacity-40" data-testid={`finance-text-save-${row.id}`}>
           Zusatz speichern
         </button>
       </div>
@@ -678,8 +679,8 @@ function InvoiceTextEditor({ row, busy, onSave }) {
 function Stat({ label, value, tone = "text-white", testId }) {
   return (
     <div className="border border-white/10 rounded-sm bg-[#121212] p-4" data-testid={testId}>
-      <div className={`font-heading text-2xl font-black ${tone}`}>{value}</div>
-      <div className="text-[11px] uppercase tracking-widest text-white/45 mt-1">{label}</div>
+      <div className={`tls-type-section tls-type-num ${tone}`}>{value}</div>
+      <div className="tls-type-label text-white/45 mt-1">{label}</div>
     </div>
   );
 }

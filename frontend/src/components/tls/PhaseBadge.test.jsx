@@ -74,3 +74,12 @@ describe("#1264: Countdown nur, wenn es bald so weit ist", () => {
     expect(screen.getByText("Angekündigt")).toBeInTheDocument();
   });
 });
+
+// Schrift-Treppe (#1302): das Schild ist ein Etikett (12 px) - klein und mittel; nur das große steht in „Klein“.
+test("Größe: sm und md sind Etiketten, lg ist Klein", () => {
+  const { container } = render(<><PhaseBadge phase={{ state: "announced", label: "Angekündigt" }} /><PhaseBadge phase={{ state: "announced", label: "Angekündigt" }} size="md" /><PhaseBadge phase={{ state: "announced", label: "Angekündigt" }} size="lg" /></>);
+  const [sm, md, lg] = container.querySelectorAll(":scope > span");
+  expect(sm).toHaveClass("tls-type-label");
+  expect(md).toHaveClass("tls-type-label");
+  expect(lg).toHaveClass("tls-type-small");
+});

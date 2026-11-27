@@ -5,6 +5,7 @@ import { api, formatApiError } from "@/lib/api";
 import { captureOnsiteToken, forgetOnsiteToken, peekOnsiteToken } from "@/lib/onsiteToken";
 import { PublicLayout } from "@/components/tls/PublicLayout";
 import { useDocumentTitle } from "@/hooks/useDocumentTitle";
+import { ShortCaps } from "@/components/tls/ShortCaps";
 
 // Vor-Ort-Zugang (#1592): Hierher führt der QR-Code von TV und Aushang („/vor-ort#<code>“). Der Code ist schon beim
 // Start aus der Adresse genommen (lib/onsiteToken) und geht nur im Rumpf an den Server. Der setzt die Freigabe für
@@ -55,15 +56,15 @@ export default function OnsiteAccessPage() {
         <QrCode className="w-10 h-10 mx-auto text-[#29B6E8]" aria-hidden="true" />
         {problem ? (
           <div data-testid="onsite-access-invalid">
-            <h1 className="mt-4 font-heading text-3xl font-black uppercase">Code gilt nicht</h1>
+            <h1 className="mt-4 tls-type-title"><ShortCaps>Code gilt nicht</ShortCaps></h1>
             <p className="mt-3 text-white/70">{problem}</p>
-            <Link to="/tournaments" className="tls-btn tls-btn--quiet mt-8 inline-flex min-h-[44px] items-center px-5 py-2 rounded-sm text-xs font-bold uppercase tracking-wider">
+            <Link to="/tournaments" className="tls-btn tls-btn--quiet mt-8 inline-flex min-h-[44px] items-center px-5 py-2 rounded-sm tls-type-label">
               Zu den Turnieren
             </Link>
           </div>
         ) : (
           <div data-testid="onsite-access-checking">
-            <h1 className="mt-4 font-heading text-3xl font-black uppercase">Einen Moment</h1>
+            <h1 className="mt-4 tls-type-title"><ShortCaps>Einen Moment</ShortCaps></h1>
             <p className="mt-3 text-white/70">Dein Vor-Ort-Zugang wird geprüft …</p>
           </div>
         )}

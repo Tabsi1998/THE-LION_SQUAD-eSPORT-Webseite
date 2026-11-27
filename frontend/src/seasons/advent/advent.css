@@ -7,7 +7,7 @@
 .tls-advent__button:focus-visible { outline: 2px solid #f0b060; outline-offset: 2px; }
 .tls-advent__svg { width: 100%; height: 100%; overflow: visible; display: block; }
 @media (max-width: 640px) { .tls-advent__button { width: 4rem; height: 2.5rem; } }
-.tls-advent__note { position: absolute; top: 100%; left: 0; margin-top: 0.4rem; white-space: nowrap; font-size: 11px; color: #ffd9a8; background: rgba(10, 10, 10, 0.92); border: 1px solid rgba(255, 190, 120, 0.35); border-radius: 0.35rem; padding: 0.25rem 0.5rem; z-index: 70; }
+.tls-advent__note { position: absolute; top: 100%; left: 0; margin-top: 0.4rem; white-space: nowrap; font-size: var(--tls-type-small-size); color: #ffd9a8; background: rgba(10, 10, 10, 0.92); border: 1px solid rgba(255, 190, 120, 0.35); border-radius: 0.35rem; padding: 0.25rem 0.5rem; z-index: 70; }
 
 /* Zweige: zwei Ebenen mit verschiedenen Dauern, damit hinten und vorne nie im Gleichtakt wiegen. */
 .tls-advent__branches { transform-origin: 38px 31px; animation: tls-advent-sway 12s ease-in-out infinite; }

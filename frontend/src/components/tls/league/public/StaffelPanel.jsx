@@ -108,13 +108,13 @@ export function MapChips({ match }) {
                 {game.map_image_url ? <LazyImg src={game.map_image_url} alt="" sizes="56px" widths={[160]} className="h-full w-full object-cover" /> : null}
               </span>
               <span className="min-w-0">
-                <span className="flex min-w-0 items-center gap-1 text-[11px] font-semibold text-white/85">
+                <span className="flex min-w-0 items-center gap-1 tls-type-small font-semibold text-white/85">
                   {/* Modus-Symbol (#2266): Schnappschuss am Spiel, ohne Bild das neutrale Symbol. */}
                   {game.mode ? <ModeIcon src={game.mode_icon_url} label={game.mode_label || ""} size="xs" testId={`league-map-${match.id}-${game.position}-mode`} /> : null}
                   <span className="truncate">{game.map_name || `Map ${game.position}`}</span>
                 </span>
                 {/* Ganz lesbar (#2268): das Co-Team ohne Hauptteam, Umbruch statt Abschneiden. */}
-                <span className="block text-[10px] leading-snug text-white/45 [overflow-wrap:anywhere]" data-testid={`league-map-${match.id}-${game.position}-winner`}>
+                <span className="block tls-type-small leading-snug text-white/45 [overflow-wrap:anywhere]" data-testid={`league-map-${match.id}-${game.position}-winner`}>
                   {winner ? `für ${splitTeamName(winner).squad}` : "offen"}{note ? ` · ${note}` : ""}
                 </span>
               </span>
@@ -123,7 +123,7 @@ export function MapChips({ match }) {
         })}
       </ol>
       {(match.not_played || []).length ? (
-        <p className="text-[10px] text-white/45" data-testid={`league-maps-${match.id}-not-played`}>{notPlayedText(match.not_played)}</p>
+        <p className="tls-type-small text-white/45" data-testid={`league-maps-${match.id}-not-played`}>{notPlayedText(match.not_played)}</p>
       ) : null}
     </>
   );
@@ -192,7 +192,7 @@ function Week({ week, logos, order }) {
         <div className="tls-league-week__head">
           <Coffee className="h-4 w-4 text-white/40" aria-hidden="true" />
           <span className="font-semibold text-white/70">{week.label}</span>
-          <span className="ml-auto text-xs text-white/40 tabular-nums">{weekHeading(week)}</span>
+          <span className="ml-auto tls-type-small text-quiet tabular-nums">{weekHeading(week)}</span>
         </div>
       </li>
     );
@@ -201,9 +201,9 @@ function Week({ week, logos, order }) {
   return (
     <li className="tls-league-week" data-kind={week.kind} data-open="true" data-testid={`league-week-${week.week}`}>
       <div className="tls-league-week__head" id={headingId}>
-        <span className="font-display font-bold text-white">{week.label}</span>
-        <span className="text-xs text-white/45 tabular-nums">{weekHeading(week)}</span>
-        <span className="ml-auto text-[11px] text-white/45">{progressLine(week)}</span>
+        <span className="tls-type-num text-white">{week.label}</span>
+        <span className="tls-type-small text-white/45 tabular-nums">{weekHeading(week)}</span>
+        <span className="ml-auto tls-type-small text-white/45">{progressLine(week)}</span>
       </div>
       {week.matches.length ? (
         <div className="tls-league-week__body">
@@ -240,7 +240,7 @@ function TableBlock({ data, staffel, champion }) {
   return (
     <StaggerIn className="tls-league-table" aria-label={`Tabelle Staffel ${staffel.staffel}`}>
       {final ? (
-        <p className="mb-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px] font-bold uppercase tracking-[0.18em] text-white/70" data-testid={`league-final-${staffel.staffel}`}>
+        <p className="mb-2 flex flex-wrap items-center gap-x-2 gap-y-1 tls-type-label text-white/70" data-testid={`league-final-${staffel.staffel}`}>
           <Lock className="h-3.5 w-3.5 shrink-0" aria-hidden="true" /> {finalNote(final)}
         </p>
       ) : null}
@@ -257,10 +257,10 @@ function TableBlock({ data, staffel, champion }) {
       {/* Reihenfolge bei Punktgleichheit (E.1, #1625) - dieselbe, nach der der Server sortiert. */}
       {/* Punkte nach gewonnenen Maps (#2312): sagt, was die Spalte „Pkt“ zählt. */}
       {pointsNote(tableRules) ? (
-        <p className="mt-2 text-[11px] text-white/55" data-testid={`league-points-note-${staffel.staffel}`}>{pointsNote(tableRules)}</p>
+        <p className="mt-2 tls-type-small text-white/55" data-testid={`league-points-note-${staffel.staffel}`}>{pointsNote(tableRules)}</p>
       ) : null}
       {tableRules?.tiebreakers?.length ? (
-        <p className={`${pointsNote(tableRules) ? "mt-1" : "mt-2"} text-[11px] text-white/45`} data-testid={`league-tiebreak-order-${staffel.staffel}`}>
+        <p className={`${pointsNote(tableRules) ? "mt-1" : "mt-2"} tls-type-small text-white/45`} data-testid={`league-tiebreak-order-${staffel.staffel}`}>
           Reihenfolge: {tiebreakOrder(tableRules.tiebreakers)}
         </p>
       ) : null}
@@ -279,7 +279,7 @@ export function StaffelPanel({ leagueSlug, seasonSlug, staffel, topLevel = false
   const logos = useMemo(() => logoMap(data?.teams), [data]);
 
   if (error && !data) {
-    return <p className="text-sm text-white/55" role="status">Die Staffel konnte gerade nicht geladen werden.</p>;
+    return <p className="tls-type-small text-white/55" role="status">Die Staffel konnte gerade nicht geladen werden.</p>;
   }
   if (!data) {
     return <div className="tls-league-skeleton" aria-busy="true" aria-label="Lade Staffel" />;
@@ -305,7 +305,7 @@ export function StaffelPanel({ leagueSlug, seasonSlug, staffel, topLevel = false
           <ol className="tls-league-weeks">
             <Week week={week} logos={logos} order={order} />
           </ol>
-        ) : <p className="text-sm text-white/55">Der Spielplan steht, sobald die Staffel startet.</p>}
+        ) : <p className="tls-type-small text-white/55">Der Spielplan steht, sobald die Staffel startet.</p>}
         <div className="tls-league-links">
           <Link to={`${sectionPath(leagueSlug, seasonSlug, "spieltage")}?staffel=${encodeURIComponent(key)}`} className="tls-league-link"
             data-testid={`league-plan-link-${staffel.staffel}`}>
@@ -326,23 +326,23 @@ function WeekPanel({ week, logos, order }) {
   if (week.kind === "pause") {
     return (
       <div className="tls-league-weekpanel" data-kind="pause" data-testid={`league-weekpanel-${week.week}`}>
-        <p className="flex items-center gap-2 font-heading text-xl font-bold uppercase text-white/80"><Coffee className="h-5 w-5" aria-hidden="true" /> {week.label}</p>
-        <p className="mt-1 text-sm text-white/55">{weekHeading(week)} – in dieser Woche wird nicht gespielt.</p>
+        <p className="flex items-center gap-2 tls-type-card text-white/80"><Coffee className="h-5 w-5" aria-hidden="true" /> {week.label}</p>
+        <p className="mt-1 tls-type-small text-white/55">{weekHeading(week)} – in dieser Woche wird nicht gespielt.</p>
       </div>
     );
   }
   return (
     <div className="tls-league-weekpanel" data-kind={week.kind} data-testid={`league-weekpanel-${week.week}`}>
       <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
-        <h3 className="font-heading text-2xl font-black uppercase leading-none">{week.label}</h3>
-        <p className="text-xs text-white/55 tabular-nums">{weekHeading(week)}{progressLine(week) ? ` · ${progressLine(week)}` : ""}</p>
+        <h3 className="tls-type-section leading-none">{week.label}</h3>
+        <p className="tls-type-small text-white/55 tabular-nums">{weekHeading(week)}{progressLine(week) ? ` · ${progressLine(week)}` : ""}</p>
       </div>
       <PlannedModes order={order} week={week} />
       {week.matches.length ? (
         <StaggerIn as="ul" key={week.week} className="tls-league-week__list">
           {week.matches.map((match) => <MatchRow key={match.id} match={match} logos={logos} />)}
         </StaggerIn>
-      ) : <p className="mt-4 text-sm text-white/55">Reservewoche – hier landen verschobene Spiele.</p>}
+      ) : <p className="mt-4 tls-type-small text-white/55">Reservewoche – hier landen verschobene Spiele.</p>}
     </div>
   );
 }
@@ -364,13 +364,13 @@ export function StaffelPlan({ leagueSlug, seasonSlug, staffel, order, week: chos
   }, [selected?.week]);
 
   if (error && !data) {
-    return <p className="text-sm text-white/55" role="status">Die Staffel konnte gerade nicht geladen werden.</p>;
+    return <p className="tls-type-small text-white/55" role="status">Die Staffel konnte gerade nicht geladen werden.</p>;
   }
   if (!data) {
     return <div className="tls-league-skeleton" aria-busy="true" aria-label="Lade Spieltage" />;
   }
   if (!weeks.length) {
-    return <p className="tls-league-weekpanel text-sm text-white/60" data-testid={`league-plan-empty-${staffel.staffel}`}>Der Spielplan steht, sobald die Staffel startet.</p>;
+    return <p className="tls-league-weekpanel tls-type-small text-white/60" data-testid={`league-plan-empty-${staffel.staffel}`}>Der Spielplan steht, sobald die Staffel startet.</p>;
   }
   const index = weeks.indexOf(selected);
   const step = (by) => {
@@ -400,11 +400,11 @@ export function StaffelPlan({ leagueSlug, seasonSlug, staffel, order, week: chos
       </ol>
       {selected ? <WeekPanel week={selected} logos={logos} order={order} /> : null}
       <div className="mt-3 flex items-center justify-between gap-3">
-        <button type="button" className="tls-btn tls-btn--quiet inline-flex min-h-[44px] items-center gap-1 rounded-sm px-3 py-2 text-xs font-bold uppercase tracking-wider"
+        <button type="button" className="tls-btn tls-btn--quiet inline-flex min-h-[44px] items-center gap-1 rounded-sm px-3 py-2 tls-type-label"
           onClick={() => step(-1)} disabled={index <= 0} data-testid="league-week-prev">
           <ChevronLeft className="h-4 w-4" aria-hidden="true" /> Woche davor
         </button>
-        <button type="button" className="tls-btn tls-btn--quiet inline-flex min-h-[44px] items-center gap-1 rounded-sm px-3 py-2 text-xs font-bold uppercase tracking-wider"
+        <button type="button" className="tls-btn tls-btn--quiet inline-flex min-h-[44px] items-center gap-1 rounded-sm px-3 py-2 tls-type-label"
           onClick={() => step(1)} disabled={index >= weeks.length - 1} data-testid="league-week-next">
           Woche danach <ChevronRight className="h-4 w-4" aria-hidden="true" />
         </button>

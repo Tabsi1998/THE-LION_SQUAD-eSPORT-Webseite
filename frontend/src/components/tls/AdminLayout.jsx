@@ -557,12 +557,12 @@ export function AdminLayout({ children }) {
               to={mfaSetupPath(location.pathname)}
               onClick={() => setOpenMobile(false)}
               data-testid="admin-nav-mfa-setup"
-              className="mb-3 flex items-start gap-3 rounded-sm border border-[#FFD700]/40 bg-[#FFD700]/5 px-3 py-2.5 text-sm font-semibold text-[#FFD700] hover:bg-[#FFD700]/10"
+              className="mb-3 flex items-start gap-3 rounded-sm border border-[#FFD700]/40 bg-[#FFD700]/5 px-3 py-2.5 tls-type-small font-semibold text-[#FFD700] hover:bg-[#FFD700]/10"
             >
               <ShieldCheck className="w-4 h-4 shrink-0 mt-0.5" />
               <span>
                 <span className="block">2FA einrichten</span>
-                <span className="block text-[11px] font-normal text-white/60">Die Verwaltung öffnet sich erst mit bestätigter Zwei-Faktor-Anmeldung.</span>
+                <span className="block tls-type-small font-normal text-white/60">Die Verwaltung öffnet sich erst mit bestätigter Zwei-Faktor-Anmeldung.</span>
               </span>
             </Link>
           )}
@@ -573,7 +573,7 @@ export function AdminLayout({ children }) {
                 onClick={() => toggleGroup(RECENT_GROUP)}
                 aria-expanded={groupIsOpen(RECENT_GROUP)}
                 data-testid={`admin-nav-group-${RECENT_GROUP}`}
-                className="w-full flex items-center justify-between gap-2 px-3 py-1.5 text-[9px] font-black uppercase tracking-[0.25em] text-quiet hover:text-white/80 transition-colors"
+                className="w-full flex items-center justify-between gap-2 px-3 py-1.5 tls-type-label text-quiet hover:text-white/80 transition-colors"
               >
                 <span className="tls-wrap">{RECENT_GROUP}</span>
                 <span className="flex items-center gap-1.5 shrink-0">
@@ -591,7 +591,7 @@ export function AdminLayout({ children }) {
                       onClick={() => setOpenMobile(false)}
                       data-recent="true"
                       data-testid={`admin-nav-recent-${it.to.split("/").pop() || "dashboard"}`}
-                      className="flex items-center gap-3 px-3 py-2 rounded-sm text-sm font-semibold text-white/70 hover:text-white hover:bg-white/5 transition-all"
+                      className="flex items-center gap-3 px-3 py-2 rounded-sm tls-type-small font-semibold text-white/70 hover:text-white hover:bg-white/5 transition-all"
                     >
                       <it.icon className="w-4 h-4 shrink-0" />
                       <span className="tls-wrap">{it.label}</span>
@@ -610,7 +610,7 @@ export function AdminLayout({ children }) {
                   onClick={() => toggleGroup(group.label)}
                   aria-expanded={open}
                   data-testid={`admin-nav-group-${group.label}`}
-                  className="w-full flex items-center justify-between gap-2 px-3 py-1.5 text-[9px] font-black uppercase tracking-[0.25em] text-quiet hover:text-white/80 transition-colors"
+                  className="w-full flex items-center justify-between gap-2 px-3 py-1.5 tls-type-label text-quiet hover:text-white/80 transition-colors"
                 >
                   <span className="tls-wrap">{group.label}</span>
                   <span className="flex items-center gap-1.5 shrink-0">
@@ -629,7 +629,7 @@ export function AdminLayout({ children }) {
                         onClick={() => setOpenMobile(false)}
                         data-testid={`admin-nav-${it.to.split("/").pop() || "dashboard"}`}
                         className={({ isActive }) =>
-                          `flex items-center gap-3 px-3 py-2.5 scroll-my-3 rounded-sm text-sm font-semibold transition-all ${
+                          `flex items-center gap-3 px-3 py-2.5 scroll-my-3 rounded-sm tls-type-small font-semibold transition-all ${
                             isActive
                               ? "bg-[#29B6E8]/15 text-[#29B6E8] border-l-2 border-[#29B6E8]"
                               : "text-white/70 hover:text-white hover:bg-white/5"
@@ -640,7 +640,7 @@ export function AdminLayout({ children }) {
                         <span className="min-w-0">
                           <span className="block tls-wrap">{it.label}</span>
                           {/* Untertitel nur in der Suche (#2111, N1): welche „Saison“ gemeint ist. */}
-                          {searchQuery && it.hint ? <span className="block truncate text-[10px] font-normal text-quiet" data-testid={`admin-nav-hint-${it.to.split("/").pop()}`}>{it.hint}</span> : null}
+                          {searchQuery && it.hint ? <span className="block truncate tls-type-small font-normal text-quiet" data-testid={`admin-nav-hint-${it.to.split("/").pop()}`}>{it.hint}</span> : null}
                         </span>
                       </NavLink>
                     ))}
@@ -650,12 +650,12 @@ export function AdminLayout({ children }) {
             );
           })}
           {visibleGroups.length === 0 && (searchQuery || !mfaHint) && (
-            <div className="px-3 py-8 text-center text-xs text-quiet">
+            <div className="px-3 py-8 text-center tls-type-small text-quiet">
               <div>Keine Admin-Seite gefunden.</div>
               <button
                 type="button"
                 onClick={() => setNavQuery("")}
-                className="mt-3 rounded-sm border border-[#29B6E8]/40 px-3 py-2 text-[10px] font-bold uppercase tracking-wider text-[#29B6E8] hover:bg-[#29B6E8]/10"
+                className="mt-3 rounded-sm border border-[#29B6E8]/40 px-3 py-2 tls-type-label text-[#29B6E8] hover:bg-[#29B6E8]/10"
               >
                 Suche leeren
               </button>
@@ -667,19 +667,19 @@ export function AdminLayout({ children }) {
           <Link
             to="/"
             data-testid="admin-exit-link"
-            className="flex items-center gap-2 px-3 py-2 text-xs font-bold uppercase tracking-wider text-white/60 hover:text-[#29B6E8]"
+            className="flex items-center gap-2 px-3 py-2 tls-type-label text-white/60 hover:text-[#29B6E8]"
           >
             <ExternalLink className="w-3.5 h-3.5" /> Public Seite
           </Link>
           <div className="px-3 pt-2 flex items-center justify-between">
-            <div className="text-xs min-w-0">
+            <div className="tls-type-small min-w-0">
               <div className="text-white font-semibold tls-wrap max-w-[130px]">{user?.display_name || user?.username}</div>
-              <div className="text-[10px] text-[#29B6E8] uppercase tracking-widest">{roleLabel(user?.role)}</div>
+              <div className="tls-type-label text-[#29B6E8]">{roleLabel(user?.role)}</div>
             </div>
             <button
               onClick={async () => { if (await logout()) nav("/"); }}
               data-testid="admin-logout"
-              className="inline-flex items-center gap-1.5 px-2 py-2 text-[#FF3B30] border border-[#FF3B30]/30 hover:bg-[#FF3B30]/10 rounded-sm text-[10px] font-bold uppercase tracking-wider shrink-0"
+              className="inline-flex items-center gap-1.5 px-2 py-2 text-[#FF3B30] border border-[#FF3B30]/30 hover:bg-[#FF3B30]/10 rounded-sm tls-type-label shrink-0"
               aria-label="Logout"
             >
               <LogOut className="w-4 h-4" />

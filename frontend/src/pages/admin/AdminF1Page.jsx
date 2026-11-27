@@ -11,6 +11,7 @@ import { sortByNearestDate } from "@/lib/contentSort";
 import { F1_STATUS_LABELS, statusFilterOptions } from "@/lib/fastLapStatus";
 import { Plus, Flag, Search, Download } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
+import { ShortCaps } from "@/components/tls/ShortCaps";
 
 export default function AdminF1Page() {
   // Globale Aktionen nur für die Turnierleitung mit Zwei-Faktor (#1028), Helfer sehen die ihres Einsatzes.
@@ -90,8 +91,8 @@ export default function AdminF1Page() {
     <AdminLayout>
       <div className="flex items-center justify-between mb-8">
         <div>
-          <span className="text-[11px] font-bold uppercase tracking-[0.3em] text-[#29B6E8]">eSports</span>
-          <h1 className="font-heading text-3xl md:text-4xl font-black uppercase">Fast Lap</h1>
+          <span className="tls-type-label text-[#29B6E8]">eSports</span>
+          <h1 className="tls-type-title"><ShortCaps>Fast Lap</ShortCaps></h1>
         </div>
         {isTournamentLead && (
           <Link to="/admin/f1/new" data-testid="admin-f1-new-btn" className="inline-flex items-center gap-2 px-5 py-2.5 bg-[#29B6E8] text-black font-bold uppercase tracking-wider rounded-sm hover:bg-[#1E95C2]">
@@ -122,12 +123,12 @@ export default function AdminF1Page() {
               type="button"
               onClick={exportCsv}
               disabled={filteredList.length === 0}
-              className="inline-flex items-center justify-center gap-2 rounded-sm border border-white/15 px-3 py-2 text-xs font-bold uppercase tracking-wider text-white/65 hover:border-[#29B6E8]/45 hover:text-white disabled:opacity-40"
+              className="inline-flex items-center justify-center gap-2 rounded-sm border border-white/15 px-3 py-2 tls-type-label text-white/65 hover:border-[#29B6E8]/45 hover:text-white disabled:opacity-40"
             >
               <Download className="h-3.5 w-3.5" /> CSV
             </button>
           </div>
-          <div className="mt-2 text-xs text-white/45">{filteredList.length} / {list.length} Challenges sichtbar</div>
+          <div className="mt-2 tls-type-small text-white/45">{filteredList.length} / {list.length} Challenges sichtbar</div>
         </div>
       )}
       <div className="space-y-3">
@@ -137,8 +138,8 @@ export default function AdminF1Page() {
               <Flag className="w-6 h-6 text-[#29B6E8]" />
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2"><StatusBadge status={c.status} /></div>
-                <h3 className="font-heading text-xl font-bold">{c.title}</h3>
-                <div className="text-xs text-white/50">{c.track_count} Strecken · {c.participant_count} Fahrer</div>
+                <h3 className="tls-type-card">{c.title}</h3>
+                <div className="tls-type-small text-white/50">{c.track_count} Strecken · {c.participant_count} Fahrer</div>
               </div>
             </div>
           </Link>

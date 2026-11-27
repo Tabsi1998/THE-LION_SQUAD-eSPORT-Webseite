@@ -29,7 +29,7 @@ export function EmblemField({ value, onChange, inherited = "", inheritedLabel = 
         <LeagueEmblem src={shown} size={72} />
         <LeagueEmblem src={shown} size={40} />
         <LeagueEmblem src={shown} size={24} />
-        <span className="text-[11px] text-white/50">
+        <span className="tls-type-small text-white/50">
           {value ? "Ligaseite, Übersicht, Teamseite, Spielseite" : inherited ? inheritedLabel : "Ohne Emblem steht das Liga-Zeichen."}
         </span>
       </div>
@@ -62,11 +62,11 @@ export function BannerField({ url, focus, onChange, inherited = null, inheritedL
       <ImageUpload value={url} onChange={(next) => onChange(next, next ? current : null)} testId={testId} variant="wide" allowLibrary {...media} />
       {url ? (
         <div className="mt-3 space-y-2" data-testid={`${testId}-focus`}>
-          <div className="flex flex-wrap items-center gap-2 text-xs text-white/60" role="group" aria-label="Fokuspunkt für">
+          <div className="flex flex-wrap items-center gap-2 tls-type-small text-white/60" role="group" aria-label="Fokuspunkt für">
             <span>Fokuspunkt für</span>
             {TARGETS.map(([key, label, Icon]) => (
               <button key={key} type="button" onClick={() => setTarget(key)} aria-pressed={target === key} data-testid={`${testId}-target-${key}`}
-                className={`tls-btn ${target === key ? "tls-btn--secondary" : "tls-btn--quiet"} inline-flex items-center gap-1.5 rounded-sm px-2.5 py-1 text-[11px] font-bold uppercase tracking-wider`}>
+                className={`tls-type-label tls-btn ${target === key ? "tls-btn--secondary" : "tls-btn--quiet"} inline-flex items-center gap-1.5 rounded-sm px-2.5 py-1`}>
                 <Icon className="h-3.5 w-3.5" aria-hidden="true" /> {label}
               </button>
             ))}
@@ -80,11 +80,11 @@ export function BannerField({ url, focus, onChange, inherited = null, inheritedL
                 style={{ left: `${current[x]}%`, top: `${current[y]}%` }} />
             ))}
           </button>
-          <p className="text-[11px] text-white/45">Dieser Punkt bleibt beim Zuschneiden immer sichtbar ({current[keyX]} % / {current[keyY]} %).</p>
+          <p className="tls-type-small text-white/45">Dieser Punkt bleibt beim Zuschneiden immer sichtbar ({current[keyX]} % / {current[keyY]} %).</p>
         </div>
       ) : null}
       {shown ? <BannerPreview banner={shown} emblem={emblem} accent={accent} testId={`${testId}-crops`} /> : null}
-      {!url && inherited ? <p className="mt-1.5 text-xs text-white/55" data-testid={`${testId}-inherited`}>{inheritedLabel}</p> : null}
+      {!url && inherited ? <p className="mt-1.5 tls-type-small text-white/55" data-testid={`${testId}-inherited`}>{inheritedLabel}</p> : null}
     </FieldLabel>
   );
 }
@@ -98,7 +98,7 @@ function BannerPreview({ banner, emblem, accent, testId }) {
         <span className="absolute inset-0 bg-gradient-to-b from-transparent via-transparent to-black/70" aria-hidden="true" />
         <span className="absolute bottom-1.5 left-1.5"><LeagueEmblem src={emblem} size={22} /></span>
       </div>
-      <figcaption className="mt-1 text-[10px] uppercase tracking-wider text-white/45">{label}</figcaption>
+      <figcaption className="mt-1 tls-type-label text-white/45">{label}</figcaption>
     </figure>
   );
   return (
@@ -121,18 +121,18 @@ export function AccentField({ value, onChange, testId = "league-accent" }) {
           aria-label="Akzentfarbe wählen" className="h-9 w-12 cursor-pointer rounded-sm border border-white/10 bg-transparent" data-testid={`${testId}-picker`} />
         <TextField label="" value={value || ""} onChange={(next) => onChange(next.trim())} placeholder="leer = Vereinsfarbe" maxLength={7} testId={testId} className="w-36" />
         {value ? (
-          <button type="button" onClick={() => onChange("")} className="tls-btn tls-btn--quiet rounded-sm px-2.5 py-1 text-[11px] font-bold uppercase tracking-wider" data-testid={`${testId}-reset`}>
+          <button type="button" onClick={() => onChange("")} className="tls-btn tls-btn--quiet rounded-sm px-2.5 py-1 tls-type-label" data-testid={`${testId}-reset`}>
             Vereinsfarbe
           </button>
         ) : null}
       </div>
-      <div className="mt-2 flex flex-wrap items-center gap-3 text-xs" style={accentStyle(color)} data-testid={`${testId}-preview`}>
+      <div className="mt-2 flex flex-wrap items-center gap-3 tls-type-small" style={accentStyle(color)} data-testid={`${testId}-preview`}>
         <span className="tls-league-accent font-bold uppercase tracking-[0.2em]">Spieltag 3</span>
-        <span className="rounded-sm px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider"
+        <span className="rounded-sm px-2 py-0.5 tls-type-label"
           style={{ background: `rgb(${accentStyle(color)["--league-accent-rgb"]})`, color: accentStyle(color)["--league-on-accent"] }}>Abzeichen</span>
         {ratio && !problem ? <span className="text-white/50" data-testid={`${testId}-ratio`}>Kontrast {ratio.toFixed(1).replace(".", ",")} : 1 – gut lesbar</span> : null}
       </div>
-      {problem ? <p className="mt-1 text-xs text-warn" role="alert" data-testid={`${testId}-problem`}>{problem}</p> : null}
+      {problem ? <p className="mt-1 tls-type-small text-warn" role="alert" data-testid={`${testId}-problem`}>{problem}</p> : null}
     </FieldLabel>
   );
 }
@@ -144,7 +144,7 @@ export function PrizeEditor({ rows, onChange, testId = "prizes", emptyHint }) {
   const nextPlace = String(Math.max(0, ...rows.map((row) => Number(row.place) || 0)) + 1);
   return (
     <div className="space-y-2" data-testid={testId}>
-      <div className="text-[11px] font-bold uppercase tracking-widest text-white/60">Gewinne – um was gespielt wird</div>
+      <div className="tls-type-small font-bold text-white/60">Gewinne – um was gespielt wird</div>
       {rows.length ? rows.map((row, index) => (
         <div key={index} className="rounded-sm border border-white/10 bg-[#0A0A0A] p-3 space-y-2" data-testid={`${testId}-row-${index}`}>
           <div className="grid grid-cols-[5rem_1fr_auto] items-end gap-2">
@@ -157,9 +157,9 @@ export function PrizeEditor({ rows, onChange, testId = "prizes", emptyHint }) {
           </div>
           <ImageUpload value={row.image_url} onChange={(url) => update(index, "image_url", url || "")} label="Bild (freiwillig)" testId={`${testId}-image-${index}`} variant="square" allowLibrary {...media} />
         </div>
-      )) : <p className="text-xs text-white/50">{emptyHint || "Noch keine Gewinne."}</p>}
+      )) : <p className="tls-type-small text-white/50">{emptyHint || "Noch keine Gewinne."}</p>}
       <button type="button" onClick={() => onChange([...rows, { place: nextPlace, text: "", image_url: "" }])} data-testid={`${testId}-add`}
-        className="tls-btn tls-btn--quiet inline-flex items-center gap-1.5 rounded-sm px-3 py-1.5 text-[11px] font-bold uppercase tracking-wider">
+        className="tls-btn tls-btn--quiet inline-flex items-center gap-1.5 rounded-sm px-3 py-1.5 tls-type-label">
         <Plus className="h-3.5 w-3.5" aria-hidden="true" /> Platz {nextPlace} hinzufügen
       </button>
     </div>

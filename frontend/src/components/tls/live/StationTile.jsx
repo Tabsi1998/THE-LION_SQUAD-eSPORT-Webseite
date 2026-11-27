@@ -86,7 +86,7 @@ export function moveTargets(stations = [], from, canOperate = () => true) {
     && station.next?.state !== "called" && canOperate(station));
 }
 
-const BTN = "inline-flex min-h-[44px] w-full items-center justify-center gap-2 rounded-sm px-3 py-2 text-xs font-bold uppercase tracking-wider";
+const BTN = "inline-flex min-h-[44px] w-full items-center justify-center gap-2 rounded-sm px-3 py-2 tls-type-label";
 
 export function StationTile({ station, index = 0, highlighted = "", busy = false, canOperate = false, targets = [], callable = [], onCall, onStart, onRelease, onBroken, onMove, onClear }) {
   const tone = stationTone(station);
@@ -100,20 +100,20 @@ export function StationTile({ station, index = 0, highlighted = "", busy = false
   return (
     <section className={`tls-live-station rounded-sm border bg-[#121212] p-3 ${broken ? "border-warn/40" : "border-white/10"}`} style={{ "--tls-live-i": index }} data-tone={tone} data-highlighted={highlighted || undefined} data-testid={`live-station-${station.id}`} aria-label={station.station_text || station.name}>
       <header className="flex items-center justify-between gap-2">
-        <h3 className="min-w-0 font-heading text-sm font-black uppercase tracking-wide text-white [overflow-wrap:anywhere]">{station.station_text || station.name}</h3>
-        <span className={`tls-live-chip inline-flex shrink-0 items-center gap-1.5 rounded-sm border px-2 py-0.5 text-[11px] font-bold uppercase tracking-wider ${chipClass}`} data-tone={tone} data-testid={`live-chip-${station.id}`}>
+        <h3 className="min-w-0 tls-type-small font-black text-white [overflow-wrap:anywhere]">{station.station_text || station.name}</h3>
+        <span className={`tls-live-chip inline-flex shrink-0 items-center gap-1.5 rounded-sm border px-2 py-0.5 tls-type-label ${chipClass}`} data-tone={tone} data-testid={`live-chip-${station.id}`}>
           {running && !broken ? <span className="tls-live-dot" aria-hidden="true" /> : null}{chip}
         </span>
       </header>
 
       {station.hold_issue?.kind === "other" ? (
-        <p className="tls-live-reveal mt-2 rounded-sm border border-white/15 bg-white/[0.03] px-2.5 py-2 text-xs text-white/70 [overflow-wrap:anywhere]" role="status" data-testid={`live-other-hint-${station.id}`}>
+        <p className="tls-live-reveal mt-2 rounded-sm border border-white/15 bg-white/[0.03] px-2.5 py-2 tls-type-small text-white/70 [overflow-wrap:anywhere]" role="status" data-testid={`live-other-hint-${station.id}`}>
           Hier spielt gerade „{station.hold_issue.tournament_title}“ – dessen Leitung ruft auf, startet und gibt frei.
         </p>
       ) : null}
 
       {tone === "stuck" ? (
-        <div className="tls-live-reveal mt-2 rounded-sm border border-warn/30 bg-warn/5 px-2.5 py-2 text-xs text-warn" role="status" data-testid={`live-stuck-hint-${station.id}`}>
+        <div className="tls-live-reveal mt-2 rounded-sm border border-warn/30 bg-warn/5 px-2.5 py-2 tls-type-small text-warn" role="status" data-testid={`live-stuck-hint-${station.id}`}>
           Als belegt gespeichert, aber ohne offenes Spiel – „Station räumen“ macht sie wieder frei.
           {canOperate && onClear ? (
             <button type="button" disabled={busy} onClick={() => onClear(station)} className={`tls-btn tls-btn--secondary mt-2 ${BTN}`} data-testid={`live-clear-${station.id}`}>
@@ -124,32 +124,32 @@ export function StationTile({ station, index = 0, highlighted = "", busy = false
       ) : null}
 
       {broken && holds ? (
-        <p className="tls-live-reveal mt-2 rounded-sm border border-warn/30 bg-warn/5 px-2.5 py-2 text-xs text-warn" role="status" data-testid={`live-broken-hint-${station.id}`}>
+        <p className="tls-live-reveal mt-2 rounded-sm border border-warn/30 bg-warn/5 px-2.5 py-2 tls-type-small text-warn" role="status" data-testid={`live-broken-hint-${station.id}`}>
           {running ? "Das laufende Spiel steht noch hier – mit „Umlegen“ auf eine freie Station, Uhr und Startzeit bleiben." : "Der Aufruf steht noch hier – mit „Umlegen“ an einer freien Station neu aufrufen."}
         </p>
       ) : null}
 
       {running ? (
         <div className="mt-3" data-testid={`live-running-${station.id}`}>
-          <div className="text-xs text-white/50 [overflow-wrap:anywhere]">{queueWhat(running)}</div>
-          <div className="text-sm font-bold text-white [overflow-wrap:anywhere]">{stationWho(running)}</div>
+          <div className="tls-type-small text-white/50 [overflow-wrap:anywhere]">{queueWhat(running)}</div>
+          <div className="tls-type-small font-bold text-white [overflow-wrap:anywhere]">{stationWho(running)}</div>
           <MatchClock startedAt={running.started_at} durationMinutes={running.duration_minutes} pausedAt={running.paused_at} pausedSeconds={running.paused_seconds} testId={`live-clock-${running.match_id}`} className="mt-2" />
         </div>
       ) : null}
 
       {next ? (
         <div className={`tls-live-next mt-3 rounded-sm border p-2.5 ${next.state === "called" ? "border-brand/40 bg-brand/5" : "border-white/10 bg-white/[0.02]"}`} data-state={next.state} data-testid={`live-next-${station.id}`}>
-          <div className="text-[11px] font-bold uppercase tracking-widest text-white/45">Als Nächstes</div>
-          <div className="mt-0.5 text-xs text-white/50 [overflow-wrap:anywhere]">{queueWhat(next)}</div>
-          <div className="text-sm font-bold text-white [overflow-wrap:anywhere]">{stationWho(next)}</div>
-          <div className={`mt-1 flex items-start gap-1.5 text-xs ${next.state === "called" ? "text-brand" : "text-white/60"}`}>
+          <div className="tls-type-label text-white/45">Als Nächstes</div>
+          <div className="mt-0.5 tls-type-small text-white/50 [overflow-wrap:anywhere]">{queueWhat(next)}</div>
+          <div className="tls-type-small font-bold text-white [overflow-wrap:anywhere]">{stationWho(next)}</div>
+          <div className={`mt-1 flex items-start gap-1.5 tls-type-small ${next.state === "called" ? "text-brand" : "text-white/60"}`}>
             {next.state === "called" ? <BellRing className="tls-live-bell mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden="true" /> : null}
             <span className="min-w-0 [overflow-wrap:anywhere]">{next.state === "called" ? calledLine(next) : when(next)}</span>
           </div>
           <NextAction station={station} next={next} running={running} broken={broken} blocked={tone === "other" || tone === "stuck"} busy={busy} canOperate={canOperate} onCall={onCall} onStart={onStart} />
         </div>
       ) : (
-        !running ? <p className="mt-3 text-sm text-white/45">{broken ? "Station ist defekt – nichts wird hierher geplant." : "Nichts mehr in der Warteschlange."}</p> : null
+        !running ? <p className="mt-3 tls-type-small text-white/45">{broken ? "Station ist defekt – nichts wird hierher geplant." : "Nichts mehr in der Warteschlange."}</p> : null
       )}
 
       {tone === "free" && canOperate && onCall && callable.length ? (
@@ -162,10 +162,10 @@ export function StationTile({ station, index = 0, highlighted = "", busy = false
               {callable.map((entry) => (
                 <li key={entry.match_id}>
                   <button type="button" disabled={busy || Boolean(entry.busy_at)} onClick={() => { setPanel(""); onCall(station, entry); }} className="tls-btn tls-btn--secondary flex min-h-[44px] w-full flex-col items-start rounded-sm px-3 py-2 text-left disabled:opacity-45" data-testid={`live-pick-${station.id}-${entry.match_id}`}>
-                    <span className="text-[11px] uppercase tracking-wider text-white/50 [overflow-wrap:anywhere]">{entry.match_id === next?.match_id ? "Als Nächstes · " : ""}{queueWhat(entry)}{when(entry) ? ` · ${when(entry)}` : ""}</span>
-                    <span className="text-sm font-bold normal-case tracking-normal text-white [overflow-wrap:anywhere]">{stationWho(entry)}</span>
+                    <span className="tls-type-label text-white/50 [overflow-wrap:anywhere]">{entry.match_id === next?.match_id ? "Als Nächstes · " : ""}{queueWhat(entry)}{when(entry) ? ` · ${when(entry)}` : ""}</span>
+                    <span className="tls-type-small font-bold text-white [overflow-wrap:anywhere]">{stationWho(entry)}</span>
                     {entry.busy_at ? (
-                      <span className="text-xs normal-case tracking-normal text-warn" data-testid={`live-pick-busy-${entry.match_id}`}>{busyText(entry.busy_at)}</span>
+                      <span className="tls-type-small text-warn" data-testid={`live-pick-busy-${entry.match_id}`}>{busyText(entry.busy_at)}</span>
                     ) : null}
                   </button>
                 </li>
@@ -176,7 +176,7 @@ export function StationTile({ station, index = 0, highlighted = "", busy = false
       ) : null}
 
       {after ? (
-        <div className="mt-2 text-xs text-white/50 [overflow-wrap:anywhere]" data-testid={`live-after-${station.id}`}>
+        <div className="mt-2 tls-type-small text-white/50 [overflow-wrap:anywhere]" data-testid={`live-after-${station.id}`}>
           <span className="font-bold uppercase tracking-wider text-white/40">Danach</span> · {queueWhat(after)} · {stationWho(after)}{when(after) ? ` · ${when(after)}` : ""}
         </div>
       ) : null}
@@ -218,7 +218,7 @@ export function StationTile({ station, index = 0, highlighted = "", busy = false
 
           {panel === "move" && holds ? (
             <div className="tls-live-reveal mt-3" data-testid={`live-move-picker-${station.id}`}>
-              <div className="text-[11px] font-bold uppercase tracking-widest text-white/50">{running ? "Laufendes Spiel auf welche Station?" : "Aufruf an welche Station?"}</div>
+              <div className="tls-type-label text-white/50">{running ? "Laufendes Spiel auf welche Station?" : "Aufruf an welche Station?"}</div>
               {targets.length ? (
                 <div className="mt-2 grid grid-cols-2 gap-2">
                   {targets.map((target) => (
@@ -227,7 +227,7 @@ export function StationTile({ station, index = 0, highlighted = "", busy = false
                     </button>
                   ))}
                 </div>
-              ) : <p className="mt-2 text-xs text-white/50">Gerade ist keine Station frei.</p>}
+              ) : <p className="mt-2 tls-type-small text-white/50">Gerade ist keine Station frei.</p>}
             </div>
           ) : null}
         </div>
@@ -240,7 +240,7 @@ export function StationTile({ station, index = 0, highlighted = "", busy = false
 function ConfirmPanel({ text, yes, busy, onYes, onNo, testId, yesTestId }) {
   return (
     <div className="tls-live-reveal mt-3 rounded-sm border border-white/10 bg-white/[0.03] p-2.5" data-testid={testId}>
-      <p className="text-xs text-white/70 [overflow-wrap:anywhere]">{text}</p>
+      <p className="tls-type-small text-white/70 [overflow-wrap:anywhere]">{text}</p>
       <div className="mt-2 grid grid-cols-2 gap-2">
         <button type="button" className={`tls-btn tls-btn--secondary ${BTN}`} onClick={onNo}>Abbrechen</button>
         <button type="button" disabled={busy} className={`tls-btn tls-btn--primary ${BTN}`} onClick={onYes} data-testid={yesTestId}>{yes}</button>
@@ -253,7 +253,7 @@ function NextAction({ station, next, running, broken, blocked, busy, canOperate,
   if (!next.ready) {
     // Worauf es wartet, sagt der Server (#1858): das Los je Runde (Show-Auslosung) oder ein offenes Vorspiel.
     const waiting = next.waiting_for === "draw" ? "wartet auf die Auslosung" : "wartet auf die Vorspiele";
-    return <p className="mt-2 flex items-center gap-1.5 text-xs text-white/45"><Hourglass className="h-3.5 w-3.5" aria-hidden="true" /> {waiting}</p>;
+    return <p className="mt-2 flex items-center gap-1.5 tls-type-small text-white/45"><Hourglass className="h-3.5 w-3.5" aria-hidden="true" /> {waiting}</p>;
   }
   if (next.state === "called") {
     // An einer defekten Station startet nichts - der Aufruf wird umgelegt.
@@ -263,7 +263,7 @@ function NextAction({ station, next, running, broken, blocked, busy, canOperate,
       </button>
     ) : null;
   }
-  if (running || blocked) return <p className="mt-2 text-xs text-white/45">{blocked ? "Aufrufen, sobald die Station frei ist." : "Aufrufen nach dem laufenden Spiel."}</p>;
+  if (running || blocked) return <p className="mt-2 tls-type-small text-white/45">{blocked ? "Aufrufen, sobald die Station frei ist." : "Aufrufen nach dem laufenden Spiel."}</p>;
   if (broken || !canOperate) return null;
   return (
     <button type="button" disabled={busy} onClick={() => onCall(station, next)} className={`tls-btn tls-btn--secondary mt-2.5 ${BTN} px-4`} data-testid={`live-call-${station.id}`}>

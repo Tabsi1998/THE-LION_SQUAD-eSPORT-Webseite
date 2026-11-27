@@ -24,19 +24,19 @@ export function CalendarStrip({ calendar }) {
   if (!calendar?.weeks?.length) return null;
   return (
     <div className="space-y-2" data-testid="season-calendar">
-      <p className="text-sm text-white/75">
+      <p className="tls-type-body text-white/75">
         {calendar.weeks.length} Wochen, davon {calendar.blocked_weeks.length} gesperrt – <strong className="text-white">{calendar.active_weeks} Spielwochen</strong>.
         {" "}Eine Staffel fasst damit höchstens <strong className="text-white">{calendar.max_teams_per_staffel} Teams</strong>; mehr Teams brauchen eine zweite Staffel.
       </p>
       <ol className="flex flex-wrap gap-1.5" aria-label="Spielwochen">
         {calendar.weeks.map((week) => (
           <li key={week.number} title={`${dayText(week.start_day)} – ${dayText(week.end_day)}`}
-            className={`rounded-sm border px-2 py-1 text-[11px] tabular-nums ${week.blocked ? "border-white/5 bg-transparent text-white/35 line-through" : "border-white/10 bg-[#0A0A0A] text-white/75"}`}>
+            className={`rounded-sm border px-2 py-1 tls-type-small tabular-nums ${week.blocked ? "border-white/5 bg-transparent text-quiet line-through" : "border-white/10 bg-[#0A0A0A] text-white/75"}`}>
             <span className="font-bold">W{week.number}</span> {dayText(week.start_day)}
           </li>
         ))}
       </ol>
-      <p className="text-[11px] text-white/45">Eine Woche ist gesperrt, wenn mehr als die Hälfte ihrer Tage in einer Sperrzeit liegt. Stand nach dem letzten Speichern.</p>
+      <p className="tls-type-small text-white/45">Eine Woche ist gesperrt, wenn mehr als die Hälfte ihrer Tage in einer Sperrzeit liegt. Stand nach dem letzten Speichern.</p>
     </div>
   );
 }
@@ -45,7 +45,7 @@ function BlockedPeriods({ periods, onChange }) {
   const update = (index, key, value) => onChange(periods.map((period, at) => (at === index ? { ...period, [key]: value } : period)));
   return (
     <div className="space-y-2" data-testid="season-blocked">
-      <div className="text-[11px] font-bold uppercase tracking-widest text-white/60">Sperrzeiten</div>
+      <div className="tls-type-label text-white/60">Sperrzeiten</div>
       {periods.length ? periods.map((period, index) => (
         <div key={index} className="grid grid-cols-2 gap-2 sm:grid-cols-[1fr_1fr_1.5fr_auto] sm:items-end">
           <TextField label="Von" type="date" value={period.start_date} onChange={(value) => update(index, "start_date", value)} testId={`blocked-start-${index}`} />
@@ -57,9 +57,9 @@ function BlockedPeriods({ periods, onChange }) {
             <Trash2 className="w-4 h-4" aria-hidden="true" />
           </button>
         </div>
-      )) : <p className="text-xs text-white/50">Keine – jede Woche wird gespielt.</p>}
+      )) : <p className="tls-type-small text-white/50">Keine – jede Woche wird gespielt.</p>}
       <button type="button" onClick={() => onChange([...periods, { start_date: "", end_date: "", label: "" }])} data-testid="blocked-add"
-        className="tls-btn tls-btn--quiet px-3 py-1.5 rounded-sm text-[11px] font-bold uppercase tracking-wider inline-flex items-center gap-1.5">
+        className="tls-btn tls-btn--quiet px-3 py-1.5 rounded-sm tls-type-label inline-flex items-center gap-1.5">
         <CalendarOff className="w-3.5 h-3.5" aria-hidden="true" /> Sperrzeit hinzufügen
       </button>
     </div>

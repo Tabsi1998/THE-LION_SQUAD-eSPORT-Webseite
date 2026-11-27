@@ -10,7 +10,7 @@ export function LeagueOverallStanding({ rows, showTeam = false, testId = "league
   if (!rows?.length) return null;
   return (
     <section data-testid={testId} aria-labelledby={`${testId}-title`}>
-      <h2 id={`${testId}-title`} className="mb-4 flex items-center gap-2 font-heading text-2xl font-bold uppercase">
+      <h2 id={`${testId}-title`} className="mb-4 flex items-center gap-2 tls-type-section">
         <Trophy className="h-5 w-5 text-[#29B6E8]" aria-hidden="true" /> Gesamtwertung
       </h2>
       <ul className="divide-y divide-white/5 rounded-sm border border-white/10 bg-[#121212]">
@@ -26,13 +26,13 @@ export function LeagueOverallStanding({ rows, showTeam = false, testId = "league
                   {/* Vereinsintern (#2521): Gäste sähen diese Wertung nicht oder nicht so - eine Season „Nur Mitglieder“ zählt mit. */}
                   {row.internal ? <InternalTag testId={`${testId}-${row.level}-internal`} /> : null}
                 </div>
-                <p className="flex flex-wrap items-center gap-x-2 text-xs text-white/60 [overflow-wrap:anywhere] hyphens-auto">
+                <p className="flex flex-wrap items-center gap-x-2 tls-type-small text-white/60 [overflow-wrap:anywhere] hyphens-auto">
                   {/* Liga-Abzeichen (#1638) klein vor der Liga N - der Text daneben trägt den Beinamen. */}
                   <LeagueBadge badge={{ level: row.level }} size="list" label={false} testId={`${testId}-${row.level}-badge`} />
                   {[row.division_label, showTeam ? row.name : "", row.closed ? (row.complete ? "Endstand" : "Endstand ohne nicht öffentliche Seasons") : "laufend"].filter(Boolean).join(" · ")}
                 </p>
               </div>
-              <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm tabular-nums">
+              <div className="flex flex-wrap items-center gap-x-3 gap-y-1 tls-type-small tabular-nums">
                 {row.closed && row.complete && row.place === 1 ? <span className="inline-flex items-center gap-1 font-bold text-honor"><Trophy className="h-4 w-4" aria-hidden="true" /> Gesamtsieger</span> : null}
                 {row.closed ? <Lock className="h-3.5 w-3.5 text-white/40" aria-label="Abgeschlossen" /> : null}
                 <span className="text-white/80">Platz {row.place} von {row.of}</span>

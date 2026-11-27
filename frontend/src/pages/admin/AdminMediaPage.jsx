@@ -15,6 +15,7 @@ import { FileText, Search, RefreshCw, Upload, AlertTriangle, CheckCircle2 } from
 import { MediaDetailSheet } from "./media/MediaDetailSheet";
 import { MediaPreview, UploadEventsPanel } from "./media/parts";
 import { BACKEND, IMG_EXT, MEDIA_SCOPE_LABELS, VIDEO_EXT, cacheBustedMediaUrl, fmtBytes } from "./media/shared";
+import { ShortCaps } from "@/components/tls/ShortCaps";
 
 const ORIGINAL_EXT = ORIGINAL_MEDIA_EXTENSIONS;
 
@@ -388,9 +389,9 @@ export default function AdminMediaPage() {
 
   return (
     <AdminLayout>
-      <span className="text-[11px] font-bold uppercase tracking-[0.3em] text-[#FFD700]">Content</span>
-      <h1 className="font-heading text-3xl md:text-4xl font-black uppercase mt-1">Medien</h1>
-      <p className="mt-2 text-white/55 text-sm max-w-2xl">
+      <span className="tls-type-label text-[#FFD700]">Content</span>
+      <h1 className="tls-type-title mt-1"><ShortCaps>Medien</ShortCaps></h1>
+      <p className="mt-2 text-white/55 tls-type-body max-w-2xl">
         Alle hochgeladenen Bilder und Dateien an einem Ort: ansehen, Adresse kopieren, drehen oder löschen.
       </p>
 
@@ -402,7 +403,7 @@ export default function AdminMediaPage() {
               key={k}
               data-testid={`media-filter-${k}`}
               onClick={() => setFilter(k)}
-              className={`px-3 py-1.5 text-[11px] font-bold uppercase tracking-wider rounded-sm ${
+              className={`px-3 py-1.5 tls-type-label rounded-sm ${
                 filter === k ? "bg-[#FFD700] text-black" : "text-white/60 hover:text-white"
               }`}
             >
@@ -420,7 +421,7 @@ export default function AdminMediaPage() {
             <option key={key} value={key}>{label}</option>
           ))}
         </select>
-        <label className="h-[34px] inline-flex items-center gap-2 border border-white/10 bg-[#121212] rounded-sm px-3 text-xs font-bold uppercase tracking-wider text-white/70">
+        <label className="h-[34px] inline-flex items-center gap-2 border border-white/10 bg-[#121212] rounded-sm px-3 tls-type-label text-white/70">
           <input
             type="checkbox"
             checked={includeUserUploads}
@@ -443,15 +444,15 @@ export default function AdminMediaPage() {
         <button
           onClick={load}
           data-testid="media-refresh"
-          className="px-3 py-2 border border-white/10 hover:bg-white/5 rounded-sm text-xs font-bold uppercase tracking-wider inline-flex items-center gap-2"
+          className="px-3 py-2 border border-white/10 hover:bg-white/5 rounded-sm tls-type-label inline-flex items-center gap-2"
         >
           <RefreshCw className="w-3.5 h-3.5" /> Neu laden
         </button>
-        <label className={`px-3 py-2 bg-[#FFD700] text-black rounded-sm text-xs font-bold uppercase tracking-wider inline-flex items-center gap-2 cursor-pointer ${uploading ? "opacity-60" : ""}`} data-testid="media-upload">
+        <label className={`px-3 py-2 bg-[#FFD700] text-black rounded-sm tls-type-label inline-flex items-center gap-2 cursor-pointer ${uploading ? "opacity-60" : ""}`} data-testid="media-upload">
           <Upload className="w-3.5 h-3.5" /> {uploading ? "Lade hoch…" : "Medien hochladen"}
           <input type="file" accept={MEDIA_ACCEPT} multiple disabled={uploading} className="hidden" onChange={(e) => { uploadMediaFiles(e.target.files); e.target.value = ""; }} />
         </label>
-        <span className="ml-auto text-xs text-white/45">
+        <span className="ml-auto tls-type-small text-white/45">
           {total} {total === 1 ? "Datei" : "Dateien"} · {fmtBytes(totalSize)}
         </span>
       </div>
@@ -478,23 +479,23 @@ export default function AdminMediaPage() {
               }}
               className="border border-white/10 bg-[#121212] rounded-sm p-3 text-left hover:border-white/25"
             >
-              <div className="text-[10px] uppercase tracking-widest text-white/45 font-bold">{label}</div>
-              <div className={`font-heading text-2xl font-black mt-1 tabular-nums ${color}`}>{value}</div>
+              <div className="tls-type-label text-white/45">{label}</div>
+              <div className={`tls-type-section tls-type-num mt-1 ${color}`}>{value}</div>
             </button>
           ))}
         </div>
       )}
       {mediaAudit?.unused > 0 && (
         <div className="mt-3 flex flex-wrap items-center gap-3">
-          <button type="button" onClick={cleanupUnused} disabled={cleaning} data-testid="media-cleanup-unused" className="tls-btn tls-btn--danger min-h-11 rounded-sm text-xs font-bold uppercase tracking-wider disabled:opacity-50">
+          <button type="button" onClick={cleanupUnused} disabled={cleaning} data-testid="media-cleanup-unused" className="tls-btn tls-btn--danger min-h-11 rounded-sm tls-type-label disabled:opacity-50">
             {cleaning ? "Prüfe …" : "Ungenutzte löschen"}
           </button>
-          <span className="text-xs text-white/45">Vor dem Löschen siehst du, wie viele es sind.</span>
+          <span className="tls-type-small text-white/45">Vor dem Löschen siehst du, wie viele es sind.</span>
         </div>
       )}
       {/* Original-Bilder der Serien (#1933): privat abgelegt, gepflegt im Ergebnisblatt des Termins - hier nur gezählt. */}
       {mediaAudit?.reference_originals?.count > 0 && (
-        <p className="mt-2 text-xs text-white/50 tabular-nums" data-testid="media-reference-originals">
+        <p className="mt-2 tls-type-small text-white/50 tabular-nums" data-testid="media-reference-originals">
           Dazu privat: {mediaAudit.reference_originals.count} Original-Bilder der Serien · {fmtBytes(mediaAudit.reference_originals.bytes)} – sie stehen im Ergebnisblatt ihres Termins, nicht in dieser Liste.
         </p>
       )}
@@ -503,17 +504,17 @@ export default function AdminMediaPage() {
         <details className="mt-4 border border-white/10 bg-[#0A0A0A] rounded-sm p-4 group">
           <summary className="cursor-pointer list-none flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
             <div>
-              <div className="text-[11px] font-bold uppercase tracking-[0.25em] text-[#29B6E8]">Medienpflege</div>
-              <p className="mt-1 text-xs text-white/45">Bereiche und das Einsortieren alter Uploads – nur bei Bedarf einblenden.</p>
+              <div className="tls-type-label text-[#29B6E8]">Medienpflege</div>
+              <p className="mt-1 tls-type-small text-white/45">Bereiche und das Einsortieren alter Uploads – nur bei Bedarf einblenden.</p>
             </div>
-            <span className="text-[10px] font-bold uppercase tracking-widest text-white/45 group-open:text-white">Einblenden</span>
+            <span className="tls-type-label text-white/45 group-open:text-white">Einblenden</span>
           </summary>
           <div className="mt-4 flex flex-wrap gap-2">
             <button
               onClick={auditScopes}
               disabled={auditingScopes}
               data-testid="media-scope-audit"
-              className="px-3 py-2 border border-white/10 hover:border-[#29B6E8]/60 hover:text-[#29B6E8] rounded-sm text-xs font-bold uppercase tracking-wider inline-flex items-center gap-2 disabled:opacity-50"
+              className="px-3 py-2 border border-white/10 hover:border-[#29B6E8]/60 hover:text-[#29B6E8] rounded-sm tls-type-label inline-flex items-center gap-2 disabled:opacity-50"
             >
               {auditingScopes ? "Prüfe..." : "Zuordnung prüfen"}
             </button>
@@ -521,12 +522,12 @@ export default function AdminMediaPage() {
               onClick={repairScopes}
               disabled={repairingScopes}
               data-testid="media-scope-repair"
-              className="px-3 py-2 border border-[#FFD700]/40 text-[#FFD700] hover:bg-[#FFD700]/10 rounded-sm text-xs font-bold uppercase tracking-wider inline-flex items-center gap-2 disabled:opacity-50"
+              className="px-3 py-2 border border-[#FFD700]/40 text-[#FFD700] hover:bg-[#FFD700]/10 rounded-sm tls-type-label inline-flex items-center gap-2 disabled:opacity-50"
             >
               {repairingScopes ? "Sortiere..." : "Alte Uploads einsortieren"}
             </button>
           </div>
-          <div className="mt-3 flex flex-wrap gap-2 text-[10px] uppercase tracking-widest font-bold text-white/50">
+          <div className="mt-3 flex flex-wrap gap-2 tls-type-label text-white/50">
             {Object.entries(mediaAudit.by_scope).map(([scope, count]) => (
               <button
                 key={scope}
@@ -545,12 +546,12 @@ export default function AdminMediaPage() {
         <details className="mt-4 border border-white/10 bg-[#121212] rounded-sm p-4 group" data-testid="media-quality-checklist">
           <summary className="cursor-pointer list-none flex flex-col gap-2 md:flex-row md:items-start md:justify-between">
             <div>
-              <div className="text-[11px] font-bold uppercase tracking-[0.25em] text-[#29B6E8]">Medien-Prüfung</div>
-              <p className="mt-1 max-w-3xl text-xs text-white/50">
+              <div className="tls-type-label text-[#29B6E8]">Medien-Prüfung</div>
+              <p className="mt-1 max-w-3xl tls-type-small text-white/50">
                 Zeigt, wo bei den Medien etwas nicht stimmt. Bildbeschreibungen pflegt ihr dort, wo das Bild steht – es kann in News, Event, Galerie oder beim Sponsor etwas anderes bedeuten.
               </p>
             </div>
-            <span className="inline-flex items-center justify-center gap-2 rounded-sm border border-white/10 px-3 py-2 text-[10px] font-bold uppercase tracking-widest text-white/60 group-open:text-white">
+            <span className="inline-flex items-center justify-center gap-2 rounded-sm border border-white/10 px-3 py-2 tls-type-label text-white/60 group-open:text-white">
               Details einblenden
             </span>
           </summary>
@@ -569,11 +570,11 @@ export default function AdminMediaPage() {
                   style={{ borderColor: ok ? "rgba(255,255,255,0.1)" : `${color}66` }}
                 >
                   <div className="flex items-center justify-between gap-3">
-                    <span className="text-[10px] font-bold uppercase tracking-widest text-white/50">{check.label}</span>
+                    <span className="tls-type-label text-white/50">{check.label}</span>
                     {ok ? <CheckCircle2 className="h-4 w-4 text-[#00FF88]" /> : <AlertTriangle className="h-4 w-4" style={{ color }} />}
                   </div>
-                  <div className="mt-2 font-heading text-2xl font-black tabular-nums" style={{ color }}>{check.value || 0}</div>
-                  <div className="mt-1 text-xs text-white/45">{ok ? "Sauber." : check.detail}</div>
+                  <div className="mt-2 tls-type-section tls-type-num" style={{ color }}>{check.value || 0}</div>
+                  <div className="mt-1 tls-type-small text-white/45">{ok ? "Sauber." : check.detail}</div>
                 </button>
               );
             })}
@@ -585,12 +586,12 @@ export default function AdminMediaPage() {
         <div className="mt-4 border border-white/10 bg-[#0A0A0A] rounded-sm p-4">
           <div className="flex items-center justify-between gap-3 flex-wrap">
             <div>
-              <div className="text-[11px] font-bold uppercase tracking-widest text-white/50">Medien-Einsortierung</div>
-              <p className="mt-1 text-xs text-white/45">Zeigt, wie viele Uploads persönliche Profilbilder, Medien der Redaktion oder aus anderen Bereichen sind.</p>
+              <div className="tls-type-label text-white/50">Medien-Einsortierung</div>
+              <p className="mt-1 tls-type-small text-white/45">Zeigt, wie viele Uploads persönliche Profilbilder, Medien der Redaktion oder aus anderen Bereichen sind.</p>
             </div>
-            {scopeAudit.repair && <span className="text-[10px] uppercase tracking-widest font-bold text-[#00FF88]">Einsortiert</span>}
+            {scopeAudit.repair && <span className="tls-type-label text-[#00FF88]">Einsortiert</span>}
           </div>
-          <div className="mt-3 grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-2 text-xs">
+          <div className="mt-3 grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-2 tls-type-small">
             {[
               ["Gesamt", scopeAudit.summary.scanned],
               ["Schon sauber", scopeAudit.summary.already_scoped],
@@ -603,7 +604,7 @@ export default function AdminMediaPage() {
             ].map(([label, value]) => (
               <div key={label} className="border border-white/10 rounded-sm px-3 py-2">
                 <div className="text-white/45 uppercase tracking-wider font-bold">{label}</div>
-                <div className="font-display text-lg text-white mt-1">{value || 0}</div>
+                <div className="tls-type-card tls-type-num text-white mt-1">{value || 0}</div>
               </div>
             ))}
           </div>
@@ -613,9 +614,9 @@ export default function AdminMediaPage() {
       {/* Grid */}
       <div className="mt-6">
         {loading ? (
-          <div className="text-white/50 text-sm">Lade Medien…</div>
+          <div className="text-white/50 tls-type-small">Lade Medien…</div>
         ) : items.length === 0 ? (
-          <div className="border border-white/10 rounded-sm p-12 bg-[#121212] text-center text-white/40 text-sm">
+          <div className="border border-white/10 rounded-sm p-12 bg-[#121212] text-center text-quiet tls-type-small">
             Keine Dateien {q || filter !== "all" || scopeFilter !== "all" ? "gefunden" : "vorhanden"}.
           </div>
         ) : (
@@ -654,20 +655,20 @@ export default function AdminMediaPage() {
                     ) : (
                       <span className="flex flex-col items-center gap-2 text-white/40">
                         <FileText className="w-10 h-10" />
-                        <span className="text-[10px] font-mono uppercase">{isOriginal ? it.ext || "orig" : it.ext || "file"}</span>
+                        <span className="tls-type-label font-mono">{isOriginal ? it.ext || "orig" : it.ext || "file"}</span>
                       </span>
                     )}
                   </span>
                   <span className="block p-2">
-                    <span className="block text-[11px] font-mono text-white/70 truncate" title={it.filename}>{it.filename}</span>
+                    <span className="block tls-type-small font-mono text-white/70 truncate" title={it.filename}>{it.filename}</span>
                     <span id={`${infoId}-tags`} className="mt-1 flex flex-wrap gap-1">
-                      <span className="text-[9px] uppercase tracking-wider border border-white/10 px-1.5 py-0.5 text-white/45">{MEDIA_SCOPE_LABELS[it.media_scope] || MEDIA_SCOPE_LABELS.legacy}</span>
-                      {it.is_unused && <span className="text-[9px] uppercase tracking-wider border border-[#FFD700]/30 px-1.5 py-0.5 text-[#FFD700]">ungenutzt</span>}
-                      {!it.tracked && <span className="text-[9px] uppercase tracking-wider border border-[#FF3B30]/30 px-1.5 py-0.5 text-[#FF3B30]">nicht erfasst</span>}
-                      {it.duplicate_count > 1 && <span className="text-[9px] uppercase tracking-wider border border-[#FFD700]/30 px-1.5 py-0.5 text-[#FFD700]">duplikat</span>}
+                      <span className="tls-type-label border border-white/10 px-1.5 py-0.5 text-white/45">{MEDIA_SCOPE_LABELS[it.media_scope] || MEDIA_SCOPE_LABELS.legacy}</span>
+                      {it.is_unused && <span className="tls-type-label border border-[#FFD700]/30 px-1.5 py-0.5 text-[#FFD700]">ungenutzt</span>}
+                      {!it.tracked && <span className="tls-type-label border border-[#FF3B30]/30 px-1.5 py-0.5 text-[#FF3B30]">nicht erfasst</span>}
+                      {it.duplicate_count > 1 && <span className="tls-type-label border border-[#FFD700]/30 px-1.5 py-0.5 text-[#FFD700]">duplikat</span>}
                     </span>
-                    <span id={`${infoId}-size`} className="block text-[10px] text-white/40 mt-1">{fmtBytes(it.size)} · {it.usage_count || 0}x genutzt</span>
-                    {it.kept_for_results && <span id={`${infoId}-kept`} className="block text-[10px] text-white/60 mt-1" data-testid={`media-kept-${it.filename}`}>wird noch von gespeicherten Ergebnissen gezeigt</span>}
+                    <span id={`${infoId}-size`} className="block tls-type-small text-quiet mt-1">{fmtBytes(it.size)} · {it.usage_count || 0}x genutzt</span>
+                    {it.kept_for_results && <span id={`${infoId}-kept`} className="block tls-type-small text-white/60 mt-1" data-testid={`media-kept-${it.filename}`}>wird noch von gespeicherten Ergebnissen gezeigt</span>}
                   </span>
                 </button>
               );
@@ -676,9 +677,9 @@ export default function AdminMediaPage() {
         )}
         {pageCount > 1 && (
           <div className="mt-4 flex flex-wrap items-center justify-center gap-3" data-testid="media-pager">
-            <button type="button" onClick={() => setPage((value) => Math.max(0, value - 1))} disabled={page === 0 || loading} data-testid="media-page-prev" className="min-h-11 px-4 py-2 border border-white/10 hover:bg-white/5 rounded-sm text-xs font-bold uppercase tracking-wider disabled:opacity-40">Zurück</button>
-            <span className="text-xs tabular-nums text-white/60" data-testid="media-page-label">Seite {page + 1} von {pageCount}</span>
-            <button type="button" onClick={() => setPage((value) => Math.min(pageCount - 1, value + 1))} disabled={page >= pageCount - 1 || loading} data-testid="media-page-next" className="min-h-11 px-4 py-2 border border-white/10 hover:bg-white/5 rounded-sm text-xs font-bold uppercase tracking-wider disabled:opacity-40">Weiter</button>
+            <button type="button" onClick={() => setPage((value) => Math.max(0, value - 1))} disabled={page === 0 || loading} data-testid="media-page-prev" className="min-h-11 px-4 py-2 border border-white/10 hover:bg-white/5 rounded-sm tls-type-label disabled:opacity-40">Zurück</button>
+            <span className="tls-type-small tabular-nums text-white/60" data-testid="media-page-label">Seite {page + 1} von {pageCount}</span>
+            <button type="button" onClick={() => setPage((value) => Math.min(pageCount - 1, value + 1))} disabled={page >= pageCount - 1 || loading} data-testid="media-page-next" className="min-h-11 px-4 py-2 border border-white/10 hover:bg-white/5 rounded-sm tls-type-label disabled:opacity-40">Weiter</button>
           </div>
         )}
       </div>

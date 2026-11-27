@@ -20,7 +20,7 @@ function initials(name) {
 
 function FriendAvatar({ friend }) {
   const fallback = (
-    <span className="inline-flex w-8 h-8 shrink-0 items-center justify-center rounded-full bg-[#9F7AEA]/25 text-[11px] font-bold text-white" aria-hidden="true">
+    <span className="inline-flex w-8 h-8 shrink-0 items-center justify-center rounded-full bg-[#9F7AEA]/25 tls-type-small font-bold text-white" aria-hidden="true">
       {initials(friend.display_name)}
     </span>
   );
@@ -66,12 +66,12 @@ export function FriendsAtEvent({ event, user, over = false, path = "", scope = "
     <section className="space-y-4" data-section="friends" data-testid="event-friends">
       {data.hint && (
         <div className="border border-[#9F7AEA]/40 bg-[#9F7AEA]/5 rounded-sm p-4" role="note" data-testid="event-friends-hint">
-          <p className="text-sm text-white/85">Deine Freunde sehen, zu welchen Events du angemeldet bist.</p>
+          <p className="tls-type-small text-white/85">Deine Freunde sehen, zu welchen Events du angemeldet bist.</p>
           <div className="mt-3 flex flex-wrap gap-2">
-            <button type="button" disabled={busy} onClick={() => answerHint(false)} className="tls-btn tls-btn--quiet inline-flex min-h-11 items-center px-4 py-2 text-xs font-bold uppercase tracking-wider rounded-sm" data-testid="event-friends-hint-ok">
+            <button type="button" disabled={busy} onClick={() => answerHint(false)} className="tls-btn tls-btn--quiet inline-flex min-h-11 items-center px-4 py-2 tls-type-label rounded-sm" data-testid="event-friends-hint-ok">
               Verstanden
             </button>
-            <button type="button" disabled={busy} onClick={() => answerHint(true)} className="tls-btn tls-btn--secondary inline-flex min-h-11 items-center px-4 py-2 text-xs font-bold uppercase tracking-wider rounded-sm" data-testid="event-friends-hint-off">
+            <button type="button" disabled={busy} onClick={() => answerHint(true)} className="tls-btn tls-btn--secondary inline-flex min-h-11 items-center px-4 py-2 tls-type-label rounded-sm" data-testid="event-friends-hint-off">
               Ausschalten
             </button>
           </div>
@@ -79,10 +79,10 @@ export function FriendsAtEvent({ event, user, over = false, path = "", scope = "
       )}
       {!!friends.length && (
         <div>
-          <h2 className="font-heading text-2xl font-black uppercase mb-1 inline-flex items-center gap-2">
+          <h2 className="tls-type-section mb-1 inline-flex items-center gap-2">
             <Users className="w-5 h-5 text-[#9F7AEA]" aria-hidden="true" /> {over ? "Deine Freunde waren dabei" : "Von deinen Freunden dabei"}
           </h2>
-          <p className="text-sm text-white/60 mb-3" data-testid="event-friends-sentence">{friendsSentence(friends, { over })}.</p>
+          <p className="tls-type-small text-white/60 mb-3" data-testid="event-friends-sentence">{friendsSentence(friends, { over })}.</p>
           <ul className="grid sm:grid-cols-2 gap-2">
             {friends.slice(0, SHOWN).map((friend) => {
               const name = <span className="block font-bold text-white leading-tight break-words">{friend.display_name}</span>;
@@ -91,13 +91,13 @@ export function FriendsAtEvent({ event, user, over = false, path = "", scope = "
                   <FriendAvatar friend={friend} />
                   <span className="min-w-0">
                     {friend.username ? <Link to={`/u/${encodeURIComponent(friend.username)}`} className="hover:text-[#9F7AEA]">{name}</Link> : name}
-                    <span className="block text-xs text-white/55 break-words">{friendPlaces(friend, { scope }).join(" · ")}</span>
+                    <span className="block tls-type-small text-white/55 break-words">{friendPlaces(friend, { scope }).join(" · ")}</span>
                   </span>
                 </li>
               );
             })}
           </ul>
-          {friends.length > SHOWN && <p className="mt-2 text-xs text-white/50">und {friends.length - SHOWN} weitere</p>}
+          {friends.length > SHOWN && <p className="mt-2 tls-type-small text-white/50">und {friends.length - SHOWN} weitere</p>}
         </div>
       )}
     </section>

@@ -67,7 +67,7 @@ export function MentionSuggestionList({ id, items, activeIndex = 0, onPick, load
       tabIndex={-1}
       aria-label="Vorschläge zum Erwähnen"
     >
-      {loading && <div className="px-3 py-2 text-xs text-white/40">Benutzer werden gesucht...</div>}
+      {loading && <div className="px-3 py-2 tls-type-small text-quiet">Benutzer werden gesucht...</div>}
       {!loading && items.map((user, index) => (
         <button
           key={user.id}
@@ -75,13 +75,13 @@ export function MentionSuggestionList({ id, items, activeIndex = 0, onPick, load
           type="button"
           tabIndex={-1}
           onClick={() => onPick(user)}
-          className={`flex w-full items-center gap-2 px-3 py-2 text-left text-sm transition ${
+          className={`flex w-full items-center gap-2 px-3 py-2 text-left tls-type-small transition ${
             index === activeIndex ? "bg-[#29B6E8]/15 text-white" : "text-white/75 hover:bg-white/5"
           }`}
           role="option"
           aria-selected={index === activeIndex}
         >
-          <span className="flex h-7 w-7 shrink-0 items-center justify-center overflow-hidden rounded-sm border border-white/10 bg-[#0A0A0A] text-[10px] font-bold uppercase text-[#29B6E8]">
+          <span className="flex h-7 w-7 shrink-0 items-center justify-center overflow-hidden rounded-sm border border-white/10 bg-[#0A0A0A] tls-type-label text-[#29B6E8]">
             {user.avatar_url ? (
               <img src={resolveMediaUrl(user.avatar_url)} alt="" className="h-full w-full object-cover" />
             ) : (
@@ -90,7 +90,7 @@ export function MentionSuggestionList({ id, items, activeIndex = 0, onPick, load
           </span>
           <span className="min-w-0">
             <span className="block truncate font-bold">{userLabel(user)}</span>
-            <span className="block truncate text-xs text-white/40">@{user.username}</span>
+            <span className="block truncate tls-type-small text-quiet">@{user.username}</span>
           </span>
         </button>
       ))}

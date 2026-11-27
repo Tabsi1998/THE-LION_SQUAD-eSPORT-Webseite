@@ -142,7 +142,7 @@ function firstTimeError(errors) {
 // Befangenheit (#2203): Wer hier sonst entscheiden dürfte, aber selbst beteiligt ist, sieht warum - der Server entscheidet.
 function ConflictNotice({ conflict }) {
   return (
-    <p className="mt-5 rounded-sm border border-warn/40 bg-warn/10 px-4 py-3 text-sm text-white/85" data-testid="match-conflict">
+    <p className="mt-5 rounded-sm border border-warn/40 bg-warn/10 px-4 py-3 tls-type-small text-white/85" data-testid="match-conflict">
       <strong>Du bist an diesem Spiel selbst beteiligt.</strong>{" "}
       {conflict.override
         ? "Das entscheidet sonst eine zweite Person. Als Superadmin geht es nur als Notausnahme: Im Ergebnis-Fenster und im Matchplan fragt die Seite nach dem Grund, er kommt ins Protokoll."
@@ -464,14 +464,14 @@ function MatchPageView() {
             vor dem Spiel der Termin, danach „Beendet“ mit dem Ergebnis. */}
         <div className="flex items-start justify-between gap-4 flex-wrap">
           <div className="min-w-0 flex-1">
-            <div className="flex items-center gap-2 text-[11px] uppercase tracking-[0.3em] text-[#29B6E8] font-bold">
+            <div className="flex items-center gap-2 tls-type-label text-[#29B6E8]">
               {/* Liga-Spiel (#2107): das Emblem der Season bzw. Liga klein vor dem Spieltag. */}
               {trail?.emblemUrl ? <LeagueEmblem src={trail.emblemUrl} size={24} testId="match-league-emblem" /> : null}
               {data.matchday_label}
             </div>
-            <h1 className="mt-2 font-heading text-3xl md:text-5xl font-black uppercase [overflow-wrap:anywhere]" data-testid="match-headline">{headline}</h1>
-            <div className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-white/55">
-              <span className="text-[11px] uppercase tracking-widest text-white/40" data-testid="match-key">{formatMatchKind(match)} {match.match_key || ""}</span>
+            <h1 className="mt-2 tls-type-title [overflow-wrap:anywhere]" data-testid="match-headline">{headline}</h1>
+            <div className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 tls-type-small text-white/55">
+              <span className="tls-type-label text-quiet" data-testid="match-key">{formatMatchKind(match)} {match.match_key || ""}</span>
               {data.tournament && (
                 <>
                   <span aria-hidden="true" className="text-white/25">·</span>
@@ -483,23 +483,23 @@ function MatchPageView() {
           {finished ? (
             <div className="border border-white/10 bg-[#121212] rounded-sm px-4 py-3 w-full sm:w-auto sm:min-w-[16rem] sm:max-w-sm" data-testid="match-finished">
               <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
-                <span className="rounded-sm border border-white/20 bg-white/10 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-white/80">Beendet</span>
-                {match.scheduled_at && <span className="text-sm text-white/65" data-testid="match-when">{formatWhen(match.scheduled_at)}</span>}
+                <span className="rounded-sm border border-white/20 bg-white/10 px-2 py-0.5 tls-type-label text-white/80">Beendet</span>
+                {match.scheduled_at && <span className="tls-type-small text-white/65" data-testid="match-when">{formatWhen(match.scheduled_at)}</span>}
               </div>
-              <div className="mt-2 font-heading font-black text-white" data-testid="match-outcome">{finishedMatchText(participants, match)}</div>
-              {station && <div className="mt-1 text-xs font-bold uppercase tracking-wider text-[#29B6E8]" data-testid="match-station">{station}</div>}
+              <div className="mt-2 font-black text-white" data-testid="match-outcome">{finishedMatchText(participants, match)}</div>
+              {station && <div className="mt-1 tls-type-label text-[#29B6E8]" data-testid="match-station">{station}</div>}
             </div>
           ) : (
             <div className="border border-white/10 bg-[#121212] rounded-sm px-4 py-3 w-full sm:w-auto sm:min-w-[16rem]" data-testid="match-schedule">
-              <div className="text-[10px] uppercase tracking-widest text-white/45 font-bold">Terminstatus</div>
-              <div className="mt-1 font-heading font-black uppercase text-[#FFD700]" data-testid="match-schedule-headline">{scheduleHeadline(match, league, waitingForOtherSide(data.schedule_proposals, data, user?.id))}</div>
-              <div className="mt-1 text-sm text-white/65" data-testid="match-when">{scheduleWhen(match, league)}</div>
+              <div className="tls-type-label text-white/45">Terminstatus</div>
+              <div className="mt-1 font-black uppercase text-[#FFD700]" data-testid="match-schedule-headline">{scheduleHeadline(match, league, waitingForOtherSide(data.schedule_proposals, data, user?.id))}</div>
+              <div className="mt-1 tls-type-small text-white/65" data-testid="match-when">{scheduleWhen(match, league)}</div>
               <div className="mt-3 flex flex-wrap gap-1.5">
                 {eventModeLabels[data.event_mode] && <Pill>{eventModeLabels[data.event_mode]}</Pill>}
                 {resultModeLabels[data.result_entry_mode] && <Pill>{resultModeLabels[data.result_entry_mode]}</Pill>}
                 {scheduleModeLabels[data.schedule_mode] && <Pill>{scheduleModeLabels[data.schedule_mode]}</Pill>}
               </div>
-              {station && <div className="mt-2 text-xs font-bold uppercase tracking-wider text-[#29B6E8]" data-testid="match-station">{station}</div>}
+              {station && <div className="mt-2 tls-type-label text-[#29B6E8]" data-testid="match-station">{station}</div>}
             </div>
           )}
         </div>
@@ -530,17 +530,17 @@ function MatchPageView() {
           <div className="flex items-start justify-between gap-4 flex-wrap">
             <div>
               <div className="flex items-center gap-2">
-                <h2 className="font-heading text-xl font-black uppercase flex items-center gap-2"><Trophy className="w-5 h-5 text-[#29B6E8]" /> Ergebnis</h2>
+                <h2 className="tls-type-section flex items-center gap-2"><Trophy className="w-5 h-5 text-[#29B6E8]" /> Ergebnis</h2>
                 {!over ? <HelpLink thema={data.league ? "liga-captains" : "turniere"} schritt="ergebnis-melden" /> : null}
               </div>
-              {!over && <p className="mt-1 text-sm text-white/55">Der Matchstand aktualisiert sich automatisch.</p>}
+              {!over && <p className="mt-1 tls-type-small text-white/55">Der Matchstand aktualisiert sich automatisch.</p>}
             </div>
             <div className="flex items-center gap-2 flex-wrap">
               {/* GG (#616): eine Seite lobt die andere - einmal je Match, nur nach dem Ende. */}
               {user && isV2 ? <CommendButton matchId={id} completed={String(match.status) === "completed"} /> : null}
               {/* Nach dem Ende (#1221) aktualisiert sich nichts mehr - der Hinweis fällt weg. */}
               {!over && (
-                <div className="inline-flex items-center gap-2 rounded-sm border border-[#29B6E8]/25 bg-[#29B6E8]/10 px-3 py-1.5 text-[10px] font-bold uppercase tracking-wider text-[#29B6E8]" data-testid="match-live-refresh">
+                <div className="inline-flex items-center gap-2 rounded-sm border border-[#29B6E8]/25 bg-[#29B6E8]/10 px-3 py-1.5 tls-type-label text-[#29B6E8]" data-testid="match-live-refresh">
                   <RefreshCw className="w-3.5 h-3.5" /> Live
                 </div>
               )}
@@ -548,7 +548,7 @@ function MatchPageView() {
           </div>
 
           {isBye && finished ? (
-            <p className="mt-5 text-sm text-white/65" data-testid="match-bye-line">Ein Freilos wird nicht gespielt – es zählt als Sieg für {slotName(participants.find((participant) => participant.registration_id)?.display_name, {}, match)}.</p>
+            <p className="mt-5 tls-type-small text-white/65" data-testid="match-bye-line">Ein Freilos wird nicht gespielt – es zählt als Sieg für {slotName(participants.find((participant) => participant.registration_id)?.display_name, {}, match)}.</p>
           ) : (
           <div className={`mt-5 grid gap-3 items-stretch ${isV2 ? "sm:grid-cols-2 xl:grid-cols-4" : "md:grid-cols-[1fr_auto_1fr]"}`} data-testid="match-result-sides">
             {isHeat ? (
@@ -575,7 +575,7 @@ function MatchPageView() {
             ) : (
               <>
                 <ResultSide participant={duelParticipants[0]} match={match} score={match.score_a} isWinner={match.winner_id && match.winner_id === duelParticipants[0]?.registration_id} />
-                <div className="hidden md:flex items-center justify-center font-display text-3xl text-white/35">:</div>
+                <div className="hidden md:flex items-center justify-center tls-type-title tls-type-num text-white/35">:</div>
                 <ResultSide participant={duelParticipants[1]} match={match} score={match.score_b} isWinner={match.winner_id && match.winner_id === duelParticipants[1]?.registration_id} />
               </>
             )}
@@ -601,8 +601,8 @@ function MatchPageView() {
             <div className="mt-5 flex items-start gap-3 rounded-sm border border-[#29B6E8]/30 bg-[#29B6E8]/5 px-4 py-3" data-testid="match-staff-enters">
               <Flag className="mt-0.5 w-4 h-4 shrink-0 text-[#29B6E8]" />
               <div>
-                <p className="text-sm font-bold text-white">Das Ergebnis trägt die Turnierleitung ein.</p>
-                <p className="mt-0.5 text-xs text-white/55">Du musst nichts melden. Sobald es drin ist, bekommst du eine Benachrichtigung.</p>
+                <p className="tls-type-small font-bold text-white">Das Ergebnis trägt die Turnierleitung ein.</p>
+                <p className="mt-0.5 tls-type-small text-white/55">Du musst nichts melden. Sobald es drin ist, bekommst du eine Benachrichtigung.</p>
               </div>
             </div>
           ) : null}
@@ -610,7 +610,7 @@ function MatchPageView() {
           {data.conflict ? <ConflictNotice conflict={data.conflict} /> : null}
 
           {data.in_dispute && (
-            <p className="mt-5 rounded-sm border border-[#FF3B30]/40 bg-[#FF3B30]/10 px-4 py-3 text-sm text-[#FFD2CF]" data-testid="match-in-dispute">
+            <p className="mt-5 rounded-sm border border-[#FF3B30]/40 bg-[#FF3B30]/10 px-4 py-3 tls-type-body text-[#FFD2CF]" data-testid="match-in-dispute">
               <strong>In Klärung</strong> – zu diesem Spiel wurde ein Problem gemeldet. Die {data.league ? "Liga-Leitung" : "Turnierleitung"} prüft und entscheidet.
               {/* Die Turnierleitung entscheidet in ihrer Ansicht (#1158) - mit Meldung, Foto und Ergebnis. */}
               {(canStaffSubmit || data.can_decide_dispute) && data.tournament && !procedures.length ? (
@@ -622,14 +622,14 @@ function MatchPageView() {
           <OwnDisputes match={match} userId={user?.id} />
           {/* Liga-Verfahren (#1619, E.2): öffentlich nur „in Klärung“ - Beteiligte und Leitung sehen Stand, Fristen und Entscheidung. */}
           {data.league?.contested && !data.in_dispute ? (
-            <p className="mt-5 rounded-sm border border-honor/40 bg-honor/10 px-4 py-3 text-sm text-white/85" data-testid="match-contested">
+            <p className="mt-5 rounded-sm border border-honor/40 bg-honor/10 px-4 py-3 tls-type-body text-white/85" data-testid="match-contested">
               <strong>In Klärung</strong> – das Ergebnis zählt vorläufig. Die Liga-Leitung prüft einen Protest und entscheidet.
             </p>
           ) : null}
           {/* Einspruch gegen eine Wertung kampflos oder eine Korrektur (Nr. 41, 45) - gegen einen Protestentscheid steht er an dessen Karte. */}
           {procedureForm?.appealable ? (
             <section className="mt-5 space-y-2 rounded-sm border border-white/10 bg-[#121212] p-4" data-testid="match-appealable">
-              <p className="text-sm text-white/80">
+              <p className="tls-type-small text-white/80">
                 {procedureForm.appealable.type === "forfeit" ? "Dieses Spiel wurde kampflos gewertet." : "Das Ergebnis dieses Spiels wurde von der Liga-Leitung korrigiert."} Seid ihr nicht einverstanden, könnt ihr einmal Einspruch einlegen.
               </p>
               <AppealForm matchId={id} against={procedureForm.appealable} until={procedureForm.appealable.until} onChanged={() => load({ preserveDrafts: false })} testId="match-appeal" />
@@ -646,7 +646,7 @@ function MatchPageView() {
           ) : null}
 
           {reportHint ? (
-            <p className="mt-5 rounded-sm border border-honor/30 bg-honor/5 px-4 py-3 text-sm text-white/85" data-testid="match-report-hint">{reportHint}</p>
+            <p className="mt-5 rounded-sm border border-honor/30 bg-honor/5 px-4 py-3 tls-type-body text-white/85" data-testid="match-report-hint">{reportHint}</p>
           ) : null}
 
           {hasResultActions ? (
@@ -677,16 +677,16 @@ function MatchPageView() {
 
               {canSubmitV2Result && (
                 <div className="flex flex-wrap items-center gap-3" data-testid="match-staff-result">
-                  <button type="button" onClick={() => setResultOpen(true)} className="tls-btn tls-btn--primary min-h-[44px] px-4 py-2 rounded-sm text-xs uppercase tracking-wider font-bold" data-testid="match-staff-result-open">
+                  <button type="button" onClick={() => setResultOpen(true)} className="tls-btn tls-btn--primary min-h-[44px] px-4 py-2 rounded-sm tls-type-label" data-testid="match-staff-result-open">
                     {data.result_entry.has_result ? "Ergebnis korrigieren" : "Ergebnis eintragen"}
                   </button>
-                  <p className="text-xs text-white/50">{data.result_entry.has_result ? "Korrigieren geht nur mit Grund – er steht im Protokoll." : "Mit „Nicht erschienen“ und „Aufgegeben“ je Seite. Danach 10 Sekunden „Rückgängig“."}</p>
+                  <p className="tls-type-small text-white/50">{data.result_entry.has_result ? "Korrigieren geht nur mit Grund – er steht im Protokoll." : "Mit „Nicht erschienen“ und „Aufgegeben“ je Seite. Danach 10 Sekunden „Rückgängig“."}</p>
                 </div>
               )}
               {/* Liga-Staffel (E.1, #1625): beide nicht erschienen werten oder das Spiel neu ansetzen. */}
               {data.league && canStaffSubmit ? <DoubleNoShowAction match={match} conflict={data.conflict} onDone={() => load()} /> : null}
               {canStaffSubmit && data.result_entry?.hold ? (
-                <p className="text-sm text-[#29B6E8]" data-testid="match-staff-result-held">{data.result_entry.hold.mine ? "Gespeichert – in wenigen Sekunden geht es raus." : `${data.result_entry.hold.actor_name} trägt gerade das Ergebnis ein.`}</p>
+                <p className="tls-type-small text-[#29B6E8]" data-testid="match-staff-result-held">{data.result_entry.hold.mine ? "Gespeichert – in wenigen Sekunden geht es raus." : `${data.result_entry.hold.actor_name} trägt gerade das Ergebnis ein.`}</p>
               ) : null}
 
               {canDispute && (
@@ -698,13 +698,13 @@ function MatchPageView() {
 
             </div>
           ) : !user && !isCompleted && guestsCouldReport ? (
-            <Link to={`/login?next=/matches/${id}`} data-testid="match-login-to-report" className="tls-btn tls-btn--secondary mt-5 inline-flex min-h-11 items-center gap-2 px-4 py-2 rounded-sm text-xs uppercase tracking-wider font-bold">
+            <Link to={`/login?next=/matches/${id}`} data-testid="match-login-to-report" className="tls-btn tls-btn--secondary mt-5 inline-flex min-h-11 items-center gap-2 px-4 py-2 rounded-sm tls-type-label">
               Zum Ergebnis-Melden anmelden
             </Link>
           ) : showStaffEnters || reportHint ? null : (
-            <p className="mt-4 text-sm text-white/50">{isCompleted ? "Dieses Match ist abgeschlossen." : resultModeLabels[data.result_entry_mode] || "Ergebnis wird durch die Turnierleitung gepflegt."}</p>
+            <p className="mt-4 tls-type-small text-white/50">{isCompleted ? "Dieses Match ist abgeschlossen." : resultModeLabels[data.result_entry_mode] || "Ergebnis wird durch die Turnierleitung gepflegt."}</p>
           )}
-          {canStaffSubmit && !isCompleted && reports.length > 0 && <p className="mt-3 text-xs text-white/45" data-testid="match-report-count">{reports.length} Ergebnismeldung{reports.length === 1 ? "" : "en"} der Spieler vorhanden.</p>}
+          {canStaffSubmit && !isCompleted && reports.length > 0 && <p className="mt-3 tls-type-small text-white/45" data-testid="match-report-count">{reports.length} Ergebnismeldung{reports.length === 1 ? "" : "en"} der Spieler vorhanden.</p>}
         </div>
 
         {/* Vorfälle im Spiel (D.5, #1619): melden, antworten, entscheiden - nur Beteiligte und Leitung bekommen den Block. */}
@@ -721,28 +721,28 @@ function MatchPageView() {
             {!over && (
             <div className="border border-white/10 bg-[#121212] rounded-sm p-5" data-testid="match-scheduling">
               <div className="flex items-center gap-2">
-                <h2 className="font-heading text-xl font-black uppercase flex items-center gap-2"><CalendarClock className="w-5 h-5 text-[#29B6E8]" /> Terminabstimmung</h2>
+                <h2 className="tls-type-section flex items-center gap-2"><CalendarClock className="w-5 h-5 text-[#29B6E8]" /> Terminabstimmung</h2>
                 {data.league ? <HelpLink thema="liga-captains" schritt="termin-vorschlagen" /> : null}
               </div>
               {canProposeSchedule ? (
                 <form onSubmit={propose} className="mt-4 space-y-3" data-testid="match-proposal-form" noValidate>
                   {/* Mehrere Termine auf einmal (#2325): die Gegenseite nimmt einen davon an. */}
-                  <p className="text-xs text-white/55">Schlag bis zu 3 Termine vor – die Gegenseite nimmt einen davon an.</p>
+                  <p className="tls-type-small text-white/55">Schlag bis zu 3 Termine vor – die Gegenseite nimmt einen davon an.</p>
                   <div className="grid gap-3 md:grid-cols-2 md:items-start">
                     <div>
-                      <div className="text-[11px] font-bold uppercase tracking-widest text-white/60 mb-1.5" aria-hidden="true">{proposalTimes.length > 1 ? "Termine" : "Termin"}</div>
+                      <div className="tls-type-label text-white/60 mb-1.5" aria-hidden="true">{proposalTimes.length > 1 ? "Termine" : "Termin"}</div>
                       <ProposalTimesEditor values={proposalTimes} onChange={changeProposalTimes} errors={proposalErrors} hints={timeHints(proposalTimes)} min={earliestProposalInput()} label="Termin" testId="match-proposal-at" disabled={busy} />
                     </div>
                     <Field label="Notiz (für alle Termine)">
                       <input value={proposalNote} onChange={(e) => setProposalNote(e.target.value)} maxLength={500} className="input" placeholder="z.B. nach 20:00 Uhr möglich" />
                     </Field>
                   </div>
-                  <button disabled={busy} data-testid="match-proposal-send" className="tls-btn tls-btn--primary min-h-11 w-full sm:w-auto px-4 py-2 rounded-sm text-xs uppercase tracking-wider font-bold disabled:opacity-50">{proposeButtonLabel(proposalTimes.length)}</button>
+                  <button disabled={busy} data-testid="match-proposal-send" className="tls-btn tls-btn--primary min-h-11 w-full sm:w-auto px-4 py-2 rounded-sm tls-type-label disabled:opacity-50">{proposeButtonLabel(proposalTimes.length)}</button>
                 </form>
               ) : showFixedScheduleNotice ? (
-                <p className="mt-3 text-sm text-white/55">Termin und Station werden durch die Turnierleitung festgelegt. Rückfragen bitte im Matchchat mit <button type="button" onClick={addStaffMention} className="text-[#29B6E8] font-bold hover:text-white">@leitung</button> markieren.</p>
+                <p className="mt-3 tls-type-body text-white/55">Termin und Station werden durch die Turnierleitung festgelegt. Rückfragen bitte im Matchchat mit <button type="button" onClick={addStaffMention} className="text-[#29B6E8] font-bold hover:text-white">@leitung</button> markieren.</p>
               ) : data.schedule_block?.fixed ? null : (
-                <p className="mt-3 text-sm text-white/50">Termine können Teilnehmer, {teamLeadsWord(Boolean(data.league))} und Turnierleitung vorschlagen, sofern die Terminabstimmung aktiv ist.</p>
+                <p className="mt-3 tls-type-body text-white/50">Termine können Teilnehmer, {teamLeadsWord(Boolean(data.league))} und Turnierleitung vorschlagen, sofern die Terminabstimmung aktiv ist.</p>
               )}
 
               <div className="mt-5 space-y-3">
@@ -750,7 +750,7 @@ function MatchPageView() {
                 <ScheduleProposalList proposals={data.schedule_proposals} page={data} userId={user?.id} canManage={canManageSchedule}
                   fixedTime={fixedTime} busy={busy} min={earliestProposalInput()} formatDateTime={formatDateTime}
                   onDecide={decide} onGroupDecide={decideGroup} onCounter={counterPropose} hintsFor={timeHints} />
-                {!latestProposal && (data.schedule_proposals || []).length === 0 && !data.schedule_block?.fixed && <div className="text-sm text-white/40">Noch kein Terminvorschlag vorhanden.</div>}
+                {!latestProposal && (data.schedule_proposals || []).length === 0 && !data.schedule_block?.fixed && <div className="tls-type-small text-quiet">Noch kein Terminvorschlag vorhanden.</div>}
               </div>
               {/* Liga-Termine (#2194): Verschiebung, Grenzen und Verlauf - nur Beteiligte und Leitung bekommen den Block. */}
               <ScheduleChangePanel block={data.schedule_block} matchId={id} busy={busy} run={runAction} onChanged={() => load({ preserveDrafts: false })} onAskLead={canUseChat ? askStaff : null} />
@@ -761,7 +761,7 @@ function MatchPageView() {
             {data.league?.allowed_equipment ? (
               <details className="group border border-white/10 bg-[#121212] rounded-sm p-5" data-testid="match-allowed-equipment">
                 <summary className="flex cursor-pointer list-none items-center justify-between gap-3 rounded-sm focus-visible:outline focus-visible:outline-1 focus-visible:outline-[#29B6E8]">
-                  <span className="font-heading text-xl font-black uppercase flex items-center gap-2"><ShieldCheck className="w-5 h-5 text-[#29B6E8]" aria-hidden="true" /> Erlaubte Ausrüstung</span>
+                  <span className="tls-type-card flex items-center gap-2"><ShieldCheck className="w-5 h-5 text-[#29B6E8]" aria-hidden="true" /> Erlaubte Ausrüstung</span>
                   <ChevronDown className="h-4 w-4 shrink-0 text-white/60 transition-transform duration-fast group-open:rotate-180" aria-hidden="true" />
                 </summary>
                 <AllowedEquipmentView data={data.league.allowed_equipment} hideTitle className="mt-4" testId="match-allowed-equipment-view" />
@@ -771,25 +771,25 @@ function MatchPageView() {
 
           {showChat && (
           <aside className="border border-white/10 bg-[#121212] rounded-sm p-5 h-fit" data-testid="match-chat">
-            <h2 className="font-heading text-xl font-black uppercase flex items-center gap-2"><MessageSquare className="w-5 h-5 text-[#29B6E8]" /> Matchchat</h2>
+            <h2 className="tls-type-section flex items-center gap-2"><MessageSquare className="w-5 h-5 text-[#29B6E8]" /> Matchchat</h2>
             <div className="mt-4 space-y-3 max-h-[28rem] overflow-y-auto pr-1">
               {chat.map((m) => (
                 <div key={m.id} className="border border-white/10 bg-[#0A0A0A] rounded-sm p-3">
-                  <div className="text-[10px] uppercase tracking-widest text-[#29B6E8] font-bold">{m.author?.display_name || m.author?.username || "Benutzer"}</div>
-                  {m.message && <div className="mt-1 text-sm text-white/75 whitespace-pre-wrap">{m.message}</div>}
+                  <div className="tls-type-small text-[#29B6E8] font-bold">{m.author?.display_name || m.author?.username || "Benutzer"}</div>
+                  {m.message && <div className="mt-1 tls-type-small text-white/75 whitespace-pre-wrap">{m.message}</div>}
                   <ModerationStateBadge moderation={m.moderation} />
                   <ChatMessageAttachments attachments={m.attachments} />
                   <ChatMessageSticker sticker={m.sticker} />
                 </div>
               ))}
-              {chat.length === 0 && <div className="text-sm text-white/40">Noch keine Nachrichten.</div>}
+              {chat.length === 0 && <div className="tls-type-small text-quiet">Noch keine Nachrichten.</div>}
             </div>
             {chatClosed ? (
-              <p className="mt-4 text-xs text-white/45" data-testid="match-chat-closed">Das Match ist beendet – der Chat bleibt zum Nachlesen.</p>
+              <p className="mt-4 tls-type-small text-white/45" data-testid="match-chat-closed">Das Match ist beendet – der Chat bleibt zum Nachlesen.</p>
             ) : canUseChat ? (
               <form onSubmit={sendMessage} className="mt-4 space-y-2">
                 <div className="flex flex-wrap gap-2">
-                  <button type="button" onClick={addStaffMention} className="tls-btn tls-btn--secondary tls-hit px-2.5 py-1.5 rounded-sm text-[10px] font-bold uppercase tracking-wider">@leitung</button>
+                  <button type="button" onClick={addStaffMention} className="tls-btn tls-btn--secondary tls-hit px-2.5 py-1.5 rounded-sm tls-type-label">@leitung</button>
                 </div>
                 <ChatAttachmentDrafts drafts={chatAttachments.drafts} onRemove={chatAttachments.remove} />
                 <ChatStickerPicker open={stickersOpen} onClose={() => setStickersOpen(false)} onPick={sendSticker} disabled={busy} />
@@ -811,7 +811,7 @@ function MatchPageView() {
                 </div>
               </form>
             ) : (
-              <p className="mt-4 text-xs text-white/45">Schreiben können Teilnehmer, {teamLeadsWord(Boolean(data.league))} und Turnierleitung.</p>
+              <p className="mt-4 tls-type-small text-white/45">Schreiben können Teilnehmer, {teamLeadsWord(Boolean(data.league))} und Turnierleitung.</p>
             )}
           </aside>
           )}
@@ -824,15 +824,15 @@ function MatchPageView() {
 }
 
 function Pill({ children }) {
-  return <span className="rounded-sm border border-white/10 bg-white/5 px-2 py-1 text-[10px] font-bold uppercase tracking-wider text-white/60">{children}</span>;
+  return <span className="rounded-sm border border-white/10 bg-white/5 px-2 py-1 tls-type-label text-white/60">{children}</span>;
 }
 
 function ResultSide({ participant, match, score, isWinner }) {
   return (
     <div className={`border rounded-sm bg-[#0A0A0A] p-4 ${isWinner ? "border-[#29B6E8]/70 shadow-[0_0_18px_rgba(41,182,232,0.18)]" : "border-white/10"}`}>
-      <div className="font-heading text-lg font-bold uppercase truncate">{slotName(participant?.display_name, participant, match)}</div>
-      {participant?.team && <div className="mt-1 text-xs text-[#29B6E8] truncate">[{participant.team.tag}] {participant.team.name}</div>}
-      <div className={`mt-3 font-display text-5xl font-bold ${isWinner ? "text-[#29B6E8]" : "text-white/75"}`}>{score ?? 0}</div>
+      <div className="tls-type-card truncate">{slotName(participant?.display_name, participant, match)}</div>
+      {participant?.team && <div className="mt-1 tls-type-small text-[#29B6E8] truncate">[{participant.team.tag}] {participant.team.name}</div>}
+      <div className={`mt-3 tls-type-hero tls-type-num ${isWinner ? "text-[#29B6E8]" : "text-white/75"}`}>{score ?? 0}</div>
     </div>
   );
 }
@@ -840,7 +840,7 @@ function ResultSide({ participant, match, score, isWinner }) {
 function Field({ label, children }) {
   return (
     <label className="block">
-      <div className="text-[11px] font-bold uppercase tracking-widest text-white/60 mb-1.5">{label}</div>
+      <div className="tls-type-label text-white/60 mb-1.5">{label}</div>
       {children}
     </label>
   );
@@ -876,10 +876,10 @@ function HeatSide({ participant, match, result, mode }) {
   const detail = heatResultDetail(result, mode);
   return (
     <div className={`border rounded-sm bg-[#0A0A0A] p-4 ${place === 1 ? "border-[#29B6E8]/70 shadow-[0_0_18px_rgba(41,182,232,0.18)]" : "border-white/10"}`} data-testid="match-heat-side" data-place={place || ""}>
-      <div className={`font-display text-4xl font-bold ${place === 1 ? "text-[#29B6E8]" : place ? "text-white/80" : "text-white/35"}`} data-testid="match-heat-place">{place ? `Platz ${place}` : "–"}</div>
-      <div className="mt-2 font-heading text-lg font-bold uppercase truncate">{slotName(participant?.display_name, participant, match)}</div>
-      {participant?.team && <div className="mt-1 text-xs text-[#29B6E8] truncate">[{participant.team.tag}] {participant.team.name}</div>}
-      <div className="mt-1 text-xs text-white/50" data-testid="match-heat-detail">{[detail, participant?.slot ? `Startplatz ${participant.slot}` : ""].filter(Boolean).join(" · ")}</div>
+      <div className={`tls-type-title tls-type-num ${place === 1 ? "text-[#29B6E8]" : place ? "text-white/80" : "text-white/35"}`} data-testid="match-heat-place">{place ? `Platz ${place}` : "–"}</div>
+      <div className="mt-2 tls-type-card truncate">{slotName(participant?.display_name, participant, match)}</div>
+      {participant?.team && <div className="mt-1 tls-type-small text-[#29B6E8] truncate">[{participant.team.tag}] {participant.team.name}</div>}
+      <div className="mt-1 tls-type-small text-white/50" data-testid="match-heat-detail">{[detail, participant?.slot ? `Startplatz ${participant.slot}` : ""].filter(Boolean).join(" · ")}</div>
     </div>
   );
 }

@@ -75,3 +75,9 @@ test("Mitgliederbereich: alle Server mit eigenem Status; ohne Verknüpfung nur E
   rerender(<MemoryRouter><DiscordServerList data={{ linked: true, servers: [] }} /></MemoryRouter>);
   expect(screen.queryByTestId("discord-servers")).toBeNull();
 });
+
+// Schrift-Treppe (#1302): „Beitreten“ ist ein kurzer GROSSER Knopf - Etikett 12 px, nicht 14 px.
+test("der Knopf „Beitreten“ steht als Etikett", () => {
+  render(<MemoryRouter><DiscordServerTile server={RL} title="Rocket League" /></MemoryRouter>);
+  expect(screen.getByText("Beitreten")).toHaveClass("tls-type-label");
+});

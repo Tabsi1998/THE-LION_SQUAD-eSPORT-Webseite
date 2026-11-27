@@ -30,11 +30,11 @@ export function RafflePanel({ day, raffle, isOpen, busy = false, onDraw, onRedra
     <div className="mt-3 rounded-sm border border-[#e9c46a]/25 bg-[#e9c46a]/[0.04] p-3" data-testid={`advent-raffle-${day}`} data-status={raffle.status}>
       <div className="flex flex-wrap items-center gap-2">
         <Gift className="h-4 w-4 shrink-0 text-[#e9c46a]" aria-hidden="true" />
-        <span className="min-w-0 break-words text-sm font-bold text-white">{raffle.label}</span>
-        {raffle.value && <span className="min-w-0 break-words text-xs text-white/50">{raffle.value}</span>}
-        <span className={`rounded-sm border px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider ${status.tone}`} data-testid={`advent-raffle-status-${day}`}>{status.label}</span>
+        <span className="min-w-0 break-words tls-type-small font-bold text-white">{raffle.label}</span>
+        {raffle.value && <span className="min-w-0 break-words tls-type-small text-white/50">{raffle.value}</span>}
+        <span className={`rounded-sm border px-2 py-0.5 tls-type-label ${status.tone}`} data-testid={`advent-raffle-status-${day}`}>{status.label}</span>
       </div>
-      <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-white/60">
+      <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 tls-type-small text-white/60">
         <span data-testid={`advent-raffle-entries-${day}`}>{entries}</span>
         <span>{raffle.winners === 1 ? "1 Gewinn" : `${raffle.winners} Gewinne`}</span>
         <span>{AUDIENCE[raffle.audience] || AUDIENCE.all}{raffle.staff_may_enter ? ", auch Vorstand und Verwaltung" : ""}</span>
@@ -43,22 +43,22 @@ export function RafflePanel({ day, raffle, isOpen, busy = false, onDraw, onRedra
 
       {/* Ziehen macht die Vereinsleitung (#2122 NW11) - ohne das Recht ein Satz statt eines Knopfs, der scheitert. */}
       {raffle.may_draw === false && raffle.status !== "drawn" && (
-        <p className="mt-3 text-xs text-white/50" data-testid={`advent-raffle-no-draw-${day}`}>Gezogen wird von der Vereinsleitung.</p>
+        <p className="mt-3 tls-type-small text-white/50" data-testid={`advent-raffle-no-draw-${day}`}>Gezogen wird von der Vereinsleitung.</p>
       )}
       {raffle.can_draw && (
         <div className="mt-3 flex flex-wrap items-center gap-3">
-          <button type="button" disabled={busy || !isOpen || raffle.entries === 0} onClick={() => onDraw(day, raffle)} data-testid={`advent-raffle-draw-${day}`} className="inline-flex items-center gap-2 rounded-sm bg-[#e9c46a] px-4 py-2 text-[11px] font-bold uppercase tracking-wider text-black transition hover:opacity-90 disabled:opacity-40">
+          <button type="button" disabled={busy || !isOpen || raffle.entries === 0} onClick={() => onDraw(day, raffle)} data-testid={`advent-raffle-draw-${day}`} className="inline-flex items-center gap-2 rounded-sm bg-[#e9c46a] px-4 py-2 tls-type-label text-black transition hover:opacity-90 disabled:opacity-40">
             <Dices className="h-3.5 w-3.5" /> {raffle.needs_close_early ? "Teilnahme beenden und ziehen" : "Ziehen"}
           </button>
-          {!isOpen && <span className="text-xs text-white/45">Gezogen wird erst, wenn das Türchen offen war.</span>}
-          {isOpen && raffle.entries === 0 && <span className="text-xs text-white/45">Noch macht niemand mit.</span>}
+          {!isOpen && <span className="tls-type-small text-white/45">Gezogen wird erst, wenn das Türchen offen war.</span>}
+          {isOpen && raffle.entries === 0 && <span className="tls-type-small text-white/45">Noch macht niemand mit.</span>}
         </div>
       )}
 
       {raffle.protocol.length > 0 && (
         <ol className="mt-3 space-y-3 border-t border-white/10 pt-3" data-testid={`advent-raffle-protocol-${day}`}>
           {raffle.protocol.map((record) => (
-            <li key={record.id} className="text-xs text-white/70" data-testid={`advent-raffle-record-${record.id}`}>
+            <li key={record.id} className="tls-type-small text-white/70" data-testid={`advent-raffle-record-${record.id}`}>
               <div className="font-bold text-white/85">
                 {record.kind === "redraw" ? "Nachgezogen" : "Gezogen"} am {stampText(record.drawn_at)} von {record.drawn_by}
               </div>
@@ -72,7 +72,7 @@ export function RafflePanel({ day, raffle, isOpen, busy = false, onDraw, onRedra
                     <span className="font-semibold text-white">{winner.name}</span>
                     <span className="text-white/50">Gewinn {pickupLabel(winner.pickup_status)}{winner.replaced ? " – dafür wurde nachgezogen" : ""}</span>
                     {winner.can_redraw && (
-                      <button type="button" disabled={busy} onClick={() => onRedraw(day, raffle, winner)} data-testid={`advent-raffle-redraw-${winner.pickup_id}`} className="inline-flex items-center gap-1.5 rounded-sm border border-[#e9c46a]/50 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider text-[#e9c46a] transition hover:bg-[#e9c46a]/10 disabled:opacity-40">
+                      <button type="button" disabled={busy} onClick={() => onRedraw(day, raffle, winner)} data-testid={`advent-raffle-redraw-${winner.pickup_id}`} className="inline-flex items-center gap-1.5 rounded-sm border border-[#e9c46a]/50 px-2.5 py-1 tls-type-label text-[#e9c46a] transition hover:bg-[#e9c46a]/10 disabled:opacity-40">
                         <RotateCcw className="h-3 w-3" /> Nachziehen
                       </button>
                     )}
@@ -82,7 +82,7 @@ export function RafflePanel({ day, raffle, isOpen, busy = false, onDraw, onRedra
             </li>
           ))}
           <li>
-            <Link to="/admin/prizes?source=season" className="text-[11px] font-bold uppercase tracking-wider text-[#29B6E8] hover:underline" data-testid={`advent-raffle-prizes-${day}`}>Übergabe unter „Gewinne“ verwalten</Link>
+            <Link to="/admin/prizes?source=season" className="tls-type-small font-bold text-[#29B6E8] hover:underline" data-testid={`advent-raffle-prizes-${day}`}>Übergabe unter „Gewinne“ verwalten</Link>
           </li>
         </ol>
       )}

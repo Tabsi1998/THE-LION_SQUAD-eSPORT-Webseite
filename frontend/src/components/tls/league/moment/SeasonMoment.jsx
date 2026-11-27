@@ -163,7 +163,7 @@ export function SeasonMoment({ plan, onClose, reduced = false }) {
             <RewardCardContent awards={rewards} onClose={onClose} reduced={reduced} titleId={rewardTitleId} />
             <div className="tls-placement__actions tls-placement__line" style={{ "--tls-i": 5 }}>
               <button type="button" onClick={advance} data-testid="season-moment-done"
-                className="tls-btn tls-btn--secondary inline-flex min-h-[44px] items-center gap-2 px-3 py-2 rounded-sm text-xs font-bold uppercase tracking-wider">
+                className="tls-btn tls-btn--secondary inline-flex min-h-[44px] items-center gap-2 px-3 py-2 rounded-sm tls-type-label">
                 Fertig
               </button>
             </div>
@@ -183,18 +183,18 @@ export function SeasonMoment({ plan, onClose, reduced = false }) {
         <div className="tls-placement__actions tls-placement__line" style={{ "--tls-i": lines.length }}>
           {next ? (
             <Link to={next.url} onClick={onClose} data-testid="season-moment-next-step"
-              className="tls-btn tls-btn--primary inline-flex min-h-[44px] items-center gap-2 px-3 py-2 rounded-sm text-xs font-bold uppercase tracking-wider">
+              className="tls-btn tls-btn--primary inline-flex min-h-[44px] items-center gap-2 px-3 py-2 rounded-sm tls-type-label">
               {next.label}
             </Link>
           ) : null}
           {moment.url ? (
             <Link to={moment.url} onClick={onClose} data-testid="season-moment-final"
-              className="tls-btn tls-btn--secondary inline-flex min-h-[44px] items-center gap-2 px-3 py-2 rounded-sm text-xs font-bold uppercase tracking-wider">
+              className="tls-btn tls-btn--secondary inline-flex min-h-[44px] items-center gap-2 px-3 py-2 rounded-sm tls-type-label">
               Endstand ansehen
             </Link>
           ) : null}
           <button type="button" onClick={advance} data-testid="season-moment-done"
-            className="tls-btn tls-btn--secondary inline-flex min-h-[44px] items-center gap-2 px-3 py-2 rounded-sm text-xs font-bold uppercase tracking-wider">
+            className="tls-btn tls-btn--secondary inline-flex min-h-[44px] items-center gap-2 px-3 py-2 rounded-sm tls-type-label">
             Weiter
           </button>
         </div>

@@ -342,4 +342,4 @@ const PAGES = [
   { key: "admin-users", path: "/admin/users", user: ADMIN, ready: null },
 ];
 
-module.exports = { mockLongApi, LONG, PAGES, PLAYER, ADMIN, NOW };
+module.exports = { mockLongApi, LONG, PAGES, PLAYER, ADMIN, NOW, HOME };

@@ -39,8 +39,8 @@ function ModeOrder({ modes, poolModes = [], bestOf, value, onChange, note = "", 
   const problem = note ? "" : modeOrderProblem(value, bestOf);
   return (
     <fieldset className="space-y-1.5" data-testid="season-mode-order">
-      <legend className="text-[11px] font-bold uppercase tracking-widest text-white/60">Modus je Map</legend>
-      <p className="text-xs text-white/50">Welcher Modus auf welcher Map der Serie gespielt wird. Entweder alle frei oder jede Map belegt.</p>
+      <legend className="tls-type-label text-white/60">Modus je Map</legend>
+      <p className="tls-type-small text-white/50">Welcher Modus auf welcher Map der Serie gespielt wird. Entweder alle frei oder jede Map belegt.</p>
       <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
         {Array.from({ length: count }, (_, index) => {
           const chosen = choices.find((mode) => mode.mode === value[index]);
@@ -56,14 +56,14 @@ function ModeOrder({ modes, poolModes = [], bestOf, value, onChange, note = "", 
           );
         })}
       </div>
-      {note ? <p className="text-xs text-warn" data-testid="season-mode-order-note">{note}</p> : (
-        <p className={`text-xs ${problem ? "text-warn" : "text-white/45"}`}>
+      {note ? <p className="tls-type-small text-warn" data-testid="season-mode-order-note">{note}</p> : (
+        <p className={`tls-type-small ${problem ? "text-warn" : "text-white/45"}`}>
           {problem || (value.some(Boolean) ? "Gilt in jeder Serie in dieser Reihenfolge." : "Alle frei: die Teams wählen den Modus je Map selbst.")}
         </p>
       )}
       {hints.length ? (
         <ul className="space-y-1" data-testid="season-mode-order-hints">
-          {hints.map((text) => <li key={text} className="text-xs text-warn">{text}</li>)}
+          {hints.map((text) => <li key={text} className="tls-type-small text-warn">{text}</li>)}
         </ul>
       ) : null}
     </fieldset>
@@ -74,7 +74,7 @@ function ModeNeed({ row }) {
   if (!row) return null;
   const short = row.have < row.needed;
   return (
-    <p className={`text-xs tabular-nums ${short ? "text-warn" : "text-white/50"}`} data-testid={`season-mode-need-${row.mode ?? "alle"}`}>
+    <p className={`tls-type-small tabular-nums ${short ? "text-warn" : "text-white/50"}`} data-testid={`season-mode-need-${row.mode ?? "alle"}`}>
       Braucht mindestens {row.needed} {row.needed === 1 ? "Map" : "Maps"}{short ? ` – gespeichert sind ${row.have}` : ""}
     </p>
   );
@@ -118,7 +118,7 @@ export function SeasonPlayTab({ seasonId, data, form, set, canSeason, readiness,
         {/* Ergebnisregeln (C.3, #1617): je Modus der Season, eigenes Speichern, Hinweis aufs Übertragen. */}
         {hasModes && !picked.length ? (
           <FormSection title="Ergebnisregeln" testId="season-result-rules-empty">
-            <p className="text-sm text-white/60">Hake oben die Modi der Season an – dann steht hier je Modus die Ergebnisregel.</p>
+            <p className="tls-type-small text-white/60">Hake oben die Modi der Season an – dann steht hier je Modus die Ergebnisregel.</p>
           </FormSection>
         ) : (
           <SeasonResultRulesPanel seasonId={seasonId} canEdit={canSeason} onSaved={onPendingSync} modes={hasModes ? picked : undefined} />

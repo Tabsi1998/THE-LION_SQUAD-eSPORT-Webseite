@@ -42,26 +42,26 @@ export function PasskeysPanel() {
 
   return (
     <div className="mt-6 border border-white/10 rounded-sm p-4 space-y-4" data-testid="profile-passkeys">
-      <h3 className="font-bold text-lg">Passkeys</h3>
-      <p className="text-sm text-white/65">Melde dich mit Fingerabdruck, Gesichtserkennung oder Geräte-PIN an. Dein Gerät verwaltet den privaten Schlüssel. Ein Passkey zählt als zweiter Faktor: Danach fragt die Seite nicht noch einmal nach einem Code. Für einen Adminbereich muss die Zwei-Faktor-Anmeldung trotzdem eingerichtet sein.</p>
-      {!enabled ? <p className="text-sm text-white/60">Passkeys sind in diesem Browser oder für diese Website derzeit nicht verfügbar.</p> : (
+      <h3 className="tls-type-card">Passkeys</h3>
+      <p className="tls-type-body text-white/65">Melde dich mit Fingerabdruck, Gesichtserkennung oder Geräte-PIN an. Dein Gerät verwaltet den privaten Schlüssel. Ein Passkey zählt als zweiter Faktor: Danach fragt die Seite nicht noch einmal nach einem Code. Für einen Adminbereich muss die Zwei-Faktor-Anmeldung trotzdem eingerichtet sein.</p>
+      {!enabled ? <p className="tls-type-small text-white/60">Passkeys sind in diesem Browser oder für diese Website derzeit nicht verfügbar.</p> : (
         <>
-          <label className="block text-sm">Bezeichnung
+          <label className="block tls-type-small">Bezeichnung
             <input value={name} onChange={(event) => setName(event.target.value)} maxLength={80} disabled={submitting}
               className="mt-1 block w-full bg-black border border-white/20 rounded-sm px-3 py-2" />
           </label>
-          <label className="block text-sm">Aktuelles Passwort zur Bestätigung
+          <label className="block tls-type-small">Aktuelles Passwort zur Bestätigung
             <input type="password" autoComplete="current-password" value={password} onChange={(event) => setPassword(event.target.value)} disabled={submitting}
               className="mt-1 block w-full bg-black border border-white/20 rounded-sm px-3 py-2" />
           </label>
-          <p className="text-xs text-white/60">Zum Hinzufügen oder Entfernen bestätigst du dein Passwort. Nutzt du bisher nur Google, kannst du über <Link to="/forgot-password" className="text-[#29B6E8] underline">Passwort festlegen</Link> zuerst ein Passwort einrichten.</p>
+          <p className="tls-type-small text-white/60">Zum Hinzufügen oder Entfernen bestätigst du dein Passwort. Nutzt du bisher nur Google, kannst du über <Link to="/forgot-password" className="text-[#29B6E8] underline">Passwort festlegen</Link> zuerst ein Passwort einrichten.</p>
           <button type="button" disabled={submitting || !password || !name.trim()} onClick={() => perform(() => enrollPasskey(name.trim(), password), "Passkey eingerichtet. Beim nächsten Anmelden kannst du ihn verwenden.")}
             className="tls-btn tls-btn--primary min-h-11 px-4 py-2 font-bold rounded-sm disabled:opacity-50">{submitting ? "Bitte warten …" : "Passkey hinzufügen"}</button>
           <ul className="space-y-2">
             {items.map((item) => (
               <li key={item.id} className="border-t border-white/10 pt-3 flex flex-wrap gap-3 items-center justify-between">
-                <div><p className="text-sm font-bold">{item.name}</p><p className="text-xs text-white/55">{item.last_used_at ? `Zuletzt verwendet: ${viennaDate(item.last_used_at)}` : "Noch nicht zur Anmeldung verwendet"}</p></div>
-                <button type="button" disabled={submitting || !password} className="min-h-11 px-3 text-sm text-[#FF6B62] disabled:opacity-50"
+                <div><p className="tls-type-small font-bold">{item.name}</p><p className="tls-type-small text-white/55">{item.last_used_at ? `Zuletzt verwendet: ${viennaDate(item.last_used_at)}` : "Noch nicht zur Anmeldung verwendet"}</p></div>
+                <button type="button" disabled={submitting || !password} className="min-h-11 px-3 tls-type-small text-[#FF6B62] disabled:opacity-50"
                   onClick={async () => {
                     if (!await confirm({ title: "Passkey entfernen?", description: "Dieser Passkey kann dich anschließend nicht mehr anmelden. Passwort und andere Passkeys bleiben verfügbar.", confirmText: "Entfernen", variant: "danger" })) return;
                     await perform(() => api.post(`/auth/passkeys/${encodeURIComponent(item.id)}/remove`, { current_password: password }, { skipInvalidation: true }), "Passkey entfernt.");
@@ -70,11 +70,11 @@ export function PasskeysPanel() {
             ))}
           </ul>
           {items.length > 0 && (
-            <p className="text-xs text-white/60" data-testid="passkeys-login-hint">Schlägt dein Browser den Passkey beim Anmelden nicht im E-Mail-Feld vor? Wähle dort „Mit Passkey anmelden“ – so findest du auch Passkeys auf deinem Handy oder Sicherheitsschlüssel.</p>
+            <p className="tls-type-small text-white/60" data-testid="passkeys-login-hint">Schlägt dein Browser den Passkey beim Anmelden nicht im E-Mail-Feld vor? Wähle dort „Mit Passkey anmelden“ – so findest du auch Passkeys auf deinem Handy oder Sicherheitsschlüssel.</p>
           )}
         </>
       )}
-      {message && <p role="status" className={`text-sm ${failed ? "text-[#FF6B62]" : "text-[#29B6E8]"}`}>{message}</p>}
+      {message && <p role="status" className={`tls-type-body ${failed ? "text-[#FF6B62]" : "text-[#29B6E8]"}`}>{message}</p>}
     </div>
   );
 }

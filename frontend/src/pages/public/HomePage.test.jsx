@@ -337,3 +337,11 @@ test("Kopf aus dem Stand, sonst die Vorgabe", async () => {
   expect(screen.getByTestId("hero-text")).toHaveTextContent("Komm vorbei.");
   expect(homeHero(null)).toEqual(HOME_HERO_DEFAULT);
 });
+
+// Großbuchstaben nur für Kurzes (#1303): Der Name des Termins über dem Countdown steht normal geschrieben.
+test("der Name über dem Countdown ist kein GROSSES Etikett", async () => {
+  apiMock.get.mockResolvedValue({ data: stateWith(12) });
+  render(<MemoryRouter><HomePage /></MemoryRouter>);
+  const countdown = await screen.findByTestId("home-countdown");
+  expect(countdown.querySelector(".tls-type-label")).toBeNull();
+});

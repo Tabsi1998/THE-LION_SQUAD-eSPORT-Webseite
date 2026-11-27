@@ -13,6 +13,7 @@ import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { toast } from "sonner";
 import { Archive, ArchiveRestore, ExternalLink, Handshake, Pencil, Plus, Trash2 } from "lucide-react";
 import { SOCIAL_PLATFORMS } from "@/lib/socialIcons";
+import { ShortCaps } from "@/components/tls/ShortCaps";
 
 // Partner: Liste und Seitenblatt (#435). Seit der Partnerseite (#469) hat jeder Partner eine eigene
 // Adresse (/partners/<slug>), Kanäle (Discord, Twitch und seit #967 eine Liste Socials: „+“, Plattform aus dem
@@ -80,8 +81,8 @@ export function SocialsEditor({ socials, onChange }) {
           )}
         </div>
       ))}
-      {!socials.length && <div className="text-sm text-white/40 border border-dashed border-white/10 rounded-sm p-4">Noch keine Socials – mit „Social“ kommt die erste Zeile.</div>}
-      <button type="button" onClick={() => onChange([...socials, emptySocial()])} className="inline-flex items-center gap-2 px-4 py-2 border border-[#29B6E8]/45 text-[#29B6E8] rounded-sm text-xs font-bold uppercase tracking-wider" data-testid="partner-social-add">
+      {!socials.length && <div className="tls-type-small text-quiet border border-dashed border-white/10 rounded-sm p-4">Noch keine Socials – mit „Social“ kommt die erste Zeile.</div>}
+      <button type="button" onClick={() => onChange([...socials, emptySocial()])} className="inline-flex items-center gap-2 px-4 py-2 border border-[#29B6E8]/45 text-[#29B6E8] rounded-sm tls-type-label" data-testid="partner-social-add">
         <Plus className="w-3.5 h-3.5" /> Social
       </button>
     </div>
@@ -128,10 +129,10 @@ export default function AdminPartnersPage() {
     <AdminLayout>
       <div className="flex items-start justify-between gap-4 mb-6 flex-wrap">
         <div>
-          <span className="text-[11px] font-bold uppercase tracking-[0.3em] text-[#29B6E8]">Verein</span>
-          <h1 className="font-heading text-3xl md:text-4xl font-black uppercase mt-1">Partner</h1>
-          <p className="mt-2 text-white/60 text-sm max-w-xl">Befreundete Vereine, Veranstalter und Communitys. Jeder Partner hat eine eigene Seite mit Kanälen, Twitch-Live, Discord, Tools und gemeinsamen News.</p>
-          <p className="mt-2 text-white/60 text-sm max-w-xl" data-testid="partner-vs-sponsor">
+          <span className="tls-type-label text-[#29B6E8]">Verein</span>
+          <h1 className="tls-type-title mt-1"><ShortCaps>Partner</ShortCaps></h1>
+          <p className="mt-2 text-white/60 tls-type-body max-w-xl">Befreundete Vereine, Veranstalter und Communitys. Jeder Partner hat eine eigene Seite mit Kanälen, Twitch-Live, Discord, Tools und gemeinsamen News.</p>
+          <p className="mt-2 text-white/60 tls-type-body max-w-xl" data-testid="partner-vs-sponsor">
             Partner arbeiten mit uns zusammen und zahlen nichts dafür. Wer den Verein mit Geld oder Sachleistungen unterstützt, steht unter <Link to="/admin/sponsors" className="text-[#29B6E8] underline-offset-2 hover:underline">Sponsoren</Link>.
           </p>
         </div>
@@ -155,10 +156,10 @@ export default function AdminPartnersPage() {
                   </div>
                 )}
                 <div className="min-w-0">
-                  <div className="text-[10px] uppercase tracking-widest font-bold text-[#29B6E8]">{p.kind || "Partner"}</div>
-                  <div className="font-heading text-lg font-bold tls-wrap">{p.name}</div>
-                  {p.is_active === false && <div className="text-[10px] uppercase tracking-widest text-[#FF3B30] font-bold">Archiviert</div>}
-                  {p.source === "dolibarr" && <div className="text-[10px] uppercase tracking-widest text-[#29B6E8]/80 font-bold" data-testid={`partner-dolibarr-${p.id}`}>Aus Dolibarr</div>}
+                  <div className="tls-type-label text-[#29B6E8]">{p.kind || "Partner"}</div>
+                  <div className="tls-type-card tls-wrap">{p.name}</div>
+                  {p.is_active === false && <div className="tls-type-label text-[#FF3B30]">Archiviert</div>}
+                  {p.source === "dolibarr" && <div className="tls-type-label text-[#29B6E8]/80" data-testid={`partner-dolibarr-${p.id}`}>Aus Dolibarr</div>}
                 </div>
               </div>
               <div className="flex gap-1 shrink-0">
@@ -172,10 +173,10 @@ export default function AdminPartnersPage() {
                 <button onClick={() => remove(p.id)} disabled={dolibarrKeepsEntry(dolibarrSource, p)} title={dolibarrKeepsEntry(dolibarrSource, p) ? DOLIBARR_DELETE_HINT : "Partner löschen"} aria-label="Partner löschen" data-testid={`partner-delete-${p.id}`} className="p-1.5 text-white/40 hover:text-[#FF3B30] disabled:opacity-30 disabled:hover:text-white/40 disabled:cursor-not-allowed"><Trash2 className="w-4 h-4" /></button>
               </div>
             </div>
-            {p.description && <p className="mt-3 text-sm text-white/60 line-clamp-2">{p.description}</p>}
-            <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs">
+            {p.description && <p className="mt-3 tls-type-body text-white/60 line-clamp-2">{p.description}</p>}
+            <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1 tls-type-small">
               {p.slug && (
-                <a href={`/partners/${p.slug}`} target="_blank" rel="noreferrer" data-testid={`partner-page-${p.id}`} className="inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider text-[#29B6E8] hover:text-white">
+                <a href={`/partners/${p.slug}`} target="_blank" rel="noreferrer" data-testid={`partner-page-${p.id}`} className="inline-flex items-center gap-1 tls-type-label text-[#29B6E8] hover:text-white">
                   Seite ansehen <ExternalLink className="w-3 h-3" />
                 </a>
               )}
@@ -218,7 +219,7 @@ function PartnerForm({ partner, locked = new Set(), onClose, onSaved }) {
   return (
     <AdminSheet title={isNew ? "Neuer Partner" : "Partner bearbeiten"} eyebrow="Verein" onClose={onClose} onSubmit={save} saving={saving} submitTestId="partner-save" testId="partner-sheet">
       {locked.size > 0 && (
-        <p className="text-xs text-[#29B6E8] border border-[#29B6E8]/30 bg-[#29B6E8]/5 rounded-sm px-3 py-2" data-testid="partner-locked-hint">
+        <p className="tls-type-small text-[#29B6E8] border border-[#29B6E8]/30 bg-[#29B6E8]/5 rounded-sm px-3 py-2" data-testid="partner-locked-hint">
           {locked.has("is_active")
             ? "Dieser Partner kommt aus Dolibarr: Name, Art und „Öffentlich zeigen“ werden dort gepflegt. Inaktiv wird er, wenn die Firma in Dolibarr geschlossen oder aus der Kategorie genommen wird. Alles andere bleibt hier."
             : "Dieser Partner kam aus Dolibarr und steht dort nicht mehr in der Kategorie: Name und Art bleiben gesperrt, „Öffentlich zeigen“ pflegt ihr jetzt hier."}
@@ -227,7 +228,7 @@ function PartnerForm({ partner, locked = new Set(), onClose, onSaved }) {
       <TextField label="Name" value={form.name} onChange={(v) => set("name", v)} required testId="partner-name" {...lock("name")} />
       <ImageUpload value={form.logo_url} onChange={(v) => set("logo_url", v)} label="Logo" testId="partner-logo" variant="square" endpoint="/uploads/logo" allowLibrary logo />
       {imageSourceText(partner?.dolibarr_image_summary) && (
-        <p className="text-xs text-white/60 border border-white/10 rounded-sm px-3 py-2" data-testid="partner-images-hint">
+        <p className="tls-type-small text-white/60 border border-white/10 rounded-sm px-3 py-2" data-testid="partner-images-hint">
           {imageSourceText(partner.dolibarr_image_summary)}. Die Website zeigt die Fassung für dunklen Hintergrund; das Logo hier springt nur ein, wo
           Dolibarr keines liefert.
         </p>
@@ -275,7 +276,7 @@ function ToolsEditor({ tools, onChange }) {
       {tools.map((tool, index) => (
         <div key={tool.id || `neu-${index}`} className="border border-white/10 rounded-sm p-3 space-y-3 bg-[#0A0A0A]" data-testid={`partner-tool-${index}`}>
           <div className="flex items-center justify-between gap-2">
-            <span className="text-[10px] font-bold uppercase tracking-widest text-white/40">Eintrag {index + 1}</span>
+            <span className="tls-type-label text-quiet">Eintrag {index + 1}</span>
             <button type="button" onClick={() => remove(index)} data-testid={`partner-tool-remove-${index}`} aria-label="Eintrag entfernen" className="text-white/40 hover:text-[#FF3B30]"><Trash2 className="w-4 h-4" /></button>
           </div>
           <FormGrid>
@@ -287,7 +288,7 @@ function ToolsEditor({ tools, onChange }) {
           <CheckField label="Auf der Partnerseite einbetten" checked={tool.embed} onChange={(v) => update(index, { embed: v })} testId={`partner-tool-embed-${index}`} hint="Bleibt der Rahmen leer, lässt die Seite das Einbetten nicht zu – dann bleibt der Link." />
         </div>
       ))}
-      <button type="button" onClick={() => onChange([...tools, emptyTool()])} data-testid="partner-tool-add" className="inline-flex items-center gap-2 px-3 py-2 border border-white/15 rounded-sm text-[10px] font-bold uppercase tracking-wider text-white/70 hover:text-[#29B6E8] hover:border-[#29B6E8]/60">
+      <button type="button" onClick={() => onChange([...tools, emptyTool()])} data-testid="partner-tool-add" className="inline-flex items-center gap-2 px-3 py-2 border border-white/15 rounded-sm tls-type-label text-white/70 hover:text-[#29B6E8] hover:border-[#29B6E8]/60">
         <Plus className="w-3.5 h-3.5" /> Tool oder Projekt hinzufügen
       </button>
     </div>

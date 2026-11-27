@@ -57,12 +57,12 @@ export function FastLapGuestLinkDialog({ challengeId, guest, onClose, onLinked }
     <Dialog open onOpenChange={(open) => { if (!open) onClose?.(); }}>
       <DialogContent className="bg-[#121212] border border-white/10 rounded-sm max-w-md w-[calc(100vw-2rem)] p-6 space-y-4 min-w-0" data-testid="fl-link-dialog">
         <div className="min-w-0 pr-6">
-          <DialogTitle className="font-heading text-lg font-bold uppercase">Mit Konto verknüpfen</DialogTitle>
-          <DialogDescription className="text-xs text-white/55 mt-1 truncate">Gast „{guest.name}“</DialogDescription>
+          <DialogTitle className="tls-type-card">Mit Konto verknüpfen</DialogTitle>
+          <DialogDescription className="tls-type-small text-white/55 mt-1 truncate">Gast „{guest.name}“</DialogDescription>
         </div>
         <PersonPicker purpose="fastlap" contextId={challengeId} value={person} onChange={setPerson} label="Konto" placeholder="Konto suchen …" testId="fl-link-person" />
         {preview && (
-          <div className="border border-white/10 bg-black/30 rounded-sm p-3 text-sm space-y-1.5" data-testid="fl-link-preview" aria-live="polite">
+          <div className="border border-white/10 bg-black/30 rounded-sm p-3 tls-type-small space-y-1.5" data-testid="fl-link-preview" aria-live="polite">
             <div>
               {plural(preview.laps, "Zeit", "Zeiten")} von Gast „{preview.guest_name}“ gehen an Konto „{preview.account_name}“.
             </div>
@@ -72,15 +72,15 @@ export function FastLapGuestLinkDialog({ challengeId, guest, onClose, onLinked }
                 Hinweis: {row.track_name || "Strecke"}: {row.attempts} von {row.max_attempts} Versuchen - die Grenze wird überschritten, das ist erlaubt.
               </div>
             ))}
-            <div className="text-white/45 text-xs">Danach zählt das Konto voll: Rangliste, Gewinne, Jahreswertung, Erfolge.</div>
+            <div className="text-white/45 tls-type-small">Danach zählt das Konto voll: Rangliste, Gewinne, Jahreswertung, Erfolge.</div>
           </div>
         )}
         {preview?.needs_reason && (
           <label className="block">
-            <span className="block text-[11px] font-bold uppercase tracking-widest text-white/60 mb-1.5">Begründung (Pflicht, mind. {MIN_REASON} Zeichen)</span>
+            <span className="block tls-type-small font-bold text-white/60 mb-1.5">Begründung (Pflicht, mind. {MIN_REASON} Zeichen)</span>
             <textarea rows={2} value={reason} onChange={(event) => setReason(event.target.value)} maxLength={500} data-testid="fl-link-reason"
               placeholder="z. B. Gast hat sich am Eventtag registriert" className={INPUT_CLASS} />
-            <span className="block mt-1 text-[11px] text-white/45">Die Ergebnisse sind veröffentlicht: die Begründung steht im Protokoll, danach werden Gewinne und Jahreswertung angeglichen.</span>
+            <span className="block mt-1 tls-type-small text-white/45">Die Ergebnisse sind veröffentlicht: die Begründung steht im Protokoll, danach werden Gewinne und Jahreswertung angeglichen.</span>
           </label>
         )}
         <div className="flex gap-2 pt-1">

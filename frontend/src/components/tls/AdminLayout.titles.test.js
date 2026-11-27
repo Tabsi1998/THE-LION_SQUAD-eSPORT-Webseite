@@ -24,7 +24,8 @@ function heading(file) {
     const match = read(full).match(/<h1[^>]*>([\s\S]*?)<\/h1>/);
     if (!match) return null;
     // Der Titel ist der Text nach dem letzten Tag (Symbole davor sind selbstschließend); es wird nichts "bereinigt", nur gelesen.
-    const inner = match[1];
+    // Kurze Titel stehen in <ShortCaps> (GROSS bis 18 Zeichen, #1303) - der Baustein zählt nicht zum Text.
+    const inner = match[1].replace(/<\/?ShortCaps>/g, "");
     const raw = inner.slice(inner.lastIndexOf(">") + 1);
     const text = raw.split("&shy;").join("").split("&amp;").join("&").split(/\s+/).filter(Boolean).join(" ");
     return text.startsWith("{") ? null : text;

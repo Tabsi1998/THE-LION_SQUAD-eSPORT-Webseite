@@ -32,7 +32,7 @@ function DriverPick({ row, driver, selected, onSelect, publicKeys }) {
           <span className="font-semibold text-white leading-snug [overflow-wrap:anywhere]">{row.name}</span>
           <span className="tls-standing-me">Verein</span>
         </span>
-        <span className="text-[12px] tabular-nums text-white/55 whitespace-nowrap">{line}</span>
+        <span className="tls-type-small tabular-nums text-white/55 whitespace-nowrap">{line}</span>
       </button>
     );
   }
@@ -42,7 +42,7 @@ function DriverPick({ row, driver, selected, onSelect, publicKeys }) {
         <span className="leading-snug text-white/70">{label.name}</span>
         {driver?.guest && <GuestBadge />}
       </span>
-      <span className="text-[12px] tabular-nums text-white/45 whitespace-nowrap">{line}</span>
+      <span className="tls-type-small tabular-nums text-white/45 whitespace-nowrap">{line}</span>
     </div>
   );
 }
@@ -53,17 +53,17 @@ function Duel({ duel, rows, publicKeys }) {
   const b = nameOf(duel.b.key);
   return (
     <div className="mt-3 border-t border-white/10 px-3 pt-3 pb-1" data-testid="racing-duel">
-      <p className="flex items-baseline justify-between gap-2 text-[11px] font-bold uppercase tracking-[0.16em] text-white/45">
+      <p className="flex items-baseline justify-between gap-2 tls-type-label text-white/45">
         <span>Teamduell</span>
         <span className="normal-case tracking-normal font-normal">{count(duel.races, "gemeinsames Rennen", "gemeinsame Rennen")}</span>
       </p>
       {duel.races === 0 ? (
-        <p className="mt-2 text-sm text-white/55">Noch kein Rennen, in dem beide ins Ziel kamen.</p>
+        <p className="mt-2 tls-type-small text-white/55">Noch kein Rennen, in dem beide ins Ziel kamen.</p>
       ) : (
         <>
           <div className="mt-2 grid grid-cols-[1fr_auto_1fr] items-center gap-3">
-            <span className={`min-w-0 text-sm leading-snug [overflow-wrap:anywhere] ${a.named ? "text-white" : "text-white/70"}`}>{a.name}</span>
-            <span className="font-display text-2xl font-bold tabular-nums text-white">
+            <span className={`min-w-0 tls-type-small leading-snug [overflow-wrap:anywhere] ${a.named ? "text-white" : "text-white/70"}`}>{a.name}</span>
+            <span className="tls-type-section tls-type-num text-white">
               <span aria-hidden="true">
                 <span className="text-[#29B6E8]">{duel.a.ahead}</span>
                 <span className="text-white/35 px-1">:</span>
@@ -71,14 +71,14 @@ function Duel({ duel, rows, publicKeys }) {
               </span>
               <span className="sr-only">{`${duel.a.ahead} zu ${duel.b.ahead}`}</span>
             </span>
-            <span className={`min-w-0 text-sm leading-snug text-right [overflow-wrap:anywhere] ${b.named ? "text-white" : "text-white/70"}`}>{b.name}</span>
+            <span className={`min-w-0 tls-type-small leading-snug text-right [overflow-wrap:anywhere] ${b.named ? "text-white" : "text-white/70"}`}>{b.name}</span>
           </div>
           <div className="tls-racing-duel mt-2" style={{ "--a": duel.a.ahead || 0.04, "--b": duel.b.ahead || 0.04 }} aria-hidden="true">
             <span />
             <span />
           </div>
           {duel.a.points != null && (
-            <p className="mt-1.5 flex justify-between text-[12px] tabular-nums text-white/50">
+            <p className="mt-1.5 flex justify-between tls-type-small tabular-nums text-white/50">
               <span>{formatNumber(duel.a.points)} Pkt fürs Team</span>
               <span data-testid="racing-duel-points-b">{formatNumber(duel.b.points)} Pkt</span>
             </p>
@@ -97,13 +97,13 @@ export function RacingGarageTeams({ garage, rows, drivers, selectedKey, onSelect
       {garage.map((item) => (
         <li key={item.team} className="tls-racing-garage-team py-3" data-testid="racing-garage-team">
           <div className="flex items-baseline justify-between gap-3 px-3">
-            <h3 className="font-heading text-lg font-black uppercase leading-tight min-w-0 break-words">{item.team}</h3>
+            <h3 className="tls-type-card leading-tight min-w-0 break-words">{item.team}</h3>
             {item.standing && (
-              <span className="shrink-0 text-[12px] font-bold tabular-nums text-white/60">{`P${item.standing.rank} · ${formatNumber(item.standing.points)} Pkt`}</span>
+              <span className="shrink-0 tls-type-small font-bold tabular-nums text-white/60">{`P${item.standing.rank} · ${formatNumber(item.standing.points)} Pkt`}</span>
             )}
           </div>
           {item.drivers.length === 0 ? (
-            <p className="mt-2 px-3 text-sm text-white/55">Noch kein Rennen gefahren.</p>
+            <p className="mt-2 px-3 tls-type-small text-white/55">Noch kein Rennen gefahren.</p>
           ) : (
             <ul className="mt-2 space-y-0.5 px-0.5">
               {item.drivers.map((row) => (
@@ -174,9 +174,9 @@ export const RacingDriverDetail = forwardRef(function RacingDriverDetail({ row, 
       <div key={row.key} className="tls-racing-driver__head">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div className="min-w-0">
-            <h3 id="racing-driver-name" className="font-heading text-2xl font-black uppercase leading-tight break-words">{row.name}</h3>
+            <h3 id="racing-driver-name" className="tls-type-section leading-tight break-words">{row.name}</h3>
             {driver?.team && (
-              <p className="text-sm text-white/55">
+              <p className="tls-type-small text-white/55">
                 {driver.team}
                 {/* Teamwechsel (#1960): ab welchem Rennen der Fahrer im aktuellen Team ist. */}
                 {teamSinceLabel(driver, rounds) && <span className="text-white/40" data-testid="racing-driver-team-since">{` · ${teamSinceLabel(driver, rounds)}`}</span>}
@@ -184,15 +184,15 @@ export const RacingDriverDetail = forwardRef(function RacingDriverDetail({ row, 
             )}
           </div>
           {row.profile_slug && (
-            <Link to={`/members/${row.profile_slug}`} className="tls-btn tls-btn--quiet inline-flex items-center min-h-[40px] px-3 rounded-md text-[12px] font-bold uppercase tracking-[0.12em]">
+            <Link to={`/members/${row.profile_slug}`} className="tls-btn tls-btn--quiet inline-flex items-center min-h-[40px] px-3 rounded-md tls-type-label">
               Vereinsprofil
             </Link>
           )}
         </div>
-        <p className="mt-3 text-sm text-white tabular-nums">
+        <p className="mt-3 tls-type-small text-white tabular-nums">
           {`P${row.rank} in der Fahrerwertung · ${formatNumber(row.points)} ${Number(row.points) === 1 ? "Punkt" : "Punkte"} · ${season.races} Rennen`}
         </p>
-        <p className="mt-1 text-sm text-white/65 tabular-nums" data-testid="racing-driver-stats">{stats.join(" · ")}</p>
+        <p className="mt-1 tls-type-small text-white/65 tabular-nums" data-testid="racing-driver-stats">{stats.join(" · ")}</p>
         {/* Anpassungen (#1960): öffentlich als „−5“ mit Grund - erklären die Abweichung zur Rennsumme. */}
         <AdjustmentList row={row} rounds={rounds} className="mt-2" />
       </div>

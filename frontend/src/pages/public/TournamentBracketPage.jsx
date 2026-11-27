@@ -83,10 +83,10 @@ export default function TournamentBracketPage() {
           <div>
             {/* Eine Brotkrumen-Kette (#2124): kein zusätzliches „← Zurück“ - die Reiter darunter führen weiter. */}
             <Breadcrumbs items={tournamentCrumbs(t, trail, { tournamentUrl, current: { label: "Turnierbaum" } })} className="mb-3" />
-            <h1 className="mt-2 font-heading text-3xl md:text-5xl font-black uppercase">{t.title}</h1>
+            <h1 className="mt-2 tls-type-title">{t.title}</h1>
             <div className="mt-2 flex gap-2 items-center">
               <PhaseBadge phase={t.public_phase} status={t.status} />
-              <span className="text-white/40 text-sm">{formatTournamentDisplay(t)}</span>
+              <span className="text-quiet tls-type-small">{formatTournamentDisplay(t)}</span>
             </div>
             <TournamentTabs tournament={t} accessToken={accessToken} className="mt-4" />
           </div>
@@ -94,7 +94,7 @@ export default function TournamentBracketPage() {
           {/* Druckansicht (#1283): Plan B auf Papier - Baum auf A4 quer. */}
           <PrintLink slug={t.slug || t.id} parts="baum" from="baum" accessToken={accessToken} testId="bracket-print-link" />
           {t.can_view_display && (
-            <Link to={`/display/bracket/${t.id}`} target="_blank" data-testid="bracket-tv-link" className="tls-btn tls-btn--secondary inline-flex items-center gap-2 px-4 py-2.5 font-bold uppercase tracking-wider rounded-sm text-sm">
+            <Link to={`/display/bracket/${t.id}`} target="_blank" data-testid="bracket-tv-link" className="tls-btn tls-btn--secondary inline-flex items-center gap-2 px-4 py-2.5 font-bold uppercase tracking-wider rounded-sm tls-type-small">
               <Tv className="w-4 h-4" /> TV-/Beamer-Ansicht
             </Link>
           )}
@@ -104,7 +104,7 @@ export default function TournamentBracketPage() {
           // Ohne Turnierbaum (#2124): Zeitfahren und Rennserie bekommen nie einen - der Weg zur Rangliste.
           <div className="border border-white/10 rounded-sm bg-surface-1 p-12 text-center" data-testid="bracket-no-tree">
             <p className="text-muted-text">Bei diesem Format gibt es keinen Turnierbaum – den Stand zeigt die Rangliste.</p>
-            <Link to={standingsUrl} className="tls-btn tls-btn--secondary mt-4 inline-flex px-4 py-2 rounded-sm text-xs font-bold uppercase tracking-wider">Zur Rangliste</Link>
+            <Link to={standingsUrl} className="tls-btn tls-btn--secondary mt-4 inline-flex px-4 py-2 rounded-sm tls-type-label">Zur Rangliste</Link>
           </div>
         ) : (data.matches_v2?.length || 0) === 0 ? (
           <div className="border border-white/10 rounded-sm bg-surface-1 p-12 text-center">

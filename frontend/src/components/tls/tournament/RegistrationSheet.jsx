@@ -21,8 +21,8 @@ function Fact({ icon: Icon, label, testId, children }) {
     <div className="flex min-w-0 items-start gap-2.5">
       <Icon className="mt-0.5 h-4 w-4 shrink-0 text-[#29B6E8]" aria-hidden="true" />
       <div className="min-w-0">
-        <dt className="text-[10px] font-bold uppercase tracking-widest text-white/50">{label}</dt>
-        <dd className="mt-0.5 text-sm text-white break-words" data-testid={testId}>{children}</dd>
+        <dt className="tls-type-label text-white/50">{label}</dt>
+        <dd className="mt-0.5 tls-type-small text-white break-words" data-testid={testId}>{children}</dd>
       </div>
     </div>
   );
@@ -93,9 +93,9 @@ export function RegistrationSheet({ tournament, user, myTeams = [], loading, err
           <div className="min-w-0">
             {/* Griff am Handy: zeigt, dass es ein Blatt ist. */}
             <div className="mx-auto mb-3 h-1 w-10 rounded-full bg-white/20 sm:hidden" aria-hidden="true" />
-            <div className="text-[11px] font-bold uppercase tracking-[0.3em] text-[#29B6E8]">{needsTeam ? "Team-Anmeldung" : "Anmeldung"}</div>
-            <h2 id={titleId} className="mt-0.5 font-heading text-2xl font-black uppercase leading-tight break-words">{tournament.title}</h2>
-            <p className="mt-1 text-sm text-white/60">{lead}</p>
+            <div className="tls-type-small font-bold text-[#29B6E8]">{needsTeam ? "Team-Anmeldung" : "Anmeldung"}</div>
+            <h2 id={titleId} className="mt-0.5 tls-type-section leading-tight break-words">{tournament.title}</h2>
+            <p className="mt-1 tls-type-body text-white/60">{lead}</p>
           </div>
           <button type="button" onClick={onClose} aria-label="Schließen" className="tls-hit shrink-0 p-2 text-white/50 hover:text-white" data-testid="register-sheet-close">
             <X className="h-5 w-5" />
@@ -113,8 +113,8 @@ export function RegistrationSheet({ tournament, user, myTeams = [], loading, err
               {fee ? <Fact icon={Receipt} label="Startgeld" testId="register-sheet-fee">{fee}</Fact> : null}
             </dl>
 
-            <section aria-label="Regeln" className="text-sm" data-testid="register-sheet-rules">
-              <div className="text-[10px] font-bold uppercase tracking-widest text-white/50">Regeln kurz</div>
+            <section aria-label="Regeln" className="tls-type-small" data-testid="register-sheet-rules">
+              <div className="tls-type-label text-white/50">Regeln kurz</div>
               <p className="mt-1 text-white/80">
                 {rules || noRules}
               </p>
@@ -124,14 +124,14 @@ export function RegistrationSheet({ tournament, user, myTeams = [], loading, err
                     type="button"
                     onClick={() => setRulesOpen((open) => !open)}
                     aria-expanded={rulesOpen}
-                    className="tls-hit mt-1 inline-flex items-center gap-1 text-xs font-bold uppercase tracking-wider text-[#29B6E8] hover:text-white"
+                    className="tls-hit mt-1 inline-flex items-center gap-1 tls-type-label text-[#29B6E8] hover:text-white"
                     data-testid="register-sheet-rules-all"
                   >
                     {rulesOpen ? "Regeln ausblenden" : "Alle Regeln"}
                     <ChevronDown className={`h-3.5 w-3.5 transition-transform duration-200 ${rulesOpen ? "rotate-180" : ""}`} aria-hidden="true" />
                   </button>
                   {rulesOpen ? (
-                    <div className="prose-cms mt-2 max-h-64 overflow-y-auto rounded-sm border border-white/10 bg-[#121212] p-4 text-sm" data-testid="register-sheet-rules-full" dangerouslySetInnerHTML={{ __html: renderMarkdownLite(tournament.rules) }} />
+                    <div className="prose-cms mt-2 max-h-64 overflow-y-auto rounded-sm border border-white/10 bg-[#121212] p-4 tls-type-small" data-testid="register-sheet-rules-full" dangerouslySetInnerHTML={{ __html: renderMarkdownLite(tournament.rules) }} />
                   ) : null}
                 </>
               ) : null}
@@ -139,7 +139,7 @@ export function RegistrationSheet({ tournament, user, myTeams = [], loading, err
 
             {needsTeam && (
               <label className="block">
-                <div className="mb-1.5 text-[11px] font-bold uppercase tracking-widest text-white/60">Team *</div>
+                <div className="mb-1.5 tls-type-label text-white/60">Team *</div>
                 <select
                   value={teamId}
                   onChange={(e) => setTeamId(e.target.value)}
@@ -149,13 +149,13 @@ export function RegistrationSheet({ tournament, user, myTeams = [], loading, err
                   {manageableTeams.map((team) => <option key={team.id} value={team.id}>[{team.tag}] {team.name}</option>)}
                 </select>
                 {manageableTeams.length === 0 && (
-                  <div className="mt-2 text-xs text-[#FF3B30]">Du bist aktuell bei keinem Team als Teamleitung oder Co-Leitung eingetragen.</div>
+                  <div className="mt-2 tls-type-small text-[#FF3B30]">Du bist aktuell bei keinem Team als Teamleitung oder Co-Leitung eingetragen.</div>
                 )}
               </label>
             )}
             {fields.map((field) => (
               <label key={field.key} className="block">
-                <div className="mb-1.5 text-[11px] font-bold uppercase tracking-widest text-white/60">{field.label}{field.required !== false ? " *" : ""}</div>
+                <div className="mb-1.5 tls-type-label text-white/60">{field.label}{field.required !== false ? " *" : ""}</div>
                 <input
                   value={playerIds[field.key] || ""}
                   onChange={(e) => set(field.key, e.target.value)}
@@ -167,11 +167,11 @@ export function RegistrationSheet({ tournament, user, myTeams = [], loading, err
             ))}
             {offer && (
               <div className="space-y-2 rounded-sm border border-[#FFD700]/40 p-3" data-testid="tournament-register-costs">
-                <div className="text-[11px] font-bold uppercase tracking-widest text-[#FFD700]">Startgeld</div>
+                <div className="tls-type-label text-[#FFD700]">Startgeld</div>
                 {offer.positions.some((position) => position.optional) && (
                   <div className="space-y-1">
                     {offer.positions.filter((position) => position.optional).map((position) => (
-                      <label key={position.key} className="flex min-h-11 items-center gap-2 text-sm">
+                      <label key={position.key} className="flex min-h-11 items-center gap-2 tls-type-small">
                         <input type="checkbox" checked={selectedPositions.includes(position.key)} onChange={(e) => setSelectedPositions((current) => (e.target.checked ? [...current, position.key] : current.filter((key) => key !== position.key)))} className="h-5 w-5 shrink-0 accent-[#29B6E8]" data-testid={`tournament-offer-option-${position.key}`} />
                         <span>{position.label} <span className="text-white/50">{formatCents(position.amount_cents, offer.currency)} {position.basis === "per_person" ? "je Spieler" : position.basis === "per_team" ? "je Team" : "je Anmeldung"}</span></span>
                       </label>
@@ -179,17 +179,17 @@ export function RegistrationSheet({ tournament, user, myTeams = [], loading, err
                   </div>
                 )}
                 {quote && !quote.free && (
-                  <div className="flex items-baseline justify-between gap-3 text-sm" data-testid="tournament-quote">
+                  <div className="flex items-baseline justify-between gap-3 tls-type-small" data-testid="tournament-quote">
                     <span className="text-white/65">{needsTeam ? `Summe für ein Team mit ${seats} Spielern` : "Summe"}</span>
-                    <strong className="font-heading text-xl text-white">{formatCents(quote.total_cents, quote.currency)}</strong>
+                    <strong className="tls-type-card text-white">{formatCents(quote.total_cents, quote.currency)}</strong>
                   </div>
                 )}
                 {needsTeam && offer.positions.some((position) => position.basis === "per_person") && (
-                  <div className="text-xs text-white/45">Gezählt wird der Roster bei der Freigabe – fehlen noch Spieler, gilt die Teamgröße.</div>
+                  <div className="tls-type-small text-white/45">Gezählt wird der Roster bei der Freigabe – fehlen noch Spieler, gilt die Teamgröße.</div>
                 )}
-                <label className="flex items-start gap-2 text-sm">
+                <label className="flex items-start gap-2 tls-type-small">
                   <input type="checkbox" checked={acceptCosts} onChange={(e) => setAcceptCosts(e.target.checked)} className="mt-0.5 h-5 w-5 shrink-0 accent-[#29B6E8]" data-testid="tournament-accept-costs" />
-                  <span>{needsTeam ? "Ich übernehme das Startgeld für das Team (Rechnung an mich)." : "Ich übernehme das Startgeld (Rechnung an mich)."}<br /><span className="text-xs text-white/45">Bezahlt wird erst mit der verbindlichen Teilnahme; die Rechnung kommt in dein Konto unter „Meine Rechnungen“.</span></span>
+                  <span>{needsTeam ? "Ich übernehme das Startgeld für das Team (Rechnung an mich)." : "Ich übernehme das Startgeld (Rechnung an mich)."}<br /><span className="tls-type-small text-white/45">Bezahlt wird erst mit der verbindlichen Teilnahme; die Rechnung kommt in dein Konto unter „Meine Rechnungen“.</span></span>
                 </label>
               </div>
             )}
@@ -198,16 +198,16 @@ export function RegistrationSheet({ tournament, user, myTeams = [], loading, err
 
           {/* Fester Fuß: am Handy bleibt „Verbindlich anmelden“ unten stehen, auch wenn der Inhalt scrollt. */}
           <div className="border-t border-white/10 bg-[#0F0F10] px-5 pb-[max(1rem,env(safe-area-inset-bottom))] pt-3">
-            <p className="mb-3 text-xs text-white/55" data-testid="register-sheet-consent">
+            <p className="mb-3 tls-type-small text-white/55" data-testid="register-sheet-consent">
               Mit der Anmeldung akzeptierst du die Turnierregeln und den <Link to="/privacy" className="underline hover:text-white">Datenschutz</Link>.
             </p>
             <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
-              <button type="button" onClick={onClose} className="tls-btn tls-btn--quiet min-h-11 rounded-sm px-4 text-xs font-bold uppercase tracking-wider" data-testid="register-sheet-cancel">Abbrechen</button>
+              <button type="button" onClick={onClose} className="tls-btn tls-btn--quiet min-h-11 rounded-sm px-4 tls-type-label" data-testid="register-sheet-cancel">Abbrechen</button>
               <button
                 type="submit"
                 disabled={loading || (needsTeam && !teamId) || (offer && !acceptCosts)}
                 data-testid="tournament-register-submit"
-                className="tls-btn tls-btn--primary min-h-12 rounded-sm px-5 text-sm font-bold uppercase tracking-wider disabled:opacity-50 sm:min-h-11 sm:text-xs"
+                className="tls-btn tls-btn--primary min-h-12 rounded-sm px-5 tls-type-label disabled:opacity-50 sm:min-h-11"
               >
                 {loading ? "Sendet…" : submitLabel}
               </button>

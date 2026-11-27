@@ -1,7 +1,7 @@
 const { test, expect } = require("@playwright/test");
 const { routeFakeUploads } = require("./fixtures/fakeUploads");
 
-// Erfolge-Seite am Handy (#1229): beim ersten Laden höchstens vier Bildschirme lang, kein ganzer Katalog (nur Übersicht
+// Erfolge-Seite am Handy (#1229): beim ersten Laden gut vier Bildschirme lang (4,25, #1302), kein ganzer Katalog (nur Übersicht
 // und zehn Plätze der Bestenliste); eine Kategorie aufklappen zeigt ihre Abzeichen in unter einer Sekunde.
 // Die Übertragung zählt hier nur, was die Seite selbst holt (Daten, Bilder, Schriften) - die Programmdateien liefert im
 // Test der Entwicklungsserver ungebündelt; ihre Größe im Betrieb zeigt der Build.
@@ -84,7 +84,9 @@ test.describe("Erfolge-Seite am Handy", () => {
     await page.waitForLoadState("networkidle");
 
     const height = await page.evaluate(() => document.documentElement.scrollHeight);
-    expect(height, `Seitenhöhe ${height} px`).toBeLessThanOrEqual(4 * VIEWPORT.height);
+    // Seit der Schrift-Treppe (#1302) ist Kleintext 14 px, Etiketten 12 px, und die vier Kennzahlen stehen am Handy 2 × 2
+    // (in vier Spalten passten die Etiketten nicht mehr): gut vier Bildschirme, der Katalog bleibt zu.
+    expect(height, `Seitenhöhe ${height} px`).toBeLessThanOrEqual(4.25 * VIEWPORT.height);
     expect(apiCalls.some((call) => call.startsWith("/api/achievements/groups"))).toBe(false);
     expect(apiCalls.some((call) => call.startsWith("/api/achievements/me"))).toBe(false);
     expect(apiCalls).toContain("/api/achievements/leaderboard?limit=10&by=points");

@@ -17,6 +17,7 @@ import { PreviewTab } from "./achievements/PreviewTab";
 import { NegativeTab } from "./achievements/NegativeTab";
 import { StatsTab } from "./achievements/StatsTab";
 import { useBoardRights } from "./achievements/shared";
+import { ShortCaps } from "@/components/tls/ShortCaps";
 
 export { MATERIALS, materialColor, materialLabel } from "./achievements/shared";
 
@@ -54,9 +55,9 @@ export default function AdminAchievementsPage() {
 
   return (
     <AdminLayout>
-      <span className="text-[11px] font-bold uppercase tracking-[0.3em] text-[#FFD700]">Content</span>
-      <h1 className="font-heading text-3xl md:text-4xl font-black uppercase mt-1">Erfolge</h1>
-      <p className="mt-2 text-white/55 text-sm max-w-2xl">
+      <span className="tls-type-label text-[#FFD700]">Content</span>
+      <h1 className="tls-type-title mt-1"><ShortCaps>Erfolge</ShortCaps></h1>
+      <p className="mt-2 text-white/55 tls-type-body max-w-2xl">
         Katalog, Vergaben, Saisonabschluss, XP und Vorschau an einem Ort. Jede Aktion steht im Protokoll unter „Vergeben“.
       </p>
 
@@ -69,7 +70,7 @@ export default function AdminAchievementsPage() {
             aria-selected={tab === key}
             onClick={() => setTab(key)}
             data-testid={`ach-tab-${key}`}
-            className={`px-4 py-2 text-xs font-bold uppercase tracking-wider inline-flex items-center gap-2 border-b-2 whitespace-nowrap transition ${tab === key ? "border-[#FFD700] text-[#FFD700]" : "border-transparent text-white/50 hover:text-white"}`}
+            className={`px-4 py-2 tls-type-label inline-flex items-center gap-2 border-b-2 whitespace-nowrap transition ${tab === key ? "border-[#FFD700] text-[#FFD700]" : "border-transparent text-white/50 hover:text-white"}`}
           >
             <Icon className="w-3.5 h-3.5" /> {label}
           </button>

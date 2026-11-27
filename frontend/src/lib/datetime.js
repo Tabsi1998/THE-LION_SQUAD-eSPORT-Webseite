@@ -71,6 +71,28 @@ export function formatAgo(value, { now = new Date(), fallback = "" } = {}) {
   return formatWhen(date, { now, time: false });
 }
 
+/**
+ * Eine Dauer in Worten (#1304): „154 Tage 16 Std.“, „3 Std. 12 Min.“, „45 Min.“, unter einer Minute „42 Sek.“ -
+ * höchstens zwei Einheiten, die größte zuerst, eine Einheit mit 0 fällt weg. Nie „154T 16H“. Negatives zählt als 0.
+ * `round: "up"` rundet auf ganze Minuten auf - für die Restzeit bis zu einem Termin („noch 1 Min.“ statt „noch 59 Sek.“).
+ * Dieselben Fälle wie die App: docs/duration-cases.json.
+ */
+export function formatDuration(ms, { round = "down" } = {}) {
+  if (ms === null || ms === undefined || ms === "") return "";
+  const value = Number(ms);
+  if (!Number.isFinite(value)) return "";
+  const safe = Math.max(0, value);
+  const total = round === "up" ? Math.ceil(safe / MINUTE_MS) * 60 : Math.floor(safe / 1000);
+  const days = Math.floor(total / 86400);
+  const hours = Math.floor((total % 86400) / 3600);
+  const minutes = Math.floor((total % 3600) / 60);
+  const dayText = (count) => `${count} ${count === 1 ? "Tag" : "Tage"}`;
+  if (days) return hours ? `${dayText(days)} ${hours} Std.` : dayText(days);
+  if (hours) return minutes ? `${hours} Std. ${minutes} Min.` : `${hours} Std.`;
+  if (minutes) return `${minutes} Min.`;
+  return `${total % 60} Sek.`;
+}
+
 export function formatDateTime(value, options = {}) {
   if (!value) return options.fallback || "TBD";
   const date = asInstant(value);

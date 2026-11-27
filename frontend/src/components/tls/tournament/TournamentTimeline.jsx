@@ -98,17 +98,17 @@ export function TournamentTimeline({ tournament: t, calendarItem = null }) {
   return (
     <section className="border border-white/10 rounded-sm bg-[#121212] p-4" data-testid="tournament-timeline">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <div className="font-heading font-bold uppercase text-sm inline-flex items-center gap-2"><CalendarClock className="w-4 h-4 text-[#29B6E8]" /> Termine</div>
-        {highlight ? <div className="text-xs text-[#29B6E8] font-bold uppercase tracking-wider" data-testid="tournament-timeline-next">{timelineHeadline(steps, now, days)}</div> : <div className="text-xs text-white/40">Alle Termine vorbei</div>}
+        <div className="tls-type-label inline-flex items-center gap-2"><CalendarClock className="w-4 h-4 text-[#29B6E8]" /> Termine</div>
+        {highlight ? <div className="tls-type-label text-[#29B6E8]" data-testid="tournament-timeline-next">{timelineHeadline(steps, now, days)}</div> : <div className="tls-type-small text-quiet">Alle Termine vorbei</div>}
       </div>
       <ol className="mt-3 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
         {steps.map((step) => {
           const highlighted = step.key === highlight?.key;
           return (
-            <li key={step.key} data-testid={`tournament-timeline-${step.key}`} data-state={step.running ? "running" : step.past ? "past" : step.next ? "next" : "upcoming"} className={`flex items-start gap-2 rounded-sm border px-3 py-2 text-sm ${highlighted ? "border-[#29B6E8]/50 bg-[#29B6E8]/5" : step.past ? "border-white/5 text-white/40" : "border-white/10"}`}>
+            <li key={step.key} data-testid={`tournament-timeline-${step.key}`} data-state={step.running ? "running" : step.past ? "past" : step.next ? "next" : "upcoming"} className={`flex items-start gap-2 rounded-sm border px-3 py-2 tls-type-small ${highlighted ? "border-[#29B6E8]/50 bg-[#29B6E8]/5" : step.past ? "border-white/5 text-quiet" : "border-white/10"}`}>
               <StepMark step={step} highlighted={highlighted} />
               <span>
-                <span className={`block text-[10px] font-bold uppercase tracking-widest ${step.running ? "text-[#29B6E8]" : "text-white/50"}`}>{step.label}</span>
+                <span className={`block tls-type-label ${step.running ? "text-[#29B6E8]" : "text-white/50"}`}>{step.label}</span>
                 <span className="block">{formatDateTime(step.at)}</span>
               </span>
             </li>

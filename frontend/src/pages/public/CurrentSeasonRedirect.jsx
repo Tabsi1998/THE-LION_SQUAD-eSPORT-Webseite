@@ -93,8 +93,8 @@ export default function CurrentSeasonRedirect() {
     <PublicLayout>
       <section className="border-b border-white/10 bg-grid-dense">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-14">
-          <span className="text-[11px] font-bold uppercase tracking-[0.3em] text-[#29B6E8]">TLS Jahreswertung</span>
-          <h1 className="mt-2 font-heading text-4xl md:text-6xl font-black uppercase leading-tight" data-testid="season-current-title">{latest ? finalTitle(latest) : "Jahreswertung"}</h1>
+          <span className="tls-type-label text-[#29B6E8]">TLS Jahreswertung</span>
+          <h1 className="mt-2 tls-type-title leading-tight" data-testid="season-current-title">{latest ? finalTitle(latest) : "Jahreswertung"}</h1>
           {next?.start_date && (
             <p className="mt-4 text-white/75" data-testid="season-next">Die nächste Wertung beginnt am {viennaDate(next.start_date, { day: "numeric", month: "long", year: "numeric" })}.</p>
           )}
@@ -112,10 +112,10 @@ export default function CurrentSeasonRedirect() {
           <div data-testid="season-final">
             <div className="flex flex-wrap items-end justify-between gap-3">
               <div>
-                <div className="text-[11px] font-bold uppercase tracking-[0.3em] text-[#FFD700]">{latest.name}</div>
-                <h2 className="mt-1 font-heading text-2xl font-black uppercase">Die ersten zehn</h2>
+                <div className="tls-type-small font-bold text-[#FFD700]">{latest.name}</div>
+                <h2 className="mt-1 tls-type-section">Die ersten zehn</h2>
               </div>
-              <Link to={`/seasons/${latest.slug || latest.id}`} className="tls-btn tls-btn--secondary inline-flex items-center gap-2 px-4 py-2 rounded-sm text-xs font-bold uppercase tracking-wider">
+              <Link to={`/seasons/${latest.slug || latest.id}`} className="tls-btn tls-btn--secondary inline-flex items-center gap-2 px-4 py-2 rounded-sm tls-type-label">
                 Ganze Tabelle <ArrowRight className="w-3.5 h-3.5" />
               </Link>
             </div>
@@ -124,16 +124,16 @@ export default function CurrentSeasonRedirect() {
                 {standings.map((row) => <FinalRow key={`${row.rank}-${row.user_id || row.display_name}`} row={row} />)}
               </ol>
             ) : (
-              <p className="mt-5 text-sm text-white/55">In dieser Wertung stehen keine Punkte.</p>
+              <p className="mt-5 tls-type-small text-white/55">In dieser Wertung stehen keine Punkte.</p>
             )}
           </div>
         )}
 
         {canSetUp && (
           <div className="border border-dashed border-[#29B6E8]/40 bg-[#29B6E8]/5 rounded-sm p-5" data-testid="season-admin-guide">
-            <div className="flex items-center gap-2 text-[11px] font-bold uppercase tracking-[0.3em] text-[#29B6E8]"><Settings className="w-3.5 h-3.5" /> Für die Turnierleitung</div>
-            <p className="mt-2 text-sm text-white/75">Gerade läuft keine Saison. Lege in der Verwaltung eine Saison an und setze sie auf aktiv – dann öffnet diese Seite automatisch Rangliste, Punkte und Top-Spieler.</p>
-            <Link to={canOpenAdmin ? "/admin/seasons" : mfaSetupPath("/admin/seasons")} className="tls-btn tls-btn--secondary mt-4 inline-flex items-center gap-2 px-4 py-2 rounded-sm text-xs font-bold uppercase tracking-wider">
+            <div className="flex items-center gap-2 tls-type-label text-[#29B6E8]"><Settings className="w-3.5 h-3.5" /> Für die Turnierleitung</div>
+            <p className="mt-2 tls-type-body text-white/75">Gerade läuft keine Saison. Lege in der Verwaltung eine Saison an und setze sie auf aktiv – dann öffnet diese Seite automatisch Rangliste, Punkte und Top-Spieler.</p>
+            <Link to={canOpenAdmin ? "/admin/seasons" : mfaSetupPath("/admin/seasons")} className="tls-btn tls-btn--secondary mt-4 inline-flex items-center gap-2 px-4 py-2 rounded-sm tls-type-label">
               {canOpenAdmin ? "Zu den Saisons" : "2FA einrichten"} <ArrowRight className="w-3.5 h-3.5" />
             </Link>
           </div>
@@ -141,7 +141,7 @@ export default function CurrentSeasonRedirect() {
 
         {earlier.length > 0 && (
           <div>
-            <h2 className="font-heading text-xl font-black uppercase">Frühere Wertungen</h2>
+            <h2 className="tls-type-section">Frühere Wertungen</h2>
             <div className="mt-4 grid md:grid-cols-2 xl:grid-cols-3 gap-4">
               {earlier.map((season) => <SeasonTile key={season.id} season={season} />)}
             </div>
@@ -157,9 +157,9 @@ function FinalRow({ row }) {
   const medal = rank === 1 ? "text-[#FFD700]" : rank === 2 ? "text-white/80" : rank === 3 ? "text-[#CD7F32]" : "text-white/45";
   const content = (
     <>
-      <span className={`font-display font-black text-lg w-8 shrink-0 ${medal}`}>#{rank}</span>
+      <span className={`tls-type-card tls-type-num w-8 shrink-0 ${medal}`}>#{rank}</span>
       <span className="min-w-0 flex-1 truncate font-bold text-white">{row.display_name || row.username || "—"}</span>
-      <span className="shrink-0 text-sm text-white/60 tabular-nums">{row.points ?? 0} Punkte</span>
+      <span className="shrink-0 tls-type-small tls-type-num text-white/60">{row.points ?? 0} Punkte</span>
     </>
   );
   const cls = "flex items-center gap-3 border border-white/10 bg-[#121212] rounded-sm px-4 py-3 min-w-0";
@@ -187,9 +187,9 @@ function SeasonTile({ season }) {
           <StatusBadge status={season.status} />
           <ArrowRight className="w-4 h-4 text-white/35 group-hover:text-[#29B6E8]" />
         </div>
-        <h3 className="mt-3 font-heading text-xl font-black uppercase group-hover:text-[#29B6E8] transition">{season.name}</h3>
+        <h3 className="mt-3 tls-type-card group-hover:text-[#29B6E8] transition">{season.name}</h3>
         {(season.start_date || season.end_date) && (
-          <div className="mt-2 inline-flex items-center gap-2 text-xs text-white/45">
+          <div className="mt-2 inline-flex items-center gap-2 tls-type-small text-white/45">
             <CalendarDays className="w-3.5 h-3.5" />
             {season.start_date ? viennaDate(season.start_date) : "Start offen"}
             {season.end_date ? ` - ${viennaDate(season.end_date)}` : ""}

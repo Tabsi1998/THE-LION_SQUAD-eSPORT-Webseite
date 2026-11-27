@@ -44,12 +44,12 @@ export function EquipmentCategoriesSheet({ game, categories, suggested = [], lim
   return (
     <AdminSheet title="Kategorien" eyebrow={game.name} onClose={onClose} onSubmit={submit} saving={saving} size="lg"
       submitTestId="equipment-categories-save" testId="equipment-categories-sheet">
-      <p className="text-sm text-white/65">
+      <p className="tls-type-body text-white/65">
         Die Art entscheidet, was geht: An einer <strong className="text-white">Waffe</strong> lassen sich einzelne Aufsätze sperren, ein
         <strong className="text-white"> Aufsatz</strong> passt zu Waffen, alles andere ist <strong className="text-white">sonstige Ausrüstung</strong>.
       </p>
       {!categories.length && suggested.length ? (
-        <p className="text-xs text-[#29B6E8]" data-testid="equipment-categories-suggested">Vorschlag – passe Namen an oder entferne, was das Spiel nicht hat. Gespeichert wird erst mit „Speichern“.</p>
+        <p className="tls-type-small text-[#29B6E8]" data-testid="equipment-categories-suggested">Vorschlag – passe Namen an oder entferne, was das Spiel nicht hat. Gespeichert wird erst mit „Speichern“.</p>
       ) : null}
       <ol className="space-y-2" data-testid="equipment-categories-list">
         {rows.map((row, index) => (
@@ -61,7 +61,7 @@ export function EquipmentCategoriesSheet({ game, categories, suggested = [], lim
               className="rounded-sm border border-white/15 bg-[#121212] px-2 py-1.5 text-sm text-white disabled:opacity-60 focus-visible:outline focus-visible:outline-1 focus-visible:outline-[#29B6E8]">
               {ROLE_OPTIONS.map(([value, label]) => <option key={value} value={value}>{label}</option>)}
             </select>
-            <span className="w-20 shrink-0 text-right text-[11px] tabular-nums text-white/55">{row.count ? `${row.count} Eintr.` : "leer"}</span>
+            <span className="w-20 shrink-0 text-right tls-type-small tabular-nums text-white/55">{row.count ? `${row.count} Eintr.` : "leer"}</span>
             <span className="flex shrink-0 items-center">
               <button type="button" className={ICON_BUTTON} onClick={() => move(index, -1)} disabled={index === 0} aria-label={`${row.label || "Kategorie"} nach oben`}><ArrowUp className="h-4 w-4" /></button>
               <button type="button" className={ICON_BUTTON} onClick={() => move(index, 1)} disabled={index === rows.length - 1} aria-label={`${row.label || "Kategorie"} nach unten`}><ArrowDown className="h-4 w-4" /></button>
@@ -74,9 +74,9 @@ export function EquipmentCategoriesSheet({ game, categories, suggested = [], lim
           </li>
         ))}
       </ol>
-      {problem ? <p className="text-sm text-warn" role="alert">{problem}</p> : null}
+      {problem ? <p className="tls-type-small text-warn" role="alert">{problem}</p> : null}
       <button type="button" onClick={() => setRows((list) => [...list, { label: "", role: "item", count: 0 }])} disabled={rows.length >= limit}
-        data-testid="equipment-category-add" className="tls-btn tls-btn--quiet inline-flex items-center gap-2 rounded-sm px-3 py-1.5 text-[11px] font-bold uppercase tracking-wider disabled:opacity-50">
+        data-testid="equipment-category-add" className="tls-btn tls-btn--quiet inline-flex items-center gap-2 rounded-sm px-3 py-1.5 tls-type-label disabled:opacity-50">
         <Plus className="h-3.5 w-3.5" /> Kategorie
       </button>
     </AdminSheet>

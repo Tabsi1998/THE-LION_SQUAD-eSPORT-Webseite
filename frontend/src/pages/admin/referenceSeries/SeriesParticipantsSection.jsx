@@ -77,7 +77,7 @@ function bulkText(data, link) {
 }
 
 const LINK_TONE = { member: "text-[#29B6E8]", guest: "text-white/75", external: "text-white/45" };
-const ACTION_CLASS = "tls-btn px-3 py-1.5 rounded-sm text-[10px] font-bold uppercase tracking-wider inline-flex items-center gap-1.5 disabled:opacity-50";
+const ACTION_CLASS = "tls-btn px-3 py-1.5 rounded-sm tls-type-label inline-flex items-center gap-1.5 disabled:opacity-50";
 
 function AddNamesSheet({ series, onClose, onSaved }) {
   const [text, setText] = useState("");
@@ -118,7 +118,7 @@ function FilterBar({ filter, onFilter, query, onQuery }) {
           const on = filter === key;
           return (
             <button key={key} type="button" aria-pressed={on} onClick={() => onFilter(key)} data-testid={`participants-filter-${key}`}
-              className={`min-h-[36px] px-2 sm:px-3 py-1.5 border rounded-sm text-[10px] font-bold uppercase tracking-wide sm:tracking-wider transition-colors ${on ? "border-[#29B6E8]/60 bg-[#29B6E8]/10 text-[#29B6E8]" : "border-white/15 text-white/60 hover:text-white hover:border-white/30"}`}>
+              className={`min-h-[36px] px-2 sm:px-3 py-1.5 border rounded-sm tls-type-label sm:tracking-wider transition-colors ${on ? "border-[#29B6E8]/60 bg-[#29B6E8]/10 text-[#29B6E8]" : "border-white/15 text-white/60 hover:text-white hover:border-white/30"}`}>
               {label}
             </button>
           );
@@ -225,8 +225,8 @@ export function SeriesParticipantsSection({ series }) {
     <section className="border border-white/10 rounded-sm bg-[#121212] p-4" data-testid="series-participants">
       <div className="flex items-start justify-between gap-3 flex-wrap">
         <div className="min-w-0">
-          <div className="text-[11px] font-bold uppercase tracking-widest text-[#29B6E8]">Teilnehmer</div>
-          <div className="mt-1 text-[10px] uppercase tracking-widest text-white/45 font-bold" data-testid="series-participants-counts">
+          <div className="tls-type-label text-[#29B6E8]">Teilnehmer</div>
+          <div className="mt-1 tls-type-label text-white/45" data-testid="series-participants-counts">
             {countsText(counts)}
           </div>
         </div>
@@ -240,7 +240,7 @@ export function SeriesParticipantsSection({ series }) {
           </button>
         </div>
       </div>
-      <p className="mt-3 max-w-[75ch] text-xs text-white/55 leading-relaxed" data-testid="series-participants-hint">
+      <p className="mt-3 max-w-[75ch] tls-type-small text-white/55 leading-relaxed" data-testid="series-participants-hint">
         <strong className="text-[#29B6E8]">Mitglied</strong> zählt für Verein und Profil. <strong className="text-white/80">Gast</strong> fährt für ein Vereinsteam, ist aber kein Mitglied.
         {" "}<strong className="text-white/80">Extern</strong> sind alle anderen. {ALIAS_HINT}
       </p>
@@ -249,14 +249,14 @@ export function SeriesParticipantsSection({ series }) {
 
       {data.participants.length > 0 && (
         <div className="mt-3 flex min-h-[40px] flex-wrap items-center gap-x-3 gap-y-2 border-b border-white/10 pb-2" data-testid="participants-bulk">
-          <label className="inline-flex items-center gap-2 text-xs text-white/60">
+          <label className="inline-flex items-center gap-2 tls-type-small text-white/60">
             <input type="checkbox" checked={allChosen} onChange={toggleAll} disabled={!visible.length} data-testid="participants-select-all" className="w-4 h-4" style={{ accentColor: "#29B6E8" }}
               ref={(element) => { if (element) element.indeterminate = chosen.length > 0 && !allChosen; }} />
             Alle {visible.length} auswählen
           </label>
           {chosen.length > 0 && (
             <>
-              <span className="text-xs font-bold text-white" data-testid="participants-bulk-count">{chosen.length} ausgewählt</span>
+              <span className="tls-type-small font-bold text-white" data-testid="participants-bulk-count">{chosen.length} ausgewählt</span>
               <div className="flex flex-wrap items-center gap-2 sm:ml-auto">
                 <button type="button" disabled={busy} onClick={() => bulk("guest")} data-testid="participants-bulk-guest" className={`${ACTION_CLASS} tls-btn--secondary`}>
                   <UserRound className="w-3.5 h-3.5" /> Als Gast
@@ -278,7 +278,7 @@ export function SeriesParticipantsSection({ series }) {
         </div>
       )}
 
-      {notice && <p className="mt-3 text-xs text-white/55" role="status" data-testid="series-participants-notice">{notice}</p>}
+      {notice && <p className="mt-3 tls-type-small text-white/55" role="status" data-testid="series-participants-notice">{notice}</p>}
 
       <ul className="mt-1 divide-y divide-white/5" data-testid="series-participants-list">
         {visible.map((row) => {
@@ -291,9 +291,9 @@ export function SeriesParticipantsSection({ series }) {
                 <span className="min-w-0 flex-1 sm:flex sm:items-center sm:justify-between sm:gap-3">
                   <span className="block min-w-0">
                     <span className="font-bold text-white break-words">{row.name}</span>
-                    {details && <span className="ml-2 text-sm text-white/55">{details}</span>}
+                    {details && <span className="ml-2 tls-type-small text-white/55">{details}</span>}
                   </span>
-                  <span className={`block sm:shrink-0 text-[10px] uppercase tracking-widest font-bold ${row.link_status === "open" ? "text-brand" : LINK_TONE[row.link] || ""}`} data-testid={`participant-link-${row.id}`}>
+                  <span className={`block sm:shrink-0 tls-type-label ${row.link_status === "open" ? "text-brand" : LINK_TONE[row.link] || ""}`} data-testid={`participant-link-${row.id}`}>
                     {linkText(row)}
                   </span>
                 </span>
@@ -304,9 +304,9 @@ export function SeriesParticipantsSection({ series }) {
             </li>
           );
         })}
-        {data.participants.length === 0 && <li className="py-2 text-sm text-white/40">Noch keine Teilnehmer.</li>}
+        {data.participants.length === 0 && <li className="py-2 tls-type-small text-quiet">Noch keine Teilnehmer.</li>}
         {data.participants.length > 0 && visible.length === 0 && (
-          <li className="py-3 text-sm text-white/45" data-testid="series-participants-none">Kein Teilnehmer passt zu Filter und Suche.</li>
+          <li className="py-3 tls-type-small text-white/45" data-testid="series-participants-none">Kein Teilnehmer passt zu Filter und Suche.</li>
         )}
       </ul>
       {adding && <AddNamesSheet series={series} onClose={() => setAdding(false)} onSaved={() => { setAdding(false); load(); }} />}

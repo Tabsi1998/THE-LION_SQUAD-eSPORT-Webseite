@@ -12,6 +12,7 @@ import { toast } from "sonner";
 import { Download, Globe, Plus, Pin, RotateCcw, Smartphone, Trash2, Search, Newspaper, Undo2 } from "lucide-react";
 import { viennaDate } from "@/lib/vienna";
 import { pinState } from "@/lib/newsPin";
+import { ShortCaps } from "@/components/tls/ShortCaps";
 
 function csvCell(value) {
   const text = String(value ?? "").replace(/\r?\n/g, " ");
@@ -130,10 +131,10 @@ export default function AdminNewsPage() {
     <AdminLayout>
       <div className="flex items-center justify-between mb-6 flex-wrap gap-3">
         <div>
-          <span className="text-[11px] font-bold uppercase tracking-[0.3em] text-[#29B6E8]">VEREINS-CMS</span>
-          <h1 className="font-heading text-3xl md:text-4xl font-black uppercase mt-1">News</h1>
+          <span className="tls-type-label text-[#29B6E8]">VEREINS-CMS</span>
+          <h1 className="tls-type-title mt-1"><ShortCaps>News</ShortCaps></h1>
         </div>
-        <Link to="/admin/news/new" data-testid="news-new" className="inline-flex items-center gap-2 px-4 py-2 bg-[#29B6E8] text-black font-bold uppercase tracking-wider text-xs rounded-sm hover:bg-[#1E95C2] transition">
+        <Link to="/admin/news/new" data-testid="news-new" className="inline-flex items-center gap-2 px-4 py-2 bg-[#29B6E8] text-black tls-type-label rounded-sm hover:bg-[#1E95C2] transition">
           <Plus className="w-3.5 h-3.5" /> Neuer Beitrag
         </Link>
       </div>
@@ -177,25 +178,25 @@ export default function AdminNewsPage() {
                 };
               }))}
               disabled={filteredList.length === 0}
-              className="inline-flex items-center justify-center gap-2 rounded-sm border border-white/15 px-3 py-2 text-xs font-bold uppercase tracking-wider text-white/65 hover:border-[#29B6E8]/45 hover:text-white disabled:opacity-40"
+              className="inline-flex items-center justify-center gap-2 rounded-sm border border-white/15 px-3 py-2 tls-type-label text-white/65 hover:border-[#29B6E8]/45 hover:text-white disabled:opacity-40"
             >
               <Download className="h-3.5 w-3.5" /> CSV
             </button>
           </div>
-          <div className="mt-2 text-xs text-white/45">{filteredList.length} / {list.length} Beiträge sichtbar</div>
+          <div className="mt-2 tls-type-small text-white/45">{filteredList.length} / {list.length} Beiträge sichtbar</div>
         </div>
       )}
 
       {list.length === 0 ? (
         <div className="border border-dashed border-white/15 rounded-sm p-12 text-center text-white/50">
           <Newspaper className="w-10 h-10 mx-auto opacity-40 mb-3" />
-          <div className="font-heading font-bold">Noch keine News-Beiträge</div>
+          <div className="font-bold">Noch keine News-Beiträge</div>
         </div>
       ) : (
         <div className="border border-white/10 rounded-sm bg-[#121212] overflow-hidden">
           <div className="tls-swipe pb-0">
-            <table className="w-full text-sm min-w-[800px]">
-              <thead className="bg-[#0A0A0A] text-[11px] uppercase tracking-widest text-white/50">
+            <table className="w-full tls-type-small min-w-[800px]">
+              <thead className="bg-[#0A0A0A] tls-type-label text-white/50">
                 <tr>
                   <th className="text-left px-4 py-3">Titel</th>
                   <th className="text-left px-4 py-3">Kategorie</th>
@@ -217,50 +218,50 @@ export default function AdminNewsPage() {
                         {pin?.active && <Pin className="w-3 h-3 text-honor" aria-label="Angepinnt" />}
                         {n.title}
                       </div>
-                      <div className="text-[11px] text-white/50">/{n.slug}</div>
+                      <div className="tls-type-small text-white/50">/{n.slug}</div>
                       {/* Ende der Anheftung (#1263): die Redaktion sieht, wie lange der Beitrag noch oben steht. */}
                       {pin && (pin.active ? pin.text : pin.until) && (
-                        <div className={`mt-0.5 text-[11px] ${pin.active ? "text-honor/80" : "text-white/40"}`} data-testid={`news-pin-${n.id}`}>
+                        <div className={`mt-0.5 tls-type-small ${pin.active ? "text-honor/80" : "text-quiet"}`} data-testid={`news-pin-${n.id}`}>
                           {pin.active ? `Angepinnt ${pin.text}` : `Anpinnen abgelaufen (${pin.text})`}
                         </div>
                       )}
                     </td>
-                    <td className="px-4 py-3 text-[10px] uppercase tracking-widest text-[#29B6E8] font-bold">{newsCategoryLabel(n.category)}</td>
-                    <td className="px-4 py-3 text-xs text-white/65">
+                    <td className="px-4 py-3 tls-type-label text-[#29B6E8]">{newsCategoryLabel(n.category)}</td>
+                    <td className="px-4 py-3 tls-type-small text-white/65">
                       <div data-testid={`news-visibility-${n.id}`}>{newsVisibilityLabel(n.visibility)}</div>
                       {/* Kanal (#1532): ein Schild nur, wenn der Beitrag nicht auf Website und App erscheint. */}
                       {channel && (
                         <span
                           data-testid={`news-channel-${n.id}`}
-                          className={`mt-1 inline-flex items-center gap-1 rounded-sm border px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wider whitespace-nowrap ${channel.key === "app" ? "border-[#29B6E8]/40 bg-[#29B6E8]/10 text-[#29B6E8]" : "border-white/20 bg-white/5 text-white/70"}`}
+                          className={`mt-1 inline-flex items-center gap-1 rounded-sm border px-1.5 py-0.5 tls-type-label whitespace-nowrap ${channel.key === "app" ? "border-[#29B6E8]/40 bg-[#29B6E8]/10 text-[#29B6E8]" : "border-white/20 bg-white/5 text-white/70"}`}
                         >
                           {channel.key === "app" ? <Smartphone className="w-3 h-3" aria-hidden="true" /> : <Globe className="w-3 h-3" aria-hidden="true" />}
                           {channel.label}
                         </span>
                       )}
                     </td>
-                    <td className="px-4 py-3 text-xs">
+                    <td className="px-4 py-3 tls-type-small">
                       <span className={`${state.className} font-bold uppercase`}>{state.label}</span>
-                      {state.detail && <div className="mt-0.5 text-[11px] normal-case text-white/45">{state.detail}</div>}
+                      {state.detail && <div className="mt-0.5 tls-type-small text-white/45">{state.detail}</div>}
                     </td>
-                    <td className="px-4 py-3 text-xs text-white/55">{viennaDate(n.published_at || n.created_at)}</td>
+                    <td className="px-4 py-3 tls-type-small text-white/55">{viennaDate(n.published_at || n.created_at)}</td>
                     <td className="px-4 py-3 text-center space-x-2 whitespace-nowrap">
-                      <Link to={`/admin/news/${n.id}`} data-testid={`news-edit-${n.id}`} className="inline-flex text-xs font-bold uppercase px-3 py-1 rounded-sm border border-[#29B6E8]/40 text-[#29B6E8] hover:bg-[#29B6E8]/10">Bearbeiten</Link>
+                      <Link to={`/admin/news/${n.id}`} data-testid={`news-edit-${n.id}`} className="inline-flex tls-type-label px-3 py-1 rounded-sm border border-[#29B6E8]/40 text-[#29B6E8] hover:bg-[#29B6E8]/10">Bearbeiten</Link>
                       {n.slug && (
-                        <Link to={`/news/${n.slug}`} target="_blank" rel="noreferrer" data-testid={`news-view-${n.id}`} className="inline-flex text-xs font-bold uppercase px-3 py-1 rounded-sm border border-white/15 text-white/65 hover:text-white hover:border-white/35">
+                        <Link to={`/news/${n.slug}`} target="_blank" rel="noreferrer" data-testid={`news-view-${n.id}`} className="inline-flex tls-type-label px-3 py-1 rounded-sm border border-white/15 text-white/65 hover:text-white hover:border-white/35">
                           {state.key === "published" ? "Ansehen" : "Vorschau"}
                         </Link>
                       )}
                       {state.key === "withdrawn" ? (
-                        <button type="button" onClick={() => restore(n)} data-testid={`news-restore-${n.id}`} className="text-xs font-bold uppercase px-3 py-1 rounded-sm border border-[#10B981]/40 text-[#10B981] hover:bg-[#10B981]/10 inline-flex items-center gap-1">
+                        <button type="button" onClick={() => restore(n)} data-testid={`news-restore-${n.id}`} className="tls-type-label px-3 py-1 rounded-sm border border-[#10B981]/40 text-[#10B981] hover:bg-[#10B981]/10 inline-flex items-center gap-1">
                           <RotateCcw className="w-3 h-3" /> Wiederherstellen
                         </button>
                       ) : n.can_delete ? (
-                        <button type="button" onClick={() => remove(n)} data-testid={`news-delete-${n.id}`} aria-label={`„${n.title || "Ohne Titel"}“ löschen`} className="text-xs font-bold uppercase px-3 py-1 rounded-sm border border-[#FF3B30]/40 text-[#FF3B30] hover:bg-[#FF3B30]/10 inline-flex items-center gap-1">
+                        <button type="button" onClick={() => remove(n)} data-testid={`news-delete-${n.id}`} aria-label={`„${n.title || "Ohne Titel"}“ löschen`} className="tls-type-label px-3 py-1 rounded-sm border border-[#FF3B30]/40 text-[#FF3B30] hover:bg-[#FF3B30]/10 inline-flex items-center gap-1">
                           <Trash2 className="w-3 h-3" />
                         </button>
                       ) : (
-                        <button type="button" onClick={() => withdraw(n)} data-testid={`news-withdraw-${n.id}`} className="text-xs font-bold uppercase px-3 py-1 rounded-sm border border-live/40 text-live hover:bg-live/10 inline-flex items-center gap-1">
+                        <button type="button" onClick={() => withdraw(n)} data-testid={`news-withdraw-${n.id}`} className="tls-type-label px-3 py-1 rounded-sm border border-live/40 text-live hover:bg-live/10 inline-flex items-center gap-1">
                           <Undo2 className="w-3 h-3" /> Zurückziehen
                         </button>
                       )}
@@ -270,7 +271,7 @@ export default function AdminNewsPage() {
                 })}
                 {filteredList.length === 0 && (
                   <tr>
-                    <td colSpan="6" className="px-4 py-10 text-center text-sm text-white/40">Keine News für diesen Filter.</td>
+                    <td colSpan="6" className="px-4 py-10 text-center tls-type-small text-quiet">Keine News für diesen Filter.</td>
                   </tr>
                 )}
               </tbody>

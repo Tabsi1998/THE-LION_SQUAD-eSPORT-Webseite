@@ -10,11 +10,11 @@ const NUMBERS = ["home_rule_hours", "reschedule_notice_hours", "reschedule_max",
 
 function Toggle({ label, hint, checked, onChange, testId }) {
   return (
-    <label className="flex min-h-[44px] items-start gap-2 text-sm text-white/80">
+    <label className="flex min-h-[44px] items-start gap-2 tls-type-small text-white/80">
       <input type="checkbox" checked={Boolean(checked)} onChange={(event) => onChange(event.target.checked)} className="mt-1 accent-[#29B6E8]" data-testid={testId} />
       <span className="min-w-0">
         <span className="block">{label}</span>
-        {hint ? <span className="block text-xs text-white/50">{hint}</span> : null}
+        {hint ? <span className="block tls-type-small text-white/50">{hint}</span> : null}
       </span>
     </label>
   );
@@ -47,7 +47,7 @@ export function SeasonScheduleRulesPanel({ seasonId }) {
   }, [seasonId]);
 
   if (!form) {
-    return error ? <p className="text-sm text-warn" role="alert" data-testid="schedule-rules-error">{error}</p> : null;
+    return error ? <p className="tls-type-small text-warn" role="alert" data-testid="schedule-rules-error">{error}</p> : null;
   }
   const set = (key, value) => setForm((current) => ({ ...current, [key]: value }));
   const save = async () => {
@@ -69,7 +69,7 @@ export function SeasonScheduleRulesPanel({ seasonId }) {
     <FormSection title="Termine und Verschiebungen" testId="season-schedule-rules"
       hint="Gilt sofort für alle Staffeln dieser Season (gesperrte nehmen es beim Übertragen mit). Regelwerk § 7.">
       {!state?.active ? (
-        <p className="rounded-sm border border-warn/30 bg-warn/5 px-3 py-2 text-sm text-white/75" data-testid="schedule-rules-inactive">
+        <p className="rounded-sm border border-warn/30 bg-warn/5 px-3 py-2 tls-type-body text-white/75" data-testid="schedule-rules-inactive">
           Diese Season ist älter als die Terminregeln: Ein Vorschlag der Heimseite gilt dort sofort, Verschiebungen gibt es nicht.
           Mit „Speichern“ gelten die Werte unten.
         </p>
@@ -92,9 +92,9 @@ export function SeasonScheduleRulesPanel({ seasonId }) {
         <TextField label="Überfällig nach (Stunden nach dem Termin)" type="number" min={1} max={720} value={form.result_overdue_hours}
           onChange={(value) => set("result_overdue_hours", value)} hint="dann entscheidet die Leitung (Mein Dienst)" testId="schedule-rules-overdue" />
       </FormGrid>
-      {error ? <p className="text-sm text-warn" role="alert" data-testid="schedule-rules-error">{error}</p> : null}
+      {error ? <p className="tls-type-small text-warn" role="alert" data-testid="schedule-rules-error">{error}</p> : null}
       <button type="button" onClick={save} disabled={saving} data-testid="schedule-rules-save"
-        className="tls-btn tls-btn--primary min-h-11 rounded-sm px-4 py-2 text-xs font-bold uppercase tracking-wider disabled:opacity-50">
+        className="tls-btn tls-btn--primary min-h-11 rounded-sm px-4 py-2 tls-type-label disabled:opacity-50">
         {saving ? "Speichere …" : "Terminregeln speichern"}
       </button>
     </FormSection>

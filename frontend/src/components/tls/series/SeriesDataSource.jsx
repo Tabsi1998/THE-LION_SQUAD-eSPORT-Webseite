@@ -10,7 +10,7 @@ export function SeriesDataSource({ source }) {
   if (!source || !(source.partner?.name || source.provider)) return null;
   const partner = source.partner;
   return (
-    <p className="mt-3 mb-0 text-xs text-white/50" data-testid="series-data-source">
+    <p className="mt-3 mb-0 tls-type-small text-white/50" data-testid="series-data-source">
       Daten von{" "}
       {partner ? (
         <Link to={`/partners/${partner.slug || partner.id}`} className={LINK}>{partner.name}</Link>

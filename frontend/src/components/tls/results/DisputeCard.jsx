@@ -42,43 +42,43 @@ export function DisputeCard({ item, busy = false, highlighted = false, onKeep, o
     <div tabIndex={-1} className={`outline-none rounded-sm border bg-[#121212] p-4 space-y-3 ${highlighted ? "border-[#FFD700]/70 ring-2 ring-[#FFD700]/40" : "border-[#FF3B30]/40"}`} data-testid={`lead-dispute-${item.id}`} id={`fall-ds-${item.id}`}>
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
-          <div className="text-[11px] font-bold uppercase tracking-widest text-[#FFD700]">Gemeldet von {dispute.by}{dispute.at ? ` · ${clock(dispute.at)}` : ""}</div>
-          <div className="mt-1 flex items-center gap-2 font-heading text-lg font-black uppercase"><AlertTriangle className="w-4 h-4 text-[#FF6B60]" /> {dispute.category_label}</div>
-          <div className="text-xs text-white/50 truncate">{item.stage_name ? `${item.stage_name} · ` : ""}{item.label}</div>
+          <div className="tls-type-label text-[#FFD700]">Gemeldet von {dispute.by}{dispute.at ? ` · ${clock(dispute.at)}` : ""}</div>
+          <div className="mt-1 flex items-center gap-2 tls-type-card"><AlertTriangle className="w-4 h-4 text-[#FF6B60]" /> {dispute.category_label}</div>
+          <div className="tls-type-small text-white/50 truncate">{item.stage_name ? `${item.stage_name} · ` : ""}{item.label}</div>
         </div>
       </div>
-      {dispute.text ? <p className="text-sm text-white/80">„{dispute.text}“</p> : null}
+      {dispute.text ? <p className="tls-type-body text-white/80">„{dispute.text}“</p> : null}
       <Photo photo={dispute.photo} label="Foto zur Meldung" />
       {hasResult ? (
-        <div className="text-xs text-white/60" data-testid={`lead-dispute-result-${item.id}`}>
+        <div className="tls-type-small text-white/60" data-testid={`lead-dispute-result-${item.id}`}>
           Eingetragen: <strong className="text-white">{item.result_summary}</strong>
           {dispute.result_by ? ` · von ${dispute.result_by}` : ""}{dispute.result_at ? ` um ${clock(dispute.result_at)}` : ""}
         </div>
-      ) : <div className="text-xs text-white/50">Noch kein Ergebnis eingetragen.</div>}
+      ) : <div className="tls-type-small text-white/50">Noch kein Ergebnis eingetragen.</div>}
       {(dispute.reports || []).length ? (
         <div className="space-y-1">
           {dispute.reports.map((report) => (
-            <div key={`${report.by}-${report.at}`} className="text-xs text-white/55">Meldung von {report.by}: <strong className="text-white/80">{report.summary}</strong></div>
+            <div key={`${report.by}-${report.at}`} className="tls-type-small text-white/55">Meldung von {report.by}: <strong className="text-white/80">{report.summary}</strong></div>
           ))}
         </div>
       ) : null}
-      {item.conflict ? <p className="rounded-sm border border-warn/40 bg-warn/10 px-3 py-2 text-sm text-white/85" data-testid={`lead-dispute-conflict-${item.id}`}>Du bist an diesem Spiel selbst beteiligt. Das entscheidet eine zweite berechtigte Person.</p> : null}
+      {item.conflict ? <p className="rounded-sm border border-warn/40 bg-warn/10 px-3 py-2 tls-type-body text-white/85" data-testid={`lead-dispute-conflict-${item.id}`}>Du bist an diesem Spiel selbst beteiligt. Das entscheidet eine zweite berechtigte Person.</p> : null}
       {item.conflict_override ? (
         <label className="block rounded-sm border border-warn/40 bg-warn/10 px-3 py-2" data-testid={`lead-dispute-override-${item.id}`}>
-          <span className="mb-2 block text-sm text-white/85">Du bist an diesem Spiel selbst beteiligt. Als Superadmin geht es nur als Notausnahme, der Grund steht im Protokoll.</span>
+          <span className="mb-2 block tls-type-small text-white/85">Du bist an diesem Spiel selbst beteiligt. Als Superadmin geht es nur als Notausnahme, der Grund steht im Protokoll.</span>
           <input value={conflictReason} onChange={(e) => setConflictReason(e.target.value)} maxLength={500} className="input" placeholder="Grund der Notausnahme" aria-label="Grund der Notausnahme" data-testid={`lead-dispute-reason-${item.id}`} />
         </label>
       ) : null}
       <input value={note} onChange={(e) => setNote(e.target.value)} maxLength={500} className="input" placeholder="Begründung (freiwillig, geht an beide Seiten)" data-testid={`lead-dispute-note-${item.id}`} />
       <div className="grid grid-cols-2 gap-2">
-        <button type="button" disabled={busy || !mayDecide || needsReason} onClick={() => (item.conflict_override ? onKeep(note.trim() || null, conflictReason.trim()) : onKeep(note.trim() || null))} className="tls-btn tls-btn--secondary min-h-[44px] px-3 py-2 rounded-sm text-xs uppercase tracking-wider font-bold disabled:opacity-50" data-testid={`lead-dispute-keep-${item.id}`}>
+        <button type="button" disabled={busy || !mayDecide || needsReason} onClick={() => (item.conflict_override ? onKeep(note.trim() || null, conflictReason.trim()) : onKeep(note.trim() || null))} className="tls-btn tls-btn--secondary min-h-[44px] px-3 py-2 rounded-sm tls-type-label disabled:opacity-50" data-testid={`lead-dispute-keep-${item.id}`}>
           {hasResult ? "Ergebnis bleibt" : "Weiter wie bisher"}
         </button>
-        <button type="button" disabled={busy || !item.can_enter} onClick={onChange} className="tls-btn tls-btn--primary min-h-[44px] px-3 py-2 rounded-sm text-xs uppercase tracking-wider font-bold disabled:opacity-50" data-testid={`lead-dispute-change-${item.id}`}>
+        <button type="button" disabled={busy || !item.can_enter} onClick={onChange} className="tls-btn tls-btn--primary min-h-[44px] px-3 py-2 rounded-sm tls-type-label disabled:opacity-50" data-testid={`lead-dispute-change-${item.id}`}>
           {hasResult ? "Ergebnis ändern" : "Ergebnis eintragen"}
         </button>
       </div>
-      <p className="text-center text-[11px] text-white/45">Beide Seiten bekommen die Entscheidung als Benachrichtigung.</p>
+      <p className="text-center tls-type-small text-white/45">Beide Seiten bekommen die Entscheidung als Benachrichtigung.</p>
     </div>
   );
 }
@@ -91,7 +91,7 @@ export function DisputeCard({ item, busy = false, highlighted = false, onKeep, o
 
 const TONE = { none: "text-white/55", calm: "text-white/70", soon: "text-warn", over: "text-[#FF6B60]" };
 const STATE_STYLE = { open: "border-honor/50 text-honor", decided: "border-white/20 text-white/70", withdrawn: "border-white/15 text-white/50" };
-const SMALL_BUTTON = "tls-btn tls-btn--secondary min-h-[44px] px-3 py-2 rounded-sm text-xs uppercase tracking-wider font-bold disabled:opacity-50";
+const SMALL_BUTTON = "tls-btn tls-btn--secondary min-h-[44px] px-3 py-2 rounded-sm tls-type-label disabled:opacity-50";
 
 function when(value) {
   if (!value) return "";
@@ -117,7 +117,7 @@ function Deadline({ label, until, now, testId }) {
   if (!until) return null;
   const tone = deadlineTone(until, now);
   return (
-    <div className="flex items-baseline justify-between gap-3 text-xs" data-testid={testId}>
+    <div className="flex items-baseline justify-between gap-3 tls-type-small" data-testid={testId}>
       <span className="flex items-center gap-1.5 text-white/55"><Clock className="h-3.5 w-3.5 shrink-0" aria-hidden="true" /> {label}</span>
       <span className={`text-right tabular-nums transition-colors motion-reduce:transition-none ${TONE[tone]}`}>
         <span className="text-white/45">{when(until)} · </span><strong data-tone={tone}>{remainingText(until, now)}</strong>
@@ -157,20 +157,20 @@ export function AppealForm({ matchId, against, until = null, onChanged, testId =
       {openForm ? (
         <form onSubmit={submit} className="tls-stagger space-y-2" noValidate>
           <label className="block">
-            <span className="mb-1 block text-sm text-white/75">Einspruch {AGAINST_LABELS[against.type]} – Begründung</span>
+            <span className="mb-1 block tls-type-small text-white/75">Einspruch {AGAINST_LABELS[against.type]} – Begründung</span>
             <textarea value={text} onChange={(event) => setText(event.target.value)} rows={3} maxLength={1000} className="input w-full min-h-[5rem] resize-y"
               placeholder="Warum ist die Entscheidung aus eurer Sicht falsch? Mindestens zehn Zeichen." data-testid={`${testId}-input`} />
           </label>
-          <p className="text-xs text-white/50">Einspruch geht nur einmal. Es entscheidet eine andere Person als bei der ersten Entscheidung, ihre Entscheidung ist endgültig. Bis dahin gilt die erste Entscheidung weiter.</p>
+          <p className="tls-type-small text-white/50">Einspruch geht nur einmal. Es entscheidet eine andere Person als bei der ersten Entscheidung, ihre Entscheidung ist endgültig. Bis dahin gilt die erste Entscheidung weiter.</p>
           <div className="flex flex-wrap gap-2">
             <button disabled={busy || text.trim().length < 10} className={SMALL_BUTTON} data-testid={`${testId}-send`}>Einspruch einlegen</button>
-            <button type="button" disabled={busy} onClick={() => setOpenForm(false)} className="min-h-[44px] px-2 text-xs font-bold uppercase tracking-wider text-white/60 hover:text-white">Abbrechen</button>
+            <button type="button" disabled={busy} onClick={() => setOpenForm(false)} className="min-h-[44px] px-2 tls-type-label text-white/60 hover:text-white">Abbrechen</button>
           </div>
         </form>
       ) : (
         <button type="button" onClick={() => setOpenForm(true)} className={SMALL_BUTTON} data-testid={`${testId}-open`}>Einspruch einlegen</button>
       )}
-      {error ? <p className="text-sm text-[#FF6B60]" role="alert" data-testid={`${testId}-error`}>{error}</p> : null}
+      {error ? <p className="tls-type-small text-[#FF6B60]" role="alert" data-testid={`${testId}-error`}>{error}</p> : null}
     </div>
   );
 }
@@ -180,7 +180,7 @@ function Fold({ when, summary, testId, children }) {
   if (!when) return children;
   return (
     <details className="rounded-sm border border-white/10 bg-[#0A0A0A] px-3" data-testid={testId}>
-      <summary className="flex min-h-[44px] cursor-pointer items-center text-xs font-bold uppercase tracking-wider text-white/70 hover:text-white">{summary}</summary>
+      <summary className="flex min-h-[44px] cursor-pointer items-center tls-type-label text-white/70 hover:text-white">{summary}</summary>
       <div className="space-y-2 pb-3">{children}</div>
     </details>
   );
@@ -228,22 +228,22 @@ export function ProcedureCard({ matchId, procedure, sideNames = {}, players = []
       <div className="tls-stagger space-y-3">
         <header className="flex items-start justify-between gap-3">
           <div className="min-w-0">
-            <div className="text-[11px] font-bold uppercase tracking-widest text-white/55">{sideName}{p.at ? ` · ${when(p.at)}` : ""}</div>
-            <h3 className="mt-1 flex items-center gap-2 font-heading text-lg font-black uppercase">
+            <div className="tls-type-small font-bold text-white/55">{sideName}{p.at ? ` · ${when(p.at)}` : ""}</div>
+            <h3 className="mt-1 flex items-center gap-2 tls-type-card">
               <Scale className="h-4 w-4 shrink-0 text-honor" aria-hidden="true" /> {p.kind_label}
             </h3>
-            <div className="text-sm font-bold text-white/70" data-testid={`procedure-reason-label-${p.id}`}>{p.kind === "appeal" && p.against ? AGAINST_LABELS[p.against.type] : p.reason_label}</div>
+            <div className="tls-type-small font-bold text-white/70" data-testid={`procedure-reason-label-${p.id}`}>{p.kind === "appeal" && p.against ? AGAINST_LABELS[p.against.type] : p.reason_label}</div>
           </div>
-          <span className={`shrink-0 rounded-full border px-2.5 py-1 text-[11px] font-bold uppercase tracking-wider ${STATE_STYLE[p.state]}`} data-testid={`procedure-state-${p.id}`}>{PROCEDURE_STATE_LABELS[p.state]}</span>
+          <span className={`shrink-0 rounded-full border px-2.5 py-1 tls-type-label ${STATE_STYLE[p.state]}`} data-testid={`procedure-state-${p.id}`}>{PROCEDURE_STATE_LABELS[p.state]}</span>
         </header>
 
         <div className="space-y-2">
-          {p.reason ? <p className="whitespace-pre-line text-sm text-white/85" data-testid={`procedure-reason-${p.id}`}>„{p.reason}“</p> : null}
+          {p.reason ? <p className="whitespace-pre-line tls-type-small text-white/85" data-testid={`procedure-reason-${p.id}`}>„{p.reason}“</p> : null}
           {(p.additions || []).map((row) => (
-            <p key={row.at} className="whitespace-pre-line border-l-2 border-white/15 pl-3 text-sm text-white/75">Ergänzung {when(row.at)}: „{row.text}“</p>
+            <p key={row.at} className="whitespace-pre-line border-l-2 border-white/15 pl-3 tls-type-body text-white/75">Ergänzung {when(row.at)}: „{row.text}“</p>
           ))}
-          {claimed ? <p className="text-xs text-white/60" data-testid={`procedure-claimed-${p.id}`}>Ergebnis aus Sicht der Seite: <strong className="text-white">{claimed}</strong></p> : null}
-          {typeof p.notified_immediately === "boolean" ? <p className="text-xs text-white/60">Gegenseite sofort hingewiesen: <strong className="text-white">{p.notified_immediately ? "Ja" : "Nein"}</strong></p> : null}
+          {claimed ? <p className="tls-type-small text-white/60" data-testid={`procedure-claimed-${p.id}`}>Ergebnis aus Sicht der Seite: <strong className="text-white">{claimed}</strong></p> : null}
+          {typeof p.notified_immediately === "boolean" ? <p className="tls-type-small text-white/60">Gegenseite sofort hingewiesen: <strong className="text-white">{p.notified_immediately ? "Ja" : "Nein"}</strong></p> : null}
         </div>
 
         {open ? (
@@ -251,7 +251,7 @@ export function ProcedureCard({ matchId, procedure, sideNames = {}, players = []
             {p.own ? <Deadline label="Ergänzen und Nachweise bis" until={p.evidence_until} now={now} testId={`procedure-evidence-until-${p.id}`} /> : null}
             {p.statement && !p.statement.text ? <Deadline label="Stellungnahme der Gegenseite bis" until={p.statement.due_at} now={now} testId={`procedure-statement-until-${p.id}`} /> : null}
             {p.target_at ? <Deadline label="Zielfrist der Leitung" until={p.target_at} now={now} testId={`procedure-target-${p.id}`} /> : null}
-            <div className="flex items-center gap-1.5 text-xs" data-testid={`procedure-assignee-${p.id}`}>
+            <div className="flex items-center gap-1.5 tls-type-small" data-testid={`procedure-assignee-${p.id}`}>
               <UserCheck className="h-3.5 w-3.5 shrink-0 text-white/55" aria-hidden="true" />
               {p.assignee ? <span className="text-white/80">Übernommen von <strong>{p.assignee.name}</strong> am {when(p.assignee.at)}</span>
                 : <span className="text-white/55">Noch von niemandem übernommen. Die Liga-Leitung weiß Bescheid.</span>}
@@ -260,17 +260,17 @@ export function ProcedureCard({ matchId, procedure, sideNames = {}, players = []
         ) : null}
 
         {/* Direkt nach dem Einreichen stehen die Nachweise oben im Formular (Schritt 3) - jede Info nur an einer Stelle. */}
-        {proofsElsewhere ? <p className="text-xs text-white/55" data-testid={`procedure-proofs-elsewhere-${p.id}`}>Deine Nachweise fügst du gerade oben im Formular hinzu.</p>
+        {proofsElsewhere ? <p className="tls-type-small text-white/55" data-testid={`procedure-proofs-elsewhere-${p.id}`}>Deine Nachweise fügst du gerade oben im Formular hinzu.</p>
           : <ProofList matchId={matchId} kind="protest" refId={p.id} title="Nachweise" sideLabels={sideNames} testId={`procedure-proofs-${p.id}`} hint={false} />}
         {/* Was als Nachweis zählt und wer ihn sieht: einmal für die ganze Karte, nicht unter jeder der drei Listen. */}
-        {open && !proofsElsewhere ? <p className="text-xs text-white/50" data-testid={`procedure-proof-hint-${p.id}`}>{proofHintText()}</p> : null}
-        {!proofsElsewhere ? <p className="text-xs text-white/50" data-testid={`procedure-proof-audience-${p.id}`}>{proofAudienceText("protest")}</p> : null}
+        {open && !proofsElsewhere ? <p className="tls-type-small text-white/50" data-testid={`procedure-proof-hint-${p.id}`}>{proofHintText()}</p> : null}
+        {!proofsElsewhere ? <p className="tls-type-small text-white/50" data-testid={`procedure-proof-audience-${p.id}`}>{proofAudienceText("protest")}</p> : null}
 
         {p.statement ? (
           <section className="space-y-2 border-t border-white/10 pt-3" data-testid={`procedure-statement-${p.id}`}>
-            <div className="flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-widest text-white/60"><MessageSquareText className="h-3.5 w-3.5" aria-hidden="true" /> Stellungnahme · {sideNames[p.statement.side] || "Gegenseite"}</div>
-            {p.statement.text ? <p className="whitespace-pre-line text-sm text-white/85">„{p.statement.text}“ <span className="text-xs text-white/45">({when(p.statement.at)})</span></p>
-              : <p className="text-sm text-white/55">{p.statement.expired ? "Die Frist ist abgelaufen, ohne dass eine Stellungnahme einging." : "Noch keine Stellungnahme."}</p>}
+            <div className="flex items-center gap-1.5 tls-type-label text-white/60"><MessageSquareText className="h-3.5 w-3.5" aria-hidden="true" /> Stellungnahme · {sideNames[p.statement.side] || "Gegenseite"}</div>
+            {p.statement.text ? <p className="whitespace-pre-line tls-type-body text-white/85">„{p.statement.text}“ <span className="tls-type-small text-white/45">({when(p.statement.at)})</span></p>
+              : <p className="tls-type-small text-white/55">{p.statement.expired ? "Die Frist ist abgelaufen, ohne dass eine Stellungnahme einging." : "Noch keine Stellungnahme."}</p>}
             {p.can_state ? (
               <form className="space-y-2" onSubmit={(event) => { event.preventDefault(); run(() => api.post(`${base}/statement`, { text: text.trim() }), () => setText("")); }}>
                 <label className="block">
@@ -291,9 +291,9 @@ export function ProcedureCard({ matchId, procedure, sideNames = {}, players = []
 
         {mossVisible ? (
           <section className="space-y-2 border-t border-white/10 pt-3" data-testid={`procedure-moss-${p.id}`}>
-            <div className="flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-widest text-white/60"><FileArchive className="h-3.5 w-3.5" aria-hidden="true" /> MOSS-Datei</div>
+            <div className="flex items-center gap-1.5 tls-type-label text-white/60"><FileArchive className="h-3.5 w-3.5" aria-hidden="true" /> MOSS-Datei</div>
             {(p.moss_requests || []).map((row) => (
-              <div key={row.id} className="flex flex-wrap items-baseline justify-between gap-x-3 text-xs" data-testid={`procedure-moss-request-${row.id}`}>
+              <div key={row.id} className="flex flex-wrap items-baseline justify-between gap-x-3 tls-type-small" data-testid={`procedure-moss-request-${row.id}`}>
                 <span className="text-white/80">{row.own ? "Deine Datei" : row.name}: <strong data-state={row.state}>{MOSS_STATE_LABELS[row.state] || row.state}</strong></span>
                 {row.state === "requested" ? <span className={`tabular-nums ${TONE[deadlineTone(row.due_at, now)]}`}>bis {when(row.due_at)} · {remainingText(row.due_at, now)}</span> : null}
                 {p.can_lead && ["requested", "missing"].includes(row.state) ? (
@@ -302,11 +302,11 @@ export function ProcedureCard({ matchId, procedure, sideNames = {}, players = []
                 ) : null}
               </div>
             ))}
-            {mossPending ? <p className="text-xs text-warn">Bitte lade die ZIP-Datei unverändert hoch, so wie MOSS sie geschrieben hat (Regelwerk § 9a).</p> : null}
+            {mossPending ? <p className="tls-type-small text-warn">Bitte lade die ZIP-Datei unverändert hoch, so wie MOSS sie geschrieben hat (Regelwerk § 9a).</p> : null}
             {mossPending || p.can_lead || (p.moss_requests || []).length ? (
               <Fold when={p.can_lead} summary="MOSS-Nachweise" testId={`procedure-moss-fold-${p.id}`}>
                 <ProofList matchId={matchId} kind="moss" refId={p.id} title="MOSS-Nachweise" sideLabels={sideNames} testId={`procedure-moss-proofs-${p.id}`} onChanged={onChanged} hint={false} />
-                <p className="text-xs text-white/50" data-testid={`procedure-moss-audience-${p.id}`}>{proofAudienceText("moss")}</p>
+                <p className="tls-type-small text-white/50" data-testid={`procedure-moss-audience-${p.id}`}>{proofAudienceText("moss")}</p>
               </Fold>
             ) : null}
             {p.can_lead ? (
@@ -331,20 +331,20 @@ export function ProcedureCard({ matchId, procedure, sideNames = {}, players = []
 
         {outcome ? (
           <section className="space-y-1 rounded-sm border border-white/10 bg-[#0A0A0A] px-3 py-2.5" data-testid={`procedure-decision-${p.id}`}>
-            <div className="flex items-center gap-1.5 text-sm font-bold text-white"><Gavel className="h-4 w-4 text-honor" aria-hidden="true" /> {outcome}</div>
-            {p.decision_note ? <p className="whitespace-pre-line text-sm text-white/75">Begründung: {p.decision_note}</p> : null}
-            {p.resolved_at ? <p className="text-xs text-white/45">Entschieden am {when(p.resolved_at)}{p.resolved_by ? ` von ${p.resolved_by}` : ""}</p> : null}
+            <div className="flex items-center gap-1.5 tls-type-small font-bold text-white"><Gavel className="h-4 w-4 text-honor" aria-hidden="true" /> {outcome}</div>
+            {p.decision_note ? <p className="whitespace-pre-line tls-type-body text-white/75">Begründung: {p.decision_note}</p> : null}
+            {p.resolved_at ? <p className="tls-type-small text-white/45">Entschieden am {when(p.resolved_at)}{p.resolved_by ? ` von ${p.resolved_by}` : ""}</p> : null}
             {p.can_appeal ? <AppealForm matchId={matchId} against={{ type: "protest_decision", ref_id: p.id }} until={p.appeal_until} onChanged={onChanged} testId={`procedure-appeal-${p.id}`} /> : null}
           </section>
         ) : null}
 
-        {p.own_decision ? <p className="rounded-sm border border-warn/40 bg-warn/10 px-3 py-2 text-sm text-white/85" data-testid={`procedure-own-decision-${p.id}`}>Du hast die Ausgangsentscheidung getroffen. Über den Einspruch entscheidet eine andere Person.</p> : null}
+        {p.own_decision ? <p className="rounded-sm border border-warn/40 bg-warn/10 px-3 py-2 tls-type-body text-white/85" data-testid={`procedure-own-decision-${p.id}`}>Du hast die Ausgangsentscheidung getroffen. Über den Einspruch entscheidet eine andere Person.</p> : null}
 
         {p.can_lead ? (
           <section className="space-y-2 border-t border-white/10 pt-3" data-testid={`procedure-lead-${p.id}`}>
             {conflictOverride ? (
               <label className="block rounded-sm border border-warn/40 bg-warn/10 px-3 py-2">
-                <span className="mb-2 block text-sm text-white/85">Du bist an diesem Spiel selbst beteiligt. Als Superadmin geht es nur als Notausnahme, der Grund steht im Protokoll.</span>
+                <span className="mb-2 block tls-type-small text-white/85">Du bist an diesem Spiel selbst beteiligt. Als Superadmin geht es nur als Notausnahme, der Grund steht im Protokoll.</span>
                 <input value={conflictReason} onChange={(event) => setConflictReason(event.target.value)} maxLength={500} className="input" placeholder="Grund der Notausnahme" aria-label="Grund der Notausnahme" />
               </label>
             ) : null}
@@ -353,23 +353,23 @@ export function ProcedureCard({ matchId, procedure, sideNames = {}, players = []
               {p.statement && !p.statement.text ? <button type="button" disabled={busy || blocked} onClick={() => run(() => api.post(`${base}/statement/extend`, { hours: 24, ...lead }))} className={SMALL_BUTTON} data-testid={`procedure-extend-${p.id}`}>Stellungnahme +24 Std.</button> : null}
             </div>
             <label className="block">
-              <span className="mb-1 block text-sm text-white/75">Begründung der Entscheidung (Pflicht, geht an beide Seiten)</span>
+              <span className="mb-1 block tls-type-small text-white/75">Begründung der Entscheidung (Pflicht, geht an beide Seiten)</span>
               <textarea value={note} onChange={(event) => setNote(event.target.value)} rows={3} maxLength={2000} className="input w-full min-h-[5rem] resize-y" placeholder="Mindestens zehn Zeichen" data-testid={`procedure-note-${p.id}`} />
             </label>
             <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
               <button type="button" disabled={busy || blocked || note.trim().length < 10} onClick={() => run(() => api.post(`${base}/decision`, { decision: "keep", decision_note: note.trim(), ...lead }), () => setNote(""))}
                 className={SMALL_BUTTON} data-testid={`procedure-keep-${p.id}`}>{p.kind === "appeal" ? "Einspruch abweisen" : "Ergebnis bleibt"}</button>
               {onChangeResult ? <button type="button" disabled={busy || note.trim().length < 10} onClick={() => onChangeResult(note.trim())}
-                className="tls-btn tls-btn--primary min-h-[44px] px-3 py-2 rounded-sm text-xs uppercase tracking-wider font-bold disabled:opacity-50" data-testid={`procedure-change-${p.id}`}>Ergebnis ändern</button> : null}
+                className="tls-btn tls-btn--primary min-h-[44px] px-3 py-2 rounded-sm tls-type-label disabled:opacity-50" data-testid={`procedure-change-${p.id}`}>Ergebnis ändern</button> : null}
             </div>
-            <p className="text-[11px] text-white/45">Entschieden wird nie automatisch. „Ergebnis ändern“ öffnet das Ergebnis-Fenster; die Begründung steht dort als Grund der Korrektur.</p>
+            <p className="tls-type-small text-white/45">Entschieden wird nie automatisch. „Ergebnis ändern“ öffnet das Ergebnis-Fenster; die Begründung steht dort als Grund der Korrektur.</p>
           </section>
         ) : null}
 
         {p.can_amend ? (
           <form className="space-y-2 border-t border-white/10 pt-3" onSubmit={(event) => { event.preventDefault(); run(() => api.patch(base, { addition: extra.trim() }), () => setExtra("")); }} data-testid={`procedure-amend-${p.id}`}>
             <label className="block">
-              <span className="mb-1 block text-sm text-white/75">Ergänzen</span>
+              <span className="mb-1 block tls-type-small text-white/75">Ergänzen</span>
               <textarea value={extra} onChange={(event) => setExtra(event.target.value)} rows={2} maxLength={1000} className="input w-full resize-y" placeholder="Was kommt noch dazu? Mindestens zehn Zeichen." data-testid={`procedure-amend-input-${p.id}`} />
             </label>
             <button disabled={busy || extra.trim().length < 10} className={SMALL_BUTTON} data-testid={`procedure-amend-send-${p.id}`}>Ergänzung speichern</button>
@@ -379,14 +379,14 @@ export function ProcedureCard({ matchId, procedure, sideNames = {}, players = []
         {p.can_withdraw ? (
           <div className="flex flex-wrap items-center gap-3 border-t border-white/10 pt-3">
             <button type="button" disabled={busy} onClick={() => (confirmWithdraw ? run(() => api.post(`${base}/withdraw`), () => setConfirmWithdraw(false)) : setConfirmWithdraw(true))}
-              className={`min-h-[44px] text-xs font-bold uppercase tracking-wider underline underline-offset-2 disabled:opacity-50 ${confirmWithdraw ? "text-[#FF6B60]" : "text-white/60 hover:text-white"}`} data-testid={`procedure-withdraw-${p.id}`}>
+              className={`min-h-[44px] tls-type-label underline underline-offset-2 disabled:opacity-50 ${confirmWithdraw ? "text-[#FF6B60]" : "text-white/60 hover:text-white"}`} data-testid={`procedure-withdraw-${p.id}`}>
               {confirmWithdraw ? "Wirklich zurückziehen?" : "Zurückziehen"}
             </button>
-            {confirmWithdraw ? <span className="text-xs text-white/55">Danach ist kein neues Verfahren mit demselben Grund möglich.</span> : null}
+            {confirmWithdraw ? <span className="tls-type-small text-white/55">Danach ist kein neues Verfahren mit demselben Grund möglich.</span> : null}
           </div>
         ) : null}
 
-        {error ? <p className="text-sm text-[#FF6B60]" role="alert" data-testid={`procedure-error-${p.id}`}>{error}</p> : null}
+        {error ? <p className="tls-type-small text-[#FF6B60]" role="alert" data-testid={`procedure-error-${p.id}`}>{error}</p> : null}
       </div>
     </article>
   );

@@ -13,8 +13,8 @@ import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { api, formatApiError } from "@/lib/api";
 import { DRAW_REASON_MIN, divisionNeedsDraw, drawLogLine, drawStatusLine, drawVisible, drawWhen, openRightsLine, staffelnLine, swapPartners, waitingLine } from "@/lib/leagueDraw";
 
-const BUTTON = "inline-flex min-h-[40px] items-center gap-1.5 rounded-sm px-3 py-1.5 text-[11px] font-bold uppercase tracking-wider disabled:opacity-50";
-const HEADING = "text-[11px] font-bold uppercase tracking-[0.2em] text-white/50";
+const BUTTON = "inline-flex min-h-[40px] items-center gap-1.5 rounded-sm px-3 py-1.5 tls-type-label disabled:opacity-50";
+const HEADING = "tls-type-label text-white/50";
 const REASON_HINT = { redraw: "Warum neu gelost wird. Der Grund steht im Protokoll.", discard: "Warum das Los verworfen wird. Der Grund steht im Protokoll." };
 const REASON_ACTION = { redraw: "Neu auslosen", discard: "Los verwerfen" };
 
@@ -23,7 +23,7 @@ export function SeatCheck({ suggestion, testId }) {
   if (!suggestion?.text) return null;
   const Icon = suggestion.fits ? CircleCheck : CircleAlert;
   return (
-    <p className={`flex gap-2 text-sm [overflow-wrap:anywhere] ${suggestion.fits ? "text-white/70" : "text-warn"}`} data-testid={testId} data-fits={suggestion.fits ? "yes" : "no"}>
+    <p className={`flex gap-2 tls-type-body [overflow-wrap:anywhere] ${suggestion.fits ? "text-white/70" : "text-warn"}`} data-testid={testId} data-fits={suggestion.fits ? "yes" : "no"}>
       <Icon className={`mt-0.5 h-4 w-4 shrink-0 ${suggestion.fits ? "text-ok" : ""}`} aria-hidden="true" />
       <span><span className="sr-only">{suggestion.fits ? "Passt: " : "Passt nicht: "}</span>{suggestion.text}</span>
     </p>
@@ -35,19 +35,19 @@ function StaffelCard({ staffel, canSwap, onSwap, active }) {
     <div className="min-w-0 rounded-sm border border-white/10 bg-[#0A0A0A] p-3" data-testid={`draw-staffel-${staffel.staffel}`}>
       <div className="flex items-baseline justify-between gap-2">
         <h4 className="font-bold text-white">Staffel {staffel.staffel}</h4>
-        <span className="text-xs tabular-nums text-white/55">{staffel.size} von {staffel.capacity} Plätzen</span>
+        <span className="tls-type-small tabular-nums text-white/55">{staffel.size} von {staffel.capacity} Plätzen</span>
       </div>
       <ul className="mt-2 divide-y divide-white/5">
         {staffel.seated.map((name) => (
-          <li key={`seated-${name}`} className="py-2 text-sm text-white/55 [overflow-wrap:anywhere]">{name} <span className="text-xs">· schon zugeteilt</span></li>
+          <li key={`seated-${name}`} className="py-2 tls-type-small text-white/55 [overflow-wrap:anywhere]">{name} <span className="tls-type-small">· schon zugeteilt</span></li>
         ))}
         {staffel.teams.map((team) => (
           <li key={team.squad_id} className="flex min-w-0 items-center gap-2 py-1" data-testid={`draw-team-${team.squad_id}`}>
-            <span className="min-w-0 flex-1 py-1 text-sm font-semibold text-white [overflow-wrap:anywhere]">
+            <span className="min-w-0 flex-1 py-1 tls-type-small font-semibold text-white [overflow-wrap:anywhere]">
               {team.display_name}
-              {team.swapped ? <span className="ml-2 rounded-sm bg-white/5 px-1.5 py-0.5 align-middle text-[10px] font-bold uppercase tracking-wider text-white/60">getauscht</span> : null}
+              {team.swapped ? <span className="ml-2 rounded-sm bg-white/5 px-1.5 py-0.5 align-middle tls-type-label text-white/60">getauscht</span> : null}
               {/* Nach einem abgebrochenen Zuteilen steht ein Teil schon fest: Diese Co-Teams tauschen nicht mehr. */}
-              {canSwap && team.done ? <span className="ml-2 text-xs font-normal text-white/55">· schon zugeteilt</span> : null}
+              {canSwap && team.done ? <span className="ml-2 tls-type-small font-normal text-white/55">· schon zugeteilt</span> : null}
             </span>
             {canSwap && !team.done ? (
               <button type="button" onClick={() => onSwap(team)} aria-pressed={active === team.squad_id} aria-label={`${team.display_name} tauschen`}
@@ -58,7 +58,7 @@ function StaffelCard({ staffel, canSwap, onSwap, active }) {
             ) : null}
           </li>
         ))}
-        {!staffel.seated.length && !staffel.teams.length ? <li className="py-2 text-sm text-white/50">Kein Team.</li> : null}
+        {!staffel.seated.length && !staffel.teams.length ? <li className="py-2 tls-type-small text-white/50">Kein Team.</li> : null}
       </ul>
     </div>
   );
@@ -120,10 +120,10 @@ export function DrawSheet({ seasonId, division, superadmin, onClose, onChanged }
       savingLabel="Einen Moment …" submitLabel={count === 1 ? "1 Co-Team zuteilen" : `${count} Co-Teams zuteilen`} submitTestId="draw-apply"
       submitDisabled={!open || draw.stale || locked || !count} cancelLabel={open ? "Schließen" : "Zurück"} testId="draw-sheet">
       {draw ? (
-        <div className="space-y-5 text-sm">
+        <div className="space-y-5 tls-type-small">
           <div className="space-y-1">
             <p className="font-semibold text-white" data-testid="draw-status">{drawStatusLine(draw)}</p>
-            <p className="text-xs text-white/60 [overflow-wrap:anywhere]">
+            <p className="tls-type-small text-white/60 [overflow-wrap:anywhere]">
               Ausgelost {drawWhen(draw.created_at)} · Seed <code className="font-mono text-white/80" data-testid="draw-seed">{draw.seed}</code>. Dieselbe Eingabe mit diesem Seed ergibt immer dieses Ergebnis.
             </p>
           </div>
@@ -142,7 +142,7 @@ export function DrawSheet({ seasonId, division, superadmin, onClose, onChanged }
                   onSwap={(team) => { setSwapFrom((current) => (current?.squad_id === team.squad_id ? null : team)); setSwapWith(""); }} />
               ))}
             </div>
-            {open && !draw.stale ? <p className="text-xs text-white/55">Zwei Co-Teams tauschst du über den Pfeil. Die Größen bleiben, die Regel für Co-Teams eines Hauptteams wird neu geprüft.</p> : null}
+            {open && !draw.stale ? <p className="tls-type-small text-white/55">Zwei Co-Teams tauschst du über den Pfeil. Die Größen bleiben, die Regel für Co-Teams eines Hauptteams wird neu geprüft.</p> : null}
           </section>
 
           {swapFrom ? (
@@ -181,11 +181,11 @@ export function DrawSheet({ seasonId, division, superadmin, onClose, onChanged }
 
           <section aria-labelledby="draw-log" className="space-y-2">
             <h3 id="draw-log" className={HEADING}>Protokoll</h3>
-            <ul className="space-y-1 text-xs text-white/70" data-testid="draw-log">
+            <ul className="space-y-1 tls-type-small text-white/70" data-testid="draw-log">
               {draw.log.map((step, index) => <li key={`${step.at}-${index}`} className="[overflow-wrap:anywhere]">{drawLogLine(step)}</li>)}
             </ul>
             {draw.swaps.length ? (
-              <ul className="space-y-1 text-xs text-white/70" data-testid="draw-swaps">
+              <ul className="space-y-1 tls-type-small text-white/70" data-testid="draw-swaps">
                 {draw.swaps.map((step, index) => (
                   <li key={`${step.at}-${index}`} className="[overflow-wrap:anywhere]">Tausch: {step.a_name} und {step.b_name} – {step.reason} ({step.by_name})</li>
                 ))}
@@ -196,7 +196,7 @@ export function DrawSheet({ seasonId, division, superadmin, onClose, onChanged }
           {blockedOwn ? <OwnTeamNote testId="draw-own-team" /> : null}
           {needsReason && open ? <ConflictReasonField value={conflictReason} onChange={setConflictReason} testId="draw-conflict-reason" /> : null}
         </div>
-      ) : <p className="text-sm text-white/55">Dieses Los gibt es nicht mehr.</p>}
+      ) : <p className="tls-type-small text-white/55">Dieses Los gibt es nicht mehr.</p>}
     </AdminSheet>
   );
 }
@@ -209,7 +209,7 @@ function DivisionRow({ division, superadmin, busy, onDraw, onOpen }) {
       <div className="flex flex-wrap items-start justify-between gap-x-4 gap-y-2">
         <div className="min-w-0">
           <h3 className="font-bold text-white [overflow-wrap:anywhere]">{division.label}</h3>
-          <p className="text-xs text-white/60 [overflow-wrap:anywhere]">{waitingLine(division)} · {staffelnLine(division.staffeln)}</p>
+          <p className="tls-type-small text-white/60 [overflow-wrap:anywhere]">{waitingLine(division)} · {staffelnLine(division.staffeln)}</p>
         </div>
         {draw ? (
           <button type="button" onClick={() => onOpen(division)} className={`tls-btn ${draw.status === "draft" ? "tls-btn--primary" : "tls-btn--quiet"} ${BUTTON}`} data-testid={`draw-open-${division.level}`}>
@@ -220,9 +220,9 @@ function DivisionRow({ division, superadmin, busy, onDraw, onOpen }) {
         ) : null}
       </div>
       <SeatCheck suggestion={division.suggestion} testId={`draw-seats-${division.level}`} />
-      {openRightsLine(division) ? <p className="text-xs text-warn [overflow-wrap:anywhere]" data-testid={`draw-open-rights-${division.level}`}>{openRightsLine(division)}</p> : null}
-      {draw ? <p className={`text-xs ${draw.stale ? "text-warn" : "text-white/70"}`} data-testid={`draw-state-${division.level}`}>{drawStatusLine(draw)}</p> : null}
-      {!draw && division.problem && division.waiting.length ? <p className="text-xs text-white/60 [overflow-wrap:anywhere]" data-testid={`draw-problem-${division.level}`}>{division.problem}</p> : null}
+      {openRightsLine(division) ? <p className="tls-type-small text-warn [overflow-wrap:anywhere]" data-testid={`draw-open-rights-${division.level}`}>{openRightsLine(division)}</p> : null}
+      {draw ? <p className={`tls-type-small ${draw.stale ? "text-warn" : "text-white/70"}`} data-testid={`draw-state-${division.level}`}>{drawStatusLine(draw)}</p> : null}
+      {!draw && division.problem && division.waiting.length ? <p className="tls-type-small text-white/60 [overflow-wrap:anywhere]" data-testid={`draw-problem-${division.level}`}>{division.problem}</p> : null}
       {!draw && division.can_draw && blockedOwn ? <OwnTeamNote testId={`draw-own-team-${division.level}`} /> : null}
     </li>
   );

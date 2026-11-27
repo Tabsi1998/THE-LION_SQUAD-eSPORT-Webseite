@@ -409,16 +409,16 @@ function TournamentDetailView() {
           <NoticeBanner items={notices} className="mb-5 max-w-3xl" />
           <div className="flex flex-wrap items-center gap-2 mb-4">
             <PhaseBadge phase={t.public_phase} status={t.status} size="lg" />
-            <span className="text-[11px] font-bold uppercase tracking-widest text-[#29B6E8] border border-[#29B6E8]/30 rounded-sm px-2 py-1">{formatTournamentDisplay(t)}</span>
-            {t.game && <span className="text-white/60 text-sm">· {gameLabel(t.game)}</span>}
+            <span className="tls-type-label text-[#29B6E8] border border-[#29B6E8]/30 rounded-sm px-2 py-1">{formatTournamentDisplay(t)}</span>
+            {t.game && <span className="text-white/60 tls-type-small">· {gameLabel(t.game)}</span>}
             {(t.partners || []).map((p) => (
-              <Link key={p.id} to={`/partners/${p.slug || p.id}`} data-testid={`tournament-partner-${p.slug || p.id}`} className="inline-flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-widest text-[#29B6E8] border border-[#29B6E8]/30 rounded-sm px-2 py-1 hover:bg-[#29B6E8]/10">
+              <Link key={p.id} to={`/partners/${p.slug || p.id}`} data-testid={`tournament-partner-${p.slug || p.id}`} className="inline-flex items-center gap-1.5 tls-type-small font-bold text-[#29B6E8] border border-[#29B6E8]/30 rounded-sm px-2 py-1 hover:bg-[#29B6E8]/10">
                 <Handshake className="w-3 h-3" /> mit {p.name}
               </Link>
             ))}
           </div>
           <div className="flex items-start justify-between gap-3">
-            <h1 data-testid="tournament-title" className="font-heading text-4xl md:text-6xl font-black uppercase leading-tight min-w-0 break-words">{t.title}</h1>
+            <h1 data-testid="tournament-title" className="tls-type-title leading-tight min-w-0 break-words">{t.title}</h1>
             {/* Teilen (#1154): oben rechts neben dem Titel. */}
             <ShareButton kind="tournament" id={t.slug || t.id} title={t.title} start={t.start_date} end={t.end_date} className="shrink-0 mt-1" />
           </div>
@@ -433,14 +433,14 @@ function TournamentDetailView() {
             <InfoTile icon={Trophy} label="Format" value={formatTournamentDisplay(t)} wrap title={[formatTournamentDisplay(t), formatTeamMode(t.team_mode), t.best_of > 1 ? `Best of ${t.best_of}` : null].filter(Boolean).join(" · ")} testId="tournament-format-tile" />
           </div>
 
-          <div className={`mt-5 border rounded-sm px-4 py-3 text-sm max-w-3xl ${
+          <div className={`mt-5 border rounded-sm px-4 py-3 tls-type-small max-w-3xl ${
             registration.canRegister
               ? "border-[#00FF88]/30 bg-[#00FF88]/5 text-[#00FF88]"
               : registration.state === "scheduled"
                 ? "border-[#29B6E8]/30 bg-[#29B6E8]/5 text-[#29B6E8]"
                 : "border-white/10 bg-[#121212] text-white/60"
           }`} data-testid="tournament-registration-state">
-            <div className="font-bold uppercase tracking-wider text-xs">{registration.label}</div>
+            <div className="tls-type-label">{registration.label}</div>
             {nextStep && <div className="mt-1 text-white/55">{stepCountdown(nextStep, Date.now(), countdownDays)} – alle Termine unten in der Zeitleiste.</div>}
             {!nextStep && !t.registration_open_from && !t.registration_open_until && <div className="mt-1 text-white/55">Status wird vom Admin gesteuert.</div>}
             {clubMemberBlocked && <div className="mt-1 text-[#FFD700]/75">Dieses Turnier ist für externe Teilnehmer vorgesehen. Vereinsmitglieder können sich hier nicht selbst anmelden.</div>}
@@ -457,22 +457,22 @@ function TournamentDetailView() {
           </div>
 
           {t.offer && (
-            <div className="mt-3 border border-[#FFD700]/30 bg-[#FFD700]/5 rounded-sm px-4 py-3 text-sm max-w-3xl" data-testid="tournament-offer">
-              <div className="text-[11px] uppercase tracking-widest font-bold text-[#FFD700]">Startgeld</div>
+            <div className="mt-3 border border-[#FFD700]/30 bg-[#FFD700]/5 rounded-sm px-4 py-3 tls-type-small max-w-3xl" data-testid="tournament-offer">
+              <div className="tls-type-label text-[#FFD700]">Startgeld</div>
               <div className="mt-1 text-white">{startFeeSummary(t.offer, { teamMode: t.team_mode || "solo", teamSize: t.team_size })}</div>
-              <ul className="mt-1 space-y-0.5 text-xs text-white/60">
+              <ul className="mt-1 space-y-0.5 tls-type-small text-white/60">
                 {t.offer.positions.filter((position) => !position.optional).map((position) => (
                   <li key={position.key}>{position.label}: {formatCents(position.amount_cents, t.offer.currency)} {position.basis === "per_person" ? "je Spieler" : position.basis === "per_team" ? "je Team" : ""}</li>
                 ))}
               </ul>
-              <div className="mt-1 text-xs text-white/45">{isTeamTournament ? "Die Teamleitung übernimmt das Startgeld für das Team und bekommt die Rechnung." : "Die Rechnung geht an dich."} Bezahlt wird erst, wenn die Teilnahme bestätigt ist.</div>
+              <div className="mt-1 tls-type-small text-white/45">{isTeamTournament ? "Die Teamleitung übernimmt das Startgeld für das Team und bekommt die Rechnung." : "Die Rechnung geht an dich."} Bezahlt wird erst, wenn die Teilnahme bestätigt ist.</div>
             </div>
           )}
 
           {/* Eine Hauptaktion je Phase (#401): Anmelden, Check-in, Turnierbaum oder Rangliste - der Rest als Textlinks. */}
           <div className="mt-8 flex flex-wrap items-center gap-x-5 gap-y-3" data-testid="tournament-actions">
             {primaryAction}
-            <div className="flex flex-wrap items-center gap-4 text-xs font-bold uppercase tracking-wider">
+            <div className="flex flex-wrap items-center gap-4 tls-type-label">
               {primaryKey !== "bracket" && hasBracketTree(t) && <Link to={subPage("bracket")} data-testid="tournament-bracket-link" className="tls-hit text-white/70 hover:text-[#29B6E8]">Turnierbaum</Link>}
               {primaryKey !== "schedule" && <Link to={subPage("matches")} data-testid="tournament-schedule-link" className="tls-hit text-white/70 hover:text-[#29B6E8]">Spielplan</Link>}
               {primaryKey !== "standings" && <Link to={subPage("standings")} data-testid="tournament-standings-link" className="tls-hit text-white/70 hover:text-[#29B6E8]">Rangliste</Link>}
@@ -502,13 +502,13 @@ function TournamentDetailView() {
           <FriendsAtEvent user={user} path={`/tournaments/${t.slug || t.id}/friends`} scope="tournament" over={tournamentIsOver(t)} accessToken={accessToken} />
           {t.rules && (
             <section>
-              <h2 className="font-heading text-2xl font-bold uppercase mb-3 flex items-center gap-2"><Zap className="w-4 h-4 text-[#29B6E8]" /> Regeln</h2>
+              <h2 className="tls-type-section mb-3 flex items-center gap-2"><Zap className="w-4 h-4 text-[#29B6E8]" /> Regeln</h2>
               <div className="prose-cms border border-white/10 rounded-sm p-5 bg-[#121212]" dangerouslySetInnerHTML={{ __html: renderMarkdownLite(t.rules) }} />
             </section>
           )}
           {(t.prize_places?.length || t.prize_pool) && (
             <section>
-              <h2 className="font-heading text-2xl font-bold uppercase mb-3 flex items-center gap-2"><Trophy className="w-4 h-4 text-[#FFD700]" /> Preise</h2>
+              <h2 className="tls-type-section mb-3 flex items-center gap-2"><Trophy className="w-4 h-4 text-[#FFD700]" /> Preise</h2>
               <PrizeList prizePlaces={t.prize_places} prizePool={t.prize_pool} />
             </section>
           )}
@@ -516,11 +516,11 @@ function TournamentDetailView() {
           {t.game_id ? <TournamentMapPools tournamentId={t.id} /> : null}
           {podiumRows.length > 0 && (
             <section>
-              <h2 className="font-heading text-2xl font-bold uppercase mb-8 flex items-center gap-2"><Trophy className="w-4 h-4 text-[#FFD700]" /> Podest</h2>
+              <h2 className="tls-type-section mb-8 flex items-center gap-2"><Trophy className="w-4 h-4 text-[#FFD700]" /> Podest</h2>
               {/* Das Treppchen (#1339) - das Bild, das nach dem Sieger-Moment stehen bleibt. Vor „Ergebnisse
                   veröffentlicht“ ist der Stand noch nicht bestätigt: dann steht es als „vorläufig“ da. */}
               {t.status === "completed" && (
-                <p className="-mt-5 mb-6 text-sm text-white/55" data-testid="podium-provisional">Stand vorläufig – die Turnierleitung bestätigt die Ergebnisse noch.</p>
+                <p className="-mt-5 mb-6 tls-type-small text-white/55" data-testid="podium-provisional">Stand vorläufig – die Turnierleitung bestätigt die Ergebnisse noch.</p>
               )}
               <Podium rows={podiumRows} registrations={regs} />
             </section>
@@ -532,13 +532,13 @@ function TournamentDetailView() {
           )}
           {!!t.related_f1_challenges?.length && (
             <section>
-              <h2 className="font-heading text-2xl font-bold uppercase mb-3 flex items-center gap-2"><Flag className="w-4 h-4 text-[#29B6E8]" /> Fast-Lap Challenges beim Event</h2>
+              <h2 className="tls-type-section mb-3 flex items-center gap-2"><Flag className="w-4 h-4 text-[#29B6E8]" /> Fast-Lap Challenges beim Event</h2>
               <div className="grid sm:grid-cols-2 gap-3">
                 {t.related_f1_challenges.map((c) => (
                   <Link key={c.id} to={`/fastlap/${c.slug || c.id}`} className="tls-card border border-white/10 rounded-sm bg-[#121212] p-4">
                     <PhaseBadge phase={c.public_phase} status={c.status} />
-                    <div className="mt-2 font-heading font-bold">{c.title}</div>
-                    {c.start_date && <div className="mt-1 text-xs text-white/50">{formatWhen(c.start_date)}</div>}
+                    <div className="mt-2 font-bold">{c.title}</div>
+                    {c.start_date && <div className="mt-1 tls-type-small text-white/50">{formatWhen(c.start_date)}</div>}
                   </Link>
                 ))}
               </div>
@@ -548,7 +548,7 @@ function TournamentDetailView() {
           {t.show_chat && <TournamentChat key={t.id} tournament={t} user={user} />}
           <section id="teilnehmer" data-testid="tournament-participants">
             <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
-              <h2 className="font-heading text-2xl font-bold uppercase">Teilnehmer ({regs.length})</h2>
+              <h2 className="tls-type-section">Teilnehmer ({regs.length})</h2>
               {/* Druckansicht (#1283): Check-in-Liste mit Kästchen - nur mit Check-in-Recht (der Server prüft es selbst). */}
               {t.can_check_in ? <PrintLink slug={t.slug || t.id} parts="liste" from="teilnehmer" accessToken={accessToken} testId="participants-print-link" /> : null}
             </div>
@@ -559,12 +559,12 @@ function TournamentDetailView() {
                   <div key={r.id} className={`flex items-center justify-between gap-3 px-4 py-3 ${mine ? "tls-you tls-you--inset" : ""}`} data-testid={`tournament-participant-${r.id}`}>
                     <div className="flex items-center gap-3 min-w-0">
                       {finalRank.size ? (
-                        <span className="font-display font-bold text-white/80 w-7 tabular-nums" title="Endplatz" data-testid={`tournament-participant-rank-${r.id}`}>{finalRank.has(r.id) ? `${finalRank.get(r.id)}.` : "–"}</span>
+                        <span className="tls-type-num text-white/80 w-7 shrink-0" title="Endplatz" data-testid={`tournament-participant-rank-${r.id}`}>{finalRank.has(r.id) ? `${finalRank.get(r.id)}.` : "–"}</span>
                       ) : (
-                        <span className="font-display font-bold text-[#29B6E8] w-7" title="Setzplatz">{r.seed ? `#${r.seed}` : ""}</span>
+                        <span className="tls-type-num text-[#29B6E8] w-7 shrink-0" title="Setzplatz">{r.seed ? `#${r.seed}` : ""}</span>
                       )}
-                      <span className="text-white truncate">{r.display_name || r.ingame_name || r.user?.display_name || "—"}</span>
-                      {r.team && <span className="text-white/45 text-xs truncate">[{r.team.tag || r.team.name}]{Number(r.team.member_count) > 0 ? ` · ${r.team.member_count} Spieler` : ""}</span>}
+                      <span className="text-white tls-wrap tls-wrap--name">{r.display_name || r.ingame_name || r.user?.display_name || "—"}</span>
+                      {r.team && <span className="text-white/45 tls-type-small truncate">[{r.team.tag || r.team.name}]{Number(r.team.member_count) > 0 ? ` · ${r.team.member_count} Spieler` : ""}</span>}
                       {/* Ecken-Klammern (#1316): deine Zeile mit Winkeln, Fläche und „Du“ - Cyan heißt „du“, Gold bleibt der Ehre. */}
                       {mine && <span className="tls-you-tag" data-testid={`tournament-participant-me-${r.id}`}>{youLabel(r)}</span>}
                     </div>
@@ -572,7 +572,7 @@ function TournamentDetailView() {
                   </div>
                 );
               })}
-              {regs.length === 0 && <div className="p-6 text-white/40 text-sm text-center">Noch keine Teilnehmer</div>}
+              {regs.length === 0 && <div className="p-6 text-quiet tls-type-small text-center">Noch keine Teilnehmer</div>}
             </div>
           </section>
         </div>
@@ -582,7 +582,7 @@ function TournamentDetailView() {
           <InfoRow icon={Users} label="Modus" value={formatTeamMode(t.team_mode)} />
           {/* Der Discord-Server zum Spiel (#626): eigener, der des Hauptspiels oder der Hauptserver. */}
           <GameDiscordTile gameId={t.game?.id || t.game_id} gameName={gameLabel(t.game)} />
-          {t.discord_link && <a href={t.discord_link} target="_blank" rel="noreferrer" className="tls-btn tls-btn--quiet block px-4 py-3 rounded-sm text-center text-sm font-bold uppercase tracking-wider">Discord</a>}
+          {t.discord_link && <a href={t.discord_link} target="_blank" rel="noreferrer" className="tls-btn tls-btn--quiet block px-4 py-3 rounded-sm text-center tls-type-small font-bold uppercase tracking-wider">Discord</a>}
         </aside>
       </div>
       {registerModal && (
@@ -666,16 +666,16 @@ function TournamentChat({ tournament, user }) {
 
   return (
     <section data-testid="tournament-chat">
-      <h2 className="font-heading text-2xl font-bold uppercase mb-3 flex items-center gap-2">
+      <h2 className="tls-type-section mb-3 flex items-center gap-2">
         <MessageSquare className="w-4 h-4 text-[#29B6E8]" /> Turnier-Chat
       </h2>
       <div className="border border-white/10 rounded-sm bg-[#121212] overflow-hidden">
         {!user ? (
-          <div className="p-5 text-sm text-white/55">
+          <div className="p-5 tls-type-small text-white/55">
             <Link to={`/login?next=/tournaments/${tournament.slug || tournament.id}`} className="text-[#29B6E8] font-bold hover:text-white">Melde dich an</Link>, um den Chat als Teilnehmer zu nutzen.
           </div>
         ) : blocked ? (
-          <div className="p-5 text-sm text-white/45">{blocked}</div>
+          <div className="p-5 tls-type-small text-white/45">{blocked}</div>
         ) : (
           <>
             <div ref={scrollRef} className="max-h-80 overflow-y-auto p-4 space-y-3">
@@ -684,11 +684,11 @@ function TournamentChat({ tournament, user }) {
                 return (
                   <div key={message.id} className={`flex ${mine ? "justify-end" : "justify-start"}`}>
                     <div className={`max-w-[85%] border rounded-sm px-3 py-2 ${mine ? "border-[#29B6E8]/40 bg-[#29B6E8]/10" : "border-white/10 bg-[#0A0A0A]"}`}>
-                      <div className="flex items-center gap-2 text-[10px] uppercase tracking-widest text-white/40">
+                      <div className="flex items-center gap-2 tls-type-small text-quiet">
                         <span className={mine ? "text-[#29B6E8]" : "text-white/55"}>{message.author?.display_name || message.author?.username || "Benutzer"}</span>
                         {message.created_at && <span>{viennaDateTime(message.created_at, { dateStyle: "short", timeStyle: "short" })}</span>}
                       </div>
-                      {message.message && <div className="mt-1 whitespace-pre-wrap break-words text-sm text-white/85"><MentionText text={message.message} /></div>}
+                      {message.message && <div className="mt-1 whitespace-pre-wrap break-words tls-type-small text-white/85"><MentionText text={message.message} /></div>}
                       <ChatMessageAttachments attachments={message.attachments} />
                       <ChatMessageSticker sticker={message.sticker} />
                       <ModerationStateBadge moderation={message.moderation} />
@@ -696,7 +696,7 @@ function TournamentChat({ tournament, user }) {
                   </div>
                 );
               })}
-              {messages.length === 0 && <div className="text-center py-8 text-sm text-white/35">Noch keine Nachrichten.</div>}
+              {messages.length === 0 && <div className="text-center py-8 tls-type-small text-quiet">Noch keine Nachrichten.</div>}
             </div>
             <ChatAttachmentDrafts drafts={attachments.drafts} onRemove={attachments.remove} />
             <ChatStickerPicker open={stickersOpen} onClose={() => setStickersOpen(false)} onPick={sendSticker} disabled={loading} />
@@ -718,9 +718,9 @@ function TournamentChat({ tournament, user }) {
                 maxLength={1000}
                 placeholder="Spielcode, Lobbycode oder Absprache schreiben..."
                 className="flex-1 min-w-0"
-                textareaClassName="h-10 max-h-28 w-full resize-none bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-sm focus:outline-none focus:border-[#29B6E8]"
+                textareaClassName="h-10 max-h-28 w-full resize-none bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm tls-type-small focus:outline-none focus:border-[#29B6E8]"
               />
-              <button disabled={loading || !attachments.canSend(text)} className="tls-btn tls-btn--primary inline-flex items-center gap-2 px-4 py-2 rounded-sm text-xs uppercase tracking-wider font-bold disabled:opacity-45">
+              <button disabled={loading || !attachments.canSend(text)} className="tls-btn tls-btn--primary inline-flex items-center gap-2 px-4 py-2 rounded-sm tls-type-label disabled:opacity-45">
                 <Send className="w-3.5 h-3.5" /> Senden
               </button>
             </form>
@@ -735,15 +735,15 @@ function TournamentChat({ tournament, user }) {
 function InfoTile({ icon: Icon, label, value, wrap = false, title = "", testId = "" }) {
   return (
     <div className="border border-white/10 rounded-sm bg-[#121212]/80 px-4 py-3" title={title || undefined} data-testid={testId || undefined}>
-      <div className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-widest text-white/50"><Icon className="w-3.5 h-3.5" /> {label}</div>
-      <div className={`mt-1 font-heading font-bold text-lg ${wrap ? "break-words leading-tight" : "truncate"}`}>{value}</div>
+      <div className="flex items-center gap-2 tls-type-label text-white/50"><Icon className="w-3.5 h-3.5" /> {label}</div>
+      <div className={`mt-1 tls-type-card tls-type-num ${wrap ? "break-words leading-tight" : "truncate"}`}>{value}</div>
     </div>
   );
 }
 function InfoRow({ icon: Icon, label, value }) {
   return (
     <div className="border border-white/10 rounded-sm p-4 bg-[#121212]">
-      <div className="flex items-center gap-2 text-[11px] uppercase tracking-widest text-white/50"><Icon className="w-3.5 h-3.5" /> {label}</div>
+      <div className="flex items-center gap-2 tls-type-label text-white/50"><Icon className="w-3.5 h-3.5" /> {label}</div>
       <div className="mt-1 text-white">{value}</div>
     </div>
   );

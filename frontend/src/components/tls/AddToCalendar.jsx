@@ -49,7 +49,7 @@ export function AddToCalendar({ item, days = null, className = "", block = false
         aria-expanded={open}
         aria-haspopup="dialog"
         data-testid={`${testId}-button`}
-        className={`tls-btn tls-btn--secondary inline-flex min-h-11 items-center justify-center gap-2 px-4 py-2 text-xs uppercase tracking-wider font-bold rounded-sm ${block ? "w-full" : ""}`}
+        className={`tls-btn tls-btn--secondary inline-flex min-h-11 items-center justify-center gap-2 px-4 py-2 tls-type-label rounded-sm ${block ? "w-full" : ""}`}
       >
         <CalendarPlus className="w-4 h-4" /> In den Kalender <ChevronDown className={`w-3.5 h-3.5 transition-transform ${open ? "rotate-180" : ""}`} />
       </button>
@@ -63,12 +63,12 @@ export function AddToCalendar({ item, days = null, className = "", block = false
             className="fixed inset-x-0 bottom-0 z-50 sm:absolute sm:inset-x-auto sm:bottom-auto sm:left-0 sm:top-full sm:mt-2 w-full sm:w-80 bg-[#0F0F10] border-t sm:border border-white/10 rounded-t-md sm:rounded-sm shadow-2xl shadow-black/60 p-4 pb-6 sm:pb-4 text-left normal-case tracking-normal"
           >
             <div className="flex items-center justify-between gap-3 sm:hidden mb-3">
-              <span className="font-heading font-black uppercase">In den Kalender</span>
+              <span className="font-black uppercase">In den Kalender</span>
               <button type="button" onClick={close} aria-label="Schließen" className="p-2 text-white/60 hover:text-white"><X className="w-4 h-4" /></button>
             </div>
             {multi && (
               <div className="mb-3" role="group" aria-label="Welche Tage">
-                <div className="text-[10px] font-bold uppercase tracking-[0.2em] text-white/40 mb-1.5">Welche Tage</div>
+                <div className="tls-type-label text-quiet mb-1.5">Welche Tage</div>
                 <div className="flex flex-wrap gap-1.5">
                   <ScopeChip active={scope === "all"} onClick={() => setScope("all")} testId={`${testId}-scope-all`}>Alle {days.length} Tage</ScopeChip>
                   {days.map((day) => (
@@ -82,30 +82,30 @@ export function AddToCalendar({ item, days = null, className = "", block = false
                 {ics ? (
                   <a href={ics} download onClick={close} className="flex items-start gap-3 rounded-sm p-2 hover:bg-white/[0.06]" data-testid={`${testId}-ics`}>
                     <Download className="w-4 h-4 mt-0.5 text-[#29B6E8] shrink-0" />
-                    <span><span className="block text-sm font-bold text-white">{icsLabel}</span><span className="block text-xs text-white/50">{DEVICES}</span></span>
+                    <span><span className="block tls-type-small font-bold text-white">{icsLabel}</span><span className="block tls-type-small text-white/50">{DEVICES}</span></span>
                   </a>
                 ) : (
                   <button type="button" onClick={() => { downloadIcs(target); close(); }} className="w-full text-left flex items-start gap-3 rounded-sm p-2 hover:bg-white/[0.06]" data-testid={`${testId}-ics`}>
                     <Download className="w-4 h-4 mt-0.5 text-[#29B6E8] shrink-0" />
-                    <span><span className="block text-sm font-bold text-white">{icsLabel}</span><span className="block text-xs text-white/50">{DEVICES}</span></span>
+                    <span><span className="block tls-type-small font-bold text-white">{icsLabel}</span><span className="block tls-type-small text-white/50">{DEVICES}</span></span>
                   </button>
                 )}
               </li>
               {single ? (
                 <>
                   <li>
-                    <a href={googleCalendarUrl(target)} target="_blank" rel="noreferrer" onClick={close} className="flex items-center gap-3 rounded-sm p-2 text-sm text-white/85 hover:bg-white/[0.06]" data-testid={`${testId}-google`}>
+                    <a href={googleCalendarUrl(target)} target="_blank" rel="noreferrer" onClick={close} className="flex items-center gap-3 rounded-sm p-2 tls-type-small text-white/85 hover:bg-white/[0.06]" data-testid={`${testId}-google`}>
                       <ExternalLink className="w-4 h-4 text-white/45 shrink-0" /> Google Kalender
                     </a>
                   </li>
                   <li>
-                    <a href={outlookCalendarUrl(target)} target="_blank" rel="noreferrer" onClick={close} className="flex items-center gap-3 rounded-sm p-2 text-sm text-white/85 hover:bg-white/[0.06]" data-testid={`${testId}-outlook`}>
+                    <a href={outlookCalendarUrl(target)} target="_blank" rel="noreferrer" onClick={close} className="flex items-center gap-3 rounded-sm p-2 tls-type-small text-white/85 hover:bg-white/[0.06]" data-testid={`${testId}-outlook`}>
                       <ExternalLink className="w-4 h-4 text-white/45 shrink-0" /> Outlook
                     </a>
                   </li>
                 </>
               ) : (
-                <li className="px-2 pt-1 text-xs text-white/45" data-testid={`${testId}-pick-day`}>Google und Outlook nehmen je einen Termin – wähle oben einen Tag.</li>
+                <li className="px-2 pt-1 tls-type-small text-white/45" data-testid={`${testId}-pick-day`}>Google und Outlook nehmen je einen Termin – wähle oben einen Tag.</li>
               )}
             </ul>
           </div>
@@ -122,7 +122,7 @@ function ScopeChip({ active, onClick, testId, children }) {
       onClick={onClick}
       aria-pressed={active}
       data-testid={testId}
-      className={`rounded-sm px-2.5 py-1 text-xs font-bold transition ${active ? "bg-[#29B6E8] text-black" : "bg-white/[0.06] text-white/75 hover:text-white"}`}
+      className={`rounded-sm px-2.5 py-1 tls-type-small font-bold transition ${active ? "bg-[#29B6E8] text-black" : "bg-white/[0.06] text-white/75 hover:text-white"}`}
     >
       {children}
     </button>
