@@ -1,7 +1,8 @@
 const path = require("path");
 const { test, expect } = require("@playwright/test");
 
-// Zustands-Schilder (#1306) auf Startseite und Dashboard bei 390, 768, 1440 und 2560 px - zusammen alle neun Arten.
+// Zustands-Schilder (#1306) auf Startseite, Dashboard und den Stationen der Turnierleitung bei 390, 768, 1440 und 2560 px -
+// zusammen alle zehn Arten.
 // Geprüft wird: kein Schild bricht um oder wird abgeschnitten, keins ist kleiner als 12 px oder GROSS, der Countdown steht
 // neben dem Schild und nie darin, axe-Kontrast an Schild und Countdown. Server nachgestellt, nur erfundene Namen, feste
 // Uhr. Mit SHOTS_DIR legt der Test Bilder für die Abnahme ab (kein Bildvergleich mit festen Goldwerten).
@@ -11,9 +12,10 @@ const HOUR = 60 * 60 * 1000;
 const DAY = 24 * HOUR;
 const at = (offsetMs) => new Date(NOW.getTime() + offsetMs).toISOString();
 const WIDTHS = [[390, 844], [768, 1024], [1440, 900], [2560, 1440]];
-const KINDS = ["soon", "registration", "checkin", "live", "joined", "waiting", "problem", "done", "cancelled"];
+const KINDS = ["soon", "registration", "checkin", "free", "live", "joined", "waiting", "problem", "done", "cancelled"];
 const HOME_KINDS = ["live", "registration", "checkin", "waiting", "cancelled"];
 const DASHBOARD_KINDS = ["joined", "done", "problem", "soon"];
+const STATION_KINDS = ["free", "live", "problem", "soon"];
 
 const CONSENT = () => window.localStorage.setItem("tls_cookie_consent_v1", JSON.stringify({
   essential: true, external_media: false, analytics: false, meta: false, tiktok: false,
@@ -56,6 +58,24 @@ const DASHBOARD = {
   stats: {},
 };
 
+// Stationen der Turnierleitung: frei (eigene Art „Frei“), läuft, defekt und aufgerufen.
+const LEAD = { id: "probe-leitung", username: "leitung", display_name: "Probe Leitung", role: "tournament_admin", is_tournament_staff: true };
+const queued = (id, key, extra = {}) => ({
+  match_id: id, match_key: key, label: "Viertelfinale", stage_name: "Turnierbaum", names: ["Probe Eins", "Probe Zwei"], open_slots: 0,
+  ready: true, heat: false, state: "queued", position: 1, forecast: false, delay_minutes: 0, duration_minutes: 20,
+  forecast_at: at(HOUR), planned_at: at(HOUR), ...extra,
+});
+const QUEUE = {
+  applies: true, reason: null, now: NOW.toISOString(), unplaced: [], operate: { all: true, station_ids: [] },
+  summary: { delay_minutes: 0, last: { label: "Finale", forecast_at: at(3 * HOUR) } }, matches: {},
+  stations: [
+    { id: "st-1", name: "PC 1", station_text: "PC 1 · PC", status: "free", waiting: 0, running: null, next: null, after: null },
+    { id: "st-2", name: "PC 2", station_text: "PC 2 · PC", status: "busy", waiting: 0, running: queued("m-2", "B", { state: "running", position: 0, started_at: at(-10 * 60000) }), next: null, after: null },
+    { id: "st-3", name: "PC 3", station_text: "PC 3 · PC", status: "broken", waiting: 0, running: null, next: null, after: null },
+    { id: "st-4", name: "PC 4", station_text: "PC 4 · PC", status: "reserved", waiting: 0, running: null, next: queued("m-4", "D", { state: "called", called_at: at(-60000), report_by: at(60000) }), after: null },
+  ],
+};
+
 async function mock(page, { user = null } = {}) {
   await page.addInitScript(CONSENT);
   await page.clock.install({ time: NOW });
@@ -67,6 +87,10 @@ async function mock(page, { user = null } = {}) {
     if (pathname === "/auth/me") return user ? json(user) : route.fulfill({ status: 401, contentType: "application/json", body: "{}" });
     if (pathname === "/home/state") return json(HOME);
     if (pathname === "/mobile/dashboard") return json(DASHBOARD);
+    if (pathname === "/tournaments/probe-cup/lead") {
+      return json({ tournament: { id: "t-probe", slug: "probe-cup", title: "Probe-Cup", status: "live", event_mode: "local" }, now: NOW.toISOString(), matches: [], attention: [], recent: [], stations: [], counts: { open: 0 } });
+    }
+    if (pathname === "/tournaments/probe-cup/live-queue") return json(QUEUE);
     const objects = ["/settings/public", "/home/about", "/chats/unread", "/seasonal/active", "/friends"];
     return json(objects.includes(pathname) ? {} : []);
   });
@@ -165,9 +189,18 @@ for (const [width, height] of WIDTHS) {
       await check(page, width, DASHBOARD_KINDS);
       await shot(page, "dashboard", width, page.locator("main"));
     });
+    test("Stationen der Turnierleitung: Frei, Läuft, Problem und Bald", async ({ page }) => {
+      await mock(page, { user: LEAD });
+      await page.goto("/tournaments/probe-cup/leitung?reiter=stationen");
+      await expect(page.getByTestId("live-chip-st-1")).toHaveText("Frei");
+      await expect(page.getByTestId("live-chip-st-1")).toHaveAttribute("data-kind", "free");
+      await expect(page.getByTestId("live-chip-st-2")).toHaveAttribute("data-kind", "live");
+      await check(page, width, STATION_KINDS);
+      await shot(page, "stationen", width, page.locator("main"));
+    });
   });
 }
 
-test("alle neun Arten kommen in den beiden Seiten vor", () => {
-  expect([...HOME_KINDS, ...DASHBOARD_KINDS].sort()).toEqual([...KINDS].sort());
+test("alle zehn Arten kommen in den drei Seiten vor", () => {
+  expect(new Set([...HOME_KINDS, ...DASHBOARD_KINDS, ...STATION_KINDS])).toEqual(new Set(KINDS));
 });
