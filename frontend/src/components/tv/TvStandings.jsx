@@ -66,9 +66,9 @@ function TableBlock({ title, rows, columns, nameLabel, final, startRank = 0, tes
                 {row.rank}
               </td>
               <td className="tv-standings__name" data-tv-name="1">
+                <span className="tv-standings__namerow">
+                <span className="tv-standings__nametext">
                 {row.display_name || "Teilnehmer"}
-                {/* Gastteam (#1665, Nr. 286): am TV nur „Gast“, nie Verein oder Schule - wie die anderen Zusätze hinter dem Namen. */}
-                {row.guest_badge ? <span className="tv-standings__exit" data-testid={`tv-guest-${row.registration_id}`}> · Gast</span> : null}
                 {row.exit?.kind ? <span className="tv-standings__exit"> · {row.exit.kind === "disqualified" ? "disqualifiziert" : "ausgetreten"}</span> : null}
                 {/* Schweizer System (#1559): weiter oder raus nach der Abschlussregel - wie in der Webtabelle. */}
                 {SWISS_STATUS_WORDS[row.swiss_status] ? <span className="tv-standings__exit" data-testid={`tv-swiss-status-${row.registration_id}`}> · {SWISS_STATUS_WORDS[row.swiss_status]}</span> : null}
@@ -78,6 +78,10 @@ function TableBlock({ title, rows, columns, nameLabel, final, startRank = 0, tes
                 {Number(row.contested) > 0 ? <span className="tv-standings__exit" data-testid={`tv-contested-${row.registration_id}`}> · in Klärung</span> : null}
                 {/* Nachmeldung (#2422): „Nachgemeldet ab Woche X“ - erklärt die kleinere Spielzahl. */}
                 {lateEntryText(row) ? <span className="tv-standings__exit" data-testid={`tv-late-${row.registration_id}`}> · {lateEntryText(row)}</span> : null}
+                </span>
+                {/* Gastteam (#1665, Nr. 286): am TV nur „Gast“, nie Verein oder Schule - außerhalb der Kürzung, damit es immer zu sehen ist. */}
+                {row.guest_badge ? <span className="tv-standings__exit tv-standings__guest" data-testid={`tv-guest-${row.registration_id}`}> · Gast</span> : null}
+                </span>
               </td>
               {columns.map((column) => (
                 <td key={column.key} className={`tv-standings__num ${column.strong ? "tv-standings__num--strong font-display" : ""}`}>{standingCell(column, row)}</td>
