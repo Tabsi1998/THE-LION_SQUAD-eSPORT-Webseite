@@ -90,6 +90,8 @@ test.describe("Schrift-Treppe", () => {
       await page.goto(`/seasons/${SEASON.slug}`);
       const row = (id) => page.locator(`[data-testid="season-row-${id}"]:visible, [data-testid="season-item-${id}"]:visible`).first();
       await expect(row("u-5")).toBeVisible();
+      // Erst messen, wenn Rajdhani geladen ist - sonst misst der erste Versuch die Ersatzschrift (CI, 27.11.).
+      await page.evaluate(() => document.fonts.ready);
       const cells = await page.evaluate((ids) => ids.map((id) => {
         const root = document.querySelector(`[data-testid="season-row-${id}"]`)?.offsetParent
           ? document.querySelector(`[data-testid="season-row-${id}"]`)
