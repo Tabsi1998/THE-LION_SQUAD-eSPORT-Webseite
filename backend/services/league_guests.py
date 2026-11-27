@@ -34,7 +34,10 @@ PROJECTION = {"_id": 0, "id": 1, FIELD: 1}
 NAME_REQUIRES_KIND = "Sag zuerst, ob ihr für einen Verein oder eine Schule spielt."
 NAME_LENGTH = f"Der Name von Verein oder Schule braucht {NAME_MIN} bis {NAME_MAX} Zeichen."
 NOT_TEAM_LEAD = "Verein oder Schule tragen Teamleitung und Co-Leitung ein."
-NO_LEAGUE_TEAM = "Das Kennzeichen „Gast“ setzt die Liga-Leitung einer Liga, in der das Team angemeldet ist."
+NO_LEAGUE_TEAM = "Das Kennzeichen „Gast“ setzt die Liga-Leitung einer Liga, in der das Team gerade angemeldet oder zugeteilt ist."
+NOT_A_LEAGUE_TEAM = "Verein oder Schule gebt ihr an, sobald euer Team in einer Liga angemeldet ist."
+ORG_FIELDS = ("kind", "name", "school_name_public", "updated_at")
+CONFIRM_FIELDS = ("confirmed_at", "confirmed_kind", "confirmed_name")
 
 
 def clean_name(value) -> str:
@@ -175,24 +178,71 @@ def confirmed_fields(state: dict, confirmed: bool) -> dict:
     return state
 
 
-async def save(db, team_id: str, state: dict) -> None:
-    if is_empty(state):
-        await db.teams.update_one({"id": team_id}, {"$unset": {FIELD: ""}})
-    else:
-        await db.teams.update_one({"id": team_id}, {"$set": {FIELD: state}})
+async def _write(db, team_id: str, state: dict, fields: tuple[str, ...]) -> None:
+    """Nur die eigenen Teilfelder schreiben (Teamleitung: Angabe, Liga-Leitung: Kennzeichen) - speichern beide gleichzeitig, überschreibt
+    keine die andere. Bleibt danach weder Angabe noch Kennzeichen, fällt das Feld ganz weg (nur, wenn es dann noch leer ist)."""
+    sets = {f"{FIELD}.{key}": state[key] for key in fields if state.get(key) is not None}
+    unsets = {f"{FIELD}.{key}": "" for key in fields if state.get(key) is None}
+    await db.teams.update_one({"id": team_id}, {key: value for key, value in (("$set", sets), ("$unset", unsets)) if value})
+    await db.teams.update_one({"id": team_id, f"{FIELD}.confirmed_at": {"$exists": False}, f"{FIELD}.kind": {"$in": [None]}},
+                              {"$unset": {FIELD: ""}})
+
+
+async def save_org(db, team_id: str, state: dict) -> None:
+    await _write(db, team_id, state, ORG_FIELDS)
+
+
+async def save_confirmed(db, team_id: str, state: dict) -> None:
+    await _write(db, team_id, state, CONFIRM_FIELDS)
+
+
+async def _running_seasons(db, season_ids) -> set[str]:
+    from services.league_service import CLOSED_SEASON_STATUSES
+
+    wanted = sorted({season_id for season_id in season_ids if season_id})
+    if not wanted:
+        return set()
+    rows = await db.league_seasons.find({"id": {"$in": wanted}}, {"_id": 0, "id": 1, "status": 1}).to_list(len(wanted))
+    return {row["id"] for row in rows if row.get("status") not in CLOSED_SEASON_STATUSES}
 
 
 async def league_ids_of_team(db, team_id: str) -> set[str]:
-    """Die Ligen, in denen das Team einen Antrag hat oder in einer Staffel steht - dort darf deren Leitung das Kennzeichen setzen."""
-    leagues = {row.get("league_id") for row in await db.league_applications.find(
-        {"team_id": team_id}, {"_id": 0, "league_id": 1}).to_list(500)}
+    """Entscheidung B (27.11.): die Ligen, in denen das Team **gerade** angemeldet oder zugeteilt ist - ein offener oder angenommener
+    Antrag bzw. eine Anmeldung in einer Staffel, die noch nicht beendet ist, jeweils in einer laufenden oder kommenden Season. Ein
+    abgelehnter oder zurückgezogener Antrag und eine beendete Season geben der Leitung kein Recht am Kennzeichen."""
+    from services.league_applications import OPEN_STATUSES
+    from services.league_service import FINISHED_STAFFEL_STATUSES
+    from services.squad_registration import SEAT_STATUSES
+
+    applications = await db.league_applications.find({"team_id": team_id, "status": {"$in": list(OPEN_STATUSES)}},
+                                                     {"_id": 0, "league_id": 1, "season_id": 1}).to_list(500)
     tournament_ids = sorted({row.get("tournament_id") for row in await db.tournament_registrations.find(
-        {"team_id": team_id}, {"_id": 0, "tournament_id": 1}).to_list(2000) if row.get("tournament_id")})
-    if tournament_ids:
-        rows = await db.tournaments.find({"id": {"$in": tournament_ids}, "league_context.league_id": {"$exists": True}},
-                                         {"_id": 0, "league_context": 1}).to_list(len(tournament_ids))
-        leagues |= {(row.get("league_context") or {}).get("league_id") for row in rows}
-    return {league_id for league_id in leagues if league_id}
+        {"team_id": team_id, "status": {"$in": list(SEAT_STATUSES)}}, {"_id": 0, "tournament_id": 1}).to_list(2000) if row.get("tournament_id")})
+    staffeln = await db.tournaments.find(
+        {"id": {"$in": tournament_ids}, "league_context.league_id": {"$exists": True}, "status": {"$nin": sorted(FINISHED_STAFFEL_STATUSES)}},
+        {"_id": 0, "league_context": 1}).to_list(len(tournament_ids)) if tournament_ids else []
+    contexts = [(row.get("league_id"), row.get("season_id")) for row in applications]
+    contexts += [((row.get("league_context") or {}).get("league_id"), (row.get("league_context") or {}).get("season_id")) for row in staffeln]
+    running = await _running_seasons(db, [season_id for _league, season_id in contexts])
+    # Eine Staffel ohne Season-Dokument (Altbestand) zählt, solange sie selbst läuft.
+    known = {row["id"] for row in await db.league_seasons.find(
+        {"id": {"$in": sorted({season_id for _league, season_id in contexts if season_id})}}, {"_id": 0, "id": 1}).to_list(500)} if contexts else set()
+    return {league_id for league_id, season_id in contexts if league_id and (season_id in running or season_id not in known)}
+
+
+async def is_league_team(db, team: dict | None) -> bool:
+    """Entscheidung C (27.11.): Verein oder Schule gibt es nur für Liga-Teams - ein Liga-Antrag (gleich welcher Stand), eine Anmeldung in
+    einer Liga-Staffel oder schon eine Angabe bzw. ein Kennzeichen am Team."""
+    if not team:
+        return False
+    if state_of(team):
+        return True
+    if await db.league_applications.find_one({"team_id": team.get("id")}, {"_id": 1}):
+        return True
+    tournament_ids = sorted({row.get("tournament_id") for row in await db.tournament_registrations.find(
+        {"team_id": team.get("id")}, {"_id": 0, "tournament_id": 1}).to_list(2000) if row.get("tournament_id")})
+    return bool(tournament_ids) and bool(await db.tournaments.find_one(
+        {"id": {"$in": tournament_ids}, "league_context.league_id": {"$exists": True}}, {"_id": 1}))
 
 
 async def may_confirm(db, user: dict | None, team_id: str) -> bool:

@@ -429,7 +429,7 @@ def _viewer_rights(team: dict, user: dict | None) -> dict:
     Zwei-Faktor-Anmeldung fehlt - dann zeigen sie „2FA einrichten“ statt der Verwaltung."""
     if not user:
         return {"can_manage": False, "can_edit_team": False, "can_remove_members": False, "can_dissolve": False,
-                "can_change_roles": False, "admin_needs_second_factor": False, "can_edit_guest_team": False}
+                "can_change_roles": False, "admin_needs_second_factor": False}
     leads = team.get("leader_id") == user.get("id") or user.get("id") in (team.get("co_leader_ids") or [])
     owns = team.get("leader_id") == user.get("id") or _team_admin(user, TEAM_OWNER_ADMIN_ROLES)
     return {
@@ -443,9 +443,17 @@ def _viewer_rights(team: dict, user: dict | None) -> dict:
         "can_change_roles": owns,
         "admin_needs_second_factor": not leads and (admin_role_without_second_factor(user, TEAM_ADMIN_ROLES)
                                                     or _grant_lacks_second_factor(team, user)),
-        # Gastteam (#1665): Verein oder Schule und die Freigabe des Schulnamens gibt nur die Teamleitung an.
-        "can_edit_guest_team": leads,
     }
+
+
+async def _guest_editing(db, out: dict, team: dict, user: dict | None) -> dict:
+    """Gastteam (#1665, Entscheidung C): ``can_edit_guest_team`` nur in den Antworten des eigenen Teams - wahr für Leitung und Co-Leitung
+    eines Liga-Teams (Liga-Antrag, Liga-Staffel oder schon eine Angabe)."""
+    if user and (_is_member(team, user) or _can_manage(team, user)):
+        from services import league_guests
+
+        out["can_edit_guest_team"] = _leads_team(team, user) and await league_guests.is_league_team(db, team)
+    return out
 
 
 def _with_guest(out: dict, team: dict, insider: bool) -> dict:
@@ -649,7 +657,9 @@ async def my_teams(me: dict = Depends(get_current_user)):
         # Wie GET /teams/{id}: der Code gehört zur Teamleitung (#2126).
         if not _can_manage(team, me):
             team.pop("join_code", None)
-        _with_guest(team, dict(team), True)
+        raw = dict(team)
+        _with_guest(team, raw, True)
+        await _guest_editing(db, team, raw, me)
     return teams
 
 
@@ -677,7 +687,9 @@ async def get_team(team_id: str, user: dict | None = Depends(get_optional_user))
     if team.get("is_public") is False and not (_is_member(team, user) or _is_staff(user)):
         raise HTTPException(status_code=404, detail="Team nicht gefunden")
     await _hydrate_team(team)
+    raw = dict(team)
     out = _team_response(team, user)
+    await _guest_editing(db, out, raw, user)
     # Auszeichnungen (#230): Team-Banner und -Trophäen; das Team selbst sieht alles, Vereinsmitglieder dazu Internes, das
     # sie selbst sehen dürfen (#2516, dieselbe Regel wie im Profil), alle anderen nur öffentliche Turniere.
     from services.awards import awards_for_team

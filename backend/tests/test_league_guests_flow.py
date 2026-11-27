@@ -67,6 +67,7 @@ async def test_team_lead_gives_the_school_and_only_the_league_lead_makes_it_a_gu
     w = await application_world(flow, teams=2)
     side = w["teams"][0]
     team_id = side["team"]["id"]
+    application = await submitted(flow, w, side)
 
     # Captain und Spieler sind nicht die Teamleitung.
     refused = await set_org(flow, side["captain"], team_id, kind="school", name=SCHOOL)
@@ -77,7 +78,6 @@ async def test_team_lead_gives_the_school_and_only_the_league_lead_makes_it_a_gu
     # Die Teamleitung setzt das Kennzeichen nicht selbst.
     assert (await set_mark(flow, side["lead"], team_id)).status_code == 403
 
-    application = await submitted(flow, w, side)
     flow.act_as(w["lead"])
     item = next(row for row in ok(await flow.get(inbox_url(w)))["items"] if row["id"] == application["id"])
     assert item["guest_team"]["pending"] is True and item["guest_team"]["kind"] == "school"
@@ -187,6 +187,7 @@ async def test_the_team_lead_data_is_checked_and_screened(flow):
     w = await application_world(flow, teams=1)
     side = w["teams"][0]
     team_id = side["team"]["id"]
+    await submitted(flow, w, side)
     assert (await set_org(flow, side["lead"], team_id, name="Ohne Art")).status_code == 422
     assert (await set_org(flow, side["lead"], team_id, kind="club", name="S")).status_code == 422
     assert (await set_org(flow, side["lead"], team_id, kind="verein", name="SV Probedorf")).status_code == 422
@@ -385,3 +386,110 @@ async def test_without_a_season_text_everybody_sees_the_placeholder_and_release_
     refused = await flow.put(f"/api/admin/leagues/seasons/{w['season']['id']}/privacy-release", json={"released": True})
     assert refused.status_code == 422
     assert (await submit(flow, w, w["teams"][0])).status_code == 200
+
+
+# ---------------------------------------------------------------- Nachbesserung nach der Prüfung (27.11.)
+
+
+@pytest.mark.asyncio
+async def test_only_the_lead_of_a_league_where_the_team_plays_now_sets_or_removes_the_mark(flow):
+    """Entscheidung B (27.11.): offener oder angenommener Antrag in einer laufenden oder kommenden Season - ein abgelehnter oder
+    zurückgezogener Antrag und eine beendete Season geben kein Recht. Der Bereich Ligen darf immer."""
+    from league_application_world import decide
+
+    w = await application_world(flow, teams=3)
+    lead = await league_lead(flow, w["league"]["id"])
+    rejected, withdrawn, playing = w["teams"]
+    application = await submitted(flow, w, rejected)
+    assert (await decide(flow, w, application, "reject", reason="Kader passt nicht")).status_code == 200
+    gone = await submitted(flow, w, withdrawn)
+    flow.act_as(withdrawn["captain"])
+    assert (await flow.post(f"/api/leagues/{w['league']['slug']}/{w['season']['slug']}/applications/{gone['id']}/withdraw", json={})).status_code == 200
+    for side in (rejected, withdrawn):
+        refused = await set_mark(flow, lead, side["team"]["id"])
+        assert refused.status_code == 403 and refused.json()["detail"] == league_guests.NO_LEAGUE_TEAM, side["team"]["name"]
+    await submitted(flow, w, playing)
+    assert (await set_mark(flow, lead, playing["team"]["id"])).status_code == 200
+    # Season beendet: auch der offene Antrag gibt kein Recht mehr - entfernen auch nicht.
+    await flow.db.league_seasons.update_one({"id": w["season"]["id"]}, {"$set": {"status": "completed"}})
+    assert (await set_mark(flow, lead, playing["team"]["id"], confirmed=False)).status_code == 403
+    area = await flow.add_user(name="Bereich Ligen")
+    area["areas"] = ["leagues"]
+    assert (await set_mark(flow, area, playing["team"]["id"], confirmed=False)).status_code == 200
+
+
+@pytest.mark.asyncio
+async def test_a_team_assigned_to_a_running_staffel_counts_and_a_finished_staffel_does_not(flow):
+    w = await surface_world(flow)
+    lead = await league_lead(flow, w["league_id"])
+    assert (await set_mark(flow, lead, w["falcons"]["id"])).status_code == 200, "zugeteilt in einer laufenden Staffel"
+    await flow.db.tournaments.update_one({"id": w["tournament"]["id"]}, {"$set": {"status": "completed"}})
+    assert (await set_mark(flow, lead, w["falcons"]["id"], confirmed=False)).status_code == 403
+
+
+@pytest.mark.asyncio
+async def test_the_guest_section_belongs_to_league_teams_only(flow):
+    """Entscheidung C (27.11.): Verein oder Schule gibt es nur für Teams mit Liga-Antrag oder schon gekennzeichnete; ``can_edit_guest_team``
+    steht nur in den Antworten des eigenen Teams."""
+    w = await application_world(flow, teams=1)
+    side = w["teams"][0]
+    team_id = side["team"]["id"]
+    flow.act_as(side["lead"])
+    assert ok(await flow.get(f"/api/teams/{team_id}"))["can_edit_guest_team"] is False
+    refused = await set_org(flow, side["lead"], team_id, kind="club", name="SV Probedorf")
+    assert refused.status_code == 409 and refused.json()["detail"] == league_guests.NOT_A_LEAGUE_TEAM
+    await submitted(flow, w, side)
+    flow.act_as(side["lead"])
+    assert ok(await flow.get(f"/api/teams/{team_id}"))["can_edit_guest_team"] is True
+    mine = next(row for row in ok(await flow.get("/api/teams/my")) if row["id"] == team_id)
+    assert mine["can_edit_guest_team"] is True
+    ok(await set_org(flow, side["lead"], team_id, kind="club", name="SV Probedorf"))
+    flow.act_as(side["captain"])
+    assert ok(await flow.get(f"/api/teams/{team_id}"))["can_edit_guest_team"] is False, "Mitglied, nicht Teamleitung"
+    flow.act_as(None)
+    assert "can_edit_guest_team" not in ok(await flow.get(f"/api/teams/{team_id}"))
+
+
+@pytest.mark.asyncio
+async def test_saving_the_team_data_never_drops_the_mark_and_confirming_never_drops_the_data(flow, monkeypatch):
+    """Gleichzeitig gespeichert: Die Teamleitung liest das Team, die Liga-Leitung bestätigt dazwischen - die Bestätigung bleibt stehen, und
+    umgekehrt bleibt die Angabe der Teamleitung. Jede Seite schreibt nur ihre Teilfelder."""
+    from routes import league_guest_routes
+
+    w = await application_world(flow, teams=1)
+    side = w["teams"][0]
+    team_id = side["team"]["id"]
+    await submitted(flow, w, side)
+    lead = await league_lead(flow, w["league"]["id"])
+    stale = await flow.db.teams.find_one({"id": team_id}, {"_id": 0})
+    ok(await set_mark(flow, lead, team_id))
+    real_team = league_guest_routes._team
+
+    async def first_stale(db, wanted):
+        monkeypatch.setattr(league_guest_routes, "_team", real_team)
+        return dict(stale)
+
+    monkeypatch.setattr(league_guest_routes, "_team", first_stale)
+    ok(await set_org(flow, side["lead"], team_id, kind="club", name="SV Probedorf"))
+    state = (await flow.db.teams.find_one({"id": team_id}, {"_id": 0}))["guest_team"]
+    assert state.get("confirmed_at"), "die Bestätigung der Liga-Leitung bleibt"
+    assert state["name"] == "SV Probedorf"
+
+    stale = await flow.db.teams.find_one({"id": team_id}, {"_id": 0})
+    ok(await set_org(flow, side["lead"], team_id, kind="club", name="SV Probedorf Nord"))
+    monkeypatch.setattr(league_guest_routes, "_team", first_stale)
+    ok(await set_mark(flow, lead, team_id, confirmed=False))
+    state = (await flow.db.teams.find_one({"id": team_id}, {"_id": 0}))["guest_team"]
+    assert state["name"] == "SV Probedorf Nord", "die Angabe der Teamleitung bleibt"
+    assert not state.get("confirmed_at")
+
+
+@pytest.mark.asyncio
+async def test_a_guest_team_is_not_named_as_member_of_the_club_in_the_link_preview(flow):
+    w = await surface_world(flow)
+    flow.act_as(None)
+    guest = ok(await flow.get("/api/seo/meta", params={"path": f"/teams/{w['lions']['id']}"}))
+    assert "SportsTeam" in json.dumps(guest["json_ld"]) and "memberOf" not in json.dumps(guest["json_ld"])
+    club = ok(await flow.get("/api/seo/meta", params={"path": f"/teams/{w['falcons']['id']}"}))
+    assert "memberOf" in json.dumps(club["json_ld"]), "Vereinsteams bleiben, wie sie sind"
+

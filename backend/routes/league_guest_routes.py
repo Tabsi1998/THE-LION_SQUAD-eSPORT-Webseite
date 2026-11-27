@@ -55,6 +55,9 @@ async def set_guest_org(team_id: str, body: GuestTeamOrg, me: dict = Depends(get
     team = await _team(db, team_id)
     if me.get("id") not in {team.get("leader_id"), *(team.get("co_leader_ids") or [])}:
         raise HTTPException(status_code=403, detail=guests.NOT_TEAM_LEAD)
+    if not await guests.is_league_team(db, team):
+        # Entscheidung C (27.11.): nur Liga-Teams - wie der Abschnitt im Team-Blatt.
+        raise HTTPException(status_code=409, detail=guests.NOT_A_LEAGUE_TEAM)
     before = guests.state_of(team)
     try:
         state = guests.org_fields(body.kind, body.name, body.school_name_public, before=before)
@@ -62,7 +65,7 @@ async def set_guest_org(team_id: str, body: GuestTeamOrg, me: dict = Depends(get
         raise HTTPException(status_code=422, detail=str(problem)) from None
     if state.get("name") and state["name"] != guests.clean_name(before.get("name")):
         await word_filter.screen_field(db, state["name"], kind="guest_org", user_id=me["id"], ref_id=team_id)
-    await guests.save(db, team_id, state)
+    await guests.save_org(db, team_id, state)
     # Ins Protokoll nur, was sich geändert hat - der Name selbst gehört zum Team und steht am Team.
     changed = sorted(key for key in ("kind", "name", "school_name_public") if _same(key, before.get(key)) != _same(key, state.get(key)))
     if changed:
@@ -98,7 +101,7 @@ async def confirm_guest_team(team_id: str, body: GuestTeamConfirm, me: dict = De
                                               conflict_reason=body.conflict_reason)
     state = guests.confirmed_fields(guests.state_of(team), body.confirmed)
     was = guests.is_confirmed(team)
-    await guests.save(db, team_id, state)
+    await guests.save_confirmed(db, team_id, state)
     season_id = await guests.season_context(db, team_id, body.season_id)
     action = "league.guest_team.confirm" if body.confirmed else "league.guest_team.revoke"
     await _audit(db, action, team_id, me["id"], {"season_id": season_id, "kind": state.get("confirmed_kind"),
