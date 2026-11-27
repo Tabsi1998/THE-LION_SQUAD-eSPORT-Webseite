@@ -11,7 +11,7 @@ from pymongo.errors import DuplicateKeyError
 from database import get_db
 from services import billing_orders, league_applications, league_participants, squad_registration
 from services.league_scope import is_league_staffel
-from services.staffel_guard import SQUAD_UNREGISTER_REFUSED, STAFFEL_REGISTRATION_REFUSED
+from services.staffel_guard import PERSON_UNREGISTER_REFUSED, SQUAD_UNREGISTER_REFUSED, registration_refused
 from services.station_runtime import free_stations_of_deleted_matches
 from services.permissions import is_confirmed_tournament_lead
 from auth import get_current_user, get_optional_user
@@ -824,7 +824,7 @@ async def self_register(db, t: dict, body: RegistrationCreate, me: dict, registe
         raise HTTPException(status_code=423, detail=TOURNAMENT_MUTATION_LOCKED_DETAIL)
     # Liga-Staffel (#2109): nur Co-Teams über „Co-Team zuteilen“ - eine Selbstanmeldung gibt es dort auf keinem Weg.
     if is_league_staffel(t):
-        raise HTTPException(status_code=400, detail=STAFFEL_REGISTRATION_REFUSED)
+        raise HTTPException(status_code=400, detail=registration_refused(t))
     if not body.accept_rules or not body.accept_privacy:
         raise HTTPException(status_code=400, detail="Regeln und Datenschutz müssen akzeptiert werden.")
     registration_error = _registration_error(t)
@@ -997,7 +997,7 @@ async def admin_create_registration(tid: str, body: RegistrationAdminCreate,
     if is_league_staffel(tournament):
         # Liga-Staffel (#2109): nur Co-Teams über „Co-Team zuteilen“ (mit Kader- und Season-Prüfung) - kein ganzes
         # Hauptteam und kein Ersatz an diesen Prüfungen vorbei. Diese Route kennt kein ``squad_id``.
-        raise HTTPException(status_code=400, detail=STAFFEL_REGISTRATION_REFUSED)
+        raise HTTPException(status_code=400, detail=registration_refused(tournament))
 
     payload = body.model_dump()
     user = None
@@ -1253,6 +1253,9 @@ async def staff_set_registration_checkin(tid: str, reg_id: str, body: dict,
     tid = await _resolve_tid(tid)
     tournament_doc = await _ensure_tournament_unlocked(db, tid)
     await require_tournament_staff_permission(me, tid, CHECKIN_STAFF_ROLES, capability="matches")
+    # Solo-Staffel (#1629, P1): Check-in und „nicht erschienen“ gehören zum Spielbetrieb für Spieler (P3).
+    if league_participants.is_solo_staffel(tournament_doc):
+        raise HTTPException(status_code=409, detail=league_participants.OPERATIONS_FOLLOW)
     status = body.get("status")
     if status not in REGISTRATION_CHECKIN_STATUSES:
         raise HTTPException(status_code=400, detail="Ungültiger Check-in-Status")
@@ -1347,6 +1350,9 @@ async def _delete_registration_locked(db, tid: str, reg_id: str, me: dict) -> di
         team = await db.teams.find_one({"id": reg["team_id"]}, {"_id": 0})
         is_team_manager = bool(team and _can_register_team(team, me))
     is_staff = await has_tournament_staff_permission(me, tid, PARTICIPANT_STAFF_ROLES, capability="applications")
+    # Solo-Staffel (#1629): Die Leitung teilt die Person zu und nimmt sie heraus - eine Selbst-Abmeldung gibt es dort nicht (wie beim Co-Team).
+    if not is_staff and league_participants.is_solo_staffel(await db.tournaments.find_one({"id": tid}, {"_id": 0, "league_context": 1, "team_mode": 1})):
+        raise HTTPException(status_code=403, detail=PERSON_UNREGISTER_REFUSED)
     if not is_own_registration and not is_team_manager and not is_staff:
         # Co-Team (#2109): eine deutsche Begründung statt eines nackten 403.
         raise HTTPException(status_code=403, detail=SQUAD_UNREGISTER_REFUSED if reg.get("squad_id") else None)
@@ -1408,6 +1414,9 @@ async def checkin_self(tid: str, me: dict = Depends(get_current_user)):
     # Eine Prüfung für alle Stellen (#1135): Knopf, Startseite, Erinnerungen, Mail und Discord fragen dieselbe Regel.
     if not self_checkin_allowed(tournament):
         raise HTTPException(status_code=403, detail="Bei Vor-Ort-Turnieren macht die Turnierleitung den Check-in.")
+    # Solo-Staffel (#1629, P1): Check-in gehört zum Spielbetrieb für Spieler (P3). Team-Staffeln bleiben, wie sie sind.
+    if league_participants.is_solo_staffel(tournament):
+        raise HTTPException(status_code=409, detail=league_participants.OPERATIONS_FOLLOW)
     try:
         async with mutation_lock(db, tournament_write_resource(tid)):
             reg = await _find_self_registration(db, tid, me["id"])
@@ -1533,7 +1542,7 @@ async def assign_squad(tid: str, body: SquadAssignBody, me: dict = Depends(requi
     if problem:
         raise HTTPException(status_code=400, detail=problem)
     if league_participants.is_solo_staffel(tournament):
-        return await _assign_person(db, tournament, body.user_id, me)
+        return await _assign_person(db, tournament, body.user_id, me, body.conflict_reason)
     # Staffeln derselben Season teilen dasselbe Co-Team nie gleichzeitig zu: Sperre je Season (die Turnier-Sperre
     # hält nur diese Staffel), dazu der eindeutige Index auf ``league_squad_key``.
     season_resource = squad_registration.season_lock_resource(tournament)
@@ -1561,10 +1570,18 @@ async def assign_squad(tid: str, body: SquadAssignBody, me: dict = Depends(requi
     return {"registration": reg, "auto_bracket_update": auto_bracket_update, "ids_missing": sorted(missing)}
 
 
-async def _assign_person(db, tournament: dict, user_id: str, me: dict) -> dict:
+async def _assign_person(db, tournament: dict, user_id: str, me: dict, conflict_reason: str | None = None) -> dict:
     """Eine Person in die Solo-Staffel (#1629, P1): dieselbe Season-Sperre, dieselben Folgen wie beim Co-Team - Vorschau neu mischen,
-    Nachricht an die Person, Spiel-ID für die Season festhalten. Anträge gibt es für Personen noch nicht (P2)."""
+    Nachricht an die Person, Spiel-ID für die Season festhalten. Anträge gibt es für Personen noch nicht (P2). Sich selbst teilt die
+    Leitung nicht zu - wie bei der eigenen Anmeldung (#2245) nur der Superadmin als Notausnahme mit Grund."""
+    from services.league_permissions import CONFLICT_INVOLVED, override_reason, record_override
+    from services.permissions import is_superadmin
+
     tid = tournament["id"]
+    override = None
+    if user_id == me.get("id"):
+        override = override_reason({"kind": CONFLICT_INVOLVED, "override": is_superadmin(me)}, conflict_reason,
+                                   detail=squad_registration.SELF_ASSIGN_DETAIL, superadmin_detail=squad_registration.SELF_ASSIGN_SUPERADMIN)
     season_resource = squad_registration.season_lock_resource(tournament)
     try:
         async with (mutation_lock(db, season_resource) if season_resource else contextlib.nullcontext()):
@@ -1576,6 +1593,9 @@ async def _assign_person(db, tournament: dict, user_id: str, me: dict) -> dict:
     await _audit_tournament_action(db, "league.player.assign", me.get("id"), tid, {
         "registration_id": reg["id"], "user_id": reg["user_id"], "display_name": reg.get("display_name"),
     })
+    if override:
+        await record_override(db, me, action="league.player.assign", target_id=tid, reason=override, registration_id=reg["id"],
+                              season_id=(tournament.get("league_context") or {}).get("season_id"))
     auto_bracket_update = await _refresh_tournament_previews_after_registration(db, tournament, me.get("id"))
     await _notify_registration(db, tid, reg, reg["status"], actor_id=me.get("id"))
     # Liga-Kader (#2108): Die Person ist ihr eigener Kader - ihre Spiel-ID gilt ab jetzt für die Season.

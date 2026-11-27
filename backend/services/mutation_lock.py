@@ -94,6 +94,12 @@ def game_equipment_resource(game_id: str) -> str:
     return f"game:{game_id}:equipment"
 
 
+def game_solo_resource(game_id: str) -> str:
+    """Einzelspieler eines Spiels (#1629): „Einzelspieler erlaubt“ ausschalten und eine Solo-Liga für das Spiel anlegen nacheinander - nie
+    beides zugleich, sonst spielte eine Solo-Liga ein Spiel ohne Einzelspieler. Eigene Sperre, nimmt keine weitere."""
+    return f"game:{game_id}:solo"
+
+
 def league_resource(league_id: str) -> str:
     """Eine Liga: liga-weites Regelwerk veröffentlichen, Liga löschen (#1646). Vor den Sperren ihrer Seasons."""
     return f"league:{league_id}:rules"

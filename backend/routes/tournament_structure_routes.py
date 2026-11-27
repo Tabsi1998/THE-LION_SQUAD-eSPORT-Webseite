@@ -11,7 +11,7 @@ from services.tournament_permissions import (
     require_tournament_staff_permission,
 )
 from services.custom_bracket import BracketSchemaError, build_matches_v2_from_schema
-from services.staffel_guard import staffel_rebuild_problem
+from services.staffel_guard import solo_fixed_plan_problem, staffel_rebuild_problem
 from services.station_runtime import free_stations_of_deleted_matches, held_calls, tell_withdrawn_calls
 from services import tournament_guard
 from services.draw_records import record_build_draws
@@ -265,6 +265,10 @@ async def apply_tournament_structure_plan(
     tid = await _resolve_tid(tid)
     tournament = await _ensure_tournament_unlocked(db, tid)
     await require_tournament_staff_permission(me, tid, STRUCTURE_STAFF_ROLES, capability="season")
+    # Solo-Staffel (#1629, P1): Übernehmen macht den Plan fest - das gibt es erst mit dem Spielbetrieb für Spieler.
+    solo_problem = solo_fixed_plan_problem(tournament)
+    if solo_problem:
+        raise HTTPException(status_code=400, detail=solo_problem)
 
     last_plan_hash = str(tournament.get("last_structure_plan_hash") or "")
     if last_plan_hash and hmac.compare_digest(last_plan_hash, body.expected_plan_hash):
@@ -430,6 +434,10 @@ async def rebuild_bracket_from_tournament_format(tid: str, body: TournamentBrack
     await require_tournament_staff_permission(me, tid, STRUCTURE_STAFF_ROLES, capability="season")
     if not _can_rebuild_bracket_from_format(tournament):
         raise HTTPException(status_code=400, detail=_no_generator_text(tournament))
+    # Solo-Staffel (#1629, P1): fest erst mit dem Spielbetrieb für Spieler - die Vorschau bleibt.
+    solo_problem = None if preview else solo_fixed_plan_problem(tournament)
+    if solo_problem:
+        raise HTTPException(status_code=400, detail=solo_problem)
     # Liga-Staffel (#2109): ein fester Spielplan wird nicht durch eine Vorschau ersetzt - auch nicht mit force.
     staffel_problem = await staffel_rebuild_problem(db, tournament)
     if staffel_problem:

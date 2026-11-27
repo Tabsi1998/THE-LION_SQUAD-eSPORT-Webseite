@@ -35,8 +35,8 @@ from services import checkin_rules, league_protest_settings, league_reminder_rul
 from services.league_schedule import DEFAULTS as SCHEDULE_RULE_DEFAULTS
 from services.league_schedule import public_rules as schedule_public_rules
 from services.log_safe import log_safe
-from services.mutation_lock import (MutationLockBusy, league_resource, league_season_pool_resource, league_season_resource,
-                                    mutation_lock, tournament_write_resource)
+from services.mutation_lock import (MutationLockBusy, game_solo_resource, league_resource, league_season_pool_resource,
+                                    league_season_resource, mutation_lock, tournament_write_resource)
 from services.tournament_purge import purge_tournament
 # Runden ≤ aktive Wochen steht im Blatt-Modul (auch für Spielplan und Turnierstart) und wird hier weitergereicht.
 from services.league_rounds import max_teams_for, rounds_needed, rounds_problem  # noqa: F401
@@ -627,10 +627,23 @@ async def create_league(db, body: dict, user: dict) -> dict:
         "created_at": _now(), "created_by": user["id"], "updated_at": _now(),
     }
     try:
-        await db.leagues.insert_one(dict(doc))
+        if kind == league_participants.SOLO:
+            # Gegen „Einzelspieler erlaubt“ ausschalten (#1629): unter der Sperre des Spiels noch einmal frisch geprüft, dann geschrieben.
+            async with mutation_lock(db, game_solo_resource(game["id"])):
+                problem = league_participants.game_problem(await _game(db, game["id"]), kind)
+                if problem:
+                    raise LeagueProblem(problem)
+                await db.leagues.insert_one(dict(doc))
+        else:
+            await db.leagues.insert_one(dict(doc))
     except DuplicateKeyError:
         raise LeagueProblem("Diese Kurzadresse ist schon vergeben.", 409) from None
+    except MutationLockBusy:
+        raise LeagueProblem(GAME_SOLO_BUSY, 409) from None
     return doc
+
+
+GAME_SOLO_BUSY = "Das Spiel wird gerade geändert – bitte gleich noch einmal versuchen."
 
 
 async def update_league(db, league: dict, body: dict) -> tuple[dict, list[str]]:

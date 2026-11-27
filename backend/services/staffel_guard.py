@@ -98,6 +98,21 @@ STAFFEL_REGISTRATION_REFUSED = ("In einer Liga-Staffel spielen nur Co-Teams – 
                                 "eintragen.")
 SQUAD_UNREGISTER_REFUSED = ("Ein zugeteiltes Co-Team nimmt nur die Turnierleitung wieder aus der Staffel – bitte "
                             "bei der Turnierleitung melden.")
+# Solo-Staffel (#1629): dieselben Sperren mit den Wörtern der Solo-Liga.
+PERSON_REGISTRATION_REFUSED = ("In einer Solo-Staffel teilt die Leitung die Spieler zu – bitte über „Spieler zuteilen“ eintragen. Die "
+                               "Selbstanmeldung als Spieler folgt in einem späteren Ausbau.")
+PERSON_UNREGISTER_REFUSED = "Eine zugeteilte Person nimmt nur die Leitung aus der Staffel."
+
+
+def registration_refused(tournament: dict | None) -> str:
+    """Der Satz, wenn sich jemand an einer Staffel vorbei anmeldet - je Teilnehmerart."""
+    return PERSON_REGISTRATION_REFUSED if league_participants.is_solo_staffel(tournament) else STAFFEL_REGISTRATION_REFUSED
+
+
+def solo_fixed_plan_problem(tournament: dict | None) -> str | None:
+    """Ein fester Spielplan in einer Solo-Staffel (#1629, P1): gibt es erst mit dem Spielbetrieb (P3) - sonst hinge die Staffel im Entwurf
+    mit festen Spielen fest. Die Vorschau bleibt erlaubt."""
+    return league_participants.OPERATIONS_FOLLOW if league_participants.is_solo_staffel(tournament) else None
 
 # Vor dem Start einer Staffel (wie ``league_service.PRE_START_STATUSES``).
 PRE_START_STATUSES = frozenset({"draft", "scheduled", "registration_open", "registration_closed", "check_in"})

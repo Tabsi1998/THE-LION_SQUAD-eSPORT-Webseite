@@ -496,6 +496,10 @@ async def build_registration(db, tournament: dict, team_id: str, squad_id: str, 
 # ``registration_type="solo"``, ``identity_key "<tid>:user:<id>"`` wie bei jeder Einzel-Anmeldung und als Season-Schlüssel
 # ``league_squad_key "<season>:user:<id>"`` - so spielt eine Person je Season nur in einer Staffel. Kein zweites System.
 
+# Sich selbst zuteilen (#1629, wie #2245): Über die eigene Teilnahme entscheidet eine andere Person, der Superadmin nur mit Grund.
+SELF_ASSIGN_DETAIL = "Dich selbst teilt eine andere Person aus der Leitung zu."
+SELF_ASSIGN_SUPERADMIN = ("Dich selbst teilt eine andere Person aus der Leitung zu. Als Superadmin geht es nur als Notausnahme, mit einem Grund "
+                          "von mindestens fünf Zeichen.")
 PERSON_FIELDS = {"_id": 0, "id": 1, "username": 1, "display_name": 1, "avatar_url": 1, "is_banned": 1, "is_active": 1}
 PERSON_SEARCH_LIMIT = 30
 
@@ -574,8 +578,11 @@ async def person_candidates(db, tournament: dict, query: str | None) -> dict:
     people: list[dict] = []
     if len(needle) >= 2:
         pattern = safe_regex(needle)
+        # Wie die Personensuche (``mention-search``): gesperrte und deaktivierte Konten erscheinen nicht - die Leitung sieht so keinen
+        # fremden Sperrstatus. Das direkte Zuteilen sagt weiter „gesperrt“ (``person_problems``).
         people = await db.users.find(
-            {"$or": [{"username": {"$regex": pattern, "$options": "i"}}, {"display_name": {"$regex": pattern, "$options": "i"}}]},
+            {"is_active": True, "is_banned": {"$ne": True},
+             "$or": [{"username": {"$regex": pattern, "$options": "i"}}, {"display_name": {"$regex": pattern, "$options": "i"}}]},
             PERSON_FIELDS).sort("display_name", 1).to_list(PERSON_SEARCH_LIMIT)
     ids = [row["id"] for row in people if row.get("id")]
     taken, seats, other = await _person_state(db, tournament, ids)

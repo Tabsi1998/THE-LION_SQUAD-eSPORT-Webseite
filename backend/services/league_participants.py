@@ -38,7 +38,7 @@ SUCCESSOR_FOLLOWS = ("Die Folge-Season mit Auf- und Abstieg und Startrechten fol
 # Prüfung vor der Veröffentlichung (Nr. 297): Veröffentlichen bleibt erlaubt, „Was fehlt noch?“ warnt aber, bis P3 steht.
 READINESS_FOLLOWS = ("Solo-Liga: Spielbetrieb folgt – Spiele lassen sich noch nicht austragen. Veröffentlichen geht, die Staffeln "
                      "starten aber erst, wenn Check-in, Veto und Melden für Spieler fertig sind.")
-WRONG_ENTRY_SOLO ="In dieser Staffel spielen Spieler, keine Co-Teams – bitte eine Person zuteilen."
+WRONG_ENTRY_SOLO = "In dieser Staffel spielen Spieler, keine Co-Teams – bitte eine Person zuteilen."
 WRONG_ENTRY_TEAM = "In dieser Staffel spielen Co-Teams – bitte ein Co-Team zuteilen."
 # Status einer Solo-Staffel, die erst mit dem Spielbetrieb (P3) Sinn haben.
 OPERATING_STATUSES = frozenset({"live", "paused", "completed", "results_published"})

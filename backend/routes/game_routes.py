@@ -1,8 +1,11 @@
 """Game/Discipline routes."""
+import contextlib
+
 from fastapi import APIRouter, HTTPException, Depends
 from database import get_db
 from auth import get_optional_user, require_admin
 from services import game_id_keys, game_maps, game_modes, game_usage, league_participants, league_result_rules, mode_icons
+from services.mutation_lock import MutationLockBusy, game_solo_resource, mutation_lock
 from services.slug_utils import apply_slug_history, find_by_slug_or_history, slugify, unique_slug
 from models import GameCreate, GameUpdate, normalize_rule, now_utc, new_id
 
@@ -333,13 +336,6 @@ async def update_game(game_id: str, body: GameUpdate, me: dict = Depends(require
         if await game_usage.chosen_is_archived(db, updates.get(key), current.get(key)):
             raise HTTPException(status_code=422, detail=game_usage.ARCHIVED_DETAIL)
     lost_keys = await _lost_id_keys(db, current, updates, confirmed)
-    if updates.get("supports_solo") is False and league_participants.game_allows(current, league_participants.SOLO):
-        # Einzelspieler ausschalten (#1629, Nr. 296): nicht still, solange eine Solo-Liga - auch archiviert - dieses Spiel spielt.
-        solo = await db.leagues.find({"game_id": game_id, "participant_kind": league_participants.SOLO},
-                                     {"_id": 0, "name": 1}).sort("name", 1).to_list(20)
-        problem = league_participants.solo_off_problem([row.get("name") or "ohne Namen" for row in solo])
-        if problem:
-            raise HTTPException(status_code=409, detail=problem)
     await _check_discord_guild(db, updates, current)
     if any(key in updates for key in ID_SOURCE_FIELDS):
         await _check_platform_source(db, {**current, **updates})
@@ -347,7 +343,20 @@ async def update_game(game_id: str, body: GameUpdate, me: dict = Depends(require
     if status and status != (current.get("status") or "active"):
         updates["archived_at"] = now_utc().isoformat() if status == game_usage.ARCHIVED else None
     updates["updated_at"] = now_utc().isoformat()
-    await db.games.update_one({"id": game_id}, {"$set": updates})
+    solo_off = updates.get("supports_solo") is False and league_participants.game_allows(current, league_participants.SOLO)
+    try:
+        # Einzelspieler ausschalten (#1629, Nr. 296): nicht still, solange eine Solo-Liga - auch archiviert - dieses Spiel spielt. Unter
+        # derselben Sperre wie das Anlegen einer Solo-Liga, damit nie beides zugleich durchgeht.
+        async with (mutation_lock(db, game_solo_resource(game_id)) if solo_off else contextlib.nullcontext()):
+            if solo_off:
+                solo = await db.leagues.find({"game_id": game_id, "participant_kind": league_participants.SOLO},
+                                             {"_id": 0, "name": 1}).sort("name", 1).to_list(20)
+                problem = league_participants.solo_off_problem([row.get("name") or "ohne Namen" for row in solo])
+                if problem:
+                    raise HTTPException(status_code=409, detail=problem)
+            await db.games.update_one({"id": game_id}, {"$set": updates})
+    except MutationLockBusy:
+        raise HTTPException(status_code=409, detail="Das Spiel wird gerade geändert – bitte gleich noch einmal versuchen.") from None
     if lost_keys:
         await db.audit_logs.insert_one({
             "id": new_id(), "action": "game.player_id_fields.remove", "target_id": game_id, "actor_id": me.get("id"),
