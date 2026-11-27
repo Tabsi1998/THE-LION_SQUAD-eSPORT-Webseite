@@ -70,7 +70,7 @@ export function TwitchTab({ brand, setBrandField, status, saving, refreshing, on
             </div>
             <input type="password" value={brand.twitch_client_secret || ""} onChange={(e) => setBrandField("twitch_client_secret", e.target.value)} data-testid="twitch-client-secret" className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-sm font-mono" placeholder={brand.twitch_client_secret_masked ? "Leer lassen, um Secret beizubehalten" : "Client Secret eintragen"} />
             <p className="mt-1 tls-type-small text-quiet">Das Secret wird beim Laden nicht mehr im Klartext zurückgegeben.</p>
-            {brand.twitch_client_secret_masked && <button type="button" onClick={onClearSecret} className="mt-2 tls-type-label text-[#FF6B6B]">Gespeichertes Secret entfernen</button>}
+            {brand.twitch_client_secret_masked && <button type="button" onClick={onClearSecret} className="mt-2 tls-type-label text-live">Gespeichertes Secret entfernen</button>}
           </label>
           <div className="flex flex-col sm:flex-row gap-2">
             <button onClick={onSave} disabled={saving} data-testid="twitch-save" className="px-5 py-2 bg-[#9146FF] text-white font-bold uppercase tracking-wider rounded-sm disabled:opacity-50">{saving ? "Speichere..." : "Speichern"}</button>
@@ -93,7 +93,7 @@ export function TwitchTab({ brand, setBrandField, status, saving, refreshing, on
           <div className="divide-y divide-white/5">
             {status.live_streams.map((stream) => (
               <a key={stream.stream_id || stream.user_id} href={stream.stream_url} target="_blank" rel="noreferrer" className="flex items-center gap-3 px-4 py-3 hover:bg-white/5">
-                <Radio className="w-4 h-4 text-[#FF3B30] animate-pulse" />
+                <Radio className="w-4 h-4 text-live animate-pulse" />
                 <div className="min-w-0 flex-1">
                   <div className="font-bold tls-wrap">{stream.display_name || stream.username || stream.twitch_login}</div>
                   <div className="tls-type-small text-white/45 tls-wrap">{stream.title || "Stream läuft"}{stream.game_name ? ` · ${stream.game_name}` : ""}</div>
@@ -120,7 +120,7 @@ export function TwitchTab({ brand, setBrandField, status, saving, refreshing, on
                   <div className="font-bold tls-wrap">{channel.display_name || channel.username}</div>
                   <div className="tls-type-small text-white/45 tls-wrap">twitch.tv/{channel.twitch_login}{channel.is_live ? " · live" : ""}</div>
                 </div>
-                <span className={`tls-type-label shrink-0 ${channel.homepage_visible ? "text-[#00FF88]" : "text-[#FFD700]"}`}>
+                <span className={`tls-type-label shrink-0 ${channel.homepage_visible ? "text-ok" : "text-quiet"}`}>
                   {channel.homepage_visible ? "Startseite" : "nicht sichtbar"}
                 </span>
                 <div className="tls-type-small text-white/55 min-w-0 flex-1">{channel.reason_text}</div>

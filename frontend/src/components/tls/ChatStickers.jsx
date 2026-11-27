@@ -131,7 +131,7 @@ export function ChatStickerPicker({ open, onClose, onPick, disabled = false }) {
           <Loader2 className="h-4 w-4 animate-spin text-[#29B6E8]" />
         </div>
       )}
-      {failed && <p role="alert" className="py-4 text-center tls-type-small text-[#FF6B61]">Sticker konnten nicht geladen werden.</p>}
+      {failed && <p role="alert" className="py-4 text-center tls-type-small text-warn">Sticker konnten nicht geladen werden.</p>}
       {packs !== null && searching && visible.length === 0 && (
         <p className="py-4 text-center tls-type-small text-quiet">Kein Sticker passt zu „{query.trim()}“.</p>
       )}

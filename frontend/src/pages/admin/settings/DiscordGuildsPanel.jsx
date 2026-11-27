@@ -109,7 +109,7 @@ function GuildRoles({ guild, busy, onToggle }) {
         </label>
       </div>
       {sync.missing?.length ? (
-        <div className="text-[#FFD700]" data-testid={`discord-guild-${guild.guild_id}-roles-missing`}>
+        <div className="text-warn" data-testid={`discord-guild-${guild.guild_id}-roles-missing`}>
           Fehlt im Discord: {sync.missing.map((name) => `„${name}“`).join(", ")} – anlegen (gleicher Name) oder „Fehlende Rollen anlegen“.
         </div>
       ) : null}
@@ -118,7 +118,7 @@ function GuildRoles({ guild, busy, onToggle }) {
           Spiel-Rollen ohne Rolle hier: {sync.missing_games.map((name) => `„${name}“`).join(", ")} – nur nötig, wenn ihr sie hier wollt.
         </div>
       ) : null}
-      {sync.error ? <div className="text-[#FF6B6B]" data-testid={`discord-guild-${guild.guild_id}-roles-error`}>{sync.error}</div> : null}
+      {sync.error ? <div className="text-warn" data-testid={`discord-guild-${guild.guild_id}-roles-error`}>{sync.error}</div> : null}
     </div>
   );
 }
@@ -218,7 +218,7 @@ export function DiscordGuildsPanel() {
         ) : (
           <span className="text-white/45">Der Link, mit dem du den Bot auf einen weiteren Server holst, erscheint, sobald der Bot einmal verbunden war.</span>
         )}
-        {!data.connected && <span className="text-[#FFD700]">Der Bot ist gerade nicht verbunden – die Liste zeigt den zuletzt gesehenen Stand.</span>}
+        {!data.connected && <span className="text-warn">Der Bot ist gerade nicht verbunden – die Liste zeigt den zuletzt gesehenen Stand.</span>}
       </div>
       {guilds.length === 0 ? (
         <div className="tls-type-small text-white/45" data-testid="discord-guilds-empty">Noch kein Server bekannt – sobald der Bot verbunden ist, steht sein Server hier.</div>
@@ -236,7 +236,7 @@ export function DiscordGuildsPanel() {
                   <div className="min-w-0 flex-1">
                     <div className="font-bold inline-flex items-center gap-2 min-w-0">
                       <span className="tls-wrap">{guild.name}</span>
-                      {guild.role === "main" && <Crown className="w-3.5 h-3.5 text-[#FFD700] shrink-0" aria-label="Hauptserver" />}
+                      {guild.role === "main" && <Crown className="w-3.5 h-3.5 text-brand shrink-0" aria-label="Hauptserver" />}
                     </div>
                     <div className="tls-type-small text-white/45" data-testid={`discord-guild-${guild.guild_id}-status`}>
                       {guildStatusText(guild)}{guild.member_count != null ? ` · ${guild.member_count} Mitglieder` : ""}
@@ -246,12 +246,12 @@ export function DiscordGuildsPanel() {
                     {guild.role !== "main" && !guild.left_at && (
                       <>
                         <label className="inline-flex items-center gap-2 tls-type-small">
-                          <input type="checkbox" checked={!!guild.enabled} disabled={!!busy} className="accent-[#00FF88]" data-testid={`discord-guild-${guild.guild_id}-enabled`}
+                          <input type="checkbox" checked={!!guild.enabled} disabled={!!busy} className="accent-ok" data-testid={`discord-guild-${guild.guild_id}-enabled`}
                             onChange={(event) => patch(guild, { enabled: event.target.checked }, event.target.checked ? `„${guild.name}“ ist an.` : `„${guild.name}“ ist aus – dorthin geht nichts mehr.`)} />
                           an
                         </label>
                         <button type="button" onClick={() => makeMain(guild)} disabled={!!busy} data-testid={`discord-guild-${guild.guild_id}-main`}
-                          className="px-3 py-1.5 border border-[#FFD700]/40 text-[#FFD700] tls-type-label rounded-sm disabled:opacity-40">Zum Hauptserver</button>
+                          className="px-3 py-1.5 border border-brand/40 text-brand tls-type-label rounded-sm disabled:opacity-40">Zum Hauptserver</button>
                       </>
                     )}
                     <button type="button" onClick={() => check(guild)} disabled={!!busy} data-testid={`discord-guild-${guild.guild_id}-health`}
@@ -267,7 +267,7 @@ export function DiscordGuildsPanel() {
                   </div>
                 </div>
                 {missing.length > 0 && (
-                  <div className="tls-type-small text-[#FFD700]" data-testid={`discord-guild-${guild.guild_id}-missing`}>
+                  <div className="tls-type-small text-warn" data-testid={`discord-guild-${guild.guild_id}-missing`}>
                     Dem Bot fehlt: {missing.map((entry) => `„${entry.label}“`).join(", ")} – Discord → Servereinstellungen → Rollen → Rolle des Bots.
                   </div>
                 )}
@@ -304,8 +304,8 @@ export function DiscordGuildsPanel() {
                 {report && (
                   <ul className="space-y-1 tls-type-small" data-testid={`discord-guild-${guild.guild_id}-report`}>
                     {report.checks.map((entry) => (
-                      <li key={entry.key} className={`flex items-start gap-2 ${entry.ok ? "text-white/60" : "text-[#FFD700]"}`}>
-                        {entry.ok ? <CheckCircle2 className="w-3.5 h-3.5 text-[#00FF88] shrink-0 mt-0.5" /> : <XCircle className="w-3.5 h-3.5 shrink-0 mt-0.5" />}
+                      <li key={entry.key} className={`flex items-start gap-2 ${entry.ok ? "text-white/60" : "text-warn"}`}>
+                        {entry.ok ? <CheckCircle2 className="w-3.5 h-3.5 text-ok shrink-0 mt-0.5" /> : <XCircle className="w-3.5 h-3.5 shrink-0 mt-0.5" />}
                         <span>{entry.text}</span>
                       </li>
                     ))}

@@ -95,8 +95,8 @@ export function SeasonVetoPresets({ seasonId, unsaved }) {
   const problemsOf = (week) => (changed.includes(week) || stale.includes(week) || !stored.has(week) ? []
     : state?.problems?.find((row) => row.week === week)?.problems || []);
 
-  const frame = "mt-2 space-y-3 rounded-sm border border-[#00D26A]/30 bg-[#00D26A]/[0.03] p-4";
-  const title = <h3 className="tls-type-label text-[#00D26A]">Vorgabe der Woche</h3>;
+  const frame = "mt-2 space-y-3 rounded-sm border border-ok/30 bg-ok/[0.03] p-4";
+  const title = <h3 className="tls-type-label text-ok">Vorgabe der Woche</h3>;
   if (!state) {
     return (
       <div className={frame} data-testid="veto-presets-box">

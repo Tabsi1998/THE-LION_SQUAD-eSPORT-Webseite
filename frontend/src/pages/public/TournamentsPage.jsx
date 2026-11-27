@@ -26,7 +26,7 @@ const MODES = [
 
 /** Ein Chip der zweiten Filterzeile: weich und rund, aktiv gefüllt (Cyan, „Nur meine“ in Gold wie bei den Events). */
 function Chip({ testId, active, tone = "brand", onClick, children }) {
-  const on = tone === "honor" ? "bg-[#FFD700] text-black" : "bg-[#29B6E8] text-black";
+  const on = tone === "honor" ? "bg-honor text-black" : "bg-[#29B6E8] text-black";
   return (
     <button
       type="button"
@@ -207,7 +207,7 @@ export default function TournamentsPage() {
             </Chip>
           ))}
           {signedIn && (
-            <Chip testId="tournament-only-mine" tone="honor" active={mineFilter} onClick={() => toggleParam("mine", "1")}>
+            <Chip testId="tournament-only-mine" active={mineFilter} onClick={() => toggleParam("mine", "1")}>
               Nur meine
             </Chip>
           )}
@@ -216,7 +216,7 @@ export default function TournamentsPage() {
           <PublicLoadingState cards={6} />
         ) : error ? (
           <div className="col-span-full text-center py-20">
-            <div className="text-[#FF3B30] tls-type-label">FEHLER BEIM LADEN</div>
+            <div className="text-warn tls-type-label">FEHLER BEIM LADEN</div>
             <p className="mt-2 text-quiet tls-type-small">Turniere konnten nicht geladen werden. Bitte Seite neu laden.</p>
             <button onClick={load} className="tls-btn tls-btn--secondary mt-4 px-4 py-2 rounded-sm tls-type-label">
               Erneut versuchen

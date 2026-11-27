@@ -69,9 +69,10 @@ test("Mitglieder sehen „Verein“ in „Mein Bereich“, Admins den Adminberei
   expect(screen.queryByTestId("nav-member-area")).toBeNull();
   expect(screen.getByTestId("nav-account-verein")).toHaveAttribute("href", "/mein-bereich/verein");
   expect(screen.getByTestId("nav-admin")).toHaveAttribute("href", "/admin");
-  // Blau und Rot ohne das weisse `text-white/80` daneben (#431) - sonst bleibt alles weiss.
+  // Blau und Grau ohne das weisse `text-white/80` daneben (#431) - sonst bleibt alles weiss. Abmelden ist ruhig
+  // (Farb-Rollen #1305: Rot nur für „läuft gerade“ und Löschen).
   expect(screen.getByTestId("nav-admin").className).toMatch(/text-\[#29B6E8\]/);
-  expect(screen.getByTestId("nav-logout").className).toMatch(/text-\[#FF3B30\]/);
+  expect(screen.getByTestId("nav-logout").className).toMatch(/text-quiet/);
   expect(screen.getByTestId("nav-logout").className).not.toMatch(/text-white/);
 });
 

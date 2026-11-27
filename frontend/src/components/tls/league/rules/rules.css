@@ -2,7 +2,7 @@
    Inhaltsverzeichnis. Änderungen tragen Randstrich und Wort - die Farbe allein sagt nichts. */
 
 .tls-rules {
-  --tls-rules-mark: var(--tls-gold, #ffd700);
+  --tls-rules-mark: var(--tls-warn);
   --tls-rules-new: #7ee2a8;
   --tls-rules-gone: #ff9a91;
   --tls-rules-top: 4rem;
@@ -88,8 +88,8 @@
 .tls-rules-search::placeholder { color: rgba(255, 255, 255, 0.5); }
 .tls-rules-search:focus-visible { outline: 2px solid rgb(var(--league-accent-rgb, var(--tls-brand-rgb))); outline-offset: 1px; }
 .tls-rules-search__count { font-size: var(--tls-type-small-size); font-variant-numeric: tabular-nums; color: rgba(255, 255, 255, 0.72); white-space: nowrap; }
-::highlight(tls-rules-hit) { background-color: rgba(255, 215, 0, 0.3); color: #fff; }
-::highlight(tls-rules-hit-active) { background-color: #ffd700; color: #0a0a0a; }
+::highlight(tls-rules-hit) { background-color: rgb(var(--tls-brand-rgb) / 0.3); color: #fff; }
+::highlight(tls-rules-hit-active) { background-color: var(--tls-brand); color: #0a0a0a; }
 
 /* Text */
 .tls-rules-doc { max-width: 72ch; min-width: 0; overflow-wrap: anywhere; }
@@ -426,7 +426,7 @@
   background: #fff;
   transition: transform var(--tls-motion-fast) var(--tls-ease);
 }
-.tls-rules-switch[aria-checked="true"] .tls-rules-switch__track { background: rgba(255, 215, 0, 0.35); border-color: var(--tls-rules-mark); }
+.tls-rules-switch[aria-checked="true"] .tls-rules-switch__track { background: rgb(var(--tls-warn-rgb) / 0.35); border-color: var(--tls-rules-mark); }
 .tls-rules-switch[aria-checked="true"] .tls-rules-switch__track::after { transform: translateX(1rem); }
 .tls-rules-switch:focus-visible { outline: 2px solid rgb(var(--league-accent-rgb, var(--tls-brand-rgb))); outline-offset: 2px; border-radius: 2px; }
 

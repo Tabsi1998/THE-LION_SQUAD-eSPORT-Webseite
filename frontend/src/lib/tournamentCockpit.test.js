@@ -49,9 +49,9 @@ test("Arten: jede Zeile trägt das Wort der Art, ihre Farbe und kurz die Station
   expect(rows["vf-m6"]).toMatchObject({ chip: "Einspruch", tone: "warn", where: "" });
   expect(rows["ns-m3"]).toMatchObject({ chip: "Nicht erschienen", tone: "warn" });
   expect(rows["st-pc6"]).toMatchObject({ chip: "Defekt", tone: "warn", where: "PC 6" });
-  expect(rows["rm-m2"]).toMatchObject({ chip: "Ergebnis fehlt", tone: "honor", detail: "17 Min. über der Zeit" });
-  expect(rows["rc-m4"]).toMatchObject({ chip: "Meldungen weichen ab", tone: "honor", title: "Meldungen weichen ab" });
-  expect(rows["dl-pc4"]).toMatchObject({ chip: "Verzug", tone: "honor", where: "PC4", title: "+12 Min. hinter dem Plan", what: "Halbfinale · Frostbiss gegen Jo" });
+  expect(rows["rm-m2"]).toMatchObject({ chip: "Ergebnis fehlt", tone: "warn", detail: "17 Min. über der Zeit" });
+  expect(rows["rc-m4"]).toMatchObject({ chip: "Meldungen weichen ab", tone: "warn", title: "Meldungen weichen ab" });
+  expect(rows["dl-pc4"]).toMatchObject({ chip: "Verzug", tone: "warn", where: "PC4", title: "+12 Min. hinter dem Plan", what: "Halbfinale · Frostbiss gegen Jo" });
   expect(rows["dl-pc5"].detail).toContain("Aufgerufen");
   expect(rows["dr-1"]).toMatchObject({ chip: "Auslosung", tone: "brand", title: "Auslosung bereit · 1 Name" });
   expect(Object.keys(PROBLEM_KINDS)).toEqual(expect.arrayContaining(["dispute", "no_show", "result_missing", "delay"]));

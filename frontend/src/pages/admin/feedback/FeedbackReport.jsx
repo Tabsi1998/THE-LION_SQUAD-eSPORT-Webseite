@@ -35,8 +35,8 @@ export function FeedbackReport({ kind, targetId }) {
         {report.details ? (
           <div>
             <div className="tls-type-label text-white/50">Schnitt</div>
-            <div className="tls-type-title tls-type-num text-[#FFD700] inline-flex items-center gap-1.5" data-testid="feedback-report-average">
-              {averageLabel(report.average)} <Star className="w-5 h-5 fill-[#FFD700]" />
+            <div className="tls-type-title tls-type-num text-honor inline-flex items-center gap-1.5" data-testid="feedback-report-average">
+              {averageLabel(report.average)} <Star className="w-5 h-5 fill-honor" />
             </div>
           </div>
         ) : null}
@@ -52,7 +52,7 @@ export function FeedbackReport({ kind, targetId }) {
             {[5, 4, 3, 2, 1].map((n) => (
               <div key={n} className="flex items-center gap-2 tls-type-small">
                 <span className="w-10 text-white/60 inline-flex items-center gap-1">{n} <Star className="w-3 h-3" /></span>
-                <span className="flex-1 h-2 bg-white/5 rounded-full overflow-hidden"><span className="block h-full bg-[#FFD700]/80" style={{ width: `${((report.distribution?.[String(n)] || 0) / max) * 100}%` }} /></span>
+                <span className="flex-1 h-2 bg-white/5 rounded-full overflow-hidden"><span className="block h-full bg-honor/80" style={{ width: `${((report.distribution?.[String(n)] || 0) / max) * 100}%` }} /></span>
                 <span className="w-6 text-right tabular-nums text-white/60">{report.distribution?.[String(n)] || 0}</span>
               </div>
             ))}
@@ -67,7 +67,7 @@ export function FeedbackReport({ kind, targetId }) {
               <ul className="space-y-2" data-testid="feedback-report-texts">
                 {report.texts.map((row, index) => (
                   <li key={`${index}-${row.text}`} className="border border-white/10 rounded-sm bg-[#0A0A0A] px-3 py-2 tls-type-small">
-                    <span className="text-[#FFD700] tls-type-small mr-2">{"★".repeat(row.stars)}</span>{row.text}
+                    <span className="text-honor tls-type-small mr-2">{"★".repeat(row.stars)}</span>{row.text}
                   </li>
                 ))}
               </ul>

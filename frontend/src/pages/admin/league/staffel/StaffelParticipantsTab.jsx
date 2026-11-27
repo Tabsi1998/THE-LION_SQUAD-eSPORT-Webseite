@@ -75,7 +75,7 @@ function Actions({ tournament, registration, fixed, squad, onKader, onRemove, on
       {/* Entfernen nimmt nur eine Zuteilung ohne festes Spiel zurück - ausgetretene oder disqualifizierte Co-Teams bleiben stehen. */}
       {canParticipants && assigned && !fixed && ACTIVE_STAFFEL_REGISTRATION.has(registration.status) ? (
         <button type="button" onClick={() => onRemove(registration)} data-testid={`staffel-reg-remove-${registration.id}`}
-          className={`${SMALL_BUTTON} border border-[#FF3B30]/40 text-[#FF3B30] hover:bg-[#FF3B30]/10`}>
+          className={`${SMALL_BUTTON} border border-live/40 text-live hover:bg-live/10`}>
           Entfernen
         </button>
       ) : null}

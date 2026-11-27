@@ -45,7 +45,7 @@ export function SocialsTab({ brand, setSocialLink, addSocialLink, removeSocialLi
                 <input type="checkbox" checked={social.enabled !== false} onChange={(e) => setSocialLink(index, "enabled", e.target.checked)} className="accent-[#29B6E8]" />
                 Aktiv
               </label>
-              <button type="button" onClick={() => removeSocialLink(index)} className="h-10 px-3 border border-[#FF3B30]/35 text-[#FF3B30] rounded-sm inline-flex items-center justify-center">
+              <button type="button" onClick={() => removeSocialLink(index)} className="h-10 px-3 border border-live/35 text-live rounded-sm inline-flex items-center justify-center">
                 <Trash2 className="w-3.5 h-3.5" />
               </button>
             </div>

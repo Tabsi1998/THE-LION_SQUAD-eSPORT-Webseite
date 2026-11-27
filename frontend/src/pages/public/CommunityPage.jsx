@@ -6,6 +6,7 @@ import { Reveal } from "@/components/tls/Reveal";
 import { api, resolveMediaUrl } from "@/lib/api";
 import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 
+import { ROLE_COLORS } from "@/lib/categoryColors";
 function memberGamertag(member) {
   return member.gamertag || member.linked_account?.username || member.display_name;
 }
@@ -143,10 +144,10 @@ export default function CommunityPage() {
 function CommunityPaths() {
   const paths = [
     { to: "/players", label: "Spieler", text: "Profile, Level und sichtbare Achievement-Signale.", icon: Users, color: "#29B6E8" },
-    { to: "/teams", label: "Teams", text: "Teams, Co-Teams und gemeinsame Teamseiten.", icon: Shield, color: "#00FF88" },
+    { to: "/teams", label: "Teams", text: "Teams, Co-Teams und gemeinsame Teamseiten.", icon: Shield, color: ROLE_COLORS.ok },
     { to: "/servers", label: "Server", text: "Aktive Community- und Vereinsserver.", icon: Server, color: "#9F7AEA" },
-    { to: "/members", label: "Mitglieder", text: "Offizielle Vereinsprofile und Rollen.", icon: Crown, color: "#FFD700" },
-    { to: "/references", label: "Referenzen", text: "Turnier-, Event- und Community-Historie.", icon: Trophy, color: "#FFD700" },
+    { to: "/members", label: "Mitglieder", text: "Offizielle Vereinsprofile und Rollen.", icon: Crown, color: ROLE_COLORS.honor },
+    { to: "/references", label: "Referenzen", text: "Turnier-, Event- und Community-Historie.", icon: Trophy, color: ROLE_COLORS.honor },
     { to: "/achievements", label: "Erfolge", text: "Erfolg der Woche, Bestenliste und alle Erfolge mit Seltenheit.", icon: Medal, color: "#29B6E8" },
   ];
   return (
@@ -179,7 +180,7 @@ function CommunityPaths() {
 }
 
 function CommunityBlock({ title, text, to, cta, items, accent = "cyan", icon: Icon = Gamepad2 }) {
-  const color = accent === "gold" ? "#FFD700" : accent === "green" ? "#00FF88" : "#29B6E8";
+  const color = accent === "gold" ? ROLE_COLORS.honor : accent === "green" ? ROLE_COLORS.ok : "#29B6E8";
   return (
     <section className="tls-reveal-item border border-white/10 bg-[#121212] rounded-sm p-5">
       <div className="flex items-start justify-between gap-4">

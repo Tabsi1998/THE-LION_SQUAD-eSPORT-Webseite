@@ -13,7 +13,7 @@ import { shortWhen } from "@/lib/leagueSchedule";
 
 const ROW_BUTTON = "tls-btn min-h-11 min-w-11 inline-flex items-center justify-center rounded-sm disabled:opacity-50";
 // Annehmen in Grün, Ablehnen rot wie jeder gefährliche Knopf - ohne `tls-btn--quiet`, dessen Grau die Farbe sonst überdeckt.
-const ACCEPT = "border border-[#00D26A]/45 text-[#00D26A] hover:bg-[#00D26A]/10";
+const ACCEPT = "border border-ok/45 text-ok hover:bg-ok/10";
 const DECLINE = "tls-btn--danger";
 // Zur Auswahl mit Wochentag: „Do 12.11. 20:00 Uhr“ - so vergleicht man Tage auf einen Blick.
 const dayTime = (value) => (value ? `${shortWhen(value)} Uhr` : "ohne Zeit");

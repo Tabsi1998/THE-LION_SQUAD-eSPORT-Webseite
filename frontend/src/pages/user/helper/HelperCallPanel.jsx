@@ -44,8 +44,8 @@ export function HelperCallPanel() {
   };
 
   return (
-    <section className="mt-8 border border-[#FFD700]/35 bg-[#FFD700]/[0.05] rounded-sm p-4 md:p-5" data-testid="helper-call-panel">
-      <div className="flex items-center gap-2 tls-type-label text-[#FFD700]"><Megaphone className="w-3.5 h-3.5" /> Helfer-Aufruf · Vorstand</div>
+    <section className="mt-8 border border-brand/35 bg-brand/[0.05] rounded-sm p-4 md:p-5" data-testid="helper-call-panel">
+      <div className="flex items-center gap-2 tls-type-label text-brand"><Megaphone className="w-3.5 h-3.5" /> Helfer-Aufruf · Vorstand</div>
       <p className="mt-1 tls-type-small text-white/55">Fehlen noch Helfer, fragst du hier mit einem Knopf alle Mitglieder.</p>
       <div className="mt-3 space-y-3">
         {events.map((event) => (
@@ -63,7 +63,7 @@ export function HelperCallPanel() {
                 onClick={() => send(event)}
                 disabled={!event.can_call || busy === event.id}
                 data-testid={`helper-call-send-${event.id}`}
-                className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-[#FFD700] text-black rounded-sm tls-type-label disabled:opacity-40"
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-brand text-black rounded-sm tls-type-label disabled:opacity-40"
               >
                 <Megaphone className="w-3.5 h-3.5" /> {event.called_today ? "Heute gesendet" : "Aufruf senden"}
               </button>

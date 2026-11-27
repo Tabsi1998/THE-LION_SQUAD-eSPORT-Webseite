@@ -29,6 +29,7 @@ import { useConfirm } from "@/components/tls/ConfirmDialog";
 import { affectedRegistrations, cancelConfirmText, eventStatusOptions, outsideText, savedEventMessage, touchesScheduleOrPlace } from "@/lib/eventAdmin";
 import { toast } from "sonner";
 
+import { ROLE_COLORS } from "@/lib/categoryColors";
 const ACCENT = "#9F7AEA";
 const CREATE_STATUS_OPTIONS = [
   ["draft", "Entwurf"],
@@ -450,8 +451,8 @@ function EventForm({ event, meta, partners = [], onDone }) {
         </div>
       </FormSection>
 
-      <FormSection title="Live-Stream (optional)" accent="#FF3B30">
-        <CheckField label="Live Stream hinterlegt" checked={form.has_live_stream} onChange={(v) => set("has_live_stream", v)} accent="#FF3B30" />
+      <FormSection title="Live-Stream (optional)" accent={ROLE_COLORS.live}>
+        <CheckField label="Live Stream hinterlegt" checked={form.has_live_stream} onChange={(v) => set("has_live_stream", v)} accent={ROLE_COLORS.live} />
         {form.has_live_stream && (
           <FormGrid>
             <SelectField label="Plattform" value={form.stream_platform || ""} onChange={(v) => set("stream_platform", v)} options={STREAM_PLATFORM_OPTIONS} />

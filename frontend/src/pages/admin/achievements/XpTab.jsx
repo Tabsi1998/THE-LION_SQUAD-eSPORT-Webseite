@@ -6,6 +6,7 @@ import { INPUT_CLASS } from "@/components/tls/FormFields";
 import { useConfirm } from "@/components/tls/ConfirmDialog";
 import { BoardOnly, Panel, PersonPicker, Stat, XP_SOURCES, errorText, personName } from "./shared";
 
+import { ROLE_COLORS } from "@/lib/categoryColors";
 /** XP (E10): Stand einer Person, Tagesdeckel je Quelle, Korrektur mit Grund, Prestige zurücksetzen. */
 export function XpTab({ board = false }) {
   const [person, setPerson] = useState(null);
@@ -68,8 +69,8 @@ export function XpTab({ board = false }) {
             <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
               <Stat label="Level" value={view.level} hint={view.title} testId="xp-level" />
               <Stat label="XP" value={Number(view.xp || 0).toLocaleString("de-DE")} hint={`nächstes Level ab ${Number(view.next_level_xp || 0).toLocaleString("de-DE")}`} accent="#29B6E8" testId="xp-total" />
-              <Stat label="Prestige" value={"★".repeat(view.prestige || 0) || "–"} hint={view.prestige_available ? "Prestige möglich" : `${view.prestige || 0} Stern${view.prestige === 1 ? "" : "e"}`} accent="#FF3B30" testId="xp-prestige" />
-              <Stat label="Login-Serie" value={view.login_streak || 0} hint="Tage in Folge" accent="#00FF88" />
+              <Stat label="Prestige" value={"★".repeat(view.prestige || 0) || "–"} hint={view.prestige_available ? "Prestige möglich" : `${view.prestige || 0} Stern${view.prestige === 1 ? "" : "e"}`} accent={ROLE_COLORS.honor} testId="xp-prestige" />
+              <Stat label="Login-Serie" value={view.login_streak || 0} hint="Tage in Folge" accent={ROLE_COLORS.ok} />
             </div>
             <Panel title={`Tagesdeckel heute (${caps.day})`} icon={Gauge} accent="#29B6E8" hint="Wie oft eine Quelle heute schon XP gebracht hat – volle Deckel bringen bis Mitternacht nichts mehr." testId="xp-caps">
               <div className="tls-swipe pb-0">
@@ -84,10 +85,10 @@ export function XpTab({ board = false }) {
                         <td className="py-2 pr-3 text-right tabular-nums">{row.xp}</td>
                         <td className="py-2 pr-3 w-1/3">
                           {row.cap ? (
-                            <span className="block h-2 bg-white/5 rounded-sm overflow-hidden"><span className="block h-full" style={{ width: `${Math.min(100, Math.round((row.used / row.cap) * 100))}%`, backgroundColor: row.full ? "#FF3B30" : "#29B6E8" }} /></span>
+                            <span className="block h-2 bg-white/5 rounded-sm overflow-hidden"><span className="block h-full" style={{ width: `${Math.min(100, Math.round((row.used / row.cap) * 100))}%`, backgroundColor: row.full ? ROLE_COLORS.warn : "#29B6E8" }} /></span>
                           ) : <span className="text-white/35">ohne Deckel</span>}
                         </td>
-                        <td className={`py-2 text-right tabular-nums ${row.full ? "text-[#FF3B30] font-bold" : ""}`}>{row.cap ? `${row.used} / ${row.cap}${row.full ? " · voll" : ""}` : row.used}</td>
+                        <td className={`py-2 text-right tabular-nums ${row.full ? "text-warn font-bold" : ""}`}>{row.cap ? `${row.used} / ${row.cap}${row.full ? " · voll" : ""}` : row.used}</td>
                       </tr>
                     ))}
                   </tbody>
@@ -100,16 +101,16 @@ export function XpTab({ board = false }) {
                   <div className="space-y-2">
                     <input type="number" value={amount} onChange={(e) => setAmount(e.target.value)} placeholder="z. B. 50 oder -20" aria-label="XP" data-testid="xp-amount" className={INPUT_CLASS} />
                     <input value={reason} onChange={(e) => setReason(e.target.value)} placeholder="Grund" aria-label="Grund" data-testid="xp-reason" className={INPUT_CLASS} />
-                    <button type="button" onClick={correct} disabled={busy} data-testid="xp-submit" className="px-4 py-2 bg-[#FFD700] text-black tls-type-label rounded-sm disabled:opacity-40">Korrigieren</button>
+                    <button type="button" onClick={correct} disabled={busy} data-testid="xp-submit" className="px-4 py-2 bg-honor text-black tls-type-label rounded-sm disabled:opacity-40">Korrigieren</button>
                   </div>
                 </BoardOnly>
               </Panel>
-              <Panel title="Prestige zurücksetzen" icon={RotateCcw} accent="#FF3B30" hint="Alle Sterne weg, die XP bleiben, das Level wird neu gerechnet." testId="xp-reset">
+              <Panel title="Prestige zurücksetzen" icon={RotateCcw} accent={ROLE_COLORS.live} hint="Alle Sterne weg, die XP bleiben, das Level wird neu gerechnet." testId="xp-reset">
                 <BoardOnly board={board} what="Das Zurücksetzen">
                   {view.prestige ? (
                     <div className="space-y-2">
                       <input value={resetReason} onChange={(e) => setResetReason(e.target.value)} placeholder="Grund" aria-label="Grund für das Zurücksetzen" data-testid="xp-reset-reason" className={INPUT_CLASS} />
-                      <button type="button" onClick={resetPrestige} disabled={busy} data-testid="xp-reset-submit" className="px-4 py-2 bg-[#FF3B30] text-white tls-type-label rounded-sm disabled:opacity-40">Zurücksetzen</button>
+                      <button type="button" onClick={resetPrestige} disabled={busy} data-testid="xp-reset-submit" className="px-4 py-2 bg-live text-[#0A0A0A] tls-type-label rounded-sm disabled:opacity-40">Zurücksetzen</button>
                     </div>
                   ) : <p className="tls-type-small text-white/45">{personName(person)} hat keine Prestige-Sterne.</p>}
                 </BoardOnly>

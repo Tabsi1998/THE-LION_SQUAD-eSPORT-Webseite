@@ -108,11 +108,11 @@ function NoticeCard({ item, index, now, showTournament, leaving = false }) {
       aria-hidden={leaving ? "true" : undefined}
       data-testid={leaving ? undefined : `notice-${item.id}`}
     >
-      <div className="tls-notice__icon mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-sm border border-honor/45 bg-black/40 text-honor" aria-hidden="true">
+      <div className="tls-notice__icon mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-sm border border-warn/45 bg-black/40 text-warn" aria-hidden="true">
         <Megaphone className="h-4 w-4" />
       </div>
       <div className="min-w-0 flex-1">
-        <div className="tls-type-label text-honor">
+        <div className="tls-type-label text-warn">
           Hinweis der Turnierleitung{where ? <span className="text-white/45 tracking-[0.12em]"> · {where}</span> : null}
         </div>
         <p className="mt-0.5 tls-type-body font-bold leading-snug text-white [overflow-wrap:anywhere]" data-testid="notice-text">{item.text}</p>

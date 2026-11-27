@@ -14,8 +14,8 @@ import { ProofPhotoPicker } from "@/components/tls/results/ProofPhotoPicker";
 
 const TONE = {
   waiting: "border-[#29B6E8]/35 bg-[#29B6E8]/10 text-[#BFE9F8]",
-  conflict: "border-[#FF3B30]/40 bg-[#FF3B30]/10 text-[#FFD2CF]",
-  confirm: "border-[#FFD700]/40 bg-[#FFD700]/10 text-[#FFF2B3]",
+  conflict: "border-warn/40 bg-warn/10 text-warn",
+  confirm: "border-brand/40 bg-brand/10 text-brand",
 };
 
 /** Ohne Beschreibung vom Server: aus den Teilnehmern der Matchseite. */
@@ -143,7 +143,7 @@ export function MatchReportForm({ participants = [], match = {}, entry: serverEn
           <p className={`rounded-sm border px-3 py-2 tls-type-small font-bold ${sentence ? "border-[#29B6E8]/35 bg-[#29B6E8]/10 text-[#BFE9F8]" : "border-white/10 bg-white/5 text-white/45"}`} data-testid="match-report-sentence">
             {sentence || outcome.error}
           </p>
-          {error && <p className="tls-type-small text-[#FF6B60]" role="alert" data-testid="match-report-error">{error}</p>}
+          {error && <p className="tls-type-small text-warn" role="alert" data-testid="match-report-error">{error}</p>}
           <div className="flex flex-wrap items-center gap-3">
             <button disabled={busy} className="tls-btn tls-btn--primary min-h-[44px] px-4 py-2 rounded-sm tls-type-label disabled:opacity-50" data-testid="match-report-submit">Ergebnis melden</button>
             <p className="tls-type-small text-white/50">Meldet die Gegenseite dasselbe, steht das Ergebnis fest. Weicht es ab, entscheidet die Turnierleitung.</p>

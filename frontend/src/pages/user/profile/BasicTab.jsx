@@ -28,7 +28,7 @@ export function BasicTab({ form, set, setNow = set, errors = {} }) {
         <Field label="Nachname (privat)"><Input value={form.last_name} onChange={(v) => set("last_name", v)} /></Field>
       </Row>
       <Field label="Bio" error={errors.bio} errorTestId="profile-bio-error">
-        <textarea value={form.bio || ""} onChange={(e) => set("bio", e.target.value)} rows={4} data-testid="profile-bio" aria-invalid={errors.bio ? "true" : undefined} className={`w-full bg-[#0A0A0A] border ${errors.bio ? "border-[#FF3B30]" : "border-white/10"} focus:border-[#29B6E8] px-3 py-2 rounded-sm text-white`} />
+        <textarea value={form.bio || ""} onChange={(e) => set("bio", e.target.value)} rows={4} data-testid="profile-bio" aria-invalid={errors.bio ? "true" : undefined} className={`w-full bg-[#0A0A0A] border ${errors.bio ? "border-warn" : "border-white/10"} focus:border-[#29B6E8] px-3 py-2 rounded-sm text-white`} />
         <p className="tls-type-small text-white/45 mt-1.5 text-right" data-testid="profile-bio-count">{(form.bio || "").length} / {PROFILE_LIMITS.bio}</p>
       </Field>
       <Row>

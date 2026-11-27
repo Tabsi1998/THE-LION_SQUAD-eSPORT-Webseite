@@ -90,7 +90,7 @@ export function SeriesTeamColorsSection({ series }) {
                 </span>
                 <input value={value} onChange={(event) => set(item.team, event.target.value)} placeholder="neutral" maxLength={7} spellCheck={false}
                   aria-label={`Farbwert für ${item.team}`} aria-invalid={wrong || undefined}
-                  className={`w-[5.5rem] shrink-0 rounded-sm border bg-[#121212] px-2 py-1.5 text-xs tabular-nums text-white ${wrong ? "border-amber-400/70" : "border-white/15"}`} data-testid="series-colors-hex" />
+                  className={`w-[5.5rem] shrink-0 rounded-sm border bg-[#121212] px-2 py-1.5 text-xs tabular-nums text-white ${wrong ? "border-warn/70" : "border-white/15"}`} data-testid="series-colors-hex" />
                 {item.suggestion && item.suggestion !== color && (
                   <button type="button" onClick={() => set(item.team, item.suggestion)} title={`Vorschlag aus dem Bild: ${item.suggestion}`} aria-label={`Vorschlag aus dem Bild für ${item.team} übernehmen`}
                     className="tls-hit h-7 w-7 shrink-0 rounded-sm border border-white/20" style={{ backgroundColor: item.suggestion }} data-testid="series-colors-suggestion" />

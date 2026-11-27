@@ -45,8 +45,8 @@ export function SecurityTab({ user, refresh, siteSettings }) {
       <KontoAngaben />
 
       {sentHereForMfa && (
-        <div className="border border-[#FFD700]/40 bg-[#FFD700]/10 rounded-sm p-4 flex items-start gap-3" data-testid="profile-mfa-required">
-          <ShieldCheck className="w-5 h-5 text-[#FFD700] mt-0.5 shrink-0" />
+        <div className="border border-warn/40 bg-warn/10 rounded-sm p-4 flex items-start gap-3" data-testid="profile-mfa-required">
+          <ShieldCheck className="w-5 h-5 text-warn mt-0.5 shrink-0" />
           <div className="tls-type-small text-white/80">
             <strong>Für den Adminbereich brauchst du die Zwei-Faktor-Anmeldung.</strong> Richte sie unten ein (dauert zwei Minuten),
             melde dich danach einmal neu an – dann geht es weiter{params.get("next") ? ` zu ${params.get("next")}` : ""}.
@@ -66,7 +66,7 @@ export function SecurityTab({ user, refresh, siteSettings }) {
             <div>
               <h3 className="tls-type-card mb-1">Google-Konto</h3>
               {googleLinked ? (
-                <p className="tls-type-small text-[#00FF88]" data-testid="profile-google-status">Verknüpft{user?.google_email ? ` · ${user.google_email}` : ""} · schnell anmelden mit einem Klick.</p>
+                <p className="tls-type-small text-ok" data-testid="profile-google-status">Verknüpft{user?.google_email ? ` · ${user.google_email}` : ""} · schnell anmelden mit einem Klick.</p>
               ) : (
                 <p className="tls-type-small text-white/50" data-testid="profile-google-status">Verbinde dein Google-Konto, um dich künftig mit einem Klick anzumelden.</p>
               )}
@@ -78,7 +78,7 @@ export function SecurityTab({ user, refresh, siteSettings }) {
                 disabled={googleOnly}
                 title={googleOnly ? "Setze zuerst ein Passwort, dann kannst du Google trennen." : undefined}
                 data-testid="profile-google-unlink"
-                className="px-4 py-2.5 rounded-sm border border-[#FF3B30]/40 text-[#FF3B30] tls-type-label hover:bg-[#FF3B30]/10 disabled:opacity-40 disabled:cursor-not-allowed shrink-0"
+                className="px-4 py-2.5 rounded-sm border border-live/40 text-live tls-type-label hover:bg-live/10 disabled:opacity-40 disabled:cursor-not-allowed shrink-0"
               >
                 Trennen
               </button>

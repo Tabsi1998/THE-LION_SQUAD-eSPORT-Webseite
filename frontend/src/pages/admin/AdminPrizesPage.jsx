@@ -12,10 +12,10 @@ import { PrizeFormSheet } from "./prizes/PrizeFormSheet";
 import { ShortCaps } from "@/components/tls/ShortCaps";
 
 const STATUS_LABEL = {
-  pending: { label: "Offen", icon: Clock, color: "text-[#FFD700] bg-[#FFD700]/10 border-[#FFD700]/30" },
-  ready: { label: "Bereit zur Abholung", icon: Gift, color: "text-[#29B6E8] bg-[#29B6E8]/10 border-[#29B6E8]/30" },
-  picked_up: { label: "Abgeholt", icon: CheckCircle2, color: "text-[#00FF88] bg-[#00FF88]/10 border-[#00FF88]/30" },
-  expired: { label: "Verfallen", icon: XCircle, color: "text-[#FF3B30] bg-[#FF3B30]/10 border-[#FF3B30]/30" },
+  pending: { label: "Offen", icon: Clock, color: "text-brand bg-brand/10 border-brand/30" },
+  ready: { label: "Bereit zur Abholung", icon: Gift, color: "text-ok bg-ok/10 border-ok/30" },
+  picked_up: { label: "Abgeholt", icon: CheckCircle2, color: "text-quiet bg-white/5 border-quiet/30" },
+  expired: { label: "Verfallen", icon: XCircle, color: "text-quiet bg-white/5 border-quiet/30" },
 };
 
 function statusToast(status, from) {
@@ -198,7 +198,7 @@ export default function AdminPrizesPage() {
             onClick={createMissing}
             disabled={creatingMissing}
             data-testid="prizes-create-missing"
-            className="inline-flex items-center justify-center gap-2 rounded-sm border border-[#FFD700]/40 px-4 py-2.5 tls-type-label text-[#FFD700] hover:bg-[#FFD700]/10 disabled:opacity-50"
+            className="inline-flex items-center justify-center gap-2 rounded-sm border border-honor/40 px-4 py-2.5 tls-type-label text-honor hover:bg-honor/10 disabled:opacity-50"
           >
             <RefreshCw className={`h-4 w-4 ${creatingMissing ? "animate-spin" : ""}`} />
             Gewinne neu erzeugen
@@ -244,9 +244,9 @@ export default function AdminPrizesPage() {
             placeholder="Suchen nach Turnier, Fast Lap, Empfänger oder Preis..."
           />
         </label>
-        <div className="border border-[#FFD700]/20 bg-[#FFD700]/5 rounded-sm px-4 py-2.5 flex items-center justify-between gap-3">
+        <div className="border border-honor/20 bg-honor/5 rounded-sm px-4 py-2.5 flex items-center justify-between gap-3">
           <span className="tls-type-label text-white/50">Bald fällig</span>
-          <span className="font-black text-[#FFD700]">{dueSoon}</span>
+          <span className="font-black text-honor">{dueSoon}</span>
         </div>
       </div>
 
@@ -319,17 +319,17 @@ export default function AdminPrizesPage() {
                       </span>
                     </td>
                     <td className="px-4 py-3 tls-type-small whitespace-nowrap">
-                      <div className={`inline-flex items-center gap-1.5 ${isUrgent ? "text-[#FFD700]" : "text-white/50"}`}>
+                      <div className={`inline-flex items-center gap-1.5 ${isUrgent ? "text-warn" : "text-white/50"}`}>
                         <CalendarDays className="w-3 h-3" /> {deadlineText(p)}
                       </div>
-                      {isUrgent && <div className="tls-type-label text-[#FFD700] mt-1">{due < 0 ? "überfällig" : `${due} Tage`}</div>}
+                      {isUrgent && <div className="tls-type-label text-warn mt-1">{due < 0 ? "überfällig" : `${due} Tage`}</div>}
                     </td>
                     <td className="px-4 py-3 text-right whitespace-nowrap">
                       {p.status === "pending" && (
                         <button onClick={() => updateStatus(p.id, "ready")} data-testid={`prize-mark-ready-${p.id}`} className="text-[#29B6E8] hover:underline mr-3 tls-type-small font-semibold">Bereit ▸</button>
                       )}
                       {p.status === "ready" && (
-                        <button onClick={() => markPickedUp(p.id)} data-testid={`prize-pickup-${p.id}`} className="text-[#00FF88] hover:underline mr-3 tls-type-small font-semibold">Abgeholt ✓</button>
+                        <button onClick={() => markPickedUp(p.id)} data-testid={`prize-pickup-${p.id}`} className="text-ok hover:underline mr-3 tls-type-small font-semibold">Abgeholt ✓</button>
                       )}
                       {p.status === "picked_up" && (
                         <button onClick={() => updateStatus(p.id, "ready", "", "picked_up")} data-testid={`prize-revert-${p.id}`} className="text-white/50 hover:text-white mr-3 tls-type-small"><RefreshCw className="w-3 h-3 inline mr-1" />Zurück</button>
@@ -338,7 +338,7 @@ export default function AdminPrizesPage() {
                         <button onClick={() => updateStatus(p.id, "ready", "", "expired")} data-testid={`prize-reopen-${p.id}`} className="text-[#29B6E8] hover:underline mr-3 tls-type-small font-semibold"><RefreshCw className="w-3 h-3 inline mr-1" />Wieder öffnen</button>
                       )}
                       <button onClick={() => setSheet(p)} data-testid={`prize-edit-${p.id}`} className="text-white/70 hover:text-white hover:underline mr-3 tls-type-small">Bearbeiten</button>
-                      <button onClick={() => remove(p.id)} className="text-[#FF3B30] hover:underline tls-type-small">Löschen</button>
+                      <button onClick={() => remove(p.id)} className="text-live hover:underline tls-type-small">Löschen</button>
                     </td>
                   </tr>
                 );
@@ -420,7 +420,7 @@ function PrizeMobileCard({ p, updateStatus, markPickedUp, remove, edit }) {
         {p.prize_value && <div className="mt-1 tls-type-small text-white/45">{p.prize_value}</div>}
       </div>
 
-      <div className={`mt-3 tls-type-small inline-flex items-center gap-1.5 ${isUrgent ? "text-[#FFD700]" : "text-white/50"}`}>
+      <div className={`mt-3 tls-type-small inline-flex items-center gap-1.5 ${isUrgent ? "text-warn" : "text-white/50"}`}>
         <CalendarDays className="w-3 h-3" /> Frist: {deadlineText(p)}
         {isUrgent && <span className="font-bold uppercase tracking-widest">{due < 0 ? "überfällig" : `${due} Tage`}</span>}
       </div>
@@ -430,7 +430,7 @@ function PrizeMobileCard({ p, updateStatus, markPickedUp, remove, edit }) {
           <button onClick={() => updateStatus(p.id, "ready")} data-testid={`prize-mobile-ready-${p.id}`} className="px-3 py-2 border border-[#29B6E8]/40 text-[#29B6E8] rounded-sm tls-type-label">Bereit</button>
         )}
         {p.status === "ready" && (
-          <button onClick={() => markPickedUp(p.id)} data-testid={`prize-mobile-pickup-${p.id}`} className="px-3 py-2 border border-[#00FF88]/40 text-[#00FF88] rounded-sm tls-type-label">Abgeholt</button>
+          <button onClick={() => markPickedUp(p.id)} data-testid={`prize-mobile-pickup-${p.id}`} className="px-3 py-2 border border-ok/40 text-ok rounded-sm tls-type-label">Abgeholt</button>
         )}
         {p.status === "picked_up" && (
           <button onClick={() => updateStatus(p.id, "ready", "", "picked_up")} data-testid={`prize-mobile-revert-${p.id}`} className="px-3 py-2 border border-white/15 text-white/70 rounded-sm tls-type-label">Zurück</button>
@@ -439,7 +439,7 @@ function PrizeMobileCard({ p, updateStatus, markPickedUp, remove, edit }) {
           <button onClick={() => updateStatus(p.id, "ready", "", "expired")} data-testid={`prize-mobile-reopen-${p.id}`} className="px-3 py-2 border border-[#29B6E8]/40 text-[#29B6E8] rounded-sm tls-type-label">Wieder öffnen</button>
         )}
         <button onClick={() => edit(p)} data-testid={`prize-mobile-edit-${p.id}`} className="px-3 py-2 border border-white/15 text-white/70 rounded-sm tls-type-label">Bearbeiten</button>
-        <button onClick={() => remove(p.id)} className="px-3 py-2 border border-[#FF3B30]/35 text-[#FF3B30] rounded-sm tls-type-label">Löschen</button>
+        <button onClick={() => remove(p.id)} className="px-3 py-2 border border-live/35 text-live rounded-sm tls-type-label">Löschen</button>
       </div>
     </article>
   );

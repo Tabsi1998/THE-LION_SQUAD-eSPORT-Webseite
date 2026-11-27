@@ -126,7 +126,7 @@ export function ScheduleChangePanel({ block, matchId, busy, run, onChanged, onAs
         <HelpLink thema="liga-captains" schritt="verschieben" />
       </div>
       {limit ? <p className="mt-2 tls-type-small text-white/80" data-testid="schedule-limit">{limit}</p> : null}
-      {homeRule ? <p className="mt-1 tls-type-small text-[#FFD700]" data-testid="schedule-home-rule">{homeRule}</p> : null}
+      {homeRule ? <p className="mt-1 tls-type-small text-quiet" data-testid="schedule-home-rule">{homeRule}</p> : null}
       {week ? <p className="mt-1 tls-type-small text-white/50" data-testid="schedule-week">Spielwoche: {week}</p> : null}
       <details className="mt-2 tls-type-small text-white/60" data-testid="schedule-rules">
         <summary className="cursor-pointer tls-hit text-white/70">So laufen Termine in dieser Season</summary>

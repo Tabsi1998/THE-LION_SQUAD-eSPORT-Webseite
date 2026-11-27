@@ -37,7 +37,7 @@ export function GuideSteps({ steps }) {
       {steps.map((step, index) => (
         <li key={step.key} data-done={step.done ? "true" : "false"}
           className={`tls-guide-step flex items-start gap-2 rounded-sm border px-3 py-2 ${step.done ? "border-white/5 text-white/40" : "border-[#29B6E8]/30 bg-[#29B6E8]/5 text-white/85"}`}>
-          <span aria-hidden="true" className={`tls-guide-step__mark mt-0.5 inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full tls-type-small font-black ${step.done ? "bg-emerald-400/15 text-emerald-300" : "bg-[#29B6E8]/20 text-[#29B6E8]"}`}>
+          <span aria-hidden="true" className={`tls-guide-step__mark mt-0.5 inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full tls-type-small font-black ${step.done ? "bg-ok/15 text-ok" : "bg-[#29B6E8]/20 text-[#29B6E8]"}`}>
             {step.done ? <Check className="h-3 w-3" /> : index + 1}
           </span>
           <span className="min-w-0 [overflow-wrap:anywhere]">

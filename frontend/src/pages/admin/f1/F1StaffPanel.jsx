@@ -112,7 +112,7 @@ export function F1StaffPanel({ challengeId, staff, staffError = "", onChanged })
                         <button type="button" onClick={() => toggle(assignment)} className="px-2 py-1 border border-white/15 text-white/70 rounded-sm tls-type-label">
                           {assignment.is_active === false ? "Aktivieren" : "Pausieren"}
                         </button>
-                        <button type="button" onClick={() => remove(assignment)} className="px-2 py-1 border border-[#FF3B30]/40 text-[#FF3B30] rounded-sm tls-type-label">
+                        <button type="button" onClick={() => remove(assignment)} className="px-2 py-1 border border-live/40 text-live rounded-sm tls-type-label">
                           Entfernen
                         </button>
                       </div>

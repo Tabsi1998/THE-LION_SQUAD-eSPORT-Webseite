@@ -68,7 +68,7 @@ test("Einfügen schickt die Tabelle an die Vorschau: Runden mit Termin, gelbe Ze
   expect(within(rows[0]).getByTestId("season-table-round")).toHaveValue("r1");
   expect(within(rows[1]).queryByTestId("season-table-pick")).toBeNull();
   expect(rows[1]).toHaveTextContent("Zum Klären");
-  expect(rows[1]).toHaveTextContent("1 gelb");
+  expect(rows[1]).toHaveTextContent("1 orange");
   const unclear = screen.getByTestId("season-table-unclear");
   expect(unclear).toHaveTextContent("1 Zelle zum Klären");
   expect(within(unclear).getByTestId("season-table-cell")).toHaveTextContent("R2 · Ada Ausgedacht · 21 Punkte");
@@ -87,7 +87,7 @@ test("eine gelbe Zelle klären und einen Termin selbst wählen schickt eine neue
   fireEvent.change(within(screen.getByTestId("season-table-unclear")).getByTestId("season-table-decide"), { target: { value: "c0" } });
   await waitFor(() => expect(apiMock.post).toHaveBeenLastCalledWith(`${URL}/preview`, expect.objectContaining({
     decisions: [{ column: 1, row: 0, choice: "place", place: 6, bonus_keys: ["bingo"], marks: [] }] }), { skipInvalidation: true }));
-  expect(await screen.findByText("Alle gelben Zellen sind geklärt")).toBeInTheDocument();
+  expect(await screen.findByText("Alle orangen Zellen sind geklärt")).toBeInTheDocument();
   expect(within(screen.getByTestId("season-table-cell")).getByTestId("season-table-decide")).toHaveValue("c0");
   fireEvent.change(within(rows[0]).getByTestId("season-table-round"), { target: { value: "__skip" } });
   await waitFor(() => expect(apiMock.post).toHaveBeenLastCalledWith(`${URL}/preview`, expect.objectContaining({
@@ -207,7 +207,7 @@ test("Fahrer-Tabelle per Bild: „Alle Namen bestätigen“ nimmt nur die gelben
   await readImage();
   await screen.findAllByTestId("season-table-column");
   const bar = screen.getByTestId("season-table-confirm-names");
-  expect(bar).toHaveTextContent("2 Namen aus dem Bild vorbelegt, aber gelb");
+  expect(bar).toHaveTextContent("2 Namen aus dem Bild vorbelegt, aber orange");
   fireEvent.click(within(bar).getByTestId("season-table-confirm-names-all"));
   const marks = screen.getByTestId("season-table-image-marks");
   expect(marks).toHaveTextContent("Aus dem Bild unsicher: 1 Zelle in 1 Zeile");
@@ -248,7 +248,7 @@ test("Team-Tabelle per Bild: Teamwertung laut Veranstalter mit Runde, Vergleich 
   expect(await within(panel).findByTestId("season-table-team-round")).toHaveValue("r2");
   expect(within(panel).getByTestId("season-table-team-compare")).toHaveTextContent("Probe Blauneu–1820−2");
   expect(within(panel).queryByTestId("season-table-team-mode")).toBeNull();  // ohne vorhandene Teamwertung keine Wahl
-  expect(within(panel).getByTestId("season-table-team-save")).toBeDisabled();  // Punkte von Probe Blau sind gelb
+  expect(within(panel).getByTestId("season-table-team-save")).toBeDisabled();  // Punkte von Probe Blau sind orange
   expect(within(panel).getByTestId("season-table-team-original")).toHaveTextContent("an R2");
   fireEvent.click(within(panel).getByTestId("result-team-total-confirm"));
   fireEvent.click(within(panel).getByTestId("season-table-team-save"));

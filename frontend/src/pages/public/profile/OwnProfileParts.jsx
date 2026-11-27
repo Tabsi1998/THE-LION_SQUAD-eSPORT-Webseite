@@ -35,8 +35,8 @@ function money(amount, currency = "EUR") {
 
 function Row({ to, icon: Icon, title, detail, tone = "gold", testId }) {
   return (
-    <Link to={to} data-testid={testId} className="flex items-center gap-3 min-h-14 border-t border-[#FFD700]/15 py-2 first:border-t-0 hover:bg-white/[0.02]">
-      <span className={`inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-sm ${tone === "danger" ? "bg-[#FF3B30]/12 text-[#FF6B6B]" : "bg-[#FFD700]/12 text-[#FFD700]"}`}><Icon className="w-4 h-4" /></span>
+    <Link to={to} data-testid={testId} className="flex items-center gap-3 min-h-14 border-t border-brand/15 py-2 first:border-t-0 hover:bg-white/[0.02]">
+      <span className={`inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-sm ${tone === "danger" ? "bg-live/10 text-live" : "bg-brand/10 text-brand"}`}><Icon className="w-4 h-4" /></span>
       <span className="min-w-0 flex-1">
         <span className="block font-bold tls-type-small">{title}</span>
         <span className="block tls-type-small text-white/55 truncate">{detail}</span>
@@ -76,8 +76,8 @@ export function PrivateBox() {
   const score = Number(state.completeness?.score || 0);
   const missing = missingLabels(state.completeness?.missing);
   return (
-    <section className="border border-[#FFD700]/40 bg-[#FFD700]/[0.05] rounded-sm px-4 py-3" data-testid="profile-private-box">
-      <div className="tls-type-label text-[#FFD700] pb-1">Nur für dich</div>
+    <section className="border border-brand/40 bg-brand/[0.05] rounded-sm px-4 py-3" data-testid="profile-private-box">
+      <div className="tls-type-label text-brand pb-1">Nur für dich</div>
       <Row
         to="/mein-bereich/rechnungen"
         icon={Receipt}

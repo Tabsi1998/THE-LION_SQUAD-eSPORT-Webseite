@@ -23,17 +23,17 @@ export function MatchCallBox({ call }) {
   const left = countdown(Number.isNaN(dueAt) ? null : dueAt, serverNow(serverOffset, now));
   const station = call.station_text || "deine Station";
   return (
-    <div className="mt-6 rounded-sm border border-[#FFD700]/50 bg-[#FFD700]/10 px-4 py-4 sm:px-5" role="status" data-testid="match-call">
+    <div className="mt-6 rounded-sm border border-brand/50 bg-brand/10 px-4 py-4 sm:px-5" role="status" data-testid="match-call">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="min-w-0">
-          <div className="tls-type-label text-[#FFD700] flex items-center gap-2"><BellRing className="w-4 h-4" /> Aufgerufen</div>
+          <div className="tls-type-label text-brand flex items-center gap-2"><BellRing className="w-4 h-4" /> Aufgerufen</div>
           <div className="mt-1 tls-type-section text-white [overflow-wrap:anywhere]" data-testid="match-call-station">Bitte jetzt zu {station}</div>
           {call.report_by && <div className="mt-1 tls-type-small text-white/70">Antreten bis {viennaTime(call.report_by, { hour: "2-digit", minute: "2-digit" })}</div>}
         </div>
         {left.seconds !== null && (
           <div className="text-right" data-testid="match-call-countdown">
             {left.done ? (
-              <div className="tls-type-card text-[#FFD700]">Jetzt geht es los</div>
+              <div className="tls-type-card text-brand">Jetzt geht es los</div>
             ) : (
               <>
                 <div className="tls-type-label text-white/55">noch</div>

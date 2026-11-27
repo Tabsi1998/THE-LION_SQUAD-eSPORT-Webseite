@@ -42,7 +42,7 @@ export default function NotificationsPage() {
               </button>
             ) : null}
             {read > 0 ? (
-              <button type="button" onClick={feed.deleteRead} className="inline-flex items-center gap-1.5 px-3 py-2 border border-white/15 text-white/60 rounded-sm tls-type-label hover:text-[#FF3B30] hover:border-[#FF3B30]/40">
+              <button type="button" onClick={feed.deleteRead} className="inline-flex items-center gap-1.5 px-3 py-2 border border-white/15 text-white/60 rounded-sm tls-type-label hover:text-live hover:border-live/40">
                 <Trash2 className="w-3.5 h-3.5" /> Gelesene löschen
               </button>
             ) : null}

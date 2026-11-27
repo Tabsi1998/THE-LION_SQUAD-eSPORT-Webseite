@@ -4,6 +4,7 @@ import { api } from "@/lib/api";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { Trophy, ArrowRight, CheckCircle2, BarChart3, Timer } from "lucide-react";
 
+import { ROLE_COLORS } from "@/lib/categoryColors";
 /**
  * SeasonPassWidget — Animierter Jahreswertungs-Ticker.
  * Zeigt Top 5 der aktuellen Wertung mit rotierendem Spotlight-Player.
@@ -45,16 +46,16 @@ export function SeasonPassWidget() {
   return (
     <section data-testid="season-pass-widget" className="relative overflow-hidden border-y border-white/10 bg-[#0A0A0A]">
       <div className="absolute inset-0 pointer-events-none">
-        <div className="absolute -top-20 -left-20 w-96 h-96 rounded-full bg-[#FFD700] blur-[140px] opacity-10" />
+        <div className="absolute -top-20 -left-20 w-96 h-96 rounded-full bg-honor blur-[140px] opacity-10" />
         <div className="absolute -bottom-20 -right-20 w-96 h-96 rounded-full bg-[#29B6E8] blur-[140px] opacity-10" />
       </div>
       <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-14 md:py-20">
         <div className="grid lg:grid-cols-12 gap-8 items-center">
           {/* Left: season meta */}
           <div className="lg:col-span-5">
-            <div className="inline-flex items-center gap-2 px-3 py-1.5 bg-[#FFD700]/10 border border-[#FFD700]/30 rounded-sm mb-4">
-              <span className="w-2 h-2 rounded-full bg-[#FFD700] animate-pulse" />
-              <span className="tls-type-label text-[#FFD700]">
+            <div className="inline-flex items-center gap-2 px-3 py-1.5 bg-honor/10 border border-honor/30 rounded-sm mb-4">
+              <span className="w-2 h-2 rounded-full bg-honor animate-pulse" />
+              <span className="tls-type-label text-honor">
                 {/* Nur die aktive Wertung kommt hierher (#2123, ER11) - der Status steht nicht roh daneben. */}
                 {s.kind === "circuit" ? "Lions Circuit" : "TLS Jahreswertung"} · läuft
               </span>
@@ -68,7 +69,7 @@ export function SeasonPassWidget() {
             <div className="mt-4 grid grid-cols-2 gap-2 max-w-md">
               {pointHints.map(({ icon: Icon, label }) => (
                 <div key={label} className="inline-flex items-center gap-2 border border-white/10 bg-white/[0.03] px-3 py-2 rounded-sm tls-type-label text-white/65">
-                  <Icon className="w-3.5 h-3.5 text-[#FFD700]" /> {label}
+                  <Icon className="w-3.5 h-3.5 text-honor" /> {label}
                 </div>
               ))}
             </div>
@@ -89,13 +90,13 @@ export function SeasonPassWidget() {
           {/* Right: spotlight + mini-table */}
           <div className="lg:col-span-7 grid grid-cols-1 sm:grid-cols-5 gap-4 items-stretch">
             {/* Spotlight Card */}
-            <div className="sm:col-span-3 relative border border-[#FFD700]/30 bg-gradient-to-br from-[#FFD700]/5 via-transparent to-[#29B6E8]/5 rounded-sm p-6 min-h-[220px] flex flex-col justify-between overflow-hidden">
+            <div className="sm:col-span-3 relative border border-honor/30 bg-gradient-to-br from-honor/5 via-transparent to-[#29B6E8]/5 rounded-sm p-6 min-h-[220px] flex flex-col justify-between overflow-hidden">
               <div className="absolute -top-6 -right-6 opacity-5">
-                <Trophy className="w-40 h-40 text-[#FFD700]" />
+                <Trophy className="w-40 h-40 text-honor" />
               </div>
               {spotlight ? (
                 <div key={spotlight.user_id} className="tls-spotlight-enter">
-                    <div className="tls-type-label" style={{ color: ["#FFD700", "#C0C0C0", "#CD7F32"][spotlightIdx] }}>
+                    <div className="tls-type-label" style={{ color: [ROLE_COLORS.honor, "#C0C0C0", "#CD7F32"][spotlightIdx] }}>
                       Position {spotlight.rank}
                     </div>
                     <div className="tls-wrap tls-wrap--name mt-2 tls-type-section leading-tight">
@@ -117,7 +118,7 @@ export function SeasonPassWidget() {
               <div className="flex gap-1.5 mt-6">
                 {top3.map((_, i) => (
                   <button key={i} onClick={() => setSpotlightIdx(i)} data-testid={`season-pass-dot-${i}`}
-                    className={`h-1 rounded-full transition-all ${i === spotlightIdx ? "w-8 bg-[#FFD700]" : "w-3 bg-white/20"}`} />
+                    className={`h-1 rounded-full transition-all ${i === spotlightIdx ? "w-8 bg-honor" : "w-3 bg-white/20"}`} />
                 ))}
               </div>
             </div>
@@ -127,10 +128,10 @@ export function SeasonPassWidget() {
                 <div
                   key={r.user_id}
                   data-testid={`season-pass-row-${r.rank}`}
-                  className={`flex items-center justify-between px-3 py-2 border rounded-sm tls-type-small ${r.rank === 1 ? "border-[#FFD700]/40 bg-[#FFD700]/5" : r.rank <= 3 ? "border-white/20 bg-white/5" : "border-white/10 bg-[#121212]"}`}
+                  className={`flex items-center justify-between px-3 py-2 border rounded-sm tls-type-small ${r.rank === 1 ? "border-honor/40 bg-honor/5" : r.rank <= 3 ? "border-white/20 bg-white/5" : "border-white/10 bg-[#121212]"}`}
                 >
                   <div className="flex items-center gap-3 min-w-0">
-                    <span className={`tls-type-num w-6 ${r.rank === 1 ? "text-[#FFD700]" : r.rank === 2 ? "text-white/80" : r.rank === 3 ? "text-[#CD7F32]" : "text-[#29B6E8]"}`}>{r.rank}</span>
+                    <span className={`tls-type-num w-6 ${r.rank === 1 ? "text-honor" : r.rank === 2 ? "text-white/80" : r.rank === 3 ? "text-[#CD7F32]" : "text-[#29B6E8]"}`}>{r.rank}</span>
                     <span className="tls-wrap text-white/90">{r.display_name}</span>
                   </div>
                   <span className="tls-type-num text-[#29B6E8]">{r.points}</span>

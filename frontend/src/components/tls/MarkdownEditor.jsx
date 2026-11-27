@@ -195,7 +195,7 @@ function MediaThumb({ item, onSelect }) {
     >
       <div className="aspect-square">
         {error ? (
-          <div className="w-full h-full flex items-center justify-center tls-type-label text-[#FF3B30]">
+          <div className="w-full h-full flex items-center justify-center tls-type-label text-warn">
             Defekt
           </div>
         ) : (

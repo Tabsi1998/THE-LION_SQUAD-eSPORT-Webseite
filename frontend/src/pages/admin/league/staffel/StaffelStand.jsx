@@ -5,7 +5,7 @@ import { StaffelStandBadge } from "@/pages/admin/tournament/StaffelParts";
 import { staffelStandText } from "./staffelPage";
 
 const TONE = {
-  live: "bg-live/20 text-live border-live/50",
+  live: "bg-live/10 text-live border-live/50",
   cancelled: "bg-white/5 text-white/70 border-white/15",
 };
 

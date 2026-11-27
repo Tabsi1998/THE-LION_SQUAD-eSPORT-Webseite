@@ -8,7 +8,8 @@ import { useModalBehavior } from "@/hooks/useModalBehavior";
 import { useSubmissionGuard } from "@/hooks/useSubmissionGuard";
 import { offerFriendsHint } from "@/lib/friendsHint";
 import { offerCalendarHint } from "@/lib/calendarHint";
-import { registrationKey, rememberWebPushRegistration } from "@/lib/webPush";
+import { registrationKey, rememberWebPushRegistration } from "@/lib/webPush";
+import { KIND_COLORS } from "@/lib/categoryColors";
 
 // „Spielst du auch mit?“ (#1184): nach der Event-Anmeldung die Turniere des Events in einem Schritt. Am Handy ein Blatt
 // von unten, ab 640 px mittig. Haken nur bei Einzel-Turnieren; Team-Turniere sagen, dass die Teamleitung anmeldet (Teamleitungen
@@ -19,20 +20,20 @@ const RESULT_TONE = {
   registered: "text-[#29B6E8]",
   pending: "text-[#29B6E8]",
   already: "text-[#29B6E8]",
-  waitlist: "text-[#FFD700]",
-  error: "text-[#FF6B6B]",
+  waitlist: "text-quiet",
+  error: "text-warn",
 };
 
 function ResultIcon({ state }) {
-  if (state === "error") return <AlertTriangle className="w-4 h-4 shrink-0 text-[#FF6B6B]" aria-hidden="true" />;
-  if (state === "waitlist") return <Clock className="w-4 h-4 shrink-0 text-[#FFD700]" aria-hidden="true" />;
+  if (state === "error") return <AlertTriangle className="w-4 h-4 shrink-0 text-warn" aria-hidden="true" />;
+  if (state === "waitlist") return <Clock className="w-4 h-4 shrink-0 text-quiet" aria-hidden="true" />;
   return <CheckCircle className="w-4 h-4 shrink-0 text-[#29B6E8]" aria-hidden="true" />;
 }
 
 function When({ row }) {
   return (
     <span className="w-14 shrink-0 text-center">
-      {row.dayLabel ? <span className="block tls-type-label text-[#FFD700]">{row.dayLabel}</span> : null}
+      {row.dayLabel ? <span className="block tls-type-label text-brand">{row.dayLabel}</span> : null}
       <span className="block tls-type-small tls-type-num text-white/85">{row.timeLabel || "–"}</span>
     </span>
   );
@@ -57,7 +58,7 @@ function EntryRow({ row, checked, onToggle }) {
   }
   return (
     <li className="flex items-center gap-3 rounded-sm border border-white/10 bg-[#0F0F10] px-3 py-2.5" data-testid={`play-along-row-${row.id}`}>
-      <Icon className={`w-5 h-5 shrink-0 ${row.kind === "fastlap" ? "text-[#29B6E8]" : "text-[#FFD700]"}`} aria-hidden="true" />
+      <Icon className={`w-5 h-5 shrink-0 ${row.kind === "fastlap" ? "" : "text-brand"}`} style={row.kind === "fastlap" ? { color: KIND_COLORS.fastlap } : undefined} aria-hidden="true" />
       <When row={row} />
       <span className="min-w-0 flex-1">
         <span className="block font-bold leading-tight break-words">{row.title}</span>
@@ -143,12 +144,12 @@ export function PlayAlongSheet({ event, from = "", userId = null, onClose }) {
         aria-modal="true"
         aria-labelledby="play-along-title"
         aria-describedby="play-along-lead"
-        className="flex max-h-[92vh] w-full max-w-xl flex-col rounded-t-md border border-[#FFD700]/30 bg-[#0A0A0A] shadow-2xl shadow-black/60 focus:outline-none sm:rounded-sm"
+        className="flex max-h-[92vh] w-full max-w-xl flex-col rounded-t-md border border-event/30 bg-[#0A0A0A] shadow-2xl shadow-black/60 focus:outline-none sm:rounded-sm"
         data-testid="play-along-sheet"
       >
         <div className="flex items-start justify-between gap-3 border-b border-white/10 px-5 py-4">
           <div className="min-w-0">
-            <div className="tls-type-label text-[#FFD700]">{result ? "Erledigt" : "Du bist beim Event dabei"}</div>
+            <div className="tls-type-label text-event">{result ? "Erledigt" : "Du bist beim Event dabei"}</div>
             <h2 id="play-along-title" className="tls-type-section">{result ? "Deine Turniere" : "Spielst du auch mit?"}</h2>
             <p id="play-along-lead" className="mt-1 tls-type-small text-white/65">
               {result ? resultSentence(result.results) + "." : "Melde dich gleich für die Turniere an – jedes einzeln, mit denselben Regeln wie auf der Turnierseite."}
@@ -174,7 +175,7 @@ export function PlayAlongSheet({ event, from = "", userId = null, onClose }) {
               ))}
             </ul>
             {result.total_cents > 0 ? (
-              <div className="mt-4 rounded-sm border border-[#FFD700]/40 bg-[#FFD700]/5 p-3 tls-type-small" data-testid="play-along-total">
+              <div className="mt-4 rounded-sm border border-event/40 bg-event/5 p-3 tls-type-small" data-testid="play-along-total">
                 <div className="flex items-baseline justify-between gap-3">
                   <span className="text-white/70">Startgeld gesamt</span>
                   <strong className="tls-type-card text-white">{formatCents(result.total_cents, result.currency)}</strong>
@@ -200,7 +201,7 @@ export function PlayAlongSheet({ event, from = "", userId = null, onClose }) {
               {selectable.length ? (
                 <div className="mt-4 space-y-2">
                   {needsCosts ? (
-                    <div className="rounded-sm border border-[#FFD700]/40 bg-[#FFD700]/5 p-3 tls-type-small" data-testid="play-along-sum">
+                    <div className="rounded-sm border border-event/40 bg-event/5 p-3 tls-type-small" data-testid="play-along-sum">
                       <div className="flex items-baseline justify-between gap-3">
                         <span className="text-white/70">Summe Startgeld</span>
                         <strong className="tls-type-card text-white">{formatCents(sum.total_cents, sum.currency)}</strong>
@@ -220,7 +221,7 @@ export function PlayAlongSheet({ event, from = "", userId = null, onClose }) {
                   ) : null}
                 </div>
               ) : null}
-              {error ? <div className="mt-3 tls-type-small font-bold text-[#FF6B6B]" role="alert" data-testid="play-along-error">{error}</div> : null}
+              {error ? <div className="mt-3 tls-type-small font-bold text-warn" role="alert" data-testid="play-along-error">{error}</div> : null}
             </div>
             <div className="flex flex-col-reverse gap-2 border-t border-white/10 px-5 py-4 sm:flex-row sm:justify-end">
               <button type="button" onClick={() => onClose?.()} className="tls-btn tls-btn--quiet min-h-11 px-4 tls-type-label rounded-sm" data-testid="play-along-skip">

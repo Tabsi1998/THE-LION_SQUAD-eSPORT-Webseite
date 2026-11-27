@@ -19,10 +19,10 @@ export const PUBLIC_STATE_LABELS = { ...STATE_LABELS, missing: "Ergebnis folgt" 
 export const STATE_TONES = {
   planned: "border-white/15 text-white/60",
   today: "border-[#29B6E8]/60 text-[#29B6E8] bg-[#29B6E8]/10",
-  missing: "border-amber-400/50 text-amber-300 bg-amber-400/10",
+  missing: "border-warn/50 text-warn bg-warn/10",
   cancelled: "border-white/10 text-white/40 line-through",
   postponed: "border-violet-400/40 text-violet-300",
-  scored: "border-emerald-400/40 text-emerald-300",
+  scored: "border-ok/40 text-ok",
 };
 
 export const ROUND_KIND_OPTIONS = [["regular", "Regulär"], ["final", "Finale"]];

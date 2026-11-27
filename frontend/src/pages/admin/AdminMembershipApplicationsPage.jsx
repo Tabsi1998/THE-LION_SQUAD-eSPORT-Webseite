@@ -22,15 +22,16 @@ import { STATE_TONE_CLASS, applicationState } from "@/lib/applicationState";
 import { mailOutcome } from "@/lib/membershipMail";
 import { ShortCaps } from "@/components/tls/ShortCaps";
 
+import { ROLE_COLORS } from "@/lib/categoryColors";
 const TABS = [
   { key: "pending",  label: "Offen",      color: "#29B6E8" },
-  { key: "approved", label: "Aufgenommen", color: "#00FF88" },
-  { key: "rejected", label: "Abgelehnt",  color: "#FF3B30" },
+  { key: "approved", label: "Aufgenommen", color: ROLE_COLORS.ok },
+  { key: "rejected", label: "Abgelehnt",  color: ROLE_COLORS.quiet },
   // Anträge über Dolibarr (#328): zurückgezogen oder beim Senden hängen geblieben.
-  { key: "withdrawn", label: "Zurückgezogen", color: "#FF9500" },
-  { key: "submitting", label: "In Übermittlung", color: "#FF9500" },
+  { key: "withdrawn", label: "Zurückgezogen", color: ROLE_COLORS.quiet },
+  { key: "submitting", label: "In Übermittlung", color: ROLE_COLORS.brand },
   // Dolibarr hat den Antrag nicht angenommen (#2125) - er stand bisher in keinem Reiter.
-  { key: "failed", label: "Fehlgeschlagen", color: "#FF3B30" },
+  { key: "failed", label: "Fehlgeschlagen", color: ROLE_COLORS.warn },
 ];
 const TAB_KEYS = new Set(TABS.map((tab) => tab.key));
 
@@ -126,8 +127,8 @@ export default function AdminMembershipApplicationsPage() {
         <a href={a.dolibarr.member_url} target="_blank" rel="noreferrer" data-testid={`${idPrefix}-dolibarr-${a.id}`} className="text-[#29B6E8] hover:underline tls-type-small inline-flex items-center gap-1"><ExternalLink className="w-3 h-3" /> In Dolibarr öffnen</a>
       )}
       {state.decide && <>
-        <button type="button" onClick={() => decide(a, "approve")} data-testid={`${idPrefix}-approve-${a.id}`} className="text-[#00FF88] hover:underline tls-type-small inline-flex items-center gap-1"><Check className="w-3 h-3" /> Annehmen</button>
-        <button type="button" onClick={() => decide(a, "reject")} data-testid={`${idPrefix}-reject-${a.id}`} className="text-[#FF6B6B] hover:underline tls-type-small inline-flex items-center gap-1"><XIcon className="w-3 h-3" /> Ablehnen</button>
+        <button type="button" onClick={() => decide(a, "approve")} data-testid={`${idPrefix}-approve-${a.id}`} className="text-ok hover:underline tls-type-small inline-flex items-center gap-1"><Check className="w-3 h-3" /> Annehmen</button>
+        <button type="button" onClick={() => decide(a, "reject")} data-testid={`${idPrefix}-reject-${a.id}`} className="text-live hover:underline tls-type-small inline-flex items-center gap-1"><XIcon className="w-3 h-3" /> Ablehnen</button>
         <button type="button" onClick={() => withdraw(a)} data-testid={`${idPrefix}-withdraw-${a.id}`} className="text-white/60 hover:text-white hover:underline tls-type-small inline-flex items-center gap-1"><Undo2 className="w-3 h-3" /> Zurückziehen</button>
       </>}
     </div>
@@ -138,7 +139,7 @@ export default function AdminMembershipApplicationsPage() {
     <AdminLayout>
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div>
-          <span className="tls-type-label text-[#FFD700]">Mitglieder</span>
+          <span className="tls-type-label text-honor">Mitglieder</span>
           <h1 className="tls-type-title mt-1 flex items-center gap-3"><Inbox className="w-6 h-6" /> <ShortCaps>Bewerbungen</ShortCaps></h1>
         </div>
         <button type="button" onClick={() => setInviting(true)} data-testid="apps-invite-open" className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-4 py-2.5 bg-[#29B6E8] text-black rounded-sm tls-type-label">
@@ -211,14 +212,14 @@ export default function AdminMembershipApplicationsPage() {
         <AdminSheet
           title="Bewerbung"
           eyebrow="Bewerbungen"
-          accent="#FFD700"
+          accent={ROLE_COLORS.honor}
           onClose={() => setSelected(null)}
           testId="application-sheet"
           footer={selectedState?.decide ? (
             <div className="ml-auto flex flex-wrap gap-2">
               <button type="button" onClick={() => withdraw(selected)} data-testid="application-sheet-withdraw" className="px-4 py-2 border border-white/15 text-white/70 hover:text-white rounded-sm tls-type-label">Zurückziehen</button>
-              <button type="button" onClick={() => decide(selected, "reject")} data-testid="application-sheet-reject" className="px-4 py-2 border border-[#FF3B30]/40 text-[#FF3B30] hover:bg-[#FF3B30]/10 rounded-sm tls-type-label">Ablehnen</button>
-              <button type="button" onClick={() => decide(selected, "approve")} data-testid="application-sheet-approve" className="px-4 py-2 bg-[#FFD700] text-black rounded-sm tls-type-label">Annehmen</button>
+              <button type="button" onClick={() => decide(selected, "reject")} data-testid="application-sheet-reject" className="px-4 py-2 border border-live/40 text-live hover:bg-live/10 rounded-sm tls-type-label">Ablehnen</button>
+              <button type="button" onClick={() => decide(selected, "approve")} data-testid="application-sheet-approve" className="px-4 py-2 bg-honor text-black rounded-sm tls-type-label">Annehmen</button>
             </div>
           ) : null}
         >
@@ -282,7 +283,7 @@ function InviteSheet({ onClose, onInvited }) {
     <AdminSheet title="Zum Antrag einladen" eyebrow="Bewerbungen" accent="#29B6E8" onClose={onClose} onSubmit={submit} saving={saving} submitLabel="Einladen" savingLabel="Lade ein …" submitTestId="apps-invite-save" testId="apps-invite-sheet">
       <p className="tls-type-body text-white/60">Die Person bekommt einen Hinweis auf der Website und in der App (und eine Mail, wenn sie Mitgliedschafts-Mails zulässt) und füllt den Antrag direkt aus. Gesucht werden nur Konten ohne Mitgliedschaft.</p>
       <PersonPicker purpose="invite" value={person} onChange={setPerson} label="Konto" placeholder="Name tippen …" testId="apps-invite-person" emptyText="Kein Konto ohne Mitgliedschaft mit diesem Namen." />
-      {already && <p className="border border-[#FF9500]/40 bg-[#FF9500]/5 rounded-sm p-3 tls-type-small text-white/80" data-testid="apps-invite-already">{already}</p>}
+      {already && <p className="border border-warn/40 bg-warn/5 rounded-sm p-3 tls-type-small text-white/80" data-testid="apps-invite-already">{already}</p>}
       <label className="block">
         <span className="tls-type-label text-white/60">Persönliche Zeile (optional)</span>
         <textarea value={note} onChange={(event) => setNote(event.target.value)} maxLength={500} data-testid="apps-invite-note" className="mt-1.5 w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-sm min-h-20" placeholder="z. B. Schön, dass du bei den Turnieren dabei bist!" />

@@ -7,12 +7,12 @@ import { MARK_LABELS } from "@/lib/referenceResults";
 
 export const PARTNER_STATES = {
   new: { label: "Neu", tone: "border-[#29B6E8]/50 text-[#29B6E8]" },
-  changed: { label: "Abweichungen", tone: "border-amber-400/50 text-amber-200" },
-  same: { label: "Übernommen", tone: "border-emerald-400/40 text-emerald-200" },
+  changed: { label: "Abweichungen", tone: "border-warn/50 text-warn" },
+  same: { label: "Übernommen", tone: "border-ok/40 text-ok" },
   new_round: { label: "Neuer Termin", tone: "border-[#29B6E8]/50 text-[#29B6E8]" },
   link: { label: "Termin verknüpfen", tone: "border-[#29B6E8]/50 text-[#29B6E8]" },
   waiting: { label: "Noch offen", tone: "border-white/15 text-white/55" },
-  error: { label: "Fehler", tone: "border-red-400/50 text-red-200" },
+  error: { label: "Fehler", tone: "border-warn bg-warn/10 text-warn" },
 };
 
 const SELECTABLE = new Set(["new", "changed", "new_round", "link"]);

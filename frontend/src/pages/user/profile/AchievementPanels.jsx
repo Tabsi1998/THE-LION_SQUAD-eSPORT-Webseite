@@ -11,6 +11,7 @@ import { CATEGORY_META, STATUS_FILTERS, categoryProgressSummary, formatPercent }
 import { AccountLevelProgress } from "@/components/tls/AccountLevel";
 import { viennaDateTime } from "@/lib/vienna";
 
+import { ROLE_COLORS } from "@/lib/categoryColors";
 // Der Reiter „Achievements“ im Profil (#619): Kopf mit Level, Titel, Prestige und XP-Leiste; „Als Nächstes“
 // mit „So schaffst du es“ und Link; Angeheftete (bis zu sechs, per Drag sortierbar); Kategorien als
 // Vitrinen mit Fortschritt; Filter nach Material und Status.
@@ -36,7 +37,7 @@ export function AchievementStatsRow({ insights, profileScore, hidden }) {
   if (!insights) return null;
   return (
     <div className="grid grid-cols-2 lg:grid-cols-4 gap-3" data-testid="achievement-stats-row">
-      <AchievementStat icon={Medal} label="Freigeschaltet" value={`${insights.earned.length}/${insights.total}`} color="#FFD700" />
+      <AchievementStat icon={Medal} label="Freigeschaltet" value={`${insights.earned.length}/${insights.total}`} color={ROLE_COLORS.honor} />
       <AchievementStat icon={Sparkles} label="Punkte" value={insights.points.toLocaleString("de-DE")} color="#A855F7" />
       <AchievementStat icon={Target} label="Geheim gefunden" value={hidden ? `${hidden.earned}/${hidden.total}` : "–"} color="#c084fc" testId="achievement-stat-hidden" />
       <AchievementStat icon={User} label="Profilpflege" value={`${profileScore}%`} color="#29B6E8" />
@@ -66,9 +67,9 @@ export function AchievementLevelHeader({ level, earnedPercent, onLevelChange, ch
           <h2 className="tls-type-section mt-1 flex items-center gap-2 flex-wrap">
             <span>Deine Erfolge</span>
             {lvl.title && (
-              <span className="tls-type-label text-[#FFD700] inline-flex items-center gap-1" data-testid="achievement-level-title">
+              <span className="tls-type-label text-honor inline-flex items-center gap-1" data-testid="achievement-level-title">
                 Level {lvl.level} · {lvl.title}
-                {prestige > 0 && <span className="inline-flex items-center gap-0.5 text-[#FFD700]" title={`Prestige ${prestige}`} data-testid="achievement-prestige">{Array.from({ length: Math.min(5, prestige) }).map((_, i) => <Star key={i} className="w-3 h-3 fill-current" />)}</span>}
+                {prestige > 0 && <span className="inline-flex items-center gap-0.5 text-honor" title={`Prestige ${prestige}`} data-testid="achievement-prestige">{Array.from({ length: Math.min(5, prestige) }).map((_, i) => <Star key={i} className="w-3 h-3 fill-current" />)}</span>}
               </span>
             )}
           </h2>
@@ -136,8 +137,8 @@ export function PrestigePanel({ level, onLevelChange }) {
   };
   const untilText = viennaDateTime(undoUntil, { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" });
   return (
-    <div className="mt-4 border border-[#FFD700]/30 bg-[#FFD700]/5 rounded-sm px-4 py-3 flex items-center gap-3 flex-wrap" data-testid="achievement-prestige-panel">
-      <Star className="w-4 h-4 text-[#FFD700] fill-current shrink-0" aria-hidden="true" />
+    <div className="mt-4 border border-honor/30 bg-honor/5 rounded-sm px-4 py-3 flex items-center gap-3 flex-wrap" data-testid="achievement-prestige-panel">
+      <Star className="w-4 h-4 text-honor fill-current shrink-0" aria-hidden="true" />
       <p className="flex-1 min-w-[12rem] tls-type-small text-white/70">
         {undoUntil
           ? `${stars}. Prestige-Stern – bis ${untilText} Uhr kannst du ihn zurücknehmen.`
@@ -148,7 +149,7 @@ export function PrestigePanel({ level, onLevelChange }) {
           <Undo2 className="w-3.5 h-3.5" /> Zurücknehmen
         </button>
       ) : (
-        <button type="button" onClick={start} disabled={busy} data-testid="achievement-prestige-start" className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-[#FFD700] text-black rounded-sm tls-type-label hover:bg-[#ffe34d] disabled:opacity-50">
+        <button type="button" onClick={start} disabled={busy} data-testid="achievement-prestige-start" className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-honor text-black rounded-sm tls-type-label hover:bg-[#ffe34d] disabled:opacity-50">
           <Star className="w-3.5 h-3.5 fill-current" /> Prestige starten
         </button>
       )}
@@ -171,10 +172,10 @@ export function NextUpPanel({ items = [] }) {
     <div className="border border-white/10 bg-[#121212] rounded-sm p-5" data-testid="achievement-next-up">
       <div className="flex items-center justify-between gap-3 mb-4">
         <div>
-          <div className="tls-type-label text-[#00FF88]">Als Nächstes</div>
+          <div className="tls-type-label text-ok">Als Nächstes</div>
           <h3 className="tls-type-card mt-1">Was dem Ziel am nächsten ist</h3>
         </div>
-        <Target className="w-5 h-5 text-[#00FF88]" />
+        <Target className="w-5 h-5 text-ok" />
       </div>
       {items.length ? (
         <div className="grid md:grid-cols-3 gap-3">
@@ -193,7 +194,7 @@ export function NextUpPanel({ items = [] }) {
                     <div className="mt-1 flex items-center gap-1.5 flex-wrap">
                       <MaterialChip tier={tier} />
                       <span className="tls-type-label text-quiet">+{tier.points}</span>
-                      {tier.member_only && <span className="tls-type-label text-[#FFD700]">Verein</span>}
+                      {tier.member_only && <span className="tls-type-label text-honor">Verein</span>}
                     </div>
                   </div>
                 </div>
@@ -226,7 +227,7 @@ export function NextUpPanel({ items = [] }) {
 }
 
 function PinnedCard({ award, onRemove, dragging }) {
-  const color = award.material_color || award.level_color || "#FFD700";
+  const color = award.material_color || award.level_color || ROLE_COLORS.honor;
   return (
     <div
       className={`relative border rounded-sm bg-[#0A0A0A] p-3 flex items-center gap-3 select-none ${dragging ? "cursor-grabbing" : "cursor-grab"}`}
@@ -273,7 +274,7 @@ export function PinnedPanel({ pinned = [], codes = [], onChange }) {
     <div className="border border-white/10 bg-[#121212] rounded-sm p-5" data-testid="achievement-pinned">
       <div className="flex items-center justify-between gap-3 mb-4">
         <div>
-          <div className="tls-type-label text-[#FFD700]">Angeheftet</div>
+          <div className="tls-type-label text-honor">Angeheftet</div>
           <h3 className="tls-type-card mt-1">Was dein Profil zuerst zeigt</h3>
         </div>
         <span className="tls-type-label text-quiet tabular-nums" data-testid="achievement-pinned-count">{items.length} von {MAX_PINS}</span>

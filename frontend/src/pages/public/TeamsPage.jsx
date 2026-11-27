@@ -188,7 +188,7 @@ function TeamCard({ team: t, levelInfo, crown = null }) {
                 <span data-testid={`team-level-chip-${t.tag}`} className="px-1.5 py-0.5 border border-[#29B6E8]/40 rounded-full tls-type-small font-black bg-[#29B6E8]/10">LVL {levelInfo.level}</span>
               )}
               {crown === "gold" && (
-                <span data-testid={`team-crown-chip-${t.tag}`} className="px-1.5 py-0.5 border border-[#FFD700]/50 rounded-full tls-type-small font-black bg-[#FFD700]/10 text-[#FFD700] inline-flex items-center gap-1">
+                <span data-testid={`team-crown-chip-${t.tag}`} className="px-1.5 py-0.5 border border-honor/50 rounded-full tls-type-small font-black bg-honor/10 text-honor inline-flex items-center gap-1">
                   <Crown className="w-2.5 h-2.5" /> #1
                 </span>
               )}
@@ -471,7 +471,7 @@ function TeamDetail({ id }) {
       ) : null}
       {activeTab === "trophies" ? (
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10 space-y-4" data-testid="team-awards">
-          <h2 className="tls-type-section flex items-center gap-2"><Trophy className="w-5 h-5 text-[#FFD700]" /> Trophäen</h2>
+          <h2 className="tls-type-section flex items-center gap-2"><Trophy className="w-5 h-5 text-honor" /> Trophäen</h2>
           {/* Turnier-Pokale und Liga-Belohnungen in einer Vitrine (Nr. 59); die Teamleitung wählt Teambanner, Titel und Embleme. */}
           <TrophyCabinet awards={trophies} testId="team-trophies"
             owner={canEdit ? {
@@ -518,7 +518,7 @@ function TeamDetail({ id }) {
               const showRole = canChangeRoles && !isLead;
               const showTransfer = canChangeRoles && !isLead && !m.is_gone;
               const roleLabel = ROLE_LABELS[memberRole(team, m)];
-              const roleColor = isLead ? "text-[#FFD700] border-[#FFD700]/40 bg-[#FFD700]/5" :
+              const roleColor = isLead ? "text-brand border-brand/40 bg-brand/5" :
                                 isCo ? "text-[#29B6E8] border-[#29B6E8]/40 bg-[#29B6E8]/5" :
                                 "text-white/60 border-white/10 bg-white/5";
               return (
@@ -899,11 +899,11 @@ function TeamLevelPanel({ info }) {
                 title={a.description}
                 className={`px-3 py-2.5 border rounded-sm flex items-center gap-2.5 transition ${
                   a.earned
-                    ? "border-[#FFD700]/35 bg-[#FFD700]/5 text-white"
+                    ? "border-honor/35 bg-honor/5 text-white"
                     : "border-white/15 bg-black/30 text-white/45"
                 }`}
               >
-                <Icon className={`w-4 h-4 shrink-0 ${a.earned ? "text-[#FFD700]" : "text-white/35"}`} />
+                <Icon className={`w-4 h-4 shrink-0 ${a.earned ? "text-honor" : "text-white/35"}`} />
                 <div className="min-w-0">
                   <div className="tls-type-small font-bold truncate">{a.name}</div>
                   <div className="tls-type-small truncate opacity-70">{a.description}</div>

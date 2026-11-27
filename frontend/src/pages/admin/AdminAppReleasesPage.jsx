@@ -29,7 +29,7 @@ export function channelLabel(channel) {
 function ChannelBadge({ channel }) {
   const beta = channel === "beta";
   return (
-    <span className={`inline-flex items-center px-2 py-0.5 rounded-sm border tls-type-label ${beta ? "border-[#FFD95A]/50 text-[#FFD95A] bg-[#FFD95A]/10" : "border-[#00FF88]/40 text-[#00FF88] bg-[#00FF88]/10"}`}>
+    <span className={`inline-flex items-center px-2 py-0.5 rounded-sm border tls-type-label ${beta ? "border-warn/50 text-warn bg-warn/10" : "border-ok/40 text-ok bg-ok/10"}`}>
       {channelLabel(channel)}
     </span>
   );
@@ -182,9 +182,9 @@ export default function AdminAppReleasesPage() {
       {tokenStatus ? (
         <div
           data-testid="app-release-token-status"
-          className={`mb-6 flex items-start gap-3 rounded-sm border px-4 py-3 tls-type-small ${tokenStatus.configured ? "border-[#00FF88]/25 bg-[#00FF88]/5" : "border-[#FFD95A]/30 bg-[#FFD95A]/10"}`}
+          className={`mb-6 flex items-start gap-3 rounded-sm border px-4 py-3 tls-type-small ${tokenStatus.configured ? "border-ok/25 bg-ok/5" : "border-warn/30 bg-warn/10"}`}
         >
-          {tokenStatus.configured ? <CheckCircle2 className="w-4 h-4 text-[#00FF88] mt-0.5" /> : <Smartphone className="w-4 h-4 text-[#FFD95A] mt-0.5" />}
+          {tokenStatus.configured ? <CheckCircle2 className="w-4 h-4 text-ok mt-0.5" /> : <Smartphone className="w-4 h-4 text-warn mt-0.5" />}
           <div>
             <div className="font-bold">
               Upload-Token am Server: {tokenStatus.configured ? `eingerichtet (${tokenStatus.length} Zeichen)` : "fehlt"}
@@ -214,7 +214,7 @@ export default function AdminAppReleasesPage() {
             {github.github_last_checked_at ? ` · geprüft ${formatTime(github.github_last_checked_at)}` : ""}
             {github.github_last_release ? ` · letztes Release ${github.github_last_release}` : ""}
           </div>
-          {github.github_last_error ? <div className="text-[#FF6B61]" data-testid="app-release-github-error">{github.github_last_error}</div> : null}
+          {github.github_last_error ? <div className="text-warn" data-testid="app-release-github-error">{github.github_last_error}</div> : null}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <label className="block">
               <div className="tls-type-label text-white/60 mb-1.5">GitHub-Token (nur Lesen)</div>
@@ -228,7 +228,7 @@ export default function AdminAppReleasesPage() {
           <div className="flex flex-wrap items-center gap-4">
             <button type="button" onClick={saveGithubForm} data-testid="app-release-github-save" className="px-3 py-1.5 border border-white/15 rounded-sm tls-type-label hover:border-[#29B6E8]/60">Speichern</button>
             {github.github_token_configured ? (
-              <button type="button" onClick={() => saveGithub({ clear_github_token: true }, "Token entfernt – der Abgleich stoppt.")} data-testid="app-release-github-clear" className="tls-type-label text-[#FF6B61] hover:text-[#FF3B30]">Token entfernen</button>
+              <button type="button" onClick={() => saveGithub({ clear_github_token: true }, "Token entfernt – der Abgleich stoppt.")} data-testid="app-release-github-clear" className="tls-type-label text-live">Token entfernen</button>
             ) : null}
             <label className="flex items-center gap-2 cursor-pointer">
               <input type="checkbox" checked={github.github_sync_enabled} onChange={(e) => saveGithub({ github_sync_enabled: e.target.checked }, e.target.checked ? "Abgleich alle 10 Minuten ist an." : "Abgleich ist aus – nur noch „Jetzt abgleichen“.")} data-testid="app-release-github-enabled" className="accent-[#29B6E8]" />
@@ -270,7 +270,7 @@ export default function AdminAppReleasesPage() {
                 <td className="p-3">{row.min_build ? `Build ${row.min_build}` : "–"}</td>
                 <td className="p-3">
                   {row.is_current ? (
-                    <span className="inline-flex items-center gap-1 tls-type-label text-[#00FF88]"><CheckCircle2 className="w-3 h-3" /> aktuell</span>
+                    <span className="inline-flex items-center gap-1 tls-type-label text-ok"><CheckCircle2 className="w-3 h-3" /> aktuell</span>
                   ) : (
                     <button type="button" onClick={() => patch(row, { is_current: true }, `Build ${row.build} ist jetzt das aktuelle Release.`)} className="tls-type-label text-white/50 hover:text-[#29B6E8]">
                       als aktuell setzen
@@ -280,7 +280,7 @@ export default function AdminAppReleasesPage() {
                 <td className="p-3 text-right whitespace-nowrap">
                   <button type="button" onClick={() => setMinBuild(row)} className="tls-type-label text-white/60 hover:text-[#29B6E8] mr-3">Pflicht</button>
                   <a href={`/api/mobile/app-download/${row.build}`} className="inline-flex items-center gap-1 tls-type-label text-white/60 hover:text-[#29B6E8] mr-3"><Download className="w-3 h-3" /> APK</a>
-                  <button type="button" onClick={() => remove(row)} className="inline-flex items-center gap-1 tls-type-label text-[#FF6B61] hover:text-[#FF3B30]"><Trash2 className="w-3 h-3" /> Löschen</button>
+                  <button type="button" onClick={() => remove(row)} className="inline-flex items-center gap-1 tls-type-label text-live"><Trash2 className="w-3 h-3" /> Löschen</button>
                 </td>
               </tr>
             ))}

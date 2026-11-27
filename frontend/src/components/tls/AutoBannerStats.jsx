@@ -23,7 +23,7 @@ export function AutoBannerList() {
       <div className="space-y-2">
         {(items || []).map((item) => (
           <div key={item.id} className="border border-white/10 bg-black/20 rounded-sm p-3" data-testid={`auto-banner-${item.id}`}>
-            <div className="tls-type-label text-honor">
+            <div className="tls-type-label text-brand">
               {autoBannerKindLabel(item.kind)} · {autoBannerTemplateLabel(item.kind, item.template)}
             </div>
             <div className="font-bold tls-type-small break-words">{item.title || item.text}</div>

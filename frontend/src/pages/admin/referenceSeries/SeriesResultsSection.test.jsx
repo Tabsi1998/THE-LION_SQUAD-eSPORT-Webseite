@@ -466,7 +466,7 @@ test("Verwerfen nennt die offenen Namen, die der Server wieder mitnimmt", async 
   await waitFor(() => expect(toastMock.success).toHaveBeenCalledWith("Entwurf verworfen. 2 offene Namen entfernt."));
 });
 
-test("ungültiger Platz oder ungültige Punkte: rot markiert, weder Vorschau noch Speichern, bis korrigiert", async () => {
+test("ungültiger Platz oder ungültige Punkte: orange markiert, weder Vorschau noch Speichern, bis korrigiert", async () => {
   setup();
   await openRound();
   fireEvent.change(screen.getAllByTestId("result-row-name")[0], { target: { value: "Alpha" } });
@@ -477,7 +477,7 @@ test("ungültiger Platz oder ungültige Punkte: rot markiert, weder Vorschau noc
   expect(screen.getByTestId("result-invalid")).toHaveTextContent("2 Eingaben sind ungültig");
   fireEvent.click(screen.getByTestId("result-submit"));
   expect(apiMock.post).not.toHaveBeenCalled();
-  expect(toastMock.error).toHaveBeenCalledWith("Bitte zuerst die rot markierten Eingaben korrigieren.");
+  expect(toastMock.error).toHaveBeenCalledWith("Bitte zuerst die orange markierten Eingaben korrigieren.");
   fireEvent.change(screen.getAllByTestId("result-row-place")[0], { target: { value: "1" } });
   fireEvent.change(screen.getAllByTestId("result-row-points")[0], { target: { value: "25,5" } });
   expect(screen.queryByTestId("result-invalid")).toBeNull();

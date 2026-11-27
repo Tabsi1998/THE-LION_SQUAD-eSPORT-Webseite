@@ -20,13 +20,13 @@ import { ShortCaps } from "@/components/tls/ShortCaps";
 // der Auswahl, jeder Beleg öffnet sich in Dolibarr. Die Tageszentrale verlinkt mit `?attention=`.
 
 const STATUS_TONE = {
-  pending: "text-white/70", ready: "text-[#00FF88]", invoiced: "text-[#00FF88]",
-  waiting_write_access: "text-[#FFD700]", waiting_link: "text-[#FFD700]", waiting_review: "text-[#FFD700]", held: "text-[#29B6E8]",
-  failed: "text-[#FF3B30]", cancelled: "text-white/40",
+  pending: "text-white/70", ready: "text-ok", invoiced: "text-ok",
+  waiting_write_access: "text-quiet", waiting_link: "text-quiet", waiting_review: "text-quiet", held: "text-[#29B6E8]",
+  failed: "text-warn", cancelled: "text-white/40",
 };
 
 const INVOICE_STATUS = { draft: "Entwurf", validated: "freigegeben", paid: "bezahlt", abandoned: "aufgegeben" };
-const ATTENTION_TONE = { overdue: "border-[#FF3B30]/50 text-[#FF3B30]", pdf_missing: "border-[#FFD700]/50 text-[#FFD700]", draft_old: "border-[#FFD700]/50 text-[#FFD700]" };
+const ATTENTION_TONE = { overdue: "border-warn/50 text-warn", pdf_missing: "border-warn/50 text-warn", draft_old: "border-warn/50 text-warn" };
 
 function capitalize(text) {
   return text ? text.charAt(0).toUpperCase() + text.slice(1) : "";
@@ -50,7 +50,7 @@ function AttentionBar({ counts, labels, active, onPick }) {
           </button>
         );
       })}
-      {total === 0 && <span className="text-[#00FF88]" data-testid="finance-attention-ok">Alles in Ordnung – kein Beleg hängt.</span>}
+      {total === 0 && <span className="text-ok" data-testid="finance-attention-ok">Alles in Ordnung – kein Beleg hängt.</span>}
     </div>
   );
 }
@@ -173,7 +173,7 @@ export default function AdminFinancePage() {
     <AdminLayout>
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div>
-          <h1 className="tls-type-title inline-flex items-center gap-3"><Wallet className="w-7 h-7 text-[#FFD700]" /> <ShortCaps>Finanzübersicht</ShortCaps></h1>
+          <h1 className="tls-type-title inline-flex items-center gap-3"><Wallet className="w-7 h-7 text-brand" /> <ShortCaps>Finanzübersicht</ShortCaps></h1>
           <p className="mt-2 tls-type-body text-white/60 max-w-2xl">Rechnungsaufträge aus kostenpflichtigen Anmeldungen. Jede verbindliche Anmeldung mit Preis wird hier zu einem Auftrag; die Rechnung entsteht in Dolibarr, Zahlungen bucht ihr dort – die Website liest nach und meldet, was nicht zusammenpasst.</p>
         </div>
         {tab === "overview" && <div className="flex flex-wrap gap-2">
@@ -200,21 +200,21 @@ export default function AdminFinancePage() {
 
       {tab === "rechnungsangaben" && <InvoiceDetailsTab onSaved={load} />}
 
-      {tab === "overview" && error && <div className="mt-6 border border-[#FF3B30]/40 bg-[#FF3B30]/10 rounded-sm p-4 tls-type-small" data-testid="finance-error">{error}</div>}
+      {tab === "overview" && error && <div className="mt-6 border border-warn/40 bg-warn/10 rounded-sm p-4 tls-type-small" data-testid="finance-error">{error}</div>}
       {tab === "overview" && !data && !error && <SkeletonTable rows={4} columns={5} className="mt-6" label="Lade Finanzübersicht" />}
 
       {tab === "overview" && data && (
         <>
           <div className="mt-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-5" data-testid="finance-summary">
-            <Stat label="Wartet auf Voraussetzungen" value={waiting} tone={waiting ? "text-[#FFD700]" : "text-white"} />
+            <Stat label="Wartet auf Voraussetzungen" value={waiting} tone={waiting ? "text-quiet" : "text-white"} />
             <Stat label="Wartet auf Freigabe" value={status.held?.count || 0} tone="text-[#29B6E8]" />
-            <Stat label="Bereit für Dolibarr" value={status.ready?.count || 0} tone="text-[#00FF88]" />
-            <Stat label="Gescheitert" value={status.failed?.count || 0} tone={status.failed?.count ? "text-[#FF3B30]" : "text-white"} />
-            <Stat label="Prüffälle offen" value={data.cases_open || 0} tone={data.cases_open ? "text-[#FF3B30]" : "text-white"} testId="finance-cases-count" />
+            <Stat label="Bereit für Dolibarr" value={status.ready?.count || 0} tone="text-ok" />
+            <Stat label="Gescheitert" value={status.failed?.count || 0} tone={status.failed?.count ? "text-warn" : "text-white"} />
+            <Stat label="Prüffälle offen" value={data.cases_open || 0} tone={data.cases_open ? "text-warn" : "text-white"} testId="finance-cases-count" />
           </div>
 
-          <div className={`mt-4 border rounded-sm p-4 tls-type-small flex items-start gap-3 ${data.dolibarr?.write_capable ? "border-[#00FF88]/30" : "border-[#FFD700]/40 bg-[#FFD700]/5"}`} data-testid="finance-dolibarr">
-            {data.dolibarr?.write_capable ? <CheckCircle2 className="w-4 h-4 text-[#00FF88] mt-0.5" /> : <AlertTriangle className="w-4 h-4 text-[#FFD700] mt-0.5" />}
+          <div className={`mt-4 border rounded-sm p-4 tls-type-small flex items-start gap-3 ${data.dolibarr?.write_capable ? "border-ok/30" : "border-warn/40 bg-warn/5"}`} data-testid="finance-dolibarr">
+            {data.dolibarr?.write_capable ? <CheckCircle2 className="w-4 h-4 text-ok mt-0.5" /> : <AlertTriangle className="w-4 h-4 text-warn mt-0.5" />}
             <div>
               {data.dolibarr?.write_capable
                 ? "Dolibarr ist angebunden und darf Rechnungen anlegen."
@@ -224,7 +224,7 @@ export default function AdminFinancePage() {
               {data.dolibarr?.write_capable && data.pdfs?.unconfirmed > 0 && (
                 // Rechnungs-PDF (#840): Belege von vor der Umstellung einmal nachziehen - danach macht es der Abgleich.
                 <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-2 tls-type-small" data-testid="finance-pdfs">
-                  <span className={data.pdfs.failed ? "text-[#FFD700]" : "text-white/60"}>
+                  <span className={data.pdfs.failed ? "text-warn" : "text-white/60"}>
                     {data.pdfs.unconfirmed === 1 ? "1 freigegebener Beleg" : `${data.pdfs.unconfirmed} freigegebene Belege`} ohne bestätigtes PDF
                     {data.pdfs.failed ? ` – bei ${data.pdfs.failed} ist das Erzeugen gescheitert, der Grund steht am Auftrag` : ""}.
                   </span>
@@ -246,7 +246,7 @@ export default function AdminFinancePage() {
                 </label>
               )}
               {data.dolibarr?.write_capable && !data.dolibarr?.terms_complete && (
-                <div className="mt-1 tls-type-small text-[#FF9500]" data-testid="finance-terms-hint">Rechnungskonditionen (Zahlungsziel, Zahlungsart, Bankkonto) fehlen noch – Belege bleiben Entwurf. <button type="button" onClick={() => selectTab("rechnungsangaben")} className="text-[#29B6E8] hover:underline" data-testid="finance-terms-hint-link">Unter Rechnungsangaben eintragen</button>.</div>
+                <div className="mt-1 tls-type-small text-warn" data-testid="finance-terms-hint">Rechnungskonditionen (Zahlungsziel, Zahlungsart, Bankkonto) fehlen noch – Belege bleiben Entwurf. <button type="button" onClick={() => selectTab("rechnungsangaben")} className="text-[#29B6E8] hover:underline" data-testid="finance-terms-hint-link">Unter Rechnungsangaben eintragen</button>.</div>
               )}
             </div>
           </div>
@@ -284,7 +284,7 @@ export default function AdminFinancePage() {
               </label>
             </div>
           </div>
-          <p className={`mt-2 tls-type-small ${periodBackwards ? "text-[#FF9500]" : "text-quiet"}`} data-testid="finance-export-hint">
+          <p className={`mt-2 tls-type-small ${periodBackwards ? "text-warn" : "text-quiet"}`} data-testid="finance-export-hint">
             {periodBackwards ? "Der Zeitraum beginnt nach seinem Ende." : "Der CSV-Export enthält alle Belege dieser Auswahl, ohne Grenze. Der Zeitraum gilt für den Tag, an dem der Beleg angelegt wurde; ohne Zeitraum alle."}
           </p>
 
@@ -309,7 +309,7 @@ export default function AdminFinancePage() {
           {(!!cases.length || data.cases_resolved > 0 || caseView === "resolved") && (
             <div className="mt-8" data-testid="finance-cases">
               <div className="flex flex-wrap items-center justify-between gap-3">
-                <h2 className="tls-type-section text-[#FF3B30]">Prüffälle</h2>
+                <h2 className="tls-type-section text-warn">Prüffälle</h2>
                 <div className="flex gap-1" role="group" aria-label="Welche Prüffälle">
                   {[["open", `Offen · ${data.cases_open || 0}`], ["resolved", `Erledigt · ${data.cases_resolved || 0}`]].map(([key, label]) => (
                     <button key={key} type="button" aria-pressed={caseView === key} onClick={() => setCaseView(key)} data-testid={`finance-cases-${key}`}
@@ -324,7 +324,7 @@ export default function AdminFinancePage() {
               {!cases.length && <div className="mt-3 tls-type-small text-white/50" data-testid="finance-cases-none">Keine offenen Prüffälle in dieser Auswahl.</div>}
               <div className="mt-3 space-y-3">
                 {cases.map((item) => (
-                  <div key={item.id} className="border border-[#FF3B30]/30 bg-[#FF3B30]/5 rounded-sm p-4 tls-type-small" data-testid={`finance-case-${item.id}`}>
+                  <div key={item.id} className="border border-warn/30 bg-warn/5 rounded-sm p-4 tls-type-small" data-testid={`finance-case-${item.id}`}>
                     <div className="flex flex-wrap items-start justify-between gap-3">
                       <div>
                         <div className="font-bold text-white">{item.label} <span className="text-white/50 font-normal">· {sourceName(item)} · {item.person || item.user_id} · {item.total}</span></div>
@@ -335,7 +335,7 @@ export default function AdminFinancePage() {
                     </div>
                     <div className="mt-3 flex flex-wrap items-center gap-2">
                       <input value={caseReason[item.id] || ""} onChange={(ev) => setCaseReason((c) => ({ ...c, [item.id]: ev.target.value }))} placeholder="Grund, z. B. „Gutschrift GA2026-0003 angelegt, 20 € am 24.09. überwiesen“" className="flex-1 min-w-[min(16rem,100%)] bg-[#0A0A0A] border border-white/10 px-2 py-1.5 rounded-sm text-xs" aria-label="Grund für die Erledigung" data-testid={`finance-case-reason-${item.id}`} />
-                      <button type="button" disabled={!!busy || (caseReason[item.id] || "").trim().length < 3} onClick={() => run(`case-${item.id}`, () => api.post(`/admin/finance/cases/${item.id}/resolve`, { reason: caseReason[item.id].trim() }), "Prüffall erledigt.")} className="px-3 py-1.5 border border-[#00FF88]/50 text-[#00FF88] rounded-sm tls-type-label disabled:opacity-40" data-testid={`finance-case-resolve-${item.id}`}>
+                      <button type="button" disabled={!!busy || (caseReason[item.id] || "").trim().length < 3} onClick={() => run(`case-${item.id}`, () => api.post(`/admin/finance/cases/${item.id}/resolve`, { reason: caseReason[item.id].trim() }), "Prüffall erledigt.")} className="px-3 py-1.5 border border-ok/50 text-ok rounded-sm tls-type-label disabled:opacity-40" data-testid={`finance-case-resolve-${item.id}`}>
                         Erledigt
                       </button>
                     </div>
@@ -391,7 +391,7 @@ export default function AdminFinancePage() {
                         </div>
                       )}
                       {row.status === "failed" && (
-                        <button type="button" disabled={!!busy} onClick={() => run(row.id, () => api.post(`/admin/finance/orders/${row.id}/retry`), "Auftrag neu gestartet.")} className="px-3 py-1.5 border border-[#FF3B30]/50 text-[#FF3B30] rounded-sm tls-type-label disabled:opacity-40" data-testid={`finance-retry-${row.id}`}>
+                        <button type="button" disabled={!!busy} onClick={() => run(row.id, () => api.post(`/admin/finance/orders/${row.id}/retry`), "Auftrag neu gestartet.")} className="px-3 py-1.5 border border-warn/50 text-warn rounded-sm tls-type-label disabled:opacity-40" data-testid={`finance-retry-${row.id}`}>
                           Erneut versuchen
                         </button>
                       )}
@@ -450,7 +450,7 @@ export default function AdminFinancePage() {
                         <tr key={row.id} data-testid={`finance-invoice-${row.id}`}>
                           <td className="px-4 py-3 font-mono text-white">
                             {row.invoice_ref || "–"}
-                            {row.booking_state === "cancelled" && <div className="tls-type-small text-[#FF3B30] font-sans">Buchung storniert</div>}
+                            {row.booking_state === "cancelled" && <div className="tls-type-small text-quiet font-sans">Buchung storniert</div>}
                           </td>
                           <td className="px-4 py-3 text-white/80">{sourceName(row)}</td>
                           <td className="px-4 py-3 text-white/80">{row.person || row.user_id}</td>
@@ -585,7 +585,7 @@ function OrderDetail({ detail, busy, paymentLabels, onClose, onResync, onRefund 
           </div>
           <CloseInfo order={order} />
           {order.pdf_missing && (
-            <div className="mt-2 tls-type-small text-[#FFD700]" data-testid="finance-detail-pdf-missing">
+            <div className="mt-2 tls-type-small text-warn" data-testid="finance-detail-pdf-missing">
               PDF fehlt: {order.pdf_error_text || order.pdf_error} Der Abgleich versucht es stündlich wieder, „Fehlende PDFs nachziehen“ sofort.
             </div>
           )}
@@ -621,7 +621,7 @@ function OrderDetail({ detail, busy, paymentLabels, onClose, onResync, onRefund 
             {timeline.map((item, index) => (
               <li key={`${item.at}-${index}`} className="flex gap-3">
                 <span className="text-white/40 shrink-0 tabular-nums w-28" data-testid="finance-timeline-at">{timelineMoment(item.at)}</span>
-                <span className={item.kind === "error" || item.kind === "case" ? "text-[#FF3B30]" : item.kind === "payment" ? "text-[#00FF88]" : "text-white/80"}>{item.text}</span>
+                <span className={item.kind === "error" || item.kind === "case" ? "text-warn" : item.kind === "payment" ? "text-ok" : "text-white/80"}>{item.text}</span>
               </li>
             ))}
             {!timeline.length && <li className="text-white/40">Noch nichts passiert.</li>}
@@ -645,7 +645,7 @@ function OrderDetail({ detail, busy, paymentLabels, onClose, onResync, onRefund 
               </select>
             ) : <span />}
           </div>
-          <button type="button" disabled={!!busy || !refundOk} onClick={saveRefund} className="mt-2 px-3 py-1.5 border border-[#00FF88]/50 text-[#00FF88] rounded-sm tls-type-label disabled:opacity-40" data-testid="finance-refund-save">
+          <button type="button" disabled={!!busy || !refundOk} onClick={saveRefund} className="mt-2 px-3 py-1.5 border border-ok/50 text-ok rounded-sm tls-type-label disabled:opacity-40" data-testid="finance-refund-save">
             Erstattung eintragen
           </button>
         </div>

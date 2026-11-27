@@ -17,16 +17,16 @@ function ZuTunKnopf({ item }) {
     <Link
       to={item.to}
       data-testid={`mein-bereich-todo-${item.key}`}
-      className={`tls-card ${warn ? "tls-card--gold" : ""} group flex min-h-16 items-center gap-4 rounded-sm border bg-[#121212] px-4 py-3 ${warn ? "border-[#FFD700]/45" : "border-[#29B6E8]/35"}`}
+      className={`tls-card ${warn ? "tls-card--gold" : ""} group flex min-h-16 items-center gap-4 rounded-sm border bg-[#121212] px-4 py-3 ${warn ? "border-warn/45" : "border-[#29B6E8]/35"}`}
     >
       <span className="min-w-0 flex-1">
-        <span className={`tls-card__title tls-wrap block tls-type-card ${warn ? "text-[#FFD700]" : "text-white"}`}>{item.label}</span>
+        <span className={`tls-card__title tls-wrap block tls-type-card ${warn ? "text-warn" : "text-white"}`}>{item.label}</span>
         {item.detail ? <span className="tls-wrap mt-0.5 block tls-type-small text-white/60">{item.detail}</span> : null}
       </span>
       <ArrowRight className="tls-card__arrow w-5 h-5 shrink-0 text-white/40" aria-hidden="true" />
     </Link>
   );
-  return <li className="min-w-0">{warn ? <Glow active tone="honor">{card}</Glow> : card}</li>;
+  return <li className="min-w-0">{warn ? <Glow active tone="warn">{card}</Glow> : card}</li>;
 }
 
 export default function UebersichtSeite() {
@@ -46,7 +46,7 @@ export default function UebersichtSeite() {
           </StaggerIn>
         ) : (
           <p className="mt-3 flex items-center gap-2 rounded-sm border border-white/10 bg-[#121212] px-4 py-4 tls-type-small text-white/70" data-testid="mein-bereich-todo-empty">
-            <CheckCircle2 className="w-4 h-4 shrink-0 text-[#00FF88]" aria-hidden="true" /> Alles erledigt – gerade ist nichts offen.
+            <CheckCircle2 className="w-4 h-4 shrink-0 text-ok" aria-hidden="true" /> Alles erledigt – gerade ist nichts offen.
           </p>
         )}
       </section>

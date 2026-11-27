@@ -50,7 +50,7 @@ export function BannerScopePicker({ value, onChange }) {
               type="button"
               onClick={() => onChange(key)}
               data-testid={`site-banner-scope-${key}`}
-              className={`flex items-center gap-2 border px-3 py-2 rounded-sm text-left tls-type-label transition ${active ? "border-[#29B6E8]/65 bg-[#29B6E8]/12 text-[#29B6E8]" : "border-white/10 bg-[#0A0A0A] text-white/55 hover:border-white/25 hover:text-white"}`}
+              className={`flex items-center gap-2 border px-3 py-2 rounded-sm text-left tls-type-label transition ${active ? "border-[#29B6E8]/65 bg-[#29B6E8]/10 text-[#29B6E8]" : "border-white/10 bg-[#0A0A0A] text-white/55 hover:border-white/25 hover:text-white"}`}
             >
               <span className={`w-4 h-4 border rounded-sm inline-flex items-center justify-center shrink-0 ${active ? "border-[#29B6E8] bg-[#29B6E8] text-black" : "border-white/20"}`}>
                 {active && <CheckCircle2 className="w-3 h-3" />}
@@ -84,10 +84,10 @@ export function BrandDateTimeField({ label, value, onChange, testId }) {
 
 export function SeoStatusCard({ title, ok, detail }) {
   return (
-    <div className={`rounded-sm border bg-[#121212] p-3 ${ok ? "border-[#10B981]/25" : "border-[#FFD700]/25"}`}>
+    <div className={`rounded-sm border bg-[#121212] p-3 ${ok ? "border-ok/25" : "border-warn/25"}`}>
       <div className="flex items-center justify-between gap-2">
         <div className="tls-type-label text-white/65">{title}</div>
-        {ok ? <CheckCircle2 className="h-4 w-4 text-[#10B981]" /> : <AlertTriangle className="h-4 w-4 text-[#FFD700]" />}
+        {ok ? <CheckCircle2 className="h-4 w-4 text-ok" /> : <AlertTriangle className="h-4 w-4 text-warn" />}
       </div>
       <div className="mt-2 break-words tls-type-small leading-relaxed text-white/45">{detail}</div>
     </div>

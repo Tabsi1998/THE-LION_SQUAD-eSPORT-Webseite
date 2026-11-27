@@ -265,7 +265,7 @@ export function ResultWindow({ entry, league = null, onClose, onSaved, testId = 
               </button>
             </div>
           ) : null}
-          {error ? <p className="tls-type-small text-[#FF6B60]" role="alert" data-testid="result-error">{error}</p> : null}
+          {error ? <p className="tls-type-small text-warn" role="alert" data-testid="result-error">{error}</p> : null}
         </div>
 
         <div className="sticky bottom-0 flex flex-wrap items-center gap-3 border-t border-white/10 bg-[#0F0F10] px-4 py-3">
@@ -321,7 +321,7 @@ export function ResultWindowLoader({ matchId, onClose, onSaved, testId = "result
   return (
     <div role="presentation" className="fixed inset-0 z-50 flex items-end xl:items-center justify-center bg-black/70" onMouseDown={(event) => { if (event.target === event.currentTarget) onClose?.(); }} data-testid={`${testId}-loading`}>
       <div className="w-full xl:max-w-xl rounded-t-xl xl:rounded-xl border border-white/10 bg-[#0F0F10] p-6 text-center tls-type-small text-white/60">
-        {error ? <span className="text-[#FF6B60]" role="alert">{error}</span> : "Wird geladen …"}
+        {error ? <span className="text-warn" role="alert">{error}</span> : "Wird geladen …"}
         <div className="mt-4"><button type="button" onClick={onClose} className="tls-btn tls-btn--quiet px-4 py-2 rounded-sm tls-type-label">Schließen</button></div>
       </div>
     </div>

@@ -11,6 +11,7 @@ import { readSoundPrefs } from "@/components/achievements/ceremony/sounds";
 import { MOTIONS, SEQUENCE_KEYS, SEQUENCES } from "@/components/achievements/ceremony/select";
 import { MAX_LEVEL, rankInfo } from "@/lib/loewenRang";
 
+import { ROLE_COLORS } from "@/lib/categoryColors";
 const previewQueue = createCeremonyQueue();
 const CATEGORY_LABELS = { match: "Spielen", tournament: "Turnier", fastlap: "Fast Lap", season: "Saison", team: "Team", community: "Community", creator: "Streaming & Creator", profile: "Profil & Konto", club: "Verein", special: "Besonders", hidden: "Geheim" };
 const SIZES = ["sm", "md", "lg", "xl", "hero"];
@@ -48,7 +49,7 @@ export function sampleCeremony({ material, category, sequence, art, level = 10 }
   return { tiers: [make(0)], context };
 }
 
-function Toggle({ on, onClick, testId, children, color = "#00FF88" }) {
+function Toggle({ on, onClick, testId, children, color = ROLE_COLORS.ok }) {
   return (
     <button type="button" onClick={onClick} aria-pressed={on} data-testid={testId} className="inline-flex items-center gap-1 px-2.5 py-1.5 tls-type-label border rounded-sm" style={on ? { borderColor: `${color}99`, color } : { borderColor: "rgba(255,255,255,0.15)", color: "rgba(255,255,255,0.6)" }}>
       {children}
@@ -108,9 +109,9 @@ export function PreviewTab() {
       </div>
 
       {/* Zeremonie abspielen: jede Kombination aus Material, Bewegung (Kategorie) und Sonderablauf */}
-      <section className="mt-6 border border-[#FFD700]/25 rounded-sm bg-[#121212] p-5" data-testid="preview-ceremony">
+      <section className="mt-6 border border-honor/25 rounded-sm bg-[#121212] p-5" data-testid="preview-ceremony">
         <div className="flex items-center gap-2 mb-1">
-          <Sparkles className="w-4 h-4 text-[#FFD700]" />
+          <Sparkles className="w-4 h-4 text-honor" />
           <h2 className="tls-type-section">Zeremonie abspielen</h2>
         </div>
         <p className="tls-type-small text-white/50 mb-4">Material bestimmt Look und Klang, die Kategorie die Bewegung, der Ablauf die Sonderteile. Klang und „weniger Bewegung“ gelten nur hier in der Vorschau.</p>
@@ -133,9 +134,9 @@ export function PreviewTab() {
               })}
             </select>
           )}
-          <Toggle on={sound} onClick={() => setSound((v) => !v)} testId="ceremony-sound" color="#FFD700">{sound ? <Volume2 className="w-3 h-3" /> : <VolumeX className="w-3 h-3" />} Klang</Toggle>
+          <Toggle on={sound} onClick={() => setSound((v) => !v)} testId="ceremony-sound" color={ROLE_COLORS.honor}>{sound ? <Volume2 className="w-3 h-3" /> : <VolumeX className="w-3 h-3" />} Klang</Toggle>
           <Toggle on={reduced} onClick={() => setReduced((v) => !v)} testId="ceremony-reduced" color="#29B6E8">Weniger Bewegung</Toggle>
-          <button type="button" onClick={playCeremony} data-testid="ceremony-play" className="inline-flex items-center gap-1.5 px-3 py-1.5 border border-[#FFD700]/60 text-[#FFD700] tls-type-label rounded-sm hover:bg-[#FFD700]/10">
+          <button type="button" onClick={playCeremony} data-testid="ceremony-play" className="inline-flex items-center gap-1.5 px-3 py-1.5 border border-honor/60 text-honor tls-type-label rounded-sm hover:bg-honor/10">
             <Play className="w-3 h-3" /> Abspielen
           </button>
         </div>
@@ -145,7 +146,7 @@ export function PreviewTab() {
       {/* Ein Motiv in allen Materialien */}
       <section className="mt-8 border border-white/10 rounded-sm bg-[#121212] p-5" data-testid="preview-material-row">
         <div className="flex items-center gap-2 mb-4">
-          <Gem className="w-4 h-4 text-[#FFD700]" />
+          <Gem className="w-4 h-4 text-honor" />
           <h2 className="tls-type-section">„{focus}“ in jedem Material</h2>
         </div>
         <div className="grid grid-cols-3 sm:grid-cols-5 lg:grid-cols-9 gap-3">

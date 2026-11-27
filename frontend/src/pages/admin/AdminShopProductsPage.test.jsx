@@ -1181,7 +1181,7 @@ test("ohne Berechnung (blockiert) wird nichts gedimmt, nur der Hinweis steht da 
   expect(apiMock.post).not.toHaveBeenCalled();
 });
 
-test("nicht abbildbare alte Platzierungen: rote Meldung, Produkt nicht bestellbar", async () => {
+test("nicht abbildbare alte Platzierungen: Meldung in Orange (Achtung), Produkt nicht bestellbar", async () => {
   apiMock.get.mockResolvedValue({ data: view({ extra: { layout_converted: true, layout_blocked: ["„Ärmel links“ bleibt unverändert: die Fläche sleeve_left hat keine Druckvorgabe bei Printful."] } }) });
   const user = userEvent.setup();
   show("/admin/shop/products/p1");
@@ -1189,7 +1189,7 @@ test("nicht abbildbare alte Platzierungen: rote Meldung, Produkt nicht bestellba
   const box = screen.getByTestId("shop-layout-blocked");
   expect(box).toHaveTextContent("Nicht bestellbar");
   expect(box).toHaveTextContent("Ärmel links");
-  expect(box.className).toContain("text-live");
+  expect(box.className).toContain("text-warn");
 });
 
 test("ein übernommener alter Stand der Druckvorlage ist sichtbar eine Warnung (#2091)", async () => {

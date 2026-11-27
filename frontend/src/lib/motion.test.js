@@ -57,9 +57,9 @@ test("Dauern über die Tailwind-Namen (duration-fast …), nie als beliebiger We
   expect(offenders).toEqual([]);
 });
 
-test("Puls (#1969): eine Farbe über --tls-pulse-rgb, Vorgabe Gold, Varianten Cyan, Rot und Grün aus den Farb-Rollen", () => {
+test("Puls (#1969): eine Farbe über --tls-pulse-rgb, Vorgabe Cyan (#1305: „heute“ ist keine Ehre), Varianten Cyan, Rot und Grün aus den Farb-Rollen", () => {
   expect(css).toContain("@keyframes tls-run-pulse { 0% { box-shadow: 0 0 0 0 rgb(var(--tls-pulse-rgb) / 0.55); }");
-  expect(css).toContain(".tls-run-pulse { --tls-pulse-rgb: var(--tls-honor-rgb);");
+  expect(css).toContain(".tls-run-pulse { --tls-pulse-rgb: var(--tls-brand-rgb);");
   for (const [variant, role] of [["brand", "brand"], ["live", "live"], ["ok", "ok"]]) {
     expect(css).toContain(`.tls-run-pulse--${variant} { --tls-pulse-rgb: var(--tls-${role}-rgb); }`);
   }

@@ -93,14 +93,14 @@ export default function AdminGalleryPage() {
                   <span className="tls-type-label text-quiet">{albumMediaCount(a)} Medien</span>
                 </div>
                 {/* Leere Alben (#1224) sehen Besucher nicht - sie erscheinen von selbst, sobald Medien da sind. */}
-                {albumMediaCount(a) === 0 && <div className="mt-1 tls-type-label text-[#FFD700]" data-testid={`admin-album-empty-${a.id}`}>leer – für Besucher unsichtbar</div>}
+                {albumMediaCount(a) === 0 && <div className="mt-1 tls-type-label text-quiet" data-testid={`admin-album-empty-${a.id}`}>leer – für Besucher unsichtbar</div>}
                 <div className="tls-type-label text-[#29B6E8]/80 mt-1">
                   {ALBUM_VISIBILITY[a.visibility] || a.visibility} · {a.published ? "Veröffentlicht" : "Entwurf"}{a.section_count ? ` · ${a.section_count} Abschnitte` : ""}{a.video_count ? ` · ${a.video_count} Videos` : ""}
                 </div>
                 <div className="mt-3 flex gap-2">
                   <button onClick={() => setActiveAlbum(a)} data-testid={`album-open-${a.id}`} className="flex-1 tls-type-label px-3 py-1 rounded-sm border border-[#29B6E8]/40 text-[#29B6E8] hover:bg-[#29B6E8]/10">Medien</button>
                   <button onClick={() => setEditingAlbum(a)} className="tls-type-label px-3 py-1 rounded-sm border border-white/15 text-white/70 hover:text-white">Bearb.</button>
-                  <button onClick={() => remove(a.id)} className="tls-type-label px-3 py-1 rounded-sm border border-[#FF3B30]/40 text-[#FF3B30] hover:bg-[#FF3B30]/10"><Trash2 className="w-3 h-3" /></button>
+                  <button onClick={() => remove(a.id)} className="tls-type-label px-3 py-1 rounded-sm border border-live/40 text-live hover:bg-live/10"><Trash2 className="w-3 h-3" /></button>
                 </div>
               </div>
             </div>

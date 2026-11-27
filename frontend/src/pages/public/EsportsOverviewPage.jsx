@@ -81,7 +81,7 @@ export default function EsportsOverviewPage() {
     <PublicLayout>
       <section className="relative overflow-hidden border-b border-white/10">
         <LazyImg src={heroImage} priority alt="" sizes="100vw" className="absolute inset-0 h-full w-full object-cover opacity-35" />
-        <div className="absolute inset-0 bg-gradient-to-b from-[#0A0A0A]/55 via-[#0A0A0A]/78 to-[#0A0A0A]" />
+        <div className="absolute inset-0 bg-gradient-to-b from-[#0A0A0A]/55 via-[#0A0A0A]/80 to-[#0A0A0A]" />
         <div className="relative mx-auto grid max-w-7xl gap-8 px-4 py-16 sm:px-6 md:grid-cols-[minmax(0,1fr)_360px] md:py-20 lg:px-8">
           <div className="max-w-3xl self-end">
             <span className="tls-type-label text-[#29B6E8]">THE LION SQUAD</span>
@@ -202,7 +202,7 @@ function HubLink({ to, icon: Icon, title, text, badge = "", testId }) {
       </div>
       <h2 className="mt-5 tls-type-section text-white">{title}</h2>
       <p className="mt-2 tls-type-body leading-relaxed text-white/55">{text}</p>
-      {badge && <p className="mt-3 inline-flex rounded-sm border border-honor/40 bg-honor/10 px-2 py-0.5 tls-type-label text-honor" data-testid={testId ? `${testId}-badge` : undefined}>{badge}</p>}
+      {badge && <p className="mt-3 inline-flex rounded-sm border border-brand/40 bg-brand/10 px-2 py-0.5 tls-type-label text-brand" data-testid={testId ? `${testId}-badge` : undefined}>{badge}</p>}
     </Link>
   );
 }
@@ -253,7 +253,7 @@ function CompactList({ title, items, empty, action }) {
               ) : item.kind === "fastlap" ? (
                 <Flag className="h-6 w-6 text-[#29B6E8]/45" />
               ) : (
-                <Trophy className="h-6 w-6 text-[#FFD700]/45" />
+                <Trophy className="h-6 w-6 text-honor/45" />
               )}
             </div>
             <div className="min-w-0 flex-1">
@@ -284,7 +284,7 @@ function ActivityMeta({ item, compact = false }) {
       ) : (
         <>
           <span className="inline-flex items-center gap-1.5"><Users className="h-3.5 w-3.5 text-[#29B6E8]" />{item.participant_count || 0}/{item.max_participants || "-"}</span>
-          {item.prize_pool && <span className="inline-flex items-center gap-1.5 text-[#FFD700]"><Trophy className="h-3.5 w-3.5" />Preise</span>}
+          {item.prize_pool && <span className="inline-flex items-center gap-1.5 text-honor"><Trophy className="h-3.5 w-3.5" />Preise</span>}
         </>
       )}
     </div>

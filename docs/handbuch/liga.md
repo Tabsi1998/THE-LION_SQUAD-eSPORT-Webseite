@@ -1019,7 +1019,7 @@ Spieltag-Zusammenfassung, vor jeder Liga N der Saisonende-Meldung und vor der Zi
 Die Sichtbarkeit steht im Reiter **Überblick** und gilt beim **Überblick speichern** sofort für alle Staffeln. Wer in einer Staffel spielt, sieht seine
 Spiele, Termine und den Matchchat immer – auch bei *Aus*.
 
-**Prüfung vor der Veröffentlichung:** **Was fehlt noch?** im Reiter **Überblick** listet **Probleme** (rot) und **Warnungen**; jeder Punkt führt mit **Zu …** in den Reiter, wo du ihn erledigst. Probleme
+**Prüfung vor der Veröffentlichung:** **Was fehlt noch?** im Reiter **Überblick** listet **Probleme** (orange, kräftiger) und **Warnungen**; jeder Punkt führt mit **Zu …** in den Reiter, wo du ihn erledigst. Probleme
 sind: kein oder ein fremder Map-Pool, zu wenige Maps für einen Modus, ein Modus aus **Modus je Map** fehlt im Pool, **Modus je Map**
 passt nicht zur längsten Serie, kein veröffentlichtes **Regelwerk** (ein Regeltext allein reicht nicht), keine Liga N oder eine Liga
 N ohne Staffel. Warnungen sind etwa ein abgelaufenes oder fehlendes Anmeldefenster, ein Anmeldefenster, das erst nach dem Beginn

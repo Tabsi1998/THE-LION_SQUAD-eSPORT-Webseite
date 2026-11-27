@@ -4,16 +4,16 @@ function itemState(item) {
   if (item.done) {
     return {
       Icon: CheckCircle2,
-      iconClass: "text-[#10B981]",
-      borderClass: "border-[#10B981]/20 bg-[#10B981]/5",
+      iconClass: "text-ok",
+      borderClass: "border-ok/20 bg-ok/5",
       textClass: "text-white",
     };
   }
   if (item.tone === "note") {
     return {
       Icon: Info,
-      iconClass: "text-[#FFD700]",
-      borderClass: "border-[#FFD700]/20 bg-[#FFD700]/5",
+      iconClass: "text-brand",
+      borderClass: "border-brand/20 bg-brand/5",
       textClass: "text-white/80",
     };
   }
@@ -33,7 +33,7 @@ export function EditorialChecklist({ title = "Redaktions-Checkliste", items = []
     <section className={`rounded-sm border border-white/10 bg-[#0A0A0A] p-4 ${className}`}>
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <div className="tls-type-label text-[#FFD700]">{title}</div>
+          <div className="tls-type-label text-brand">{title}</div>
           <div className="mt-1 tls-type-small text-white/45">Vor dem Veröffentlichen kurz gegenprüfen.</div>
         </div>
         <span className="rounded-sm border border-white/10 px-2 py-1 tls-type-label text-white/45">

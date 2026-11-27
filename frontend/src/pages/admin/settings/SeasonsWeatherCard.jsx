@@ -151,7 +151,7 @@ export function SeasonsWeatherCard({ weather, location, busy, onSave, onRefresh,
         <button type="submit" disabled={busy || !valid || !changed} className="inline-flex items-center gap-2 px-3 py-1.5 bg-[#29B6E8] text-black tls-type-label rounded-sm disabled:opacity-50" data-testid="seasons-location-save">
           <MapPin className="w-3.5 h-3.5" /> Ort speichern
         </button>
-        {!valid && <span className="tls-type-small text-[#FF6B6B]">Breite −90 bis 90, Länge −180 bis 180.</span>}
+        {!valid && <span className="tls-type-small text-warn">Breite −90 bis 90, Länge −180 bis 180.</span>}
       </form>
       {season && <WeatherSwitch season={season} busy={busy} onSeasonSave={onSeasonSave} onPreview={onPreview} />}
     </div>

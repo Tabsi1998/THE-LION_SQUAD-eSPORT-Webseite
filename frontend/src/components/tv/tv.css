@@ -44,19 +44,20 @@
   --tv-card: #101010;
   --tv-bar: rgba(10, 10, 10, 0.9);
   --tv-accent: #29b6e8;
-  --tv-gold: #ffd700;
-  --tv-green: #00ff88;
-  --tv-red: #ff3b30;
+  --tv-gold: var(--tls-honor);
+  --tv-green: var(--tls-ok);
+  --tv-red: var(--tls-warn);
   --tv-accent-soft: rgba(41, 182, 232, 0.12);
-  --tv-green-soft: rgba(0, 255, 136, 0.06);
-  --tv-gold-soft: rgba(255, 215, 0, 0.08);
-  --tv-red-soft: rgba(255, 59, 48, 0.1);
-  --tv-live: var(--tls-live, #ff3b30);
+  --tv-green-soft: rgb(var(--tls-ok-rgb) / 0.06);
+  --tv-gold-soft: rgb(var(--tls-honor-rgb) / 0.08);
+  --tv-red-soft: rgb(var(--tls-warn-rgb) / 0.1);
+  --tv-warn: var(--tls-warn);
+  --tv-live: var(--tls-live);
   --tv-live-soft: rgb(var(--tls-live-rgb, 255 59 48) / 0.1);
   --tv-vignette: rgba(1, 3, 4, 0.85);
   --tv-on-accent: #000000;
   --tv-hero-opacity: 0.25;
-  --tv-medal-1: #ffd700;
+  --tv-medal-1: var(--tls-honor);
   --tv-medal-2: #c0c0c0;
   --tv-medal-3: #cd7f32;
 
@@ -79,12 +80,13 @@
   --tv-bar: #000000;
   --tv-accent: #6edcff;
   --tv-gold: #ffe66b;
-  --tv-red: #ff8a80;
+  --tv-red: color-mix(in srgb, var(--tls-warn) 70%, #ffffff);
+  --tv-warn: color-mix(in srgb, var(--tls-warn) 70%, #ffffff);
   --tv-accent-soft: #000000;
   --tv-green-soft: #000000;
   --tv-gold-soft: #000000;
   --tv-red-soft: #000000;
-  --tv-live: color-mix(in srgb, var(--tls-live, #ff3b30) 55%, #ffffff);
+  --tv-live: color-mix(in srgb, var(--tls-live) 55%, #ffffff);
   --tv-live-soft: #000000;
   --tv-hero-opacity: 0;
   --tv-medal-1: #ffe66b;
@@ -245,9 +247,9 @@
 /* Podium (Fast Lap): das Platz-Schild sitzt halb über der Kante und darf nicht abgeschnitten werden. */
 .tv-podium { overflow: visible; }
 .tv-card--ready { border-color: color-mix(in srgb, var(--tv-accent) 55%, transparent); }
-.tv-card--waiting { border-color: color-mix(in srgb, var(--tv-gold) 55%, transparent); background: var(--tv-gold-soft); }
+.tv-card--waiting { border-color: color-mix(in srgb, var(--tls-quiet) 55%, transparent); background: rgba(255, 255, 255, 0.04); }
 .tv-screen[data-tv-contrast="1"] .tv-card--ready { border-color: var(--tv-accent); }
-.tv-screen[data-tv-contrast="1"] .tv-card--waiting { border-color: var(--tv-gold); }
+.tv-screen[data-tv-contrast="1"] .tv-card--waiting { border-color: var(--tv-text); }
 .tv-card__head {
   display: flex;
   align-items: baseline;
@@ -386,7 +388,7 @@
 }
 
 /* ---------------------------------------------------------------- Hinweis der Turnierleitung (#1166)
-   Ein Band unter der Kopfleiste: Gold für „bitte lesen“, ruhig stehend. Fährt beim Erscheinen von oben herein, der
+   Ein Band unter der Kopfleiste: Orange für „bitte lesen“ (Achtung, #1305), ruhig stehend. Fährt beim Erscheinen von oben herein, der
    Rahmen leuchtet einmal auf, die Leiste unten läuft bis zum Ablauf leer. Ohne Bewegung steht es einfach da. */
 .tv-notice-band {
   display: flex;
@@ -402,9 +404,9 @@
   align-items: center;
   gap: calc(var(--tv-u) * 1.6);
   padding: calc(var(--tv-u) * 1) calc(var(--tv-u) * 1.6);
-  border: var(--tv-line-w) solid rgba(255, 215, 0, 0.5);
+  border: var(--tv-line-w) solid rgb(var(--tls-warn-rgb) / 0.5);
   border-radius: 2px;
-  background: linear-gradient(90deg, rgba(255, 215, 0, 0.14), rgba(10, 10, 10, 0.92) 55%);
+  background: linear-gradient(90deg, rgb(var(--tls-warn-rgb) / 0.14), rgba(10, 10, 10, 0.92) 55%);
   animation: tv-notice-in var(--tls-motion-slow) var(--tls-ease) both;
   animation-delay: calc(var(--tv-notice-i, 0) * var(--tls-motion-fast));
 }
@@ -417,7 +419,7 @@
   position: absolute;
   inset: 0;
   border-radius: inherit;
-  box-shadow: inset 0 0 0 calc(var(--tv-line-w) * 2) var(--tv-gold), 0 0 calc(var(--tv-u) * 4) rgba(255, 215, 0, 0.45);
+  box-shadow: inset 0 0 0 calc(var(--tv-line-w) * 2) var(--tv-warn), 0 0 calc(var(--tv-u) * 4) rgb(var(--tls-warn-rgb) / 0.45);
   pointer-events: none;
   opacity: 0;
   animation: tv-notice-glow calc(var(--tls-motion-slow) * 3) var(--tls-ease) both;
@@ -436,12 +438,12 @@
   width: calc(var(--tv-u) * 5);
   height: calc(var(--tv-u) * 5);
   border-radius: 2px;
-  background: var(--tv-gold);
+  background: var(--tv-warn);
   color: #000000;
   font-size: var(--tv-fs-head);
 }
 .tv-notice__body { min-width: 0; flex: 1 1 auto; }
-.tv-notice__kicker { color: var(--tv-gold); font-weight: 700; letter-spacing: 0.18em; text-transform: uppercase; }
+.tv-notice__kicker { color: var(--tv-warn); font-weight: 700; letter-spacing: 0.18em; text-transform: uppercase; }
 .tv-notice__text { color: var(--tv-text); overflow-wrap: anywhere; }
 .tv-notice__time {
   display: flex;
@@ -457,7 +459,7 @@
   right: 0;
   bottom: 0;
   height: calc(var(--tv-line-w) * 3);
-  background: var(--tv-gold);
+  background: var(--tv-warn);
   opacity: 0.75;
   transform-origin: left center;
   transition: transform 30s linear;
@@ -539,7 +541,7 @@
   height: calc(var(--tv-u) * 0.35 * var(--s));
   border-radius: 999px;
   background: #ffe28a;
-  box-shadow: 0 0 calc(var(--tv-u) * 0.8) rgba(255, 215, 0, 0.6);
+  box-shadow: 0 0 calc(var(--tv-u) * 0.8) rgb(var(--tls-honor-rgb) / 0.6);
   opacity: 0.7;
 }
 .tv-deco--bats .tv-deco__p {
@@ -727,13 +729,13 @@
   stroke-linecap: round;
   stroke-dasharray: 1 1;
   stroke-dashoffset: 1;
-  filter: drop-shadow(0 0 6px rgba(255, 215, 0, 0.75));
+  filter: drop-shadow(0 0 6px rgb(var(--tls-honor-rgb) / 0.75));
   transition: stroke-dashoffset 0.76s var(--tls-ease);
 }
 .tv-gold-path[data-drawn="1"] { stroke-dashoffset: 0; }
 .tv-trail { fill: none; stroke: #c8f1ff; stroke-width: 5px; stroke-linecap: round; filter: drop-shadow(0 0 5px rgba(41, 182, 232, 1)); }
-.tv-trail--drop { stroke: #ffa3a8; filter: drop-shadow(0 0 5px rgb(var(--tls-live-rgb, 255 59 48) / 0.9)); }
-.tv-drop-line { fill: none; stroke: rgb(var(--tls-live-rgb, 255 59 48) / 0.6); stroke-width: 3px; stroke-dasharray: 9 9; opacity: 0; transition: opacity 0.4s; }
+.tv-trail--drop { stroke: rgb(var(--tls-quiet-rgb)); filter: drop-shadow(0 0 5px rgb(255 255 255 / 0.35)); }
+.tv-drop-line { fill: none; stroke: rgb(255 255 255 / 0.5); stroke-width: 3px; stroke-dasharray: 9 9; opacity: 0; transition: opacity 0.4s; }
 .tv-rider { position: absolute; left: 0; top: 0; z-index: 3; pointer-events: none; will-change: transform, opacity; }
 .tv-rider__face {
   position: absolute;
@@ -900,12 +902,12 @@
   border: 2px solid var(--tv-gold);
   border-radius: 8px;
   background: linear-gradient(180deg, rgba(42, 34, 4, 0.97), rgba(11, 10, 6, 0.97));
-  box-shadow: 0 30px 80px rgba(0, 0, 0, 0.6), 0 0 60px rgba(255, 215, 0, 0.18);
+  box-shadow: 0 30px 80px rgba(0, 0, 0, 0.6), 0 0 60px rgb(var(--tls-honor-rgb) / 0.18);
   animation: tv-rise 0.8s var(--tls-ease) both;
 }
 .tv-screen[data-tv-contrast="1"] .tv-champion { background: #000000; box-shadow: none; }
 .tv-champion__top { display: inline-flex; align-items: center; gap: 0.5em; color: var(--tv-gold); font-weight: 700; letter-spacing: 0.3em; text-transform: uppercase; }
-.tv-champion__photo { width: calc(var(--tv-u) * 11); height: calc(var(--tv-u) * 11); font-size: calc(var(--tv-fs-head) * 1.3); box-shadow: 0 0 0 3px var(--tv-gold), 0 0 30px rgba(255, 215, 0, 0.45); }
+.tv-champion__photo { width: calc(var(--tv-u) * 11); height: calc(var(--tv-u) * 11); font-size: calc(var(--tv-fs-head) * 1.3); box-shadow: 0 0 0 3px var(--tv-gold), 0 0 30px rgb(var(--tls-honor-rgb) / 0.45); }
 .tv-champion__big { font-size: var(--tv-fs-hero); line-height: 1.05; font-weight: 900; text-transform: uppercase; overflow-wrap: anywhere; }
 .tv-champion__sub, .tv-champion__podium { color: var(--tv-muted); }
 .tv-champion__podium { display: flex; flex-wrap: wrap; justify-content: center; gap: 0.4em 1.6em; }

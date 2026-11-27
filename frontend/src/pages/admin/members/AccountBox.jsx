@@ -96,7 +96,7 @@ export function AccountBox({ form, set, profile, profiles = [] }) {
           <button type="button" onClick={takeOver} data-testid="club-member-account-takeover" className="inline-flex items-center gap-1 px-2.5 py-1.5 border border-white/15 rounded-sm tls-type-label text-white/70 hover:text-white">
             <Wand2 className="w-3.5 h-3.5" /> Bild, Spiele, Plattformen übernehmen
           </button>
-          <button type="button" onClick={unlink} data-testid="club-member-account-unlink" className="inline-flex items-center gap-1 px-2.5 py-1.5 border border-[#FF3B30]/35 rounded-sm tls-type-label text-[#FF3B30] hover:bg-[#FF3B30]/10">
+          <button type="button" onClick={unlink} data-testid="club-member-account-unlink" className="inline-flex items-center gap-1 px-2.5 py-1.5 border border-live/35 rounded-sm tls-type-label text-live hover:bg-live/10">
             <Unlink className="w-3.5 h-3.5" /> Konto lösen
           </button>
         </div>

@@ -108,8 +108,8 @@ export default function AdminIntegrationPage() {
 
       <div className="max-w-4xl space-y-4">
         {platformOff && (
-          <div data-testid="integration-disabled-hint" className="border border-[#FFD700]/40 bg-[#FFD700]/5 rounded-sm p-4 tls-type-small">
-            <strong className="text-[#FFD700]">Für Mitglieder abgeschaltet.</strong> {integration.label} erscheint nirgends – im Profil, im öffentlichen Profil, in der App und in der Datenschutzerklärung nicht.
+          <div data-testid="integration-disabled-hint" className="border border-warn/40 bg-warn/5 rounded-sm p-4 tls-type-small">
+            <strong className="text-warn">Für Mitglieder abgeschaltet.</strong> {integration.label} erscheint nirgends – im Profil, im öffentlichen Profil, in der App und in der Datenschutzerklärung nicht.
             Wieder anbieten: Haken setzen unter <Link to="/admin/integrations" className="text-[#29B6E8] hover:underline">Alle Verbindungen → Plattformen für Mitglieder</Link>.
           </div>
         )}

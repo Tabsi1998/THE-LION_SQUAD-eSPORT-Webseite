@@ -5,6 +5,7 @@ import { api } from "@/lib/api";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { CATEGORIES, MaterialChip, Panel, categoryLabel, download, errorText, personName } from "./shared";
 
+import { ROLE_COLORS } from "@/lib/categoryColors";
 const PAGE = 40;
 
 /** „2026-W40“ → „KW 40“ */
@@ -61,10 +62,10 @@ export function StatsTab() {
           <ol className="divide-y divide-white/5">
             {data.top.map((row) => (
               <li key={row.id || row.user_id || row.rank} className="py-1.5 flex items-center gap-3 tls-type-small">
-                <span className="w-6 tls-type-num" style={{ color: row.rank === 1 ? "#FFD700" : "rgba(255,255,255,0.5)" }}>{row.rank}</span>
+                <span className="w-6 tls-type-num" style={{ color: row.rank === 1 ? ROLE_COLORS.honor : "rgba(255,255,255,0.5)" }}>{row.rank}</span>
                 <span className="flex-1 tls-wrap">{personName(row)}</span>
                 <span className="tls-type-small text-white/45 tabular-nums">{row.count} Erfolge · Level {row.level}</span>
-                <span className="font-bold tabular-nums text-[#FFD700]">{Number(row.points || 0).toLocaleString("de-DE")}</span>
+                <span className="font-bold tabular-nums text-honor">{Number(row.points || 0).toLocaleString("de-DE")}</span>
               </li>
             ))}
             {!data.top.length && <li className="py-6 text-center tls-type-small text-quiet">Noch niemand mit öffentlichem Profil.</li>}

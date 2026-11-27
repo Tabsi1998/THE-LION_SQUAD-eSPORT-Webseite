@@ -25,7 +25,7 @@ export function NewsletterSection() {
         <div className="font-bold uppercase text-[#29B6E8] mb-1">Newsletter-Verlauf</div>
         <p>News und Events gehen beim Veröffentlichen von selbst an alle mit Newsletter-Zustimmung. Senden und ein zweites Mal senden geht im Kasten „Verteilen“ im <Link to="/admin/news" className="text-[#29B6E8] hover:underline">News-</Link> und <Link to="/admin/events" className="text-[#29B6E8] hover:underline">Event-Editor</Link>. Hier steht, was wann hinausging.</p>
       </div>
-      {error && <div className="border border-[#FF3B30]/40 bg-[#FF3B30]/10 rounded-sm p-4 tls-type-small" data-testid="newsletter-history-error">{error}</div>}
+      {error && <div className="border border-warn/40 bg-warn/10 rounded-sm p-4 tls-type-small" data-testid="newsletter-history-error">{error}</div>}
       {items === null && !error && <div className="tls-type-small text-white/45" role="status">Lade Verlauf …</div>}
       {items && (
         <ul className="border border-white/10 bg-[#121212] rounded-sm divide-y divide-white/5" data-testid="newsletter-history">

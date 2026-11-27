@@ -31,7 +31,7 @@ export function FeedAddress({ url, testId = "calendar-feed", label = "Abo-Adress
     <div className="mt-3 flex gap-2 min-w-0">
       <input readOnly value={url} onFocus={(ev) => ev.target.select()} data-testid={`${testId}-url`} aria-label={label} className="flex-1 min-w-0 bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-xs font-mono" />
       <button type="button" onClick={copy} data-testid={`${testId}-copy`} data-copied={copied ? "true" : undefined} className="tls-btn tls-btn--quiet px-3 py-2 rounded-sm tls-type-label inline-flex items-center gap-1.5">
-        {copied ? <Check key="check" className="tls-copy-check w-3.5 h-3.5 text-[#10B981]" /> : <Copy className="w-3.5 h-3.5" />} {copied ? "Kopiert" : "Kopieren"}
+        {copied ? <Check key="check" className="tls-copy-check w-3.5 h-3.5 text-ok" /> : <Copy className="w-3.5 h-3.5" />} {copied ? "Kopiert" : "Kopieren"}
       </button>
       <span className="sr-only" aria-live="polite">{copied ? `${label} kopiert` : ""}</span>
     </div>
@@ -112,8 +112,8 @@ export function PersonalFeedCard({ origin = typeof window !== "undefined" ? wind
 
   if (!status) return null;
   return (
-    <div ref={ref} id={SUBSCRIBE_ANCHOR} className="scroll-mt-24 border border-[#FFD700]/40 bg-[#FFD700]/5 rounded-sm p-5" data-testid={testId}>
-      <div className="inline-flex items-center gap-2 tls-type-label text-[#FFD700]"><CalendarPlus className="w-3.5 h-3.5" /> Automatisch in deinen Kalender</div>
+    <div ref={ref} id={SUBSCRIBE_ANCHOR} className="scroll-mt-24 border border-brand/40 bg-brand/5 rounded-sm p-5" data-testid={testId}>
+      <div className="inline-flex items-center gap-2 tls-type-label text-brand"><CalendarPlus className="w-3.5 h-3.5" /> Automatisch in deinen Kalender</div>
       <p className="mt-2 tls-type-body text-white/65">
         Einmal abonnieren – danach erscheint jede Anmeldung von selbst im Handy- oder PC-Kalender: Events, Turniere (auch mit deinem Team), gefahrene Fast Laps, zugesagte Versammlungen und deine Schichten. Die Adresse ist privat – gib sie nicht weiter.
       </p>
@@ -135,10 +135,10 @@ export function PersonalFeedCard({ origin = typeof window !== "undefined" ? wind
           {subscriptionLine(status, viennaDateTime)} Die Adresse zeigen wir nur beim Erzeugen – brauchst du sie wieder, erzeug eine neue.
         </p>
       ) : null}
-      {problem && <p className="mt-3 tls-type-small text-[#FF3B30]" role="alert">{problem}</p>}
+      {problem && <p className="mt-3 tls-type-small text-warn" role="alert">{problem}</p>}
       <div className="mt-3 flex flex-wrap items-center gap-2 tls-type-small">
         {!status.active ? (
-          <button type="button" onClick={issue} disabled={busy} data-testid={`${testId}-create`} className="tls-btn tls-btn--honor px-3 py-2 rounded-sm font-bold uppercase tracking-wider">Abo einrichten</button>
+          <button type="button" onClick={issue} disabled={busy} data-testid={`${testId}-create`} className="tls-btn tls-btn--primary px-3 py-2 rounded-sm font-bold uppercase tracking-wider">Abo einrichten</button>
         ) : confirming ? (
           <>
             <button type="button" onClick={confirming === "renew" ? issue : revoke} disabled={busy} data-testid={`${testId}-${confirming}-confirm`} className="tls-btn tls-btn--danger px-3 py-2 rounded-sm font-bold uppercase tracking-wider">

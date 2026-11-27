@@ -165,7 +165,7 @@ function LevelExtras({ levelUp, reduced }) {
         </motion.div>
       )}
       {Number(levelUp?.prestige || 0) > 0 && levelUp?.prestigeGained && (
-        <div className="mt-2 flex gap-1 text-[#FFD700]" data-testid="ceremony-prestige-stars" aria-label={`Prestige ${levelUp.prestige}`}>
+        <div className="mt-2 flex gap-1 text-honor" data-testid="ceremony-prestige-stars" aria-label={`Prestige ${levelUp.prestige}`}>
           {Array.from({ length: Math.min(5, Number(levelUp.prestige)) }).map((_, i) => (
             <motion.span key={i} initial={{ y: reduced ? 0 : -30, opacity: 0 }} animate={{ y: 0, opacity: 1 }} transition={{ delay: reduced ? 0 : 1.4 + i * 0.12 }}><Star className="w-4 h-4 fill-current" /></motion.span>
           ))}
@@ -413,7 +413,7 @@ export function Ceremony({ plan, onClose, user = null, reduced = false, autoClos
             <Link to="/achievements" onClick={onClose} className="inline-flex items-center gap-2 px-3 py-1.5 rounded-sm border border-[#29B6E8]/50 text-[#29B6E8] tls-type-label hover:bg-[#29B6E8]/10" data-testid="ceremony-showcase-link">Zum Schaukasten</Link>
           )}
           {plan.sequence === "legendary" && (
-            <Link to={shareTo} onClick={onClose} className="inline-flex items-center gap-2 px-3 py-1.5 rounded-sm border border-[#FFD700]/60 text-[#FFD700] tls-type-label hover:bg-[#FFD700]/10" data-testid="ceremony-photo-mode"><Camera className="w-3.5 h-3.5" /> Fotomodus</Link>
+            <Link to={shareTo} onClick={onClose} className="inline-flex items-center gap-2 px-3 py-1.5 rounded-sm border border-honor/60 text-honor tls-type-label hover:bg-honor/10" data-testid="ceremony-photo-mode"><Camera className="w-3.5 h-3.5" /> Fotomodus</Link>
           )}
           {phase === "level" && !isLevelOnly && null}
         </div>

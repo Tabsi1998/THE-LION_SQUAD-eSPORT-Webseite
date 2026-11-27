@@ -41,7 +41,7 @@ export function TeamSquads({ team, userId, canManage = false, enabled = false })
             <li key={squad.id} className="min-w-0 border border-white/10 bg-[#121212] rounded-sm p-4" data-testid={`team-squad-${squad.id}`}>
               <div className="flex min-w-0 items-start justify-between gap-2">
                 <div className="min-w-0 tls-type-card [overflow-wrap:anywhere]">{squad.name}</div>
-                {mine ? <span className="shrink-0 rounded-sm border border-honor/40 px-2 py-0.5 tls-type-label text-honor">Du: {mine.label}</span> : null}
+                {mine ? <span className="shrink-0 rounded-sm border border-brand/40 px-2 py-0.5 tls-type-label text-brand">Du: {mine.label}</span> : null}
               </div>
               {squad.game || squad.game_id ? <p className="mt-1 tls-type-small text-white/60 break-words" data-testid={`team-squad-game-line-${squad.id}`}>{squadGameLabel(squad)}</p> : null}
               <p className="mt-1 tls-type-small text-white/60 break-words" data-testid={`team-squad-roles-line-${squad.id}`}>{rolesSummary(squad, squad.members)}</p>

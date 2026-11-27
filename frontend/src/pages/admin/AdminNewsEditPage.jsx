@@ -26,6 +26,7 @@ import { NEWS_CHANNEL_OPTIONS, channelChoice, channelHint, channelsFromChoice } 
 import { toast } from "sonner";
 import { AtSign, ExternalLink, Flag, Search, X } from "lucide-react";
 
+import { ROLE_COLORS } from "@/lib/categoryColors";
 // Beitrag anlegen und bearbeiten als eigene Seite (#434) - vorher ein 1024-px-Fenster über der
 // Liste. Links Titel, Text, Bild, Personen und Verknüpfungen, Checkliste und SEO-Vorschau; rechts
 // Veröffentlichung, Discord- und Teilen-Vorschau.
@@ -333,9 +334,9 @@ function NewsForm({ post, meta, onDone, onReload }) {
       aside={(
         <>
           {post.withdrawn_at && (
-            <div role="status" className="border border-[#FF6B6B]/40 bg-[#FF6B6B]/10 rounded-sm p-4 space-y-3" data-testid="news-withdrawn">
+            <div role="status" className="border border-warn/40 bg-warn/10 rounded-sm p-4 space-y-3" data-testid="news-withdrawn">
               <p className="tls-type-small text-white/85">
-                <strong className="text-[#FF6B6B]">Zurückgezogen</strong> am {viennaDateTime(post.withdrawn_at, { dateStyle: "medium", timeStyle: "short" })}{post.withdrawn_by_name ? ` von ${post.withdrawn_by_name}` : ""}. Besucher sehen statt des Beitrags nur einen Hinweis.
+                <strong className="text-warn">Zurückgezogen</strong> am {viennaDateTime(post.withdrawn_at, { dateStyle: "medium", timeStyle: "short" })}{post.withdrawn_by_name ? ` von ${post.withdrawn_by_name}` : ""}. Besucher sehen statt des Beitrags nur einen Hinweis.
               </p>
               <button type="button" onClick={restore} disabled={saving} data-testid="news-restore" className="tls-btn tls-btn--quiet px-4 py-2 rounded-sm tls-type-label disabled:opacity-50">Wiederherstellen (als Entwurf)</button>
             </div>
@@ -349,7 +350,7 @@ function NewsForm({ post, meta, onDone, onReload }) {
             {mode === "scheduled" && (
               <TextField label="Termin" type="datetime-local" value={scheduleAt} onChange={setScheduleAt} testId="news-published-at" required hint={plannedDetail} />
             )}
-            <CheckField label="Anpinnen" hint="Bleibt bis zum gewählten Tag oben in der News-Liste und auf der Startseite, danach rutscht der Beitrag normal in die Liste." checked={form.pinned} onChange={togglePinned} testId="news-pinned" accent="#FFD700" />
+            <CheckField label="Anpinnen" hint="Bleibt bis zum gewählten Tag oben in der News-Liste und auf der Startseite, danach rutscht der Beitrag normal in die Liste." checked={form.pinned} onChange={togglePinned} testId="news-pinned" accent={ROLE_COLORS.brand} />
             {form.pinned && (
               <>
                 <TextField label="Angepinnt bis" type="date" value={form.pinned_until} onChange={(v) => set("pinned_until", v)} min={pinFirstDay} required testId="news-pinned-until" hint={`Einschließlich dieses Tages. Vorschlag: ${PIN_DEFAULT_DAYS} Tage ab dem Erscheinen.`} />
@@ -423,7 +424,7 @@ function NewsForm({ post, meta, onDone, onReload }) {
                 {selectedUsers.map((user) => (
                   <span key={user.id} className="inline-flex items-center gap-1.5 px-2 py-1 border border-[#29B6E8]/30 text-[#29B6E8] rounded-sm tls-type-small">
                     <AtSign className="w-3 h-3" /> {userLabel(user)}
-                    <button type="button" onClick={() => removeMention(user.id)} className="text-white/45 hover:text-[#FF3B30]" aria-label={`${userLabel(user)} entfernen`}>
+                    <button type="button" onClick={() => removeMention(user.id)} className="text-white/45 hover:text-live" aria-label={`${userLabel(user)} entfernen`}>
                       <X className="w-3 h-3" />
                     </button>
                   </span>

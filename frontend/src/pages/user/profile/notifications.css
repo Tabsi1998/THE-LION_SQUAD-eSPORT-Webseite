@@ -120,7 +120,7 @@
 .tls-quiet__time { width: 100%; min-height: 2.75rem; padding: 0 0.75rem; border: 1px solid rgba(255, 255, 255, 0.15); border-radius: 2px; background: #050505; color: #fff; font-variant-numeric: tabular-nums; color-scheme: dark; transition: border-color 200ms ease; }
 .tls-quiet__time:focus { outline: none; border-color: #29b6e8; }
 .tls-quiet__moon { transition: color 240ms ease, transform 320ms var(--tls-ease-out); }
-.tls-notify-card[data-enabled="true"] .tls-quiet__moon { color: var(--tls-honor); transform: rotate(-12deg); }
+.tls-notify-card[data-enabled="true"] .tls-quiet__moon { color: var(--tls-brand); transform: rotate(-12deg); }
 
 @keyframes tls-topic-lit-a { 0% { background-color: rgba(41, 182, 232, 0.16); } 100% { background-color: rgba(41, 182, 232, 0); } }
 @keyframes tls-topic-lit-b { 0% { background-color: rgba(41, 182, 232, 0.16); } 100% { background-color: rgba(41, 182, 232, 0); } }

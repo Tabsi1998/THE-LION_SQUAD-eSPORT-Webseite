@@ -27,8 +27,8 @@ export function formatEventTime(value) {
 
 function severityClass(severity) {
   if (severity === "success") return "border-ok/35 bg-ok/10 text-ok";
-  if (severity === "error") return "border-[#FF3B30]/40 bg-[#FF3B30]/10 text-[#FF6B61]";
-  if (severity === "warn") return "border-[#FFD700]/40 bg-[#FFD700]/10 text-[#FFD700]";
+  if (severity === "error") return "border-warn/40 bg-warn/10 text-warn";
+  if (severity === "warn") return "border-warn/40 bg-warn/10 text-warn";
   return "border-white/10 bg-white/5 text-white/60";
 }
 
@@ -298,7 +298,7 @@ export function OpsEventsTab() {
               className={`inline-flex min-h-[44px] items-center gap-1.5 rounded-sm px-3 py-1.5 tls-type-label ${source === item.key ? "bg-[#29B6E8] text-black" : "text-white/55 hover:text-white"}`}
             >
               {item.label}
-              {Number(item.problems || 0) > 0 && <span className={`rounded-sm px-1 ${source === item.key ? "bg-black/20" : "bg-[#FFD700]/15 text-[#FFD700]"}`}>{item.problems}</span>}
+              {Number(item.problems || 0) > 0 && <span className={`rounded-sm px-1 ${source === item.key ? "bg-black/20" : "bg-warn/15 text-warn"}`}>{item.problems}</span>}
             </button>
           ))}
         </div>
@@ -378,7 +378,7 @@ export function OpsEventsTab() {
         )}
       </div>
       {data?.summary?.problem_count > 0 && (
-        <div className="inline-flex items-center gap-2 rounded-sm border border-[#FFD700]/30 bg-[#FFD700]/5 px-3 py-2 tls-type-small text-[#FFD700]" data-testid="ops-events-problems">
+        <div className="inline-flex items-center gap-2 rounded-sm border border-warn/30 bg-warn/5 px-3 py-2 tls-type-small text-warn" data-testid="ops-events-problems">
           <AlertTriangle className="h-4 w-4" /> {data.summary.problem_count} auffällige Einträge über alle Quellen.
         </div>
       )}

@@ -9,6 +9,7 @@ import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { INPUT_CLASS } from "@/components/tls/FormFields";
 import { asInstant, viennaDate, viennaDateTime } from "@/lib/vienna";
 
+import { ROLE_COLORS } from "@/lib/categoryColors";
 const LEVEL_NAMES = { 1: "Bronze", 2: "Silber", 3: "Gold", 4: "Platin", 5: "Legendär" };
 // Erfolge II (#611): Material statt Level - Holz bis Diamant, dazu Legendär und Geheim.
 export const MATERIALS = {
@@ -128,7 +129,7 @@ export function useCatalog() {
   return { groups, tiers, groupsByCode: byCode, reload: load };
 }
 
-export function Panel({ title, hint, icon: Icon, accent = "#FFD700", actions, children, testId, className = "" }) {
+export function Panel({ title, hint, icon: Icon, accent = ROLE_COLORS.honor, actions, children, testId, className = "" }) {
   return (
     <section className={`border border-white/10 bg-[#121212] rounded-sm ${className}`} data-testid={testId}>
       {(title || actions) && (
@@ -149,7 +150,7 @@ export function Panel({ title, hint, icon: Icon, accent = "#FFD700", actions, ch
   );
 }
 
-export function Stat({ label, value, hint, accent = "#FFD700", testId }) {
+export function Stat({ label, value, hint, accent = ROLE_COLORS.honor, testId }) {
   // Wörter (seltenste Stufe, Kategorie) kleiner und umbrechend statt abgeschnitten; Zahlen groß.
   const wordy = typeof value === "string" && value.length > 7;
   return (
@@ -209,7 +210,7 @@ export function PersonPicker({ value, onChange, testId = "person", label = "Pers
 
   if (value) {
     return (
-      <div className="flex items-center gap-3 border border-[#FFD700]/30 bg-[#FFD700]/5 rounded-sm px-3 py-2" data-testid={`${testId}-selected`}>
+      <div className="flex items-center gap-3 border border-honor/30 bg-honor/5 rounded-sm px-3 py-2" data-testid={`${testId}-selected`}>
         {value.avatar_url ? <img src={resolveMediaUrl(value.avatar_url)} alt="" className="w-8 h-8 rounded-sm object-cover" /> : <div className="w-8 h-8 rounded-sm bg-[#0A0A0A] border border-white/10" />}
         <div className="min-w-0 flex-1">
           <div className="tls-type-small font-semibold tls-wrap">{personName(value)}</div>
@@ -238,7 +239,7 @@ export function PersonPicker({ value, onChange, testId = "person", label = "Pers
               <div className="tls-type-small font-semibold tls-wrap">{personName(u)}</div>
               <div className="tls-type-small text-quiet tls-wrap">@{u.username}</div>
             </div>
-            {u.is_club_member && <Crown className="ml-auto w-3.5 h-3.5 text-[#FFD700]" aria-label="Vereinsmitglied" />}
+            {u.is_club_member && <Crown className="ml-auto w-3.5 h-3.5 text-honor" aria-label="Vereinsmitglied" />}
           </button>
         ))}
         {!users.length && <div className="px-3 py-5 text-center tls-type-small text-quiet">Keine Treffer.</div>}

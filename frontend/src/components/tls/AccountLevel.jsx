@@ -5,7 +5,7 @@ import { rankInfo } from "@/lib/loewenRang";
 
 // Löwen-Rang (#1452): der Titel ist der Rang-Name, wie im Backend und am Rahmen. Farben nur Cyan (Rang 1–5) und Gold
 // (ab Rang 6); `key` wählt die bestehenden Karten- und Leuchtklassen, Rang 12 bekommt den Puls.
-const BORDER = { rookie: "border-[#29B6E8]/40", pro: "border-[#29B6E8]/70", elite: "border-[#FFD700]/70", legendary: "border-[#FFD700]/80" };
+const BORDER = { rookie: "border-[#29B6E8]/40", pro: "border-[#29B6E8]/70", elite: "border-honor/70", legendary: "border-honor/80" };
 
 export function accountLevelTier(level) {
   const info = rankInfo(level);
@@ -20,7 +20,7 @@ export function accountLevelFrameClass(level) {
 
 export function accountAvatarFrameClass(level, isMember = false) {
   const { key } = accountLevelTier(level);
-  if (key === "rookie") return isMember ? "border-[#FFD700]/50" : "border-white/15";
+  if (key === "rookie") return isMember ? "border-honor/50" : "border-white/15";
   return `tls-account-avatar-frame tls-account-avatar-frame-${key} ${BORDER[key]}`;
 }
 

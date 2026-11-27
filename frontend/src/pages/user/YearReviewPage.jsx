@@ -10,6 +10,7 @@ import { motionAllowed, motionTransition } from "@/lib/motion";
 import { loadResultImage, prefersShareSheet, shareResultImage } from "@/lib/resultShare";
 import { bestResultText, comparisonText, countWord, fastlapText, seasonText, yearReviewPages } from "@/lib/yearReview";
 
+import { ROLE_COLORS } from "@/lib/categoryColors";
 // Jahresrückblick „Dein Jahr bei LION“ (#1195): Seiten zum Durchtippen wie eine Story - rechts tippen (oder Pfeil
 // rechts) weiter, links zurück. Nur Seiten mit Inhalt; am Ende das Bild zum Teilen (Handy: Teilen-Menü, PC:
 // herunterladen). Mit „Bewegung reduzieren“ wechseln die Seiten ohne Animation. Den Rückblick sieht nur man selbst.
@@ -19,7 +20,7 @@ function Big({ children, className = "" }) {
 }
 
 function Eyebrow({ children, tone = "gold" }) {
-  return <div className={`tls-type-label ${tone === "gold" ? "text-[#FFD700]" : "text-[#29B6E8]"}`}>{children}</div>;
+  return <div className={`tls-type-label ${tone === "gold" ? "text-honor" : "text-[#29B6E8]"}`}>{children}</div>;
 }
 
 function Tile({ value, label }) {
@@ -61,7 +62,7 @@ function SharePage({ review }) {
       <Eyebrow tone="cyan">Zum Teilen</Eyebrow>
       <div className="tls-type-section leading-tight">Dein Jahr als Bild</div>
       <div className="flex-1 min-h-0 flex items-center justify-center">
-        {url ? <img src={url} alt={`Mein ${review.year} – Zusammenfassung`} className="max-h-[46vh] w-auto rounded-sm border border-[#FFD700]/30" data-testid="year-review-card" />
+        {url ? <img src={url} alt={`Mein ${review.year} – Zusammenfassung`} className="max-h-[46vh] w-auto rounded-sm border border-brand/30" data-testid="year-review-card" />
           : <div className="tls-type-small text-quiet" data-testid="year-review-card-loading">Bild wird gezeichnet …</div>}
       </div>
       <div className="flex flex-wrap gap-2">
@@ -87,7 +88,7 @@ function PageBody({ page, review }) {
       return (
         <div className="flex flex-col gap-4">
           <Eyebrow>Dein Jahr bei {review.club_name}</Eyebrow>
-          <Big className="text-[#FFD700]">{review.year}</Big>
+          <Big className="text-brand">{review.year}</Big>
           <p className="text-white/70 tls-type-body">Turniere, Siege, Events und Bestzeiten – tipp dich durch dein Jahr. Rechts tippen für weiter.</p>
         </div>
       );
@@ -148,7 +149,7 @@ function PageBody({ page, review }) {
           <ul className="space-y-2">
             {(review.achievements.top || []).map((row) => (
               <li key={row.name} className="flex items-center gap-3 tls-type-small">
-                <span className="w-3 h-3 rounded-full shrink-0" style={{ backgroundColor: row.material_color || "#FFD700" }} aria-hidden="true" />
+                <span className="w-3 h-3 rounded-full shrink-0" style={{ backgroundColor: row.material_color || ROLE_COLORS.honor }} aria-hidden="true" />
                 <span className="font-semibold truncate">{row.name}</span>
                 {row.material_name ? <span className="text-white/45 tls-type-small shrink-0">{row.material_name}</span> : null}
               </li>
@@ -160,7 +161,7 @@ function PageBody({ page, review }) {
       return (
         <div className="flex flex-col gap-4">
           <Eyebrow>{review.season.name}</Eyebrow>
-          <Big className="text-[#FFD700]">Platz {review.season.rank}</Big>
+          <Big className="text-honor">Platz {review.season.rank}</Big>
           <p className="text-white/70">{seasonText(review)}</p>
         </div>
       );

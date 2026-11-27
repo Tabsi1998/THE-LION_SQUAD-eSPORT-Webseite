@@ -7,11 +7,12 @@ import { Award, Download, Gift, CheckCircle2, Clock, XCircle, MapPin, Trophy, Us
 import { Link } from "react-router-dom";
 import { asInstant, viennaDate } from "@/lib/vienna";
 
+import { ROLE_COLORS } from "@/lib/categoryColors";
 const STATUS = {
-  pending: { label: "Wird vorbereitet", color: "text-[#FFD700]", icon: Clock },
+  pending: { label: "Wird vorbereitet", color: "text-quiet", icon: Clock },
   ready: { label: "Bereit zur Abholung", color: "text-[#29B6E8]", icon: Gift },
-  picked_up: { label: "Abgeholt", color: "text-[#00FF88]", icon: CheckCircle2 },
-  expired: { label: "Verfallen", color: "text-[#FF3B30]", icon: XCircle },
+  picked_up: { label: "Abgeholt", color: "text-ok", icon: CheckCircle2 },
+  expired: { label: "Verfallen", color: "text-quiet", icon: XCircle },
 };
 
 function formatDate(value) {
@@ -95,16 +96,16 @@ function PrizesView({ data, onRetry }) {
 
       {(items.length > 0 || certificates.length > 0) && (
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-8">
-          <PrizeStat icon={Gift} label="Offen" value={open.length} color="#FFD700" />
+          <PrizeStat icon={Gift} label="Offen" value={open.length} color={ROLE_COLORS.honor} />
           <PrizeStat icon={MapPin} label="Abholbereit" value={ready.length} color="#29B6E8" />
-          <PrizeStat icon={CheckCircle2} label="Abgeholt" value={closed.filter((p) => p.status === "picked_up").length} color="#00FF88" />
+          <PrizeStat icon={CheckCircle2} label="Abgeholt" value={closed.filter((p) => p.status === "picked_up").length} color={ROLE_COLORS.ok} />
           <PrizeStat icon={Award} label="Urkunden" value={certificates.length} color="#A855F7" />
         </div>
       )}
 
       {certificates.length > 0 && (
         <section className="mb-10">
-          <h2 className="tls-type-section text-[#FFD700] mb-4">Meine Urkunden</h2>
+          <h2 className="tls-type-section text-honor mb-4">Meine Urkunden</h2>
           <div className="grid sm:grid-cols-2 gap-4">{certificates.map((item) => <CertificateCard key={item.id} item={item} />)}</div>
         </section>
       )}
@@ -145,16 +146,16 @@ function absoluteDownloadUrl(path) {
 
 function CertificateCard({ item }) {
   return (
-    <div data-testid={`my-certificate-${item.id}`} className="border border-[#FFD700]/35 bg-gradient-to-br from-[#FFD700]/10 to-transparent rounded-sm p-5">
+    <div data-testid={`my-certificate-${item.id}`} className="border border-honor/35 bg-gradient-to-br from-honor/10 to-transparent rounded-sm p-5">
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
-          <div className="tls-type-label text-[#FFD700] flex items-center gap-2">
+          <div className="tls-type-label text-honor flex items-center gap-2">
             <Award className="w-3.5 h-3.5" /> {item.label || `Platz #${item.rank}`}
           </div>
           <div className="tls-type-card mt-1">{item.title}</div>
           <div className="mt-1 tls-type-small text-white/50">{item.category || "Gesamtwertung"}</div>
         </div>
-        <div className="shrink-0 w-10 h-10 border border-[#FFD700]/40 rounded-sm flex items-center justify-center tls-type-num text-[#FFD700]">
+        <div className="shrink-0 w-10 h-10 border border-honor/40 rounded-sm flex items-center justify-center tls-type-num text-honor">
           {item.rank}
         </div>
       </div>
@@ -164,7 +165,7 @@ function CertificateCard({ item }) {
             Anzeigen
           </Link>
         )}
-        <a href={absoluteDownloadUrl(item.download_url)} target="_blank" rel="noreferrer" className="inline-flex items-center gap-2 px-3 py-2 border border-[#FFD700]/45 text-[#FFD700] rounded-sm tls-type-label hover:bg-[#FFD700]/10">
+        <a href={absoluteDownloadUrl(item.download_url)} target="_blank" rel="noreferrer" className="inline-flex items-center gap-2 px-3 py-2 border border-honor/45 text-honor rounded-sm tls-type-label hover:bg-honor/10">
           <Download className="w-3 h-3" /> PDF
         </a>
       </div>
@@ -187,7 +188,7 @@ function PrizeCard({ p, highlight }) {
           </div>
           <div className="tls-type-card mt-1">{p.prize_label}</div>
           {p.recipient_type === "team" && (
-            <div className="mt-1 inline-flex items-center gap-1.5 tls-type-label text-[#10B981]">
+            <div className="mt-1 inline-flex items-center gap-1.5 tls-type-label text-ok">
               <Users className="w-3 h-3" /> Team-Gewinn: {p.recipient_label}
             </div>
           )}
@@ -216,7 +217,7 @@ function PrizeCard({ p, highlight }) {
         </div>
       )}
       {p.pickup_deadline && p.status === "ready" && (
-        <div className={`mt-3 tls-type-small flex items-center gap-1.5 ${urgent ? "text-[#FFD700]" : "text-quiet"}`}>
+        <div className={`mt-3 tls-type-small flex items-center gap-1.5 ${urgent ? "text-warn" : "text-quiet"}`}>
           <CalendarDays className="w-3 h-3" />
           Abholbar bis: {formatDate(p.pickup_deadline)}
           {urgent && <span className="font-bold uppercase tracking-widest">· {due < 0 ? "überfällig" : `${due} Tage`}</span>}

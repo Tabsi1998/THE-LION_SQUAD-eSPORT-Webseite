@@ -120,7 +120,7 @@ export function EventDaysSection({ value, onChange, locations, startDate, endDat
                 <span className="flex items-center gap-1">
                   <button type="button" onClick={() => move(index, -1)} disabled={index === 0} className="p-1.5 border border-white/10 rounded-sm disabled:opacity-30" aria-label={`Tag ${index + 1} nach oben`}><ArrowUp className="w-3.5 h-3.5" /></button>
                   <button type="button" onClick={() => move(index, 1)} disabled={index === days.length - 1} className="p-1.5 border border-white/10 rounded-sm disabled:opacity-30" aria-label={`Tag ${index + 1} nach unten`}><ArrowDown className="w-3.5 h-3.5" /></button>
-                  <button type="button" onClick={() => onChange(days.filter((_, i) => i !== index))} className="p-1.5 border border-[#FF3B30]/40 text-[#FF3B30] rounded-sm" aria-label={`Tag ${index + 1} entfernen`} data-testid={`event-day-remove-${index}`}><Trash2 className="w-3.5 h-3.5" /></button>
+                  <button type="button" onClick={() => onChange(days.filter((_, i) => i !== index))} className="p-1.5 border border-live/40 text-live rounded-sm" aria-label={`Tag ${index + 1} entfernen`} data-testid={`event-day-remove-${index}`}><Trash2 className="w-3.5 h-3.5" /></button>
                 </span>
               </div>
               <div className="grid grid-cols-3 gap-2">
@@ -144,7 +144,7 @@ export function EventDaysSection({ value, onChange, locations, startDate, endDat
             <button type="button" onClick={add} className="inline-flex items-center gap-2 px-3 py-2 border border-white/15 text-white/70 hover:text-white tls-type-label rounded-sm" data-testid="event-days-add">
               <Plus className="w-3.5 h-3.5" /> Tag
             </button>
-            {error && <div className="tls-type-small text-[#FF3B30]" data-testid="event-days-error">{error}</div>}
+            {error && <div className="tls-type-small text-warn" data-testid="event-days-error">{error}</div>}
           </div>
           <p className="tls-type-small text-white/45">Endet ein Tag nach Mitternacht, trage die Endzeit einfach ein (z. B. 02:00) – sie zählt zum nächsten Morgen. Kalender und Discord bekommen je Tag einen Termin.</p>
         </>

@@ -92,7 +92,7 @@ export function PrivacyTab({ form, set, setVisibility, setVisibilityGroup, autos
           </div>
         </div>
         {publicProfile ? null : (
-          <p className="tls-type-small text-[#FFD700] mb-4" data-testid="profile-visibility-hint">
+          <p className="tls-type-small text-quiet mb-4" data-testid="profile-visibility-hint">
             Solange das Profil nicht öffentlich ist, sieht niemand diese Felder. Die Stufen gelten, sobald du es einschaltest.
           </p>
         )}
@@ -134,7 +134,7 @@ export function PrivacyTab({ form, set, setVisibility, setVisibilityGroup, autos
                   </div>
                 </div>
                 {current === "mixed" ? (
-                  <p className="tls-type-small text-[#FFD700] mt-2" data-testid={`profile-vis-group-${group.k}-mixed`}>Gemischt: Die Felder dieser Gruppe haben unterschiedliche Stufen.</p>
+                  <p className="tls-type-small text-quiet mt-2" data-testid={`profile-vis-group-${group.k}-mixed`}>Gemischt: Die Felder dieser Gruppe haben unterschiedliche Stufen.</p>
                 ) : null}
                 {current === "admins" ? (
                   <p className="tls-type-small text-white/50 mt-2">Alle Felder dieser Gruppe stehen auf „Nur Admins“.</p>

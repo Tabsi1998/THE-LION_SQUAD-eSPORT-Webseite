@@ -84,6 +84,7 @@ const EXCEPTIONS = {
   "components/tls/GlobalSearch.jsx": 1, // Kacheln der Suche
   "components/tls/MentionText.jsx": 1, // @-Erwähnung im Text
   "components/tls/PublicLayout.jsx": 2, // offizieller Discord-Knopf; Login als Personen-Symbol wie Lupe und Glocke (#1234)
+  "components/tls/references/HonorHeader.jsx": 1, // Sprungmarken als Chips (seit #1305 erkennt der Test auch Farb-Rollen)
   "pages/public/CalendarPage.jsx": 1, // Terminzeile
   "pages/public/EventDetailPage.jsx": 1, // Zeile eines Turniers am Event
   "pages/public/FaqPage.jsx": 1, // Zeile einer Anleitung in einem Bereich der FAQ (#2448)
@@ -112,7 +113,8 @@ function ownStyledButtons(text) {
     if (!tag || !["button", "Link", "a", "NavLink"].includes(tag.name)) continue;
     const cls = m[1];
     if (/\btls-(btn|store|card)\b/.test(cls) || !/\bp[xy]-\d/.test(cls)) continue;
-    const colorful = /\b(?:bg|border)-\[#[0-9A-Fa-f]{6}\]/.test(cls);
+    // Farbig: ein Hexwert oder eine Farb-Rolle (#1305: bg-honor/5, border-warn/40 …).
+    const colorful = /\b(?:bg|border)-(?:\[#[0-9A-Fa-f]{6}\]|(?:brand|live|warn|ok|honor|event|quiet)\b)/.test(cls);
     // GROSS kommt seit der Schrift-Treppe (#1302) auch vom Etikett (tls-type-label).
     if (colorful || (/\bborder\b/.test(cls) && /\b(?:uppercase|tls-type-label)\b/.test(cls))) count += 1;
   }

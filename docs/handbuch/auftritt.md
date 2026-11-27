@@ -104,7 +104,7 @@ damit es auf dem Handy scharf bleibt. Ein Bild könnt ihr neu hochladen oder aus
 
 **Favicon aus dem Logo erzeugen:** Der Knopf **Aus Logo und Akzentfarbe erzeugen** macht ein Standard-Favicon: das weiße
 Logo auf einem Kreis in der Akzentfarbe. Das lohnt sich, wenn ihr nur ein Favicon für dunklen Modus habt, das auf
-hellen Tableisten unsichtbar wäre (dann warnt die Seite gelb).
+hellen Tableisten unsichtbar wäre (dann warnt die Seite orange).
 
 **Hinweisleisten** (Abschnitt „Banner-Manager“): **Neuer Banner**, dann **Interner Titel**, **Text**, **Stil** (Info,
 Live, Warnung, Erfolg), **Design** (Neon, Signal, Minimal), **Animation** (Lauftext oder Statisch), **Position**
@@ -244,7 +244,7 @@ Menü**, am PC und am Tablet quer **ganz unten in der Fußzeile** – je Gerät 
 - Oben vier Kacheln: **Angelegt** („x von 24“), **Hinweise**, **Personen dabei**, **Stand** (leer / bereit / läuft).
 - **Vorschau** zeigt den Kalender (erst ab dem ersten Türchen). **Aus <Vorjahr> übernehmen** kopiert die Türchen vom
   Vorjahr. **Kalender öffnen** erscheint, sobald er läuft.
-- Pro Tag **Anlegen** oder **Bearbeiten**; mit dem Papierkorb-Symbol leert ihr ein Türchen. Warnt die Seite gelb,
+- Pro Tag **Anlegen** oder **Bearbeiten**; mit dem Papierkorb-Symbol leert ihr ein Türchen. Warnt die Seite orange,
   lest den Hinweis dort; er sagt, was fehlt.
 
 Ein Türchen kann sein:

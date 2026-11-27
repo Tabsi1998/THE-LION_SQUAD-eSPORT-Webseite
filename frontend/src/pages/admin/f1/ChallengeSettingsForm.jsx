@@ -17,6 +17,7 @@ import { LIVE_HINT } from "@/lib/fastLapStatus";
 import { streamFormValues, streamPayload } from "@/lib/tournamentStream";
 import { FastLapChampionshipFields, FastLapStreamFields } from "./FastLapRulesFields";
 
+import { ROLE_COLORS } from "@/lib/categoryColors";
 // Nach „Ergebnisse veröffentlicht“ (#1584) ändern Wertungsregeln Rangfolge, Gewinne oder Saisonpunkte - nur mit
 // Begründung; danach gleicht der Server Gewinne und Punkte an. Dieselbe Liste wie SCORING_FIELDS in f1_routes.py.
 const LOCKED_STATUSES = new Set(["results_published", "archived"]);
@@ -152,11 +153,11 @@ export function ChallengeSettingsForm({ challenge, onSaved }) {
               <TextField label="Start Challenge/Event" type="datetime-local" value={form.start_date} onChange={(v)=>set("start_date", v)} testId="f1-edit-start" />
               <TextField label="Ende Challenge/Event" type="datetime-local" value={form.end_date} onChange={(v)=>set("end_date", v)} testId="f1-edit-end" />
               {/* Online-Einreichen gibt es noch nicht: der Schalter kommt mit #1278 zurück (#2130). Gespeichertes bleibt unberührt. */}
-              <CheckField label="Automatisches Fast-Lap-Hinweisbanner anzeigen" checked={form.site_banner_enabled} onChange={(v)=>set("site_banner_enabled", v)} accent="#FFD700" />
+              <CheckField label="Automatisches Fast-Lap-Hinweisbanner anzeigen" checked={form.site_banner_enabled} onChange={(v)=>set("site_banner_enabled", v)} accent={ROLE_COLORS.brand} />
               {/* Zahlen der automatischen Banner (#2352), auch nach dem Ende des Banners. */}
               <AutoBannerStats kind="fastlap" refId={challenge.id} />
             </FormSection>
-            <FormSection title="Teilnahme und Vereins-Referenzzeiten" accent="#FFD700" hint="Für externe Fast-Lap-Challenges kann die Vereinswertung sauber von Referenzzeiten getrennt werden.">
+            <FormSection title="Teilnahme und Vereins-Referenzzeiten" accent={ROLE_COLORS.honor} hint="Für externe Fast-Lap-Challenges kann die Vereinswertung sauber von Referenzzeiten getrennt werden.">
               <CheckField
                 label="Vereinsmitglieder aus offizieller Wertung ausschließen"
                 hint="Sie erscheinen nicht in Rangliste, Jahrespunkten oder Achievements dieser Challenge."
@@ -209,12 +210,12 @@ export function ChallengeSettingsForm({ challenge, onSaved }) {
 
         <FastLapPrizeEditor value={form.prize_places} onChange={(v)=>set("prize_places", v)} />
         {challenge.status === "results_published" && (
-          <div className="border border-[#FFD700]/25 bg-[#FFD700]/5 rounded-sm p-3 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+          <div className="border border-honor/25 bg-honor/5 rounded-sm p-3 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
             <div>
-              <div className="tls-type-label text-[#FFD700]">Gewinnabholung</div>
+              <div className="tls-type-label text-honor">Gewinnabholung</div>
               <div className="tls-type-small text-white/55 mt-0.5">Erzeugt fehlende Gewinn-Einträge aus der aktuellen Fast-Lap-Wertung.</div>
             </div>
-            <button type="button" disabled={creatingPrizes} onClick={createPrizePickups} className="px-4 py-2 bg-[#FFD700] text-black tls-type-label rounded-sm disabled:opacity-50">
+            <button type="button" disabled={creatingPrizes} onClick={createPrizePickups} className="px-4 py-2 bg-honor text-black tls-type-label rounded-sm disabled:opacity-50">
               {creatingPrizes ? "Erzeuge..." : "Gewinne erzeugen"}
             </button>
           </div>
@@ -233,10 +234,10 @@ function FastLapPrizeEditor({ value, onChange }) {
     onChange(next);
   };
   return (
-    <div className="border border-[#FFD700]/20 bg-[#FFD700]/5 rounded-sm p-4 space-y-3">
+    <div className="border border-honor/20 bg-honor/5 rounded-sm p-4 space-y-3">
       <div className="flex items-center justify-between gap-3">
         <div>
-          <div className="tls-type-label text-[#FFD700]">Preise</div>
+          <div className="tls-type-label text-honor">Preise</div>
           <div className="tls-type-small text-white/50 mt-0.5">Wird bei Ergebnisveröffentlichung als Gewinnabholung angelegt.</div>
         </div>
         <button
@@ -277,7 +278,7 @@ function FastLapPrizeEditor({ value, onChange }) {
             type="button"
             onClick={() => onChange(prizes.filter((_, j) => j !== i))}
             data-testid={`f1-edit-prize-remove-${i}`}
-            className="col-span-1 text-white/40 hover:text-[#FF3B30] text-center py-2"
+            className="col-span-1 text-white/40 hover:text-live text-center py-2"
           >
             x
           </button>

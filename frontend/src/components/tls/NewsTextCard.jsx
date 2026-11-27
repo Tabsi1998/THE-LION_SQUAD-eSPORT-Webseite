@@ -39,7 +39,7 @@ export function NewsTextCard({ news, size = "md", className = "" }) {
   const result = news?.result?.winner ? news.result : null;
   const thumb = size === "thumb";
   const background = result
-    ? `radial-gradient(120% 90% at 0% 100%, rgb(255 215 0 / 0.16), transparent 60%), ${SURFACE_COLORS[2]}`
+    ? `radial-gradient(120% 90% at 0% 100%, rgb(var(--tls-honor-rgb) / 0.16), transparent 60%), ${SURFACE_COLORS[2]}`
     : undefined;
   const pad = size === "lg" ? "p-6 md:p-8" : "p-5";
   return (

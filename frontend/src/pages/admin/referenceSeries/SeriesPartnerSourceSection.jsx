@@ -94,7 +94,7 @@ function SourceForm({ url, state, onSaved, onCancel }) {
           disabled={!platform} testId="partner-source-partner" hint="Partner dieser Saison – ohne Partner verlinkt der Hinweis die Plattform."
           options={[["", "Ohne Partner – Link zur Plattform"], ...partners.map((partner) => [partner.id, partner.role === "organizer" ? `${partner.name} (Veranstalter)` : partner.name])]} />
       </div>
-      {listError && <p className="tls-type-small text-amber-200" role="alert" data-testid="partner-source-list-error">{listError}</p>}
+      {listError && <p className="tls-type-small text-warn" role="alert" data-testid="partner-source-list-error">{listError}</p>}
       <div className="flex flex-wrap items-center gap-2">
         <button type="button" onClick={save} disabled={!ready || saving} data-testid="partner-source-save"
           className="tls-btn tls-btn--primary px-4 py-2 rounded-sm tls-type-label disabled:opacity-50">
@@ -136,7 +136,7 @@ function PreviewItem({ item, picked, onToggle }) {
         <div className="tls-type-small text-white/60">{targetText(item)}</div>
         {counts && <div className="tls-type-small text-white/45 tabular-nums">{counts}</div>}
         {problems.length > 0 && (
-          <ul className="tls-type-small text-red-200 space-y-0.5" data-testid="partner-item-problems">
+          <ul className="tls-type-small text-warn space-y-0.5" data-testid="partner-item-problems">
             {problems.map((text, index) => <li key={index}>{text}</li>)}
           </ul>
         )}
@@ -247,7 +247,7 @@ export function SeriesPartnerSourceSection({ series, onChanged }) {
           onSaved={(saved) => { setState((current) => ({ ...current, source: saved })); setEditing(false); setPreview(null); }} />
       )}
       {fetchError && (
-        <p className="mt-3 border border-red-400/40 bg-red-400/10 rounded-sm px-3 py-2 tls-type-small text-red-100" role="alert" data-testid="partner-source-error">{fetchError}</p>
+        <p className="mt-3 border border-warn/40 bg-warn/10 rounded-sm px-3 py-2 tls-type-small text-white/85" role="alert" data-testid="partner-source-error">{fetchError}</p>
       )}
       {preview && !editing && (
         <div className="mt-4" data-testid="partner-source-preview">

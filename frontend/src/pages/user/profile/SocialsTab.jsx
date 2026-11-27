@@ -83,7 +83,7 @@ function LinkRow({ platformKey, link, available, form, set, onLink, onUnlink, in
       <div className="min-w-0 flex-1">
         <div className="flex items-center gap-1.5 tls-type-small font-bold text-white">
           <span>{label}</span>
-          {link && <span className="inline-flex items-center gap-1 text-[#00FF88] tls-type-small font-bold" data-testid={`${testId}-verified`}><BadgeCheck className="w-3.5 h-3.5" aria-hidden="true" /> verifiziert</span>}
+          {link && <span className="inline-flex items-center gap-1 text-ok tls-type-small font-bold" data-testid={`${testId}-verified`}><BadgeCheck className="w-3.5 h-3.5" aria-hidden="true" /> verifiziert</span>}
         </div>
         {link ? (
           <div className="tls-type-small text-white/55 truncate" data-testid={`${testId}-linked-since`}>
@@ -112,7 +112,7 @@ function LinkRow({ platformKey, link, available, form, set, onLink, onUnlink, in
           </a>
         )}
         {link && (
-          <button type="button" onClick={() => onUnlink(platformKey)} data-testid={`${testId}-unlink`} className="inline-flex items-center gap-1 px-2.5 py-1.5 border border-white/15 rounded-sm tls-type-label text-white/60 hover:text-[#FF3B30] hover:border-[#FF3B30]/50">
+          <button type="button" onClick={() => onUnlink(platformKey)} data-testid={`${testId}-unlink`} className="inline-flex items-center gap-1 px-2.5 py-1.5 border border-white/15 rounded-sm tls-type-label text-white/60 hover:text-live hover:border-live/50">
             <Unlink className="w-3.5 h-3.5" aria-hidden="true" /> Verknüpfung lösen
           </button>
         )}

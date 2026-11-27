@@ -138,7 +138,7 @@ test.describe("Abnahme #1756: Ergebnis-Bild auslesen - einfügen, Vorschau, korr
       await expect(sheet.getByTestId("result-preview")).toBeVisible();
       const yellow = await sheet.getByTestId("result-row-ocr").count();
       expect(yellow, "das unscharfe Bild hat unsichere Zeilen").toBeGreaterThan(0);
-      await expect(sheet.getByTestId("result-submit")).toHaveText("Gelbe Zeilen prüfen");
+      await expect(sheet.getByTestId("result-submit")).toHaveText("Orange Zeilen prüfen");
       await admin.waitForTimeout(1600); // das Aufleuchten der gelben Felder ist vorbei
       await shot(admin, sheet, "ergebnis-bild-gelb-1440");
 

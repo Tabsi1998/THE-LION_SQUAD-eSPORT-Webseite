@@ -321,7 +321,7 @@ export default function AdminEventsPage() {
                           <div className="font-bold text-white">{e.registration_summary?.reserved_seats || 0}{e.max_participants ? `/${e.max_participants}` : ""} Plätze</div>
                           <div className="tls-type-small text-quiet">{e.registration_summary?.registered_count || 0} Anm. · {e.registration_summary?.companion_count || 0} Begleitp.</div>
                           {e.registration_summary?.waitlist_count ? (
-                            <div className="tls-type-small text-honor" data-testid={`event-waitlist-${e.id}`}>
+                            <div className="tls-type-small text-quiet" data-testid={`event-waitlist-${e.id}`}>
                               {e.registration_summary.waitlist_count} Warteliste{e.registration_summary?.spots_left ? ` · ${e.registration_summary.spots_left} frei` : ""}
                             </div>
                           ) : null}
@@ -338,7 +338,7 @@ export default function AdminEventsPage() {
                         </button>
                       )}
                       <Link to={`/admin/events/${e.id}`} data-testid={`event-edit-${e.id}`} className="inline-flex tls-type-label px-3 py-1 rounded-sm border border-[#9F7AEA]/40 text-[#9F7AEA] hover:bg-[#9F7AEA]/10">Bearbeiten</Link>
-                      <button onClick={() => remove(e)} data-testid={`event-delete-${e.id}`} className="tls-type-label px-3 py-1 rounded-sm border border-[#FF3B30]/40 text-[#FF3B30] hover:bg-[#FF3B30]/10 inline-flex items-center"><Trash2 className="w-3 h-3" /></button>
+                      <button onClick={() => remove(e)} data-testid={`event-delete-${e.id}`} className="tls-type-label px-3 py-1 rounded-sm border border-live/40 text-live hover:bg-live/10 inline-flex items-center"><Trash2 className="w-3 h-3" /></button>
                       </div>
                     </td>
                   </tr>

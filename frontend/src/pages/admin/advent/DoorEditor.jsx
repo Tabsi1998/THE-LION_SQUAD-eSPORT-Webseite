@@ -173,7 +173,7 @@ export function DoorEditor({ year, day, door, kinds, options, locked = false, sa
         </FormGrid>
       </FormSection>
 
-      {problem && <div className="rounded-sm border border-[#FF3B30]/40 bg-[#FF3B30]/10 px-4 py-3 tls-type-small text-[#ffb4ae]" role="alert" data-testid="advent-editor-problem">{problem}</div>}
+      {problem && <div className="rounded-sm border border-warn/40 bg-warn/10 px-4 py-3 tls-type-small text-warn" role="alert" data-testid="advent-editor-problem">{problem}</div>}
 
       <FormSection title="So sieht es aus" accent={GOLD} hint="Das Fenster, das sich nach dem Öffnen zeigt. Die Verlosung und das Quiz sind hier nur zum Ansehen." testId="advent-editor-preview">
         <div className="tls-adv-dialog !static !max-h-none !w-full !translate-x-0 !translate-y-0" style={{ position: "static" }}>

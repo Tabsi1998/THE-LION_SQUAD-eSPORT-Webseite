@@ -15,7 +15,7 @@ const ACCESS_EVENT_LIMIT_FIELDS = [
 
 function FieldError({ message, testId }) {
   if (!message) return null;
-  return <p role="alert" className="mt-1 tls-type-small text-[#FF6B6B]" data-testid={testId}>{message}</p>;
+  return <p role="alert" className="mt-1 tls-type-small text-warn" data-testid={testId}>{message}</p>;
 }
 const LIMIT_KEYS = [...ACCESS_LIMIT_FIELDS, ...ACCESS_EVENT_LIMIT_FIELDS].map(([key]) => key).concat(["event_limits_from", "event_limits_until"]);
 
@@ -59,7 +59,7 @@ function AccessLimitsCard({ authConfig, savingAuth, saveAuth }) {
             <p className="tls-type-small text-white/50 mt-1">In diesem Zeitraum (höchstens drei Tage) gelten die Event-Werte, danach von selbst wieder die normalen.</p>
           </div>
           {authConfig.event_limits_active && (
-            <span className="shrink-0 whitespace-nowrap tls-type-label text-[#00FF88]" data-testid="access-event-active">Läuft gerade</span>
+            <span className="shrink-0 whitespace-nowrap tls-type-label text-live" data-testid="access-event-active">Läuft gerade</span>
           )}
         </div>
         <div className="grid sm:grid-cols-2 gap-3">

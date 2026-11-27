@@ -25,6 +25,7 @@ import { dateWarnings } from "@/lib/tournamentDateWarnings";
 import { toast } from "sonner";
 import { AlertTriangle } from "lucide-react";
 
+import { ROLE_COLORS } from "@/lib/categoryColors";
 const CREATE_STATUS_OPTIONS = [
   ["draft", "Entwurf"],
   ["scheduled", "Angekündigt"],
@@ -243,12 +244,12 @@ export default function AdminTournamentNewPage() {
                 <TextField label="Check-in endet" type="datetime-local" value={form.check_in_until} onChange={(v) => set("check_in_until", v)} testId="new-tr-checkin-until" />
                 <CheckField label="Nur Einladung/manuelle Teilnehmer, keine öffentliche Anmeldung" checked={form.is_invite_only} onChange={(v) => set("is_invite_only", v)} testId="new-tr-invite-only" />
                 <CheckField label="Anmeldung über Discord erlauben (/anmelden und Knopf unter der Ankündigung)" checked={form.discord_registration} onChange={(v) => set("discord_registration", v)} testId="new-tr-discord-registration" accent="#5865F2" />
-                <CheckField label="Vereinsmitglieder von der Selbstanmeldung ausschließen, z.B. wenn wir das Turnier für externe Teilnehmer veranstalten" checked={form.block_club_member_registration} onChange={(v) => set("block_club_member_registration", v)} testId="new-tr-block-members" accent="#FFD700" />
+                <CheckField label="Vereinsmitglieder von der Selbstanmeldung ausschließen, z.B. wenn wir das Turnier für externe Teilnehmer veranstalten" checked={form.block_club_member_registration} onChange={(v) => set("block_club_member_registration", v)} testId="new-tr-block-members" accent={ROLE_COLORS.brand} />
                 {event && <CheckField label="Anmeldung nur mit Event-Anmeldung – wer nicht beim Event angemeldet ist, kann sich nicht anmelden (Teams: so viele Spieler wie die Teamgröße)" checked={form.requires_event_registration} onChange={(v) => set("requires_event_registration", v)} testId="new-tr-event-gate" accent="#29B6E8" />}
               </FormSection>
             </FormSection>
             {planningWarnings.length > 0 && (
-              <div className="rounded-sm border border-[#FFD700]/30 bg-[#FFD700]/5 p-4 tls-type-small text-[#FFD700]" data-testid="new-tr-planning-warnings">
+              <div className="rounded-sm border border-warn/30 bg-warn/5 p-4 tls-type-small text-warn" data-testid="new-tr-planning-warnings">
                 <div className="flex items-start gap-3">
                   <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0" />
                   <div className="space-y-1">
@@ -292,7 +293,7 @@ export default function AdminTournamentNewPage() {
           </FormSection>
           <FormGrid>
             <CheckField label="Öffentliche Anmeldung grundsätzlich erlauben" checked={form.registration_enabled} onChange={(v) => set("registration_enabled", v)} testId="new-tr-reg-enabled" />
-            <CheckField label="Automatisches Turnier-Hinweisbanner für dieses Turnier anzeigen" checked={form.site_banner_enabled} onChange={(v) => set("site_banner_enabled", v)} testId="new-tr-site-banner" accent="#FFD700" />
+            <CheckField label="Automatisches Turnier-Hinweisbanner für dieses Turnier anzeigen" checked={form.site_banner_enabled} onChange={(v) => set("site_banner_enabled", v)} testId="new-tr-site-banner" accent={ROLE_COLORS.brand} />
             <CheckField label="Ohne Discord" hint="Keine Meldung, kein Thread, kein Bracket und kein Termin im Discord – etwa für Probe- oder interne Turniere." checked={form.discord_skip} onChange={(v) => set("discord_skip", v)} testId="new-tr-discord-skip" accent="#5865F2" />
             {/* Vor Ort startet die Turnierleitung selbst (#2111, W4) - der Schalter fehlt dort und geht aus. */}
             {form.event_mode !== "local" && <CheckField label="Turnier anhand Start-/Endzeit automatisch live/beendet schalten" checked={form.auto_start_enabled} onChange={(v) => set("auto_start_enabled", v)} testId="new-tr-auto-start" className="md:col-span-2" />}
@@ -348,7 +349,7 @@ export default function AdminTournamentNewPage() {
         </FormSection>
 
         {/* Structured Prize Places */}
-        <FormSection title="Preise" collapsible accent="#FFD700">
+        <FormSection title="Preise" collapsible accent={ROLE_COLORS.honor}>
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div className="tls-type-small text-white/50">Jede Zeile erscheint als eigene Preis-Karte auf der Turnierseite.</div>
             <div className="flex flex-wrap justify-end gap-3">
@@ -356,7 +357,7 @@ export default function AdminTournamentNewPage() {
               {rules.loserBracketPrizes && <button type="button" onClick={() => addPrizeTop3("winner")} data-testid="new-tr-prize-winner-top3" className="tls-type-label text-[#29B6E8] hover:text-white">+ Siegerrunde Top 3</button>}
               {rules.loserBracketPrizes && <button type="button" onClick={() => addPrizeTop3("loser")} data-testid="new-tr-prize-loser-top3" className="tls-type-label text-[#CD7F32] hover:text-white">+ Verliererrunde Top 3</button>}
               <button type="button" onClick={() => set("prize_places", [...form.prize_places, { group: "overall", place: form.prize_places.length + 1, label: `Platz ${form.prize_places.length + 1}`, value: "" }])} data-testid="new-tr-prize-add" className="tls-type-label text-[#29B6E8] hover:text-white">+ Platz hinzufügen</button>
-              <button type="button" onClick={() => set("prize_places", [...form.prize_places, { group: "overall", place: "last", label: "Letzter Platz", value: "" }])} data-testid="new-tr-prize-last" className="tls-type-label text-[#FFD700] hover:text-white">+ Letzter Platz</button>
+              <button type="button" onClick={() => set("prize_places", [...form.prize_places, { group: "overall", place: "last", label: "Letzter Platz", value: "" }])} data-testid="new-tr-prize-last" className="tls-type-label text-honor hover:text-white">+ Letzter Platz</button>
             </div>
           </div>
           {form.prize_places.map((p, i) => (
@@ -370,7 +371,7 @@ export default function AdminTournamentNewPage() {
               </select>
               <input value={p.label || ""} onChange={(e) => updatePrize(i, { label: e.target.value })} data-testid={`new-tr-prize-label-${i}`} className="col-span-4 sm:col-span-3 bg-[#0A0A0A] border border-white/10 px-2 py-2 rounded-sm text-sm" placeholder="Bezeichnung (z.B. Champion)" />
               <input value={p.value || ""} onChange={(e) => updatePrize(i, { value: e.target.value })} data-testid={`new-tr-prize-value-${i}`} className="col-span-5 sm:col-span-3 bg-[#0A0A0A] border border-white/10 px-2 py-2 rounded-sm text-sm" placeholder="Preis (z.B. 100 €)" />
-              <button type="button" onClick={() => set("prize_places", form.prize_places.filter((_, j) => j !== i))} data-testid={`new-tr-prize-remove-${i}`} className="col-span-1 text-white/40 hover:text-[#FF3B30] text-center py-2">✕</button>
+              <button type="button" onClick={() => set("prize_places", form.prize_places.filter((_, j) => j !== i))} data-testid={`new-tr-prize-remove-${i}`} className="col-span-1 text-white/40 hover:text-live text-center py-2">✕</button>
             </div>
           ))}
           <MarkdownField label="Freier Preistext (wenn die Plätze oben nicht reichen)" value={form.prize_pool} onChange={(v) => set("prize_pool", v)} testId="new-tr-prizes" />
@@ -426,7 +427,7 @@ function RulePresetPicker({ form, onApply }) {
         ))}
       </div>
       <div className="mt-2 tls-type-small text-white/55">{ruleModeSummary(form)}</div>
-      {warnings.length > 0 && <div className="mt-2 tls-type-small text-[#FFD700]">{warnings.join(" ")}</div>}
+      {warnings.length > 0 && <div className="mt-2 tls-type-small text-warn">{warnings.join(" ")}</div>}
     </div>
   );
 }

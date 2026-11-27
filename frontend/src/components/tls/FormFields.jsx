@@ -5,7 +5,7 @@ export const INPUT_CLASS = "w-full bg-[#0A0A0A] border border-white/10 focus:bor
 const LABEL_CLASS = "tls-type-label text-white/60 mb-1.5";
 
 export function RequiredMark() {
-  return <span className="text-[#FF3B30] ml-1" title="Pflichtfeld">*</span>;
+  return <span className="text-quiet ml-1" title="Pflichtfeld">*</span>;
 }
 
 // Beschriftung um beliebige Inhalte (Editor, Bild-Upload, Listen). Bewusst kein <label>, damit

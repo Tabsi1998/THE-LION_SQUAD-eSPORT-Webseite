@@ -84,7 +84,7 @@ function StepMark({ step, highlighted }) {
       </span>
     );
   }
-  const tone = step.past ? "border-[#00FF88]/60 text-[#00FF88]" : highlighted ? "border-[#29B6E8]" : "border-white/20";
+  const tone = step.past ? "border-ok/60 text-ok" : highlighted ? "border-[#29B6E8]" : "border-white/20";
   return <span className={`mt-0.5 w-4 h-4 rounded-full border shrink-0 inline-flex items-center justify-center ${tone}`}>{step.past ? <Check className="w-3 h-3" /> : null}</span>;
 }
 

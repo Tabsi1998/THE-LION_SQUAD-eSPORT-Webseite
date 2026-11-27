@@ -230,8 +230,8 @@ function MetaList({ item }) {
 
 function TextBlock({ title, text, tone }) {
   return (
-    <div className={`border rounded-sm p-5 ${tone === "gold" ? "border-[#FFD700]/25 bg-[#FFD700]/10" : "border-white/10 bg-[#121212]"}`}>
-      <h2 className={`tls-type-section ${tone === "gold" ? "text-[#FFD700]" : "text-white"}`}>{title}</h2>
+    <div className={`border rounded-sm p-5 ${tone === "gold" ? "border-honor/25 bg-honor/10" : "border-white/10 bg-[#121212]"}`}>
+      <h2 className={`tls-type-section ${tone === "gold" ? "text-honor" : "text-white"}`}>{title}</h2>
       <p className="mt-3 tls-type-body text-white/70 leading-relaxed whitespace-pre-line">{text}</p>
     </div>
   );

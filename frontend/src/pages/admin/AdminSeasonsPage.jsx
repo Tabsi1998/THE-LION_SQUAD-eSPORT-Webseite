@@ -249,8 +249,8 @@ export default function AdminSeasonsPage() {
 
       {/* Altbestand (#2123): früher ließen sich mehrere Wertungen aktivieren - Punkte landen dann nur in einer. */}
       {list.filter((s) => s.status === "active").length > 1 && (
-        <div role="alert" data-testid="season-multiple-active" className="mb-4 rounded-sm border border-live/40 bg-live/10 p-4 tls-type-small text-white/85">
-          <strong className="text-live">Mehrere aktive Wertungen:</strong>{" "}
+        <div role="alert" data-testid="season-multiple-active" className="mb-4 rounded-sm border border-warn/40 bg-warn/10 p-4 tls-type-small text-white/85">
+          <strong className="text-warn">Mehrere aktive Wertungen:</strong>{" "}
           {list.filter((s) => s.status === "active").map((s) => `„${s.name}“`).join(", ")}. Neue Punkte landen nur in einer davon –
           bitte alle bis auf eine abschließen oder auf „Entwurf“ setzen.
         </div>
@@ -315,8 +315,8 @@ function CompleteSheet({ season, onClose, onDone }) {
   return (
     <AdminSheet title={`„${season.name}“ abschließen`} eyebrow="Jahreswertung" size="lg" onClose={onClose} onSubmit={submit} saving={saving}
       submitLabel="Endgültig abschließen" savingLabel="Schließe ab …" submitDisabled={!preview} submitTestId="season-complete-submit" testId="season-complete-sheet">
-      <div className="rounded-sm border border-honor/30 bg-honor/5 p-4 tls-type-small text-white/75 space-y-2">
-        <p className="font-bold text-honor">Das passiert einmalig und lässt sich nicht zurücknehmen:</p>
+      <div className="rounded-sm border border-warn/30 bg-warn/5 p-4 tls-type-small text-white/75 space-y-2">
+        <p className="font-bold text-warn">Das passiert einmalig und lässt sich nicht zurücknehmen:</p>
         <ul className="list-disc pl-5 space-y-1">
           <li>Die Rangliste wird festgeschrieben.</li>
           <li>Jede platzierte Person bekommt XP („Saison abgeschlossen“).</li>
@@ -324,7 +324,7 @@ function CompleteSheet({ season, onClose, onDone }) {
           <li>Neue Ergebnisse bekommen danach keine Jahrespunkte mehr, bis eine neue Jahreswertung aktiv ist.</li>
         </ul>
       </div>
-      {failed && <p className="tls-type-small text-live" role="alert">{failed}</p>}
+      {failed && <p className="tls-type-small text-warn" role="alert">{failed}</p>}
       {!preview && !failed && <p className="tls-type-small text-quiet">Lade Vorschau …</p>}
       {preview && (
         <div data-testid="season-complete-preview" className="space-y-3">
@@ -385,7 +385,7 @@ function SeasonCard({ season, onEdit, onDelete, onComplete }) {
           </button>
           <Link to={`/seasons/${season.slug}`} target="_blank" className="px-3 py-1.5 border border-white/15 text-white/70 tls-type-label rounded-sm hover:text-white">Öffentliche Seite</Link>
           {season.status === "active" && (
-            <button onClick={onComplete} data-testid={`season-complete-${season.id}`} className="px-3 py-1.5 border border-honor/50 text-honor tls-type-label rounded-sm inline-flex items-center gap-1">
+            <button onClick={onComplete} data-testid={`season-complete-${season.id}`} className="px-3 py-1.5 border border-brand/50 text-brand tls-type-label rounded-sm inline-flex items-center gap-1">
               <Flag className="w-3 h-3" /> Abschließen
             </button>
           )}
@@ -567,7 +567,7 @@ function AdjustmentsSection({ season }) {
           <ul className="divide-y divide-white/5 border border-white/10 rounded-sm" data-testid="season-adjust-list">
             {rows.map((row) => (
               <li key={row.id} className="flex flex-wrap items-center gap-x-3 gap-y-1 px-3 py-2 tls-type-small">
-                <span className={`tabular-nums font-bold ${row.total_points < 0 ? "text-live" : "text-ok"}`}>{row.total_points > 0 ? "+" : ""}{formatPoints(row.total_points)}</span>
+                <span className={`tabular-nums font-bold ${row.total_points < 0 ? "text-warn" : "text-ok"}`}>{row.total_points > 0 ? "+" : ""}{formatPoints(row.total_points)}</span>
                 <span className="min-w-0 flex-1 truncate">{row.recipient_label}</span>
                 <span className="w-full sm:w-auto tls-type-small text-white/50 break-words">{row.bonus_reason}</span>
                 <button type="button" onClick={() => remove(row)} aria-label={`Korrektur für ${row.recipient_label} entfernen`} className="p-1 text-live/80 hover:text-live">
@@ -618,7 +618,7 @@ function RuleSummary({ form }) {
 
       <div className="rounded-sm border border-white/10 bg-black/20 p-3 space-y-2 tls-type-small text-white/55">
         <div className="flex items-start gap-2">
-          <Info className="w-4 h-4 text-[#FFD700] shrink-0 mt-0.5" />
+          <Info className="w-4 h-4 text-brand shrink-0 mt-0.5" />
           <div>Streichresultate: {Number(form.drop_worst || 0)}</div>
         </div>
       </div>

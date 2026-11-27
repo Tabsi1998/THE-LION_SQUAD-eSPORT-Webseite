@@ -106,7 +106,7 @@ stehen nicht darauf. Ist die Season nicht öffentlich, gibt es kein Rankingbanne
 ### 3.6 Teamverwaltung im Admin
 
 **Admin → eSports → Teams** (auch über die Kachel **Teams** auf dem Dashboard): alle Teams mit Suche, auch private. **Ohne aktive
-Teamleitung** steht rot in der Zeile – die Teamleitung hat ihr Konto gelöscht. Ein Klick führt zur Teamseite; dort übergeben
+Teamleitung** steht orange in der Zeile – die Teamleitung hat ihr Konto gelöscht. Ein Klick führt zur Teamseite; dort übergeben
 Club-Admin und Superadmin unter **Mitglieder verwalten** mit **Zur Teamleitung machen**.
 
 **Alle Beitrittscodes erneuern** gibt jedem Team auf einmal einen neuen Code, etwa nach einer Bereinigung – mit Rückfrage und

@@ -11,7 +11,7 @@
   line-height: 1; font-variant-numeric: tabular-nums; color: rgb(255 255 255 / 0.82);
 }
 .tls-race-cell[data-medal] { color: var(--tls-race-medal); box-shadow: inset 0 0 0 1.5px var(--tls-race-medal); }
-.tls-race-cell[data-medal="gold"] { background: rgb(255 215 0 / 0.08); }
+.tls-race-cell[data-medal="gold"] { background: rgb(var(--tls-honor-rgb) / 0.08); }
 .tls-race-cell[data-status="dnf"],
 .tls-race-cell[data-status="dsq"] { font-size: var(--tls-type-label-size); letter-spacing: 0.06em; color: rgb(255 255 255 / 0.45); }
 .tls-race-cell[data-status="dns"] { font-size: var(--tls-type-label-size); letter-spacing: 0.06em; color: rgb(255 255 255 / 0.3); }
@@ -33,10 +33,10 @@
   color: rgb(255 255 255 / 0.7); box-shadow: inset 0 0 0 1px rgb(255 255 255 / 0.22);
 }
 
-/* Offizieller Wert weicht von der eigenen Summe ab (meist Strafen): klein in Gold neben den Punkten. */
+/* Offizieller Wert weicht von der eigenen Summe ab (meist Strafen): klein in Achtung-Orange neben den Punkten (#1305). */
 .tls-racing-deviation {
-  margin-left: 0.35rem; font-size: var(--tls-type-small-size); font-weight: 700; color: var(--tls-honor); cursor: help;
-  text-decoration: underline dotted rgb(var(--tls-honor-rgb) / 0.5); text-underline-offset: 3px;
+  margin-left: 0.35rem; font-size: var(--tls-type-small-size); font-weight: 700; color: var(--tls-warn); cursor: help;
+  text-decoration: underline dotted rgb(var(--tls-warn-rgb) / 0.5); text-underline-offset: 3px;
 }
 
 /* Name eines Vereinsfahrers öffnet sein Detail. */

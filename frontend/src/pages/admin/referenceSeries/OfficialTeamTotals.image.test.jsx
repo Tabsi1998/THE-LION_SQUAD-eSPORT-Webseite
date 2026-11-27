@@ -44,7 +44,7 @@ test("Bild auslesen füllt Team und Punkte, gelbe Zeilen bis „Passt so“", as
   expect(within(rows[1]).getByTestId("result-team-total-ocr")).toHaveTextContent("gelesen: 548");
   expect(within(rows[1]).getByTestId("result-team-total-hint")).toHaveTextContent("Summe der Runden 0 ≠ Punkte 543");
   expect(onOpenChange).toHaveBeenLastCalledWith(1);
-  expect(screen.getByTestId("result-team-totals-open")).toHaveTextContent("Eine Zeile aus dem Bild ist gelb");
+  expect(screen.getByTestId("result-team-totals-open")).toHaveTextContent("Eine Zeile aus dem Bild ist orange");
   fireEvent.click(within(rows[1]).getByTestId("result-team-total-confirm"));
   expect(onOpenChange).toHaveBeenLastCalledWith(0);
   expect(screen.queryByTestId("result-team-totals-open")).toBeNull();
@@ -70,15 +70,15 @@ test("„Alle Namen bestätigen“: vorbelegte gelbe Teams auf einmal, gelbe Pun
     { team: "Probe Gelb", points: "500", ocr: { read: "508", fields: ["points"] } },
   ]} />);
   const bar = screen.getByTestId("result-team-totals-confirm-names");
-  expect(bar).toHaveTextContent("2 Teams aus dem Bild vorbelegt, aber gelb");
+  expect(bar).toHaveTextContent("2 Teams aus dem Bild vorbelegt, aber orange");
   fireEvent.click(within(bar).getByTestId("result-team-totals-confirm-names-all"));
   const rows = screen.getAllByTestId("result-team-total");
   expect(rows[0]).not.toHaveAttribute("data-ocr-uncertain");
-  expect(within(rows[1]).getByTestId("result-team-total-team").className).not.toContain("amber");
-  expect(within(rows[1]).getByTestId("result-team-total-points").className).toContain("amber");
+  expect(within(rows[1]).getByTestId("result-team-total-team").className).not.toContain("border-warn");
+  expect(within(rows[1]).getByTestId("result-team-total-points").className).toContain("border-warn");
   expect(onOpenChange).toHaveBeenLastCalledWith(2);
   expect(screen.getByTestId("result-team-totals-confirm-names-done")).toHaveTextContent("2 Teams aus dem Bild bestätigt");
   fireEvent.click(screen.getByTestId("result-team-totals-confirm-names-undo"));
   expect(onOpenChange).toHaveBeenLastCalledWith(3);
-  expect(within(screen.getAllByTestId("result-team-total")[0]).getByTestId("result-team-total-team").className).toContain("amber");
+  expect(within(screen.getAllByTestId("result-team-total")[0]).getByTestId("result-team-total-team").className).toContain("border-warn");
 });

@@ -229,7 +229,7 @@ export function JerseyNumbersBox() {
 
   if (failed && !data) {
     return (
-      <div className="border border-honor/30 rounded-sm p-4" role="alert">
+      <div className="border border-warn/30 rounded-sm p-4" role="alert">
         <div className="tls-type-small text-white/80">Die Nummern wurden nicht geladen.</div>
         <button type="button" onClick={load} className={`${small} tls-btn--secondary mt-3`}>Nochmal versuchen</button>
       </div>

@@ -97,12 +97,12 @@ function EventDaysBlock({ schedule }) {
       {schedule.now?.text && <p className="tls-type-body text-white/60 mb-4" data-testid="event-days-now">{schedule.now.text}</p>}
       <ol className={`grid gap-4 ${columns}`}>
         {days.map((day) => {
-          const frame = day.state === "running" ? "border-[#FF3B30]/60 bg-[#FF3B30]/5" : day.state === "next" ? "border-[#9F7AEA]/60 bg-[#9F7AEA]/5" : "border-white/10 bg-[#121212]";
+          const frame = day.state === "running" ? "border-live/60 bg-live/5" : day.state === "next" ? "border-[#9F7AEA]/60 bg-[#9F7AEA]/5" : "border-white/10 bg-[#121212]";
           return (
             <li key={day.index} className={`tls-card border rounded-sm p-5 min-w-0 ${frame} ${day.state === "past" ? "opacity-60" : ""}`} data-testid={`event-day-${day.index}`} data-state={day.state}>
               <div className="flex items-center justify-between gap-2 tls-type-label text-[#9F7AEA]">
                 <span>Tag {day.index}/{schedule.count}</span>
-                {day.state === "running" && <span className="inline-flex items-center gap-1.5 text-[#FF3B30]"><span className="tls-live-dot" aria-hidden="true" /> Läuft</span>}
+                {day.state === "running" && <span className="inline-flex items-center gap-1.5 text-live"><span className="tls-live-dot" aria-hidden="true" /> Läuft</span>}
                 {day.state === "next" && <span className="text-white/60">Als Nächstes</span>}
                 {day.state === "past" && <span className="text-white/40">Vorbei</span>}
               </div>
@@ -293,7 +293,7 @@ function EventHeader({ e, notices = [] }) {
             <div className="flex items-center gap-3 flex-wrap">
               <span className="tls-type-label text-[#9F7AEA]" data-testid="event-kind">{eventKindLabel(e.event_type)}</span>
               <PhaseBadge phase={e.public_phase || e.event_phase} status={e.status || "draft"} size="md" />
-              {chip && <span className={`tls-type-small font-bold ${e.visibility === "members" ? "text-[#FFD700]" : "text-white/60"}`} data-testid="event-visibility">{chip}</span>}
+              {chip && <span className={`tls-type-small font-bold ${e.visibility === "members" ? "text-honor" : "text-white/60"}`} data-testid="event-visibility">{chip}</span>}
               {/* Teilen (#1154): oben rechts; interne Events öffnen sich nur für Mitglieder. */}
               <ShareButton kind="event" id={e.slug || e.id} title={e.name} start={e.start_date} end={e.end_date} className="ml-auto" />
             </div>
@@ -326,7 +326,7 @@ function EventTabs({ tabs, value, onChange }) {
           data-testid={`event-tab-${entry.key}`}
           className={`-mb-px min-h-11 border-b-2 px-4 py-2.5 tls-type-label transition ${value === entry.key ? "border-[#9F7AEA] text-white" : "border-transparent text-white/50 hover:text-white"}`}
         >
-          {entry.key === "live" ? <Radio className="inline w-3.5 h-3.5 mr-1.5 -mt-0.5 text-[#FF3B30]" aria-hidden="true" /> : null}{entry.label}
+          {entry.key === "live" ? <Radio className="inline w-3.5 h-3.5 mr-1.5 -mt-0.5 text-live" aria-hidden="true" /> : null}{entry.label}
         </button>
       ))}
     </div>
@@ -392,8 +392,8 @@ function EventOverview({ e, user, over, accessToken, hasConsent, onChanged, regi
     <div className="space-y-12" data-testid="event-overview">
       {/* Abgesagt (#2118): oben und deutlich - statt Anmeldung oder „Du bist dabei“. */}
       {cancelled && (
-        <div role="status" className="border border-[#FF6B6B]/35 bg-[#FF6B6B]/10 rounded-sm px-4 py-3 min-w-0" data-testid="event-cancelled">
-          <div className="inline-flex items-center gap-2 tls-type-label text-[#FF6B6B]">
+        <div role="status" className="border border-quiet/35 bg-quiet/10 rounded-sm px-4 py-3 min-w-0" data-testid="event-cancelled">
+          <div className="inline-flex items-center gap-2 tls-type-label text-quiet">
             <XCircle className="w-4 h-4 shrink-0" aria-hidden="true" /> Event abgesagt
           </div>
           <p className="mt-1 tls-type-small text-white/80 break-words">{cancelled}</p>
@@ -404,13 +404,13 @@ function EventOverview({ e, user, over, accessToken, hasConsent, onChanged, regi
           solange seine Daten fehlen, der Satz, wo die Ergebnisse stehen. */}
       {recap && (
         <EventRecap event={e} accessToken={accessToken} fallback={(
-          <div className="border border-[#FFD700]/30 bg-[#FFD700]/5 rounded-sm px-4 py-3" data-testid="event-over">
+          <div className="border border-quiet/30 bg-quiet/5 rounded-sm px-4 py-3" data-testid="event-over">
             <div className="tls-type-small text-white/85">{e.tournaments?.length ? "Das Event ist vorbei – die Ergebnisse stehen bei den Turnieren:" : "Das Event ist vorbei."}</div>
             {!!e.tournaments?.length && (
               <div className="mt-1 flex flex-wrap gap-x-5">
                 {/* Tippfläche mindestens 44 px (#1155), auch wenn ein langer Name am Handy zweizeilig umbricht. */}
                 {e.tournaments.map((t) => (
-                  <Link key={t.id} to={`/tournaments/${t.slug || t.id}${t.access_link ? accessSuffix(accessToken) : ""}`} className="inline-flex min-h-11 items-center gap-1.5 tls-type-small font-bold text-[#FFD700] hover:text-white">
+                  <Link key={t.id} to={`/tournaments/${t.slug || t.id}${t.access_link ? accessSuffix(accessToken) : ""}`} className="inline-flex min-h-11 items-center gap-1.5 tls-type-small font-bold text-brand hover:text-white">
                     <Trophy className="w-3.5 h-3.5 shrink-0" aria-hidden="true" /> {t.title}
                   </Link>
                 ))}
@@ -475,7 +475,7 @@ function EventOverview({ e, user, over, accessToken, hasConsent, onChanged, regi
                   </div>
                   <div className="p-4">
                     <div className="font-bold">{a.title}</div>
-                    {a.is_empty && <div className="mt-1 tls-type-label text-[#FFD700]" data-testid={`event-album-empty-${a.id}`}>leer – für Besucher unsichtbar</div>}
+                    {a.is_empty && <div className="mt-1 tls-type-label text-quiet" data-testid={`event-album-empty-${a.id}`}>leer – für Besucher unsichtbar</div>}
                   </div>
                 </Link>
               ))}
@@ -764,11 +764,11 @@ function EventRegistrationPanel({ event, user, accessToken = "", onChanged, open
         </div>
       )}
       {!!summary.waitlist_count && (
-        <div className="mt-2 tls-type-small text-[#FFD700]">{countText(summary.waitlist_count, "Anmeldung", "Anmeldungen")} auf der Warteliste.</div>
+        <div className="mt-2 tls-type-small text-quiet">{countText(summary.waitlist_count, "Anmeldung", "Anmeldungen")} auf der Warteliste.</div>
       )}
       {offer && (
-        <div className="mt-4 border border-[#FFD700]/30 bg-[#FFD700]/5 rounded-sm p-3 tls-type-small" data-testid="event-offer">
-          <div className="tls-type-label text-[#FFD700]">Kosten</div>
+        <div className="mt-4 border border-brand/30 bg-brand/5 rounded-sm p-3 tls-type-small" data-testid="event-offer">
+          <div className="tls-type-label text-brand">Kosten</div>
           <div className="mt-1 text-white">{offerSummary(offer, 1 + Number(companionCount || 0))}</div>
           <ul className="mt-2 space-y-0.5 tls-type-small text-white/60">
             {offer.positions.filter((position) => !position.optional).map((position) => (
@@ -790,9 +790,9 @@ function EventRegistrationPanel({ event, user, accessToken = "", onChanged, open
         // Die eigene Anmeldung (#1223): „Du bist dabei“ (oder Warteliste) mit Plätzen in Einzahl und Mehrzahl; „Stornieren“
         // als leiser Link - am Handy unter dem Kasten, ab 640 px rechts im Kasten.
         <div className="mt-5 relative" data-testid="event-own-registration">
-        <div className={`border border-[#10B981]/30 bg-[#10B981]/10 rounded-sm p-4 ${own.can_cancel ? "sm:pr-32" : ""}`}>
+        <div className={`border border-ok/30 bg-ok/10 rounded-sm p-4 ${own.can_cancel ? "sm:pr-32" : ""}`}>
           <div className="flex flex-wrap items-center gap-2">
-            <span className="inline-flex items-center gap-2 text-[#10B981] tls-type-label" data-testid="event-own-status">
+            <span className="inline-flex items-center gap-2 text-ok tls-type-label" data-testid="event-own-status">
               <CheckCircle className="w-4 h-4" /> {own.status === "waitlist" ? EVENT_REGISTRATION_LABELS.waitlist : "Du bist dabei"}
             </span>
           </div>
@@ -817,7 +817,7 @@ function EventRegistrationPanel({ event, user, accessToken = "", onChanged, open
         </div>
         {own.can_cancel && (
           <button type="button" disabled={saving} onClick={cancel} data-testid="event-cancel-link"
-            className="mt-2 sm:mt-0 sm:absolute sm:top-4 sm:right-4 inline-flex items-center gap-1.5 tls-type-small font-bold text-white/55 underline-offset-4 hover:text-[#FF6B6B] hover:underline disabled:opacity-50">
+            className="mt-2 sm:mt-0 sm:absolute sm:top-4 sm:right-4 inline-flex items-center gap-1.5 tls-type-small font-bold text-white/55 underline-offset-4 hover:text-live hover:underline disabled:opacity-50">
             <XCircle className="w-3.5 h-3.5" /> Stornieren
           </button>
         )}
@@ -849,12 +849,12 @@ function EventRegistrationPanel({ event, user, accessToken = "", onChanged, open
             </fieldset>
           )}
           {waitlisted && (
-            <div className="border border-honor/40 bg-honor/5 rounded-sm p-3 tls-type-small text-white/85" data-testid="event-waitlist-note">
+            <div className="border border-white/15 bg-white/[0.04] rounded-sm p-3 tls-type-small text-white/85" data-testid="event-waitlist-note">
               {waitlisted}{quote && !quote.free ? " Bezahlt wird erst, wenn du nachrückst." : ""}
             </div>
           )}
           {!waitlisted && quote && !quote.free && (
-            <div className="border border-[#FFD700]/40 rounded-sm p-3 tls-type-small flex items-baseline justify-between gap-3" data-testid="event-quote">
+            <div className="border border-brand/40 rounded-sm p-3 tls-type-small flex items-baseline justify-between gap-3" data-testid="event-quote">
               <span className="text-white/65">Summe für {1 + Number(companionCount || 0)} Person{1 + Number(companionCount || 0) === 1 ? "" : "en"}</span>
               <strong className="tls-type-card text-white">{formatCents(quote.total_cents, quote.currency)}</strong>
             </div>

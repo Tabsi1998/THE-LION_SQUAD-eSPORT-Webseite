@@ -105,7 +105,7 @@ export function SessionsPanel() {
             onClick={logoutAll}
             disabled={busy || otherCount === 0}
             data-testid="sessions-logout-all"
-            className="inline-flex items-center gap-2 px-4 py-2.5 rounded-sm border border-[#FF3B30]/45 text-[#FF3B30] tls-type-label hover:bg-[#FF3B30]/10 disabled:opacity-40 disabled:cursor-not-allowed shrink-0"
+            className="inline-flex items-center gap-2 px-4 py-2.5 rounded-sm border border-live/45 text-live tls-type-label hover:bg-live/10 disabled:opacity-40 disabled:cursor-not-allowed shrink-0"
           >
             <LogOut className="w-3.5 h-3.5" /> Überall abmelden{otherCount > 0 ? ` (${otherCount})` : ""}
           </button>
@@ -153,7 +153,7 @@ export function SessionsPanel() {
               onClick={() => revoke(session)}
               disabled={busy}
               data-testid={`session-revoke-${session.id}`}
-              className="inline-flex items-center gap-2 px-3 py-2 rounded-sm border border-white/15 text-white/60 tls-type-label hover:border-[#FF3B30]/50 hover:text-[#FF3B30] disabled:opacity-40 shrink-0"
+              className="inline-flex items-center gap-2 px-3 py-2 rounded-sm border border-white/15 text-white/60 tls-type-label hover:border-live/50 hover:text-live disabled:opacity-40 shrink-0"
             >
               <LogOut className="w-3.5 h-3.5" /> Abmelden
             </button>

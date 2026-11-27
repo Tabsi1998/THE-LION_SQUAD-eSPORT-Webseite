@@ -52,10 +52,10 @@ export default function AdminOnsitePosterPage() {
         ) : null}
       </div>
 
-      {error ? <p className="max-w-[820px] mx-auto px-4 text-[#FF3B30]" role="alert">{error}</p> : null}
+      {error ? <p className="max-w-[820px] mx-auto px-4 text-warn" role="alert">{error}</p> : null}
       {access && !access.enabled ? (
         <div className="max-w-[820px] mx-auto px-4" data-testid="onsite-poster-off">
-          <div className="border border-[#FFD700]/40 bg-[#FFD700]/5 rounded-sm p-4 tls-type-small text-white/80">
+          <div className="border border-brand/40 bg-brand/5 rounded-sm p-4 tls-type-small text-white/80">
             Der Vor-Ort-Zugang ist für dieses Turnier abgeschaltet – ein Aushang würde niemanden hineinlassen. Einschalten
             kannst du ihn beim Turnier unter „Vor-Ort-Anmeldung über QR“.
           </div>

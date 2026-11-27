@@ -23,7 +23,7 @@ export function SmtpSection({ smtp, setSmtp, smtpTestEmail, setSmtpTestEmail, sm
             <button type="button" onClick={applySubmissionPreset} data-testid="smtp-preset-submission" className="px-3 py-2 border border-[#29B6E8]/50 text-[#29B6E8] font-bold uppercase tracking-wider rounded-sm">
               Standard: Port 587 mit Anmeldung
             </button>
-            <button type="button" onClick={applyLocalIpPreset} data-testid="smtp-preset-local-ip" className="px-3 py-2 border border-[#FFD700]/50 text-[#FFD700] font-bold uppercase tracking-wider rounded-sm">
+            <button type="button" onClick={applyLocalIpPreset} data-testid="smtp-preset-local-ip" className="px-3 py-2 border border-brand/50 text-brand font-bold uppercase tracking-wider rounded-sm">
               Lokale IP vorbereiten
             </button>
           </div>
@@ -62,7 +62,7 @@ export function SmtpSection({ smtp, setSmtp, smtpTestEmail, setSmtpTestEmail, sm
           <div>
             <div className="tls-type-label text-white/60 mb-1.5">Passwort {smtp.smtp_pass_masked && <span className="text-white/40 normal-case">(aktuell: {smtp.smtp_pass_masked})</span>}</div>
             <input type="password" value={smtp.smtp_pass || ""} onChange={(e) => setSmtp({ ...smtp, smtp_pass: e.target.value })} data-testid="smtp-pass" className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-sm font-mono" placeholder="••••••" />
-            {smtp.smtp_pass_masked && <button type="button" onClick={() => clearSmtpSecret().catch((e) => toast.error(formatApiError(e.response?.data?.detail)))} className="mt-2 tls-type-label text-[#FF6B6B]">Gespeichertes Passwort entfernen</button>}
+            {smtp.smtp_pass_masked && <button type="button" onClick={() => clearSmtpSecret().catch((e) => toast.error(formatApiError(e.response?.data?.detail)))} className="mt-2 tls-type-label text-live">Gespeichertes Passwort entfernen</button>}
           </div>
         </div>
         <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
@@ -145,8 +145,8 @@ export function SmtpSection({ smtp, setSmtp, smtpTestEmail, setSmtpTestEmail, sm
             Hinweis: Diese Domain-Felder sind Mail-Identität, nicht Verbindung. Der SMTP Host darf weiterhin nur die IP sein.
           </div>
         </div>
-        <div className="border border-[#FFD700]/25 bg-[#FFD700]/5 rounded-sm p-4 tls-type-small text-white/60">
-          <div className="font-bold uppercase tracking-widest text-[#FFD700] mb-2">DNS Checkliste gegen Spam</div>
+        <div className="border border-brand/25 bg-brand/5 rounded-sm p-4 tls-type-small text-white/60">
+          <div className="font-bold uppercase tracking-widest text-brand mb-2">DNS Checkliste gegen Spam</div>
           <p>Gmail bewertet die öffentliche Ausgangs-IP deines Mailservers. Wichtig sind SPF, DKIM, DMARC, PTR/rDNS und die Mailserver-Logs. Der SMTP Host in dieser App darf trotzdem eine lokale IP sein.</p>
         </div>
         <button onClick={saveSmtp} disabled={savingSmtp} data-testid="smtp-save" className="px-5 py-2 bg-[#29B6E8] text-black font-bold uppercase tracking-wider rounded-sm disabled:opacity-50">{savingSmtp ? "Speichere..." : "Speichern"}</button>
@@ -156,14 +156,14 @@ export function SmtpSection({ smtp, setSmtp, smtpTestEmail, setSmtpTestEmail, sm
         <div className="font-bold uppercase">SMTP Testmail</div>
         <div className="flex flex-col sm:flex-row gap-2">
           <input type="email" placeholder="test@example.com" value={smtpTestEmail} onChange={(e) => setSmtpTestEmail(e.target.value)} data-testid="smtp-test-to" className="flex-1 bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-sm" />
-          <button onClick={diagnoseSmtp} data-testid="smtp-diagnose" className="px-4 py-2 border border-[#FFD700] text-[#FFD700] font-bold uppercase tracking-wider rounded-sm inline-flex items-center justify-center gap-2"><AlertTriangle className="w-3.5 h-3.5" /> Diagnose</button>
-          <button onClick={checkDeliverability} data-testid="smtp-deliverability" className="px-4 py-2 border border-[#00FF88] text-[#00FF88] font-bold uppercase tracking-wider rounded-sm inline-flex items-center justify-center gap-2"><CheckCircle2 className="w-3.5 h-3.5" /> Zustellbarkeit</button>
+          <button onClick={diagnoseSmtp} data-testid="smtp-diagnose" className="px-4 py-2 border border-brand text-brand font-bold uppercase tracking-wider rounded-sm inline-flex items-center justify-center gap-2"><AlertTriangle className="w-3.5 h-3.5" /> Diagnose</button>
+          <button onClick={checkDeliverability} data-testid="smtp-deliverability" className="px-4 py-2 border border-ok text-ok font-bold uppercase tracking-wider rounded-sm inline-flex items-center justify-center gap-2"><CheckCircle2 className="w-3.5 h-3.5" /> Zustellbarkeit</button>
           <button onClick={sendSmtpTest} data-testid="smtp-test-send" className="px-4 py-2 border border-[#29B6E8] text-[#29B6E8] font-bold uppercase tracking-wider rounded-sm inline-flex items-center justify-center gap-2"><Send className="w-3.5 h-3.5" /> Senden</button>
         </div>
         {smtpDiag && (
-          <div data-testid="smtp-diagnose-result" className={`border rounded-sm p-4 tls-type-small space-y-3 ${smtpDiag.ok ? "border-[#00FF88]/25 bg-[#00FF88]/5" : "border-[#FF3B30]/25 bg-[#FF3B30]/5"}`}>
+          <div data-testid="smtp-diagnose-result" className={`border rounded-sm p-4 tls-type-small space-y-3 ${smtpDiag.ok ? "border-ok/25 bg-ok/5" : "border-warn/25 bg-warn/5"}`}>
             <div className="flex items-center gap-2 font-bold uppercase tracking-widest">
-              {smtpDiag.ok ? <CheckCircle2 className="w-4 h-4 text-[#00FF88]" /> : <XCircle className="w-4 h-4 text-[#FF3B30]" />}
+              {smtpDiag.ok ? <CheckCircle2 className="w-4 h-4 text-ok" /> : <XCircle className="w-4 h-4 text-warn" />}
               Verbindung: {smtpDiag.ok ? "in Ordnung" : "Problem gefunden"}
             </div>
             <div className="grid sm:grid-cols-2 gap-2 text-white/55">
@@ -175,7 +175,7 @@ export function SmtpSection({ smtp, setSmtp, smtpTestEmail, setSmtpTestEmail, sm
             <div className="space-y-1">
               {(smtpDiag.steps || []).map((s, i) => (
                 <div key={i} className="flex gap-2 text-white/70">
-                  <span className={s.ok ? "text-[#00FF88]" : "text-[#FF3B30]"}>{s.ok ? "klappt" : "Fehler"}</span>
+                  <span className={s.ok ? "text-ok" : "text-warn"}>{s.ok ? "klappt" : "Fehler"}</span>
                   <span className="break-words">{s.label}</span>
                 </div>
               ))}
@@ -189,7 +189,7 @@ export function SmtpSection({ smtp, setSmtp, smtpTestEmail, setSmtpTestEmail, sm
                       <div className="font-mono text-white/80">{c.port} / {String(c.security || "").toUpperCase()}</div>
                       <div>Verbindung: {c.connect_ok ? "klappt" : "keine"}</div>
                       <div>Anmeldung: {c.auth_supported ? "angeboten" : "nicht angeboten"}</div>
-                      {c.error && <div className="text-[#FF3B30] break-words">{c.error}</div>}
+                      {c.error && <div className="text-warn break-words">{c.error}</div>}
                     </div>
                   ))}
                 </div>
@@ -203,9 +203,9 @@ export function SmtpSection({ smtp, setSmtp, smtpTestEmail, setSmtpTestEmail, sm
           </div>
         )}
         {smtpDeliverability && (
-          <div data-testid="smtp-deliverability-result" className={`border rounded-sm p-4 tls-type-small space-y-3 ${smtpDeliverability.ok ? "border-[#00FF88]/25 bg-[#00FF88]/5" : "border-[#FFD700]/25 bg-[#FFD700]/5"}`}>
+          <div data-testid="smtp-deliverability-result" className={`border rounded-sm p-4 tls-type-small space-y-3 ${smtpDeliverability.ok ? "border-ok/25 bg-ok/5" : "border-warn/25 bg-warn/5"}`}>
             <div className="flex items-center gap-2 font-bold uppercase tracking-widest">
-              {smtpDeliverability.ok ? <CheckCircle2 className="w-4 h-4 text-[#00FF88]" /> : <AlertTriangle className="w-4 h-4 text-[#FFD700]" />}
+              {smtpDeliverability.ok ? <CheckCircle2 className="w-4 h-4 text-ok" /> : <AlertTriangle className="w-4 h-4 text-warn" />}
               Zustellbarkeit: {smtpDeliverability.ok ? "die Grundlagen passen" : "bitte prüfen"}
             </div>
             <div className="grid sm:grid-cols-3 gap-2 text-white/55">
@@ -216,7 +216,7 @@ export function SmtpSection({ smtp, setSmtp, smtpTestEmail, setSmtpTestEmail, sm
             <div className="space-y-1">
               {(smtpDeliverability.checks || []).map((c, i) => (
                 <div key={i} className="flex gap-2 text-white/70">
-                  <span className={c.ok ? "text-[#00FF88]" : c.severity === "error" ? "text-[#FF3B30]" : "text-[#FFD700]"}>{c.ok ? "passt" : c.severity === "error" ? "Fehler" : "Hinweis"}</span>
+                  <span className={c.ok ? "text-ok" : c.severity === "error" ? "text-warn" : "text-brand"}>{c.ok ? "passt" : c.severity === "error" ? "Fehler" : "Hinweis"}</span>
                   <span className="break-words"><strong>{c.label}:</strong> {c.detail}</span>
                 </div>
               ))}

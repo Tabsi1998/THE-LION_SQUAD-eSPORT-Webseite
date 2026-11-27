@@ -138,7 +138,7 @@ function ChooseForm({ view, onChosen }) {
         {view.reserved?.length ? ` Nicht wählbar: ${view.reserved.join(", ")}.` : ""}
       </p>
       {noneLeft ? (
-        <p className="mt-3 tls-type-small text-honor" data-testid="jersey-none-left">Gerade ist keine Nummer frei. Melde dich beim Vorstand – er findet eine Lösung.</p>
+        <p className="mt-3 tls-type-small text-warn" data-testid="jersey-none-left">Gerade ist keine Nummer frei. Melde dich beim Vorstand – er findet eine Lösung.</p>
       ) : (
         <div className="mt-3 flex flex-col sm:flex-row sm:items-center gap-3">
           <label className="sr-only" htmlFor="jersey-number-input">Deine Nummer</label>

@@ -12,8 +12,8 @@ const SCOPE_ORDER = ["drivers", "teams", "table"];
 
 function Move({ change }) {
   if (change === null || change === undefined) return <span className="text-white/25" aria-label="neu in der Wertung">·</span>;
-  if (change > 0) return <span className="inline-flex items-center text-emerald-300" aria-label={`${change} Plätze nach oben`}><ArrowUp className="w-3 h-3" />{change}</span>;
-  if (change < 0) return <span className="inline-flex items-center text-red-300" aria-label={`${-change} Plätze nach unten`}><ArrowDown className="w-3 h-3" />{-change}</span>;
+  if (change > 0) return <span className="inline-flex items-center text-ok" aria-label={`${change} Plätze nach oben`}><ArrowUp className="w-3 h-3" />{change}</span>;
+  if (change < 0) return <span className="inline-flex items-center text-quiet" aria-label={`${-change} Plätze nach unten`}><ArrowDown className="w-3 h-3" />{-change}</span>;
   return <Minus className="w-3 h-3 text-white/30" aria-label="unverändert" />;
 }
 
@@ -22,9 +22,9 @@ function ProblemList({ items, level, testId }) {
   const error = level === "error";
   const Icon = error ? OctagonAlert : AlertTriangle;
   return (
-    <div className={`border rounded-sm p-3 tls-type-small space-y-1 ${error ? "border-red-400/40 bg-red-400/10 text-red-100" : "border-amber-400/40 bg-amber-400/10 text-amber-100"}`} data-testid={testId} role={error ? "alert" : "status"}>
+    <div className={`border rounded-sm p-3 tls-type-small space-y-1 ${error ? "border-warn/70 bg-warn/15 text-white/90" : "border-warn/40 bg-warn/[0.06] text-white/85"}`} data-testid={testId} role={error ? "alert" : "status"}>
       <div className="flex items-center gap-2 font-bold">
-        <Icon className={`w-4 h-4 ${error ? "text-red-300" : "text-amber-300"}`} />
+        <Icon className={`w-4 h-4 ${error ? "text-warn" : "text-white/70"}`} />
         {error ? "Fehler – so lässt sich nicht übernehmen" : "Hinweise"}
       </div>
       <ul className="space-y-0.5">
@@ -60,9 +60,9 @@ function StandingsScope({ scope, rows, final, profile = null }) {
                 <td className="py-1.5 px-1 tls-type-small"><Move change={row.rank_change} /></td>
                 <td className="py-1.5 px-2 min-w-0">
                   <span className="break-words">{row.name || row.team || "–"}</span>
-                  {row.is_new && <span className="ml-1.5 tls-type-label text-amber-300">neu</span>}
+                  {row.is_new && <span className="ml-1.5 tls-type-label text-warn">neu</span>}
                   {row.deviation ? (
-                    <span className="block tls-type-small text-amber-300">laut Veranstalter {formatPoints(row.official_points)}, gerechnet {formatPoints(row.computed_points)}</span>
+                    <span className="block tls-type-small text-warn">laut Veranstalter {formatPoints(row.official_points)}, gerechnet {formatPoints(row.computed_points)}</span>
                   ) : null}
                 </td>
                 <td className="py-1.5 px-2 text-right font-bold">{formatPoints(row.points)}</td>
@@ -82,8 +82,8 @@ function FinalChanges({ final, rows }) {
   const list = (ids) => ids.map((id) => names[id] || "Unbekannt").join(", ");
   return (
     <div className="tls-type-small text-white/75 space-y-0.5" data-testid="preview-final">
-      {final.entered?.length > 0 && <div><span className="text-emerald-300 font-bold">Neu im Finale:</span> {list(final.entered)}</div>}
-      {final.left?.length > 0 && <div><span className="text-red-300 font-bold">Aus dem Finale gefallen:</span> {list(final.left)}</div>}
+      {final.entered?.length > 0 && <div><span className="text-ok font-bold">Neu im Finale:</span> {list(final.entered)}</div>}
+      {final.left?.length > 0 && <div><span className="text-quiet font-bold">Aus dem Finale gefallen:</span> {list(final.left)}</div>}
     </div>
   );
 }
@@ -92,7 +92,7 @@ function UnknownNames({ items, board }) {
   if (!items.length) return null;
   return (
     <div className="border border-white/10 rounded-sm p-3 space-y-2" data-testid="preview-unknown">
-      <div className="flex items-center gap-2 tls-type-label text-amber-300">
+      <div className="flex items-center gap-2 tls-type-label text-warn">
         <UserPlus className="w-3.5 h-3.5" /> Unbekannte Namen ({items.length})
       </div>
       <p className="tls-type-small text-white/55">
@@ -104,7 +104,7 @@ function UnknownNames({ items, board }) {
         {items.map((item) => (
           <li key={item.participant_id} className="tls-type-small" data-testid="preview-unknown-name">
             <span className="font-bold text-white">{item.name}</span>
-            <span className="ml-1.5 tls-type-label text-amber-300">neu</span>
+            <span className="ml-1.5 tls-type-label text-warn">neu</span>
             {board && item.alias && (
               <span className="block tls-type-small text-[#29B6E8]" data-testid="preview-unknown-alias">Bekannter Alias{item.alias.label ? `: ${item.alias.label}` : ""} – wird gleich zugeordnet</span>
             )}

@@ -50,6 +50,7 @@ import { EmblemRow, TrophyCabinet } from "@/components/tls/rewards/TrophyCabinet
 import { InternalTag } from "@/components/tls/InternalTag";
 import { ShortCaps } from "@/components/tls/ShortCaps";
 
+import { ROLE_COLORS } from "@/lib/categoryColors";
 // Öffentliches Profil, Umbau 24.09.: Banner als echtes Banner mit überlappendem Avatar, eine Zeile
 // mit Level, Rolle und verknüpften Konten, eine Zahlenleiste und dieselben Reiter wie in der App (#1149): Übersicht,
 // Erfolge, Auszeichnungen, Referenzen mit Turnieren und Fast Laps, Teams, für Mitglieder Ehrungen. Das eigene Profil
@@ -156,7 +157,7 @@ const SUBSCRIPTION_LABELS = {
 };
 
 const RANK_TONES = {
-  1: { color: "#FFD700", label: "Gold" },
+  1: { color: ROLE_COLORS.honor, label: "Gold" },
   2: { color: "#C0C0C0", label: "Silber" },
   3: { color: "#CD7F32", label: "Bronze" },
 };
@@ -524,7 +525,7 @@ export default function PublicProfilePage() {
   const headerStats = [
     { key: "points", icon: Zap, label: "Punkte", value: s.points || 0, color: "#29B6E8" },
     { key: "badges", icon: Medal, label: "Erfolge", value: badges.length },
-    { key: "wins", icon: Trophy, label: "Siege", value: s.wins || 0, color: "#FFD700", glory: true },
+    { key: "wins", icon: Trophy, label: "Siege", value: s.wins || 0, color: ROLE_COLORS.honor, glory: true },
     { key: "top3", icon: Medal, label: "Podium", value: s.top3 || 0, color: "#C0C0C0", glory: true },
     { key: "tournaments", icon: Flag, label: "Turniere", value: s.tournaments || tournaments.length || 0 },
     { key: "fastlaps", icon: TrendingUp, label: "Fast Laps", value: s.fast_laps || 0 },
@@ -572,9 +573,9 @@ export default function PublicProfilePage() {
           {profile.banner_url ? (
             <img src={resolveMediaUrl(profile.banner_url)} alt="" className="absolute inset-0 w-full h-full object-cover object-[50%_30%]" />
           ) : (
-            <div className="absolute inset-0 bg-gradient-to-br from-[#29B6E8]/30 via-[#0A0A0A] to-[#FFD700]/15">
+            <div className="absolute inset-0 bg-gradient-to-br from-[#29B6E8]/30 via-[#0A0A0A] to-brand/15">
               <div className="absolute -top-10 left-1/4 w-[420px] h-[420px] rounded-full bg-[#29B6E8] blur-[160px] opacity-20" />
-              <div className="absolute -bottom-20 right-1/4 w-[360px] h-[360px] rounded-full bg-[#FFD700] blur-[160px] opacity-10" />
+              <div className="absolute -bottom-20 right-1/4 w-[360px] h-[360px] rounded-full bg-brand blur-[160px] opacity-10" />
             </div>
           )}
           <div className="absolute inset-0 bg-gradient-to-t from-[#0A0A0A] via-[#0A0A0A]/35 to-transparent" />
@@ -624,7 +625,7 @@ export default function PublicProfilePage() {
                 <AccountLevelPill level={level.level} />
                 <ClubProfileHint profile={profile} />
                 {liveStream && (
-                  <span className="inline-flex items-center gap-1 px-2 py-0.5 border border-[#FF3B30]/50 text-[#FF3B30] tls-type-label rounded-sm" data-testid="profile-live-pill">
+                  <span className="inline-flex items-center gap-1 px-2 py-0.5 border border-live/50 text-live tls-type-label rounded-sm" data-testid="profile-live-pill">
                     <Radio className="w-3 h-3 animate-live" /> Live
                   </span>
                 )}
@@ -690,7 +691,7 @@ export default function PublicProfilePage() {
             </div>
             {accounts.verifiedCount > 0 && (
               <a href="#konten" onClick={() => setTab("overview")} data-testid="profile-accounts-count"
-                className="inline-flex items-center gap-1.5 self-start lg:justify-self-end tls-type-label text-[#00FF88] hover:text-white">
+                className="inline-flex items-center gap-1.5 self-start lg:justify-self-end tls-type-label text-ok hover:text-white">
                 <BadgeCheck className="w-4 h-4" /> {accounts.verifiedCount === 1 ? "1 Konto verknüpft" : `${accounts.verifiedCount} Konten verknüpft`}
               </a>
             )}
@@ -744,7 +745,7 @@ export default function PublicProfilePage() {
 
               {highlights.length > 0 && (
                 <section data-testid="profile-highlights">
-                  <SectionTitle icon={Trophy} color="#FFD700" kicker="Podest" title="Highlights" />
+                  <SectionTitle icon={Trophy} color={ROLE_COLORS.honor} kicker="Podest" title="Highlights" />
                   <div className={`grid gap-3 ${highlights.length > 1 ? "md:grid-cols-2 xl:grid-cols-3" : ""}`}>
                     {highlights.map((item) => <HighlightCard key={item.id} item={item} />)}
                   </div>
@@ -753,7 +754,7 @@ export default function PublicProfilePage() {
 
               {awards.length > 0 && (
                 <section data-testid="profile-awards-preview">
-                  <SectionTitle icon={Medal} color="#FFD700" kicker="Turniere und Liga" title="Trophäen" action={awards.length > 2 ? { label: "Alle ansehen", onClick: () => setTab("awards") } : null} />
+                  <SectionTitle icon={Medal} color={ROLE_COLORS.honor} kicker="Turniere und Liga" title="Trophäen" action={awards.length > 2 ? { label: "Alle ansehen", onClick: () => setTab("awards") } : null} />
                   <div className="grid gap-3 md:grid-cols-2">
                     {awards.slice(0, 2).map((award) => (
                       <AwardBanner key={award.id} award={award} linkTo={award.tournament?.slug ? `/tournaments/${award.tournament.slug}` : null} />
@@ -764,7 +765,7 @@ export default function PublicProfilePage() {
 
               {pinned.length > 0 && (
                 <section data-testid="profile-pinned-awards">
-                  <SectionTitle icon={Medal} color="#FFD700" kicker="Angeheftet" title="Lieblingserfolge" action={{ label: "Alle ansehen", onClick: () => setTab("badges") }} />
+                  <SectionTitle icon={Medal} color={ROLE_COLORS.honor} kicker="Angeheftet" title="Lieblingserfolge" action={{ label: "Alle ansehen", onClick: () => setTab("badges") }} />
                   <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
                     {pinned.map((a) => <PinnedAwardCard key={a.code} award={a} />)}
                   </div>
@@ -880,7 +881,7 @@ export default function PublicProfilePage() {
             keine Referenzen (die sind die Turnier-Historie). Das eigene Profil wählt hier Banner, Titel und bis zu drei Embleme. */}
         {activeTab === "awards" && (
           <div className="space-y-4" data-testid="public-profile-awards">
-            <h2 className="tls-type-section flex items-center gap-2"><Trophy className="w-5 h-5 text-[#FFD700]" /> Trophäen</h2>
+            <h2 className="tls-type-section flex items-center gap-2"><Trophy className="w-5 h-5 text-honor" /> Trophäen</h2>
             <TrophyCabinet awards={awards} testId="profile-trophies"
               owner={ownMode ? {
                 featuredId: profile.featured_award?.id, titleId: profile.featured_title?.id,
@@ -897,7 +898,7 @@ export default function PublicProfilePage() {
         {activeTab === "honours" && ownMode && <HonoursPanel />}
         {activeTab === "honours" && !ownMode && honours.length > 0 && (
           <div className="space-y-3" data-testid="public-profile-honours">
-            <h2 className="tls-type-section flex items-center gap-2"><Award className="w-5 h-5 text-[#FFD700]" /> Ehrungen</h2>
+            <h2 className="tls-type-section flex items-center gap-2"><Award className="w-5 h-5 text-honor" /> Ehrungen</h2>
             <ul className="grid gap-3 md:grid-cols-2">
               {honours.map((honour) => <HonourCard key={`${honour.kind}-${honour.given_on}-${honour.title}`} honour={honour} />)}
             </ul>
@@ -910,7 +911,7 @@ export default function PublicProfilePage() {
             <div className="grid grid-cols-2 sm:grid-cols-5 gap-2 sm:gap-3" data-testid="profile-reference-stats">
               {[
                 { key: "total", icon: Trophy, label: "Referenzen", value: referenceCount, color: "#29B6E8" },
-                { key: "wins", icon: Crown, label: "Siege", value: referenceStats.wins || 0, color: "#FFD700", glory: true },
+                { key: "wins", icon: Crown, label: "Siege", value: referenceStats.wins || 0, color: ROLE_COLORS.honor, glory: true },
                 { key: "podiums", icon: Medal, label: "Podien", value: referenceStats.podiums || 0, color: "#C0C0C0", glory: true },
                 { key: "tournaments", icon: Flag, label: "Turniere", value: referenceStats.tournaments || 0 },
                 { key: "fastlaps", icon: Radio, label: "Fast Laps", value: referenceStats.fastlaps || 0 },
@@ -955,11 +956,11 @@ export default function PublicProfilePage() {
 
             {fastLaps.length > 0 && (
               <section data-testid="public-profile-fastlaps">
-                <SectionTitle icon={Radio} color="#FFD700" kicker="Bestzeiten" title={`Fast Lap (${fastLaps.length})`} />
+                <SectionTitle icon={Radio} color={ROLE_COLORS.brand} kicker="Bestzeiten" title={`Fast Lap (${fastLaps.length})`} />
                 <div className="space-y-2">
                   {fastLaps.map((f, i) => (
                     <div key={i} data-testid={`profile-fastlap-${f.challenge?.slug || f.challenge?.id || i}`}
-                      className={`flex items-center justify-between gap-3 px-4 py-3 border rounded-sm ${f.is_leader ? "border-[#FFD700]/40 bg-[#FFD700]/5" : "border-white/10 bg-[#121212]"}`}>
+                      className={`flex items-center justify-between gap-3 px-4 py-3 border rounded-sm ${f.is_leader ? "border-honor/40 bg-honor/5" : "border-white/10 bg-[#121212]"}`}>
                       <div className="min-w-0">
                         {/* Umbrechen statt abschneiden: am Handy rutscht das Etikett unter den Titel (#2521). */}
                         <div className="flex flex-wrap items-center gap-x-2 gap-y-1 min-w-0">
@@ -970,7 +971,7 @@ export default function PublicProfilePage() {
                         <div className="tls-type-card truncate">{f.track?.name || "—"}{f.track?.country ? ` · ${f.track.country}` : ""}</div>
                       </div>
                       <div className="flex items-center gap-3 shrink-0">
-                        {f.is_leader && <span className="tls-type-label text-[#FFD700]">Pole</span>}
+                        {f.is_leader && <span className="tls-type-label text-honor">Pole</span>}
                         <span className="tls-type-card tls-type-num">{showLapTime(f.time_str)}</span>
                       </div>
                     </div>
@@ -1001,7 +1002,7 @@ export default function PublicProfilePage() {
 
 // Angeheftete Erfolge (#619): die bis zu sechs Lieblingsstufen, in der Reihenfolge der Person.
 function PinnedAwardCard({ award }) {
-  const color = award.material_color || award.level_color || "#FFD700";
+  const color = award.material_color || award.level_color || ROLE_COLORS.honor;
   return (
     <div className="flex items-center gap-3 p-3 border rounded-sm bg-[#121212]" style={{ borderColor: `${color}55`, boxShadow: `inset 0 0 0 1px ${color}14` }} data-testid={`profile-pinned-${award.code}`}>
       <Badge material={award.material} level={award.level} rank={award.rank} art={award.art} icon={award.icon || award.group_icon} size="lg" title={award.name} />
@@ -1039,7 +1040,7 @@ function TwitchLiveCard({ channel, url, stream, hasConsent }) {
         <h2 className="tls-type-section flex items-center gap-2">
           <SocialIcon kind="twitch" className="w-5 h-5 text-[#9146FF]" /> Live auf Twitch
         </h2>
-        <span className="inline-flex items-center gap-1.5 px-2 py-0.5 border border-[#FF3B30]/50 text-[#FF3B30] tls-type-label rounded-sm">
+        <span className="inline-flex items-center gap-1.5 px-2 py-0.5 border border-live/50 text-live tls-type-label rounded-sm">
           <Radio className="w-3 h-3 animate-live" /> Live{stream.viewer_count ? ` · ${stream.viewer_count} Zuschauer` : ""}
         </span>
       </div>
@@ -1133,10 +1134,10 @@ export function AccountsCard({ groups }) {
     <section id="konten" className="border border-white/10 rounded-sm bg-[#121212] p-4 space-y-4 scroll-mt-24" data-testid="public-profile-accounts">
       <div>
         <h2 className="tls-type-section flex items-center gap-2"><Globe className="w-4 h-4 text-[#29B6E8]" /> Konten</h2>
-        <p className="tls-type-small text-quiet mt-1 flex items-start gap-1.5"><BadgeCheck className="w-3.5 h-3.5 mt-0.5 text-[#00FF88] shrink-0" aria-hidden="true" /><span>Mit Haken: per Anmeldung bei der Plattform bestätigt – der Link führt zum echten Konto.</span></p>
+        <p className="tls-type-small text-quiet mt-1 flex items-start gap-1.5"><BadgeCheck className="w-3.5 h-3.5 mt-0.5 text-ok shrink-0" aria-hidden="true" /><span>Mit Haken: per Anmeldung bei der Plattform bestätigt – der Link führt zum echten Konto.</span></p>
       </div>
       {groups.socials.length > 0 && <AccountGroup title="Socials" icon={Globe} color="#29B6E8" entries={groups.socials} testId="public-profile-socials" />}
-      {groups.games.length > 0 && <AccountGroup title="Spielkonten" icon={Gamepad2} color="#FFD700" entries={groups.games} testId="public-profile-gaming-ids" />}
+      {groups.games.length > 0 && <AccountGroup title="Spielkonten" icon={Gamepad2} color={ROLE_COLORS.brand} entries={groups.games} testId="public-profile-gaming-ids" />}
     </section>
   );
 }
@@ -1160,7 +1161,7 @@ function AccountRow({ entry }) {
       <span className="min-w-0 flex-1">
         <span className="flex items-center gap-1.5 font-bold text-white tls-type-small">
           <span className="truncate">{entry.title}</span>
-          {entry.verified && <BadgeCheck className="w-4 h-4 text-[#00FF88] shrink-0" aria-label="verifiziert" data-testid={`profile-account-${entry.key}-verified`}><title>{verifiedTitle}</title></BadgeCheck>}
+          {entry.verified && <BadgeCheck className="w-4 h-4 text-ok shrink-0" aria-label="verifiziert" data-testid={`profile-account-${entry.key}-verified`}><title>{verifiedTitle}</title></BadgeCheck>}
         </span>
         <span className="block tls-type-small text-white/50 [overflow-wrap:anywhere]">{entry.detail}</span>
       </span>
@@ -1243,7 +1244,7 @@ function SetupCard({ profile }) {
   return (
     <section className="border border-white/10 rounded-sm bg-[#121212] p-4" data-testid="public-profile-setup">
       <h2 className="tls-type-section flex items-center gap-2">
-        <Gamepad2 className="w-4 h-4 text-[#FFD700]" /> Setup & Games
+        <Gamepad2 className="w-4 h-4 text-brand" /> Setup & Games
       </h2>
       <div className="mt-3 space-y-3">
         {groups.map((group) => (
@@ -1286,8 +1287,8 @@ function TeamsCard({ teams }) {
 
 const PROFILE_TONES = {
   blue: "border-[#29B6E8]/35 bg-[#29B6E8]/10 text-[#29B6E8]",
-  gold: "border-[#FFD700]/35 bg-[#FFD700]/10 text-[#FFD700]",
-  green: "border-[#10B981]/35 bg-[#10B981]/10 text-[#10B981]",
+  gold: "border-honor/35 bg-honor/10 text-honor",
+  green: "border-ok/35 bg-ok/10 text-ok",
   violet: "border-[#A855F7]/35 bg-[#A855F7]/10 text-[#A855F7]",
   white: "border-white/15 bg-white/[0.04] text-white/75",
 };
@@ -1314,13 +1315,13 @@ function ReferenceRow({ item, expanded = false }) {
   const content = (
     <div data-testid={`profile-reference-${item.id}`} className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 p-3 sm:px-4 sm:py-3 border border-white/10 rounded-sm bg-[#121212] hover:border-[#29B6E8]/60 transition min-w-0 overflow-hidden">
       <div className="flex items-start gap-3 min-w-0 flex-1 w-full">
-        <div className={`w-10 h-10 rounded-sm border flex items-center justify-center shrink-0 ${isFastlap || isSeason ? "border-[#FFD700]/35 bg-[#FFD700]/10 text-[#FFD700]" : "border-[#29B6E8]/35 bg-[#29B6E8]/10 text-[#29B6E8]"}`}>
+        <div className={`w-10 h-10 rounded-sm border flex items-center justify-center shrink-0 ${isFastlap || isSeason ? "border-honor/35 bg-honor/10 text-honor" : "border-[#29B6E8]/35 bg-[#29B6E8]/10 text-[#29B6E8]"}`}>
           {isFastlap ? <Radio className="w-5 h-5" /> : <Trophy className="w-5 h-5" />}
         </div>
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2 flex-wrap">
-            <span className={`tls-type-label ${isFastlap || isSeason ? "text-[#FFD700]" : "text-[#29B6E8]"}`}>{referenceKindLabel(item.kind)}</span>
-            {isSeason && item.points != null && <span className="tls-type-label text-[#FFD700] border border-[#FFD700]/35 px-1.5 py-0.5 rounded-sm">{item.points} Jahrespunkte</span>}
+            <span className={`tls-type-label ${isFastlap || isSeason ? "text-honor" : "text-[#29B6E8]"}`}>{referenceKindLabel(item.kind)}</span>
+            {isSeason && item.points != null && <span className="tls-type-label text-honor border border-honor/35 px-1.5 py-0.5 rounded-sm">{item.points} Jahrespunkte</span>}
             {item.time_str && <span className="tls-type-label text-white/70 border border-white/10 px-1.5 py-0.5 rounded-sm break-all">{showLapTime(item.time_str)}</span>}
             {item.internal ? <InternalTag testId={`internal-tag-reference-${item.id}`} /> : null}
           </div>
@@ -1369,7 +1370,7 @@ function TournamentRow({ t, expanded = false }) {
           <StatusBadge status={t.status} />
           {/* Vereinsintern (#2521): eine Teilnahme, die Gäste nicht sehen. */}
           {t.internal ? <InternalTag testId={`internal-tag-tournament-${t.id}`} /> : null}
-          {t.final_position === 1 && <span className="tls-type-label text-[#FFD700] border border-[#FFD700]/40 px-1.5 py-0.5 rounded-sm">Sieger</span>}
+          {t.final_position === 1 && <span className="tls-type-label text-honor border border-honor/40 px-1.5 py-0.5 rounded-sm">Sieger</span>}
           {t.final_position > 1 && t.final_position <= 3 && <span className="tls-type-label text-[#CD7F32] border border-[#CD7F32]/40 px-1.5 py-0.5 rounded-sm">Top 3</span>}
         </div>
         <div className="mt-1 tls-type-card truncate">{t.title}</div>

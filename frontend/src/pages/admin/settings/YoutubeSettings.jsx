@@ -72,7 +72,7 @@ export function YoutubeSettings() {
   };
 
   if (!data) {
-    return loadError ? <div className="tls-type-small text-[#FF6B6B]" data-testid="youtube-feed-error">Der Stand von YouTube → News konnte nicht geladen werden.</div> : null;
+    return loadError ? <div className="tls-type-small text-warn" data-testid="youtube-feed-error">Der Stand von YouTube → News konnte nicht geladen werden.</div> : null;
   }
   const url = channelUrl ?? (data.channel_url || "");
   const effective = data.channel_url || data.branding_url;
@@ -118,7 +118,7 @@ export function YoutubeSettings() {
           <span data-testid="youtube-feed-last-video">{data.last_video?.title ? <a href={data.last_video.url} target="_blank" rel="noreferrer" className="text-[#29B6E8] hover:underline">{data.last_video.title}</a> : "–"}</span>
         </div>
         <div className="flex flex-wrap justify-between gap-2 px-3 py-2"><span className="text-white/45">Gemerkt / als News angelegt</span><span data-testid="youtube-feed-counts">{data.videos_seen || 0} / {data.news_created || 0}</span></div>
-        {data.last_error && <div className="px-3 py-2 text-[#FF6B6B] break-words" data-testid="youtube-feed-last-error">{data.last_error}</div>}
+        {data.last_error && <div className="px-3 py-2 text-warn break-words" data-testid="youtube-feed-last-error">{data.last_error}</div>}
       </div>
     </div>
   );

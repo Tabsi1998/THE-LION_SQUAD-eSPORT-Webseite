@@ -162,7 +162,7 @@ export default function AdminShopPage() {
   return (
     <AdminLayout>
       <div>
-        <h1 className="tls-type-title inline-flex items-center gap-3"><ShoppingBag className="w-7 h-7 text-honor" aria-hidden="true" /> <ShortCaps>Shop</ShortCaps></h1>
+        <h1 className="tls-type-title inline-flex items-center gap-3"><ShoppingBag className="w-7 h-7 text-brand" aria-hidden="true" /> <ShortCaps>Shop</ShortCaps></h1>
         <ShopTabs />
         <p className="mt-4 tls-type-body text-white/60 max-w-2xl">
           Wer den Vereinsshop sieht, ob Bestellungen an Printful gehen, Preise und der Zugang zu Printful. Jede Änderung braucht einen Grund und steht im Protokoll der Adminaktionen.

@@ -17,7 +17,7 @@ export function FormatHint({ format, testId = "format-hint" }) {
   }
   if (NO_MATCH_FORMATS.has(format)) {
     return (
-      <span data-testid={testId} className="text-[#FFD700]">
+      <span data-testid={testId} className="text-brand">
         Dieses Format bekommt im Turnier keine Spiele und keine Zeiteingabe. Zeitfahren laufen über <Link to="/admin/f1" className={LINK_CLASS}>Fast Lap</Link>, Rennserien über <Link to="/admin/reference-series" className={LINK_CLASS}>Serien</Link>.
       </span>
     );

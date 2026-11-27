@@ -1,5 +1,5 @@
 // Bausteine der Dolibarr-Seite (#223: aus AdminDolibarrPage herausgelöst, Verhalten unverändert).
-const TONES = { ok: "border-[#00FF88]/25", warn: "border-[#FFD700]/30", danger: "border-[#FF3B30]/40", plain: "border-white/10" };
+const TONES = { ok: "border-ok/25", warn: "border-warn/30", danger: "border-warn/40", plain: "border-white/10" };
 
 export function Tile({ label, value, detail, tone = "plain", testId }) {
   return (

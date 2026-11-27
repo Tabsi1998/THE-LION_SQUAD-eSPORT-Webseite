@@ -99,7 +99,7 @@ test("die Solo-Warnung steht deutlich mit Zeichen da, andere Warnungen bleiben r
 
   const loud = await screen.findByTestId("season-readiness-loud-solo_operations_follow");
   expect(loud).toHaveTextContent("Solo-Liga: Spielbetrieb folgt");
-  expect(loud.className).toMatch(/border-warn/);
+  expect(loud.className).toMatch(/border-brand/);
   expect(screen.queryByTestId("season-readiness-loud-application_none")).toBeNull();
   expect(screen.getByTestId("season-readiness-state")).toHaveTextContent("2 Warnungen");
 });

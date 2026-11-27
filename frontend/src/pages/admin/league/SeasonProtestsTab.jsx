@@ -25,7 +25,7 @@ const MODE_OPTIONS = [
   ["counts", "Zählt vorläufig, markiert „in Klärung“"],
   ["excluded", "Zählt bis zur Entscheidung nicht"],
 ];
-const TONE = { none: "text-white/55", calm: "text-white/70", soon: "text-warn", over: "text-[#FF6B60]" };
+const TONE = { none: "text-white/55", calm: "text-white/70", soon: "text-warn", over: "text-warn font-bold" };
 const WHEN = { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" };
 
 /** Die Eingabe als Werte für den Server: ganze Zahlen, Gründe ohne leere Zeilen. */
@@ -75,7 +75,7 @@ function ProceduresInbox({ seasonId }) {
             {state.items.map((item) => {
               const deadline = item.target_at || item.statement?.due_at || null;
               return (
-                <li key={item.id} className={`rounded-sm border bg-[#0A0A0A] p-3 ${item.state === "open" ? "border-honor/30" : "border-white/10"}`} data-testid={`season-procedure-${item.id}`}>
+                <li key={item.id} className={`rounded-sm border bg-[#0A0A0A] p-3 ${item.state === "open" ? "border-warn/30" : "border-white/10"}`} data-testid={`season-procedure-${item.id}`}>
                   <div className="flex flex-wrap items-start justify-between gap-x-3 gap-y-1">
                     <div className="min-w-0">
                       <div className="tls-type-label text-white/50">{item.staffel}</div>

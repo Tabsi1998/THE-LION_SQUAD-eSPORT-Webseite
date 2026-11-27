@@ -91,7 +91,7 @@ function AlbumCard({ a }) {
           <div className="w-full h-full flex items-center justify-center"><ImageIcon className="w-10 h-10 text-white/15" /></div>
         )}
         {a.visibility === "members" && (
-          <span className="absolute top-2 left-2 inline-flex items-center gap-1 tls-type-label text-[#FFD700] bg-black/60 px-2 py-1 rounded-sm">
+          <span className="absolute top-2 left-2 inline-flex items-center gap-1 tls-type-label text-honor bg-black/60 px-2 py-1 rounded-sm">
             <Crown className="w-3 h-3" /> Mitglieder
           </span>
         )}
@@ -112,7 +112,7 @@ function AlbumCard({ a }) {
       <div className="p-4">
         <div className="tls-card__title tls-wrap tls-type-card">{a.title}</div>
         {/* Leere Alben (#1224) sieht nur, wer Inhalte pflegt - mit diesem Hinweis. */}
-        {a.is_empty && <div className="mt-1 tls-type-label text-[#FFD700]" data-testid={`album-empty-${a.slug}`}>leer – für Besucher unsichtbar</div>}
+        {a.is_empty && <div className="mt-1 tls-type-label text-quiet" data-testid={`album-empty-${a.slug}`}>leer – für Besucher unsichtbar</div>}
         {a.taken_at && <div className="tls-type-small text-white/45 mt-1">{viennaDate(a.taken_at)}</div>}
         {a.description && <p className="tls-type-small text-white/55 mt-2 line-clamp-2">{a.description}</p>}
       </div>

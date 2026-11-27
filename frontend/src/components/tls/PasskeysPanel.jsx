@@ -61,7 +61,7 @@ export function PasskeysPanel() {
             {items.map((item) => (
               <li key={item.id} className="border-t border-white/10 pt-3 flex flex-wrap gap-3 items-center justify-between">
                 <div><p className="tls-type-small font-bold">{item.name}</p><p className="tls-type-small text-white/55">{item.last_used_at ? `Zuletzt verwendet: ${viennaDate(item.last_used_at)}` : "Noch nicht zur Anmeldung verwendet"}</p></div>
-                <button type="button" disabled={submitting || !password} className="min-h-11 px-3 tls-type-small text-[#FF6B62] disabled:opacity-50"
+                <button type="button" disabled={submitting || !password} className="min-h-11 px-3 tls-type-small text-live disabled:opacity-50"
                   onClick={async () => {
                     if (!await confirm({ title: "Passkey entfernen?", description: "Dieser Passkey kann dich anschließend nicht mehr anmelden. Passwort und andere Passkeys bleiben verfügbar.", confirmText: "Entfernen", variant: "danger" })) return;
                     await perform(() => api.post(`/auth/passkeys/${encodeURIComponent(item.id)}/remove`, { current_password: password }, { skipInvalidation: true }), "Passkey entfernt.");
@@ -74,7 +74,7 @@ export function PasskeysPanel() {
           )}
         </>
       )}
-      {message && <p role="status" className={`tls-type-body ${failed ? "text-[#FF6B62]" : "text-[#29B6E8]"}`}>{message}</p>}
+      {message && <p role="status" className={`tls-type-body ${failed ? "text-warn" : "text-[#29B6E8]"}`}>{message}</p>}
     </div>
   );
 }

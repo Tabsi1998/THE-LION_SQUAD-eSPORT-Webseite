@@ -120,7 +120,7 @@ function MapWinner({ game, league, onPick, staff = false }) {
   const mismatch = Boolean(auto) && Boolean(game.winner) && game.winner !== auto && !awarded;
   if (!staff && fromScores) {
     return (
-      <p role="status" className="flex min-h-[44px] min-w-0 items-start gap-2 rounded-sm border border-honor/50 bg-honor/10 px-3 py-2 tls-type-small font-bold text-honor" data-testid={`${testId}-auto`}>
+      <p role="status" className="flex min-h-[44px] min-w-0 items-start gap-2 rounded-sm border border-brand/50 bg-brand/10 px-3 py-2 tls-type-small font-bold text-brand" data-testid={`${testId}-auto`}>
         <Trophy className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
         {/* Lange Teamnamen brechen um statt abgeschnitten zu werden - der Sieger muss ganz lesbar sein. */}
         <span className="min-w-0 break-words [overflow-wrap:anywhere]">
@@ -188,7 +188,7 @@ export function GameEditor({ game, league, onChange, index, staff = false, games
       </legend>
       {rule ? <p className="tls-type-small text-white/60" data-testid={`league-game-${game.position}-rule`}>Gewertet: {rule}</p> : null}
       {plan ? (
-        <div className="flex items-center gap-3 rounded-sm border border-[#00D26A]/40 bg-[#00D26A]/5 p-2" data-testid={`league-game-${game.position}-planned`}>
+        <div className="flex items-center gap-3 rounded-sm border border-ok/40 bg-ok/5 p-2" data-testid={`league-game-${game.position}-planned`}>
           {plan.map_image_url ? <LazyImg src={plan.map_image_url} alt="" sizes="64px" className="h-12 w-16 shrink-0 rounded-sm object-cover" /> : <span className="h-12 w-16 shrink-0 rounded-sm bg-white/5" />}
           <span className="min-w-0">
             <span className="block truncate font-bold text-white">{plan.map_name}</span>

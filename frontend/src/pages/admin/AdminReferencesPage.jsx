@@ -343,11 +343,11 @@ export default function AdminReferencesPage() {
               <div className="min-w-0">
                 <div className="flex items-center gap-2 tls-type-small text-white/45 font-bold flex-wrap">
                   <span>{item.game_name || item.game?.display_name || item.game?.name || "Spiel offen"}</span>
-                  <span className={(item.status || "completed") === "active" ? "text-[#00D26A]" : (item.status || "completed") === "planned" ? "text-[#29B6E8]" : "text-white/45"}>{statusLabel[item.status || "completed"]}</span>
-                  {item.medal && <span className="text-[#FFD700]">{medalLabel[item.medal]}</span>}
+                  <span className={(item.status || "completed") === "active" ? "text-ok" : (item.status || "completed") === "planned" ? "text-[#29B6E8]" : "text-white/45"}>{statusLabel[item.status || "completed"]}</span>
+                  {item.medal && <span className="text-honor">{medalLabel[item.medal]}</span>}
                   <span>{formatDate(item.start_date)}</span>
                   {item.visibility !== "public" && <span className="text-[#29B6E8]">{visibilityLabel[item.visibility] || item.visibility}</span>}
-                  {item.is_active === false && <span className="text-[#FF3B30]">Archiviert</span>}
+                  {item.is_active === false && <span className="text-quiet">Archiviert</span>}
                 </div>
                 <h2 className="mt-1 tls-type-section leading-tight">{item.display_title || item.title}</h2>
                 <div className="mt-1 flex flex-wrap gap-1.5">
@@ -363,7 +363,7 @@ export default function AdminReferencesPage() {
                     <li key={entry.id} className="flex items-center gap-2">
                       {entry.kind === "solo" ? <User className="w-3.5 h-3.5 text-[#29B6E8] shrink-0" /> : <Users className="w-3.5 h-3.5 text-[#29B6E8] shrink-0" />}
                       <span>{entrySummary(entry)}</span>
-                      {entry.medal && <Medal className={`w-3.5 h-3.5 ${entry.medal === "gold" ? "text-[#FFD700]" : entry.medal === "silver" ? "text-white/80" : "text-[#CD7F32]"}`} />}
+                      {entry.medal && <Medal className={`w-3.5 h-3.5 ${entry.medal === "gold" ? "text-honor" : entry.medal === "silver" ? "text-white/80" : "text-[#CD7F32]"}`} />}
                     </li>
                   ))}
                 </ul>
@@ -383,7 +383,7 @@ export default function AdminReferencesPage() {
                 ) : (
                   <button onClick={() => setArchived(item, true)} title="Archivieren" aria-label="Referenz archivieren" data-testid={`reference-archive-${item.id}`} className="p-1.5 text-white/40 hover:text-brand"><Archive className="w-4 h-4" /></button>
                 )}
-                <button onClick={() => remove(item.id)} title="Löschen" aria-label="Referenz löschen" data-testid={`reference-delete-${item.id}`} className="p-1.5 text-white/40 hover:text-[#FF3B30]"><Trash2 className="w-4 h-4" /></button>
+                <button onClick={() => remove(item.id)} title="Löschen" aria-label="Referenz löschen" data-testid={`reference-delete-${item.id}`} className="p-1.5 text-white/40 hover:text-live"><Trash2 className="w-4 h-4" /></button>
               </div>
             </div>
           </div>
@@ -406,7 +406,7 @@ export default function AdminReferencesPage() {
 }
 
 function Stat({ label, value, tone }) {
-  const color = tone === "gold" ? "text-[#FFD700]" : tone === "bronze" ? "text-[#CD7F32]" : "text-[#29B6E8]";
+  const color = tone === "gold" ? "text-honor" : tone === "bronze" ? "text-[#CD7F32]" : "text-[#29B6E8]";
   return (
     <div className="border border-white/10 rounded-sm bg-[#121212] p-4">
       <div className="tls-type-label text-white/45">{label}</div>
@@ -950,7 +950,7 @@ function QuickEntry({ entry, index, profiles, suggestions, onChange, onRemove, w
         <div className="flex items-center gap-2 tls-type-label text-[#29B6E8]">
           {isSolo ? <User className="w-3.5 h-3.5" /> : <Users className="w-3.5 h-3.5" />} Eintrag {index + 1} · {isSolo ? "Einzelstarter" : "Team"}
         </div>
-        <button type="button" onClick={onRemove} aria-label="Eintrag entfernen" data-testid={`reference-entry-${index}-remove`} className="p-1 text-white/40 hover:text-[#FF3B30]"><Trash2 className="w-4 h-4" /></button>
+        <button type="button" onClick={onRemove} aria-label="Eintrag entfernen" data-testid={`reference-entry-${index}-remove`} className="p-1 text-white/40 hover:text-live"><Trash2 className="w-4 h-4" /></button>
       </div>
       <FormGrid cols={3}>
         <SelectField label="Art" value={entry.kind} onChange={setKind} options={KIND_OPTIONS} testId={`reference-entry-${index}-kind`} />
@@ -1012,7 +1012,7 @@ function MemberPicker({ profiles, selectedIds, frozenMembers, onToggle, single =
             <input type={single ? "radio" : "checkbox"} checked={selected.has(profile.id)} onChange={() => onToggle(profile.id)} onClick={single && selected.has(profile.id) ? () => onToggle(profile.id) : undefined} data-testid={`${testIdPrefix}-member-${profile.id}`} className="accent-[#29B6E8]" />
             <span className="min-w-0">
               <span className="block tls-wrap font-semibold">{memberName(profile)}</span>
-              {profile.is_active === false && <span className="block tls-type-label text-[#FFD700]">inaktiv</span>}
+              {profile.is_active === false && <span className="block tls-type-label text-quiet">inaktiv</span>}
             </span>
           </label>
         ))}

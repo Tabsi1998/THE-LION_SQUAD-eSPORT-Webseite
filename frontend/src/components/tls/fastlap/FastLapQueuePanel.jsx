@@ -17,7 +17,7 @@ function Row({ row, max, children }) {
     <div className="flex items-center gap-3 min-w-0">
       <div className="min-w-0 flex-1">
         <div className="flex items-center gap-2 min-w-0">
-          {row.is_guest && <span className="shrink-0 tls-type-label text-honor border border-honor/40 rounded-sm px-1">Gast</span>}
+          {row.is_guest && <span className="shrink-0 tls-type-label text-quiet border border-white/20 rounded-sm px-1">Gast</span>}
           <span className="tls-type-small font-semibold truncate" title={row.display_name}>{row.display_name}</span>
         </div>
         <div className="tls-type-small text-white/45 truncate">{[row.station, attemptLabel(row.attempts_used, max)].filter(Boolean).join(" · ")}</div>

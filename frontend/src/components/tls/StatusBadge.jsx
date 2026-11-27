@@ -1,7 +1,7 @@
 // Zustände nach Farb-Rolle (#1305, styles/system.css): Rot nur „läuft gerade“ (und eine belegte Station - dort läuft
 // etwas), Grün offen und frei, Orange Achtung, Cyan Marke und „du“, Grau wartet oder ist vorbei. Gold ist Ehre und
 // kommt bei Zuständen nicht mehr vor.
-const LIVE = "bg-live/20 text-live border-live/50";
+const LIVE = "bg-live/10 text-live border-live/50";
 const OK = "bg-ok/15 text-ok border-ok/50";
 const WARN = "bg-warn/15 text-warn border-warn/50";
 const BRAND = "bg-brand/15 text-brand border-brand/50";

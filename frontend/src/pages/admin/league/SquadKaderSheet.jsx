@@ -60,7 +60,7 @@ export function SquadKaderSheet({ squad, onClose, onSaved }) {
             <label key={person.id} className="flex min-h-[44px] min-w-0 cursor-pointer items-center gap-2.5 rounded-sm border border-white/10 px-3 py-2 tls-type-small has-[:checked]:border-[#29B6E8]/60 has-[:checked]:bg-[#29B6E8]/5">
               <input type="checkbox" className="accent-[#29B6E8]" checked={form.member_ids.includes(person.id)} disabled={isLocked(form, person.id)} onChange={() => toggle(person.id)} data-testid={`kader-member-${person.id}`} />
               <span className="min-w-0 flex-1 truncate">{person.display_name}</span>
-              {role ? <span className="shrink-0 tls-type-label text-[#FFD700]">{role.label}</span> : null}
+              {role ? <span className="shrink-0 tls-type-label text-brand">{role.label}</span> : null}
             </label>
           );
         })}
