@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useId, useState } from "react";
+import { useCallback, useEffect, useId, useRef, useState } from "react";
 import { AlertTriangle, Check, UserPlus } from "lucide-react";
 import { toast } from "sonner";
 import { api, formatRequestError } from "@/lib/api";
@@ -47,17 +47,22 @@ export function PersonAssignDialog({ tournament, onAssigned, triggerClassName = 
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
 
+  // Nur die Antwort auf die letzte Suche zählt - eine langsamere ältere überschreibt die neuere nicht.
+  const latest = useRef(0);
   const search = useCallback(async (text) => {
+    const ticket = latest.current + 1;
+    latest.current = ticket;
     setLoadError("");
     setLoading(true);
     try {
       const { data: body } = await api.get(`/tournaments/${tournament.id}/squad-candidates`, { params: { q: text } });
-      setData(body);
+      if (ticket === latest.current) setData(body);
     } catch (err) {
+      if (ticket !== latest.current) return;
       setData(null);
       setLoadError(formatRequestError(err, "Die Suche geht gerade nicht."));
     } finally {
-      setLoading(false);
+      if (ticket === latest.current) setLoading(false);
     }
   }, [tournament.id]);
 
@@ -143,12 +148,13 @@ export function PersonAssignDialog({ tournament, onAssigned, triggerClassName = 
                   {people.map((row) => {
                     const blocked = row.problems.length > 0;
                     return (
-                      <label key={row.id} className={`flex min-w-0 items-start gap-3 rounded-sm border bg-[#0A0A0A] p-3 ${blocked ? "border-white/5 opacity-70" : "cursor-pointer border-white/10 hover:border-white/25"}`}>
+                      <label key={row.id} className={`flex min-w-0 items-start gap-3 rounded-sm border bg-[#0A0A0A] p-3 ${blocked ? "border-white/5 text-quiet" : "cursor-pointer border-white/10 hover:border-white/25"}`}>
                         <input type="radio" name="person-assign" value={row.id} disabled={blocked} checked={personId === row.id} onChange={() => { setPersonId(row.id); setError(""); }}
                           className="mt-1 accent-[#29B6E8]" data-testid={`person-assign-person-${row.id}`} />
                         <span className="min-w-0 flex-1">
-                          <span className="block font-bold text-white break-words [overflow-wrap:anywhere]">{row.display_name}</span>
-                          {row.username && row.username !== row.display_name ? <span className="block tls-type-small text-white/50 [overflow-wrap:anywhere]">@{row.username}</span> : null}
+                          {/* Gesperrt: ruhig in der Farbe für Nebensachen, ohne zusätzliche Deckkraft - der Grund darunter bleibt gut lesbar. */}
+                          <span className={`block font-bold break-words [overflow-wrap:anywhere] ${blocked ? "text-quiet" : "text-white"}`}>{row.display_name}</span>
+                          {row.username && row.username !== row.display_name ? <span className="block tls-type-small text-quiet [overflow-wrap:anywhere]">@{row.username}</span> : null}
                           <PersonIds players={row.players} label={data?.id_label} personId={row.id} />
                           {row.problems.map((text) => <span key={text} className="mt-1 block tls-type-small text-warn break-words [overflow-wrap:anywhere]">{text}</span>)}
                           {!blocked && row.notes?.length ? (

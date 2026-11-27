@@ -47,9 +47,9 @@ import { SeasonTableLinks } from "./SeasonTablePanel";
 import { SeasonPointsFields, SeasonTableRules } from "./SeasonTableRules";
 import { SeasonTabForm } from "./SeasonTabForm";
 import { toast } from "sonner";
-import { isSoloLeague, participantLabel } from "@/lib/leagueParticipants";
+import { SOLO_SUCCESSOR_FOLLOWS, isSoloLeague, participantLabel } from "@/lib/leagueParticipants";
 
-const LONG_DAY ={ day: "2-digit", month: "2-digit", year: "numeric" };
+const LONG_DAY = { day: "2-digit", month: "2-digit", year: "numeric" };
 const SAVE_LABELS = {
   ueberblick: "Überblick speichern", spielbetrieb: "Spielbetrieb speichern", termine: "Termine speichern", anmeldung: "Anmeldung und Kader speichern",
   tabelle: "Tabelle speichern", ligen: "Staffelgröße speichern",
@@ -440,8 +440,10 @@ export default function AdminLeagueSeasonPage() {
                     <RefreshCw className="w-3.5 h-3.5" aria-hidden="true" /> Übernahme neu berechnen
                   </button>
                 ) : null}
-                <button type="button" onClick={() => setSuccessorOpen(true)} data-testid="season-successor"
-                  className="tls-btn tls-btn--secondary px-3 py-1.5 rounded-sm tls-type-label inline-flex items-center gap-1.5">
+                {/* Solo-Liga (#1629): Folge-Season und Startrechte je Person folgen (P4) - der Knopf steht da, gesperrt mit Satz darunter. */}
+                <button type="button" onClick={() => setSuccessorOpen(true)} data-testid="season-successor" disabled={solo}
+                  aria-describedby={solo ? "season-successor-follows" : undefined}
+                  className="tls-btn tls-btn--secondary px-3 py-1.5 rounded-sm tls-type-label inline-flex items-center gap-1.5 disabled:opacity-50">
                   <CopyPlus className="w-3.5 h-3.5" aria-hidden="true" /> Neue Season aus {season.name}
                 </button>
                 <button type="button" onClick={() => setDeleting({ kind: "season", target: season, name: season.name })} data-testid="season-delete"
@@ -451,6 +453,9 @@ export default function AdminLeagueSeasonPage() {
               </div>
             ) : null}
           </div>
+          {solo && can("manage") ? (
+            <p id="season-successor-follows" className="-mt-2 mb-5 tls-type-small text-white/70" data-testid="season-successor-follows">{SOLO_SUCCESSOR_FOLLOWS}</p>
+          ) : null}
 
           {pendingSync > 0 ? (
             <div role="status" className="mb-5 flex flex-wrap items-center justify-between gap-3 rounded-sm border border-warn/30 bg-warn/5 px-4 py-3 tls-type-small text-warn" data-testid="season-sync-hint">

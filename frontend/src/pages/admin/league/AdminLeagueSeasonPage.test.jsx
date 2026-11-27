@@ -992,8 +992,18 @@ test("Solo-Liga: Liga N ohne eigene Teamgröße und Mindestkader, Staffel anlege
   expect(within(sheet).getByText("Spieler je Staffel höchstens")).toBeInTheDocument();
 });
 
+test("Solo-Liga: „Neue Season aus …“ ist gesperrt und sagt, dass es folgt", async () => {
+  body = SOLO_BODY;
+  renderPage();
+  const button = await screen.findByTestId("season-successor");
+  expect(button).toBeDisabled();
+  expect(screen.getByTestId("season-successor-follows")).toHaveTextContent("Die Folge-Season mit Auf- und Abstieg und Startrechten folgt für Solo-Ligen");
+});
+
 test("Gegenprobe Team-Liga: Kopf nennt Co-Teams, Teamgröße bleibt änderbar, Eingang wie bisher", async () => {
   const first = renderPage("#spielbetrieb");
+  expect(await screen.findByTestId("season-successor")).toBeEnabled();
+  expect(screen.queryByTestId("season-successor-follows")).toBeNull();
   expect(await screen.findByTestId("season-head")).toHaveTextContent("Probe Shooter · Co-Teams · ab");
   expect(screen.getByTestId("season-form-team-size")).toBeEnabled();
   first.unmount();

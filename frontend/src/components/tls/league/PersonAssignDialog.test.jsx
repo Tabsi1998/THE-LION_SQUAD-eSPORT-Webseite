@@ -87,3 +87,30 @@ test("ohne Treffer ein klarer Satz", async () => {
 
   expect(await screen.findByTestId("person-assign-empty")).toHaveTextContent("Kein Konto passt zur Suche.");
 });
+
+test("eine ältere, langsamere Suchantwort überschreibt die neuere nicht", async () => {
+  let answerOld;
+  apiMock.get.mockImplementation((_url, { params }) => (params.q === "Duel"
+    ? new Promise((resolve) => { answerOld = () => resolve({ data: PEOPLE }); })
+    : Promise.resolve({ data: { ...PEOPLE, people: [{ id: "u9", display_name: "Duellant Neun", username: "d9", problems: [], notes: [], players: [] }] } })));
+  render(<PersonAssignDialog tournament={TOURNAMENT} />);
+
+  fireEvent.click(screen.getByTestId("person-assign-open"));
+  fireEvent.change(screen.getByTestId("person-assign-search"), { target: { value: "Duel" } });
+  await waitFor(() => expect(apiMock.get).toHaveBeenCalledTimes(1));
+  fireEvent.change(screen.getByTestId("person-assign-search"), { target: { value: "Duellant N" } });
+  expect(await screen.findByTestId("person-assign-person-u9")).toBeInTheDocument();
+  answerOld();
+  await new Promise((resolve) => { setTimeout(resolve, 20); });
+
+  expect(screen.getByTestId("person-assign-person-u9")).toBeInTheDocument();
+  expect(screen.queryByTestId("person-assign-person-u2")).toBeNull();
+});
+
+test("eine gesperrte Zeile ist ruhig, aber ohne zusätzliche Deckkraft lesbar", async () => {
+  render(<PersonAssignDialog tournament={TOURNAMENT} />);
+  await openAndSearch();
+  const row = screen.getByTestId("person-assign-person-u1").closest("label");
+  expect(row.className).not.toMatch(/opacity-/);
+  expect(row.className).toMatch(/text-quiet/);
+});

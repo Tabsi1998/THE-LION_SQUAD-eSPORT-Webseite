@@ -11,7 +11,8 @@ const LABELS = Object.fromEntries(PARTICIPANT_OPTIONS);
 export const KIND_FIXED_HINT = "Steht seit dem Anlegen fest. Für die andere Art eine neue Liga anlegen.";
 export const SOLO_ONLY_ONE = "Solo-Liga: Jede Person spielt für sich – immer 1 gegen 1.";
 export const SOLO_APPLICATIONS_FOLLOW = "Die Selbstanmeldung als Spieler folgt in einem späteren Ausbau – bis dahin teilt die Leitung die Spieler auf der Staffel-Seite zu.";
-export const SOLO_OPERATIONS_FOLLOW = "Der Spielbetrieb einer Solo-Liga (Check-in, Veto, Ergebnis melden) folgt in einem späteren Ausbau – die Staffel bleibt bis dahin im Entwurf.";
+export const SOLO_SUCCESSOR_FOLLOWS = "Die Folge-Season mit Auf- und Abstieg und Startrechten folgt für Solo-Ligen in einem späteren Ausbau – bis dahin eine neue Season anlegen und die Spieler zuteilen.";
+export const SOLO_OPERATIONS_FOLLOW ="Der Spielbetrieb einer Solo-Liga (Check-in, Veto, Ergebnis melden) folgt in einem späteren Ausbau – die Staffel bleibt bis dahin im Entwurf.";
 
 export function participantKind(league) {
   return league?.participant_kind === SOLO ? SOLO : TEAM;
