@@ -63,6 +63,13 @@
     "link": { "to": "/faq/liga-captains#anmeldung-starten", "label": "Zur Anleitung" }
   },
   {
+    "id": "liga-gastteam",
+    "frage": "Können Teams anderer Vereine oder Schulen in der Liga mitspielen?",
+    "antwort": "Ja, mit eigenem Konto und ohne Mitgliedschaft. Sie melden sich an wie jedes Team, die Liga-Leitung gibt die Anmeldung frei und kennzeichnet sie als Gastteam. Den Namen einer Schule zeigen wir nur mit Freigabe der Teamleitung.",
+    "bereich": "liga", "rollen": ["captain"], "sichtbar_fuer": "alle",
+    "link": { "to": "/faq/liga-captains#gastteam", "label": "Zur Anleitung" }
+  },
+  {
     "id": "ergebnis-melden",
     "frage": "Wo melde ich ein Ergebnis?",
     "antwort": "Auf der Matchseite deines Spiels. Meldet die Gegenseite dasselbe, steht das Ergebnis fest. Weicht es ab, entscheidet die Leitung.",

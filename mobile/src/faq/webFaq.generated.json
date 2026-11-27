@@ -280,6 +280,20 @@
       }
     },
     {
+      "id": "liga-gastteam",
+      "frage": "Können Teams anderer Vereine oder Schulen in der Liga mitspielen?",
+      "antwort": "Ja, mit eigenem Konto und ohne Mitgliedschaft. Sie melden sich an wie jedes Team, die Liga-Leitung gibt die Anmeldung frei und kennzeichnet sie als Gastteam. Den Namen einer Schule zeigen wir nur mit Freigabe der Teamleitung.",
+      "bereich": "liga",
+      "rollen": [
+        "captain"
+      ],
+      "sichtbar_fuer": "alle",
+      "link": {
+        "to": "/faq/liga-captains#gastteam",
+        "label": "Zur Anleitung"
+      }
+    },
+    {
       "id": "ergebnis-melden",
       "frage": "Wo melde ich ein Ergebnis?",
       "antwort": "Auf der Matchseite deines Spiels. Meldet die Gegenseite dasselbe, steht das Ergebnis fest. Weicht es ab, entscheidet die Leitung.",
@@ -866,6 +880,9 @@
       "sichtbar_fuer": "alle",
       "suchbegriffe": [
         "anmeldung",
+        "gastteam",
+        "gast",
+        "schule",
         "season",
         "staffel",
         "regelwerk",
@@ -927,6 +944,12 @@
               "titel": "Stand und offene Punkte",
               "text": "Den Stand eurer Anmeldung siehst du auf der Ligaseite. „Eingereicht“: Die Liga-Leitung prüft noch. „Angemeldet“: Ihr habt einen Startplatz. Steht „Zuteilung folgt“ dabei, fehlt nur noch die Staffel. Darunter stehen die offenen Punkte, bis alle erledigt sind.",
               "hinweis": "Zurückziehen geht, bis die Liga-Leitung euch einer Staffel zuteilt. Hat euch die Season automatisch zugeteilt, geht es bis zum Check-in, solange noch kein Spielplan steht."
+            },
+            {
+              "id": "gastteam",
+              "titel": "Als Gastteam anmelden",
+              "text": "Spielt ihr als Gast für einen anderen Verein oder eine Schule? Meldet euch an wie jedes andere Team. Danach trägt die Teamleitung auf der Teamseite unter Bearbeiten → Gastteam in der Liga ein, für wen ihr spielt. Das Kennzeichen „Gast“ setzt die Liga-Leitung, wenn sie eure Anmeldung freigibt.",
+              "hinweis": "In Tabellen, im Spielplan und auf der Teamseite steht dann „Gast“ mit dem Namen des Vereins bzw. der Schule, am TV und im Discord nur „Gast“. Den Namen einer Schule zeigen wir nur, wenn die Teamleitung ihn freigibt. Rechte und Abläufe sind dieselben wie für jedes Team."
             }
           ]
         },

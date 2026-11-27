@@ -141,7 +141,7 @@ test("an jeder Breite genau ein Logo - auch zwischen 1439,98 und 1440 px", () =>
 });
 
 // Mitglieder sahen in der Fußzeile „Mitglied werden“ - der Layout-Aufruf übergab den falschen Namen (#2059).
-test("Fußzeile: Mitglied sieht „Mein Bereich · Verein“, Gast „Mitglied werden“", () => {
+test("Fußzeile: Gast sieht „Mitglied werden“, Mitglied keinen Vereins-Eintrag", () => {
   const { unmount } = renderLayout();
   const guest = screen.getByTestId("footer-column-join");
   expect(within(guest).getByRole("link", { name: "Mitglied werden" })).toBeInTheDocument();
@@ -150,7 +150,7 @@ test("Fußzeile: Mitglied sieht „Mein Bereich · Verein“, Gast „Mitglied w
   try {
     renderLayout();
     const member = screen.getByTestId("footer-column-join");
-    expect(within(member).getByRole("link", { name: "Mein Bereich · Verein" })).toHaveAttribute("href", "/mein-bereich/verein");
+    expect(within(member).queryByRole("link", { name: /Mein Bereich/ })).toBeNull();
     expect(within(member).queryByRole("link", { name: "Mitglied werden" })).toBeNull();
   } finally {
     Object.assign(authState, { user: null, isClubMember: false });

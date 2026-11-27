@@ -76,7 +76,7 @@ function LinkRow({ platformKey, link, available, form, set, onLink, onUnlink, in
   const numericName = /^\d{17}$/.test(String(link?.display_name || ""));
   const linkedName = link ? (numericName ? `${label}-Profil ${link.display_name}` : (link.display_name || link.handle || label)) : "";
   return (
-    <div data-testid={`${testId}-row`} className={`flex flex-wrap items-center gap-3 border rounded-sm px-3 py-2.5 bg-[#0A0A0A] ${link ? "border-[var(--social-color)]/60 shadow-[0_0_18px_-6px_var(--social-color)]" : "border-white/10"}`} style={{ "--social-color": meta.color }}>
+    <div data-testid={`${testId}-row`} className={`flex flex-wrap items-center gap-3 border rounded-sm px-3 py-2.5 bg-[#0A0A0A] ${link ? "border-[var(--social-color)]/60" : "border-white/10"}`} style={{ "--social-color": meta.color }}>
       <span className="w-10 h-10 shrink-0 rounded-sm flex items-center justify-center border-2 border-[var(--social-color)] text-[var(--social-color)] bg-black/40">
         <PlatformIcon kind={meta.key} className="w-5 h-5" />
       </span>

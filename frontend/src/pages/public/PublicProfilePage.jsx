@@ -1134,7 +1134,7 @@ export function AccountsCard({ groups }) {
     <section id="konten" className="border border-white/10 rounded-sm bg-[#121212] p-4 space-y-4 scroll-mt-24" data-testid="public-profile-accounts">
       <div>
         <h2 className="tls-type-section flex items-center gap-2"><Globe className="w-4 h-4 text-[#29B6E8]" /> Konten</h2>
-        <p className="tls-type-small text-white/45 mt-1 flex items-center gap-1"><BadgeCheck className="w-3.5 h-3.5 text-ok shrink-0" /> per Anmeldung bei der Plattform bestätigt – der Link führt zum echten Konto.</p>
+        <p className="tls-type-small text-quiet mt-1 flex items-start gap-1.5"><BadgeCheck className="w-3.5 h-3.5 mt-0.5 text-ok shrink-0" aria-hidden="true" /><span>Mit Haken: per Anmeldung bei der Plattform bestätigt – der Link führt zum echten Konto.</span></p>
       </div>
       {groups.socials.length > 0 && <AccountGroup title="Socials" icon={Globe} color="#29B6E8" entries={groups.socials} testId="public-profile-socials" />}
       {groups.games.length > 0 && <AccountGroup title="Spielkonten" icon={Gamepad2} color={ROLE_COLORS.brand} entries={groups.games} testId="public-profile-gaming-ids" />}
@@ -1146,7 +1146,7 @@ function AccountGroup({ title, icon: Icon, color, entries, testId }) {
   return (
     <div data-testid={testId}>
       <h3 className="tls-type-label text-quiet mb-2 flex items-center gap-2"><Icon className="w-3.5 h-3.5" style={{ color }} /> {title}</h3>
-      <div className="grid gap-2">{entries.map((entry) => <AccountRow key={`${entry.key}:${entry.value}`} entry={entry} />)}</div>
+      <div className="grid grid-cols-1 gap-2">{entries.map((entry) => <AccountRow key={`${entry.key}:${entry.value}`} entry={entry} />)}</div>
     </div>
   );
 }
@@ -1163,12 +1163,12 @@ function AccountRow({ entry }) {
           <span className="truncate">{entry.title}</span>
           {entry.verified && <BadgeCheck className="w-4 h-4 text-ok shrink-0" aria-label="verifiziert" data-testid={`profile-account-${entry.key}-verified`}><title>{verifiedTitle}</title></BadgeCheck>}
         </span>
-        <span className="block tls-type-small text-white/50 truncate">{entry.detail}</span>
+        <span className="block tls-type-small text-white/50 [overflow-wrap:anywhere]">{entry.detail}</span>
       </span>
       {entry.url ? <ExternalLink className="w-4 h-4 text-white/40 shrink-0" aria-hidden="true" /> : <Copy className="w-4 h-4 text-white/40 shrink-0" aria-hidden="true" />}
     </>
   );
-  const className = `flex items-center gap-3 border rounded-sm px-3 py-2.5 bg-[#0A0A0A] transition text-left w-full ${entry.verified ? "border-[var(--social-color)]/60 shadow-[0_0_18px_-6px_var(--social-color)]" : "border-white/10 hover:border-[var(--social-color)]/50"}`;
+  const className = `flex items-center gap-3 border rounded-sm px-3 py-2.5 bg-[#0A0A0A] transition text-left w-full min-w-0 ${entry.verified ? "border-[var(--social-color)]/60" : "border-white/10 hover:border-[var(--social-color)]/50"}`;
   const style = { "--social-color": entry.color };
   if (entry.url) {
     return <a href={entry.url} target="_blank" rel="noopener noreferrer" title={`${entry.label} öffnen`} data-testid={`profile-account-${entry.key}`} className={className} style={style}>{inner}</a>;

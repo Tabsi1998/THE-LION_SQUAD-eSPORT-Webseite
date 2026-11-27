@@ -8,7 +8,8 @@ export function footerColumns(settings = {}, { isMember = false } = {}) {
     { to: "/community", label: "Community" },
     discord ? { href: discord, label: "Discord", external: true } : null,
     { to: "/calendar", label: "Kalender" },
-    isMember ? { to: "/mein-bereich/verein", label: "Mein Bereich · Verein" } : { to: "/membership/join", label: "Mitglied werden" },
+    // Mitglieder: kein Eintrag (Fabian 27.11.) - Mein Bereich liegt im Profil-Menü rechts oben.
+    isMember ? null : { to: "/membership/join", label: "Mitglied werden" },
     // FAQ (#2448, vorher Hilfe #2295), gleich neben dem Kontakt.
     { to: "/faq", label: "FAQ" },
     { to: "/contact", label: "Kontakt" },

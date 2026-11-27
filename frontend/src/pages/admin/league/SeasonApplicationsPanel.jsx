@@ -14,6 +14,8 @@ import { carryLine } from "@/lib/leagueSuccessor";
 import { APPLICATION_STATES, statsLine } from "@/lib/leagueApplications";
 import { viennaDateTime } from "@/lib/vienna";
 import { staffelAdminUrl } from "@/lib/staffelTabs";
+import { GuestBadge } from "@/components/tls/league/GuestBadge";
+import { GuestTeamControl } from "./GuestTeamControl";
 
 const WHEN = { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" };
 const BUTTON = "inline-flex min-h-[40px] items-center rounded-sm px-3 py-1.5 tls-type-label disabled:opacity-50";
@@ -74,18 +76,27 @@ function OwnTeamNote({ row }) {
   return <p className="tls-type-small font-semibold text-white/80" data-testid={`application-own-team-${row.id}`}>{OWN_TEAM}</p>;
 }
 
-function RowActions({ row, options, busy, act, superadmin }) {
+// Offene Anmeldungen (Entscheidung B, #1665): Nur hier steht das Kennzeichen „Gast“ - abgelehnt oder zurückgezogen gibt kein Recht daran.
+const OPEN_STATUSES = ["submitted", "in_review", "waitlist", "accepted"];
+
+/** Hat die Anmeldung noch Knöpfe der Entscheidung? Prüfen, annehmen, zuteilen oder eine automatische Zuteilung zurücknehmen. */
+export function hasRowActions(row) {
+  const unassigned = row.status === "accepted" && !row.assignment;
+  const autoSeated = row.status === "accepted" && Boolean(row.assignment?.auto) && !row.assignment?.left;
+  return ["submitted", "in_review", "waitlist"].includes(row.status) || unassigned || autoSeated;
+}
+
+function RowActions({ row, options, busy, act, superadmin, conflictReason = "", setConflictReason = () => {} }) {
   const [staffel, setStaffel] = useState("");
   // Welcher Grund gerade offen ist: Ablehnen, oder Warteliste bei einer automatisch angenommenen Anmeldung (#2348).
   const [mode, setMode] = useState(null);
   const [reason, setReason] = useState("");
-  const [conflictReason, setConflictReason] = useState("");
   const [deviation, setDeviation] = useState("");
   const unassigned = row.status === "accepted" && !row.assignment;
   // Eine automatische Zuteilung (#2348) nehmen Ablehnen und Warteliste wieder aus der Staffel; jede andere bleibt der Teilnehmerliste.
   const autoSeated = row.status === "accepted" && Boolean(row.assignment?.auto) && !row.assignment?.left;
   const deciding = ["submitted", "in_review", "waitlist"].includes(row.status);
-  if (!deciding && !unassigned && !autoSeated) return null;
+  if (!hasRowActions(row)) return null;
   if (row.own_team && !superadmin) return <div className="mt-3"><OwnTeamNote row={row} /></div>;
   // Nur der Superadmin darf beim eigenen Team, als Notausnahme: Jeder Knopf schickt den Grund mit und geht erst mit fünf Zeichen.
   const override = row.own_team ? conflictReason.trim() : "";
@@ -150,13 +161,24 @@ function historyLine(step) {
   return `${when(step.at)}: ${APPLICATION_STATES[step.status]?.label || step.status}, ${step.by_name}${step.reason ? `, ${step.reason}` : ""}${step.conflict_reason ? ` (Notausnahme: ${step.conflict_reason})` : ""}`;
 }
 
-function ApplicationRow({ row, options, busy, act, superadmin }) {
+function ApplicationRow({ row, options, busy, act, superadmin, seasonId = null, reload = null, seasonClosed = false }) {
+  // Ein Grund für die Notausnahme je Anmeldung (#1665): Er gilt für die Entscheidung und fürs Kennzeichen - ein Feld, nicht zwei.
+  const [conflictReason, setConflictReason] = useState("");
+  // Beendete oder archivierte Season: kein Recht mehr am Kennzeichen (Entscheidung B) - der Kasten fällt weg, statt mit 403 zu antworten.
+  // Auch der Bereich Ligen setzt es dann über eine laufende Season des Teams.
+  const guestControl = Boolean(seasonId) && !seasonClosed && OPEN_STATUSES.includes(row.status);
   return (
     <li className="rounded-sm border border-white/10 bg-[#0A0A0A] p-3" data-testid={`application-${row.id}`}>
       <div className="flex flex-wrap items-center gap-2">
         <span className="min-w-0 font-semibold text-white [overflow-wrap:anywhere]">{row.display_name}</span>
         <ApplicationStateBadge state={row.status} />
+        {row.guest_badge ? <GuestBadge badge={row.guest_badge} testId={`application-guest-mark-${row.id}`} /> : null}
       </div>
+      {/* Gastteam (#1665): Angabe der Teamleitung und Kennzeichen - nur bei offenen Anmeldungen zum Bestätigen. */}
+      {guestControl ? (
+        <GuestTeamControl row={row} seasonId={seasonId} superadmin={superadmin} onChanged={reload} conflictReason={conflictReason}
+          onConflictReason={hasRowActions(row) ? null : setConflictReason} />
+      ) : null}
       {row.carry_over ? (
         <p className="mt-1 tls-type-small text-white/85 [overflow-wrap:anywhere]" data-testid={`application-carry-${row.id}`}>{carryLine(row.carry_over)}</p>
       ) : null}
@@ -197,7 +219,7 @@ function ApplicationRow({ row, options, busy, act, superadmin }) {
       ) : null}
       {row.decision_reason ? <p className="mt-1 tls-type-small text-white/75 [overflow-wrap:anywhere]">Grund: {row.decision_reason}{row.decided_by_name ? ` (${row.decided_by_name})` : ""}</p> : null}
       <Notes row={row} />
-      <RowActions row={row} options={options} busy={busy} act={act} superadmin={superadmin} />
+      <RowActions row={row} options={options} busy={busy} act={act} superadmin={superadmin} conflictReason={conflictReason} setConflictReason={setConflictReason} />
       {row.history?.length > 1 ? (
         <details className="mt-2 tls-type-small text-white/55">
           <summary className="cursor-pointer">Verlauf</summary>
@@ -209,7 +231,10 @@ function ApplicationRow({ row, options, busy, act, superadmin }) {
 }
 
 // ``version``: ändert sich mit den Einstellungen der Season. Wer das Fenster gerade gesetzt hat, sieht den Eingang gleich.
-export function SeasonApplicationsPanel({ seasonId, version }) {
+const CLOSED_SEASONS = ["completed", "archived"];
+
+// ``seasonStatus``: der Stand der Season - beendet oder archiviert, gibt es dort kein Kennzeichen „Gast“ mehr zu setzen.
+export function SeasonApplicationsPanel({ seasonId, version, seasonStatus = null }) {
   const [data, setData] = useState(null);
   const [busy, setBusy] = useState(false);
   const scrolled = useRef(false);
@@ -261,7 +286,10 @@ export function SeasonApplicationsPanel({ seasonId, version }) {
           return (
             <div key={group.key} className="space-y-2">
               <h3 className="tls-type-label text-white/60">{group.title} ({rows.length})</h3>
-              <ul className="space-y-2">{rows.map((row) => <ApplicationRow key={row.id} row={row} options={options(row)} busy={busy} act={act} superadmin={Boolean(data.superadmin)} />)}</ul>
+              <ul className="space-y-2">{rows.map((row) => (
+                <ApplicationRow key={row.id} row={row} options={options(row)} busy={busy} act={act} superadmin={Boolean(data.superadmin)} seasonId={seasonId} reload={load}
+                  seasonClosed={CLOSED_SEASONS.includes(seasonStatus)} />
+              ))}</ul>
             </div>
           );
         })}

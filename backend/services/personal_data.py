@@ -170,7 +170,8 @@ PERSONAL: dict[str, Entry] = {
                               "ohne Prüfsumme, Dateigröße und Dateinamen, auch die Prüfsumme an der Bestellposition "
                               "geht (#2150). Grunddateien des Katalogs haben kein Konto"),
     # Teams, Turniere, Events, F1, Saison
-    "teams": Entry(KEPT, ("teams",), "gehört dem Team; das Konto heißt in der Liste „Gelöschter User“"),
+    "teams": Entry(KEPT, ("teams",), "gehört dem Team; das Konto heißt in der Liste „Gelöschter User“. Das Kennzeichen Gastteam mit "
+                   "Verein bzw. Schule (#1665, ``guest_team``) trägt keine Person"),
     "dissolved_teams": Entry(OVERWRITTEN, ("dissolved_teams",), "aufgelöstes Team bis zum Ende der Frist: die Person wird herausgenommen; nach der Frist bleiben nur Name und Kürzel für alte Turniere"),
     "team_members": Entry(KEPT, ("team_memberships",), "Teamhistorie und Aufstellungen; das Konto heißt „Gelöschter User“"),
     "team_invites": Entry(DELETED, ("team_invites",)),

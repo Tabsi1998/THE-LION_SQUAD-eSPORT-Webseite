@@ -707,6 +707,11 @@ async def team_meta(db, team_id: str, base: dict, origin: str) -> dict:
         "image": image,
         "memberOf": {"@type": "Organization", "name": base["site_name"], "url": origin},
     }
+    from services import league_guests
+
+    if league_guests.is_confirmed(team):
+        # Gastteam (#1665): spielt als Gast, gehört nicht zum Verein - die Vorschau nennt ihn nicht als Verband des Teams.
+        meta["json_ld"].pop("memberOf")
     return add_breadcrumbs(meta, origin, [("Teams", "/teams")], title)
 
 

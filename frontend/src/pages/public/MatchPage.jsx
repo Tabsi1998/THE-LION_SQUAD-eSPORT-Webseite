@@ -50,6 +50,7 @@ import { useLeagueTrail } from "@/hooks/useLeagueTrail";
 import { tournamentCrumbs } from "@/lib/leagueTrail";
 import { LeagueEmblem } from "@/components/tls/league/public/LeagueLook";
 import { noteOwnMatches } from "@/lib/liveQueue";
+import { GuestBadge } from "@/components/tls/league/GuestBadge";
 import { teamLeadsWord } from "@/lib/words";
 
 const DECISION_TOASTS = {
@@ -829,9 +830,11 @@ function Pill({ children }) {
 
 function ResultSide({ participant, match, score, isWinner }) {
   return (
-    <div className={`border rounded-sm bg-[#0A0A0A] p-4 ${isWinner ? "border-[#29B6E8]/70 shadow-[0_0_18px_rgba(41,182,232,0.18)]" : "border-white/10"}`}>
+    <div className={`min-w-0 border rounded-sm bg-[#0A0A0A] p-4 ${isWinner ? "border-[#29B6E8]/70 shadow-[0_0_18px_rgba(41,182,232,0.18)]" : "border-white/10"}`}>
       <div className="tls-type-card truncate">{slotName(participant?.display_name, participant, match)}</div>
       {participant?.team && <div className="mt-1 tls-type-small text-[#29B6E8] truncate">[{participant.team.tag}] {participant.team.name}</div>}
+      {/* Gastteam (#1665): „Gast · Verein/Schule“ - der Name bricht um, statt abgeschnitten zu werden. */}
+      {participant?.guest_badge ? <div className="mt-2"><GuestBadge badge={participant.guest_badge} testId={`match-guest-${participant.registration_id}`} /></div> : null}
       <div className={`mt-3 tls-type-hero tls-type-num ${isWinner ? "text-[#29B6E8]" : "text-white/75"}`}>{score ?? 0}</div>
     </div>
   );
