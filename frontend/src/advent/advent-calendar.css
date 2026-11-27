@@ -117,23 +117,24 @@
   position: absolute; left: 0; right: 0; bottom: 0; padding: 18% 8% 9%;
   background: linear-gradient(180deg, rgba(6, 4, 2, 0), rgba(6, 4, 2, 0.86) 58%);
 }
+/* Der Titel ab 12 px (#1232, #1302), so viele Zeilen, wie die Nische hat - nie abgeschnitten, nie mit „…“, Wörter
+   bleiben ganz. Passt er nicht, bekommt er erst den Platz des Zeichens, dann steht dort die Art des Türchens
+   (NichePreview misst das); das Fenster zeigt den ganzen Titel. overflow: hidden lässt den Titel in der Nische nur
+   schrumpfen, damit die Messung sieht, dass er nicht passt - zu sehen ist er so nie. */
 .tls-adv__preview-title {
   position: relative;
   max-width: 100%;
-  font-size: clamp(10px, calc(var(--leaf) * 0.088), 14px);
+  min-height: 0;
+  font-size: clamp(12px, calc(var(--leaf) * 0.088), 14px);
   line-height: 1.22;
   font-weight: 600;
   color: #fff3d6;
   text-shadow: 0 1px 3px rgba(0, 0, 0, 0.9);
-  display: -webkit-box;
-  -webkit-box-orient: vertical;
-  -webkit-line-clamp: 3;
-  line-clamp: 3;
   overflow: hidden;
-  overflow-wrap: anywhere;
+  overflow-wrap: normal;
 }
-/* Ein langer Titel wird kleiner gesetzt statt abgeschnitten; das Fenster zeigt ihn ganz. */
-.tls-adv__preview[data-long="1"] .tls-adv__preview-title { font-size: clamp(9px, calc(var(--leaf) * 0.074), 12px); }
+/* Ein langer Titel bleibt bei 12 px und lässt dem Text mehr Platz (kleineres Zeichen). */
+.tls-adv__preview[data-long="1"] .tls-adv__preview-title { font-size: 12px; }
 .tls-adv__preview[data-long="1"] .tls-adv__preview-icon { width: calc(var(--leaf) * 0.22); height: calc(var(--leaf) * 0.22); }
 .tls-adv__cell[data-shape="round"] .tls-adv__preview { padding: calc(var(--leaf) * 0.17); }
 
@@ -308,7 +309,7 @@
   transform: translateX(-50%);
   padding: 0.16em 0.62em 0.14em;
   border-radius: 999px;
-  font-size: clamp(8px, calc(var(--cell) * 0.064), 11px);
+  font-size: var(--tls-type-label-size);
   font-weight: 700;
   letter-spacing: 0.16em;
   text-transform: uppercase;

@@ -7,7 +7,7 @@ import { useCookieConsent } from "@/components/tls/CookieConsent";
 import { ExternalMediaNotice } from "@/components/tls/ExternalMediaNotice";
 import { VideoEmbed } from "@/components/tls/VideoEmbed";
 import { clipEmbedSrc } from "@/components/tls/TwitchClips";
-import { KIND_ICONS } from "./Door";
+import { KIND_ICONS, KIND_LABELS } from "./Door";
 import { opensLabel } from "./doors";
 import { errorText } from "./useAdventCalendar";
 import { asInstant, viennaDate } from "@/lib/vienna";
@@ -16,18 +16,7 @@ import { asInstant, viennaDate } from "@/lib/vienna";
 // Quiz oder Gewinn. Videos und Clips laden erst nach der Zustimmung zu externen Medien. Das Quiz zeigt die
 // Auflösung nach der Antwort; bei der Verlosung ist Mitmachen ein eigener Klick.
 
-export const KIND_LABELS = {
-  text: "Gruß",
-  image: "Bild",
-  video: "Video",
-  clip: "Clip",
-  news: "News",
-  event: "Event",
-  member_spotlight: "Mitglied der Woche",
-  sticker: "Sticker",
-  quiz: "Quiz",
-  prize: "Gewinn",
-};
+export { KIND_LABELS };
 const CARD_KICKER = { news: "News-Beitrag", event: "Event", member_spotlight: "Mitglied der Woche" };
 const LETTERS = ["A", "B", "C"];
 

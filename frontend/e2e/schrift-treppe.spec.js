@@ -1,5 +1,6 @@
 const { test, expect } = require("@playwright/test");
 const { HOME, mockLongApi } = require("./fixtures/longTextMocks");
+const { activePayload, mockSeason } = require("./seasonQa");
 
 // Schrift-Treppe (#1302, #1303, #1304) mit schlimmen, aber echten Daten (break-ui): ein News-Titel mit 60 Zeichen und
 // Umlauten, eine Rangliste mit langen Namen und Punkten in verschiedener Breite, ein Countdown in den letzten Minuten.
@@ -195,6 +196,74 @@ test.describe("Schrift-Treppe", () => {
       expect(facts.upper).toBe(false);
       expect(facts.shown).toBe(facts.text);
       expect(facts.shown).toContain(participants[0]);
+    });
+  }
+
+  // Adventkalender (Fabians Entscheidung vom 26.11.: auch Deko-Text ab 12 px): das Schild „Heute“ und die Titel in den
+  // geöffneten Türchen haben bei 360, 390 und 1440 px mindestens 12 px. Kein Titel wird abgeschnitten und keiner endet
+  // mit „…“: Was nicht in die Nische passt, zeigt dort die kurze Art des Türchens („Gruß“, „Bild“) - der ganze Titel
+  // steht im Fenster.
+  const ADVENT_ORDER = [8, 22, 9, 14, 5, 13, 17, 12, 2, 18, 6, 16, 19, 7, 10, 3, 24, 23, 11, 15, 21, 4, 1, 20];
+  const ADVENT_SEASON = { key: "advent_calendar", label: "Adventkalender", phase: "tuerchen", intensity: "normal", channels: ["web", "app"], texts: {}, data: { today_door: 12, catch_up: false, door_hour: 6, ready: true }, starts_at: "2026-12-01T00:00:00+01:00", ends_at: "2027-01-06T23:59:59+01:00", forced: false };
+  const LONG_DOOR = "Ein ziemlich langer Titel für das heutige Türchen im Advent";
+  const LONGEST_DOOR = "Weihnachtsgrüße vom ganzen Vorstand der Lion Squad an alle Mitglieder, Fahrerinnen und Fahrer, Fans und Freunde - danke für dieses Jahr voller Rennen, Turniere und Abende im Vereinsheim in Wörgl!";
+  const PIXEL = "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='4' height='4'><rect width='4' height='4' fill='%23305'/></svg>";
+  const ADVENT_CONTENT = {
+    1: { kind: "text", title: LONGEST_DOOR },
+    2: { kind: "quiz", title: "Kranz-Quiz" },
+    5: { kind: "text", title: LONG_DOOR },
+    8: { kind: "prize", title: "Heute gibt es etwas zu gewinnen" },
+    9: { kind: "image", title: "Das Team beim Saisonfinale in Wörgl", media_url: PIXEL },
+  };
+  const KINDS = { text: "Gruß", quiz: "Quiz", prize: "Gewinn", image: "Bild" };
+
+  function adventCalendar(opened) {
+    const doors = [];
+    for (let day = 1; day <= 24; day += 1) {
+      const state = day > 12 ? "locked" : opened.includes(day) ? "opened" : "available";
+      const content = { kind: "text", title: `Türchen ${day}`, body: "Der Löwe wünscht dir einen schönen Adventtag.", media_url: null, link: null, ...ADVENT_CONTENT[day] };
+      doors.push({ day, opens_at: `2026-12-${String(day).padStart(2, "0")}T06:00:00+01:00`, seed: day * 7919, state, ...(state === "opened" ? { content } : {}) });
+    }
+    return { active: true, year: 2026, now: "2026-12-12T10:00:00+01:00", ends_at: "2027-01-06T23:59:59+01:00", catch_up: false, newest_door: 12, door_hour: 6, order: ADVENT_ORDER, doors, total: 24, signed_in: false, opened: opened.length };
+  }
+
+  for (const [width, height] of [[360, 780], [390, 844], [1440, 900]]) {
+    test(`Adventkalender bei ${width} px: „Heute“ und Türchen-Titel ab 12 px, nichts abgeschnitten`, async ({ page }) => {
+      await page.setViewportSize({ width, height });
+      const opened = [1, 2, 5, 8, 9];
+      await mockSeason(page, activePayload({ season: ADVENT_SEASON, now: "2026-12-12T10:00:00+01:00" }));
+      await page.route(/\/api\/seasonal\/advent(\?.*)?$/, (route) => route.fulfill(json(adventCalendar(opened))));
+      await page.addInitScript((days) => window.localStorage.setItem("tls-advent-opened", JSON.stringify({ year: 2026, days })), opened);
+      await page.goto("/advent");
+      await expect(page.getByTestId("advent-board")).toBeVisible({ timeout: 20000 });
+      await expect(page.locator(".tls-adv__preview-title")).toHaveCount(opened.length);
+      await page.evaluate(() => document.fonts.ready);
+
+      const today = await page.locator(".tls-adv__today").evaluate((node) => Number.parseFloat(getComputedStyle(node).fontSize));
+      expect(today, "Schild „Heute“").toBeGreaterThanOrEqual(12);
+
+      await expect.poll(() => page.locator(".tls-adv__preview-title").evaluateAll((nodes) => nodes.map((node) => {
+        const preview = node.closest(".tls-adv__preview").getBoundingClientRect();
+        const box = node.getBoundingClientRect();
+        const style = getComputedStyle(node);
+        return {
+          day: Number(node.closest("[data-day]").dataset.day),
+          size: Number.parseFloat(style.fontSize),
+          text: node.textContent,
+          clamp: style.webkitLineClamp,
+          cut: node.scrollHeight > node.clientHeight + 1 || node.scrollWidth > node.clientWidth + 1,
+          outside: box.top < preview.top - 1 || box.bottom > preview.bottom + 1 || box.left < preview.left - 1 || box.right > preview.right + 1,
+        };
+      })).then((titles) => titles.filter((title) => title.size < 12 || title.cut || title.outside || title.clamp !== "none" || title.text.includes("…")
+        || ![ADVENT_CONTENT[title.day]?.title || `Türchen ${title.day}`, KINDS[ADVENT_CONTENT[title.day]?.kind || "text"]].includes(title.text))), { timeout: 5000 }).toEqual([]);
+
+      // Kurze Titel stehen ganz in der Nische, der längste weicht auf die Art aus.
+      await expect(page.getByTestId("advent-door-2").locator(".tls-adv__preview-title")).toHaveText("Kranz-Quiz");
+      await expect(page.getByTestId("advent-door-1").locator(".tls-adv__preview-title")).toHaveText("Gruß");
+
+      // Das Fenster zeigt den langen Titel ganz.
+      await page.getByTestId("advent-door-button-5").click();
+      await expect(page.getByTestId("advent-dialog-title")).toHaveText(LONG_DOOR);
     });
   }
 });

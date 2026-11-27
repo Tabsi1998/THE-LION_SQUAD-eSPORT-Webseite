@@ -1,3 +1,4 @@
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { CalendarDays, Clapperboard, Gift, HelpCircle, Image as ImageIcon, Newspaper, Play, ScrollText, Smile, Star } from "lucide-react";
 import { resolveMediaUrl } from "@/lib/api";
 import { doorLabel } from "./doors";
@@ -17,6 +18,20 @@ export const KIND_ICONS = {
   sticker: Smile,
   quiz: HelpCircle,
   prize: Gift,
+};
+
+/** Die Art eines Türchens in einem Wort - im Fenster über dem Titel, in der Nische statt eines Titels, der nicht passt. */
+export const KIND_LABELS = {
+  text: "Gruß",
+  image: "Bild",
+  video: "Video",
+  clip: "Clip",
+  news: "News",
+  event: "Event",
+  member_spotlight: "Mitglied der Woche",
+  sticker: "Sticker",
+  quiz: "Quiz",
+  prize: "Gewinn",
 };
 
 const ORNAMENT_PATHS = {
@@ -69,17 +84,71 @@ function Leaf({ part, day, variant, withPlaque, withOrnament }) {
   );
 }
 
-/** Was in der Nische eines geöffneten Türchens zu sehen ist: das Bild, der Sticker oder ein Zeichen für die Art. */
+/** Steht der Text ganz in seiner Fläche - nicht höher oder breiter als sie und nicht über der Nische? */
+function textFits(node) {
+  const box = node.getBoundingClientRect();
+  const area = node.parentElement.getBoundingClientRect();
+  return node.scrollHeight <= node.clientHeight + 1 && node.scrollWidth <= node.clientWidth + 1
+    && box.top >= area.top - 1 && box.bottom <= area.bottom + 1;
+}
+
+// Der Titel mit dem Zeichen darüber, der Titel allein (eine Zeile mehr), die Art, nur das Zeichen.
+const FIT_STEPS = ["title", "text", "kind", "none"];
+
+/**
+ * Was von einem Titel in die Nische passt (#1302): der ganze Titel, sonst der Titel ohne das Zeichen darüber, sonst die
+ * Art („Gruß“), sonst nur das Zeichen - gemessen, bevor der Browser zeichnet. Ändert sich die Breite oder ist die
+ * Schrift geladen, wird neu gemessen.
+ */
+function useFit(previewRef, titleRef, title) {
+  const [fit, setFit] = useState({ title, step: 0, round: 0 });
+  // Ein neuer Titel fängt wieder beim ganzen Titel an.
+  const step = fit.title === title ? fit.step : 0;
+  useLayoutEffect(() => {
+    const node = titleRef.current;
+    if (node && step < FIT_STEPS.length - 1 && !textFits(node)) setFit((current) => ({ ...current, title, step: step + 1 }));
+  }, [titleRef, title, step, fit.round]);
+  useEffect(() => {
+    const preview = previewRef.current;
+    if (!preview) return undefined;
+    const again = () => setFit((current) => ({ ...current, step: 0, round: current.round + 1 }));
+    let width = preview.clientWidth;
+    const observer = typeof ResizeObserver === "undefined" ? null : new ResizeObserver(() => {
+      if (preview.clientWidth === width) return;
+      width = preview.clientWidth;
+      again();
+    });
+    observer?.observe(preview);
+    let alive = true;
+    document.fonts?.ready?.then(() => alive && again());
+    return () => {
+      alive = false;
+      observer?.disconnect();
+    };
+  }, [previewRef]);
+  return FIT_STEPS[step];
+}
+
+/**
+ * Was in der Nische eines geöffneten Türchens zu sehen ist: das Bild, der Sticker oder ein Zeichen für die Art und der
+ * Titel ab 12 px. Ein Titel wird nie abgeschnitten: Passt er auch ohne das Zeichen nicht, steht dort die Art - der ganze
+ * Titel steht im Fenster.
+ */
 export function NichePreview({ content }) {
+  const previewRef = useRef(null);
+  const titleRef = useRef(null);
+  const title = String(content?.title || "");
+  const fit = useFit(previewRef, titleRef, title);
   if (!content) return null;
   const Icon = KIND_ICONS[content.kind] || ScrollText;
   const picture = content.kind === "image" ? content.media_url : content.kind === "sticker" ? content.sticker?.url : content.card?.image_url || null;
+  const text = fit === "title" || fit === "text" ? title : fit === "kind" ? KIND_LABELS[content.kind] || KIND_LABELS.text : "";
   return (
-    <span className="tls-adv__preview" data-kind={content.kind} data-long={String(content.title || "").length > 34 ? "1" : "0"}>
+    <span ref={previewRef} className="tls-adv__preview" data-kind={content.kind} data-long={title.length > 34 ? "1" : "0"} data-fit={fit}>
       {picture
         ? <img className={`tls-adv__preview-image${content.kind === "sticker" ? " tls-adv__preview-image--sticker" : ""}`} src={resolveMediaUrl(picture)} alt="" loading="lazy" />
-        : <Icon className="tls-adv__preview-icon" aria-hidden="true" />}
-      <span className="tls-adv__preview-title">{content.title}</span>
+        : fit !== "text" && <Icon className="tls-adv__preview-icon" aria-hidden="true" />}
+      {text && <span ref={titleRef} className="tls-adv__preview-title">{text}</span>}
     </span>
   );
 }
