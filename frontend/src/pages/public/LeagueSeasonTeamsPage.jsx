@@ -8,6 +8,7 @@ import { SeasonPlaceholder } from "@/components/tls/league/public/SeasonParts";
 import { TeamMark, useStaffel } from "@/components/tls/league/public/StaffelPanel";
 import { staffelList } from "@/lib/leagueSeasonPage";
 import { RankBannerCopy } from "@/components/tls/league/RankBannerCopy";
+import { GuestBadge } from "@/components/tls/league/GuestBadge";
 
 function TeamCard({ team, standing }) {
   const meta = standing && Number(standing.played) > 0 ? `Platz ${standing.rank} · ${standing.points ?? 0} ${Number(standing.points) === 1 ? "Punkt" : "Punkte"}` : "noch ohne Spiel";
@@ -15,6 +16,7 @@ function TeamCard({ team, standing }) {
     <>
       <TeamMark name={team.display_name} logo={team.logo_url} size={72} className="tls-season-team__logo" />
       <span className="tls-season-team__name">{team.display_name}</span>
+      {team.guest_badge ? <GuestBadge badge={team.guest_badge} testId={`season-team-${team.id}-guest`} /> : null}
       <span className="tls-season-team__meta">{meta}</span>
     </>
   );

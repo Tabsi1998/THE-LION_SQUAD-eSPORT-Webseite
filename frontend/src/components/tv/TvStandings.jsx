@@ -67,6 +67,8 @@ function TableBlock({ title, rows, columns, nameLabel, final, startRank = 0, tes
               </td>
               <td className="tv-standings__name" data-tv-name="1">
                 {row.display_name || "Teilnehmer"}
+                {/* Gastteam (#1665, Nr. 286): am TV nur „Gast“, nie Verein oder Schule - wie die anderen Zusätze hinter dem Namen. */}
+                {row.guest_badge ? <span className="tv-standings__exit" data-testid={`tv-guest-${row.registration_id}`}> · Gast</span> : null}
                 {row.exit?.kind ? <span className="tv-standings__exit"> · {row.exit.kind === "disqualified" ? "disqualifiziert" : "ausgetreten"}</span> : null}
                 {/* Schweizer System (#1559): weiter oder raus nach der Abschlussregel - wie in der Webtabelle. */}
                 {SWISS_STATUS_WORDS[row.swiss_status] ? <span className="tv-standings__exit" data-testid={`tv-swiss-status-${row.registration_id}`}> · {SWISS_STATUS_WORDS[row.swiss_status]}</span> : null}

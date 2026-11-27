@@ -6,6 +6,7 @@ import { PLAYOFF_PLACE } from "@/lib/leaguePostseason";
 import { swissStatusNote } from "@/lib/tournamentTableSettings";
 import { CountUp } from "@/components/tls/motion/CountUp";
 import { PlayoffMark, ZoneMark } from "@/components/tls/league/ZoneMark";
+import { GuestBadge } from "@/components/tls/league/GuestBadge";
 
 // Eine Tabelle der Rangliste (#1562, #1179): Liga und Gruppen mit Spielen, Bilanz, Differenz, Form und Punkten; die
 // Pfeile zeigen den Weg seit dem vorigen Spieltag (vom Server), die eigene Zeile ist markiert. Sieg hell in Cyan,
@@ -172,6 +173,10 @@ export function StandingsTable({ rows, kind = "league", changed, registerRow, ce
                     {row.playoff ? <span className="inline-flex shrink-0 items-center" title={PLAYOFF_PLACE}><span className="sr-only">{PLAYOFF_PLACE}</span><PlayoffMark testId={`standing-playoff-${row.registration_id}`} /></span> : null}
                     {row.is_mine && <span className="tls-standing-me">{mineLabel}</span>}
                   </span>
+                  {/* Gastteam (#1665): unter dem Namen, damit der Name selbst Platz behält. */}
+                  {row.guest_badge ? (
+                    <span className="tls-guest-badge-line"><GuestBadge badge={row.guest_badge} testId={`standing-guest-${row.registration_id}`} /></span>
+                  ) : null}
                   <Notes row={row} labels={tiebreakLabels} />
                 </td>
                 {columns.map((column) => (
