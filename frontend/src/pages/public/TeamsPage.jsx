@@ -38,7 +38,7 @@ import { TeamSquads } from "@/pages/public/team/TeamSquads";
 import { TeamInviteSheet } from "@/pages/public/team/TeamInviteSheet";
 import { TeamJoinCard } from "@/pages/public/team/TeamJoinCard";
 import { TeamDissolveSection } from "@/pages/public/team/TeamDissolveSection";
-import { TeamGuestSection } from "@/pages/public/team/TeamGuestSection";
+import { TeamGuestSection, guestChanges, guestForm, guestPayload } from "@/pages/public/team/TeamGuestSection";
 import { SideSheet } from "@/components/tls/SideSheet";
 import { TeamHeader } from "@/pages/public/team/TeamHeader";
 import { inviteTokenFrom, memberRole, ROLE_LABELS, TEAM_NAME_MAX, TEAM_NAME_MIN, TEAM_TAG_MAX, TEAM_TAG_MIN } from "@/lib/teamPage";
@@ -595,7 +595,6 @@ function TeamDetail({ id }) {
           team={editing}
           onClose={() => setEditing(null)}
           onSaved={() => { setEditing(null); load(); }}
-          onGuestSaved={load}
           canDissolve={canDissolve}
           canChangeVisibility={canChangeRoles}
           canEditBanner={canEdit}
@@ -724,9 +723,12 @@ function TeamChat({ team, user }) {
   );
 }
 
-function TeamModal({ team, onClose, onSaved, onGuestSaved, canDissolve = false, canChangeVisibility = false, canEditBanner = true, onDissolved }) {
+function TeamModal({ team, onClose, onSaved, canDissolve = false, canChangeVisibility = false, canEditBanner = true, onDissolved }) {
   const isNew = !team?.id;
   const [form, setForm] = useState({ ...emptyTeam, ...team });
+  // Gastteam (#1665): Verein oder Schule gehören zum Formular - dasselbe „Speichern“ nimmt sie mit.
+  const guestEditable = !isNew && Boolean(team?.can_edit_guest_team);
+  const [guest, setGuest] = useState(() => guestForm(team?.guest_team));
   const { submitting: saving, submitOnce } = useSubmissionGuard();
   const [submitError, setSubmitError] = useState("");
   const set = (k, v) => { setForm((f) => ({ ...f, [k]: v })); setSubmitError(""); };
@@ -747,11 +749,21 @@ function TeamModal({ team, onClose, onSaved, onGuestSaved, canDissolve = false, 
     const attempt = await submitOnce(async () => {
       if (isNew) await api.post("/teams", payload);
       else await api.patch(`/teams/${team.id}`, payload);
+      if (guestEditable && guestChanges(guest, team.guest_team)) {
+        try {
+          await api.put(`/teams/${team.id}/guest-team`, guestPayload(guest));
+        } catch (error) {
+          // Das Team ist schon gespeichert - das Blatt bleibt offen und sagt, was bei Verein oder Schule nicht ging.
+          throw Object.assign(error, { guestOnly: true });
+        }
+      }
       toast.success(isNew ? "Team erstellt." : "Team gespeichert.");
       onSaved();
     });
     if (attempt.started && attempt.error) {
-      const message = formatRequestError(attempt.error, isNew ? "Team konnte nicht erstellt werden." : "Team konnte nicht gespeichert werden.", { name: form.name });
+      const message = attempt.error.guestOnly
+        ? `Team gespeichert, Verein oder Schule nicht: ${formatRequestError(attempt.error, "Die Angaben ließen sich nicht speichern.")}`
+        : formatRequestError(attempt.error, isNew ? "Team konnte nicht erstellt werden." : "Team konnte nicht gespeichert werden.", { name: form.name });
       setSubmitError(message);
       toast.error(message);
     }
@@ -793,9 +805,9 @@ function TeamModal({ team, onClose, onSaved, onGuestSaved, canDissolve = false, 
             </p>
           </div>
         ) : null}
+        {/* Gastteam (#1665): nur Teamleitung und Co-Leitung eines Liga-Teams; gespeichert mit demselben Knopf. */}
+        {guestEditable ? <TeamGuestSection info={team.guest_team} value={guest} onChange={(next) => { setGuest(next); setSubmitError(""); }} /> : null}
       </form>
-      {/* Gastteam (#1665): Verein oder Schule gibt nur die Teamleitung an - eigenes Speichern wie „Team auflösen“. */}
-      {!isNew && team.can_edit_guest_team ? <div className="mt-4"><TeamGuestSection team={team} onSaved={onGuestSaved} /></div> : null}
       {!isNew && canDissolve ? <TeamDissolveSection team={team} onDissolved={onDissolved} /> : null}
     </SideSheet>
   );
