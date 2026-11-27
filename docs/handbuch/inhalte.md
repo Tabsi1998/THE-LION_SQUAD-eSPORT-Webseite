@@ -900,11 +900,11 @@ Zuerst den **Kalender** der Saison anlegen (etwa mit **Termine einfügen**), dam
   den Termin in der Auswahl oder **Nicht übernehmen**. Je Runde steht, was passiert (**Ergebnis als Entwurf**,
   **Entwurf wird ersetzt** oder **Entwurf neben dem veröffentlichten Ergebnis**) und **Abweichungen ansehen** zeigt,
   was sich gegenüber einem vorhandenen Ergebnis ändert.
-- **Gelb zum Klären:** Wo der Platz aus den Punkten nicht eindeutig ist – mehrere Plätze möglich, ein Bonus im Wert
+- **Orange zum Klären:** Wo der Platz aus den Punkten nicht eindeutig ist – mehrere Plätze möglich, ein Bonus im Wert
   (schnellste Runde, Pole, Sonderbonus), Punkte außerhalb des Schemas oder derselbe Platz zweimal –, wählt ihr den
   Vorschlag („Platz 1 + schnellste Runde“) oder **Punkte laut Veranstalter**. Wählt ihr danach für die Spalte einen anderen
-  Termin, gelten ihre Klärungen nicht mehr (anderes Punkteschema) – die Zellen sind wieder gelb. **Eindeutige Vorschläge übernehmen** und
-  **Offene: Punkte laut Veranstalter** erledigen alle auf einmal. Eine Runde mit offenen gelben Zellen wird nicht
+  Termin, gelten ihre Klärungen nicht mehr (anderes Punkteschema) – die Zellen sind wieder orange. **Eindeutige Vorschläge übernehmen** und
+  **Offene: Punkte laut Veranstalter** erledigen alle auf einmal. Eine Runde mit offenen orangen Zellen wird nicht
   übernommen. 0 Punkte heißt hinter den Punkterängen – ohne Platz, ohne Meldung.
 - **Abgleich mit „Gesamt“:** Je Fahrer die eigene Rechnung nach allen Runden gegen „Gesamt“ und den Platz der Tabelle –
   mit Streichresultaten, Anpassungen, Aktivitätspunkten und Boni der Saison. **stimmt**, **erklärt** (etwa
@@ -938,19 +938,19 @@ das Bild wird nicht gespeichert.
   Rundenspalten heißen „Runde 1“, „Runde 2“ … (Flaggen sind Bilder, keine Schrift) und werden über die Reihenfolge den
   Terminen zugeordnet – in der Vorschau korrigierbar. Namen werden mit den Teilnehmern der Saison abgeglichen; grün ist
   ein Name, wenn er genau so ein Teilnehmer (bzw. bei der Teamtabelle ein Team der Saison) ist oder wenn beide Leser
-  ihn gleich lesen – nur über eine Verwechslung der Schrift erkannt ist er vorgeschlagen, aber gelb, wie bei
-  Ergebnis-Bildern. **Alle Namen bestätigen** nimmt die gelben, vorbelegten Namen auf einmal (gelbe Zahlen bleiben),
+  ihn gleich lesen – nur über eine Verwechslung der Schrift erkannt ist er vorgeschlagen, aber orange, wie bei
+  Ergebnis-Bildern. **Alle Namen bestätigen** nimmt die orangen, vorbelegten Namen auf einmal (orange Zahlen bleiben),
   mit **Rückgängig**; in der Teamwertung laut Veranstalter ebenso die Teams.
-- **Gelb = unsicher:** Wo die Lesungen nicht übereinstimmen, steht die Zelle unter **Aus dem Bild unsicher** – mit dem,
-  was sonst gelesen wurde. Gelb wird auch, was genauso aussieht wie eine Zelle mit anderem Wert (dieselbe Zahl sieht in
+- **Orange = unsicher:** Wo die Lesungen nicht übereinstimmen, steht die Zelle unter **Aus dem Bild unsicher** – mit dem,
+  was sonst gelesen wurde. Orange wird auch, was genauso aussieht wie eine Zelle mit anderem Wert (dieselbe Zahl sieht in
   einer Tabelle immer gleich aus), und „Punkte“ und „Dif.“, wenn sie nicht zusammenpassen. Ergibt die Summe der Runden
-  nicht die Punkte, wird die Zeile gelb – außer die Saison erklärt es (Streichresultate, Anpassungen,
+  nicht die Punkte, wird die Zeile orange – außer die Saison erklärt es (Streichresultate, Anpassungen,
   Aktivitätspunkte); dann steht nur ein Hinweis da. Falsches im Feld korrigieren und **Neu einlesen** – sonst **Passt
   so** bzw. **Alle geprüft**. Übernommen wird erst danach.
 - **Original-Bild:** Beim Übernehmen hängt das Bild als Original „Tabelle“ an der letzten Runde der Tabelle (siehe
   Original-Bilder); **Nicht anhängen** lässt es weg.
 - **Team-Tabelle:** Heißt die Namensspalte „Team“, wird daraus die **Teamwertung laut Veranstalter**. Vorgewählt ist die
-  letzte gewertete Runde, jede andere Runde mit Ergebnis geht auch. Die Liste zeigt Team und Punkte (gelbe Zeilen mit
+  letzte gewertete Runde, jede andere Runde mit Ergebnis geht auch. Die Liste zeigt Team und Punkte (orange Zeilen mit
   **Passt so** bestätigen), darunter der Vergleich **Laut Bild** gegen die **Eigene Rechnung** – sie bleibt als
   Prüfhinweis. Dass die Summe der Runden nicht die Punkte ergibt, ist bei Teamtabellen normal (oft zählt die aktuelle
   Besetzung): es steht nur als Hinweis an der Zeile. Steht in der Runde schon eine Teamwertung, zeigt die Liste je Team
@@ -958,8 +958,8 @@ das Bild wird nicht gespeichert.
   **Ersetzen** entfernt sie (die Liste sagt, welche). **Teamwertung übernehmen** schreibt sie ins Ergebnis der Runde (bei
   einem veröffentlichten Ergebnis wird neu gerechnet; ein Entwurf daneben bekommt dieselben Werte) und hängt das Bild als
   Original „Tabelle“ an diese Runde.
-- **Im Ergebnisblatt** einer Runde hat **Teamwertung laut Veranstalter** denselben Knopf **Bild auslesen**; gelbe
-  Zeilen halten dort das Übernehmen auf wie gelbe Zeilen aus einem Ergebnis-Bild. Das Bild steht danach unter
+- **Im Ergebnisblatt** einer Runde hat **Teamwertung laut Veranstalter** denselben Knopf **Bild auslesen**; orange
+  Zeilen halten dort das Übernehmen auf wie orange Zeilen aus einem Ergebnis-Bild. Das Bild steht danach unter
   **Original-Bilder** (Art „Tabelle“) und hängt beim Übernehmen am Termin.
 
 <table>
@@ -1049,7 +1049,7 @@ bisher.
   schnellste Runde, ein goldener Stern für den **Fahrer des Tages**, **DNF**, **DNS** und **DSQ**, dazu Punkte und
   **Abstand** zur Spitze; über jeder Spalte die Flagge des Rennens. Fährt man mit der Maus über eine Zelle, stehen dort
   Startplatz, gutgemachte Plätze, Zeit, Abstand und die Zeit der schnellsten Runde. Weicht der **Gesamtstand laut
-  Veranstalter** von der eigenen Summe ab (meist Strafen), steht die Abweichung klein in Gold neben den Punkten.
+  Veranstalter** von der eigenen Summe ab (meist Strafen), steht die Abweichung klein in Orange neben den Punkten.
 - **Teamwertung** (wenn die Regeln sie einschalten): ein Balken je Team, die Punkte je Rennen, Vereinsteams in Cyan,
   Gäste markiert; darüber, wie viele Fahrer je Rennen zählen und ob Gäste mitzählen.
 - **Rennkalender:** alle Termine mit Status; bei gewerteten Rennen der Sieger, wenn er aus dem Verein ist, sonst der
@@ -1085,13 +1085,13 @@ einstellbar, nichts ist für eine Liga fest eingebaut:
   **Team** (Teamwertung), **Punkte** (Minus zieht ab), **Grund**, **Tag** und optional der **Termin**. Mit Termin zählt
   sie ab dessen Stand, sonst ab dem Stand an ihrem Tag. Öffentlich steht sie als kleines **−5** an den Punkten (der
   Grund im Tooltip) und im Fahrer-Detail mit Grund, Termin und Tag – der Grund ist also für alle lesbar. So erklärt sich
-  eine Abweichung zur offiziellen Tabelle: Stimmen die Anpassungen, verschwindet die goldene Abweichung.
+  eine Abweichung zur offiziellen Tabelle: Stimmen die Anpassungen, verschwindet die orange Abweichung.
 - **Fahrer-Anpassung auch fürs Team:** Mit Teamwertung hat jede Fahrer-Anpassung den Haken **Zählt auch für die
   Teamwertung** – etwa wenn der Veranstalter einen WM-Abzug auch dem Team abzieht. Die Vorgabe für neue Anpassungen
   steht in den Regeln der Saison unter **Fahrer-Anpassungen zählen auch für die Teamwertung** (Vorgabe aus). **Je
   Rennen:** Sie zählt für das Team, für das der Fahrer im Termin der Anpassung gefahren ist – ohne Termin für das Team
   seiner letzten Fahrt bis zum Tag; ein späterer Teamwechsel ändert nichts. Fuhr er dort als Ersatz oder ohne Team,
-  zählt sie für keines; die Liste der Anpassungen sagt es gelb („zählt für kein Team – im Termin als Ersatz
+  zählt sie für keines; die Liste der Anpassungen sagt es orange („zählt für kein Team – im Termin als Ersatz
   gefahren“), sonst „zählt auch fürs Team · Team A“. **Aktuelle Besetzung:** Die Anpassung steckt in den Saisonpunkten
   des Fahrers und zählt so für sein aktuelles Team; ohne Haken wird sie aus der Teamsumme herausgerechnet – nie doppelt.
   Öffentlich steht bei der Teamsumme klein **−5 (Fahrer)** mit Grund im Tooltip, im Fahrer-Detail „zählt auch fürs
@@ -1134,7 +1134,7 @@ einstellbar, nichts ist für eine Liga fest eingebaut:
   ins Feld – beim Eintragen eines bekannten Namens und beim Einfügen einer Liste ohne Team-Spalte. Wer wirklich ohne
   Team fährt: Team löschen, dann zählt die Fahrt für kein Team (die Fahrerwertung bleibt). Die Zeile sagt dann
   „zählt für kein Team“, mit dem Knopf **Stammteam … eintragen**, falls das Löschen ein Versehen war. Eine Liste mit
-  Team-Spalte und die Bild-Erkennung übernehmen, was dasteht; eine leere Team-Zelle aus dem Bild bleibt leer und gelb
+  Team-Spalte und die Bild-Erkennung übernehmen, was dasteht; eine leere Team-Zelle aus dem Bild bleibt leer und orange
   (oft steht dort ein farbiges Schild, das beim Lesen wegfällt). Ein neues Standard-Team am Teilnehmer ändert gefahrene
   Rennen nicht. Ältere Ergebnisse ohne Team haben beim Update einmal ihr damaliges Standard-Team bekommen, damit
   keine Saison Punkte verliert.
@@ -1396,31 +1396,31 @@ einem gewerteten Termin **Ergebnis ändern**. Das öffnet das Blatt des Termins.
   Zeit, Abstand, DNF bzw. OUT und die Pole als Marke; dazu die **Schnellste Runde** und den **Fahrer des Tages** des
   Rennens. Die Vorschau prüft gleich. Darüber steht **Aus dem Bild gelesen** mit dem Bild zum Vergleichen (antippen
   vergrößert), Strecke, Art (Rennen oder Qualifying – nur als Hinweis), schnellster Rennrunde, Pole und Fahrer des
-  Tages. Passt die Strecke zu einem anderen Termin der Saison, sagt ein Hinweis, zu welchem. **Gelbe Felder** sind
-  unsicher, darunter steht, was im Bild stand; ist Startplatz, Zeit oder Abstand gelb, steht **Mehr** gleich offen.
+  Tages. Passt die Strecke zu einem anderen Termin der Saison, sagt ein Hinweis, zu welchem. **Orange Felder** sind
+  unsicher, darunter steht, was im Bild stand; ist Startplatz, Zeit oder Abstand orange, steht **Mehr** gleich offen.
   **Zwei Leser:** Namen, Teams, den Kopf und die Zahlen liest der Server zweimal mit verschiedenen Verfahren. Lesen
   beide einen Namen oder ein Team Zeichen für Zeichen gleich, ist er grün – auch wenn die Saison ihn noch nicht kennt.
-  Widersprechen sie sich, ist das Feld gelb, vorbelegt mit der besseren Lesung, darunter stehen beide. Stehen im Namen
+  Widersprechen sie sich, ist das Feld orange, vorbelegt mit der besseren Lesung, darunter stehen beide. Stehen im Namen
   leicht verwechselte Zeichen (l/1/I, 0/O, 2/Z, „__“/„_“), ist er nur grün, wenn er genau zu einem Teilnehmer bzw. Team
   der Saison passt. Ein Teilnehmer der Saison ist grün, wenn ein Leser ihn genau so liest (Groß/klein und Satzzeichen
-  egal) und der andere nicht widerspricht; nur über eine Verwechslung erkannt ist er vorgeschlagen, aber gelb – außer
+  egal) und der andere nicht widerspricht; nur über eine Verwechslung erkannt ist er vorgeschlagen, aber orange – außer
   die Startnummer bestätigt ihn. Passt die Startnummer zu einem, der Name aber genauso gut zu einem anderen, bleibt es
-  gelb mit **Name passt auch zu …**. Die **Strecke** wird mit dem Kalender der Saison abgeglichen und so geschrieben wie
-  dort. Fehlt der zweite Leser auf dem Server, sagt das ein Hinweis – dann sind unbekannte Namen und Teams gelb.
-  **Alle Namen bestätigen:** Stehen vorbelegte Namen oder Teams gelb da (etwa **wie in Saison …**), bestätigt der Knopf
-  über der Liste sie alle auf einmal – andere gelbe Felder bleiben gelb. Danach steht da, wie viele bestätigt sind, mit
+  orange mit **Name passt auch zu …**. Die **Strecke** wird mit dem Kalender der Saison abgeglichen und so geschrieben wie
+  dort. Fehlt der zweite Leser auf dem Server, sagt das ein Hinweis – dann sind unbekannte Namen und Teams orange.
+  **Alle Namen bestätigen:** Stehen vorbelegte Namen oder Teams orange da (etwa **wie in Saison …**), bestätigt der Knopf
+  über der Liste sie alle auf einmal – andere orange Felder bleiben orange. Danach steht da, wie viele bestätigt sind, mit
   **Rückgängig**.
   <img src="../assets/serien/serien-ergebnis-namen-bestaetigen.png" alt="Ergebnisblatt nach Bild auslesen: Leiste „3 Namen bzw. Teams aus dem Bild vorbelegt, aber gelb“ mit dem Knopf „Alle Namen bestätigen (3)“" width="560"> Kennt eine andere Saison derselben Spur den Namen oder das Team,
-  steht es so vorbelegt da – gelb, mit **wie in Saison …**; beim Übernehmen entsteht der Teilnehmer in dieser Saison
+  steht es so vorbelegt da – orange, mit **wie in Saison …**; beim Übernehmen entsteht der Teilnehmer in dieser Saison
   (ein bestätigter Alias ordnet ihn gleich derselben Person zu). Steht im Bild eine andere Startnummer als beim
-  Teilnehmer, zeigt die Zeile die aus dem Bild (gelb, **bisher …**). **Korrekturen lernen:** Ändert der Vorstand einen
+  Teilnehmer, zeigt die Zeile die aus dem Bild (orange, **bisher …**). **Korrekturen lernen:** Ändert der Vorstand einen
   gelesenen Namen auf einen Teilnehmer der Saison oder ein gelesenes Team, merkt sich die Saison beim Übernehmen die
   gelesene Schreibweise (nur eindeutige, im Protokoll) und erkennt sie beim nächsten Bild – zu sehen und zu entfernen
   unter **Aus Bildern gelernt** in „Teilnehmer bearbeiten“ bzw. „Saison bearbeiten“. Ordnet der Vorstand eine schon
   gelernte Schreibweise später jemand anderem zu, vergisst die Saison die alte Zuordnung.
   Ändern nimmt die Markierung weg, **Passt so** bestätigt die ganze Zeile (beim Rennen: schnellste Runde und Fahrer des
-  Tages). Übernehmen geht erst, wenn nichts mehr gelb ist – bis dahin heißt der Knopf **Gelbe Zeilen prüfen** und
-  springt zur ersten. Platz 1 im farbigen Kasten und der fehlende Abstand beim Ersten sind kein Fall für Gelb; ein Lauf
+  Tages). Übernehmen geht erst, wenn nichts mehr orange ist – bis dahin heißt der Knopf **Orange Zeilen prüfen** und
+  springt zur ersten. Platz 1 im farbigen Kasten und der fehlende Abstand beim Ersten sind kein Fall für Orange; ein Lauf
   ohne Punkte (etwa das Qualifying) übernimmt keine Punkte aus dem Bild. Wie das Bild
   aufgebaut ist, sagt die **Vorlage für Ergebnis-Bilder** an der Spur (eine Saison kann abweichen): Standard für
   Rennligen ist „Rennliga-Ergebnis (dunkel)“, **Aus** schaltet das Auslesen ab.
@@ -1439,7 +1439,7 @@ einem gewerteten Termin **Ergebnis ändern**. Das öffnet das Blatt des Termins.
   **Map-Pool der Saison** (sonst die Maps des Spiels) je Modus mit Bild: in der Reihenfolge des Vetos antippen, jede
   Map kommt in die nächste freie Zeile. Ein getippter oder eingefügter Name wird der Map zugeordnet, wenn er ihrem
   Namen, ihrem Slug oder einer ihrer **weiteren Schreibweisen** entspricht (Groß/klein, Leer- und Bindestriche egal) –
-  dann steht ihr Bild davor, und beim Verlassen des Felds ihr Name. Ein **unbekannter Name** ist gelb markiert („Nicht im
+  dann steht ihr Bild davor, und beim Verlassen des Felds ihr Name. Ein **unbekannter Name** ist orange markiert („Nicht im
   Map-Pool“) und bleibt als Freitext; fehlt die Map, in der Bibliothek anlegen oder die Schreibweise dort eintragen.
   Beim Speichern merkt sich das Spiel Name und Bild der Map: spätere Änderungen in der Bibliothek ändern alte Spiele
   nicht, auch eine archivierte Map bleibt bei ihnen sichtbar. Eine Map aus einem anderen Spiel lehnt die Prüfung ab.
@@ -1491,7 +1491,7 @@ einem gewerteten Termin **Ergebnis ändern**. Das öffnet das Blatt des Termins.
 </tr>
 </table>
 
-**Vorschau** lässt den Server prüfen und rechnen, gespeichert wird dabei nichts. Fehler (rot) und Hinweise (gelb)
+**Vorschau** lässt den Server prüfen und rechnen, gespeichert wird dabei nichts. Fehler und Hinweise (orange, Fehler kräftiger)
 stehen direkt an der Zeile, dazu die Punkte je Zeile, die erkannten **Vereinsleute**, **unbekannte Namen** und der
 **Stand nach diesem Termin** mit Bewegung (Pfeile) und der Linie der **Finalgrenze**; wer neu im Finale ist oder
 herausfällt, steht darunter. Fehler halten das Übernehmen auf, Hinweise nicht. Sobald ihr etwas ändert, muss die
@@ -1564,7 +1564,7 @@ Reihenfolge; ein Menü mit Unterpunkten klappt ihr auf und ordnet die Unterpunkt
 | `/references/series/…` zeigt „Hier ist kein Rudel“ | Saison oder Spur archiviert, Adresse falsch, oder die Sichtbarkeit ist enger (etwa „Nur Mitglieder“) | Sichtbarkeit und Status prüfen |
 | Termin steht auf **Ergebnis fehlt**, fand aber nie statt | Nicht abgesagt | **Absagen** – dann fehlt er nicht mehr |
 | Termin wurde gefahren, zählt aber laut Veranstalter nicht | Kein Grund „ohne Wertung“ gesetzt | Termin → **Ohne Wertung – Grund** (etwa zu wenig Fahrer) |
-| Fahrer liegt genau 5 Punkte über der offiziellen Tabelle (goldene Abweichung) | Abzug des Veranstalters ohne Rennergebnis | Seite der Saison → **Anpassungen** → −5 mit Grund |
+| Fahrer liegt genau 5 Punkte über der offiziellen Tabelle (orange Abweichung) | Abzug des Veranstalters ohne Rennergebnis | Seite der Saison → **Anpassungen** → −5 mit Grund |
 | Teamwertung weicht von der offiziellen ab, obwohl die Fahrer stimmen | Andere Zählweise bei Teamwechseln | Regeln → **Teamwertung bei Wechseln**, oder im Ergebnisblatt **Teamwertung laut Veranstalter** einfügen |
 | Ergebnis-Blatt meldet „inzwischen geändert“ | Jemand anderes hat das Ergebnis gespeichert | **Neu laden**, Vorschau prüfen, dann übernehmen |
 | Captain-Änderung ist nicht öffentlich | Das Ergebnis war veröffentlicht – die Änderung ist ein Entwurf daneben | Vorstand: im Blatt **Freigeben** |
@@ -1572,7 +1572,7 @@ Reihenfolge; ein Menü mit Unterpunkten klappt ihr auf und ordnet die Unterpunkt
 | Rennliga ohne Teamwertung | Teamwertung in den Regeln der Saison aus | Saison bearbeiten → Teamwertung einschalten |
 | Kein Knopf **Bild auslesen** | Für die Art gibt es keine Vorlage (Team-Liga, Turnierserie) oder sie steht auf **Aus** | Spur oder Saison bearbeiten → **Vorlage für Ergebnis-Bilder** |
 | „Texterkennung gerade nicht verfügbar“ | Dem Server fehlt Tesseract (altes Image) | Server mit `update.sh` aktualisieren; bis dahin **Liste einfügen** |
-| Viele Zeilen gelb | Bild unscharf, klein oder abfotografiert | Screenshot statt Foto, ganzes Ergebnis ohne Zoom; sonst gelbe Felder nach dem Bild korrigieren |
+| Viele Zeilen orange | Bild unscharf, klein oder abfotografiert | Screenshot statt Foto, ganzes Ergebnis ohne Zoom; sonst orange Felder nach dem Bild korrigieren |
 | „Das Bild sieht nicht nach einem Rennergebnis aus“ | Eingefügt wurde die Saisontabelle oder der Kalender (keine Zeiten) | Das Ergebnis dieses Termins einfügen |
 | Original-Bild öffentlich nicht zu sehen | Nur Verwaltung, Entwurf, Ergebnis nicht veröffentlicht oder ein Name im Ergebnis ausgeblendet | Im Ergebnisblatt unter **Original-Bilder** steht der Grund – umstellen, **Freigeben** oder Ergebnis veröffentlichen |
 | Captain-Bild bleibt Entwurf | Das Ergebnis war schon veröffentlicht, das Bild kam danach | Vorstand: im Blatt beim Bild **Freigeben** |

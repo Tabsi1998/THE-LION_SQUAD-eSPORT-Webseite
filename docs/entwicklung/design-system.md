@@ -84,8 +84,8 @@ Verein Gold. Die Werte hält `docs/category-colors.json` für Web und App gleich
 
 Bewusst ausgenommen (Sammel-Optik oder fremde Marken): Level-Rahmen und Erfolgs-Stufen samt Zeremonie, Saison-Deko,
 YouTube-Rot, die Ampel im Betrieb (grün/gelb/rot, Fabians Entscheidung 27.11.2026), Medaillen- und Sponsor-Stufe „Gold“. Der Wächter
-`styles/colors.test.js` zählt die Rohwerte Gold, Rot und Neon-Grün samt Nebentönen (#FF6B6B, #FF9500, #00D26A, #FFD95A …)
-und rgba() **je Datei**; erlaubt ist nur, was in `styles/colors.baseline.json` mit Grund steht (Ratschen-Prinzip).
+`styles/colors.test.js` zählt die Rohwerte Gold, Rot und Neon-Grün samt Nebentönen (#FF6B6B, #FF9500, #00D26A, #10B981,
+#FFD95A, #FFD21A …), rgba() und Tailwind-Farbstufen (`text-red-300`, `border-amber-400/50` …) **je Datei**; erlaubt ist nur, was in `styles/colors.baseline.json` mit Grund steht (Ratschen-Prinzip).
 
 Weiße Schrift auf vollen Flächen braucht 4,5 : 1 – auf Cyan, Orange, Gold und Grün steht deshalb dunkle Schrift.
 
