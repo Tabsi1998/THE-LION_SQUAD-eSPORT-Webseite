@@ -264,7 +264,8 @@ Turnierleitung), Sperrliste mit **Season konfigurieren** (lesen: jede Zuständig
 
 ### 2.2 Liga und Season anlegen
 
-1. **Admin → eSports → Liga → Liga anlegen**: Name (etwa „CoD-Liga“) und Spiel.
+1. **Admin → eSports → Liga → Liga anlegen**: Name (etwa „CoD-Liga“), Spiel und **Teilnehmer**: **Co-Teams** (Vorgabe) oder
+   **Spieler (1 gegen 1)** für eine Solo-Liga (2.5c). Die Teilnehmer stehen ab dem Anlegen fest.
 2. In der Liga **Season anlegen**: nur der **Beginn der ersten Spielwoche** (00:00 Uhr Wiener Zeit). Die übrigen Vorgaben
    kommen als Startwerte mit. Gibt es schon eine abgeschlossene Season, legst du die nächste besser aus ihr an (3.11).
 3. Die Season öffnen. Die Season-Seite hat zwölf **Reiter**; jede Angabe steht an genau einer Stelle. Am Handy wischst du die
@@ -648,6 +649,34 @@ dann nur noch über die Teilnehmerliste der Staffel. Nicht gelost wird, sobald e
 steht: Dann teilst du von Hand zu (Nachmeldung, siehe 2.5a).
 
 **Eigenes Team:** Steht dein eigenes Team im Los, lost, tauscht und teilt eine andere Person zu (wie in 2.5a).
+
+### 2.5c Solo-Liga: Spieler statt Co-Teams
+
+In einer Solo-Liga spielt jede Person für sich, 1 gegen 1 (etwa eine CoD-1v1-Liga mit Maps). Du wählst das beim Anlegen der Liga unter
+**Teilnehmer → Spieler (1 gegen 1)**. Die Wahl gibt es nur bei Spielen, die Einzelspieler erlauben, und sie steht danach fest. Für
+die andere Art legst du eine neue Liga an.
+
+**Was anders ist:**
+
+- In der Liga-Übersicht und im Kopf der Season steht **Spieler (1 gegen 1)**, auf der Staffel-Seite **Spieler · 1 gegen 1**.
+- Eine neue Season startet mit **1 gegen 1**, beim Check-in reicht die Person selbst. Die **Teamgröße** ist fest 1. Liga N hat keine
+  eigene Teamgröße und keinen Mindestkader.
+- Im Reiter **Anmeldung und Kader** stehen nur **Mindestalter**, **Jede Spiel-ID nur einmal** und die **Plattform**. Der Kader ist die
+  Person selbst.
+
+**Spieler zuteilen:**
+
+1. Season-Seite, Reiter **Ligen und Staffeln** → bei der Staffel **Staffel öffnen** → Reiter **Teilnehmer**.
+2. **Spieler zuteilen** → Namen oder Benutzernamen eintippen (ab zwei Zeichen) → die Person wählen → **Zuteilen**.
+3. Wer nicht passt, steht grau mit dem Grund da: Konto gesperrt, schon in dieser Staffel, schon in einer anderen Staffel der Season
+   oder die Staffel ist voll. Fehlendes Geburtsdatum, andere Plattform oder fehlende Spiel-ID stehen nur als Hinweis da.
+4. **Entfernen** nimmt die Person wieder heraus, solange der Spielplan nicht fest ist.
+
+**Was noch folgt** (die Seite sagt es an der Stelle):
+
+- **Selbstanmeldung als Spieler** mit Eingang, Los und Nachmeldung: bis dahin teilst du alle Spieler zu.
+- **Spielbetrieb** (Check-in, Veto, Ergebnis melden): **Liga starten** ist bis dahin gesperrt, die Staffel bleibt vor dem Start.
+- **Neue Season aus der Vorgänger-Season** mit Auf- und Abstieg und Startrechten: bis dahin legst du die nächste Season neu an.
 
 ### 2.6 Spielplan und Start
 
@@ -2322,6 +2351,13 @@ die Wertung unter **Gesamtwertung** (mit PDF), Profil und Teamseite den Platz.
 | „Turnier kann ohne spielbares Match nicht gestartet werden.“ | Eine ältere Staffel steht noch im Check-in | Status oben auf **Entwurf**, dann **Liga starten** |
 | „Best of: Kommt aus der Season – dort ändern und übertragen.“ (ebenso andere Felder, auch die Antwortfrist) | Wert gibt die Season vor | In der Season ändern, dann **Vorgaben übertragen** |
 | „In einer Liga-Staffel spielen nur Co-Teams …“ | Teilnehmer ohne Co-Team eingetragen | **Co-Team zuteilen** |
+| „Die Teilnehmerart steht ab dem Anlegen fest …“ | Eine Liga soll von Co-Teams auf Spieler wechseln (oder umgekehrt) | Neue Liga anlegen (2.5c) |
+| „… ist nicht für Einzelspieler eingestellt – eine Solo-Liga geht nur mit einem Spiel, das Einzelspieler erlaubt.“ | Solo-Liga für ein Spiel nur mit Teams | Anderes Spiel wählen oder eine Team-Liga anlegen |
+| „In einer Solo-Liga spielt jede Person für sich – die Teamgröße ist dort immer 1.“ (ebenso der Mindestkader) | Teamgröße in einer Solo-Liga geändert | Teamgröße 1 lassen; für 2 gegen 2 eine Team-Liga anlegen |
+| „Die Selbstanmeldung als Spieler folgt in einem späteren Ausbau …“ | Anmeldefenster in einer Solo-Liga | Spieler auf der Staffel-Seite zuteilen (2.5c) |
+| „Der Spielbetrieb einer Solo-Liga … folgt in einem späteren Ausbau …“ | **Liga starten** in einer Solo-Staffel | Die Staffel bleibt vor dem Start, bis der Spielbetrieb für Spieler kommt |
+| „In dieser Staffel spielen Spieler, keine Co-Teams – bitte eine Person zuteilen.“ | Co-Team in eine Solo-Staffel | **Spieler zuteilen** |
+| „… spielt in dieser Season schon in einer anderen Staffel.“ bei einer Person | Eine Person spielt je Season nur eine Staffel | Andere Staffel wählen oder dort entfernen |
 | „Für diese Season ist noch kein gültiges Regelwerk veröffentlicht.“ | Fenster offen, aber keine gültige Version | Regelwerk veröffentlichen (2.11), „Gültig ab“ darf nicht in der Zukunft liegen |
 | „Diese Season ist nur für PC – angegeben ist PlayStation.“ (oder „Liga 2 ist nur für …“) | Spieler auf einer nicht erlaubten Plattform | Andere Spieler aufstellen; stimmt die Angabe nicht, ändert sie die Person im Profil (festgehalten: Freigabe wie bei der Spiel-ID, 3.7) |
 | „… Nur 2 Spieler sind auf einer erlaubten Plattform …“ beim Zuteilen | Ohne Spieler anderer Plattformen fehlt der Mindestkader | Kader ergänzen oder Co-Team in eine Liga mit passender Plattform |

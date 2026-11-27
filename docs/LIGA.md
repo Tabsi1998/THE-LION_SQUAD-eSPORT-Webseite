@@ -34,7 +34,7 @@ Jede Sammlung hat dazu `created_at`, `created_by`, `updated_at`.
 | `slug` | str | ja | Teil der URL `/liga/<slug>/…`; Vorgabe der Slug des Spiels |
 | `name` | str | ja | z. B. „CoD-Liga“ |
 | `game_id` | str | ja | Spiel aus `games` |
-| `participant_kind` | `"team"` | ja | Stufe 1 nur `team`; `solo` folgt (#1629) |
+| `participant_kind` | `"team"` \| `"solo"` | ja | `team` (Vorgabe, Co-Teams) oder `solo` (Spieler, 1 gegen 1; #1629, Abschnitt 12 „S.1 Solo-Liga“). Steht ab dem Anlegen fest; fehlt das Feld, gilt `team` |
 | `description` | str | nein | |
 | `status` | `"active"` \| `"archived"` | ja | `active` |
 | `published_at` | ISO | nein | erste Sichtbarkeit einer Season (#2106); ab dann bleibt `slug` |
@@ -224,7 +224,8 @@ Namen der Aufgestellten, Meldungen beider Seiten, `can_amend_lineup`, `amend_unt
 ### Protokoll (`audit_logs.action`)
 
 `league.create|update`, `league.season.create|update`, `league.season.map_pool.save|clear`,
-`league.division.create|update`, `league.staffel.create`, `league.staffel.sync` (A) · `team.squad.roles`, `league.squad.assign|remove` (B) · `match.games.report`,
+`league.division.create|update`, `league.staffel.create`, `league.staffel.sync` (A) · `team.squad.roles`, `league.squad.assign|remove` (B) ·
+`league.player.assign|remove` (Person in einer Solo-Staffel, #1629: Anmeldung, Konto, Anzeigename) · `match.games.report`,
 `match.lineup.amend`, `match.games.correct` (B) · `league.delete`, `league.season.delete`, `league.division.delete`,
 `league.staffel.delete` (#2106, mit `reason` und den Kennungen dessen, was mitging) · `league.roster.approve` (neue
 Spiel-ID freigegeben, mit Grund, ohne die ID selbst), `league.season.roster_deadline` (#2108) · `league.season.status`
@@ -472,7 +473,7 @@ gemeinsam, damit das Heimrecht fair bleibt.
 | Abzeichen, Momente, Rückblick, „spielte in“ im Profil | #1630, #1638 ff. (Daten liegen ab Stufe 1 in `games[].lineups`) |
 | Versioniertes Regelwerk | #1646 (Stufe 1: `rules_text`) |
 | Gastteams anderer Vereine | #1665: Konten ohne Mitgliedschaft melden sich seit B.4 an (`entry_policy`), Gast-Plakette in Tabelle und Profil folgt |
-| Solo-Ligen (`participant_kind="solo"`) | #1629 |
+| Solo-Ligen (`participant_kind="solo"`) | #1629: Grundlage (anlegen, Staffel mit Personen, Zuteilen) seit P1, siehe 12 „S.1 Solo-Liga“; Anmeldung, Spielbetrieb und Saisonende folgen |
 | Discord-Meldungen der Liga (Spieltag, Saisonende) | #1642 (F.7) |
 | Map-Pool je Liga N, Statistik je Map/Spieler | später |
 
@@ -612,7 +613,8 @@ steht mit Fundstellen, Aufwand und Rangliste in [liga/erweiterbarkeit.md](liga/e
 F.2). Die wichtigsten Hürden:
 
 - das Spiel hängt an der Liga statt an der Season (Titelwechsel nur mit neuer Liga);
-- `participant_kind` nur `"team"`, Anmeldung und Kader setzen ein Co-Team voraus;
+- `participant_kind` nur `"team"`, Anmeldung und Kader setzen ein Co-Team voraus (seit #1629 P1: `solo` anlegen und Personen zuteilen,
+  der Rest folgt - Abschnitt „S.1 Solo-Liga“);
 - kein Übergang von der Tabelle in eine K.-o.-Phase, Relegation ohne Wirkung;
 - Map-Pflicht und kein Remis je Partie (EA FC).
 
@@ -5298,6 +5300,53 @@ selbst bleibt.
 **Nicht in F.8:** die App (`mobile/`): Moment in der App mit leichter Vibration und reduzierter Bewegung, Hinweis im Profil - die API
 liefert alles (Folgepunkt im App-Paket). Momente für Playoff-Sieger unterer Liga N und für die Plätze 2 und 3 (die kommen über die
 Belohnungen, F.4).
+
+### S.1 Solo-Liga – Grundlage (#1629, Paket P1)
+
+Eine Liga spielt mit **Co-Teams** (wie bisher) oder mit **Spielern** - 1 gegen 1, jede Person für sich. Entschieden am 27.11.
+(Fabian, Nr. 285): Die erste Solo-Liga ist CoD 1v1 mit Maps; EA FC folgt mit #2401. Die Teilnehmerart steht ab dem Anlegen fest,
+EA FC 1v1 und 2v2 wären zwei Ligen. Kein zweites System: dieselbe Liga, Season, Liga N, Staffel und dieselbe Anmeldung
+(`tournament_registrations` mit `user_id`) - die lesenden Bausteine (Endstand, Belohnungen, Gesamtwertung, Moment, Profil) kennen
+Personen schon (Lückenanalyse, Abschnitt 1). Der Code steht in `services/league_participants.py`.
+
+**Felder und Regeln:**
+
+| Wo | Feld / Wert | Regel |
+| --- | --- | --- |
+| `leagues` | `participant_kind: "team" \| "solo"` | beim Anlegen gewählt, Vorgabe `team`. `solo` nur mit einem Spiel, das Einzelspieler erlaubt (`games.supports_solo`, ohne Feld ja), sonst 422 mit Satz. Jeder andere Wert beim Ändern: 409 „Die Teilnehmerart steht ab dem Anlegen fest …“. Ein Spielwechsel einer Solo-Liga prüft das neue Spiel genauso |
+| neue Season einer Solo-Liga | `team_size 1`, `min_squad_size 1`, `max_squad_size 1`, `lineup_min_players 1` | Vorgaben (S11), was die Leitung mitschickt, gilt. Check-in `min_present` folgt daraus (1). Teamgröße und Mindestkader sind in Season und Liga N fest 1 (422 mit Satz) |
+| Season einer Solo-Liga | `application_opens_at` / `…_closes_at` | gibt es noch nicht (422 „Die Selbstanmeldung als Spieler folgt …“); `league_applications.season_problems` lehnt zusätzlich jeden Antrag ab |
+| Staffel | `team_mode: "solo"` | aus der Liga beim Anlegen, nie geändert (`STAFFEL_LOCKED_FIELDS` „Teilnahme“) |
+| Anmeldung einer Person | `user_id`, `team_id: null`, `registration_type: "solo"`, `registered_via: "league_assign"`, `source: "staff_add"`, `status: "approved"`, `identity_key "<tid>:user:<id>"` | wie jede Einzel-Anmeldung; keine Zustimmung durch das Zuteilen (wie beim Co-Team) |
+| Season-Schlüssel | `league_squad_key "<season>:user:<id>"` | derselbe eindeutige Index wie für Co-Teams: eine Person je Season nur in einer Staffel. Folgt jedem Statuswechsel (`squad_registration.season_entry`) |
+
+**Zuteilen durch die Leitung** (Zuständigkeit „Teams freigeben“): derselbe Weg wie beim Co-Team.
+
+- `GET /api/tournaments/{tid}/squad-candidates?q=` liefert in einer Solo-Staffel `{kind: "solo", people[], seats_taken,
+  max_participants, id_label}`: Konten ab zwei Zeichen nach Name, ohne E-Mail, je Person `problems` (gesperrt, schon in der Staffel,
+  in einer anderen Staffel der Season, Staffel voll) und Hinweise (Alter, Plattform, Spiel-ID). Eine Team-Staffel antwortet wie bisher.
+- `POST …/squad-registrations` mit `{user_id}`: Prüfung, Anmeldung, Protokoll `league.player.assign`, Vorschau neu mischen, Nachricht an
+  die Person, Spiel-ID für die Season festhalten (`league_roster.after_assign` mit der Person als Kader). Ein Co-Team in einer
+  Solo-Staffel oder eine Person in einer Team-Staffel: 400 mit Satz.
+- `DELETE …/squad-registrations/{id}` nimmt auch eine Person zurück, solange sie in keinem festen Spiel steht (`league.player.remove`).
+
+**Gesperrt mit „folgt“** (kein halber Weg):
+
+| Weg | Sperre | folgt in |
+| --- | --- | --- |
+| Selbstanmeldung als Spieler, Eingang, Los, Nachmeldung | kein Anmeldefenster, kein Antrag; die Verwaltung zeigt den Satz statt der Abschnitte | P2 (S7, S8) |
+| Spielbetrieb: Check-in, Veto, Melden, Vorfälle, Strafen | Status `live`, `paused`, `completed`, `results_published` einer Solo-Staffel: 400 (`staffel_guard.staffel_status_problem`); „Liga starten“ gesperrt mit Satz | P3 |
+| Folge-Season, Startrechte, Auf- und Abstieg je Person | Vorschau und Anlegen nennen den Satz als ersten Grund (`league_successor.plan`) | P4 (S9) |
+| App | unverändert | A9 |
+
+**Verwaltung:** Liga anlegen mit „Teilnehmer“ neben dem Spiel (nur bei Spielen mit Einzelspielern), danach nur lesend. Übersicht,
+Season-Kopf und Staffel zeigen die Art. Spielbetrieb: Teamgröße fest 1. Anmeldung und Kader: nur Mindestalter und „Jede Spiel-ID nur
+einmal“. Liga N ohne eigene Teamgröße und Mindestkader. Staffel-Seite: „Spieler“ statt „Co-Teams“, **Spieler zuteilen** mit Suche.
+Die volle Umstellung der Begriffe je Teilnehmerart (S12) kommt mit P3.
+
+**Gegenprobe:** Ohne `participant_kind` ist jede Liga eine Team-Liga; Vorgaben, Staffel, Zuteilen, Antworten und Anfragen der
+Verwaltung sind dort unverändert (`test_league_solo_kind_flow.py`, `test_league_solo_staffel_flow.py` mit Team- und Solo-Liga
+nebeneinander). Keine Migration.
 
 ## 13. Feature-Matrix (Stand G.3, 15.11.2026)
 
