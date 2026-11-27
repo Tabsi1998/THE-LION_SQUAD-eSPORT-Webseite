@@ -296,10 +296,11 @@ test("#2324: offene Liga-Anmeldung als Hinweis und in „Nächste Termine“, na
 
   const row = screen.getByTestId("home-next-league-tirol-season-1");
   expect(row).toHaveAttribute("href", "/liga/tirol/season-1");
-  expect(row).toHaveTextContent("Anmeldung offen · endet");
+  // Zustands-Schild (#1306): der Countdown steht neben dem Schild, nicht darin.
+  expect(row).toHaveTextContent("Anmeldung offen, endet");
   expect(row).toHaveTextContent("3 von 16 Startplätzen frei");
   expect(screen.getByTestId("home-next-period-tirol-season-1")).toHaveTextContent("05.10.2026 – 13.12.2026");
-  expect(screen.getByTestId("home-next-league-tirol-season-2")).toHaveTextContent("Angekündigt · startet");
+  expect(screen.getByTestId("home-next-league-tirol-season-2")).toHaveTextContent("Angekündigt, startet");
   // Turnier am 25.09., Anmeldeschluss am 30.09., Season 2 im November - der große Countdown bleibt beim Turnier.
   const order = screen.getAllByTestId(/^home-next-(tournament|league)-/).map((node) => node.dataset.testid);
   expect(order).toEqual(["home-next-tournament-cup", "home-next-league-tirol-season-1", "home-next-league-tirol-season-2"]);
