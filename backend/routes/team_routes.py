@@ -1210,8 +1210,10 @@ async def leave_team(team_id: str, me: dict = Depends(get_current_user)):
     team = await db.teams.find_one({"id": team_id})
     if not team:
         raise HTTPException(status_code=404, detail="Team nicht gefunden")
-    if me["id"] not in (team.get("member_ids") or []):
-        # Rechte-Audit für Gäste (#1665, P8): Wer nicht im Team ist, verlässt es nicht - sonst hörte die Teamleitung „hat verlassen“.
+    if me["id"] not in (team.get("member_ids") or []) and not await db.team_squads.find_one(
+            {"team_id": team_id, "member_ids": me["id"]}, {"_id": 1}):
+        # Rechte-Audit für Gäste (#1665, P8): Wer weder im Team noch in einem Kader steht, verlässt es nicht - sonst hörte die Teamleitung
+        # „hat verlassen“. Wer nur noch im Kader steht, nimmt sich so weiter aus ihm heraus (wie vorher).
         raise HTTPException(status_code=400, detail=NOT_IN_TEAM)
     if team["leader_id"] == me["id"]:
         # Geführt statt Sackgasse (#2113, L-C6): der Weg steht in der Meldung - auch für die App.
