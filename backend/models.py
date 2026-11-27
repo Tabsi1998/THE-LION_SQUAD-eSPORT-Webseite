@@ -2793,7 +2793,8 @@ class LeagueCreate(LeagueLookFields):
     name: str = Field(min_length=2, max_length=80)
     slug: Optional[str] = Field(default=None, max_length=80)
     game_id: str
-    participant_kind: Literal["team"] = "team"
+    # Teilnehmerart (#1629, P1): Co-Teams oder Spieler (1 gegen 1) - steht ab dem Anlegen fest, Solo nur mit ``games.supports_solo``.
+    participant_kind: Literal["team", "solo"] = "team"
     description: Optional[str] = Field(default=None, max_length=2000)
     status: LeagueStatus = "active"
     accent_color: Optional[str] = Field(default=None, max_length=9)
@@ -2803,6 +2804,8 @@ class LeagueUpdate(LeagueLookFields):
     name: Optional[str] = Field(default=None, min_length=2, max_length=80)
     slug: Optional[str] = Field(default=None, max_length=80)
     game_id: Optional[str] = None
+    # Nur zum Abweisen (#1629): Die Teilnehmerart steht ab dem Anlegen fest - ein anderer Wert ergibt 409 mit Satz.
+    participant_kind: Optional[Literal["team", "solo"]] = None
     description: Optional[str] = Field(default=None, max_length=2000)
     status: Optional[LeagueStatus] = None
     # Akzentfarbe je Liga (#2107): „#RRGGBB“, Kontrast prüft der Service; leer = Vereinsfarbe.

@@ -22,7 +22,7 @@ from pymongo.errors import DuplicateKeyError
 
 from models import new_id, now_utc
 from services import checkin_rules, league_eligibility, league_late, league_platform, league_roster, league_rules, league_service, squad_registration
-from services import league_start_right_rules
+from services import league_participants, league_start_right_rules
 from services.discord_roles import load_games, top_game
 from services.league_mail import send_league_mail
 from services.league_permissions import CAPABILITIES, belongs_to_side, record_override, require_no_side_conflict, side_of, staff_user_ids
@@ -207,6 +207,9 @@ def _when(value: str | None) -> str:
 
 async def season_problems(db, league: dict, season: dict, stats: dict | None = None) -> list[str]:
     """Was gegen jede Anmeldung spricht, egal welches Co-Team."""
+    if league_participants.is_solo(league):
+        # Solo-Liga (#1629): Die Anmeldung als Spieler kommt erst mit P2 - bis dahin auch kein Antrag mit Co-Team.
+        return [league_participants.APPLICATIONS_FOLLOW]
     state = window_state(season)
     if not state:
         return [NO_WINDOW]

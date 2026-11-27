@@ -22,8 +22,8 @@ from datetime import date, datetime, timedelta, timezone
 from pymongo.errors import DuplicateKeyError
 
 from models import TournamentCreate, new_id, now_utc
-from services import (game_maps, game_modes, game_usage, league_games, league_look, league_platform, league_pool_check,
-                      league_result_rules, loadout_bans, map_pools, pricing, staffel_guard)
+from services import (game_maps, game_modes, game_usage, league_games, league_look, league_participants, league_platform,
+                      league_pool_check, league_result_rules, loadout_bans, map_pools, pricing, staffel_guard)
 from services.league_rules_store import delete_drafts, deletion_blockers, staffel_rules
 from services.advancement_draw import sync_advancement_fields
 from services.competition_versions import new_competition_version_fields
@@ -287,6 +287,13 @@ def _check_squad(settings: dict, where: str) -> None:
         raise LeagueProblem(f"{where}: Der Höchstkader ({most}) ist kleiner als der Mindestkader ({min_squad}).")
 
 
+def _participants_check(league: dict | None, settings: dict) -> None:
+    """Was es in einer Solo-Liga nicht gibt (#1629): andere Teamgröße, größerer Mindestkader, Anmeldefenster (folgt). Team-Ligen: nichts."""
+    problem = league_participants.season_problem(league, settings)
+    if problem:
+        raise LeagueProblem(problem)
+
+
 def _transfer_windows(windows) -> list[dict]:
     out = []
     for window in windows or []:
@@ -353,7 +360,7 @@ def clean_season(raw: dict, existing: dict | None, game: dict | None) -> dict:
     return out
 
 
-def clean_overrides(raw: dict | None, season: dict) -> dict:
+def clean_overrides(raw: dict | None, season: dict, league: dict | None = None) -> dict:
     """Die Abweichungen einer Liga N - nur die erlaubten Felder, ohne leere. Die Plattform (#2270) prüft danach
     ``league_platform.check_division_overrides``."""
     allowed = (*OVERRIDE_FIELDS, *league_platform.DIVISION_KEYS)
@@ -363,6 +370,7 @@ def clean_overrides(raw: dict | None, season: dict) -> dict:
         if points:
             out["scoring_rules"] = points
     merged = effective_settings(season, {"overrides": out})
+    _participants_check(league, merged)
     _check_squad(merged, "Liga N")
     return out
 
@@ -598,6 +606,11 @@ async def create_league(db, body: dict, user: dict) -> dict:
         raise LeagueProblem("Spiel nicht gefunden.")
     if game_usage.is_archived(game):
         raise LeagueProblem(game_usage.ARCHIVED_DETAIL)
+    # Teilnehmerart (#1629, S5): Co-Teams (Vorgabe, wie bisher) oder Spieler - Solo nur mit einem Spiel, das Einzelspieler erlaubt.
+    kind = league_participants.kind_of(body)
+    problem = league_participants.game_problem(game, kind)
+    if problem:
+        raise LeagueProblem(problem)
     name = _text(body.get("name"))
     if not name:
         raise LeagueProblem("Bitte einen Namen angeben.")
@@ -609,7 +622,7 @@ async def create_league(db, body: dict, user: dict) -> dict:
         **look,
         "id": new_id(), "name": name,
         "slug": await unique_slug(db.leagues, slug_source, fallback="liga", max_length=80),
-        "game_id": game["id"], "participant_kind": "team", "description": _text(body.get("description")),
+        "game_id": game["id"], "participant_kind": kind, "description": _text(body.get("description")),
         "status": body.get("status") or "active",
         "created_at": _now(), "created_by": user["id"], "updated_at": _now(),
     }
@@ -621,6 +634,9 @@ async def create_league(db, body: dict, user: dict) -> dict:
 
 
 async def update_league(db, league: dict, body: dict) -> tuple[dict, list[str]]:
+    # Teilnehmerart (#1629, F3 A): steht ab dem Anlegen fest - derselbe Wert ist kein Wechsel und geht durch.
+    if body.get("participant_kind") and body["participant_kind"] != league_participants.kind_of(league):
+        raise LeagueProblem(league_participants.KIND_LOCKED, 409)
     updates: dict = {}
     if "name" in body and body["name"] is not None:
         name = _text(body["name"])
@@ -641,6 +657,9 @@ async def update_league(db, league: dict, body: dict) -> tuple[dict, list[str]]:
             raise LeagueProblem("Spiel nicht gefunden.")
         if game_usage.is_archived(chosen):
             raise LeagueProblem(game_usage.ARCHIVED_DETAIL)
+        problem = league_participants.game_problem(chosen, league_participants.kind_of(league))
+        if problem:
+            raise LeagueProblem(problem)
         updates["game_id"] = body["game_id"]
         clear_mode_order = True
     if body.get("slug"):
@@ -781,7 +800,10 @@ async def create_season(db, league: dict, body: dict, user: dict, *, before_writ
     if isinstance(body.get("scoring_rules"), dict):
         # Tabelle (E.1, #1625): was eine neue Season nicht selbst setzt, kommt aus den Vorgaben neuer Liga-Seasons.
         body = {**body, "scoring_rules": {**copy.deepcopy(LEAGUE_TABLE_DEFAULTS), **body["scoring_rules"]}}
-    fields = clean_season({key: value for key, value in body.items() if value is not None}, None, game)
+    # Solo-Liga (#1629, S11): 1 gegen 1 als Vorgabe - was die Leitung mitschickt, gilt. Team-Ligen legen nichts darüber.
+    given = {**league_participants.season_defaults(league), **{key: value for key, value in body.items() if value is not None}}
+    _participants_check(league, given)
+    fields = clean_season(given, None, game)
     fields.update(await _platform_season(db, {"league_id": league["id"]}, {key: value for key, value in body.items() if value is not None}))
     order_length_check({**SEASON_DEFAULTS, **fields}, [], None)
     number = fields.pop("number", None)
@@ -851,6 +873,8 @@ async def update_season(db, season: dict, body: dict, *, before_write=None,
     Veröffentlichung, #2207); ``warnings`` sammelt Hinweise, die das Speichern nicht aufhalten."""
     league = await get_league(db, season["league_id"])
     game = await _game(db, league.get("game_id"))
+    # Solo-Liga (#1629): vor den übrigen Prüfungen, damit der Satz sagt, warum - nicht nur, dass der Kader nicht passt.
+    _participants_check(league, {**season, **{key: value for key, value in body.items() if value is not None}})
     fields = clean_season(body, season, game)
     fields.update(await _platform_season(db, season, body))
     merged = {**SEASON_DEFAULTS, **season, **{key: value for key, value in fields.items() if value is not None}}
@@ -990,7 +1014,8 @@ async def _create_division(db, season: dict, body: dict, user: dict, *, warnings
     doc = {
         "id": new_id(), "league_id": season["league_id"], "season_id": season["id"], "level": int(level),
         "nickname": _text(body.get("nickname")),
-        "overrides": await _platform_overrides(db, season, clean_overrides(body.get("overrides"), season), None),
+        "overrides": await _platform_overrides(db, season, clean_overrides(body.get("overrides"), season, await get_league(db, season["league_id"])),
+                                               None),
         "status": body.get("status") or "active",
         **await _look(db, {key: value for key, value in body.items() if value is not None}, (league_look.PRIZES,)),
         "created_at": _now(), "created_by": user["id"], "updated_at": _now(),
@@ -1028,7 +1053,8 @@ async def _update_division(db, division: dict, body: dict, *, warnings: list | N
     if "nickname" in body:
         updates["nickname"] = _text(body.get("nickname"))
     if "overrides" in body:
-        updates["overrides"] = await _platform_overrides(db, season, clean_overrides(body.get("overrides"), season),
+        league = await get_league(db, season["league_id"])
+        updates["overrides"] = await _platform_overrides(db, season, clean_overrides(body.get("overrides"), season, league),
                                                          division.get("overrides"))
     if body.get("status"):
         updates["status"] = body["status"]
@@ -1287,7 +1313,9 @@ async def _create_staffel(db, division: dict, staffel: str | None, user: dict, *
                                       "league_context.staffel": letter, **ONLY_LEAGUE}, {"_id": 1}):
         raise LeagueProblem(exists, 409)
 
-    base = TournamentCreate(title=title, game_id=game["id"], format=fmt, team_mode="team").model_dump()
+    # Teilnehmer der Staffel (#1629, S6): Co-Teams (Team-Turnier) oder Personen (Solo-Turnier) - aus der Art der Liga, fest ab Anlage.
+    team_mode = "solo" if league_participants.is_solo(league) else "team"
+    base = TournamentCreate(title=title, game_id=game["id"], format=fmt, team_mode=team_mode).model_dump()
     doc = {
         **base,
         **fields,
@@ -1296,7 +1324,7 @@ async def _create_staffel(db, division: dict, staffel: str | None, user: dict, *
         "slug": await unique_slug(db.tournaments, f"{league.get('slug')}-{season.get('slug')}-liga-"
                                   f"{division.get('level')}-{letter}", fallback="liga"),
         "format": fmt,
-        "team_mode": "team",
+        "team_mode": team_mode,
         "min_participants": 2,
         "result_entry_mode": "player_confirmed",
         "registration_enabled": False,
