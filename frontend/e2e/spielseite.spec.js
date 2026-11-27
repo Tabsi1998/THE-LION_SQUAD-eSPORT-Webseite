@@ -169,6 +169,9 @@ for (const [width, height] of [[390, 844], [1440, 900]]) {
 
     await page.getByTestId("game-tab-allgemein").click();
     await page.getByTestId("game-edit-name").fill("Probe Shooter Neu");
+    // Am Handy liegen die beiden Hinweise „… freigegeben“ über dem Zurück-Knopf. Ein Klick darauf ließe die Maus
+    // über dem Hinweis stehen, das hält ihn offen, und der Klick wartet bis zur Zeitgrenze. Also erst abwarten.
+    await expect(page.locator("[data-sonner-toast]")).toHaveCount(0, { timeout: 15_000 });
     await page.getByTestId("game-page-back").click();
     const dialog = page.getByRole("dialog").filter({ hasText: "Nicht gespeicherte Änderungen" });
     await expect(dialog).toContainText("Allgemein");
