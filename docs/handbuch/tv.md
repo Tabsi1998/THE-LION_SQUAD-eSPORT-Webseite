@@ -220,7 +220,7 @@ Turniere und Fast-Lap-Challenges, die mit dem Event verknüpft sind. Ist nichts 
 verknüpften Turniere oder Fast Laps“. Sponsor-Moment und Laufband gibt es hier auch.
 
 **Hinweis der Turnierleitung:** Schreibt die Turnierleitung einen Hinweis mit dem Haken „Auch am TV zeigen“
-([Turniere, 3.17](turniere.md#317-hinweis-der-turnierleitung-an-alle)), steht er als goldenes Band unter der Kopfleiste –
+([Turniere, 3.17](turniere.md#317-hinweis-der-turnierleitung-an-alle)), steht er als oranges Band unter der Kopfleiste –
 am Turnierbaum-TV die Hinweise dieses Turniers und die an sein ganzes Event, an der Hallen-Tafel die an das Event und
 die einzelner Turniere (mit Turniername). Höchstens zwei zugleich, der neueste oben, mit Uhrzeit und Restzeit. Läuft er
 ab oder wird er entfernt, verschwindet das Band von selbst. Es zeigt nur Text und Zeit, nie, wer geschrieben hat.

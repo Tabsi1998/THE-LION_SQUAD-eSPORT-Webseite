@@ -1241,7 +1241,7 @@ dieses Turniers (und die an sein ganzes Event), sonst nichts; eine Benachrichtig
 sind. Ist der Vor-Ort-Zugang eingeschaltet, steht das im Formular unter den Empfängern: „Auch Gäste mit Vor-Ort-QR-Code sehen
 diesen Hinweis.“
 
-<img src="../assets/turniere/hinweis-banner-pc.png" alt="Turnierseite am PC: oben unter dem Pfad ein goldenes Banner Hinweis der Turnierleitung mit Megafon, Text Pause bis 14:25 und darunter 14:07 Uhr, noch 2 Stunden" width="600">
+<img src="../assets/turniere/hinweis-banner-pc.png" alt="Turnierseite am PC: oben unter dem Pfad ein oranges Banner Hinweis der Turnierleitung mit Megafon, Text Pause bis 14:25 und darunter 14:07 Uhr, noch 2 Stunden" width="600">
 
 Unter dem Formular steht, was schon hinausging: Text, Uhrzeit, wer, an wen, wie viele benachrichtigt wurden, und ob er
 noch steht. **Entfernen** nimmt ihn von Banner und TV; die Benachrichtigungen bleiben. Ein Doppeltipp auf „Senden“ oder
