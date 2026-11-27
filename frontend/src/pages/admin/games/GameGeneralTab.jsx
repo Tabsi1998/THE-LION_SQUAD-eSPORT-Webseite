@@ -1,7 +1,7 @@
-// Reiter „Allgemein“ der Spielseite (#2249): Name, Adresse, Art, Hauptspiel, Kurzname, Logo, Cover und Discord. Spiel-IDs und
+// Reiter „Allgemein“ der Spielseite (#2249): Name, Adresse, Art, Hauptspiel, Kurzname, Einzelspieler erlaubt (#1629), Logo, Cover und Discord. Spiel-IDs und
 // Modi haben eigene Reiter - jede Angabe steht an genau einer Stelle.
 import { FormGrid, FormSection } from "@/components/tls/AdminForm";
-import { SelectField, TextField } from "@/components/tls/FormFields";
+import { CheckField, SelectField, TextField } from "@/components/tls/FormFields";
 import { ImageUpload } from "@/components/tls/ImageUpload";
 import { gameLabel, gameOptionLabel, selectableGames } from "@/lib/gameLabels";
 import { GAME_KIND_OPTIONS, slugFrom } from "@/lib/gameForm";
@@ -83,6 +83,9 @@ export function GameGeneralTab({ gameId, form, onChange, games, servers }) {
             <EditionPreview form={form} games={games} />
           </div>
         )}
+        {/* Teilnahme (#1629, Nr. 296): Solo-Ligen (1 gegen 1) nur mit Einzelspielern. Ausschalten sperrt der Server, solange Solo-Ligen das Spiel spielen. */}
+        <CheckField label="Einzelspieler erlaubt" checked={form.supports_solo !== false} onChange={(value) => set("supports_solo", value)} testId="game-edit-solo"
+          hint="Für Solo-Ligen, in denen jede Person für sich spielt (1 gegen 1). Aus: nur Team-Ligen. Spielt schon eine Solo-Liga dieses Spiel, bleibt es an." />
       </FormSection>
       <FormSection title="Bilder" hint="Logo für Listen und Profile, Cover für Turnier- und Spielseiten." testId="game-general-images">
         <FormGrid cols={2}>

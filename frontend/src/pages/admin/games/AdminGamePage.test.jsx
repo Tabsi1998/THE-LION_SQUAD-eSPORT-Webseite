@@ -219,8 +219,22 @@ describe("Allgemein", () => {
     const [url, body] = apiMock.patch.mock.calls[0];
     expect(url).toBe("/games/g1");
     expect(body).toMatchObject({ name: "Mario Kart 8 Deluxe", slug: "mario-kart-8", short_name: "MK8DX", kind: "standalone" });
-    for (const key of ["match_modes", "player_id_fields", "points_table", "genre", "platforms", "supports_solo"]) expect(body).not.toHaveProperty(key);
+    for (const key of ["match_modes", "player_id_fields", "points_table", "genre", "platforms"]) expect(body).not.toHaveProperty(key);
+    // Einzelspieler erlaubt (#1629, Nr. 296) gehört seit dem Schalter zum Reiter Allgemein - ohne Feld am Spiel an.
+    expect(body.supports_solo).toBe(true);
     await waitFor(() => expect(toastMock.success).toHaveBeenCalledWith("Allgemein gespeichert."));
+  });
+
+  test("Einzelspieler erlaubt (#1629): Schalter im Reiter Allgemein, aus geht mit; eine Sperre des Servers steht als Meldung da", async () => {
+    renderPage();
+    const toggle = await screen.findByTestId("game-edit-solo");
+    expect(toggle).toBeChecked();
+    apiMock.patch.mockRejectedValueOnce({ response: { status: 409, data: { detail: "Spiel hat Solo-Ligen: Duell-Liga." } } });
+    fireEvent.click(toggle);
+    fireEvent.click(screen.getByTestId("game-save-allgemein"));
+    await waitFor(() => expect(apiMock.patch).toHaveBeenCalledWith("/games/g1", expect.objectContaining({ supports_solo: false })));
+    await waitFor(() => expect(toastMock.error).toHaveBeenCalled());
+    expect(toastMock.success).not.toHaveBeenCalled();
   });
 
   // Codex-Nachprüfung #2249: Unter der Adresse stehen die Spieler-IDs - ein neuer Name lässt sie, wie sie ist.

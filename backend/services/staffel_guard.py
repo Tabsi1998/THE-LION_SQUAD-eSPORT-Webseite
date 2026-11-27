@@ -13,7 +13,7 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 
-from services import league_late
+from services import league_late, league_participants
 from services.league_scope import is_league_staffel
 
 FROM_SEASON = "Kommt aus der Season – dort ändern und übertragen."
@@ -98,6 +98,21 @@ STAFFEL_REGISTRATION_REFUSED = ("In einer Liga-Staffel spielen nur Co-Teams – 
                                 "eintragen.")
 SQUAD_UNREGISTER_REFUSED = ("Ein zugeteiltes Co-Team nimmt nur die Turnierleitung wieder aus der Staffel – bitte "
                             "bei der Turnierleitung melden.")
+# Solo-Staffel (#1629): dieselben Sperren mit den Wörtern der Solo-Liga.
+PERSON_REGISTRATION_REFUSED = ("In einer Solo-Staffel teilt die Leitung die Spieler zu – bitte über „Spieler zuteilen“ eintragen. Die "
+                               "Selbstanmeldung als Spieler folgt in einem späteren Ausbau.")
+PERSON_UNREGISTER_REFUSED = "Eine zugeteilte Person nimmt nur die Leitung aus der Staffel."
+
+
+def registration_refused(tournament: dict | None) -> str:
+    """Der Satz, wenn sich jemand an einer Staffel vorbei anmeldet - je Teilnehmerart."""
+    return PERSON_REGISTRATION_REFUSED if league_participants.is_solo_staffel(tournament) else STAFFEL_REGISTRATION_REFUSED
+
+
+def solo_fixed_plan_problem(tournament: dict | None) -> str | None:
+    """Ein fester Spielplan in einer Solo-Staffel (#1629, P1): gibt es erst mit dem Spielbetrieb (P3) - sonst hinge die Staffel im Entwurf
+    mit festen Spielen fest. Die Vorschau bleibt erlaubt."""
+    return league_participants.OPERATIONS_FOLLOW if league_participants.is_solo_staffel(tournament) else None
 
 # Vor dem Start einer Staffel (wie ``league_service.PRE_START_STATUSES``).
 PRE_START_STATUSES = frozenset({"draft", "scheduled", "registration_open", "registration_closed", "check_in"})
@@ -152,6 +167,9 @@ def staffel_status_problem(tournament: dict, status: str | None) -> str | None:
     # veröffentlicht“) geht nur über „Wieder öffnen“. Der Aufrufer fragt nur bei einem Wechsel.
     if isinstance(tournament.get("final_table"), dict):
         return STAFFEL_CLOSED_REFUSED
+    if league_participants.is_solo_staffel(tournament) and status in league_participants.OPERATING_STATUSES:
+        # Solo-Liga (#1629, P1): Check-in, Veto und Melden rechnen noch mit Co-Teams (P3) - bis dahin startet die Staffel nicht.
+        return league_participants.OPERATIONS_FOLLOW
     if status in STAFFEL_STATUSES:
         return None
     return STAFFEL_STATUS_REFUSED

@@ -33,6 +33,7 @@ import { StaffelScheduleTab } from "./staffel/StaffelScheduleTab";
 import { StaffelSettingsTab } from "./staffel/StaffelSettingsTab";
 import { StaffelStand } from "./staffel/StaffelStand";
 import { hasCapability, sanctionsByRegistration } from "./staffel/staffelPage";
+import { entrantWords, isSoloStaffel } from "@/lib/leagueParticipants";
 
 const TABS = STAFFEL_TABS.filter((tab) => STAFFEL_TABS_READY.has(tab.key));
 // Playoffs und Relegation (#2404, F.6): ein K.-o.-Baum statt einer Tabelle - der Reiter heißt dort „Baum“.
@@ -159,9 +160,12 @@ function StaffelPage({ tournamentId }) {
   // Zuteilung zurücknehmen (#1649): nur ohne festes Spiel - danach Austritt oder Disqualifizieren. Vor dem Start mischt sich die
   // Vorschau neu, danach (Nachmeldung ohne festes Spiel) bleibt der Spielplan, wie er ist.
   const removeSquad = async (registration) => {
-    const name = registration.display_name || registration.squad_name || "Dieses Co-Team";
+    // Solo-Staffel (#1629): dieselbe Zuteilung, nur mit einer Person.
+    const solo = isSoloStaffel(t);
+    const word = entrantWords(t).one;
+    const name = registration.display_name || registration.squad_name || (solo ? "Diese Person" : "Dieses Co-Team");
     const ok = await confirm({
-      title: "Co-Team entfernen?",
+      title: `${word} entfernen?`,
       description: staffelBeforeStart(t)
         ? `${name} wird aus der Staffel genommen. Die Vorschau des Spielplans wird danach neu gemischt.`
         : `${name} wird aus der Staffel genommen. Es hat noch kein festes Spiel – Spielplan und Tabelle bleiben, wie sie sind.`,
@@ -174,7 +178,7 @@ function StaffelPage({ tournamentId }) {
       toast.success(data?.auto_bracket_update?.match_count ? `${name} entfernt. Vorschau neu gemischt.` : `${name} entfernt.`);
       loadSafely();
     } catch (failure) {
-      toast.error(formatRequestError(failure, "Das Co-Team konnte nicht entfernt werden."));
+      toast.error(formatRequestError(failure, solo ? "Die Person konnte nicht entfernt werden." : "Das Co-Team konnte nicht entfernt werden."));
     }
   };
 
@@ -246,12 +250,16 @@ function StaffelPage({ tournamentId }) {
         <div className="mt-2 flex min-w-0 flex-wrap items-center gap-x-3 gap-y-2">
           <span className="inline-flex" data-testid="staffel-stand"><StaffelStand tournament={t} /></span>
           {t.locked_at ? <span className="rounded-sm border border-quiet/40 px-2 py-[3px] tls-type-label text-quiet">Gesperrt</span> : null}
+          {/* Solo-Liga (#1629): Die Art der Staffel steht sichtbar da - Teilnehmer sind Personen. */}
+          {isSoloStaffel(t) ? (
+            <span className="rounded-sm border border-white/15 px-2 py-[3px] tls-type-label text-white/75" data-testid="staffel-kind">Spieler · 1 gegen 1</span>
+          ) : null}
         </div>
       </header>
 
       {loadNotice}
       <AdminTabBar tabs={tabs} active={tab} onSelect={go} idBase={idBase} label="Bereiche der Staffel" testPrefix="staffel" />
-      {!lists && !error ? <p className="tls-type-small text-white/60" data-testid="staffel-lists-loading">Lade Co-Teams und Spiele …</p> : null}
+      {!lists && !error ? <p className="tls-type-small text-white/60" data-testid="staffel-lists-loading">Lade {entrantWords(t).many} und Spiele …</p> : null}
       {lists && TABS.map((row) => (row.key === tab ? (
         <div key={row.key} role="tabpanel" id={`${idBase}-panel-${row.key}`} aria-labelledby={`${idBase}-tab-${row.key}`} data-testid={`staffel-panel-${row.key}`} className="min-w-0">
           {panels[row.key]()}

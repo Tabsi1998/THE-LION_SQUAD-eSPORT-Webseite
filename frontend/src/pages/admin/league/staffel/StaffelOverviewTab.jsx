@@ -19,6 +19,7 @@ import { staffelBeforeStart } from "@/pages/admin/tournament/StaffelParts";
 import { primaryTournamentAction } from "@/pages/admin/tournament/shared";
 import { FeedbackReport } from "@/pages/admin/feedback/FeedbackReport";
 import { PauseUntilControl } from "@/pages/admin/tournament/TvTournamentPanel";
+import { SOLO_OPERATIONS_FOLLOW, isSoloStaffel } from "@/lib/leagueParticipants";
 import { ACTIVE_STAFFEL_REGISTRATION, STAFFEL_RUNNING_STATUSES, STAFFEL_STATUS_WORDS, staffelStandText } from "./staffelPage";
 
 const DONE = new Set(["completed", "forfeit"]);
@@ -44,7 +45,7 @@ function Numbers({ tournament, registrations, matches }) {
       <h2 id="staffel-numbers-title" className={EYEBROW}>Zahlen</h2>
       <dl className="mt-3 grid grid-cols-2 gap-3">
         <div className="min-w-0">
-          <dt className={LABEL}>Teams</dt>
+          <dt className={LABEL}>{isSoloStaffel(tournament) ? "Spieler" : "Teams"}</dt>
           <dd className="mt-0.5 tls-type-section tls-type-num" data-testid="staffel-numbers-teams">
             {numbers.teams}{numbers.max ? <span className={SUBTLE}> von {numbers.max}</span> : null}
           </dd>
@@ -73,6 +74,8 @@ function StatusCard({ tournament, onStatus, onReload, primaryRef }) {
   const manage = Boolean(tournament.can_edit_staffel);
   const before = staffelBeforeStart(tournament);
   const primary = primaryTournamentAction(tournament.status, tournament);
+  // Solo-Liga (#1629, P1): Der Spielbetrieb für Spieler folgt - „Liga starten“ steht da, ist aber gesperrt und sagt warum.
+  const soloWaits = before && isSoloStaffel(tournament);
   const options = STAFFEL_RUNNING_STATUSES.includes(tournament.status) ? STAFFEL_RUNNING_STATUSES : [tournament.status, ...STAFFEL_RUNNING_STATUSES];
   return (
     <section id="staffel-status" className={`${CARD} scroll-mt-24`} aria-labelledby="staffel-status-title" data-testid="staffel-status">
@@ -80,13 +83,18 @@ function StatusCard({ tournament, onStatus, onReload, primaryRef }) {
       {manage ? (
         <div className="mt-3 space-y-3">
           {primary ? (
-            <button ref={primaryRef} type="button" onClick={() => onStatus(primary.status)} data-testid="staffel-primary-action" className={`tls-btn tls-btn--primary ${ACTION}`}>
+            <button ref={primaryRef} type="button" onClick={() => onStatus(primary.status)} data-testid="staffel-primary-action" disabled={soloWaits}
+              aria-describedby={soloWaits ? "staffel-solo-follows" : undefined} className={`tls-btn tls-btn--primary ${ACTION} disabled:opacity-50`}>
               <Zap className="h-4 w-4" aria-hidden="true" /> {primary.label}
             </button>
           ) : null}
           {before ? (
             <>
-              <p className="tls-type-small text-white/60" data-testid="staffel-start-note">Macht den Spielplan fest und schaltet die Staffel live. Danach kommen Teams nur noch als Nachmeldung dazu.</p>
+              {soloWaits ? (
+                <p id="staffel-solo-follows" className="tls-type-small text-white/70" data-testid="staffel-solo-follows">{SOLO_OPERATIONS_FOLLOW}</p>
+              ) : (
+                <p className="tls-type-small text-white/60" data-testid="staffel-start-note">Macht den Spielplan fest und schaltet die Staffel live. Danach kommen Teams nur noch als Nachmeldung dazu.</p>
+              )}
               {/* Vor dem Start kein Auswahlfeld: starten oder absagen. */}
               <button type="button" onClick={() => onStatus("cancelled")} data-testid="staffel-cancel" className={`tls-type-small tls-btn tls-btn--quiet ${ACTION} `}>
                 Staffel absagen

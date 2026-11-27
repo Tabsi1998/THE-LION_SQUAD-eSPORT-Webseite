@@ -47,6 +47,7 @@ import { SeasonTableLinks } from "./SeasonTablePanel";
 import { SeasonPointsFields, SeasonTableRules } from "./SeasonTableRules";
 import { SeasonTabForm } from "./SeasonTabForm";
 import { toast } from "sonner";
+import { SOLO_SUCCESSOR_FOLLOWS, isSoloLeague, participantLabel } from "@/lib/leagueParticipants";
 
 const LONG_DAY = { day: "2-digit", month: "2-digit", year: "numeric" };
 const SAVE_LABELS = {
@@ -153,6 +154,8 @@ export default function AdminLeagueSeasonPage() {
   const canSeason = can("season");
   const canRules = can("rules");
   const season = data?.season;
+  // Solo-Liga (#1629, P1): 1 gegen 1, Spieler statt Co-Teams - die Reiter blenden aus, was es für Spieler (noch) nicht gibt.
+  const solo = isSoloLeague(data?.league);
   const saved = useMemo(() => (season ? seasonToForm(season) : null), [season]);
   const staffelCount = (data?.divisions || []).reduce((sum, division) => sum + division.staffeln.length, 0);
   const readinessVersion = data ? `${season.updated_at}-${data.map_pool?.version ?? 0}-${data.divisions.length}-${staffelCount}` : "";
@@ -297,7 +300,7 @@ export default function AdminLeagueSeasonPage() {
     const ok = await confirm({
       title: `Staffel in ${division.label} anlegen?`,
       // Liga-Wörter (Paket D, #2262): kein „Liga-Turnier“, kein „Entwurf“.
-      description: `Eine Staffel mit allen Vorgaben der Season (${settingsLine(division.settings)}), noch vor dem Start. Danach teilst du auf der Staffel-Seite die Co-Teams zu.`,
+      description: `Eine Staffel mit allen Vorgaben der Season (${settingsLine(division.settings, { solo })}), noch vor dem Start. Danach teilst du auf der Staffel-Seite die ${solo ? "Spieler" : "Co-Teams"} zu.`,
       confirmLabel: "Staffel anlegen",
     });
     if (!ok) return;
@@ -364,14 +367,14 @@ export default function AdminLeagueSeasonPage() {
     // Leitstand (E.4, Nr. 152): offene Aufgaben, Protokoll und Rundnachricht - lesen darf jede Zuständigkeit, der Server filtert.
     leitstand: () => <SeasonDeskTab seasonId={seasonId} divisions={data.divisions} />,
     spielbetrieb: () => (
-      <SeasonPlayTab seasonId={seasonId} data={data} form={form} set={set} canSeason={canSeason} readiness={readiness} formProps={formProps("spielbetrieb")}
+      <SeasonPlayTab seasonId={seasonId} data={data} form={form} set={set} canSeason={canSeason} readiness={readiness} formProps={formProps("spielbetrieb")} solo={solo}
         modes={modes} longest={longest} orderNote={orderNote} seasonModes={seasonModes} onSeasonModes={setSeasonModes} onPoolDirty={setPoolDirty}
         onSavePool={savePool} onClearPool={clearPool} onPendingSync={setPendingSync} reload={reload} />
     ),
     termine: () => <SeasonDatesTab seasonId={seasonId} data={data} form={form} set={set} canSeason={canSeason} formProps={formProps("termine")} />,
     anmeldung: () => (
       <SeasonEntryTab seasonId={seasonId} season={season} form={form} set={set} canSeason={canSeason} canApplications={can("applications")} canRoster={can("roster")}
-        formProps={formProps("anmeldung")} onJump={go} applicationsWaiting={data.applications_waiting || 0}
+        formProps={formProps("anmeldung")} onJump={go} applicationsWaiting={data.applications_waiting || 0} solo={solo}
         lateRegistration={data.late_registration || null} onReload={reload} />
     ),
     tabelle: () => (
@@ -422,7 +425,7 @@ export default function AdminLeagueSeasonPage() {
               <div className="min-w-0">
                 <h1 className="tls-type-title break-words">{data.league.name} · {season.name}</h1>
                 <p className="mt-1 tls-type-small text-white/60" data-testid="season-head">
-                  {data.game?.name || "Spiel fehlt"} · ab {viennaDate(season.start_date, LONG_DAY)} · Sichtbarkeit: {VISIBILITY_SHORT[season.visibility]}
+                  {data.game?.name || "Spiel fehlt"} · {participantLabel(data.league)} · ab {viennaDate(season.start_date, LONG_DAY)} · Sichtbarkeit: {VISIBILITY_SHORT[season.visibility]}
                 </p>
               </div>
             </div>
@@ -437,8 +440,10 @@ export default function AdminLeagueSeasonPage() {
                     <RefreshCw className="w-3.5 h-3.5" aria-hidden="true" /> Übernahme neu berechnen
                   </button>
                 ) : null}
-                <button type="button" onClick={() => setSuccessorOpen(true)} data-testid="season-successor"
-                  className="tls-btn tls-btn--secondary px-3 py-1.5 rounded-sm tls-type-label inline-flex items-center gap-1.5">
+                {/* Solo-Liga (#1629): Folge-Season und Startrechte je Person folgen (P4) - der Knopf steht da, gesperrt mit Satz darunter. */}
+                <button type="button" onClick={() => setSuccessorOpen(true)} data-testid="season-successor" disabled={solo}
+                  aria-describedby={solo ? "season-successor-follows" : undefined}
+                  className="tls-btn tls-btn--secondary px-3 py-1.5 rounded-sm tls-type-label inline-flex items-center gap-1.5 disabled:opacity-50">
                   <CopyPlus className="w-3.5 h-3.5" aria-hidden="true" /> Neue Season aus {season.name}
                 </button>
                 <button type="button" onClick={() => setDeleting({ kind: "season", target: season, name: season.name })} data-testid="season-delete"
@@ -448,6 +453,9 @@ export default function AdminLeagueSeasonPage() {
               </div>
             ) : null}
           </div>
+          {solo && can("manage") ? (
+            <p id="season-successor-follows" className="-mt-2 mb-5 tls-type-small text-white/70" data-testid="season-successor-follows">{SOLO_SUCCESSOR_FOLLOWS}</p>
+          ) : null}
 
           {pendingSync > 0 ? (
             <div role="status" className="mb-5 flex flex-wrap items-center justify-between gap-3 rounded-sm border border-warn/30 bg-warn/5 px-4 py-3 tls-type-small text-warn" data-testid="season-sync-hint">
@@ -479,7 +487,7 @@ export default function AdminLeagueSeasonPage() {
 
           {divisionSheet ? (
             <DivisionSheet division={divisionSheet.id ? divisionSheet : null} season={season} nextLevel={(data.divisions.at(-1)?.level || 0) + 1}
-              divisionsLocked={Boolean(data.divisions_locked)}
+              divisionsLocked={Boolean(data.divisions_locked)} solo={solo}
               onClose={() => setDivisionSheet(null)} onSaved={() => { setDivisionSheet(null); reload(); }} />
           ) : null}
           {recomputeOpen ? (

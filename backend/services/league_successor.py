@@ -21,7 +21,7 @@ from pymongo.errors import DuplicateKeyError
 
 from models import REGISTRATION_LIMIT, new_id, now_utc
 from services import league_cross_zones, league_final, league_staffel_plan, league_zones, loadout_bans, map_pools, squad_registration
-from services import league_postseason, league_postseason_rules, league_start_right_rules
+from services import league_participants, league_postseason, league_postseason_rules, league_start_right_rules
 from services import league_service as leagues
 from services.league_final_read import active_final, is_closed
 from services.league_scope import ONLY_LEAGUE, RELEGATION, staffel_kind
@@ -135,6 +135,10 @@ async def plan(db, season: dict) -> dict:
     staffeln = await league_final.season_staffeln(db, season["id"])
     counted = [row for row in staffeln if is_closed(row) or row.get("status") not in league_final.IGNORED_STAFFEL_STATUSES]
     problems: list[str] = []
+    league = await db.leagues.find_one({"id": season.get("league_id")}, {"_id": 0, "participant_kind": 1})
+    if league_participants.is_solo(league):
+        # Solo-Liga (#1629): Übernahme je Person und Startrechte mit ``user:<id>`` kommen erst mit P4 - als erster Grund genannt.
+        problems.append(league_participants.SUCCESSOR_FOLLOWS)
     if not counted:
         problems.append(NO_STAFFELN)
     elif not all(is_closed(row) for row in counted):

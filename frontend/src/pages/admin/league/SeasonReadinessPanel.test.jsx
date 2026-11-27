@@ -89,6 +89,21 @@ test("eine fertige Season heißt bereit, ohne Rechte gibt es kein Speichern der 
   expect(screen.queryByTestId("season-readiness-min-save")).toBeNull();
 });
 
+// Solo-Liga (#1629, Nr. 297): Veröffentlichen bleibt erlaubt, die Warnung „Spielbetrieb folgt“ steht aber deutlich da - nicht leise grau.
+test("die Solo-Warnung steht deutlich mit Zeichen da, andere Warnungen bleiben ruhig", async () => {
+  apiMock.get.mockResolvedValue({ data: { ...UNREADY, ok: true, problems: [], warnings: [
+    { code: "solo_operations_follow", text: "Solo-Liga: Spielbetrieb folgt – Spiele lassen sich noch nicht austragen." },
+    { code: "application_none", text: "Kein Anmeldefenster." },
+  ] } });
+  render(<Check />);
+
+  const loud = await screen.findByTestId("season-readiness-loud-solo_operations_follow");
+  expect(loud).toHaveTextContent("Solo-Liga: Spielbetrieb folgt");
+  expect(loud.className).toMatch(/border-brand/);
+  expect(screen.queryByTestId("season-readiness-loud-application_none")).toBeNull();
+  expect(screen.getByTestId("season-readiness-state")).toHaveTextContent("2 Warnungen");
+});
+
 test("eine neu geladene Prüfung befüllt das Formular neu, eine Eingabe davor bleibt bis dahin stehen", async () => {
   const requirements = (override) => [{ mode: "suchen", label: "Suchen", derived: 1, override, needed: override || 1, have: 1 }];
   const readiness = (override) => ({ result: { ...UNREADY, requirements: requirements(override) }, reload: vi.fn() });

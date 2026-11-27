@@ -44,8 +44,22 @@ function TransferWindows({ value = [], onChange }) {
   );
 }
 
-export function SeasonEligibilitySection({ form, set, id }) {
+export function SeasonEligibilitySection({ form, set, id, solo = false }) {
   const series = form.lineup_mode === "series";
+  if (solo) {
+    // Solo-Liga (#1629, P1): Der Kader ist die Person selbst - Kadergrößen, Wartezeit, Teilnehmerliste und Transfers gibt es dort nicht.
+    return (
+      <FormSection title="Spielberechtigung" testId="season-eligibility" className="scroll-mt-24" id={id}
+        hint="Wer in dieser Season spielen darf. In einer Solo-Liga ist der Kader die Person selbst – Kaderregeln und Transfers gibt es dort nicht.">
+        <FormGrid cols={2}>
+          <TextField label="Mindestalter (Jahre)" type="number" min={0} max={99} value={form.min_age} onChange={(value) => set("min_age", value)}
+            hint="Selbstauskunft: Geburtsdatum im Profil. 0 schaltet es aus." testId="season-form-min-age" />
+        </FormGrid>
+        <Toggle label="Jede Spiel-ID nur einmal" hint="Eine ID, die in dieser Season schon gilt, kann niemand zweites nutzen. Die Meldung nennt nie, wem sie gehört." checked={form.unique_game_ids}
+          onChange={(value) => set("unique_game_ids", value)} testId="season-form-unique-ids" />
+      </FormSection>
+    );
+  }
   return (
     <FormSection title="Kader und Spielberechtigung" testId="season-eligibility" className="scroll-mt-24" id={id}
       hint="Wie groß ein Kader sein darf und wer in dieser Season spielen darf. Leer lassen heißt: Die Regel bleibt, wie sie ist. Eine 0 schaltet Mindestalter und Wartezeit aus.">

@@ -3,7 +3,7 @@
 // „Was fehlt noch?“ - jeder Punkt springt an seine Stelle -, `SeasonPoolMinimum` (Mindestgröße je Modus) im Reiter Spielbetrieb.
 // Probleme halten das Veröffentlichen auf (Sichtbarkeit von „aus“ auf sichtbar), Warnungen nicht.
 import { useCallback, useEffect, useState } from "react";
-import { ArrowRight, CheckCircle2, ClipboardCheck, RefreshCw } from "lucide-react";
+import { ArrowRight, CheckCircle2, ClipboardCheck, Info, RefreshCw } from "lucide-react";
 import { api, formatApiError } from "@/lib/api";
 import { FormSection } from "@/components/tls/AdminForm";
 import { TextField } from "@/components/tls/FormFields";
@@ -31,15 +31,26 @@ export function useSeasonReadiness(seasonId, version) {
   return { result, error, busy, reload: load };
 }
 
-function Items({ items, tone, onJump, testId }) {
+// Warnungen, die nichts aufhalten, aber niemand übersehen soll (#1629, Nr. 297): Die Solo-Liga lässt sich veröffentlichen, spielt aber noch nicht.
+const LOUD_WARNINGS = new Set(["solo_operations_follow"]);
+
+// Farb-Rollen (#1305): Probleme in `warn`; der deutliche Hinweis in `brand` (Hinweise) - so verwechselt ihn niemand mit einem Problem.
+function itemTone(tone, code) {
+  if (tone === "problem") return "border-warn/40 bg-warn/10 text-white";
+  return LOUD_WARNINGS.has(code) ? "border-brand/40 bg-brand/10 text-white" : "border-white/15 bg-white/[0.03] text-white/75";
+}
+
+function Items({ items, tone, onJump, testId, loudTestId }) {
   if (!items?.length) return null;
   return (
     <ul className="space-y-1.5" data-testid={testId}>
       {items.map((item, index) => {
         const anchor = onJump ? readinessAnchor(item.code) : "";
+        const loud = tone !== "problem" && LOUD_WARNINGS.has(item.code);
         return (
-          <li key={`${item.code}-${index}`} data-code={item.code}
-            className={`flex flex-wrap items-center justify-between gap-x-3 gap-y-1.5 rounded-sm border px-3 py-2 tls-type-small ${tone === "problem" ? "border-warn/40 bg-warn/10 text-white" : "border-white/15 bg-white/[0.03] text-white/75"}`}>
+          <li key={`${item.code}-${index}`} data-code={item.code} data-testid={loud ? `${loudTestId}-${item.code}` : undefined}
+            className={`flex flex-wrap items-center justify-between gap-x-3 gap-y-1.5 rounded-sm border px-3 py-2 tls-type-small ${itemTone(tone, item.code)}`}>
+            {loud ? <Info className="h-4 w-4 shrink-0 text-brand" aria-hidden="true" /> : null}
             <span className="min-w-[min(100%,14rem)] flex-1 [overflow-wrap:anywhere]">{item.text}</span>
             {anchor ? (
               <button type="button" onClick={() => onJump(anchor)} data-testid={`${testId}-go-${item.code}`}
@@ -80,7 +91,7 @@ export function SeasonReadinessPanel({ readiness, visibility = "off", overrideRe
       {result ? (
         <>
           <Items items={result.problems} tone="problem" onJump={onJump} testId={`${testId}-problems`} />
-          <Items items={result.warnings} tone="warning" onJump={onJump} testId={`${testId}-warnings`} />
+          <Items items={result.warnings} tone="warning" onJump={onJump} testId={`${testId}-warnings`} loudTestId={`${testId}-loud`} />
           {clean ? <p className="tls-type-small text-white/60" data-testid={`${testId}-clean`}>Nichts offen. Veröffentlichen geht mit „Sichtbarkeit“ rechts daneben.</p> : null}
           {offerOverride ? (
             <TextField label="Grund für die Notausnahme" maxLength={500} value={overrideReason} onChange={onOverrideReason}

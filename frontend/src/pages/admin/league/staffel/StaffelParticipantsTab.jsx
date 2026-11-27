@@ -11,6 +11,8 @@ import { seasonAnchorUrl } from "@/lib/seasonTabs";
 import { StatusBadge } from "@/components/tls/StatusBadge";
 import { LineupMark } from "@/components/tls/tournament/LineupMark";
 import { SquadAssignDialog, canAssignSquads } from "@/components/tls/league/SquadAssignDialog";
+import { PersonAssignDialog } from "@/components/tls/league/PersonAssignDialog";
+import { SOLO_APPLICATIONS_FOLLOW, entrantWords, isSoloStaffel } from "@/lib/leagueParticipants";
 import { ParticipantRemovalActions } from "@/pages/admin/tournament/ParticipantRemovalActions";
 import { fixedRegistrationIds, normalizeSearch } from "@/pages/admin/tournament/shared";
 import { SquadKaderSheet } from "../SquadKaderSheet";
@@ -60,6 +62,8 @@ function Marks({ registration, sanctions = [], seasonId }) {
 
 function Actions({ tournament, registration, fixed, squad, onKader, onRemove, onDone }) {
   const canParticipants = Boolean(tournament.can_manage_participants);
+  // Zugeteilt ist ein Co-Team - in einer Solo-Staffel (#1629) die Person.
+  const assigned = Boolean(registration.squad_id || (isSoloStaffel(tournament) && registration.user_id));
   return (
     <div className="flex flex-wrap gap-2 md:justify-end">
       {squad ? (
@@ -69,7 +73,7 @@ function Actions({ tournament, registration, fixed, squad, onKader, onRemove, on
       ) : null}
       <ParticipantRemovalActions tournament={tournament} registration={registration} onDone={onDone} allowed={canParticipants} touch />
       {/* Entfernen nimmt nur eine Zuteilung ohne festes Spiel zurück - ausgetretene oder disqualifizierte Co-Teams bleiben stehen. */}
-      {canParticipants && registration.squad_id && !fixed && ACTIVE_STAFFEL_REGISTRATION.has(registration.status) ? (
+      {canParticipants && assigned && !fixed && ACTIVE_STAFFEL_REGISTRATION.has(registration.status) ? (
         <button type="button" onClick={() => onRemove(registration)} data-testid={`staffel-reg-remove-${registration.id}`}
           className={`${SMALL_BUTTON} border border-live/40 text-live hover:bg-live/10`}>
           Entfernen
@@ -88,28 +92,32 @@ export function StaffelParticipantsTab({ tournament, registrations, matches, lin
   const shown = registrations.filter((row) => !needle || normalizeSearch([nameOf(row), row.team?.name, row.squad_name].filter(Boolean).join(" ")).includes(needle));
   const active = registrations.filter((row) => ACTIVE_STAFFEL_REGISTRATION.has(row.status)).length;
   const max = Number(tournament.max_participants) || 0;
-  const canAssign = Boolean(tournament.can_manage_participants) && canAssignSquads(tournament);
+  // Solo-Staffel (#1629, P1): Teilnehmer sind Personen - „Spieler zuteilen“ statt „Co-Team zuteilen“, dieselbe Liste darunter.
+  const solo = isSoloStaffel(tournament);
+  const words = entrantWords(tournament);
+  const canManage = Boolean(tournament.can_manage_participants);
+  const canAssign = canManage && canAssignSquads(tournament);
   const rowProps = (registration) => ({
     tournament, registration, fixed: fixed.has(registration.id), squad: squads[registration.id], onKader: setKader, onRemove, onDone: onReload,
   });
-  const empty = registrations.length === 0
-    ? "Noch kein Co-Team in dieser Staffel."
-    : "Kein Co-Team passt zur Suche.";
+  const empty = registrations.length === 0 ? words.none : `Kein ${words.one} passt zur Suche.`;
+  const assignButton = "tls-btn tls-btn--primary inline-flex min-h-[44px] w-full items-center justify-center gap-2 rounded-sm px-4 tls-type-label sm:w-auto";
 
   return (
     <div className="space-y-4">
       <div id="zuteilen" className="scroll-mt-24 flex flex-col gap-3 rounded-sm border border-white/10 bg-[#121212] p-4 md:flex-row md:items-center md:justify-between">
         <div className="min-w-0">
           <h2 className="tls-type-section" data-testid="staffel-teams-count">
-            Co-Teams <span className="tabular-nums text-white/60">{active}{max ? ` von ${max}` : ""}</span>
+            {words.many} <span className="tabular-nums text-white/60">{active}{max ? ` von ${max}` : ""}</span>
           </h2>
-          <p className="mt-1 tls-type-body text-white/60">Teilnehmer dieser Liga sind Co-Teams. Captain und Vertreter vergibt die Teamleitung im Profil.</p>
+          <p className="mt-1 tls-type-body text-white/60" data-testid="staffel-entrants-note">
+            {solo ? "Teilnehmer dieser Liga sind Spieler – jede Person spielt für sich, 1 gegen 1."
+              : "Teilnehmer dieser Liga sind Co-Teams. Captain und Vertreter vergibt die Teamleitung im Profil."}
+          </p>
         </div>
         <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap md:shrink-0">
-          {canAssign ? (
-            <SquadAssignDialog tournament={tournament} onAssigned={onReload}
-              triggerClassName="tls-btn tls-btn--primary inline-flex min-h-[44px] w-full items-center justify-center gap-2 rounded-sm px-4 tls-type-label sm:w-auto" />
-          ) : null}
+          {solo && canManage ? <PersonAssignDialog tournament={tournament} onAssigned={onReload} triggerClassName={assignButton} /> : null}
+          {canAssign ? <SquadAssignDialog tournament={tournament} onAssigned={onReload} triggerClassName={assignButton} /> : null}
           <a href={`${API}/exports/tournaments/${tournament.id}/participants.pdf`} target="_blank" rel="noreferrer" data-testid="staffel-pdf-participants"
             className="tls-btn tls-btn--quiet inline-flex min-h-[44px] items-center justify-center gap-2 rounded-sm px-4 tls-type-label">
             <FileDown className="h-4 w-4" aria-hidden="true" /> PDF Teilnehmer
@@ -117,18 +125,22 @@ export function StaffelParticipantsTab({ tournament, registrations, matches, lin
         </div>
       </div>
 
-      <p className="flex flex-wrap items-center gap-x-2 gap-y-1 tls-type-small text-white/60" data-testid="staffel-entry-hint">
-        Anmeldungen und Warteliste stehen im Eingang der Season.
-        <Link to={seasonAnchorUrl(seasonId, "anmeldungen")} className="inline-flex min-h-[44px] items-center gap-1 font-bold text-[#29B6E8] hover:text-white" data-testid="staffel-entry-link">
-          Zum Eingang <ArrowRight className="h-3.5 w-3.5" aria-hidden="true" />
-        </Link>
-      </p>
+      {solo ? (
+        <p className="tls-type-small text-white/60" data-testid="staffel-entry-hint">{SOLO_APPLICATIONS_FOLLOW}</p>
+      ) : (
+        <p className="flex flex-wrap items-center gap-x-2 gap-y-1 tls-type-small text-white/60" data-testid="staffel-entry-hint">
+          Anmeldungen und Warteliste stehen im Eingang der Season.
+          <Link to={seasonAnchorUrl(seasonId, "anmeldungen")} className="inline-flex min-h-[44px] items-center gap-1 font-bold text-[#29B6E8] hover:text-white" data-testid="staffel-entry-link">
+            Zum Eingang <ArrowRight className="h-3.5 w-3.5" aria-hidden="true" />
+          </Link>
+        </p>
+      )}
 
       {registrations.length > 6 ? (
         <label className="relative block">
-          <span className="sr-only">Co-Team suchen</span>
+          <span className="sr-only">{words.search}</span>
           <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-white/60" aria-hidden="true" />
-          <input value={query} onChange={(event) => setQuery(event.target.value)} data-testid="staffel-reg-search" placeholder="Co-Team oder Team suchen"
+          <input value={query} onChange={(event) => setQuery(event.target.value)} data-testid="staffel-reg-search" placeholder={words.search}
             className="min-h-[44px] w-full rounded-sm border border-white/10 bg-[#0A0A0A] pl-10 pr-3 text-base text-white placeholder:text-white/55 focus:border-[#29B6E8]/60 focus:outline-none md:text-sm" />
         </label>
       ) : null}
@@ -156,7 +168,7 @@ export function StaffelParticipantsTab({ tournament, registrations, matches, lin
           <thead className="bg-[#0A0A0A] tls-type-label text-white/60">
             <tr>
               <th scope="col" className="w-12 px-4 py-3 text-left">#</th>
-              <th scope="col" className="px-4 py-3 text-left">Co-Team</th>
+              <th scope="col" className="px-4 py-3 text-left">{words.one}</th>
               <th scope="col" className="w-[22rem] px-4 py-3 text-right xl:w-[29rem]">Aktion</th>
             </tr>
           </thead>

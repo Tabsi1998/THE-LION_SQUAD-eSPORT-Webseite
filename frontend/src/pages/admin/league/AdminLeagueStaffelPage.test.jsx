@@ -603,3 +603,47 @@ test("Überblick: der Leitstand wird höchstens alle 5 s nachgezählt, nicht bei
   await screen.findByTestId("staffel-desk-count");
   expect(invalidations.some((row) => row.options?.debounceMs === 5000 && row.resources?.includes("matches"))).toBe(true);
 });
+
+// Solo-Staffel (#1629, P1): Teilnehmer sind Personen - „Spieler zuteilen“, Entfernen wie beim Co-Team, „Liga starten“ gesperrt mit Satz.
+const PERSONS = [
+  { id: "p1", status: "approved", display_name: "Duellant Eins", user_id: "u1", team_id: null, registration_type: "solo" },
+  { id: "p2", status: "approved", display_name: "Duellant Zwei", user_id: "u2", team_id: null, registration_type: "solo" },
+];
+
+test("Solo-Staffel: Spieler statt Co-Teams, Spieler zuteilen und Entfernen der Person", async () => {
+  const user = userEvent.setup();
+  serve({ tournament: { team_mode: "solo" }, registrations: PERSONS });
+  renderPage("#teilnehmer");
+  expect(await screen.findByTestId("staffel-teams-count")).toHaveTextContent("Spieler 2 von 8");
+  expect(screen.getByTestId("staffel-kind")).toHaveTextContent("Spieler · 1 gegen 1");
+  expect(screen.getByTestId("staffel-entrants-note")).toHaveTextContent("jede Person spielt für sich");
+  expect(screen.getByTestId("staffel-entry-hint")).toHaveTextContent("Die Selbstanmeldung als Spieler folgt");
+  expect(screen.queryByTestId("staffel-entry-link")).toBeNull();
+  expect(screen.queryByTestId("squad-assign-open")).toBeNull();
+  await user.click(screen.getByTestId("person-assign-open"));
+  expect(await screen.findByTestId("person-assign-dialog")).toHaveTextContent("Spieler zuteilen");
+  await user.click(screen.getByRole("button", { name: "Abbrechen" }));
+
+  const [remove] = screen.getAllByTestId("staffel-reg-remove-p1");
+  await user.click(remove);
+  const dialog = await screen.findByRole("dialog");
+  expect(dialog).toHaveTextContent("Spieler entfernen?");
+  await user.click(within(dialog).getByRole("button", { name: "Entfernen" }));
+  await waitFor(() => expect(apiMock.delete).toHaveBeenCalledWith("/tournaments/t1/squad-registrations/p1"));
+});
+
+test("Solo-Staffel: „Liga starten“ ist gesperrt und sagt, dass der Spielbetrieb folgt - die Team-Staffel startet wie bisher", async () => {
+  serve({ tournament: { team_mode: "solo" }, registrations: PERSONS });
+  const { unmount } = renderPage();
+  expect(await screen.findByTestId("staffel-primary-action")).toBeDisabled();
+  expect(screen.getByTestId("staffel-solo-follows")).toHaveTextContent("Der Spielbetrieb einer Solo-Liga");
+  expect(screen.queryByTestId("staffel-start-note")).toBeNull();
+  expect(screen.getByTestId("staffel-numbers")).toHaveTextContent("Spieler");
+  unmount();
+
+  serve();
+  renderPage();
+  expect(await screen.findByTestId("staffel-primary-action")).toBeEnabled();
+  expect(screen.getByTestId("staffel-start-note")).toBeInTheDocument();
+  expect(screen.queryByTestId("staffel-kind")).toBeNull();
+});

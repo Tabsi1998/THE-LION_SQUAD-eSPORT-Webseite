@@ -34,7 +34,7 @@ from services.match_v2_results import (
 )
 from models import TournamentStageCreate, TournamentStageUpdate, now_utc, new_id
 from services import game_modes, tournament_guard
-from services.staffel_guard import staffel_rebuild_problem
+from services.staffel_guard import solo_fixed_plan_problem, staffel_rebuild_problem
 from services.match_public_view import public_match_view, public_stage_view
 from services.round_labels import attach_round_labels
 from services.station_runtime import free_stations_of_deleted_matches, held_calls, tell_withdrawn_calls
@@ -364,6 +364,10 @@ async def generate_tournament_stage_matches(tid: str, stage_id: str, force: bool
     stage = await db.tournament_stages.find_one({"id": stage_id, "tournament_id": tid}, {"_id": 0})
     if not stage:
         raise HTTPException(status_code=404, detail="Phase nicht gefunden")
+    # Solo-Staffel (#1629, P1): ein fester Spielplan erst mit dem Spielbetrieb für Spieler - die Vorschau bleibt.
+    solo_problem = None if preview else solo_fixed_plan_problem(tournament)
+    if solo_problem:
+        raise HTTPException(status_code=400, detail=solo_problem)
     # Liga-Staffel (#2201): der Spielplan einer gestarteten Staffel bleibt - auch mit force.
     staffel_problem = await staffel_rebuild_problem(db, tournament)
     if staffel_problem:

@@ -69,6 +69,8 @@ export function generalToForm(game) {
     cover_url: text(game?.cover_url),
     discord_guild_id: text(game?.discord_guild_id),
     discord_role_name: text(game?.discord_role_name),
+    // Einzelspieler erlaubt (#1629, Nr. 296): Vorgabe an - ein Altspiel ohne Feld gilt als erlaubt.
+    supports_solo: game?.supports_solo !== false,
   };
 }
 
@@ -87,6 +89,7 @@ export function generalPayload(form) {
     discord_guild_id: form.discord_guild_id || null,
     // Spiel-Rolle im Discord (#629) je Hauptspiel; Spielversionen zählen fürs Hauptspiel.
     discord_role_name: isEdition ? null : trimmedOrNull(form.discord_role_name),
+    supports_solo: form.supports_solo !== false,
   };
 }
 
