@@ -36,6 +36,9 @@ NAME_LENGTH = f"Der Name von Verein oder Schule braucht {NAME_MIN} bis {NAME_MAX
 NOT_TEAM_LEAD = "Verein oder Schule tragen Teamleitung und Co-Leitung ein."
 NO_LEAGUE_TEAM = "Das Kennzeichen „Gast“ setzt die Liga-Leitung einer Liga, in der das Team gerade angemeldet oder zugeteilt ist."
 NOT_A_LEAGUE_TEAM = "Verein oder Schule gebt ihr an, sobald euer Team in einer Liga angemeldet ist."
+# Offene und angenommene Anträge wie ``league_applications.OPEN_STATUSES`` - hier als Wert, weil league_applications dieses Modul liest
+# (kein Import-Kreis); test_league_guests_unit hält beide gleich.
+OPEN_APPLICATIONS = ("submitted", "in_review", "waitlist", "accepted")
 ORG_FIELDS = ("kind", "name", "school_name_public", "updated_at")
 CONFIRM_FIELDS = ("confirmed_at", "confirmed_kind", "confirmed_name")
 
@@ -210,11 +213,10 @@ async def league_ids_of_team(db, team_id: str) -> set[str]:
     """Entscheidung B (27.11.): die Ligen, in denen das Team **gerade** angemeldet oder zugeteilt ist - ein offener oder angenommener
     Antrag bzw. eine Anmeldung in einer Staffel, die noch nicht beendet ist, jeweils in einer laufenden oder kommenden Season. Ein
     abgelehnter oder zurückgezogener Antrag und eine beendete Season geben der Leitung kein Recht am Kennzeichen."""
-    from services.league_applications import OPEN_STATUSES
     from services.league_service import FINISHED_STAFFEL_STATUSES
     from services.squad_registration import SEAT_STATUSES
 
-    applications = await db.league_applications.find({"team_id": team_id, "status": {"$in": list(OPEN_STATUSES)}},
+    applications = await db.league_applications.find({"team_id": team_id, "status": {"$in": list(OPEN_APPLICATIONS)}},
                                                      {"_id": 0, "league_id": 1, "season_id": 1}).to_list(500)
     tournament_ids = sorted({row.get("tournament_id") for row in await db.tournament_registrations.find(
         {"team_id": team_id, "status": {"$in": list(SEAT_STATUSES)}}, {"_id": 0, "tournament_id": 1}).to_list(2000) if row.get("tournament_id")})

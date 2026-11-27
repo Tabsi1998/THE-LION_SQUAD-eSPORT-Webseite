@@ -103,3 +103,9 @@ def test_a_very_long_name_is_kept_whole():
     assert len(name) <= guests.NAME_MAX
     state = guests.confirmed_fields(guests.org_fields("school", name, True), True)
     assert guests.badge(team(**state))["org"] == name
+
+
+def test_the_open_applications_match_the_applications_module():
+    from services.league_applications import OPEN_STATUSES
+
+    assert set(guests.OPEN_APPLICATIONS) == set(OPEN_STATUSES)
