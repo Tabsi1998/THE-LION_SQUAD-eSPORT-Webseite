@@ -418,7 +418,8 @@ async def undo_effect(db, doc: dict, actor_id: str | None) -> None:
     if not registration or not tournament or registration.get("status") != "disqualified":
         return
     previous = effect["removal"].get("previous_status") or "approved"
-    key = squad_registration.league_squad_key(tournament, registration.get("squad_id"))
+    # Co-Team bzw. in einer Solo-Staffel die Person (#1629): derselbe Season-Schlüssel.
+    key = squad_registration.league_squad_key(tournament, squad_registration.season_entry(registration, tournament))
     if key and await db.tournament_registrations.find_one({"league_squad_key": key, "id": {"$ne": registration["id"]}}, {"_id": 1}):
         raise SanctionProblem("Das Co-Team ist in dieser Season inzwischen anders angemeldet. Bitte zuerst das klären.", 409)
     await _refuse_late_entry_clash(db, tournament, registration)

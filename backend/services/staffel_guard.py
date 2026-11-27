@@ -13,7 +13,7 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 
-from services import league_late
+from services import league_late, league_participants
 from services.league_scope import is_league_staffel
 
 FROM_SEASON = "Kommt aus der Season – dort ändern und übertragen."
@@ -152,6 +152,9 @@ def staffel_status_problem(tournament: dict, status: str | None) -> str | None:
     # veröffentlicht“) geht nur über „Wieder öffnen“. Der Aufrufer fragt nur bei einem Wechsel.
     if isinstance(tournament.get("final_table"), dict):
         return STAFFEL_CLOSED_REFUSED
+    if league_participants.is_solo_staffel(tournament) and status in league_participants.OPERATING_STATUSES:
+        # Solo-Liga (#1629, P1): Check-in, Veto und Melden rechnen noch mit Co-Teams (P3) - bis dahin startet die Staffel nicht.
+        return league_participants.OPERATIONS_FOLLOW
     if status in STAFFEL_STATUSES:
         return None
     return STAFFEL_STATUS_REFUSED
