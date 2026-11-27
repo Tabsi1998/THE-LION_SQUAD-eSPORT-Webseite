@@ -91,7 +91,7 @@ export function NegativeTab() {
               {removing === a.user_id + a.tier_code && (
                 <div className="mt-2 flex flex-wrap items-center gap-2">
                   <input value={reason} onChange={(e) => setReason(e.target.value)} placeholder="Grund" aria-label="Grund für das Entfernen" data-testid={`negative-reason-${a.tier_code}`} className={`${INPUT_CLASS} flex-1 min-w-[12rem]`} />
-                  <button type="button" onClick={() => remove(a)} data-testid={`negative-remove-${a.tier_code}`} className="px-3 py-2 bg-live text-white tls-type-label rounded-sm">Entfernen</button>
+                  <button type="button" onClick={() => remove(a)} data-testid={`negative-remove-${a.tier_code}`} className="px-3 py-2 bg-live text-[#0A0A0A] tls-type-label rounded-sm">Entfernen</button>
                   <button type="button" onClick={() => setRemoving(null)} className="tls-type-label text-white/50">Abbrechen</button>
                 </div>
               )}

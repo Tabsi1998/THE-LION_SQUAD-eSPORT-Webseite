@@ -110,7 +110,7 @@ export function XpTab({ board = false }) {
                   {view.prestige ? (
                     <div className="space-y-2">
                       <input value={resetReason} onChange={(e) => setResetReason(e.target.value)} placeholder="Grund" aria-label="Grund für das Zurücksetzen" data-testid="xp-reset-reason" className={INPUT_CLASS} />
-                      <button type="button" onClick={resetPrestige} disabled={busy} data-testid="xp-reset-submit" className="px-4 py-2 bg-live text-white tls-type-label rounded-sm disabled:opacity-40">Zurücksetzen</button>
+                      <button type="button" onClick={resetPrestige} disabled={busy} data-testid="xp-reset-submit" className="px-4 py-2 bg-live text-[#0A0A0A] tls-type-label rounded-sm disabled:opacity-40">Zurücksetzen</button>
                     </div>
                   ) : <p className="tls-type-small text-white/45">{personName(person)} hat keine Prestige-Sterne.</p>}
                 </BoardOnly>
