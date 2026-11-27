@@ -131,12 +131,16 @@ test("keine neue freie Schriftgröße - neue Stellen nehmen eine der acht Stufen
 // Zeremonien haben Text ab 12 px - nur reine Schmuckzeichen ohne Text dürfen kleiner sein (gezählt, mit Grund).
 // Ausgenommen sind nur die TV-Seiten (Beamer-Größen) und der Druck (pt).
 const CSS_SKIP = /^(components\/tv\/|styles\/printView\.css)/;
-// Unter 12 px: 0-11,99 px oder unter 0,75 rem. Erkannt als feste Größe (auch mit !important), als kleinster Wert von
-// clamp(…) und im Kürzel font: (font: 700 10px/1.2 …) - so rutscht kein kleiner Wert über eine andere Schreibweise durch.
+// Unter 12 px: 0-11,99 px oder unter 0,75 rem (Einheit auch groß geschrieben). Erkannt als feste Größe (auch mit
+// !important und Kommentaren), als kleinster Wert von clamp(…), als ein Wert von min(…), als max(…) nur aus kleinen
+// Werten und im Kürzel font: (font: 700 10px/1.2 …) - so rutscht kein kleiner Wert über eine andere Schreibweise durch.
 const TINY = String.raw`(?:(?:[0-9]|1[01])(?:\.\d+)?px|0?\.(?:[0-6]\d*|7(?:[0-4]\d*)?)rem)`;
+const COMMENT = String.raw`(?:\/\*[\s\S]*?\*\/\s*)*`;
 const CSS_TINY = new RegExp(
-  String.raw`font-size:\s*(?:${TINY}\s*(?:!important\s*)?[;}]|clamp\(\s*${TINY}\s*,)|(?<![\w-])font:[^;{}]*?(?<![\w./-])${TINY}(?![\w.])`,
-  "g",
+  String.raw`font-size:\s*${COMMENT}(?:${TINY}\s*${COMMENT}(?:!important\s*${COMMENT})?[;}]`
+    + String.raw`|clamp\(\s*${TINY}\s*,|min\([^;{}]*?(?<![\w.-])${TINY}|max\(\s*${TINY}(?:\s*,\s*${TINY})*\s*\))`
+    + String.raw`|(?<![\w-])font:[^;{}]*?(?<![\w./-])${TINY}(?![\w.])`,
+  "gi",
 );
 const CSS_TINY_EXCEPTIONS = {
   "components/tls/league/leagueBadge.css": 4, // Saisonverlauf als SVG-Grafik (fill) - Größe in Einheiten der Grafik
@@ -160,6 +164,13 @@ test("der Wächter erkennt kleine Schrift in jeder Schreibweise - und lässt 12 
     "a { font-size: clamp(0.6rem, 2vw, 1rem); }",
     "a { font: 700 10px/1.2 Outfit, sans-serif; }",
     "a { font: italic 0.7rem Rajdhani; }",
+    "a { font-size: min(10px, 2vw); }",
+    "a { font-size: min(1rem, 0.6rem); }",
+    "a { font-size: max(10px, 0.5rem); }",
+    "a { font-size: 11PX; }",
+    "a { font-size: 0.7REM; }",
+    "a { font-size: 11px /* klein */; }",
+    "a { font-size: 10px /* Punkt */ !important; }",
   ]) {
     expect(hits(tiny), tiny).toBe(1);
   }
@@ -172,6 +183,10 @@ test("der Wächter erkennt kleine Schrift in jeder Schreibweise - und lässt 12 
     "a { font-size: clamp(1.25rem, 5vw, 1.5rem); }",
     "a { font: 700 14px/11px Outfit; }",
     "a { font: inherit; }",
+    "a { font-size: max(var(--tls-type-label-size), 0.8em); }",
+    "a { font-size: max(10px, 14px); }",
+    "a { font-size: min(14px, 3vw); }",
+    "a { font-size: 12PX /* Etikett */; }",
   ]) {
     expect(hits(fine), fine).toBe(0);
   }
@@ -190,10 +205,16 @@ test("CSS: em und calc() nur mit Grund - sonst eine Stufe", () => {
 
 // Schrift im Code (Diagramm-Achsen von recharts, style={{ fontSize }}): auch hier nichts unter 12 px. SVG-Grafiken mit
 // eigener viewBox (fontSize="7" in Einheiten der Grafik) rechnen anders und sind nicht gemeint.
-const INLINE_TINY = /fontSize:\s*["']?(?:[0-9]|1[01])(?:\.\d+)?(?:px)?["']?(?![\d.])/g;
+const INLINE_TINY = /fontSize:\s*["']?(?:(?:[0-9]|1[01])(?:\.\d+)?(?:px)?|0?\.(?:[0-6]\d*|7(?:[0-4]\d*)?)rem)["']?(?![\w.%])/gi;
 
 test("Schrift im Code: kein fontSize unter 12 px", () => {
   expect(countIn(SOURCES, INLINE_TINY)).toEqual({});
+});
+
+test("der fontSize-Wächter erkennt kleine Werte - und lässt rem und 12 px und mehr durch", () => {
+  const hits = (code) => (code.match(INLINE_TINY) || []).length;
+  for (const tiny of ["{ fontSize: 10 }", "{ fontSize: \"11px\" }", "{ fontSize: '9.5px' }", "{ fontSize: \"0.6rem\" }"]) expect(hits(tiny), tiny).toBe(1);
+  for (const fine of ["{ fontSize: 12 }", "{ fontSize: \"1.5rem\" }", "{ fontSize: \"14px\" }", "{ fontSize: 100 }", "{ fontSize: \"1em\" }", "{ fontSize: \"0.75rem\" }"]) expect(hits(fine), fine).toBe(0);
 });
 
 // Unbounded nur für Bühne und Seitentitel (Fabians Variante B): font-heading steht nur noch an begründeten Stellen.
@@ -249,8 +270,9 @@ test("Großbuchstaben nur für Kurzes (#1303): kein uppercase an h1-h3 und an Ka
 
 // Namen werden nie umgeschrieben (#1303): <ShortCaps> um einen berechneten Wert nur, wo der Wert ein fester Seitentitel
 // aus dem Code ist - nie um Namen, Titel aus Daten oder der Verwaltung (Liga, Serie, Runde, Rechtstexte) oder Eingaben
-// („Jo gegen Max“ würde GROSS). Gezählt wird jedes <ShortCaps> mit {…} darin - auch Vorlagen-Text und über mehrere Zeilen.
-const SHORT_CAPS_DYNAMIC = /<ShortCaps\b[^>]*>(?:(?!<\/ShortCaps>)[^{])*\{[\s\S]*?<\/ShortCaps>/g;
+// („Jo gegen Max“ würde GROSS). Gezählt wird jedes <ShortCaps> mit {…} darin - auch Vorlagen-Text, über mehrere Zeilen
+// und als children={…}.
+const SHORT_CAPS_DYNAMIC = /<ShortCaps\b(?:[^>]*\bchildren=\{|[^>]*>(?:(?!<\/ShortCaps>)[^{])*\{[\s\S]*?<\/ShortCaps>)/g;
 const SHORT_CAPS_FIXED = {
   "advent/AdventCalendarPanel.jsx": 1, // feste Sätze („Bald ist es so weit“)
   "components/tls/AdminForm.jsx": 1, // „Neues Event“, „Event bearbeiten“ - aus den Formularen
@@ -268,6 +290,8 @@ test("der ShortCaps-Wächter erkennt jeden berechneten Inhalt - auch Vorlagen-Te
   expect(hits("<ShortCaps>{`${home} gegen ${away}`}</ShortCaps>")).toBe(1);
   expect(hits("<ShortCaps>\n  {league.name}\n</ShortCaps>")).toBe(1);
   expect(hits("<ShortCaps>Hallo {name}</ShortCaps>")).toBe(1);
+  expect(hits("<ShortCaps children={team.name} />")).toBe(1);
+  expect(hits('<ShortCaps children="Turniere" />')).toBe(0);
   expect(hits("<ShortCaps>Turniere</ShortCaps> <b>{name}</b> <ShortCaps>Saison</ShortCaps>")).toBe(0);
 });
 
