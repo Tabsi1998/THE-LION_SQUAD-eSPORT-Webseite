@@ -38,6 +38,8 @@ const checks = [
   ...opacityText("Decorative white/30", PALETTE.white, 0.3, 2),
   // Etikett „Du“ (#1316): Cyan auf seiner Fläche (12 %) über der Fläche von „du“ (8 %) - auf jedem Grund AA.
   ...youTag(),
+  // Zustands-Schilder (#1306): jede Schrift auf ihrem Schild, das Schild über Grund und den Flächen 1 bis 3.
+  ...statusChips(),
 ];
 
 const results = checks.map((check) => {
@@ -90,6 +92,31 @@ function youTag() {
     foreground: PALETTE.cyan,
     background: blend(cyan, 0.12, blend(cyan, 0.08, parseColor(background))),
     min: 4.5,
+  }));
+}
+
+// Die Werte stehen in docs/status-kinds.json (Farb-Rollen aus docs/category-colors.json): „ok“, „brand/0.55“, „white/0.88“.
+function statusChips() {
+  const fs = require("node:fs");
+  const path = require("node:path");
+  const docs = path.join(__dirname, "..", "..", "docs");
+  const kinds = JSON.parse(fs.readFileSync(path.join(docs, "status-kinds.json"), "utf8"));
+  const roles = JSON.parse(fs.readFileSync(path.join(docs, "category-colors.json"), "utf8"));
+  const named = { ...roles.roles, ...kinds.colors };
+  const grounds = [roles.surfaces.base, roles.surfaces["1"], roles.surfaces["2"], roles.surfaces["3"]];
+  const layer = (spec, below) => {
+    if (!spec) return below;
+    const [name, alpha] = spec.split("/");
+    return blend(parseColor(named[name]), alpha ? Number(alpha) : 1, below);
+  };
+  return Object.entries(kinds.kinds).flatMap(([kind, spec]) => grounds.map((ground) => {
+    const background = layer(spec.fill, parseColor(ground));
+    return {
+      label: `Zustands-Schild ${spec.label} (${kind}) on ${ground}`,
+      foreground: layer(spec.text, background),
+      background,
+      min: 4.5,
+    };
   }));
 }
 
