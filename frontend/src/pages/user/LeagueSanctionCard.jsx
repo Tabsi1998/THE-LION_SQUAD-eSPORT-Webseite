@@ -12,7 +12,7 @@ import { APPEAL_STATE_LABELS, SANCTION_STATUS } from "@/lib/leagueSanctions";
 import { viennaDateTime } from "@/lib/vienna";
 
 const WHEN = { dateStyle: "medium", timeStyle: "short" };
-const CHIP = { warn: "border-warn/50 text-warn", live: "border-[#FF6B60]/50 text-[#FF6B60]", calm: "border-white/15 text-white/60" };
+const CHIP = { warn: "border-warn/50 text-warn", live: "border-warn bg-warn/15 text-warn", calm: "border-white/15 text-white/60" };
 const TONE = { none: "text-white/60", calm: "text-white/75", soon: "text-warn", over: "text-white/50" };
 export const APPEAL_MIN = 10;
 
@@ -41,11 +41,11 @@ export function LeagueSanctionCard({ p, onChanged }) {
   return (
     <div data-testid={`penalty-card-${p.ref_id}`} className="rounded-sm border border-white/10 bg-[#121212] p-4 sm:p-5">
       <div className="flex items-start gap-4">
-        <div className="hidden h-10 w-10 shrink-0 items-center justify-center rounded-sm bg-[#FF6B60]/10 text-[#FF6B60] sm:flex"><Gavel className="h-5 w-5" aria-hidden="true" /></div>
+        <div className="hidden h-10 w-10 shrink-0 items-center justify-center rounded-sm bg-warn/10 text-warn sm:flex"><Gavel className="h-5 w-5" aria-hidden="true" /></div>
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-start justify-between gap-x-3 gap-y-2">
             <div className="min-w-0">
-              <div className="tls-type-card leading-tight text-[#FF6B60]">{p.label}</div>
+              <div className="tls-type-card leading-tight text-warn">{p.label}</div>
               <div className="tls-type-small text-white/50">
                 {p.team_penalty ? `Strafe der Liga-Leitung gegen das Co-Team ${p.team_name}` : "Strafe der Liga-Leitung gegen dich"}
               </div>
@@ -69,8 +69,8 @@ export function LeagueSanctionCard({ p, onChanged }) {
           {sanction.match_id ? <Link to={`/matches/${sanction.match_id}`} className="mt-1 inline-flex min-h-11 items-center tls-type-label text-[#29B6E8] hover:underline">Zum Spiel</Link> : null}
 
           {sanction.appeal ? (
-            <div className="mt-3 rounded-sm border border-honor/30 p-3" data-testid={`sanction-appeal-${sanction.id}`}>
-              <div className="flex items-center gap-2 tls-type-label text-honor"><Scale className="h-3.5 w-3.5" aria-hidden="true" /> {APPEAL_STATE_LABELS[sanction.appeal.state]}</div>
+            <div className="mt-3 rounded-sm border border-warn/30 p-3" data-testid={`sanction-appeal-${sanction.id}`}>
+              <div className="flex items-center gap-2 tls-type-label text-warn"><Scale className="h-3.5 w-3.5" aria-hidden="true" /> {APPEAL_STATE_LABELS[sanction.appeal.state]}</div>
               <p className="mt-1 tls-type-small text-white/50">Eingelegt {viennaDateTime(sanction.appeal.at, WHEN)}{sanction.appeal.by_name ? ` von ${sanction.appeal.by_name}` : ""}</p>
               <p className="mt-1 whitespace-pre-line break-words tls-type-body text-white/85">{sanction.appeal.text}</p>
               {sanction.appeal.state === "open" ? <p className="mt-2 tls-type-body text-white/75">Eine andere Person der Liga-Leitung entscheidet. Bis dahin gilt die Strafe weiter.</p>

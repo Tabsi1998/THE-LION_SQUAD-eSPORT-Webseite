@@ -202,7 +202,7 @@ function HubLink({ to, icon: Icon, title, text, badge = "", testId }) {
       </div>
       <h2 className="mt-5 tls-type-section text-white">{title}</h2>
       <p className="mt-2 tls-type-body leading-relaxed text-white/55">{text}</p>
-      {badge && <p className="mt-3 inline-flex rounded-sm border border-honor/40 bg-honor/10 px-2 py-0.5 tls-type-label text-honor" data-testid={testId ? `${testId}-badge` : undefined}>{badge}</p>}
+      {badge && <p className="mt-3 inline-flex rounded-sm border border-brand/40 bg-brand/10 px-2 py-0.5 tls-type-label text-brand" data-testid={testId ? `${testId}-badge` : undefined}>{badge}</p>}
     </Link>
   );
 }

@@ -203,7 +203,7 @@ function FieldHelp({ ids, description, error }) {
   return (
     <>
       {description && <div id={ids.descriptionId} className="mt-1 tls-type-small text-white/45">{description}</div>}
-      {error && <div id={ids.errorId} role="alert" className="mt-1 tls-type-small text-[#FF8A80]">{error}</div>}
+      {error && <div id={ids.errorId} role="alert" className="mt-1 tls-type-small text-warn">{error}</div>}
     </>
   );
 }

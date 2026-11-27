@@ -222,7 +222,7 @@ export default function AdminMobilePushPage() {
                     <div className="tls-type-small text-quiet mt-1">Zuletzt angemeldet: {formatTime(user.latest_updated_at)}</div>
                     {/* Rot nur bei einem Fehler an einem aktiven Gerät (#2467). */}
                     {user.active_error ? (
-                      <div className="tls-type-small text-[#FF6B61] mt-1 tls-wrap" title={user.active_error}>{pushErrorLabel(user.active_error)}</div>
+                      <div className="tls-type-small text-warn mt-1 tls-wrap" title={user.active_error}>{pushErrorLabel(user.active_error)}</div>
                     ) : null}
                   </div>
                 </div>
@@ -242,7 +242,7 @@ export default function AdminMobilePushPage() {
                 <h2 className="tls-type-section">{userLabel(selectedUser)}</h2>
                 <p className="tls-type-small text-white/45">{selectedUser?.email || selectedUser?.id || "Kein Benutzer ausgewählt"}</p>
               </div>
-              <span className={`inline-flex items-center gap-2 border px-3 py-2 rounded-sm tls-type-label ${status?.has_enabled_token ? "border-[#29B6E8]/40 text-[#29B6E8]" : "border-[#FFCC00]/40 text-[#FFD95A]"}`}>
+              <span className={`inline-flex items-center gap-2 border px-3 py-2 rounded-sm tls-type-label ${status?.has_enabled_token ? "border-[#29B6E8]/40 text-[#29B6E8]" : "border-warn/40 text-warn"}`}>
                 <CheckCircle2 className="w-4 h-4" /> {status?.enabled_count || 0} aktiv
               </span>
             </div>
@@ -297,7 +297,7 @@ export default function AdminMobilePushPage() {
                       <div className="font-mono tls-type-small text-white/65 truncate">{token.token_preview}</div>
                       <div className="tls-type-small text-white/45 mt-1">{token.platform || "-"} · {token.enabled === false ? "inaktiv" : "aktiv"}</div>
                     </div>
-                    <span className={`tls-type-label border px-2 py-1 rounded-sm ${token.enabled === false ? "border-[#FFCC00]/40 text-[#FFD95A]" : "border-ok/40 text-ok"}`}>
+                    <span className={`tls-type-label border px-2 py-1 rounded-sm ${token.enabled === false ? "border-quiet/40 text-quiet" : "border-ok/40 text-ok"}`}>
                       {token.enabled === false ? "Aus" : "An"}
                     </span>
                   </div>
@@ -305,12 +305,12 @@ export default function AdminMobilePushPage() {
                     <div className="border border-white/10 bg-[#0A0A0A] rounded-sm p-2">
                       <div className="text-quiet tls-type-label">Angenommen</div>
                       <div>{pushStateLabel(token.last_ticket_status)}</div>
-                      {token.last_ticket_error ? <div className="text-[#FF6B61] break-words" title={token.last_ticket_error}>{pushErrorLabel(token.last_ticket_error)}</div> : null}
+                      {token.last_ticket_error ? <div className="text-warn break-words" title={token.last_ticket_error}>{pushErrorLabel(token.last_ticket_error)}</div> : null}
                     </div>
                     <div className="border border-white/10 bg-[#0A0A0A] rounded-sm p-2">
                       <div className="text-quiet tls-type-label">Zugestellt</div>
                       <div>{pushStateLabel(token.last_receipt_status)}</div>
-                      {token.last_receipt_error ? <div className="text-[#FF6B61] break-words" title={token.last_receipt_error}>{pushErrorLabel(token.last_receipt_error)}</div> : null}
+                      {token.last_receipt_error ? <div className="text-warn break-words" title={token.last_receipt_error}>{pushErrorLabel(token.last_receipt_error)}</div> : null}
                     </div>
                   </div>
                   <div className="tls-type-small text-quiet">Letzter Versand: {formatTime(token.last_sent_at)}</div>
@@ -340,11 +340,11 @@ export default function AdminMobilePushPage() {
                       <td className="px-4 py-3">{token.enabled === false ? "Nein" : "Ja"}</td>
                       <td className="px-4 py-3 tls-type-small">
                         <div>{pushStateLabel(token.last_ticket_status)}</div>
-                        {token.last_ticket_error ? <div className="text-[#FF6B61]" title={token.last_ticket_error}>{pushErrorLabel(token.last_ticket_error)}</div> : null}
+                        {token.last_ticket_error ? <div className="text-warn" title={token.last_ticket_error}>{pushErrorLabel(token.last_ticket_error)}</div> : null}
                       </td>
                       <td className="px-4 py-3 tls-type-small">
                         <div>{pushStateLabel(token.last_receipt_status)}</div>
-                        {token.last_receipt_error ? <div className="text-[#FF6B61]" title={token.last_receipt_error}>{pushErrorLabel(token.last_receipt_error)}</div> : null}
+                        {token.last_receipt_error ? <div className="text-warn" title={token.last_receipt_error}>{pushErrorLabel(token.last_receipt_error)}</div> : null}
                       </td>
                       <td className="px-4 py-3 text-white/50 tls-type-small">{formatTime(token.last_sent_at)}</td>
                     </tr>
@@ -376,7 +376,7 @@ export default function AdminMobilePushPage() {
                     onClick={removeOld}
                     disabled={busy}
                     data-testid="push-old-devices-remove"
-                    className="inline-flex items-center gap-2 border border-white/10 px-3 py-2 rounded-sm tls-type-label text-white/60 hover:border-[#FF6B61]/50 hover:text-[#FF6B61] disabled:opacity-50"
+                    className="inline-flex items-center gap-2 border border-white/10 px-3 py-2 rounded-sm tls-type-label text-white/60 hover:border-live/50 hover:text-live disabled:opacity-50"
                   >
                     <Trash2 className="w-4 h-4" /> Alte Geräte entfernen
                   </button>

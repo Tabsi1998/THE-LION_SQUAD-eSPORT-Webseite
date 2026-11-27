@@ -67,7 +67,7 @@ function RowTools({ index, count, onMove, onRemove, label }) {
     <span className="inline-flex gap-1 shrink-0">
       <button type="button" onClick={() => onMove(index, -1)} disabled={index === 0} aria-label={`${label} nach oben`} className="p-1 border border-white/10 rounded-sm disabled:opacity-30"><ArrowUp className="w-3 h-3" /></button>
       <button type="button" onClick={() => onMove(index, 1)} disabled={index === count - 1} aria-label={`${label} nach unten`} className="p-1 border border-white/10 rounded-sm disabled:opacity-30"><ArrowDown className="w-3 h-3" /></button>
-      <button type="button" onClick={() => onRemove(index)} aria-label={`${label} entfernen`} className="p-1 border border-live/30 text-[#FF6B6B] rounded-sm"><Trash2 className="w-3 h-3" /></button>
+      <button type="button" onClick={() => onRemove(index)} aria-label={`${label} entfernen`} className="p-1 border border-live/30 text-live rounded-sm"><Trash2 className="w-3 h-3" /></button>
     </span>
   );
 }

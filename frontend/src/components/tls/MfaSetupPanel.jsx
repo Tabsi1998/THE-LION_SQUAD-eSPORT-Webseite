@@ -86,7 +86,7 @@ export function MfaSetupPanel({ onChanged, highlight = false }) {
         </p>
       </div>
       {loadFailed ? (
-        <p className="tls-type-small text-[#FF8A80]" role="alert" data-testid="profile-mfa-load-failed">
+        <p className="tls-type-small text-warn" role="alert" data-testid="profile-mfa-load-failed">
           Der Stand der Zwei-Faktor-Anmeldung lässt sich gerade nicht laden.{" "}
           <button type="button" onClick={load} className="font-bold text-[#29B6E8] hover:underline" data-testid="profile-mfa-retry">Nochmal versuchen</button>
         </p>

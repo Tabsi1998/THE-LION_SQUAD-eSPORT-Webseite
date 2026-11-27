@@ -99,7 +99,7 @@ export default function AdminUsersPage() {
         )}
       </div>
       <input placeholder="Name, Benutzername, E-Mail oder Mitgliedsnummer suchen …" value={q} onChange={(e) => setQ(e.target.value)} data-testid="users-search" className="w-full max-w-md bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-sm mb-4" />
-      {listLimitHint(list.length) && <p className="mb-4 border border-[#FF9500]/40 bg-[#FF9500]/5 rounded-sm p-3 tls-type-small text-white/80" data-testid="users-limit-hint">{listLimitHint(list.length)}</p>}
+      {listLimitHint(list.length) && <p className="mb-4 border border-warn/40 bg-warn/5 rounded-sm p-3 tls-type-small text-white/80" data-testid="users-limit-hint">{listLimitHint(list.length)}</p>}
 
       <details className="mb-5 border border-white/10 bg-[#121212] rounded-sm group" data-testid="roles-info">
         <summary className="cursor-pointer list-none px-4 py-3 flex items-center justify-between gap-3">
@@ -164,7 +164,7 @@ export default function AdminUsersPage() {
                   </div>
                 </td>
                 <td className="px-4 py-3 tls-type-small">
-                  {statusText(u) ? <span className={u.is_banned ? "text-[#FF6B6B] font-bold" : "text-quiet"}>{statusText(u)}</span> : <span className="text-white/35">–</span>}
+                  {statusText(u) ? <span className={u.is_banned ? "text-warn font-bold" : "text-quiet"}>{statusText(u)}</span> : <span className="text-white/35">–</span>}
                 </td>
                 <td className="px-4 py-3 text-right">
                   <button type="button" onClick={() => setEditingId(u.id)} data-testid={`user-edit-${u.username}`} className="inline-flex items-center gap-1.5 px-3 py-1.5 border border-white/15 text-white/80 hover:border-[#29B6E8]/50 hover:text-white rounded-sm tls-type-label">
@@ -382,7 +382,7 @@ function UserSheet({ target, me, isSuperAdmin, canClub, onClose, onChanged }) {
                 </div>
                 {target.id !== me?.id && target.role !== "superadmin" && (
                   <div className="border border-live/30 rounded-sm p-3 space-y-2" data-testid="user-sheet-delete-box">
-                    <div className="tls-type-small font-bold text-[#FF6B6B]">Konto löschen</div>
+                    <div className="tls-type-small font-bold text-live">Konto löschen</div>
                     <p className="tls-type-small text-white/55">Anmeldung und persönliche Daten werden entfernt; Ergebnisse bleiben ohne Namen erhalten. Zum Bestätigen den Namen eintippen: <strong className="text-white">{name}</strong></p>
                     <input value={deleteName} onChange={(event) => setDeleteName(event.target.value)} aria-label="Namen zum Löschen eintippen" data-testid="user-sheet-delete-name" className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-sm" />
                     <button type="button" disabled={deleteName.trim() !== name} onClick={removeAccount} data-testid="user-sheet-delete" className="tls-btn tls-btn--danger px-4 py-2 rounded-sm tls-type-label disabled:opacity-40">Endgültig löschen</button>
@@ -422,7 +422,7 @@ function RightsHistorySection({ target }) {
         Rechte-Verlauf <ChevronDown className={`w-3.5 h-3.5 transition ${open ? "rotate-180" : ""}`} />
       </button>
       {open && state.status === "loading" && <p className="mt-2 tls-type-small text-white/45">Lade Verlauf …</p>}
-      {open && state.status === "error" && <p className="mt-2 tls-type-small text-[#FF6B6B]" data-testid="user-sheet-history-error">Der Verlauf lässt sich gerade nicht laden.</p>}
+      {open && state.status === "error" && <p className="mt-2 tls-type-small text-warn" data-testid="user-sheet-history-error">Der Verlauf lässt sich gerade nicht laden.</p>}
       {open && state.status === "ready" && (
         state.items.length ? (
           <ul className="mt-3 space-y-2" data-testid="user-sheet-history-list">

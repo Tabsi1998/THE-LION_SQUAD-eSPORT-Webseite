@@ -22,7 +22,7 @@
 .tls-skip-link:focus,
 .tls-skip-link:focus-visible {
   transform: translateY(0);
-  outline: 3px solid rgba(255, 215, 0, 0.9);
+  outline: 3px solid rgb(var(--tls-brand-rgb) / 0.9);
   outline-offset: 3px;
 }
 

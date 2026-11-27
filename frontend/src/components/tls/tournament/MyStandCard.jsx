@@ -45,7 +45,7 @@ export function MyStandCard({ tournament: t, registration: myReg, team = null, i
         <div className="tls-type-label">Dein Stand</div>
         <StatusBadge status={myReg.status} size="lg" />
       </div>
-      {step >= 0 ? <StepBar steps={steps} current={step} className="tls-steps--gold mt-3" testId="tournament-my-steps" /> : null}
+      {step >= 0 ? <StepBar steps={steps} current={step} className="mt-3" testId="tournament-my-steps" /> : null}
       {/* Abgelehnt (#2113, L-C3): sagen, was das heißt und was jetzt geht - der Grund steht in der Nachricht. */}
       {myReg.status === "rejected" ? (
         <div className="mt-3 rounded-sm border border-warn/35 bg-warn/5 p-3 tls-type-small" data-testid="tournament-rejected-note">

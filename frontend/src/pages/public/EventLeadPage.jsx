@@ -236,9 +236,9 @@ export default function EventLeadPage() {
           <div>
             {/* Niemand rückt von selbst nach (#2127, EV6): die Leitung sieht den freien Platz und entscheidet. */}
             {freeHint ? (
-              <div className="mb-3 flex flex-wrap items-center justify-between gap-3 rounded-sm border border-honor/35 bg-honor/5 px-4 py-3" role="status" data-testid="event-lead-free-hint">
+              <div className="mb-3 flex flex-wrap items-center justify-between gap-3 rounded-sm border border-ok/35 bg-ok/5 px-4 py-3" role="status" data-testid="event-lead-free-hint">
                 <div className="min-w-0">
-                  <div className="tls-type-small font-bold text-honor">{freeHint.text}</div>
+                  <div className="tls-type-small font-bold text-ok">{freeHint.text}</div>
                   <div className="tls-type-small text-white/60 [overflow-wrap:anywhere]">{freeHint.next}</div>
                 </div>
                 {filter !== "waitlist" ? (
@@ -548,7 +548,7 @@ function WalkInDialog({ event, rows, onClose, onAdded }) {
           Name
           <input value={name} onChange={(e) => setName(e.target.value)} ref={nameRef} maxLength={80} autoComplete="off" className="mt-1 block w-full min-h-[48px] rounded-sm border border-white/10 bg-[#0A0A0A] px-3 text-base normal-case tracking-normal text-white" data-testid="event-lead-walkin-name" />
         </label>
-        {twin ? <p className="mt-2 tls-type-small text-honor" data-testid="event-lead-walkin-twin">„{twin.display_name}“ steht schon in der Liste ({STATUS_LABELS[twin.status] || twin.status}). Trotzdem eintragen, wenn es eine andere Person ist.</p> : null}
+        {twin ? <p className="mt-2 tls-type-small text-warn" data-testid="event-lead-walkin-twin">„{twin.display_name}“ steht schon in der Liste ({STATUS_LABELS[twin.status] || twin.status}). Trotzdem eintragen, wenn es eine andere Person ist.</p> : null}
         {maxCompanions ? (
           <label className="mt-4 block tls-type-label text-white/50">
             Begleitpersonen

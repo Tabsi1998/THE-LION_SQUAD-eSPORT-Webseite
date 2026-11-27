@@ -34,7 +34,7 @@ export function ResendSection({ email, setEmail, testEmail, setTestEmail, saving
           <div className="tls-type-label text-white/60 mb-1.5">API Key {email.resend_api_key_masked && <span className="text-white/40 normal-case">(aktuell: {email.resend_api_key_masked})</span>}</div>
           <input type="password" placeholder="re_..." value={email.resend_api_key} onChange={(e) => setEmail({ ...email, resend_api_key: e.target.value })} data-testid="email-api-key" className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-sm font-mono" />
           <p className="tls-type-small text-quiet mt-1">Leer lassen um den bestehenden Key beizubehalten.</p>
-          {email.resend_api_key_masked && <button type="button" onClick={() => clearEmailSecret().catch((e) => toast.error(formatApiError(e.response?.data?.detail)))} className="mt-2 tls-type-label text-[#FF6B6B]">Gespeicherten Key entfernen</button>}
+          {email.resend_api_key_masked && <button type="button" onClick={() => clearEmailSecret().catch((e) => toast.error(formatApiError(e.response?.data?.detail)))} className="mt-2 tls-type-label text-live">Gespeicherten Key entfernen</button>}
         </div>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <div>

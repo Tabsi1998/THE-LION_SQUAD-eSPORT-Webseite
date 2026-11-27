@@ -159,7 +159,7 @@ export function SponsoringOfferPanel() {
           {data.pdf_key ? (
             <div className="mt-1 flex items-center gap-3 tls-type-small" data-testid="sponsoring-pdf">
               <span className="text-white/75">{data.pdf_name}</span>
-              <button type="button" onClick={removePdf} disabled={busy} className="text-[#FF6B6B] hover:underline">Entfernen</button>
+              <button type="button" onClick={removePdf} disabled={busy} className="text-live hover:underline">Entfernen</button>
             </div>
           ) : null}
           <label className="mt-2 inline-flex items-center gap-2 tls-type-label text-[#29B6E8] cursor-pointer">

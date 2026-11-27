@@ -560,7 +560,7 @@ function DrawCard({ card, offset = 0, highlighted, busy, onDraw }) {
   }, []);
   const names = card.pot || [];
   return (
-    <div id={`fall-${card.id}`} tabIndex={-1} className={`outline-none rounded-sm border bg-surface-1 p-3 ${highlighted ? "border-honor/70 ring-2 ring-honor/40" : "border-brand/45"}`} data-testid={`lead-draw-${card.group}`}>
+    <div id={`fall-${card.id}`} tabIndex={-1} className={`outline-none rounded-sm border bg-surface-1 p-3 ${highlighted ? "border-brand/70 ring-2 ring-brand/40" : "border-brand/45"}`} data-testid={`lead-draw-${card.group}`}>
       <div className="flex items-center gap-3">
         <div className="flex h-12 w-14 shrink-0 items-center justify-center rounded-sm border border-brand/40 text-brand" aria-hidden="true">
           <Shuffle className="h-5 w-5" />
@@ -607,7 +607,7 @@ function movedText(done, where) {
 function AttentionRow({ item, highlighted, busy, canEnter, conflict = false, moving, stations, onEnter, onMove, onMoveTo, onNoShow }) {
   const bad = item.kind === "station_broken";
   return (
-    <div id={`fall-${item.id}`} tabIndex={-1} className={`outline-none rounded-sm border bg-[#121212] p-3 ${highlighted ? "border-warn/70 ring-2 ring-warn/40" : bad ? "border-warn/45" : "border-warn/45"}`} data-testid={`lead-case-${item.id}`}>
+    <div id={`fall-${item.id}`} tabIndex={-1} className={`outline-none rounded-sm border bg-[#121212] p-3 ${highlighted ? "border-brand/70 ring-2 ring-brand/40" : bad ? "border-warn/45" : "border-white/15"}`} data-testid={`lead-case-${item.id}`}>
       <div className="flex items-center gap-3">
         <div className={`flex h-12 w-14 shrink-0 items-center justify-center rounded-sm border text-center tls-type-label leading-tight ${bad ? "border-warn/50 text-warn" : "border-[#29B6E8]/40 text-[#29B6E8]"}`}>
           {item.station_text ? item.station_text.split(" · ")[0] : "ohne Station"}
@@ -615,7 +615,7 @@ function AttentionRow({ item, highlighted, busy, canEnter, conflict = false, mov
         <div className="min-w-0 flex-1">
           <div className="tls-type-small font-bold text-white">{item.title}</div>
           <div className="tls-type-small text-white/55 truncate">{item.label} · {item.names}</div>
-          <div className={`tls-type-small ${bad ? "text-[#FF6B60]" : "text-warn"}`}>{item.detail}</div>
+          <div className={`tls-type-small ${bad ? "text-warn" : "text-quiet"}`}>{item.detail}</div>
         </div>
         {item.action === "move" ? (
           <button type="button" disabled={busy} onClick={onMove} className="tls-btn tls-btn--secondary shrink-0 min-h-[44px] px-3 py-2 rounded-sm tls-type-label" data-testid={`lead-case-move-${item.id}`}>Umlegen</button>

@@ -333,10 +333,10 @@ export default function AdminDolibarrPage() {
                     <div className="font-bold tls-wrap">{link.display_name || link.username}</div>
                     <div className="tls-type-small text-white/45">{link.member_ref ? `Mitglied Nr. ${link.member_ref}` : "ohne Mitglied"}</div>
                   </div>
-                  <span className={`tls-type-label ${link.status === "verified" ? "text-ok" : link.status === "conflict" ? "text-warn" : "text-warn"}`}>{LINK_STATUS_LABELS[link.status] || link.status}</span>
+                  <span className={`tls-type-label ${link.status === "verified" ? "text-ok" : link.status === "conflict" ? "text-warn" : "text-quiet"}`}>{LINK_STATUS_LABELS[link.status] || link.status}</span>
                   <div className="tls-type-small text-white/50 flex-1 min-w-0">{link.note || (link.verified_at ? `seit ${formatDate(link.verified_at)}` : "")}</div>
                   {link.status === "verified" && (
-                    <button type="button" onClick={() => removeLink(link)} className="tls-type-label text-[#FF6B6B] inline-flex items-center gap-1"><Unlink className="w-3 h-3" /> Lösen</button>
+                    <button type="button" onClick={() => removeLink(link)} className="tls-type-label text-live inline-flex items-center gap-1"><Unlink className="w-3 h-3" /> Lösen</button>
                   )}
                 </div>
               ))}
@@ -527,7 +527,7 @@ export default function AdminDolibarrPage() {
                 )}
               </div>
               {testResult && (
-                <div className={`tls-type-small ${testResult.ok ? "text-ok" : "text-[#FF6B6B]"}`} data-testid="dolibarr-test-result">
+                <div className={`tls-type-small ${testResult.ok ? "text-ok" : "text-warn"}`} data-testid="dolibarr-test-result">
                   {testResult.ok ? `Verbunden: Modul ${testResult.module_version}, API-Version ${testResult.api_version}.` : `Keine Verbindung: ${testResult.text}`}
                 </div>
               )}

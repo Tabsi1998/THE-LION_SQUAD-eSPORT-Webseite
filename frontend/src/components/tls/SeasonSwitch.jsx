@@ -82,7 +82,7 @@ export function SeasonSwitch({ seasonKey, label, className = "mb-6" }) {
           </label>
         ))}
       </div>
-      {!state.seasons_enabled && <p className="mt-3 tls-type-small text-[#FF9500]" data-testid="season-switch-global-off">Die Jahreszeiten sind gerade insgesamt aus – einschalten kann das System unter Auftritt → Jahreszeiten.</p>}
+      {!state.seasons_enabled && <p className="mt-3 tls-type-small text-warn" data-testid="season-switch-global-off">Die Jahreszeiten sind gerade insgesamt aus – einschalten kann das System unter Auftritt → Jahreszeiten.</p>}
       {state.mode && state.mode !== "auto" && (
         <p className="mt-2 tls-type-small text-white/50" data-testid="season-switch-forced">System hat das gerade {state.mode === "force_on" ? "fest eingeschaltet" : "fest ausgeschaltet"}{state.until ? ` bis ${when(state.until)}` : ""}.</p>
       )}

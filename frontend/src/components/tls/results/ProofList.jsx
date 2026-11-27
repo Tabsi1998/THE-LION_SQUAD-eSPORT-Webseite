@@ -74,7 +74,7 @@ function ProofItem({ item, sideLabels, testId, confirming, busy, onRemove }) {
       </div>
       {item.can_remove ? (
         <button type="button" disabled={busy} onClick={() => onRemove(item)} aria-label={confirming ? "Wirklich entfernen" : "Nachweis entfernen"}
-          className={`shrink-0 min-h-[44px] px-2 tls-type-label disabled:opacity-50 ${confirming ? "text-[#FF6B60]" : "text-white/50 hover:text-white"}`}
+          className={`shrink-0 min-h-[44px] px-2 tls-type-label disabled:opacity-50 ${confirming ? "text-live" : "text-white/50 hover:text-white"}`}
           data-testid={`${testId}-remove-${item.id}`}>
           {confirming ? (item.kind === "moss" ? "Wirklich entfernen? Die Leitung sieht ihn weiter." : "Wirklich entfernen?") : <Trash2 className="w-4 h-4" />}
         </button>
@@ -233,7 +233,7 @@ export function ProofList({ matchId, kind, refId = "", title = "Nachweise", side
           {hint ? <p className="tls-type-small text-white/50" data-testid={`${testId}-audience`}>{proofAudienceText(kind)}</p> : null}
         </>
       ) : null}
-      {error ? <p className="tls-type-small text-[#FF6B60]" role="alert" data-testid={`${testId}-error`}>{error}</p> : null}
+      {error ? <p className="tls-type-small text-warn" role="alert" data-testid={`${testId}-error`}>{error}</p> : null}
     </section>
   );
 }

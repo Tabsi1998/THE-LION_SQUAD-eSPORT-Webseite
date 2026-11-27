@@ -12,10 +12,10 @@ import { markWithLogo, seriesLogo } from "@/lib/seriesLogo";
 // Lauf-Chips lädt die Startseite nur an Tagen, an denen wirklich etwas ansteht (HomeTodayStrip.jsx holt die Daten).
 export default function HomeTodayCards({ items }) {
   return (
-    <section aria-labelledby="home-today-title" className="border-b border-white/10 bg-honor/[0.04]" data-testid="home-today">
+    <section aria-labelledby="home-today-title" className="border-b border-white/10 bg-brand/[0.04]" data-testid="home-today">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 md:py-5 flex flex-col gap-3 md:flex-row md:items-center md:gap-6">
         <h2 id="home-today-title" className="shrink-0 flex items-center gap-2.5 tls-type-label text-quiet">
-          <span className="inline-flex items-center gap-[7px] px-2.5 py-1 rounded-full bg-honor/[0.12] border border-honor/45 text-honor tracking-[0.12em]">
+          <span className="inline-flex items-center gap-[7px] px-2.5 py-1 rounded-full bg-brand/[0.12] border border-brand/45 text-brand tracking-[0.12em]">
             <span className="tls-run-pulse" aria-hidden="true" />
             Heute
           </span>
@@ -42,7 +42,7 @@ function TodayCard({ item, index }) {
       <Link
         to={seriesAddress(lineage, series)}
         style={{ "--tls-run-i": Math.min(index, 8) }}
-        className="tls-run-card flex min-h-11 items-center gap-3 p-3 md:p-3.5 bg-surface-1 border border-honor/40 rounded-[10px] text-white no-underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#29B6E8]"
+        className="tls-run-card flex min-h-11 items-center gap-3 p-3 md:p-3.5 bg-surface-1 border border-brand/40 rounded-[10px] text-white no-underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#29B6E8]"
         data-testid={`home-today-item-${lineage.slug}-${series.season_slug}`}
       >
         {/* #2014: das Logo der Saison bzw. Spur steht vor dem Spiel-Logo - wie bei „Läuft gerade“. */}

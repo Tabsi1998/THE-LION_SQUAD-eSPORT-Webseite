@@ -21,7 +21,7 @@ const SELECT = "mt-1 w-full min-h-10 bg-black/40 border border-white/15 rounded-
 const SMALL_SELECT = "mt-0.5 block min-h-9 bg-black/40 border border-white/15 rounded-sm px-2 tls-type-small focus:border-brand outline-none disabled:opacity-50";
 const SMALL_BTN = "tls-btn tls-btn--secondary min-h-9 px-3 tls-type-label rounded-sm inline-flex items-center gap-1.5 disabled:opacity-40";
 const QUIET_BTN = "tls-btn tls-btn--quiet min-h-9 px-2 tls-type-small rounded-sm inline-flex items-center gap-1.5 disabled:opacity-40";
-const STATE_TONES = { ok: "text-ok", not_needed: "text-white/55", missing: "text-warn", outdated: "text-honor", invalid: "text-warn", no_area: "text-warn" };
+const STATE_TONES = { ok: "text-ok", not_needed: "text-white/55", missing: "text-warn", outdated: "text-warn", invalid: "text-warn", no_area: "text-warn" };
 const STATE_TEXT = { ok: "aktuell", not_needed: "Platzhalter", missing: "fehlt", outdated: "veraltet", invalid: "passt nicht", no_area: "Fläche fehlt" };
 const DRAFT_PREVIEW_DELAY_MS = 350;
 const SAMPLE_DELAY_MS = 300;
@@ -317,7 +317,7 @@ function AreaCanvas({ area, layers, resolved, motifFor, sampleFor, onSampleProbl
       {/* Die fertige Datei dieser Farbe als Hintergrund (#2141) - genau die Druckfläche, unter den Ebenen. */}
       {backdrop && <img src={backdrop} alt="" aria-hidden="true" className="absolute inset-0 w-full h-full pointer-events-none" draggable={false} data-testid={`${testId}-backdrop`} />}
       {marginCm > 0 && (
-        <div className="absolute border border-dashed border-honor/60 pointer-events-none" aria-hidden="true"
+        <div className="absolute border border-dashed border-white/60 pointer-events-none" aria-hidden="true"
           style={{ inset: `${(marginCm / size.height) * 100}% ${(marginCm / size.width) * 100}%` }} />
       )}
       {resolved.map((item) => {
@@ -345,7 +345,7 @@ function AreaCanvas({ area, layers, resolved, motifFor, sampleFor, onSampleProbl
       {/* Hilfslinien beim Ziehen: über die ganze Fläche, eingerastet an Mitte bzw. Rand durchgezogen, an Ebenen gestrichelt. */}
       {(live?.guides || []).map((guide) => (
         <span key={`${guide.axis}-${guide.at}`} aria-hidden="true" data-testid={`${testId}-guide-${guide.axis}`} data-kind={guide.kind}
-          className={`absolute pointer-events-none z-20 motion-safe:animate-in motion-safe:fade-in-0 motion-safe:duration-100 ${guide.axis === "x" ? "top-0 bottom-0 w-0 border-l" : "left-0 right-0 h-0 border-t"} ${guide.kind === "layer" ? "border-dashed border-honor" : "border-brand"}`}
+          className={`absolute pointer-events-none z-20 motion-safe:animate-in motion-safe:fade-in-0 motion-safe:duration-100 ${guide.axis === "x" ? "top-0 bottom-0 w-0 border-l" : "left-0 right-0 h-0 border-t"} ${guide.kind === "layer" ? "border-dashed border-white/70" : "border-brand"}`}
           style={guide.axis === "x" ? { left: pct(guide.at, size.width) } : { top: pct(guide.at, size.height) }} />
       ))}
     </div>
@@ -769,7 +769,7 @@ function TextLayer({ layer, area, rules, canvas, presets, kindLabel, editable, o
       </div>
       {badOutline && <p className="tls-type-small text-warn" data-testid={`${testId}-outline-hint`}>Kontur {cmText(limits.min_outline_cm ?? 0.05)} bis {cmText(limits.max_outline_cm ?? 2)}.</p>}
       {problem && <p className="tls-type-small text-warn" role="alert">{problem}</p>}
-      {hint && <p className="tls-type-small text-honor" role="status" data-testid={`${testId}-hint`}>{hint}</p>}
+      {hint && <p className="tls-type-small text-warn" role="status" data-testid={`${testId}-hint`}>{hint}</p>}
       <div className="flex flex-wrap gap-2">
         <button type="button" disabled={!editable} onClick={onRemove} className={`${QUIET_BTN} ml-auto`} data-testid={`${testId}-remove`}><Trash2 className="w-3.5 h-3.5" aria-hidden="true" /> {fixed ? "Ebene entfernen" : "Platzhalter entfernen"}</button>
       </div>
@@ -910,7 +910,7 @@ function FileStates({ productId, row, mode, editable, busy, onUpload }) {
               {state.state === "ok" ? <CheckCircle2 className="w-3.5 h-3.5" aria-hidden="true" /> : <AlertTriangle className="w-3.5 h-3.5" aria-hidden="true" />}
               {STATE_TEXT[state.state] || state.state}{state.file?.version ? ` · v${state.file.version}` : ""}
             </span>
-            {state.file?.warnings?.length > 0 && <span className="text-honor" title={state.file.warnings.join(" ")}>Hinweis</span>}
+            {state.file?.warnings?.length > 0 && <span className="text-warn" title={state.file.warnings.join(" ")}>Hinweis</span>}
             {state.state !== "ok" && state.state !== "not_needed" && state.detail && <span className="text-white/55 basis-full">{state.detail}</span>}
             <a href={resolveMediaUrl(`/api${BASE}/${productId}/preview?placement=${encodeURIComponent(row.key)}&color=${encodeURIComponent(state.color)}`)} target="_blank" rel="noreferrer noopener"
               className="inline-flex items-center gap-1 text-brand hover:underline" data-testid={`shop-file-${row.key}-${state.color}-preview`}>
@@ -1057,9 +1057,9 @@ function PlacementCard({ view, available, state, savedRow, used, onToggle, onCha
           <input type="checkbox" checked={used} disabled={!editable} onChange={(event) => onToggle(event.target.checked)} className="w-4 h-4 accent-brand" data-testid={`shop-area-use-${available.key}`} />
           {available.label}
         </label>
-        {available.label_translated === false && <span className="tls-type-small text-honor" data-testid={`shop-area-label-english-${available.key}`}>Bezeichnung von Printful (englisch) - keine Übersetzung bekannt</span>}
+        {available.label_translated === false && <span className="tls-type-small text-quiet" data-testid={`shop-area-label-english-${available.key}`}>Bezeichnung von Printful (englisch) - keine Übersetzung bekannt</span>}
         <span className="tls-type-small text-white/50 tabular-nums" data-testid={`shop-area-size-${available.key}`}>Druckdatei {sizeText(available.file)}{surcharge}</span>
-        {available.groups.length > 1 && <span className="tls-type-small text-honor">Je Größe eine eigene Fläche ({available.groups.length})</span>}
+        {available.groups.length > 1 && <span className="tls-type-small text-quiet">Je Größe eine eigene Fläche ({available.groups.length})</span>}
       </div>
       {problem && <p className="tls-type-small text-warn inline-flex items-center gap-1" role="alert" data-testid={`shop-area-problem-${available.key}`}><AlertTriangle className="w-3.5 h-3.5 shrink-0" aria-hidden="true" /> {problem}</p>}
       {used && (
@@ -1074,12 +1074,12 @@ function PlacementCard({ view, available, state, savedRow, used, onToggle, onCha
             </div>
             {view.labels.mode_hints?.[mode] && <p className="tls-type-small text-white/55 max-w-2xl" data-testid={`shop-area-mode-hint-${available.key}`}>{view.labels.mode_hints[mode]}</p>}
             {saveFirst && (
-              <p className="tls-type-small text-honor inline-flex items-center gap-1" role="status" data-testid={`shop-area-save-first-${available.key}`}>
+              <p className="tls-type-small text-warn inline-flex items-center gap-1" role="status" data-testid={`shop-area-save-first-${available.key}`}>
                 <Upload className="w-3.5 h-3.5 shrink-0" aria-hidden="true" /> Erst speichern, dann je Farbe hochladen.
               </p>
             )}
             {hiddenBefore && (
-              <p className="tls-type-small text-honor" role="status" data-testid={`shop-area-motifs-hidden-${available.key}`}>
+              <p className="tls-type-small text-quiet" role="status" data-testid={`shop-area-motifs-hidden-${available.key}`}>
                 Diese Motive wurden bisher nicht gedruckt (gespeichert vor dem Hintergrund-Modus). Nach dem Speichern liegen sie auf dem Hintergrund.
               </p>
             )}
@@ -1088,9 +1088,9 @@ function PlacementCard({ view, available, state, savedRow, used, onToggle, onCha
             <div className="space-y-1.5 min-w-0">
               <LayoutPreview stale={stale} area={placeArea} preview={preview} colorCode={codes[previewColor]} live={live} canvas={canvas}
                 testId={`shop-preview-${available.key}`} />
-              {!preview?.image_path && <p className="tls-type-small text-honor" data-testid={`shop-preview-${available.key}-no-image`}>Kein Vorlagenbild von Printful - die Vorschau zeigt nur die Druckfläche, Maße und Druckdatei stimmen trotzdem.</p>}
+              {!preview?.image_path && <p className="tls-type-small text-warn" data-testid={`shop-preview-${available.key}-no-image`}>Kein Vorlagenbild von Printful - die Vorschau zeigt nur die Druckfläche, Maße und Druckdatei stimmen trotzdem.</p>}
               {mode === "upload" && !background && <p className="tls-type-small text-white/50" data-testid={`shop-preview-${available.key}-no-backdrop`}>Für {colorName(previewColor)} ist noch kein Hintergrund hochgeladen.</p>}
-              {mode === "upload" && background && background.ok === false && <p className="tls-type-small text-honor" role="status" data-testid={`shop-preview-${available.key}-backdrop-outdated`}>Dieser Hintergrund passt nicht mehr zur Vorlage von Printful - bis er neu hochgeladen ist, richten sich Fassung und Farbe nach der Shirtfarbe.</p>}
+              {mode === "upload" && background && background.ok === false && <p className="tls-type-small text-warn" role="status" data-testid={`shop-preview-${available.key}-backdrop-outdated`}>Dieser Hintergrund passt nicht mehr zur Vorlage von Printful - bis er neu hochgeladen ist, richten sich Fassung und Farbe nach der Shirtfarbe.</p>}
               {/* Die Bedienung sichtbar (#2117) - nicht nur im aria-label. */}
               <p className="tls-type-small text-white/50 flex items-start gap-1" data-testid={`shop-preview-${available.key}-help`}>
                 <Move className="w-3 h-3 mt-0.5 shrink-0" aria-hidden="true" />
@@ -1158,7 +1158,7 @@ function PlacementCard({ view, available, state, savedRow, used, onToggle, onCha
                       </button>
                     ))}
                   </div>
-                  {setNotice && <p className="tls-type-small text-honor" role="status" data-testid={`shop-area-set-notice-${available.key}`}>{setNotice}</p>}
+                  {setNotice && <p className="tls-type-small text-brand" role="status" data-testid={`shop-area-set-notice-${available.key}`}>{setNotice}</p>}
                 </div>
               )}
               <div className="border-t border-white/10 pt-2">
@@ -1189,12 +1189,12 @@ export function TemplateStatus({ view, busy, run }) {
         className={SMALL_BTN} data-testid="shop-template-refresh">
         <RefreshCw className={`w-3.5 h-3.5 ${busy === "templates" ? "motion-safe:animate-spin" : ""}`} aria-hidden="true" /> Vorlagen neu laden
       </button>
-      {template?.warning && <p className="basis-full text-honor inline-flex items-center gap-1" role="status" data-testid="shop-template-carried"><AlertTriangle className="w-3.5 h-3.5 shrink-0" aria-hidden="true" /> {template.warning}</p>}
+      {template?.warning && <p className="basis-full text-warn inline-flex items-center gap-1" role="status" data-testid="shop-template-carried"><AlertTriangle className="w-3.5 h-3.5 shrink-0" aria-hidden="true" /> {template.warning}</p>}
       {template?.skipped?.length > 0 && (
         <ul className="basis-full text-warn space-y-0.5" data-testid="shop-template-skipped">{template.skipped.map((line) => <li key={line}>{line}</li>)}</ul>
       )}
       {template?.changes?.length > 0 && template?.changed_at && (
-        <div className="basis-full border border-honor/40 bg-honor/10 rounded-sm p-2" role="status" data-testid="shop-template-changes">
+        <div className="basis-full border border-warn/40 bg-warn/10 rounded-sm p-2" role="status" data-testid="shop-template-changes">
           <div className="font-bold">Printful hat die Vorlage geändert ({viennaDateTime(template.changed_at)})</div>
           <ul className="mt-1 space-y-0.5">{template.changes.map((change) => <li key={change}>{change}</li>)}</ul>
           <p className="mt-1 text-white/60">Betroffene Druckdateien sind „veraltet“ - bitte neu erzeugen.</p>
@@ -1307,7 +1307,7 @@ export default function LayoutStep({ view, busy, run, ReasonedButton, ChoiceGrou
   return (
     <div className="space-y-4" data-testid="shop-layout">
       <TemplateStatus view={view} busy={busy} run={run} />
-      {view.layout_converted && <p className="tls-type-small text-honor" data-testid="shop-layout-converted">Aus den alten Zoll-Positionen umgerechnet - bitte prüfen und speichern.</p>}
+      {view.layout_converted && <p className="tls-type-small text-warn" data-testid="shop-layout-converted">Aus den alten Zoll-Positionen umgerechnet - bitte prüfen und speichern.</p>}
       {view.layout_blocked?.length > 0 && (
         <div className="border border-live/50 bg-live/10 text-live rounded-sm p-2 tls-type-small" role="alert" data-testid="shop-layout-blocked">
           <div className="font-bold">Nicht bestellbar: diese alten Platzierungen lassen sich nicht abbilden. Bitte die Flächen hier neu setzen und speichern.</div>
@@ -1315,7 +1315,7 @@ export default function LayoutStep({ view, busy, run, ReasonedButton, ChoiceGrou
         </div>
       )}
       {pending && (
-        <p className="tls-type-small text-honor" role="status" data-testid="shop-layout-draft-preview">
+        <p className="tls-type-small text-warn" role="status" data-testid="shop-layout-draft-preview">
           {draftPreview.error && draftPreview.json === payloadJson ? `Vorschau: ${draftPreview.error}` : blocked ? "Vorschau nach dem Speichern." : "Vorschau wird berechnet …"}
         </p>
       )}

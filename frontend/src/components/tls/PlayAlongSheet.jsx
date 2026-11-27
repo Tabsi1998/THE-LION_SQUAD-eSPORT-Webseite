@@ -8,7 +8,8 @@ import { useModalBehavior } from "@/hooks/useModalBehavior";
 import { useSubmissionGuard } from "@/hooks/useSubmissionGuard";
 import { offerFriendsHint } from "@/lib/friendsHint";
 import { offerCalendarHint } from "@/lib/calendarHint";
-import { registrationKey, rememberWebPushRegistration } from "@/lib/webPush";
+import { registrationKey, rememberWebPushRegistration } from "@/lib/webPush";
+import { KIND_COLORS } from "@/lib/categoryColors";
 
 // „Spielst du auch mit?“ (#1184): nach der Event-Anmeldung die Turniere des Events in einem Schritt. Am Handy ein Blatt
 // von unten, ab 640 px mittig. Haken nur bei Einzel-Turnieren; Team-Turniere sagen, dass die Teamleitung anmeldet (Teamleitungen
@@ -20,11 +21,11 @@ const RESULT_TONE = {
   pending: "text-[#29B6E8]",
   already: "text-[#29B6E8]",
   waitlist: "text-quiet",
-  error: "text-[#FF6B6B]",
+  error: "text-warn",
 };
 
 function ResultIcon({ state }) {
-  if (state === "error") return <AlertTriangle className="w-4 h-4 shrink-0 text-[#FF6B6B]" aria-hidden="true" />;
+  if (state === "error") return <AlertTriangle className="w-4 h-4 shrink-0 text-warn" aria-hidden="true" />;
   if (state === "waitlist") return <Clock className="w-4 h-4 shrink-0 text-quiet" aria-hidden="true" />;
   return <CheckCircle className="w-4 h-4 shrink-0 text-[#29B6E8]" aria-hidden="true" />;
 }
@@ -57,7 +58,7 @@ function EntryRow({ row, checked, onToggle }) {
   }
   return (
     <li className="flex items-center gap-3 rounded-sm border border-white/10 bg-[#0F0F10] px-3 py-2.5" data-testid={`play-along-row-${row.id}`}>
-      <Icon className={`w-5 h-5 shrink-0 ${row.kind === "fastlap" ? "text-[#2DD4BF]" : "text-brand"}`} aria-hidden="true" />
+      <Icon className={`w-5 h-5 shrink-0 ${row.kind === "fastlap" ? "" : "text-brand"}`} style={row.kind === "fastlap" ? { color: KIND_COLORS.fastlap } : undefined} aria-hidden="true" />
       <When row={row} />
       <span className="min-w-0 flex-1">
         <span className="block font-bold leading-tight break-words">{row.title}</span>
@@ -220,7 +221,7 @@ export function PlayAlongSheet({ event, from = "", userId = null, onClose }) {
                   ) : null}
                 </div>
               ) : null}
-              {error ? <div className="mt-3 tls-type-small font-bold text-[#FF6B6B]" role="alert" data-testid="play-along-error">{error}</div> : null}
+              {error ? <div className="mt-3 tls-type-small font-bold text-warn" role="alert" data-testid="play-along-error">{error}</div> : null}
             </div>
             <div className="flex flex-col-reverse gap-2 border-t border-white/10 px-5 py-4 sm:flex-row sm:justify-end">
               <button type="button" onClick={() => onClose?.()} className="tls-btn tls-btn--quiet min-h-11 px-4 tls-type-label rounded-sm" data-testid="play-along-skip">

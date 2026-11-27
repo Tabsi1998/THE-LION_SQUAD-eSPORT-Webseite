@@ -506,7 +506,7 @@ export default function AdminGameServersPage() {
                 <div key={index} className="border border-white/15 rounded-sm p-3 space-y-3" data-testid="mod-resource-row">
                   <div className="flex items-center justify-between gap-3">
                     <label className="flex items-center gap-2 tls-type-small font-bold"><input type="checkbox" checked={!!item.enabled} onChange={(event) => setResource(index, "enabled", event.target.checked)} className="accent-[#29B6E8]" />Link {index + 1} anzeigen</label>
-                    <button type="button" onClick={() => set("mod_resources", form.mod_resources.filter((_item, position) => index !== position))} className="min-h-11 px-3 tls-type-small text-[#FF6B62]" aria-label={`Link ${index + 1} entfernen`}>Entfernen</button>
+                    <button type="button" onClick={() => set("mod_resources", form.mod_resources.filter((_item, position) => index !== position))} className="min-h-11 px-3 tls-type-small text-live" aria-label={`Link ${index + 1} entfernen`}>Entfernen</button>
                   </div>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                     <label className="block tls-type-small">Typ<select value={item.kind} onChange={(event) => setResource(index, "kind", event.target.value)} className="mt-1 block w-full bg-[#0A0A0A] border border-white/15 rounded-sm p-2">{Object.entries(serverResourceLabels).map(([kind, label]) => <option key={kind} value={kind}>{label}</option>)}</select></label>
@@ -599,7 +599,7 @@ function DiagnosticsPanel({ data }) {
             <div className="mt-1 text-white/40">{item.source}</div>
             {item.resolved_ips?.length > 0 && <div className="mt-1 text-white/55 break-all">DNS: {item.resolved_ips.join(", ")}</div>}
             {item.hint && <div className="mt-1 text-warn break-words">{item.hint}</div>}
-            {item.error && <div className="mt-1 text-[#FF8A80] break-words">{item.error}</div>}
+            {item.error && <div className="mt-1 text-warn break-words">{item.error}</div>}
           </div>
         ))}
       </div>

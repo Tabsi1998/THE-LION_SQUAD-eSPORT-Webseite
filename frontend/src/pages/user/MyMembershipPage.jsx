@@ -88,7 +88,7 @@ export default function MyMembershipPage() {
 
         {/* Beitrag und Stand aus der Mitgliederverwaltung (#295) */}
         {fee && (
-          <div id="beitrag" className={`mt-6 scroll-mt-32 border rounded-sm bg-[#121212] p-5 ${fee.tone === "warn" ? "border-honor/40" : "border-white/10"}`} data-testid="membership-fee-card">
+          <div id="beitrag" className={`mt-6 scroll-mt-32 border rounded-sm bg-[#121212] p-5 ${fee.tone === "warn" ? "border-warn/40" : "border-white/10"}`} data-testid="membership-fee-card">
             <div className="flex flex-wrap items-center justify-between gap-3">
               <h2 className="tls-type-section inline-flex items-center gap-2"><Wallet className="w-4 h-4 text-honor" /> Mitgliedsbeitrag</h2>
               <span className={`tls-type-label ${fee.tone === "warn" ? "text-warn" : fee.tone === "info" ? "text-[#29B6E8]" : "text-ok"}`}>{fee.label}</span>
@@ -100,7 +100,7 @@ export default function MyMembershipPage() {
             {!!erp.functions?.length && (
               <div className="mt-3 tls-type-small text-white/75">Funktion im Verein: {erp.functions.map((fn) => fn.label).join(", ")}</div>
             )}
-            <div className={`mt-3 tls-type-small ${fee.stale ? "text-honor" : "text-quiet"}`}>
+            <div className={`mt-3 tls-type-small ${fee.stale ? "text-warn" : "text-quiet"}`}>
               Stand aus der Mitgliederverwaltung vom {formatDate(fee.asOf)}{fee.stale ? " – seither nicht mehr abgeglichen" : ""}. Stimmt etwas nicht, melde dich beim Vorstand.
             </div>
           </div>
@@ -293,7 +293,7 @@ function IdentityCard() {
             : <>Dein Konto ist seit {formatDate(state.linked_at)} mit der Vereinsakte verbunden{state.capability_labels?.length ? ` (${state.capability_labels.join(", ")})` : ""}.</>}{" "}
           <Link to={vereinPfad("dokumente")} className="tls-btn tls-btn--quiet mt-2 inline-flex min-h-11 items-center px-3 py-2 rounded-sm tls-type-label" data-testid="membership-identity-documents">Zu den Vereinsdokumenten</Link>
           {viaMember && state.right_missing ? (
-            <p className="mt-2 text-honor/80" data-testid="membership-identity-right-missing">Die Website darf im Vereinsmodul noch nicht im Namen der Mitglieder handeln – der Vorstand richtet das Recht ein; bis dahin siehst du nur das Öffentliche.</p>
+            <p className="mt-2 text-warn" data-testid="membership-identity-right-missing">Die Website darf im Vereinsmodul noch nicht im Namen der Mitglieder handeln – der Vorstand richtet das Recht ein; bis dahin siehst du nur das Öffentliche.</p>
           ) : null}
         </div>
       ) : (

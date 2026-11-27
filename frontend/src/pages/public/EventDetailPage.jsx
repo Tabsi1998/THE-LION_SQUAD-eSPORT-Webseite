@@ -392,8 +392,8 @@ function EventOverview({ e, user, over, accessToken, hasConsent, onChanged, regi
     <div className="space-y-12" data-testid="event-overview">
       {/* Abgesagt (#2118): oben und deutlich - statt Anmeldung oder „Du bist dabei“. */}
       {cancelled && (
-        <div role="status" className="border border-[#FF6B6B]/35 bg-[#FF6B6B]/10 rounded-sm px-4 py-3 min-w-0" data-testid="event-cancelled">
-          <div className="inline-flex items-center gap-2 tls-type-label text-[#FF6B6B]">
+        <div role="status" className="border border-quiet/35 bg-quiet/10 rounded-sm px-4 py-3 min-w-0" data-testid="event-cancelled">
+          <div className="inline-flex items-center gap-2 tls-type-label text-quiet">
             <XCircle className="w-4 h-4 shrink-0" aria-hidden="true" /> Event abgesagt
           </div>
           <p className="mt-1 tls-type-small text-white/80 break-words">{cancelled}</p>
@@ -817,7 +817,7 @@ function EventRegistrationPanel({ event, user, accessToken = "", onChanged, open
         </div>
         {own.can_cancel && (
           <button type="button" disabled={saving} onClick={cancel} data-testid="event-cancel-link"
-            className="mt-2 sm:mt-0 sm:absolute sm:top-4 sm:right-4 inline-flex items-center gap-1.5 tls-type-small font-bold text-white/55 underline-offset-4 hover:text-[#FF6B6B] hover:underline disabled:opacity-50">
+            className="mt-2 sm:mt-0 sm:absolute sm:top-4 sm:right-4 inline-flex items-center gap-1.5 tls-type-small font-bold text-white/55 underline-offset-4 hover:text-live hover:underline disabled:opacity-50">
             <XCircle className="w-3.5 h-3.5" /> Stornieren
           </button>
         )}
@@ -849,7 +849,7 @@ function EventRegistrationPanel({ event, user, accessToken = "", onChanged, open
             </fieldset>
           )}
           {waitlisted && (
-            <div className="border border-honor/40 bg-honor/5 rounded-sm p-3 tls-type-small text-white/85" data-testid="event-waitlist-note">
+            <div className="border border-white/15 bg-white/[0.04] rounded-sm p-3 tls-type-small text-white/85" data-testid="event-waitlist-note">
               {waitlisted}{quote && !quote.free ? " Bezahlt wird erst, wenn du nachrückst." : ""}
             </div>
           )}

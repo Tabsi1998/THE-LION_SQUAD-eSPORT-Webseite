@@ -288,7 +288,7 @@ export default function F1DetailPage() {
                           <span className="flex items-center gap-2 min-w-0 max-w-[9.5rem] sm:max-w-[18rem]">
                             <span className="truncate" title={e.display_name}>{e.display_name}</span>
                             {own && <span className="tls-you-tag" data-testid={`f1-you-${e.rank}`}>Du</span>}
-                            {e.is_guest && <span className="shrink-0 tls-type-label text-honor/80 border border-honor/30 rounded-sm px-1" title="Gast ohne Konto - nicht in Jahreswertung, Erfolgen und Gewinnen">Gast</span>}
+                            {e.is_guest && <span className="shrink-0 tls-type-label text-quiet border border-white/20 rounded-sm px-1" title="Gast ohne Konto - nicht in Jahreswertung, Erfolgen und Gewinnen">Gast</span>}
                           </span>
                           {/* Am Handy stehen die Versuche unter dem Namen - Abstand, Versuche und Urkunde haben dort keine Spalte. */}
                           <span className="sm:hidden block tls-type-small tls-type-num text-white/45">{attemptsCell(e.attempts, maxAttempts)} Versuche</span>
@@ -609,7 +609,7 @@ function InlineFastLapTimeEntry({ challenge, trackId, currentUser, onSaved }) {
 
   if (locked && !isTournamentLead) {
     return (
-      <div data-testid="fastlap-locked" className="mb-5 border border-honor/30 bg-honor/5 rounded-sm p-4 tls-type-small text-white/75">
+      <div data-testid="fastlap-locked" className="mb-5 border border-warn/30 bg-warn/5 rounded-sm p-4 tls-type-small text-white/75">
         Die Ergebnisse sind veröffentlicht. Zeiten ändert jetzt nur noch die Turnierleitung, mit Begründung.
       </div>
     );

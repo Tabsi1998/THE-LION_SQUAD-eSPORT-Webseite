@@ -207,7 +207,7 @@ export default function TournamentsPage() {
             </Chip>
           ))}
           {signedIn && (
-            <Chip testId="tournament-only-mine" tone="honor" active={mineFilter} onClick={() => toggleParam("mine", "1")}>
+            <Chip testId="tournament-only-mine" active={mineFilter} onClick={() => toggleParam("mine", "1")}>
               Nur meine
             </Chip>
           )}

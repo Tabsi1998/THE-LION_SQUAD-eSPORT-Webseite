@@ -138,7 +138,7 @@ export function PersonalFeedCard({ origin = typeof window !== "undefined" ? wind
       {problem && <p className="mt-3 tls-type-small text-warn" role="alert">{problem}</p>}
       <div className="mt-3 flex flex-wrap items-center gap-2 tls-type-small">
         {!status.active ? (
-          <button type="button" onClick={issue} disabled={busy} data-testid={`${testId}-create`} className="tls-btn tls-btn--honor px-3 py-2 rounded-sm font-bold uppercase tracking-wider">Abo einrichten</button>
+          <button type="button" onClick={issue} disabled={busy} data-testid={`${testId}-create`} className="tls-btn tls-btn--primary px-3 py-2 rounded-sm font-bold uppercase tracking-wider">Abo einrichten</button>
         ) : confirming ? (
           <>
             <button type="button" onClick={confirming === "renew" ? issue : revoke} disabled={busy} data-testid={`${testId}-${confirming}-confirm`} className="tls-btn tls-btn--danger px-3 py-2 rounded-sm font-bold uppercase tracking-wider">

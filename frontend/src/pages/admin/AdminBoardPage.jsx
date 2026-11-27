@@ -202,7 +202,7 @@ export default function AdminBoardPage() {
                 <button type="button" onClick={() => toggle(p)} data-testid={`board-toggle-${p.slug}`} className="text-white/70 hover:text-white">{p.is_active ? "Deaktivieren" : "Aktivieren"}</button>
                 {p.user && <button type="button" onClick={() => clearHolder(p, false)} data-testid={`board-clear-${p.slug}`} className="text-white/70 hover:text-white">Posten leeren</button>}
                 {p.deputy_user && <button type="button" onClick={() => clearHolder(p, true)} className="text-white/70 hover:text-white">Vertretung entfernen</button>}
-                {!p.is_default && <button type="button" onClick={() => remove(p)} data-testid={`board-delete-${p.slug}`} className="text-[#FF6B6B] hover:underline">Löschen</button>}
+                {!p.is_default && <button type="button" onClick={() => remove(p)} data-testid={`board-delete-${p.slug}`} className="text-live hover:underline">Löschen</button>}
               </div>
             )}
           </li>

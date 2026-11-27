@@ -113,7 +113,7 @@ export function MailQueueSection({ queue, queueStats, queueFilter, setQueueFilte
           )}
         </div>
         {open && (
-          <button type="button" onClick={() => { setMenuFor(null); deleteJob(job); }} data-testid={`${prefix}-delete-${job.id}`} className="inline-flex items-center gap-1 tls-type-small text-[#FF6B6B] hover:underline">
+          <button type="button" onClick={() => { setMenuFor(null); deleteJob(job); }} data-testid={`${prefix}-delete-${job.id}`} className="inline-flex items-center gap-1 tls-type-small text-live hover:underline">
             <Trash2 className="w-3 h-3" /> Löschen
           </button>
         )}

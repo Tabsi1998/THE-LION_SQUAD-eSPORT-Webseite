@@ -371,7 +371,7 @@ export default function AdminF1EditPage() {
       </div>
 
       {locked && (
-        <div data-testid="f1-published-lock" className="mb-5 border border-honor/30 bg-honor/5 rounded-sm p-3 tls-type-small text-white/80">
+        <div data-testid="f1-published-lock" className="mb-5 border border-warn/30 bg-warn/5 rounded-sm p-3 tls-type-small text-white/80">
           Ergebnisse veröffentlicht: Zeiten sind gesperrt. Ändern, Nachtragen und Löschen gehen nur noch durch die Turnierleitung mit Begründung - jede Änderung steht im Protokoll.
         </div>
       )}
@@ -514,7 +514,7 @@ export default function AdminF1EditPage() {
                     <div className="flex items-center gap-3 min-w-0">
                       <span className="text-white/50 tls-type-small w-6">#{t.attempt_number}</span>
                       <span className="text-white tls-type-small truncate">{t.user?.display_name || t.user?.username}</span>
-                      {t.user?.is_guest && <span className="tls-type-label text-honor border border-honor/40 rounded-sm px-1">Gast</span>}
+                      {t.user?.is_guest && <span className="tls-type-label text-quiet border border-white/20 rounded-sm px-1">Gast</span>}
                       {t.user?.is_guest && isTournamentLead && (
                         <button type="button" onClick={() => setLinkGuest({ id: t.guest_id, name: t.user?.display_name || "Gast" })} data-testid={`f1-link-guest-${t.id}`} title="Mit Konto verknüpfen" aria-label={`${t.user?.display_name || "Gast"} mit Konto verknüpfen`} className="p-1 text-white/40 hover:text-[#29B6E8]">
                           <Link2 className="w-3.5 h-3.5" />

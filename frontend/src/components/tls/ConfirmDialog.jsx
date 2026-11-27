@@ -106,7 +106,7 @@ export function ConfirmDialogProvider({ children }) {
                     />
                   )
                 )}
-                {problem ? <p id="confirm-dialog-problem" role="alert" className="mt-2 tls-type-small text-[#FF8A80]" data-testid="confirm-dialog-problem">{problem}</p> : null}
+                {problem ? <p id="confirm-dialog-problem" role="alert" className="mt-2 tls-type-small text-warn" data-testid="confirm-dialog-problem">{problem}</p> : null}
               </div>
               <button type="button" onClick={() => close(false)} className="p-1 text-white/45 hover:text-white" aria-label="Schließen">
                 <X className="w-4 h-4" />

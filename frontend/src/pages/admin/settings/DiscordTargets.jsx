@@ -181,7 +181,7 @@ export function DiscordTargets() {
                 </div>
               </div>
               {entry.last && (
-                <div className={`tls-type-small ${entry.last.status === "sent" ? "text-white/45" : "text-[#FF6B6B]"}`} data-testid={`discord-target-${target}-last`}>
+                <div className={`tls-type-small ${entry.last.status === "sent" ? "text-white/45" : "text-warn"}`} data-testid={`discord-target-${target}-last`}>
                   {lastAttemptText(entry.last)}
                 </div>
               )}

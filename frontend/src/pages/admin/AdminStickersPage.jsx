@@ -210,7 +210,7 @@ function PackCard({ pack, onToggle, onRename, onDelete, onAdd, onDeleteSticker, 
             <div className="tls-type-card tls-wrap">{pack.name}</div>
             <div className="tls-type-label text-white/45">
               {pack.stickers.length} Sticker
-              {!pack.active && <span className="ml-2 font-bold text-[#FF6B61]">Nicht im Chat</span>}
+              {!pack.active && <span className="ml-2 font-bold text-quiet">Nicht im Chat</span>}
             </div>
           </div>
         )}

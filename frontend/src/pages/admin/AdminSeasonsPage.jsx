@@ -315,8 +315,8 @@ function CompleteSheet({ season, onClose, onDone }) {
   return (
     <AdminSheet title={`„${season.name}“ abschließen`} eyebrow="Jahreswertung" size="lg" onClose={onClose} onSubmit={submit} saving={saving}
       submitLabel="Endgültig abschließen" savingLabel="Schließe ab …" submitDisabled={!preview} submitTestId="season-complete-submit" testId="season-complete-sheet">
-      <div className="rounded-sm border border-honor/30 bg-honor/5 p-4 tls-type-small text-white/75 space-y-2">
-        <p className="font-bold text-honor">Das passiert einmalig und lässt sich nicht zurücknehmen:</p>
+      <div className="rounded-sm border border-warn/30 bg-warn/5 p-4 tls-type-small text-white/75 space-y-2">
+        <p className="font-bold text-warn">Das passiert einmalig und lässt sich nicht zurücknehmen:</p>
         <ul className="list-disc pl-5 space-y-1">
           <li>Die Rangliste wird festgeschrieben.</li>
           <li>Jede platzierte Person bekommt XP („Saison abgeschlossen“).</li>
@@ -385,7 +385,7 @@ function SeasonCard({ season, onEdit, onDelete, onComplete }) {
           </button>
           <Link to={`/seasons/${season.slug}`} target="_blank" className="px-3 py-1.5 border border-white/15 text-white/70 tls-type-label rounded-sm hover:text-white">Öffentliche Seite</Link>
           {season.status === "active" && (
-            <button onClick={onComplete} data-testid={`season-complete-${season.id}`} className="px-3 py-1.5 border border-honor/50 text-honor tls-type-label rounded-sm inline-flex items-center gap-1">
+            <button onClick={onComplete} data-testid={`season-complete-${season.id}`} className="px-3 py-1.5 border border-brand/50 text-brand tls-type-label rounded-sm inline-flex items-center gap-1">
               <Flag className="w-3 h-3" /> Abschließen
             </button>
           )}

@@ -64,7 +64,7 @@ export function DiscordPreview({ kind, item, skip, onSkipChange }) {
         <input type="checkbox" checked={!!skip} onChange={(e) => { onSkipChange(e.target.checked); setPreview(null); }} data-testid="discord-skip" className="accent-[#5865F2]" />
         <span>Ohne Discord veröffentlichen</span>
       </label>
-      {error && <div className="tls-type-small text-[#FF6B6B]">{error}</div>}
+      {error && <div className="tls-type-small text-warn">{error}</div>}
       {preview && (
         <>
           <div className={`tls-type-small ${preview.would_send ? "text-ok" : "text-quiet"}`} data-testid="discord-preview-verdict">

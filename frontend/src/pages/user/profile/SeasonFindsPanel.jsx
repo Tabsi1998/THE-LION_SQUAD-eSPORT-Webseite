@@ -71,7 +71,7 @@ function Season({ season }) {
       <header className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-0.5 px-3 pt-1 pb-2">
         <span className="tls-type-label inline-flex items-center gap-2">
           {season.label}
-          {season.active && <span className="tls-type-label px-1.5 py-0.5 rounded-sm bg-ok/15 text-ok">läuft</span>}
+          {season.active && <span className="tls-type-label px-1.5 py-0.5 rounded-sm bg-live/10 text-live">läuft</span>}
         </span>
         <span className="tls-type-label text-quiet whitespace-nowrap" data-testid={`season-finds-${season.key}-hint`}>{seasonHint(season)}</span>
       </header>

@@ -12,10 +12,10 @@ import { PrizeFormSheet } from "./prizes/PrizeFormSheet";
 import { ShortCaps } from "@/components/tls/ShortCaps";
 
 const STATUS_LABEL = {
-  pending: { label: "Offen", icon: Clock, color: "text-honor bg-honor/10 border-honor/30" },
+  pending: { label: "Offen", icon: Clock, color: "text-brand bg-brand/10 border-brand/30" },
   ready: { label: "Bereit zur Abholung", icon: Gift, color: "text-[#29B6E8] bg-[#29B6E8]/10 border-[#29B6E8]/30" },
   picked_up: { label: "Abgeholt", icon: CheckCircle2, color: "text-ok bg-ok/10 border-ok/30" },
-  expired: { label: "Verfallen", icon: XCircle, color: "text-quiet bg-quiet/10 border-quiet/30" },
+  expired: { label: "Verfallen", icon: XCircle, color: "text-quiet bg-white/5 border-quiet/30" },
 };
 
 function statusToast(status, from) {

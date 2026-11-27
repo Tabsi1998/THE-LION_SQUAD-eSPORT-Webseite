@@ -49,7 +49,7 @@ export function CalendarHintHost() {
           <h2 id="calendar-hint-title" className="tls-type-small font-bold">Deine Termine automatisch im Kalender?</h2>
           <p className="mt-1 tls-type-small text-white/60">Einmal abonnieren – danach erscheint jede Anmeldung von selbst in Google, Apple oder Outlook.</p>
           <div className="mt-3 flex flex-wrap gap-2 tls-type-small">
-            <Link to={`${MY_CALENDAR_PATH}#${SUBSCRIBE_ANCHOR}`} onClick={() => setOpen(false)} data-testid="calendar-hint-go" className="tls-btn tls-btn--honor px-3 py-2 rounded-sm font-bold uppercase tracking-wider">
+            <Link to={`${MY_CALENDAR_PATH}#${SUBSCRIBE_ANCHOR}`} onClick={() => setOpen(false)} data-testid="calendar-hint-go" className="tls-btn tls-btn--primary px-3 py-2 rounded-sm font-bold uppercase tracking-wider">
               Einmal abonnieren
             </Link>
             <button type="button" onClick={() => setOpen(false)} data-testid="calendar-hint-later" className="tls-btn tls-btn--quiet px-3 py-2 rounded-sm font-bold uppercase tracking-wider">

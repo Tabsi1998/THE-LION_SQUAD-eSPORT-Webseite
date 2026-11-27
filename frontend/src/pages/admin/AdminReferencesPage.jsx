@@ -343,7 +343,7 @@ export default function AdminReferencesPage() {
               <div className="min-w-0">
                 <div className="flex items-center gap-2 tls-type-small text-white/45 font-bold flex-wrap">
                   <span>{item.game_name || item.game?.display_name || item.game?.name || "Spiel offen"}</span>
-                  <span className={(item.status || "completed") === "active" ? "text-[#00D26A]" : (item.status || "completed") === "planned" ? "text-[#29B6E8]" : "text-white/45"}>{statusLabel[item.status || "completed"]}</span>
+                  <span className={(item.status || "completed") === "active" ? "text-ok" : (item.status || "completed") === "planned" ? "text-[#29B6E8]" : "text-white/45"}>{statusLabel[item.status || "completed"]}</span>
                   {item.medal && <span className="text-honor">{medalLabel[item.medal]}</span>}
                   <span>{formatDate(item.start_date)}</span>
                   {item.visibility !== "public" && <span className="text-[#29B6E8]">{visibilityLabel[item.visibility] || item.visibility}</span>}

@@ -26,7 +26,7 @@ function ZuTunKnopf({ item }) {
       <ArrowRight className="tls-card__arrow w-5 h-5 shrink-0 text-white/40" aria-hidden="true" />
     </Link>
   );
-  return <li className="min-w-0">{warn ? <Glow active tone="honor">{card}</Glow> : card}</li>;
+  return <li className="min-w-0">{warn ? <Glow active tone="warn">{card}</Glow> : card}</li>;
 }
 
 export default function UebersichtSeite() {

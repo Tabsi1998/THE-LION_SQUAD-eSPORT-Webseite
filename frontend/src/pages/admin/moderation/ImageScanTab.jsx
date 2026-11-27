@@ -144,7 +144,7 @@ export default function ImageScanTab() {
               <div className="tls-type-small font-bold text-white/60 mb-1.5">Google Cloud Vision API-Schlüssel {form.google_api_key_masked && <span className="text-white/40 normal-case">(aktuell gespeichert)</span>}</div>
               <input type="password" value={form.google_api_key} onChange={(e) => set("google_api_key", e.target.value)} data-testid="image-scan-google-key" autoComplete="off" className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-sm font-mono" placeholder={form.google_api_key_masked ? "Leer lassen, um den Schlüssel zu behalten" : "API-Schlüssel aus der Google Cloud Console (Vision API)"} />
               <p className="mt-1 tls-type-small text-quiet">Bilder gehen dann an Google – das steht automatisch in der Datenschutzerklärung.</p>
-              {form.google_api_key_masked && <button type="button" onClick={clearKey} className="mt-2 tls-type-label text-[#FF6B6B]">Gespeicherten Schlüssel entfernen</button>}
+              {form.google_api_key_masked && <button type="button" onClick={clearKey} className="mt-2 tls-type-label text-live">Gespeicherten Schlüssel entfernen</button>}
             </label>
           )}
           <div className="grid sm:grid-cols-3 gap-3">
@@ -188,7 +188,7 @@ function StatCard({ title, ok, detail, problem = "", testId }) {
     <div className={`border rounded-sm p-3 ${ok ? "border-ok/25 bg-ok/5" : "border-warn/30 bg-warn/5"}`} data-testid={testId}>
       <div className="flex items-center gap-2 tls-type-label text-white/50"><Icon className={`w-3.5 h-3.5 ${ok ? "text-ok" : "text-warn"}`} /> {title}</div>
       <div className="mt-1 tls-type-small text-white/85">{detail}</div>
-      {problem && <div className="mt-1 tls-type-small text-[#FF6B6B]">{problem}</div>}
+      {problem && <div className="mt-1 tls-type-small text-warn">{problem}</div>}
     </div>
   );
 }
@@ -227,7 +227,7 @@ function ScanRow({ row, note, onNote, onDecide, busy }) {
           {scores.racy > 0 && <span className="px-2 py-0.5 border border-white/10 rounded-sm text-white/50">anzüglich {percent(scores.racy)} %</span>}
           <span className="px-2 py-0.5 border border-white/10 rounded-sm text-white/40">{row.provider_label}</span>
         </div>
-        {row.error && <div className="tls-type-small text-[#FF6B6B]">Fehler: {row.error}</div>}
+        {row.error && <div className="tls-type-small text-warn">Fehler: {row.error}</div>}
         {row.note && <div className="tls-type-small text-white/60">Notiz: {row.note}</div>}
         {row.decided_by && row.decided_by !== "system" && <div className="tls-type-small text-quiet">Entschieden von der Moderation {formatMoment(row.decided_at)}</div>}
         <div className="flex flex-col sm:flex-row gap-2 pt-1">

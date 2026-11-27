@@ -5,7 +5,7 @@
    leuchtet und rückt nichts. */
 
 .tls-cockpit-row {
-  --tls-cockpit-tone: var(--tls-honor-rgb);
+  --tls-cockpit-tone: var(--tls-warn-rgb);
   isolation: isolate;
 }
 .tls-cockpit-row[data-tone="warn"] { --tls-cockpit-tone: var(--tls-warn-rgb); }
@@ -60,8 +60,8 @@
   position: absolute;
   inset: -1px;
   border-radius: inherit;
-  border: 1px solid rgb(var(--tls-honor-rgb) / 0.9);
-  box-shadow: 0 10px 30px -16px rgb(var(--tls-honor-rgb) / 0.8);
+  border: 1px solid rgb(var(--tls-warn-rgb) / 0.9);
+  box-shadow: 0 10px 30px -16px rgb(var(--tls-warn-rgb) / 0.8);
   pointer-events: none;
   opacity: 0;
 }

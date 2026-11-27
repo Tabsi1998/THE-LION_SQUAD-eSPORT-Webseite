@@ -334,9 +334,9 @@ function NewsForm({ post, meta, onDone, onReload }) {
       aside={(
         <>
           {post.withdrawn_at && (
-            <div role="status" className="border border-[#FF6B6B]/40 bg-[#FF6B6B]/10 rounded-sm p-4 space-y-3" data-testid="news-withdrawn">
+            <div role="status" className="border border-warn/40 bg-warn/10 rounded-sm p-4 space-y-3" data-testid="news-withdrawn">
               <p className="tls-type-small text-white/85">
-                <strong className="text-[#FF6B6B]">Zurückgezogen</strong> am {viennaDateTime(post.withdrawn_at, { dateStyle: "medium", timeStyle: "short" })}{post.withdrawn_by_name ? ` von ${post.withdrawn_by_name}` : ""}. Besucher sehen statt des Beitrags nur einen Hinweis.
+                <strong className="text-warn">Zurückgezogen</strong> am {viennaDateTime(post.withdrawn_at, { dateStyle: "medium", timeStyle: "short" })}{post.withdrawn_by_name ? ` von ${post.withdrawn_by_name}` : ""}. Besucher sehen statt des Beitrags nur einen Hinweis.
               </p>
               <button type="button" onClick={restore} disabled={saving} data-testid="news-restore" className="tls-btn tls-btn--quiet px-4 py-2 rounded-sm tls-type-label disabled:opacity-50">Wiederherstellen (als Entwurf)</button>
             </div>

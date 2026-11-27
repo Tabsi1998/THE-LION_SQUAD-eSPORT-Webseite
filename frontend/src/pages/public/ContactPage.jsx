@@ -193,7 +193,7 @@ export default function ContactPage() {
               )}
               <label className="flex items-start gap-2 tls-type-small text-white/70">
                 <input id="contact-privacy" type="checkbox" required checked={form.accept_privacy} onChange={(e) => updateField("accept_privacy", e.target.checked)} data-testid="contact-privacy" aria-invalid={!!fieldErrors.accept_privacy} aria-describedby={fieldErrors.accept_privacy ? "contact-privacy-error" : undefined} className="mt-1 accent-[#29B6E8]" />
-                <span>Ich habe die <Link to="/privacy" className="text-[#29B6E8] hover:underline">Datenschutzhinweise</Link> gelesen und stimme der Speicherung meiner Angaben zur Bearbeitung der Anfrage zu.{fieldErrors.accept_privacy && <span id="contact-privacy-error" role="alert" className="block mt-1 tls-type-small text-[#FF8A80]">{fieldErrors.accept_privacy}</span>}</span>
+                <span>Ich habe die <Link to="/privacy" className="text-[#29B6E8] hover:underline">Datenschutzhinweise</Link> gelesen und stimme der Speicherung meiner Angaben zur Bearbeitung der Anfrage zu.{fieldErrors.accept_privacy && <span id="contact-privacy-error" role="alert" className="block mt-1 tls-type-small text-warn">{fieldErrors.accept_privacy}</span>}</span>
               </label>
               <SpamGuardFields guard={guard} idPrefix="contact" />
               {submitError && <AuthFormAlert id="contact-submit-error">{submitError}</AuthFormAlert>}
@@ -224,7 +224,7 @@ function Field({ id, label, error, children }) {
     <label htmlFor={id} className="block">
       <div className="tls-type-label text-white/60 mb-1.5">{label}</div>
       {children}
-      {error && <div id={`${id}-error`} role="alert" className="mt-1 tls-type-small text-[#FF8A80]">{error}</div>}
+      {error && <div id={`${id}-error`} role="alert" className="mt-1 tls-type-small text-warn">{error}</div>}
     </label>
   );
 }

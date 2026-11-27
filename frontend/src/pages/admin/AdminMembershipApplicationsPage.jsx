@@ -128,7 +128,7 @@ export default function AdminMembershipApplicationsPage() {
       )}
       {state.decide && <>
         <button type="button" onClick={() => decide(a, "approve")} data-testid={`${idPrefix}-approve-${a.id}`} className="text-ok hover:underline tls-type-small inline-flex items-center gap-1"><Check className="w-3 h-3" /> Annehmen</button>
-        <button type="button" onClick={() => decide(a, "reject")} data-testid={`${idPrefix}-reject-${a.id}`} className="text-[#FF6B6B] hover:underline tls-type-small inline-flex items-center gap-1"><XIcon className="w-3 h-3" /> Ablehnen</button>
+        <button type="button" onClick={() => decide(a, "reject")} data-testid={`${idPrefix}-reject-${a.id}`} className="text-live hover:underline tls-type-small inline-flex items-center gap-1"><XIcon className="w-3 h-3" /> Ablehnen</button>
         <button type="button" onClick={() => withdraw(a)} data-testid={`${idPrefix}-withdraw-${a.id}`} className="text-white/60 hover:text-white hover:underline tls-type-small inline-flex items-center gap-1"><Undo2 className="w-3 h-3" /> Zurückziehen</button>
       </>}
     </div>
@@ -283,7 +283,7 @@ function InviteSheet({ onClose, onInvited }) {
     <AdminSheet title="Zum Antrag einladen" eyebrow="Bewerbungen" accent="#29B6E8" onClose={onClose} onSubmit={submit} saving={saving} submitLabel="Einladen" savingLabel="Lade ein …" submitTestId="apps-invite-save" testId="apps-invite-sheet">
       <p className="tls-type-body text-white/60">Die Person bekommt einen Hinweis auf der Website und in der App (und eine Mail, wenn sie Mitgliedschafts-Mails zulässt) und füllt den Antrag direkt aus. Gesucht werden nur Konten ohne Mitgliedschaft.</p>
       <PersonPicker purpose="invite" value={person} onChange={setPerson} label="Konto" placeholder="Name tippen …" testId="apps-invite-person" emptyText="Kein Konto ohne Mitgliedschaft mit diesem Namen." />
-      {already && <p className="border border-[#FF9500]/40 bg-[#FF9500]/5 rounded-sm p-3 tls-type-small text-white/80" data-testid="apps-invite-already">{already}</p>}
+      {already && <p className="border border-warn/40 bg-warn/5 rounded-sm p-3 tls-type-small text-white/80" data-testid="apps-invite-already">{already}</p>}
       <label className="block">
         <span className="tls-type-label text-white/60">Persönliche Zeile (optional)</span>
         <textarea value={note} onChange={(event) => setNote(event.target.value)} maxLength={500} data-testid="apps-invite-note" className="mt-1.5 w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-sm min-h-20" placeholder="z. B. Schön, dass du bei den Turnieren dabei bist!" />

@@ -59,14 +59,14 @@ function CountdownRing({ block }) {
 
 function SideCard({ side }) {
   return (
-    <li className={`rounded-sm border p-3 ${side.checked_in ? "border-[#00D26A]/50 bg-[#00D26A]/5" : "border-white/10 bg-[#0A0A0A]"}`}
+    <li className={`rounded-sm border p-3 ${side.checked_in ? "border-ok/50 bg-ok/5" : "border-white/10 bg-[#0A0A0A]"}`}
       data-testid={`checkin-side-${side.registration_id}`} data-checked={side.checked_in ? "true" : "false"}>
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
           <div className="tls-type-card [overflow-wrap:anywhere]">{side.name}{side.own ? <span className="ml-2 tls-type-label text-[#29B6E8]">ihr</span> : null}</div>
           <div className="mt-1 tls-type-small text-white/60" data-testid={`checkin-side-status-${side.registration_id}`}>{sideStatusText(side)}</div>
         </div>
-        <span className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full border ${side.checked_in ? "border-[#00D26A] text-[#00D26A]" : "border-white/15 text-white/30"}`} aria-hidden="true">
+        <span className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full border ${side.checked_in ? "border-ok text-ok" : "border-white/15 text-white/30"}`} aria-hidden="true">
           {side.checked_in ? <Check className="tls-checkin-tick h-5 w-5" /> : <AlarmClock className="h-4 w-4" />}
         </span>
       </div>
@@ -193,7 +193,7 @@ function StartBlock({ block, matchId, busy, run, onChanged }) {
     }, "Starten hat nicht geklappt.");
   };
   return (
-    <div className="mt-5 rounded-sm border border-[#00D26A]/40 bg-[#00D26A]/5 p-4" data-testid="checkin-start">
+    <div className="mt-5 rounded-sm border border-ok/40 bg-ok/5 p-4" data-testid="checkin-start">
       {block.can_start ? (
         <>
           {needsConflictReason ? (
@@ -247,8 +247,8 @@ function LeadEntry({ block, matchId, busy, run, onChanged }) {
     }, "Eintragen hat nicht geklappt.");
   };
   return (
-    <form onSubmit={submit} className="mt-5 rounded-sm border border-honor/30 bg-honor/5 p-4" data-testid="checkin-lead" noValidate>
-      <h3 className="flex items-center gap-2 tls-type-small font-bold text-honor"><ShieldAlert className="h-4 w-4" aria-hidden="true" /> Für eine Seite eintragen (Liga-Leitung)</h3>
+    <form onSubmit={submit} className="mt-5 rounded-sm border border-brand/30 bg-brand/5 p-4" data-testid="checkin-lead" noValidate>
+      <h3 className="flex items-center gap-2 tls-type-small font-bold text-brand"><ShieldAlert className="h-4 w-4" aria-hidden="true" /> Für eine Seite eintragen (Liga-Leitung)</h3>
       <p className="mt-1 tls-type-small text-white/60">Notfall, etwa Captain ohne Netz – geht auch nach dem Fenster, mit Grund im Protokoll. Die Regelwerks-Zustimmung der Seite bleibt Pflicht.</p>
       {needsConflictReason ? <p className="mt-2 tls-type-small text-warn" data-testid="checkin-lead-conflict">Du bist an diesem Spiel selbst beteiligt – als Superadmin nur als Notausnahme mit Grund.</p> : null}
       <div className="mt-3 flex flex-wrap gap-2" role="radiogroup" aria-label="Seite">
@@ -287,7 +287,7 @@ export function CheckinPanel({ block, matchId, busy, run, onChanged, onAskLead, 
   // Veto (#1618, D.3): solange es läuft, trägt der Veto-Block die Überschrift - der Check-in-Kopf wird eine Zeile, die Seiten stehen
   // in einem Satz, der Start-Knopf kommt danach (Fabian: nur eine Überschrift „Veto läuft“).
   const vetoRunning = block.state === "veto";
-  const tone = { ready: "border-[#00D26A]/50", veto: "border-[#00D26A]/50", running: "border-[#29B6E8]/50", closed: "border-warn/50" }[block.state] || "border-[#29B6E8]/35";
+  const tone = { ready: "border-ok/50", veto: "border-ok/50", running: "border-[#29B6E8]/50", closed: "border-warn/50" }[block.state] || "border-[#29B6E8]/35";
   return (
     <section className={`mt-6 rounded-sm border bg-[#0F1D23] p-5 ${tone}`} data-testid="checkin-panel" data-state={block.state}>
       {/* Am Handy steht der Ring unter dem Satz, am PC rechts neben der Überschrift - so bricht die Überschrift nie. */}
@@ -299,7 +299,7 @@ export function CheckinPanel({ block, matchId, busy, run, onChanged, onAskLead, 
           </div>
           {vetoRunning ? (
             <p className="mt-1 tls-type-small text-white/75 [overflow-wrap:anywhere]" data-testid="checkin-slim">
-              <span className="font-bold text-[#00D26A]">Beide Seiten eingecheckt</span>
+              <span className="font-bold text-ok">Beide Seiten eingecheckt</span>
               {" – "}{(block.sides || []).map((side) => `${side.name} (${Number(side.present_count || 0)} Spieler)`).join(" · ")}.
             </p>
           ) : (

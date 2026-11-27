@@ -181,7 +181,7 @@ export function ChatAttachmentDrafts({ drafts, onRemove }) {
         ))}
       </div>
       {errors.length > 0 && (
-        <p role="alert" className="mt-2 tls-type-small text-[#FF6B61]">{errors.join(" ")}</p>
+        <p role="alert" className="mt-2 tls-type-small text-warn">{errors.join(" ")}</p>
       )}
     </div>
   );

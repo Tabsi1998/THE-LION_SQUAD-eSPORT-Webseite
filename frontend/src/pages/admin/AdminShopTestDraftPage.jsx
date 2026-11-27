@@ -417,7 +417,7 @@ export default function AdminShopTestDraftPage() {
   return (
     <AdminLayout>
       <div className="min-w-0">
-        <h1 className="tls-type-title inline-flex items-center gap-3"><ShoppingBag className="w-7 h-7 text-honor" aria-hidden="true" /> <ShortCaps>Shop</ShortCaps></h1>
+        <h1 className="tls-type-title inline-flex items-center gap-3"><ShoppingBag className="w-7 h-7 text-brand" aria-hidden="true" /> <ShortCaps>Shop</ShortCaps></h1>
         <ShopTabs />
         <p className="mt-4 tls-type-body text-white/60 max-w-2xl">
           Ein Testentwurf legt eine Bestellung nur als <strong>Entwurf</strong> bei Printful an - nie bestätigt, nie bezahlt. Danach in Printful prüfen, ob Produkt, Variante, Druckdateien, Positionen, Anschrift und Preise stimmen, und den Entwurf wieder löschen. Er zählt nicht als Bestellung, nicht im Umsatz und nicht in Dolibarr.

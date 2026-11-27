@@ -21,7 +21,7 @@ function SecretInput({ label, value, masked, onChange, onClear, testId, placehol
         {label} {masked && <span className="text-white/40 normal-case">(aktuell gespeichert)</span>}
       </div>
       <input type="password" value={value || ""} onChange={(e) => onChange(e.target.value)} data-testid={testId} autoComplete="off" className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-sm font-mono" placeholder={masked ? "Leer lassen, um das Gespeicherte zu behalten" : placeholder} />
-      {masked && <button type="button" onClick={onClear} className="mt-2 tls-type-label text-[#FF6B6B]">Gespeichertes entfernen</button>}
+      {masked && <button type="button" onClick={onClear} className="mt-2 tls-type-label text-live">Gespeichertes entfernen</button>}
     </label>
   );
 }

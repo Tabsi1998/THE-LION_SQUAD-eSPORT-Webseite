@@ -53,7 +53,7 @@ function EmbedRow({ prefix, label, hint, entry, channels, draft, onDraft, busy, 
           <input type="checkbox" checked={!!entry.enabled} disabled={!!busy} onChange={(e) => onToggle(e.target.checked)} className="accent-[#5865F2]" data-testid={`${prefix}-enabled`} />
           <span>{label}</span>
         </label>
-        <span className={`tls-type-small ${entry.error ? "text-[#FF6B6B]" : "text-white/45"}`} data-testid={`${prefix}-state`}>{stateText(entry)}</span>
+        <span className={`tls-type-small ${entry.error ? "text-warn" : "text-white/45"}`} data-testid={`${prefix}-state`}>{stateText(entry)}</span>
       </div>
       {hint ? <p className="tls-type-small text-white/45">{hint}</p> : null}
       <div className="grid sm:grid-cols-[minmax(0,1fr)_auto] gap-2 items-start">

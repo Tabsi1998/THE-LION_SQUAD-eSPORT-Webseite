@@ -26,7 +26,7 @@ const STATUS_CLASSES = {
   active: "bg-ok/10 text-ok",
   planned: "bg-[#29B6E8]/10 text-[#29B6E8]",
   expired: "bg-white/10 text-white/60",
-  inactive: "bg-quiet/10 text-quiet",
+  inactive: "bg-white/5 text-quiet",
 };
 const TIER_DEFAULTS = {
   main: { show_on_home: true, show_on_footer: true, show_on_events: false, show_on_tv: true, show_on_pdf: true, show_in_emails: true },
@@ -143,7 +143,7 @@ export default function AdminSponsorsPage() {
                     </span>
                     {s.show_on_home && <span className="tls-type-label px-1.5 py-0.5 bg-[#29B6E8]/15 text-[#29B6E8] rounded-sm">Startseite</span>}
                     {s.show_on_footer && <span className="tls-type-label px-1.5 py-0.5 bg-white/10 text-white/70 rounded-sm">Fußzeile</span>}
-                    {s.show_on_events && <span className="tls-type-label px-1.5 py-0.5 bg-event/15 text-event rounded-sm">Events</span>}
+                    {s.show_on_events && <span className="tls-type-label px-1.5 py-0.5 border border-event/40 text-event rounded-sm">Events</span>}
                     {s.show_on_tv && <span className="tls-type-label px-1.5 py-0.5 bg-[#9F7AEA]/15 text-[#BFA6FF] rounded-sm">TV</span>}
                     {s.show_on_pdf && <span className="tls-type-label px-1.5 py-0.5 bg-[#29B6E8]/15 text-[#8EE6FF] rounded-sm">PDF</span>}
                     {s.show_in_emails && <span className="tls-type-label px-1.5 py-0.5 bg-[#18C29C]/15 text-[#18C29C] rounded-sm">E-Mail</span>}

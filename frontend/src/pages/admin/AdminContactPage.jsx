@@ -14,7 +14,7 @@ const STATUS_LABEL = {
   in_progress: { l: "In Bearbeitung", c: "text-brand bg-brand/10 border-brand/30" },
   answered: { l: "Beantwortet", c: "text-ok bg-ok/10 border-ok/30" },
   closed: { l: "Geschlossen", c: "text-white/50 bg-white/5 border-white/10" },
-  spam: { l: "Spam", c: "text-quiet bg-quiet/10 border-quiet/30" },
+  spam: { l: "Spam", c: "text-quiet bg-white/5 border-quiet/30" },
 };
 
 const PAGE_SIZE = 50;

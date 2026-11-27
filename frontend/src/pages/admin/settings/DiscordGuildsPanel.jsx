@@ -118,7 +118,7 @@ function GuildRoles({ guild, busy, onToggle }) {
           Spiel-Rollen ohne Rolle hier: {sync.missing_games.map((name) => `„${name}“`).join(", ")} – nur nötig, wenn ihr sie hier wollt.
         </div>
       ) : null}
-      {sync.error ? <div className="text-[#FF6B6B]" data-testid={`discord-guild-${guild.guild_id}-roles-error`}>{sync.error}</div> : null}
+      {sync.error ? <div className="text-warn" data-testid={`discord-guild-${guild.guild_id}-roles-error`}>{sync.error}</div> : null}
     </div>
   );
 }

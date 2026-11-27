@@ -15,7 +15,7 @@ const ACCESS_EVENT_LIMIT_FIELDS = [
 
 function FieldError({ message, testId }) {
   if (!message) return null;
-  return <p role="alert" className="mt-1 tls-type-small text-[#FF6B6B]" data-testid={testId}>{message}</p>;
+  return <p role="alert" className="mt-1 tls-type-small text-warn" data-testid={testId}>{message}</p>;
 }
 const LIMIT_KEYS = [...ACCESS_LIMIT_FIELDS, ...ACCESS_EVENT_LIMIT_FIELDS].map(([key]) => key).concat(["event_limits_from", "event_limits_until"]);
 

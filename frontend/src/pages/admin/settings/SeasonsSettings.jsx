@@ -96,7 +96,7 @@ function ManagedSeasonCard({ season }) {
     <div className="border border-white/10 bg-[#121212] rounded-sm p-4" data-testid={`season-${season.key}`}>
       <div className="font-bold uppercase inline-flex items-center gap-2">
         {season.label}
-        {season.active_now && <span className="tls-type-label px-1.5 py-0.5 rounded-sm bg-ok/15 text-ok">läuft</span>}
+        {season.active_now && <span className="tls-type-label px-1.5 py-0.5 rounded-sm bg-live/10 text-live">läuft</span>}
       </div>
       <p className="mt-1 tls-type-small text-white/75" data-testid={`season-${season.key}-managed`}>
         {season.enabled ? "An" : "Aus"} – gepflegt unter <Link to={place.to} className="text-[#29B6E8] hover:underline">{place.page}</Link>.
@@ -119,7 +119,7 @@ function SeasonCard({ season, busy, onSave, onPreview, previewRunning = false })
         <div className="min-w-0">
           <div className="font-bold uppercase inline-flex items-center gap-2">
             {season.label}
-            {season.active_now && <span className="tls-type-label px-1.5 py-0.5 rounded-sm bg-ok/15 text-ok" data-testid={`season-${season.key}-live`}>läuft</span>}
+            {season.active_now && <span className="tls-type-label px-1.5 py-0.5 rounded-sm bg-live/10 text-live" data-testid={`season-${season.key}-live`}>läuft</span>}
           </div>
           <p className="mt-1 tls-type-small text-white/50 max-w-2xl">{season.description}</p>
           <p className="mt-1 tls-type-small text-white/70" data-testid={`season-${season.key}-state`}>{stateText(season)}</p>
@@ -290,7 +290,7 @@ export function SeasonsSettings() {
   };
 
   if (!data) {
-    return loadError ? <div className="tls-type-small text-[#FF6B6B]" data-testid="seasons-error">Der Stand der Jahreszeiten konnte nicht geladen werden.</div> : null;
+    return loadError ? <div className="tls-type-small text-warn" data-testid="seasons-error">Der Stand der Jahreszeiten konnte nicht geladen werden.</div> : null;
   }
   const year = calendarYear ?? new Date(data.now).getFullYear();
   const rows = calendar ?? data.calendar ?? [];

@@ -123,7 +123,7 @@ export function GoogleAuthButton({
       ) : (
         <div ref={buttonRef} aria-label={label} className={`min-h-10 ${googleProcessing ? "pointer-events-none opacity-50" : ""}`} data-testid="google-auth-button" />
       )}
-      {loadError && <p className="mt-2 tls-type-small text-[#FF6B6B]" role="alert">{loadError}</p>}
+      {loadError && <p className="mt-2 tls-type-small text-warn" role="alert">{loadError}</p>}
     </div>
   );
 }

@@ -164,7 +164,7 @@ export default function EventsPage() {
             </button>
           ))}
           {signedIn && (
-            <button type="button" onClick={() => setOnlyMine((value) => !value)} aria-pressed={onlyMine} data-testid="events-only-mine" className={`tls-type-label tls-btn ${onlyMine ? "tls-btn--honor" : "tls-btn--quiet"} px-3 py-1.5 rounded-sm`}>
+            <button type="button" onClick={() => setOnlyMine((value) => !value)} aria-pressed={onlyMine} data-testid="events-only-mine" className={`tls-type-label tls-btn ${onlyMine ? "tls-btn--primary" : "tls-btn--quiet"} px-3 py-1.5 rounded-sm`}>
               Nur meine
             </button>
           )}

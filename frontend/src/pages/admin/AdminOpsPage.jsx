@@ -235,7 +235,7 @@ export default function AdminOpsPage() {
         {tiles.map((tile) => (
           <div
             key={tile.label}
-            className={`border rounded-sm p-3 ${tile.tone === "danger" ? "border-warn/30 bg-warn/10" : tile.tone === "warn" ? "border-[#FFD95A]/30 bg-[#FFD95A]/10" : "border-white/10 bg-[#121212]"}`}
+            className={`border rounded-sm p-3 ${tile.tone === "danger" ? "border-[#FF3B30]/30 bg-[#FF3B30]/10" : tile.tone === "warn" ? "border-[#FFD95A]/30 bg-[#FFD95A]/10" : "border-white/10 bg-[#121212]"}`}
           >
             <div className="tls-type-label text-quiet">{tile.label}</div>
             <div className="tls-type-section tls-type-num">{tile.value}</div>

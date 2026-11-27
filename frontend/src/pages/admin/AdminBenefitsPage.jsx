@@ -84,7 +84,7 @@ export default function AdminBenefitsPage() {
                   <h3 className="tls-type-card">{b.title}</h3>
                 </div>
                 {!b.is_active && <span className="tls-type-label text-quiet">inaktiv</span>}
-                {b.is_active && benefitTimeLabel(b) && <span className="tls-type-label text-[#FF9500]" data-testid={`benefit-time-${b.id}`}>{benefitTimeLabel(b)}</span>}
+                {b.is_active && benefitTimeLabel(b) && <span className="tls-type-label text-warn" data-testid={`benefit-time-${b.id}`}>{benefitTimeLabel(b)}</span>}
               </div>
               {b.description && <p className="mt-2 tls-type-body text-white/65 line-clamp-3">{b.description}</p>}
               <div className="mt-4 flex gap-2">

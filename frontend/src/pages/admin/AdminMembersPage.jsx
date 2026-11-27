@@ -216,7 +216,7 @@ export default function AdminMembersPage() {
           </>
         )}
       </div>
-      {limitHint && <p className="mb-5 border border-[#FF9500]/40 bg-[#FF9500]/5 rounded-sm p-3 tls-type-body text-white/80" data-testid="members-limit-hint">{limitHint}</p>}
+      {limitHint && <p className="mb-5 border border-warn/40 bg-warn/5 rounded-sm p-3 tls-type-body text-white/80" data-testid="members-limit-hint">{limitHint}</p>}
 
       <div className="border border-white/10 rounded-sm bg-[#121212] overflow-hidden">
         <div className="tls-swipe pb-0">
@@ -248,7 +248,7 @@ export default function AdminMembersPage() {
                     <td className="px-4 py-3 text-white/60 tls-type-small">{u.email}</td>
                     <td className="px-4 py-3">
                       <StatusPill status={m?.member_status || "none"} />
-                      {m?.exit_request && <div className="mt-1 tls-type-label text-[#FF9500]" data-testid={`member-exit-${u.username}`}>Austritt erklärt</div>}
+                      {m?.exit_request && <div className="mt-1 tls-type-label text-warn" data-testid={`member-exit-${u.username}`}>Austritt erklärt</div>}
                     </td>
                     <td className="px-4 py-3 tls-type-small font-mono text-honor">{m?.member_number || "—"}</td>
                     <td className="px-4 py-3 tls-type-small text-white/70">{m?.membership_type ? TYPE_LABELS[m.membership_type] || m.membership_type : "—"}</td>
@@ -353,7 +353,7 @@ function EditModal({ entry, meta, onClose, onSave }) {
         </div>
       )}
       {exitText && (
-        <p className="border border-[#FF9500]/40 bg-[#FF9500]/5 rounded-sm p-3 tls-type-small text-white/80" data-testid="edit-exit-request">
+        <p className="border border-warn/40 bg-warn/5 rounded-sm p-3 tls-type-small text-white/80" data-testid="edit-exit-request">
           {exitText} Setze den Status auf „Ehemalig“, wenn es so weit ist – die Person bleibt bis dahin Mitglied. Hält sie einen Vorstandsposten, besetze ihn zuerst neu.
         </p>
       )}

@@ -393,7 +393,7 @@ function DashboardMatchCard({ match, staff = false, testId }) {
       </div>
       {details.length > 0 && <div className="tls-type-small text-white/50 mt-1">{details.join(" · ")}</div>}
       {match.scheduled_at && <div className="tls-type-small text-white/45 mt-1">{viennaDateTime(match.scheduled_at)}</div>}
-      <div className={`mt-2 tls-type-label ${disputed ? "text-[#FF6B60]" : attention ? "text-warn" : "text-[#29B6E8]"}`}>{action}</div>
+      <div className={`mt-2 tls-type-label ${disputed ? "text-warn" : attention ? "text-brand" : "text-white/70"}`}>{action}</div>
     </Link>
   );
 }

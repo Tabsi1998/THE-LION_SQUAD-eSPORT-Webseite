@@ -83,7 +83,7 @@ export function DiscordBotPanel({ canSystem = false }) {
         <label className="block">
           <div className="tls-type-label text-white/60 mb-1.5">Bot-Token {data.configured && <span className="text-white/40 normal-case">(gespeichert – leer lassen, um ihn zu behalten)</span>}</div>
           <input type="password" value={draft.bot_token} onChange={(e) => setDraft((d) => ({ ...d, bot_token: e.target.value }))} autoComplete="off" placeholder={data.configured ? "••••••" : "Token aus dem Developer Portal"} data-testid="discord-bot-token" className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-sm font-mono" />
-          {data.configured && canSystem && <button type="button" onClick={() => run("clear", () => api.put("/settings/discord", { clear_bot_token: true, bot_enabled: false }), "Token entfernt, Bot angehalten.")} className="mt-2 tls-type-label text-[#FF6B6B]">Gespeicherten Token entfernen</button>}
+          {data.configured && canSystem && <button type="button" onClick={() => run("clear", () => api.put("/settings/discord", { clear_bot_token: true, bot_enabled: false }), "Token entfernt, Bot angehalten.")} className="mt-2 tls-type-label text-live">Gespeicherten Token entfernen</button>}
         </label>
         <label className="block">
           <div className="tls-type-label text-white/60 mb-1.5">Server-ID (optional)</div>

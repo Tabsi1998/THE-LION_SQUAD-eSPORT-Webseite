@@ -16,11 +16,12 @@ import {
   APPEAL_STATE_LABELS, EMPTY_SANCTION_FORM, SANCTION_STATUS, applyCatalog, applyKind, kindOf, matchesOf, needsPeriod, periodPayload,
   sanctionPayload, sanctionProblem,
 } from "@/lib/leagueSanctions";
-import { viennaDateTime } from "@/lib/vienna";
+import { viennaDateTime } from "@/lib/vienna";
+import { ROLE_COLORS } from "@/lib/categoryColors";
 
 const WHEN = { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" };
 const CHIP = {
-  warn: "border-warn/50 text-warn", live: "border-[#FF6B60]/50 text-[#FF6B60]", calm: "border-white/15 text-white/60",
+  warn: "border-warn/50 text-warn", live: "border-warn bg-warn/15 text-warn", calm: "border-white/15 text-white/60",
 };
 const TONE = { none: "text-white/55", calm: "text-white/70", soon: "text-warn", over: "text-white/45" };
 const BUTTON = "tls-btn inline-flex min-h-11 items-center gap-1.5 rounded-sm px-3 py-2 tls-type-label disabled:opacity-50";
@@ -112,7 +113,7 @@ function SanctionForm({ seasonId, data, onDone, onCancel }) {
   };
 
   return (
-    <FormSection title="Strafe verhängen" testId="sanction-form" accent="#FF6B60"
+    <FormSection title="Strafe verhängen" testId="sanction-form" accent={ROLE_COLORS.warn}
       hint="Die Leitung wählt und begründet jede Strafe von Hand. Betroffene sehen Art, Regelverstoß und Begründung unter „Meine Strafen“ und können einmal Einspruch einlegen.">
       <FormGrid cols={2}>
         <SelectField label="Aus dem Strafkatalog (Anlage C)" value={form.catalog_key} testId="sanction-catalog"
@@ -264,7 +265,7 @@ function SanctionCard({ item, superadmin, seasonId, onChanged }) {
   const now = Date.now();
   const done = () => { setAction(""); onChanged(); };
   return (
-    <li className={`rounded-sm border bg-[#0A0A0A] p-4 ${appeal?.state === "open" ? "border-honor/40" : "border-white/10"}`} data-testid={`sanction-${item.id}`}>
+    <li className={`rounded-sm border bg-[#0A0A0A] p-4 ${appeal?.state === "open" ? "border-warn/40" : "border-white/10"}`} data-testid={`sanction-${item.id}`}>
       <div className="flex flex-wrap items-start justify-between gap-x-3 gap-y-2">
         <div className="min-w-0">
           <div className="tls-type-card leading-tight text-white">{item.kind_label}</div>
@@ -290,8 +291,8 @@ function SanctionCard({ item, superadmin, seasonId, onChanged }) {
       </div>
 
       {appeal ? (
-        <div className="mt-3 rounded-sm border border-honor/30 p-3" data-testid={`sanction-appeal-${item.id}`}>
-          <div className="flex items-center gap-2 tls-type-label text-honor"><Scale className="h-3.5 w-3.5" aria-hidden="true" /> {APPEAL_STATE_LABELS[appeal.state]}</div>
+        <div className="mt-3 rounded-sm border border-warn/30 p-3" data-testid={`sanction-appeal-${item.id}`}>
+          <div className="flex items-center gap-2 tls-type-label text-warn"><Scale className="h-3.5 w-3.5" aria-hidden="true" /> {APPEAL_STATE_LABELS[appeal.state]}</div>
           <p className="mt-1 tls-type-small text-white/50">{appeal.by_name || "Gelöschter User"} · {viennaDateTime(appeal.at, WHEN)}</p>
           <p className="mt-1 whitespace-pre-line break-words tls-type-body text-white/90">{appeal.text}</p>
           {appeal.note ? <p className="mt-2 break-words tls-type-body text-white/75">Entscheidung{item.decided_by_name ? ` von ${item.decided_by_name}` : ""}: {appeal.note}</p> : null}
@@ -357,7 +358,7 @@ export function SeasonSanctionsTab({ seasonId }) {
         <div className="flex flex-wrap items-center justify-between gap-3">
           <p className="tls-type-small text-white/75" data-testid="season-sanctions-count">
             <strong className="text-white">{current.length}</strong> {current.length === 1 ? "Strafe läuft" : "Strafen laufen"}
-            {data.open_appeals ? <span className="text-honor"> · {data.open_appeals} {data.open_appeals === 1 ? "Einspruch wartet" : "Einsprüche warten"}</span> : null}
+            {data.open_appeals ? <span className="text-warn"> · {data.open_appeals} {data.open_appeals === 1 ? "Einspruch wartet" : "Einsprüche warten"}</span> : null}
           </p>
           {!adding ? (
             <button type="button" onClick={() => setAdding(true)} disabled={!data.targets.some((row) => row.squads.length)}

@@ -104,7 +104,7 @@ export function FeedbackDialog({ target, onClose, onDone }) {
                 className="mt-1.5 w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-sm resize-none" placeholder="Was sollen wir beibehalten oder besser machen?" />
               <span className="block text-right tls-type-small text-quiet">{text.length}/{textMax}</span>
             </label>
-            {error ? <div className="tls-type-small text-[#FF6B6B]" role="alert">{error}</div> : null}
+            {error ? <div className="tls-type-small text-warn" role="alert">{error}</div> : null}
             <button type="button" onClick={() => send(false)} disabled={!stars || submitting || !prompt} data-testid="feedback-submit"
               className="tls-btn tls-btn--primary w-full px-4 py-3 rounded-sm tls-type-label disabled:opacity-45">Abschicken</button>
             <button type="button" onClick={() => send(true)} disabled={submitting || !prompt} data-testid="feedback-decline"

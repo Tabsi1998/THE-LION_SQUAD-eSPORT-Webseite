@@ -368,7 +368,7 @@ function CheckReport({ report, groupsByCode, onJump, onClose }) {
         <ul className="divide-y divide-white/5 max-h-80 overflow-y-auto">
           {rows.map((f, i) => (
             <li key={`${f.code}-${f.group || ""}-${f.tier || ""}-${i}`} className="py-2 flex items-start gap-3 tls-type-small" data-testid={`finding-${f.level}`}>
-              <span className={`mt-0.5 shrink-0 tls-type-label ${f.level === "error" ? "text-warn" : "text-warn"}`}>{f.level === "error" ? "Fehler" : "Hinweis"}</span>
+              <span className={`mt-0.5 shrink-0 tls-type-label ${f.level === "error" ? "text-warn" : "text-brand"}`}>{f.level === "error" ? "Fehler" : "Hinweis"}</span>
               <span className="flex-1 text-white/75">{f.message}</span>
               {f.group && groupsByCode[f.group] && <button type="button" onClick={() => onJump(f.group)} className="shrink-0 text-[#29B6E8] hover:underline">zur Gruppe</button>}
             </li>

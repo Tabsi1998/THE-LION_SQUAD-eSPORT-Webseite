@@ -165,7 +165,7 @@ function PeopleTab() {
               </div>
               {active ? (
                 <div className="text-right">
-                  <div className="text-[#FF9500] font-bold tls-type-small" data-testid="people-active">{active.label}</div>
+                  <div className="text-warn font-bold tls-type-small" data-testid="people-active">{active.label}</div>
                   <div className="tls-type-small text-white/50">{active.chat_blocked_until ? `Chat bis ${formatMoment(active.chat_blocked_until)}` : active.open_until_decision ? "bis zur Entscheidung" : "ohne Einschränkung"}</div>
                 </div>
               ) : <div className="tls-type-small text-white/45">keine laufende Maßnahme</div>}
@@ -201,7 +201,7 @@ function PeopleTab() {
                   {sanction.action === "warning" && <input type="number" min="1" max="720" value={sanction.chat_hours} onChange={(e) => setSanction((c) => ({ ...c, chat_hours: e.target.value }))} placeholder="Stunden" aria-label="Chat-Sperre in Stunden" data-testid="people-sanction-hours" className="w-24 bg-black/40 border border-white/10 px-2 py-2 rounded-sm text-sm" />}
                 </div>
                 <input value={sanction.reason} onChange={(e) => setSanction((c) => ({ ...c, reason: e.target.value }))} placeholder="Grund (steht in der Benachrichtigung)" data-testid="people-sanction-reason" className="mt-2 w-full bg-black/40 border border-white/10 px-3 py-2 rounded-sm text-sm" />
-                <button type="button" disabled={!!busy || sanction.reason.trim().length < 3} onClick={() => run("sanction", () => api.post(`/moderation/people/${detail.user.id}/sanctions`, { action: sanction.action, reason: sanction.reason.trim(), ...(sanction.action === "warning" && sanction.chat_hours ? { chat_hours: Number(sanction.chat_hours) } : {}) }).then(() => setSanction((c) => ({ ...c, reason: "" }))), "Stufe gesetzt – die Person ist benachrichtigt.")} data-testid="people-sanction-set" className="mt-2 px-3 py-1.5 border border-[#FF9500]/50 text-[#FF9500] rounded-sm tls-type-label disabled:opacity-40">Stufe setzen</button>
+                <button type="button" disabled={!!busy || sanction.reason.trim().length < 3} onClick={() => run("sanction", () => api.post(`/moderation/people/${detail.user.id}/sanctions`, { action: sanction.action, reason: sanction.reason.trim(), ...(sanction.action === "warning" && sanction.chat_hours ? { chat_hours: Number(sanction.chat_hours) } : {}) }).then(() => setSanction((c) => ({ ...c, reason: "" }))), "Stufe gesetzt – die Person ist benachrichtigt.")} data-testid="people-sanction-set" className="mt-2 px-3 py-1.5 border border-warn/50 text-warn rounded-sm tls-type-label disabled:opacity-40">Stufe setzen</button>
               </div>
             </div>
             <div className="mt-3">
@@ -387,7 +387,7 @@ function ReportCard({ report, onSaved }) {
       <div className="mt-2 tls-type-small text-quiet">Gemeldet von {personName(report.reporter, "einem gelöschten Konto")}{report.created_at ? ` · ${viennaDateTime(report.created_at)}` : ""}</div>
       <div className="mt-3 flex flex-wrap gap-2">
         {REPORT_STEPS[reportStatusOf(report.status)].map((next) => (
-          <button key={next} type="button" disabled={busy} aria-pressed={step === next} onClick={() => open(next)} data-testid={`report-step-${next}-${report.id}`} className={`min-h-10 px-3 py-2 border rounded-sm tls-type-label disabled:opacity-40 ${step === next ? "border-[#29B6E8] text-[#29B6E8]" : next === "justified" ? "border-[#FF9500]/50 text-[#FF9500]" : "border-white/15 text-white/70 hover:text-white"}`}>
+          <button key={next} type="button" disabled={busy} aria-pressed={step === next} onClick={() => open(next)} data-testid={`report-step-${next}-${report.id}`} className={`min-h-10 px-3 py-2 border rounded-sm tls-type-label disabled:opacity-40 ${step === next ? "border-[#29B6E8] text-[#29B6E8]" : next === "justified" ? "border-warn/50 text-warn" : "border-white/15 text-white/70 hover:text-white"}`}>
             {reportStepLabel(report.status, next)}
           </button>
         ))}

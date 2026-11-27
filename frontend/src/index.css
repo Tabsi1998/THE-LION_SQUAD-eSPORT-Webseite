@@ -214,7 +214,7 @@ button.tls-bracket-row { cursor: pointer; }
 @media (hover: hover) and (pointer: fine) {
   button.tls-bracket-row:hover { background-color: rgb(255 255 255 / 0.04); }
 }
-button.tls-bracket-row[aria-pressed="true"] { background-color: rgb(var(--tls-honor-rgb) / 0.08); }
+button.tls-bracket-row[aria-pressed="true"] { background-color: rgb(var(--tls-brand-rgb) / 0.08); }
 .tls-bracket-row.is-winner::before {
   content: ""; position: absolute; left: 0; top: 6px; bottom: 6px; width: 3px; border-radius: 0 2px 2px 0;
   background: var(--tls-brand);
@@ -754,6 +754,7 @@ button.tls-bracket-row:active, .tls-bracket-head:active { transform: scale(calc(
 .tls-glow { position: relative; --tls-glow-rgb: var(--tls-brand-rgb); }
 .tls-glow[data-tone="honor"] { --tls-glow-rgb: var(--tls-honor-rgb); }
 .tls-glow[data-tone="ok"] { --tls-glow-rgb: var(--tls-ok-rgb); }
+.tls-glow[data-tone="warn"] { --tls-glow-rgb: var(--tls-warn-rgb); }
 .tls-glow[data-tone="pole"] { --tls-glow-rgb: var(--tls-pole-rgb); }
 .tls-glow[data-tone="fastest"] { --tls-glow-rgb: var(--tls-fastest-rgb); }
 .tls-glow::after {
@@ -3463,7 +3464,7 @@ html[data-season-still-cards] .tls-card[data-season-perch="card"]:focus-visible 
 }
 @media (hover: hover) { .tls-run-card:hover { border-color: rgb(41 182 232 / 0.55); transform: translateY(-2px); } }
 .tls-run-fill { transform-origin: left; animation: tls-run-fill 0.7s var(--tls-ease) 0.2s both; }
-.tls-run-pulse { --tls-pulse-rgb: var(--tls-honor-rgb); width: 6px; height: 6px; border-radius: 9999px; background: rgb(var(--tls-pulse-rgb)); animation: tls-run-pulse 2s ease-out infinite; }
+.tls-run-pulse { --tls-pulse-rgb: var(--tls-brand-rgb); width: 6px; height: 6px; border-radius: 9999px; background: rgb(var(--tls-pulse-rgb)); animation: tls-run-pulse 2s ease-out infinite; }
 .tls-run-pulse--brand { --tls-pulse-rgb: var(--tls-brand-rgb); }
 .tls-run-pulse--live { --tls-pulse-rgb: var(--tls-live-rgb); }
 .tls-run-pulse--ok { --tls-pulse-rgb: var(--tls-ok-rgb); }

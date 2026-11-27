@@ -54,7 +54,7 @@ function GuidedForm({ matchId, guide, sides, busy, onSubmit, createdId, onDone, 
   if (createdId) {
     return (
       <div className={wrapper} data-testid="match-dispute-form">
-        <div className="tls-type-label text-[#FF6B60] flex items-center gap-2"><AlertTriangle className="w-3.5 h-3.5" /> Problem melden{help}</div>
+        <div className="tls-type-label text-warn flex items-center gap-2"><AlertTriangle className="w-3.5 h-3.5" /> Problem melden{help}</div>
         <Steps current={2} />
         <div className="tls-stagger space-y-3" data-testid="procedure-step-proofs">
           <p className="tls-type-body text-white/75">
@@ -79,7 +79,7 @@ function GuidedForm({ matchId, guide, sides, busy, onSubmit, createdId, onDone, 
   const left = remainingText(guide.until);
   return (
     <form onSubmit={submit} className={wrapper} data-testid="match-dispute-form" noValidate>
-      <div className="tls-type-label text-[#FF6B60] flex items-center gap-2"><AlertTriangle className="w-3.5 h-3.5" /> Problem melden{help}</div>
+      <div className="tls-type-label text-warn flex items-center gap-2"><AlertTriangle className="w-3.5 h-3.5" /> Problem melden{help}</div>
       <Steps current={form.reasonKey ? 1 : 0} />
       <section className="rounded-sm border border-white/10 bg-[#0A0A0A] px-3 py-2.5" data-testid="procedure-kind">
         <div className="tls-type-label text-white/60">1 · Art</div>
@@ -147,7 +147,7 @@ function GuidedForm({ matchId, guide, sides, busy, onSubmit, createdId, onDone, 
       <p className="tls-type-small text-white/50" data-testid="match-dispute-hint">
         3 · Nachweise fügst du im nächsten Schritt hinzu. Die Gegenseite sieht Grund, Begründung und das abweichende Ergebnis und kann Stellung nehmen.
       </p>
-      {error ? <p className="tls-type-small text-[#FF6B60]" role="alert" data-testid="match-dispute-error">{error}</p> : null}
+      {error ? <p className="tls-type-small text-warn" role="alert" data-testid="match-dispute-error">{error}</p> : null}
       <button disabled={busy} className="tls-btn tls-btn--danger min-h-[44px] px-4 py-2 rounded-sm tls-type-label disabled:opacity-50" data-testid="match-dispute-btn">
         {guide.kind_label} einreichen
       </button>
@@ -186,7 +186,7 @@ export function ProblemReportForm({ matchId, until = null, busy = false, initial
 
   return (
     <form onSubmit={submit} className={`space-y-3 ${separated ? "border-t border-white/10 pt-5" : ""}`} data-testid="match-dispute-form" noValidate>
-      <div className="tls-type-label text-[#FF6B60] flex items-center gap-2"><AlertTriangle className="w-3.5 h-3.5" /> Problem melden{help}</div>
+      <div className="tls-type-label text-warn flex items-center gap-2"><AlertTriangle className="w-3.5 h-3.5" /> Problem melden{help}</div>
       <div className="tls-type-small text-white/60">Was stimmt nicht?</div>
       <div className="flex flex-wrap gap-2" role="group" aria-label="Grund">
         {DISPUTE_REASONS.map(([key, label]) => (
@@ -208,7 +208,7 @@ export function ProblemReportForm({ matchId, until = null, busy = false, initial
         Die Turnierleitung bekommt sofort Bescheid, prüft und entscheidet.
         {until ? ` Möglich bis ${formatWhen(until)}.` : ""}
       </p>
-      {error ? <p className="tls-type-small text-[#FF6B60]" role="alert" data-testid="match-dispute-error">{error}</p> : null}
+      {error ? <p className="tls-type-small text-warn" role="alert" data-testid="match-dispute-error">{error}</p> : null}
       <button disabled={busy} className="tls-btn tls-btn--danger min-h-[44px] px-4 py-2 rounded-sm tls-type-label disabled:opacity-50" data-testid="match-dispute-btn">An die Turnierleitung schicken</button>
     </form>
   );

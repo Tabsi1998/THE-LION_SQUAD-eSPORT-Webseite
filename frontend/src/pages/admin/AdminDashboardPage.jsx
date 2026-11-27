@@ -585,7 +585,7 @@ export default function AdminDashboardPage() {
               <CartesianGrid stroke="rgba(255,255,255,0.06)" vertical={false} />
               <XAxis dataKey="label" tick={{ fill: "rgba(255,255,255,0.4)", fontSize: 12 }} tickLine={false} axisLine={{ stroke: "rgba(255,255,255,0.1)" }} interval="preserveStartEnd" minTickGap={26} />
               <YAxis yAxisId="left" allowDecimals={false} tick={{ fill: "rgba(255,255,255,0.4)", fontSize: 12 }} tickLine={false} axisLine={false} />
-              <YAxis yAxisId="right" orientation="right" allowDecimals={false} tick={{ fill: "rgba(255,215,0,0.55)", fontSize: 12 }} tickLine={false} axisLine={false} width={40} domain={["auto", "auto"]} />
+              <YAxis yAxisId="right" orientation="right" allowDecimals={false} tick={{ fill: "rgba(41,182,232,0.55)", fontSize: 12 }} tickLine={false} axisLine={false} width={40} domain={["auto", "auto"]} />
               <Tooltip
                 contentStyle={{ background: "#0A0A0A", border: "1px solid rgba(255,255,255,0.14)", borderRadius: 4, fontSize: 12 }}
                 labelStyle={{ color: "rgba(255,255,255,0.6)", fontWeight: 700 }}

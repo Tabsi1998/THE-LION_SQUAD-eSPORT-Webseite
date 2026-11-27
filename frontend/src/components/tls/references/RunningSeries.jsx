@@ -29,7 +29,7 @@ export function RunningSeries({ items, index = 2 }) {
   const count = `${items.length} ${items.length === 1 ? "laufende Saison" : "laufende Saisons"}`;
   return (
     <section id="einsatz" aria-labelledby="references-running-title" className="tls-ref-anchor tls-ref-rise max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-10 md:pt-[72px]" style={{ "--tls-ref-i": index }} data-testid="references-running">
-      <SectionHead id="references-running-title" eyebrow="Gerade im Einsatz" tone={today ? "honor" : "brand"} pulse={today} title="Läuft gerade" hint={`${count} · Stand nach dem letzten gewerteten Termin`} />
+      <SectionHead id="references-running-title" eyebrow="Gerade im Einsatz" tone="brand" pulse={today} title="Läuft gerade" hint={`${count} · Stand nach dem letzten gewerteten Termin`} />
       <div className="tls-ref-scroll tls-ref-snap -mx-4 px-4 pb-1 flex gap-3 tls-swipe tls-swipe--room sm:-mx-6 sm:px-6 md:mx-0 md:px-0 md:pb-0 md:overflow-visible md:grid md:gap-5 md:grid-cols-[repeat(auto-fit,minmax(min(100%,330px),1fr))] md:[mask-image:none] md:[-webkit-mask-image:none]" data-testid="references-running-list">
         {items.map((item) => <RunningCard key={`${item.lineage.slug}/${item.series.season_slug}`} item={item} />)}
       </div>
@@ -48,7 +48,7 @@ function RunningCard({ item }) {
       to={seriesAddress(lineage, series)}
       data-testid={`running-card-${lineage.slug}-${series.season_slug}`}
       data-today={item.today ? "true" : undefined}
-      className={`tls-ref-lift shrink-0 w-[min(300px,calc(100vw-3rem))] md:w-auto min-w-0 flex flex-col gap-3.5 md:gap-[18px] p-[18px] md:p-[22px] bg-surface-1 border rounded-[10px] text-white no-underline ${item.today ? "border-honor/40" : "border-white/[0.08]"}`}
+      className={`tls-ref-lift shrink-0 w-[min(300px,calc(100vw-3rem))] md:w-auto min-w-0 flex flex-col gap-3.5 md:gap-[18px] p-[18px] md:p-[22px] bg-surface-1 border rounded-[10px] text-white no-underline ${item.today ? "border-brand/40" : "border-white/[0.08]"}`}
     >
       <div className="flex items-start gap-3 md:gap-3.5">
         {/* #2014: das Logo der Saison bzw. Spur steht vor dem Spiel-Logo. */}
@@ -60,7 +60,7 @@ function RunningCard({ item }) {
           <PartnerHostBadge partner={item.organizers?.[0]} className="mt-1" />
         </div>
         {item.today && (
-          <span className="shrink-0 inline-flex items-center gap-1.5 md:gap-[7px] px-2 md:px-2.5 py-1 rounded-full bg-honor/[0.12] border border-honor/45 text-honor tls-type-label md:tracking-[0.12em]" data-testid="running-today-badge">
+          <span className="shrink-0 inline-flex items-center gap-1.5 md:gap-[7px] px-2 md:px-2.5 py-1 rounded-full bg-brand/[0.12] border border-brand/45 text-brand tls-type-label md:tracking-[0.12em]" data-testid="running-today-badge">
             <span className="tls-run-pulse" aria-hidden="true" /> Heute
           </span>
         )}

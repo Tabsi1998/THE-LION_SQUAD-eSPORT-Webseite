@@ -110,14 +110,14 @@ export default function AdminDocumentsPage() {
               <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0">
                   <div className="font-bold text-white flex items-center gap-1.5">
-                    {d.pinned && <Pin className="w-3 h-3 shrink-0 text-honor" />}
+                    {d.pinned && <Pin className="w-3 h-3 shrink-0 text-white" />}
                     <span className="break-words">{d.title}</span>
                   </div>
                   <div className="tls-type-small text-white/50 tls-wrap">{d.original_filename}</div>
                 </div>
                 <VisibilityBadge value={d.visibility} />
               </div>
-              <div className="mt-2 tls-type-label text-honor">{CATEGORY_LABELS[d.category] || "Sonstiges"} · <span className="text-white/60">{fmtSize(d.file_size)}</span></div>
+              <div className="mt-2 tls-type-label text-brand">{CATEGORY_LABELS[d.category] || "Sonstiges"} · <span className="text-white/60">{fmtSize(d.file_size)}</span></div>
               <div className="mt-1 tls-type-small text-white/55">{usageLine(d)}</div>
               <div className="mt-1 tls-type-small font-semibold"><DownloadRule allowed={d.allow_download} /></div>
               <div className="mt-3 flex flex-wrap gap-1.5">

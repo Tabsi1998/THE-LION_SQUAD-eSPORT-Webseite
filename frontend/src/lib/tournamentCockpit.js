@@ -16,12 +16,12 @@ export const PROBLEM_KINDS = Object.freeze({
   procedure: { rank: 0, chip: "Einspruch", tone: "warn" },
   no_show: { rank: 1, chip: "Nicht erschienen", tone: "warn" },
   station_broken: { rank: 2, chip: "Defekt", tone: "warn" },
-  result_missing: { rank: 3, chip: "Ergebnis fehlt", tone: "honor" },
-  report_conflict: { rank: 4, chip: "Meldungen weichen ab", tone: "honor" },
-  delay: { rank: 5, chip: "Verzug", tone: "honor" },
+  result_missing: { rank: 3, chip: "Ergebnis fehlt", tone: "warn" },
+  report_conflict: { rank: 4, chip: "Meldungen weichen ab", tone: "warn" },
+  delay: { rank: 5, chip: "Verzug", tone: "warn" },
   draw: { rank: 6, chip: "Auslosung", tone: "brand" },
 });
-const OTHER = { rank: 7, chip: "", tone: "honor" };
+const OTHER = { rank: 7, chip: "", tone: "warn" };
 
 // Solange das Cockpit offen ist, fragt es zusätzlich im Takt nach (zum Änderungsstrom dazu): „Ergebnis fehlt“ und Verzug
 // entstehen mit der Zeit, ohne dass sich etwas ändert, das der Strom meldet. Kurz genug für den Turniertag, und die

@@ -269,7 +269,7 @@ export function SpamGuardSection() {
             <div className="tls-type-label text-white/60 mb-1.5">Secret Key – {SECRET_STATE[secretState] || secretState}</div>
             <input type="password" autoComplete="new-password" value={secret} onChange={(event) => setSecret(event.target.value)} placeholder={secretState === "ok" ? "hinterlegt – nur zum Ersetzen ausfüllen" : "Secret Key eintragen"}
               data-testid="turnstile-secret" className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-sm font-mono" />
-            {view.turnstile.secret?.detail && <p className="mt-1 tls-type-small text-[#FF8A80]">{view.turnstile.secret.detail}</p>}
+            {view.turnstile.secret?.detail && <p className="mt-1 tls-type-small text-warn">{view.turnstile.secret.detail}</p>}
           </label>
           <label className="block">
             <div className="tls-type-label text-white/60 mb-1.5">Modus</div>
@@ -314,7 +314,7 @@ export function SpamGuardSection() {
           )}
         </div>
         {(testResult || view.turnstile.last_test) && (
-          <p className={`tls-type-small ${(testResult || view.turnstile.last_test).ok ? "text-ok" : "text-[#FF8A80]"}`} data-testid="turnstile-test-result">
+          <p className={`tls-type-small ${(testResult || view.turnstile.last_test).ok ? "text-ok" : "text-warn"}`} data-testid="turnstile-test-result">
             Letzter Test: {(testResult || view.turnstile.last_test).detail}
           </p>
         )}

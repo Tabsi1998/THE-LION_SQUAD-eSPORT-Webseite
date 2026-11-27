@@ -150,7 +150,7 @@
   background: rgb(0 0 0 / 0.7);
 }
 .tls-veto-card[data-role="picked"][data-by="own"] .tls-veto-card__label { color: #04121a; background: var(--tls-cyan); }
-.tls-veto-card[data-role="decider"] .tls-veto-card__label { color: #1a1400; background: rgb(255 215 0 / 0.9); }
+.tls-veto-card[data-role="decider"] .tls-veto-card__label { color: #1a1400; background: rgb(var(--tls-honor-rgb) / 0.9); }
 .tls-veto-card__body { display: grid; gap: 0.0625rem; padding: 0.3125rem 0.4375rem 0.375rem; min-width: 0; }
 .tls-veto-card__name {
   font-size: var(--tls-type-label-size);

@@ -426,7 +426,7 @@
   background: #fff;
   transition: transform var(--tls-motion-fast) var(--tls-ease);
 }
-.tls-rules-switch[aria-checked="true"] .tls-rules-switch__track { background: rgba(255, 215, 0, 0.35); border-color: var(--tls-rules-mark); }
+.tls-rules-switch[aria-checked="true"] .tls-rules-switch__track { background: rgb(var(--tls-warn-rgb) / 0.35); border-color: var(--tls-rules-mark); }
 .tls-rules-switch[aria-checked="true"] .tls-rules-switch__track::after { transform: translateX(1rem); }
 .tls-rules-switch:focus-visible { outline: 2px solid rgb(var(--league-accent-rgb, var(--tls-brand-rgb))); outline-offset: 2px; border-radius: 2px; }
 

@@ -74,7 +74,7 @@ export function SeasonTvFinaleControl({ seasonId, canSteer = false }) {
       {!blocked && state.labels?.length ? (
         <ol className="mt-2 flex flex-wrap gap-2 tls-type-small" aria-label="Reihenfolge am TV" data-testid="tv-finale-labels">
           {state.labels.map((label, index) => (
-            <li key={label} className={`rounded-sm border px-2 py-1 font-bold uppercase tracking-wider ${index + 1 === state.step ? "border-honor/60 text-honor" : "border-white/15 text-white/60"}`}>
+            <li key={label} className={`rounded-sm border px-2 py-1 font-bold uppercase tracking-wider ${index + 1 === state.step ? "border-brand/60 text-brand" : "border-white/15 text-white/60"}`}>
               {index + 1}. {label}
             </li>
           ))}

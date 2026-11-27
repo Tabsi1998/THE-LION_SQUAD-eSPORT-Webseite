@@ -190,7 +190,7 @@ export default function AdminNavPage() {
         <span className="tls-type-small text-quiet ml-auto">{items.length} Hauptpunkte</span>
       </div>
       {missing.length > 0 && (
-        <p role="alert" className="mt-3 tls-type-small text-[#FF6B6B]" data-testid="nav-missing-label">Jeder Menüpunkt braucht einen Namen – ein Feld ist leer.</p>
+        <p role="alert" className="mt-3 tls-type-small text-warn" data-testid="nav-missing-label">Jeder Menüpunkt braucht einen Namen – ein Feld ist leer.</p>
       )}
 
       {loading ? (
@@ -241,7 +241,7 @@ export default function AdminNavPage() {
                     aria-label={`Name des Menüpunkts ${it.to || ""}`.trim()}
                     aria-invalid={!String(it.label || "").trim() || undefined}
                     required
-                    className={`min-w-0 flex-1 bg-[#0A0A0A] border rounded-sm px-3 py-1.5 text-sm font-semibold ${String(it.label || "").trim() ? "border-white/10" : "border-[#FF6B6B]"}`}
+                    className={`min-w-0 flex-1 bg-[#0A0A0A] border rounded-sm px-3 py-1.5 text-sm font-semibold ${String(it.label || "").trim() ? "border-white/10" : "border-warn"}`}
                   />
                   {it.to && (
                     <span className="hidden md:inline tls-type-small text-quiet font-mono truncate max-w-[180px]">{it.to}</span>
@@ -291,7 +291,7 @@ export default function AdminNavPage() {
                               aria-label={`Name des Unterpunkts ${c.to || ""}`.trim()}
                               aria-invalid={!String(c.label || "").trim() || undefined}
                               required
-                              className={`w-full bg-[#121212] border rounded-sm px-2.5 py-1 text-xs ${String(c.label || "").trim() ? "border-white/10" : "border-[#FF6B6B]"}`}
+                              className={`w-full bg-[#121212] border rounded-sm px-2.5 py-1 text-xs ${String(c.label || "").trim() ? "border-white/10" : "border-warn"}`}
                             />
                             {ENTRY_NOTES[c.key] && <span className="mt-0.5 block tls-type-small text-white/45" data-testid={`nav-note-${c.key}`}>{ENTRY_NOTES[c.key]}</span>}
                           </div>

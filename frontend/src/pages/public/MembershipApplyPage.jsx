@@ -185,7 +185,7 @@ export default function MembershipApplyPage() {
         {loading ? (
           <SkeletonLines lines={4} className="mt-8" label="Lade Antrag" />
         ) : setup.coupled && setup.available === false ? (
-          <StatusCard testId="apply-unavailable" icon={AlertTriangle} color={ROLE_COLORS.honor} title="Gerade nicht möglich" body="Die Mitgliederverwaltung ist im Moment nicht erreichbar. Bitte in ein paar Minuten noch einmal versuchen – nichts ist verloren." />
+          <StatusCard testId="apply-unavailable" icon={AlertTriangle} color={ROLE_COLORS.warn} title="Gerade nicht möglich" body="Die Mitgliederverwaltung ist im Moment nicht erreichbar. Bitte in ein paar Minuten noch einmal versuchen – nichts ist verloren." />
         ) : !showForm && status === "submitting" ? (
           <StatusCard testId="apply-submitting" icon={Send} color="#29B6E8" title="Antrag wird übermittelt" body="Dein Antrag ist gespeichert und geht gerade an die Mitgliederverwaltung. Klappt das nicht sofort, versuchen wir es automatisch weiter – du musst nichts tun." action={<button type="button" onClick={withdraw} data-testid="apply-withdraw" className="tls-type-label text-white/50 hover:text-live inline-flex items-center gap-1"><Undo2 className="w-3.5 h-3.5" /> Zurückziehen</button>} />
         ) : !showForm && status === "pending" ? (
@@ -232,11 +232,11 @@ export default function MembershipApplyPage() {
             <div className="space-y-2 pt-2 border-t border-white/5">
               <label className="flex items-start gap-2 cursor-pointer">
                 <input id="apply-statutes" type="checkbox" required checked={form.accept_statutes} onChange={(e) => updateField("accept_statutes", e.target.checked)} data-testid="apply-statutes" aria-invalid={!!fieldErrors.accept_statutes} aria-describedby={fieldErrors.accept_statutes ? "apply-statutes-error" : undefined} className="mt-1 accent-honor" />
-                <span className="tls-type-small text-white/70">Ich habe die <a href={statutesHref(statutes)} target="_blank" rel="noreferrer" data-testid="apply-statutes-link" className="text-[#29B6E8] underline">Vereinsstatuten</a> gelesen und akzeptiere sie.{fieldErrors.accept_statutes && <span id="apply-statutes-error" role="alert" className="block mt-1 tls-type-small text-[#FF8A80]">{fieldErrors.accept_statutes}</span>}</span>
+                <span className="tls-type-small text-white/70">Ich habe die <a href={statutesHref(statutes)} target="_blank" rel="noreferrer" data-testid="apply-statutes-link" className="text-[#29B6E8] underline">Vereinsstatuten</a> gelesen und akzeptiere sie.{fieldErrors.accept_statutes && <span id="apply-statutes-error" role="alert" className="block mt-1 tls-type-small text-warn">{fieldErrors.accept_statutes}</span>}</span>
               </label>
               <label className="flex items-start gap-2 cursor-pointer">
                 <input id="apply-privacy" type="checkbox" required checked={form.accept_privacy} onChange={(e) => updateField("accept_privacy", e.target.checked)} data-testid="apply-privacy" aria-invalid={!!fieldErrors.accept_privacy} aria-describedby={fieldErrors.accept_privacy ? "apply-privacy-error" : undefined} className="mt-1 accent-honor" />
-                <span className="tls-type-small text-white/70">Ich akzeptiere die <a href="/privacy" className="text-[#29B6E8] underline">Datenschutzerklärung</a>.{fieldErrors.accept_privacy && <span id="apply-privacy-error" role="alert" className="block mt-1 tls-type-small text-[#FF8A80]">{fieldErrors.accept_privacy}</span>}</span>
+                <span className="tls-type-small text-white/70">Ich akzeptiere die <a href="/privacy" className="text-[#29B6E8] underline">Datenschutzerklärung</a>.{fieldErrors.accept_privacy && <span id="apply-privacy-error" role="alert" className="block mt-1 tls-type-small text-warn">{fieldErrors.accept_privacy}</span>}</span>
               </label>
             </div>
             {submitError && <AuthFormAlert id="apply-submit-error">{submitError}</AuthFormAlert>}
@@ -272,7 +272,7 @@ function CoupledFields({ setup, form, updateField, fieldErrors, requiredPerson }
             </label>
           ))}
         </div>
-        {fieldErrors.type_id && <div id="apply-type_id" tabIndex={-1} role="alert" className="mt-1 tls-type-small text-[#FF8A80]">{fieldErrors.type_id}</div>}
+        {fieldErrors.type_id && <div id="apply-type_id" tabIndex={-1} role="alert" className="mt-1 tls-type-small text-warn">{fieldErrors.type_id}</div>}
       </div>
 
       <div>
@@ -333,7 +333,7 @@ function Field({ id, label, error, className = "", children }) {
     <label htmlFor={id} className={`block ${className}`}>
       <div className="tls-type-label text-white/60 mb-1.5">{label}</div>
       {children}
-      {error && <div id={`${id}-error`} role="alert" className="mt-1 tls-type-small text-[#FF8A80]">{error}</div>}
+      {error && <div id={`${id}-error`} role="alert" className="mt-1 tls-type-small text-warn">{error}</div>}
     </label>
   );
 }

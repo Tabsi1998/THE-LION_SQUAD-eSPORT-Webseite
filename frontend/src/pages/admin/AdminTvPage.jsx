@@ -111,7 +111,7 @@ export default function AdminTvPage() {
             </button>
           </div>
         </div>
-        {loadError && <div className="mt-3 tls-type-small text-[#FF6B6B]" data-testid="tv-defaults-error">Die Grundwerte konnten nicht geladen werden.</div>}
+        {loadError && <div className="mt-3 tls-type-small text-warn" data-testid="tv-defaults-error">Die Grundwerte konnten nicht geladen werden.</div>}
         <div className="mt-4 space-y-5">
           {TV_GROUPS.map((group) => (
             <div key={group.key} data-testid={`tv-group-${group.key}`}>
@@ -544,16 +544,16 @@ function TvKeyList() {
     <section className="mt-6 border border-white/10 bg-[#121212] rounded-sm p-5" data-testid="tv-keys">
       <h2 className="tls-type-section inline-flex items-center gap-2"><KeyRound className="w-5 h-5 text-brand" /> Aktive Anzeige-Schlüssel</h2>
       <p className="mt-1 tls-type-small text-white/50 max-w-3xl">Jeder Link mit Schlüssel steht hier – mit Bildschirm, Turnier oder Event und wann er zuletzt da war. Widerrufen beendet ihn sofort.</p>
-      {error && <div className="mt-3 tls-type-small text-[#FF6B6B]">Die Schlüssel konnten nicht geladen werden.</div>}
+      {error && <div className="mt-3 tls-type-small text-warn">Die Schlüssel konnten nicht geladen werden.</div>}
       {!keys.length && !error ? <div className="mt-4 border border-dashed border-white/15 rounded-sm p-5 tls-type-small text-white/45" data-testid="tv-keys-empty">Noch keine Links mit Schlüssel.</div> : null}
       <div className="mt-4 space-y-2">
         {keys.map((row) => (
           <div key={row.id} className="flex flex-wrap items-center justify-between gap-3 border border-white/10 bg-[#0F0F0F] rounded-sm px-4 py-3" data-testid={`tv-key-${row.id}`}>
             <div className="min-w-0">
               <div className="tls-type-small font-bold text-white/90">{row.label}</div>
-              <div className="tls-type-small text-white/50">{row.target_type === "event" ? `Event ${row.target_title}` : row.target_title || row.tournament_title} · erstellt {row.created_at ? viennaDateTime(row.created_at, { dateStyle: "short", timeStyle: "short" }) : "–"} · {row.last_used_at ? `zuletzt da ${viennaDateTime(row.last_used_at, { dateStyle: "short", timeStyle: "short" })}` : "noch nie geöffnet"} · <span data-testid={`tv-key-until-${row.id}`} className={row.expired ? "text-[#FF6B6B]" : undefined}>{row.expired ? `abgelaufen (eine Woche nach dem ${row.target_type === "event" ? "Event" : "Turnier"})` : row.expires_at ? `gilt bis ${viennaDateTime(row.expires_at, { dateStyle: "short" })}` : "gilt bis zum Widerruf"}</span></div>
+              <div className="tls-type-small text-white/50">{row.target_type === "event" ? `Event ${row.target_title}` : row.target_title || row.tournament_title} · erstellt {row.created_at ? viennaDateTime(row.created_at, { dateStyle: "short", timeStyle: "short" }) : "–"} · {row.last_used_at ? `zuletzt da ${viennaDateTime(row.last_used_at, { dateStyle: "short", timeStyle: "short" })}` : "noch nie geöffnet"} · <span data-testid={`tv-key-until-${row.id}`} className={row.expired ? "text-quiet" : undefined}>{row.expired ? `abgelaufen (eine Woche nach dem ${row.target_type === "event" ? "Event" : "Turnier"})` : row.expires_at ? `gilt bis ${viennaDateTime(row.expires_at, { dateStyle: "short" })}` : "gilt bis zum Widerruf"}</span></div>
             </div>
-            <button type="button" onClick={() => revoke(row)} className="inline-flex items-center gap-2 px-3 py-2 border border-live/40 text-[#FF6B6B] rounded-sm tls-type-label hover:bg-live/10" data-testid={`tv-key-revoke-${row.id}`}>
+            <button type="button" onClick={() => revoke(row)} className="inline-flex items-center gap-2 px-3 py-2 border border-live/40 text-live rounded-sm tls-type-label hover:bg-live/10" data-testid={`tv-key-revoke-${row.id}`}>
               <Trash2 className="w-3.5 h-3.5" /> Widerrufen
             </button>
           </div>

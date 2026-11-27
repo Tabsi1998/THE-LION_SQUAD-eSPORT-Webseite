@@ -11,7 +11,7 @@
   line-height: 1; font-variant-numeric: tabular-nums; color: rgb(255 255 255 / 0.82);
 }
 .tls-race-cell[data-medal] { color: var(--tls-race-medal); box-shadow: inset 0 0 0 1.5px var(--tls-race-medal); }
-.tls-race-cell[data-medal="gold"] { background: rgb(255 215 0 / 0.08); }
+.tls-race-cell[data-medal="gold"] { background: rgb(var(--tls-honor-rgb) / 0.08); }
 .tls-race-cell[data-status="dnf"],
 .tls-race-cell[data-status="dsq"] { font-size: var(--tls-type-label-size); letter-spacing: 0.06em; color: rgb(255 255 255 / 0.45); }
 .tls-race-cell[data-status="dns"] { font-size: var(--tls-type-label-size); letter-spacing: 0.06em; color: rgb(255 255 255 / 0.3); }

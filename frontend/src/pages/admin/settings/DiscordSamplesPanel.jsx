@@ -79,7 +79,7 @@ export function DiscordSamplesPanel() {
           </select>
         </label>
       )}
-      {loadError && <div className="tls-type-small text-[#FF6B6B]" data-testid="discord-samples-error">{loadError}</div>}
+      {loadError && <div className="tls-type-small text-warn" data-testid="discord-samples-error">{loadError}</div>}
       {groups.map((group) => {
         const rows = entries.filter((entry) => entry.group === group.key);
         if (!rows.length) return null;

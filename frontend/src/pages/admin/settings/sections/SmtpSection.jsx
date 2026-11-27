@@ -62,7 +62,7 @@ export function SmtpSection({ smtp, setSmtp, smtpTestEmail, setSmtpTestEmail, sm
           <div>
             <div className="tls-type-label text-white/60 mb-1.5">Passwort {smtp.smtp_pass_masked && <span className="text-white/40 normal-case">(aktuell: {smtp.smtp_pass_masked})</span>}</div>
             <input type="password" value={smtp.smtp_pass || ""} onChange={(e) => setSmtp({ ...smtp, smtp_pass: e.target.value })} data-testid="smtp-pass" className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-sm font-mono" placeholder="••••••" />
-            {smtp.smtp_pass_masked && <button type="button" onClick={() => clearSmtpSecret().catch((e) => toast.error(formatApiError(e.response?.data?.detail)))} className="mt-2 tls-type-label text-[#FF6B6B]">Gespeichertes Passwort entfernen</button>}
+            {smtp.smtp_pass_masked && <button type="button" onClick={() => clearSmtpSecret().catch((e) => toast.error(formatApiError(e.response?.data?.detail)))} className="mt-2 tls-type-label text-live">Gespeichertes Passwort entfernen</button>}
           </div>
         </div>
         <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
@@ -216,7 +216,7 @@ export function SmtpSection({ smtp, setSmtp, smtpTestEmail, setSmtpTestEmail, sm
             <div className="space-y-1">
               {(smtpDeliverability.checks || []).map((c, i) => (
                 <div key={i} className="flex gap-2 text-white/70">
-                  <span className={c.ok ? "text-ok" : c.severity === "error" ? "text-warn" : "text-warn"}>{c.ok ? "passt" : c.severity === "error" ? "Fehler" : "Hinweis"}</span>
+                  <span className={c.ok ? "text-ok" : c.severity === "error" ? "text-warn" : "text-brand"}>{c.ok ? "passt" : c.severity === "error" ? "Fehler" : "Hinweis"}</span>
                   <span className="break-words"><strong>{c.label}:</strong> {c.detail}</span>
                 </div>
               ))}

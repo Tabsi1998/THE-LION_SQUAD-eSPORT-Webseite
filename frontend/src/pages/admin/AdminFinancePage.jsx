@@ -246,7 +246,7 @@ export default function AdminFinancePage() {
                 </label>
               )}
               {data.dolibarr?.write_capable && !data.dolibarr?.terms_complete && (
-                <div className="mt-1 tls-type-small text-[#FF9500]" data-testid="finance-terms-hint">Rechnungskonditionen (Zahlungsziel, Zahlungsart, Bankkonto) fehlen noch – Belege bleiben Entwurf. <button type="button" onClick={() => selectTab("rechnungsangaben")} className="text-[#29B6E8] hover:underline" data-testid="finance-terms-hint-link">Unter Rechnungsangaben eintragen</button>.</div>
+                <div className="mt-1 tls-type-small text-warn" data-testid="finance-terms-hint">Rechnungskonditionen (Zahlungsziel, Zahlungsart, Bankkonto) fehlen noch – Belege bleiben Entwurf. <button type="button" onClick={() => selectTab("rechnungsangaben")} className="text-[#29B6E8] hover:underline" data-testid="finance-terms-hint-link">Unter Rechnungsangaben eintragen</button>.</div>
               )}
             </div>
           </div>
@@ -284,7 +284,7 @@ export default function AdminFinancePage() {
               </label>
             </div>
           </div>
-          <p className={`mt-2 tls-type-small ${periodBackwards ? "text-[#FF9500]" : "text-quiet"}`} data-testid="finance-export-hint">
+          <p className={`mt-2 tls-type-small ${periodBackwards ? "text-warn" : "text-quiet"}`} data-testid="finance-export-hint">
             {periodBackwards ? "Der Zeitraum beginnt nach seinem Ende." : "Der CSV-Export enthält alle Belege dieser Auswahl, ohne Grenze. Der Zeitraum gilt für den Tag, an dem der Beleg angelegt wurde; ohne Zeitraum alle."}
           </p>
 

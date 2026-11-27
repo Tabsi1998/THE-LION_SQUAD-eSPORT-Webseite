@@ -166,7 +166,7 @@ function PlacementRow({ spec, busy, onSave }) {
           <div className="tls-type-small font-bold">{spec.label}</div>
           <div className="tls-type-small text-white/60 mt-0.5">
             Druckbreite <b className="text-white/85">{spec.print_width}</b> · Bereich {spec.area_width} × {spec.area_height} · mind. {spec.min_dpi} DPI = {spec.min_width_px} px Breite
-            {!spec.is_default && <span className="ml-2 text-honor">angepasst</span>}
+            {!spec.is_default && <span className="ml-2 text-brand">angepasst</span>}
           </div>
         </div>
         {!open && (
@@ -997,7 +997,7 @@ export default function AdminShopDesignsPage() {
   return (
     <AdminLayout>
       <div>
-        <h1 className="tls-type-title inline-flex items-center gap-3"><ShoppingBag className="w-7 h-7 text-honor" aria-hidden="true" /> <ShortCaps>Shop</ShortCaps></h1>
+        <h1 className="tls-type-title inline-flex items-center gap-3"><ShoppingBag className="w-7 h-7 text-brand" aria-hidden="true" /> <ShortCaps>Shop</ShortCaps></h1>
         <ShopTabs />
         <p className="mt-4 tls-type-body text-white/60 max-w-2xl">
           Motive des Vereins: eine Hauptdatei für dunkle Shirts (am besten als SVG) und eine Fassung für helle Shirts – automatisch umgefärbt oder als eigene Datei. Jede Datei wird geprüft, ohne Metadaten neu abgelegt und bekommt als neue Version eine eigene Adresse für Printful. Ältere Versionen bleiben für ihre Bestellungen.

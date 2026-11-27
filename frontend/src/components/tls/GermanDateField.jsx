@@ -259,7 +259,7 @@ export function GermanDateField({
       </Popover>
       {hint && <div id={`${id}-hint`} className="mt-1 tls-type-small text-white/45">{hint}</div>}
       {description && <div id={`${id}-description`} className="mt-1 tls-type-small text-white/45">{description}</div>}
-      {error && <div id={`${id}-error`} role="alert" className="mt-1 tls-type-small text-[#FF8A80]">{error}</div>}
+      {error && <div id={`${id}-error`} role="alert" className="mt-1 tls-type-small text-warn">{error}</div>}
     </div>
   );
 }

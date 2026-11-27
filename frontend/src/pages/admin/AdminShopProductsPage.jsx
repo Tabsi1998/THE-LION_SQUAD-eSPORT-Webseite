@@ -32,7 +32,7 @@ const VISIBILITY_HINTS = {
 };
 const STATUS_TONES = {
   draft: "border-white/20 text-white/70",
-  reviewed: "border-honor/50 text-honor",
+  reviewed: "border-brand/50 text-brand",
   active: "border-ok/50 bg-ok/10 text-ok",
   archived: "border-white/15 text-white/45",
 };
@@ -138,8 +138,8 @@ function StatusBadge({ status, labels, testId }) {
 
 function CheckIcon({ state }) {
   if (state === "ok") return <CheckCircle2 className="w-4 h-4 text-ok shrink-0" aria-label="bestanden" />;
-  if (state === "open") return <CircleDashed className="w-4 h-4 text-honor shrink-0" aria-label="offen" />;
-  if (state === "warn") return <AlertTriangle className="w-4 h-4 text-honor shrink-0" aria-label="Warnung" />;
+  if (state === "open") return <CircleDashed className="w-4 h-4 text-quiet shrink-0" aria-label="offen" />;
+  if (state === "warn") return <AlertTriangle className="w-4 h-4 text-warn shrink-0" aria-label="Warnung" />;
   return <XOctagon className="w-4 h-4 text-warn shrink-0" aria-label="fehlt" />;
 }
 
@@ -165,7 +165,7 @@ function Shell({ children }) {
   return (
     <AdminLayout>
       <div>
-        <h1 className="tls-type-title inline-flex items-center gap-3"><ShoppingBag className="w-7 h-7 text-honor" aria-hidden="true" /> <ShortCaps>Shop</ShortCaps></h1>
+        <h1 className="tls-type-title inline-flex items-center gap-3"><ShoppingBag className="w-7 h-7 text-brand" aria-hidden="true" /> <ShortCaps>Shop</ShortCaps></h1>
         <ShopTabs />
       </div>
       <div className="mt-6 space-y-4 max-w-5xl">{children}</div>
@@ -449,7 +449,7 @@ function OfferStep({ view, busy, run }) {
         </div>
       )}
       {view.product_options && !view.product_options.loaded && (
-        <p className="tls-type-small text-honor" data-testid="shop-offer-options-unknown">Produktoptionen von Printful noch nicht geladen – in Schritt 1 das Printful-Produkt neu laden.</p>
+        <p className="tls-type-small text-warn" data-testid="shop-offer-options-unknown">Produktoptionen von Printful noch nicht geladen – in Schritt 1 das Printful-Produkt neu laden.</p>
       )}
       {catalogOptions.some((row) => !row.required) && (
         <p className="tls-type-small text-white/45" data-testid="shop-offer-options-other">Weitere Optionen bei Printful (nicht gesendet, Printful-Vorgabe): {catalogOptions.filter((row) => !row.required).map((row) => row.label).join(", ")}.</p>
@@ -535,7 +535,7 @@ function PricesStep({ view, busy, run }) {
         Mitglieder zahlen, was der Verein an Printful zahlt – brutto: Ware, Versand und Steuer, ohne Aufschlag. Je Variante steht hier <b>Printful brutto</b> (Ware) aus der Kostenschätzung für ein Stück nach Österreich; daraus kommt der Mitgliederpreis. Der Versand gilt je Bestellung und wird an der Kasse für den ganzen Warenkorb geschätzt – im Shop steht beim Preis „{view.pricing?.note || PRICE_NOTE}“. Öffentlich: Printful brutto plus Aufschlag. <b>Katalog netto</b> ist nur ein Prüfwert.
       </p>
       {!estimated && (
-        <p className="tls-type-small text-honor" data-testid="shop-prices-no-estimate">Noch keine Schätzung von Printful – bis dahin gilt der Katalog netto. Erst die Druckdateien erzeugen (Schritt 3), dann „Brutto bei Printful schätzen“.</p>
+        <p className="tls-type-small text-warn" data-testid="shop-prices-no-estimate">Noch keine Schätzung von Printful – bis dahin gilt der Katalog netto. Erst die Druckdateien erzeugen (Schritt 3), dann „Brutto bei Printful schätzen“.</p>
       )}
       {stale && (
         <p className="tls-type-small text-warn" data-testid="shop-prices-stale">Schätzung veraltet – erst „Brutto bei Printful schätzen“, dann übernehmen.</p>
@@ -654,7 +654,7 @@ function SyncLine({ view, busy, run }) {
   if (!view.product.printful) return null;
   return (
     <div className="flex flex-wrap items-center gap-3 tls-type-small" data-testid="shop-sync">
-      <span className={sync && !sync.ok ? "text-warn" : sync?.warning ? "text-honor" : "text-white/60"} data-state={sync?.warning ? "warn" : undefined}>
+      <span className={sync && !sync.ok ? "text-warn" : sync?.warning ? "text-warn" : "text-white/60"} data-state={sync?.warning ? "warn" : undefined}>
         {!sync ? "Noch nicht abgeglichen."
           : sync.ok ? `Abgleich ${viennaDateTime(sync.at)}: ${sync.detail}`
             : `Abgleich gescheitert (${viennaDateTime(sync.at)}): ${sync.detail} Stand vom ${sync.last_ok_at ? viennaDateTime(sync.last_ok_at) : "–"}.`}
@@ -705,7 +705,7 @@ function ProductEditor({ productId }) {
         <StatusBadge status={product.status} labels={labels.statuses} testId="shop-product-status" />
         <span className="tls-type-small text-white/55">{labels.visibilities[product.visibility]} · Personalisierung: {labels.personalizations[product.personalization || "none"]}</span>
       </div>
-      {!view.editable && <p className="tls-type-small text-honor" data-testid="shop-product-locked">{product.status === "active" ? "Veröffentlicht: zum Ändern des Aufbaus erst zurückziehen (Schritt 5)." : "Archiviert: bleibt für Bestellungen lesbar. Zum Ändern wieder als Entwurf öffnen."}</p>}
+      {!view.editable && <p className="tls-type-small text-warn" data-testid="shop-product-locked">{product.status === "active" ? "Veröffentlicht: zum Ändern des Aufbaus erst zurückziehen (Schritt 5)." : "Archiviert: bleibt für Bestellungen lesbar. Zum Ändern wieder als Entwurf öffnen."}</p>}
       <SyncLine view={view} busy={busy} run={run} />
 
       <nav aria-label="Schritte" data-testid="shop-steps">

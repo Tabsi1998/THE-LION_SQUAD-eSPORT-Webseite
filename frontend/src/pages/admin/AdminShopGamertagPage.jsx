@@ -331,7 +331,7 @@ export default function AdminShopGamertagPage() {
   return (
     <AdminLayout>
       <div>
-        <h1 className="tls-type-title inline-flex items-center gap-3"><ShoppingBag className="w-7 h-7 text-honor" aria-hidden="true" /> <ShortCaps>Shop</ShortCaps></h1>
+        <h1 className="tls-type-title inline-flex items-center gap-3"><ShoppingBag className="w-7 h-7 text-brand" aria-hidden="true" /> <ShortCaps>Shop</ShortCaps></h1>
         <ShopTabs />
         <p className="mt-4 tls-type-body text-white/60 max-w-2xl">
           Der Gamertag wird auf dem Server als PNG mit durchsichtigem Hintergrund erzeugt - dieselbe Datei für den Testentwurf und jede Bestellung.

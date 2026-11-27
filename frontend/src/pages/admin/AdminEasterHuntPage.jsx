@@ -225,7 +225,7 @@ export default function AdminEasterHuntPage() {
           <SeasonSwitch seasonKey="easter_hunt" label="Ostereiersuche" className="w-full xl:w-96" />
         </div>
 
-        {failed && <div className="mb-6 rounded-sm border border-honor/40 bg-honor/10 px-4 py-3 tls-type-small text-[#ffb4ae]" role="alert">{failed}</div>}
+        {failed && <div className="mb-6 rounded-sm border border-warn/40 bg-warn/10 px-4 py-3 tls-type-small text-white/85" role="alert">{failed}</div>}
         {!view && !failed && <div className="py-16 text-center tls-type-small text-white/45" role="status">Lade Eiersuche …</div>}
 
         {view && (
