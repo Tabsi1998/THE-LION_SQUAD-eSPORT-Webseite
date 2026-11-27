@@ -91,6 +91,32 @@ for (const [width, height] of [[390, 844], [1440, 900]]) {
       await expect(page).toHaveURL(/\/login\?next=%2Fu%2Falte%2520schule$/);
     });
 
+    // Fabian 27.11.: Die Konten-Karten ragten rechts aus dem Kasten (lange Steam-Nummer), der Schimmer lief über den Rand.
+    test("Konten: jede Karte bleibt im Kasten, auch mit langer Steam-Nummer", async ({ page }) => {
+      await mockServer(page, { profile: {
+        ...OLD_NAME_PROFILE, discord_name: "probe#0001", psn_id: "Probe998", nintendo_fc: "SW-1234-5678-9012", battlenet_tag: "Probe98#2722",
+        steam_id: "76561198000000001", verified_platforms: ["discord", "steam"],
+        linked_accounts: [
+          { platform: "discord", label: "Discord", handle: "probe98", display_name: "Probe98", linked_at: "2026-09-24T20:00:00Z", url: "https://discord.com/users/123" },
+          { platform: "steam", label: "Steam", handle: "76561198000000001", display_name: "76561198000000001", linked_at: "2026-09-24T20:00:00Z", url: "https://steamcommunity.com/profiles/76561198000000001" },
+        ],
+      } });
+      await page.goto("/u/alte%20schule");
+      const box = page.getByTestId("public-profile-accounts");
+      await expect(box).toContainText("Steam");
+      await expect(box).toContainText("Mit Haken:");
+      const out = await box.evaluate((section) => {
+        const inner = section.getBoundingClientRect().right - parseFloat(getComputedStyle(section).paddingRight) + 0.5;
+        return [...section.querySelectorAll("[data-testid^='profile-account-']")]
+          .filter((row) => !row.dataset.testid.endsWith("-verified"))
+          .map((row) => ({ id: row.dataset.testid, over: row.getBoundingClientRect().right - inner, shadow: getComputedStyle(row).boxShadow }))
+          .filter((row) => row.over > 0 || row.shadow !== "none");
+      });
+      expect(out).toEqual([]);
+      expect(await noSidewaysScroll(page)).toBe(true);
+      await page.screenshot({ path: test.info().outputPath(`konten-${width}.png`), fullPage: true });
+    });
+
     test("eine lange alte Rolle ohne Leerzeichen bleibt im Kasten", async ({ page }) => {
       await mockServer(page, { profile: { ...OLD_NAME_PROFILE, preferred_role: "x".repeat(120) } });
       await page.goto("/u/alte%20schule");
