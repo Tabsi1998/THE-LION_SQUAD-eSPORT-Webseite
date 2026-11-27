@@ -140,7 +140,7 @@ export function ResultImageSummary({ image, rows, raceOcr = null }) {
   const open = openImageItems({ rows, raceOcr });
   const header = imageHeader(result);
   return (
-    <section className={`border rounded-sm p-3 space-y-3 ${open ? "border-amber-400/40 bg-amber-400/[0.06]" : "border-[#29B6E8]/30 bg-[#29B6E8]/5"}`} data-testid="result-image-summary" aria-live="polite">
+    <section className={`border rounded-sm p-3 space-y-3 ${open ? "border-warn/40 bg-warn/[0.06]" : "border-[#29B6E8]/30 bg-[#29B6E8]/5"}`} data-testid="result-image-summary" aria-live="polite">
       <div className="flex items-start gap-3">
         {!large && (
           <button type="button" onClick={() => setLarge(true)} disabled={!image.picture} aria-label="Bild groß zeigen" className="group relative shrink-0 rounded-sm transition active:scale-[0.97] disabled:cursor-default" data-testid="result-image-enlarge">
@@ -162,8 +162,8 @@ export function ResultImageSummary({ image, rows, raceOcr = null }) {
               {header.map((item) => (
                 <div key={item.key} className="contents">
                   <dt className="text-white/45">{item.label}</dt>
-                  <dd className={`break-words ${item.uncertain ? "text-amber-200" : "text-white/80"}`} data-uncertain={item.uncertain || undefined}>
-                    {item.value}{item.uncertain ? <span className="text-amber-300/80"> · unsicher</span> : null}
+                  <dd className={`break-words ${item.uncertain ? "text-warn" : "text-white/80"}`} data-uncertain={item.uncertain || undefined}>
+                    {item.value}{item.uncertain ? <span className="text-warn/80"> · unsicher</span> : null}
                   </dd>
                 </div>
               ))}
@@ -179,13 +179,13 @@ export function ResultImageSummary({ image, rows, raceOcr = null }) {
           </button>
         </div>
       )}
-      <p className={`tls-type-small ${open ? "text-amber-100" : "text-white/60"}`} data-testid="result-image-status">
+      <p className={`tls-type-small ${open ? "text-white/85" : "text-white/60"}`} data-testid="result-image-status">
         {open
-          ? `${open === 1 ? "1 Zeile ist" : `${open} Zeilen sind`} gelb: mit dem Bild vergleichen, korrigieren oder mit „Passt so“ bestätigen. Übernehmen geht erst danach.`
+          ? `${open === 1 ? "1 Zeile ist" : `${open} Zeilen sind`} orange: mit dem Bild vergleichen, korrigieren oder mit „Passt so“ bestätigen. Übernehmen geht erst danach.`
           : "Alles sicher gelesen – bitte trotzdem kurz mit dem Bild vergleichen, bevor ihr übernehmt."}
       </p>
       {(result.warnings || []).length > 0 && (
-        <ul className="space-y-0.5 tls-type-small text-amber-200" data-testid="result-image-warnings">
+        <ul className="space-y-0.5 tls-type-small text-warn" data-testid="result-image-warnings">
           {result.warnings.map((item) => <li key={item.code}>{item.message}</li>)}
         </ul>
       )}
@@ -197,7 +197,7 @@ export function ResultImageSummary({ image, rows, raceOcr = null }) {
 export function ResultImageRowNote({ row, onConfirm, testId = "result-row-ocr" }) {
   if (!row.ocr?.uncertain?.length) return null;
   return (
-    <div className="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-1 tls-type-small text-amber-200" data-testid={testId}>
+    <div className="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-1 tls-type-small text-warn" data-testid={testId}>
       <span className="min-w-0">Aus dem Bild unsicher: {uncertainText(row)}</span>
       <button type="button" onClick={onConfirm} data-testid={`${testId}-confirm`}
         className="tls-btn tls-btn--quiet px-2 py-1 rounded-sm tls-type-label inline-flex items-center gap-1">
@@ -226,8 +226,8 @@ export function ConfirmNamesBar({ count, confirmed = 0, onConfirm, onUndo, what 
   }
   if (!count) return null;
   return (
-    <div className="flex flex-wrap items-center gap-2 border border-amber-400/40 bg-amber-400/10 rounded-sm px-3 py-2 tls-type-small text-amber-100" data-testid={testId}>
-      <span className="flex-1 min-w-[12rem] tabular-nums">{count} {what} aus dem Bild vorbelegt, aber gelb – mit dem Bild vergleichen.</span>
+    <div className="flex flex-wrap items-center gap-2 border border-warn/40 bg-warn/10 rounded-sm px-3 py-2 tls-type-small text-white/85" data-testid={testId}>
+      <span className="flex-1 min-w-[12rem] tabular-nums">{count} {what} aus dem Bild vorbelegt, aber orange – mit dem Bild vergleichen.</span>
       <button type="button" onClick={onConfirm} data-testid={`${testId}-all`}
         className="tls-btn tls-btn--quiet px-2.5 py-1.5 rounded-sm tls-type-label inline-flex items-center gap-1">
         <Check className="w-3 h-3" aria-hidden="true" /> Alle Namen bestätigen ({count})
@@ -240,7 +240,7 @@ export function ConfirmNamesBar({ count, confirmed = 0, onConfirm, onUndo, what 
 export function ocrMark(row, field, index = 0) {
   if (!isUncertain(row, field)) return { className: "", props: {} };
   return {
-    className: "!border-amber-400/80 !bg-amber-400/10",
+    className: "!border-warn/80 !bg-warn/10",
     props: { "data-ocr-uncertain": field, title: "Aus dem Bild – bitte prüfen", style: { "--tls-ocr-delay": `${Math.min(index, 20) * 40}ms` } },
   };
 }

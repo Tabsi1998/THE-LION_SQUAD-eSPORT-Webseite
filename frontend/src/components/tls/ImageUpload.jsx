@@ -111,8 +111,8 @@ function ImagePreviewBox({ value, previewClass, onClear, testId }) {
           )}
           {state === "error" && (
             <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 p-3 text-center bg-[#0A0A0A]">
-              <ImageIcon className="w-7 h-7 text-[#FF3B30]/70" />
-              <span className="tls-type-label text-[#FF3B30]">Vorschau nicht ladbar</span>
+              <ImageIcon className="w-7 h-7 text-warn/70" />
+              <span className="tls-type-label text-warn">Vorschau nicht ladbar</span>
               <span className="tls-type-small text-white/45">Die Bild-URL ist gespeichert.</span>
             </div>
           )}
@@ -133,7 +133,7 @@ function LibraryThumb({ item }) {
   const [error, setError] = useState(false);
   if (error) {
     return (
-      <div className="w-full h-full flex flex-col items-center justify-center gap-1 p-2 text-center text-[#FF3B30]/80">
+      <div className="w-full h-full flex flex-col items-center justify-center gap-1 p-2 text-center text-warn/80">
         <ImageIcon className="w-6 h-6" />
         <span className="tls-type-label">Defekt</span>
       </div>
@@ -617,7 +617,7 @@ export function ImageUpload({ value, onChange, label, testId = "image-upload", v
                 type="button"
                 onClick={() => onChange("")}
                 data-testid={`${testId}-remove`}
-                className="inline-flex min-h-11 items-center px-3 py-2 border border-[#FF3B30]/40 text-[#FF3B30] tls-type-label rounded-sm hover:bg-[#FF3B30]/10"
+                className="inline-flex min-h-11 items-center px-3 py-2 border border-live/40 text-live tls-type-label rounded-sm hover:bg-live/10"
               >
                 Entfernen
               </button>

@@ -39,11 +39,11 @@ export default function PartnersPage() {
 
         <div className="mt-8 grid md:grid-cols-2 gap-3">
           <Link to="/sponsors" className="tls-card tls-card--gold group rounded-sm border border-white/10 bg-[#101010] p-4">
-            <div className="flex items-center gap-2 tls-type-label text-[#FFD700]">
+            <div className="flex items-center gap-2 tls-type-label text-brand">
               <Star className="h-3.5 w-3.5" /> Sponsoren
             </div>
             <p className="mt-2 tls-type-small text-white/55">Unterstützer, Tiers und Marken, die Events und Turniere mit möglich machen.</p>
-            <span className="mt-3 inline-flex items-center gap-1.5 tls-type-label text-quiet group-hover:text-[#FFD700]">
+            <span className="mt-3 inline-flex items-center gap-1.5 tls-type-label text-quiet group-hover:text-brand">
               Sponsoren ansehen <ArrowRight className="h-3 w-3" />
             </span>
           </Link>

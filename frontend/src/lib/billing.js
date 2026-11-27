@@ -3,8 +3,8 @@ import { asInstant, viennaDateTime } from "@/lib/vienna";
 // der CSV-Export für den Kassier (ohne Formel-Injektion) und die Summenzeile je Veranstaltung.
 
 export const PAYMENT_TONE = {
-  draft: "text-[#FFD700]", open: "text-white/80", partial: "text-[#29B6E8]", paid: "text-[#00FF88]", paid_reduced: "text-[#00FF88]",
-  overdue: "text-[#FF3B30]", overpaid: "text-[#FF3B30]", credited: "text-white/60", abandoned: "text-white/40",
+  draft: "text-quiet", open: "text-white/80", partial: "text-[#29B6E8]", paid: "text-ok", paid_reduced: "text-ok",
+  overdue: "text-warn", overpaid: "text-warn", credited: "text-white/60", abandoned: "text-white/40",
 };
 
 export const SUMMARY_FIELDS = [
@@ -86,8 +86,8 @@ export function firstAttention(counts) {
 // „Stand von Dolibarr: 23.09., 11:40“ - oder der Fehler, wenn der letzte Abgleich nicht lesen konnte.
 export function syncLine(row) {
   // Ein Entwurf verschwindet in diesem Fall (#2226); ein freigegebener Beleg wird zum Prüffall.
-  if (row?.sync_error === "not_found") return { tone: "text-[#FF3B30]", text: "In Dolibarr nicht mehr gefunden – siehe Prüffall" };
-  if (row?.sync_error) return { tone: "text-[#FF3B30]", text: `Dolibarr nicht lesbar: ${row.sync_error_text || row.sync_error}` };
+  if (row?.sync_error === "not_found") return { tone: "text-warn", text: "In Dolibarr nicht mehr gefunden – siehe Prüffall" };
+  if (row?.sync_error) return { tone: "text-warn", text: `Dolibarr nicht lesbar: ${row.sync_error_text || row.sync_error}` };
   if (!row?.synced_at) return { tone: "text-white/40", text: "noch nicht nachgelesen" };
   const at = asInstant(row.synced_at);
   return { tone: "text-white/40", text: `Stand ${Number.isNaN(at.getTime()) ? row.synced_at : viennaDateTime(at, { dateStyle: "short", timeStyle: "short" })}` };

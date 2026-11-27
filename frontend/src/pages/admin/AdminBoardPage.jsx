@@ -15,6 +15,7 @@ import { CLUB_ACCESS, boardSentence, clearSentence, deleteSentence, postTitle, s
 import { isDeputyPosition } from "@/lib/boardSeats";
 import { ShortCaps } from "@/components/tls/ShortCaps";
 
+import { ROLE_COLORS } from "@/lib/categoryColors";
 // Vorstand (#1355): Posten als Liste mit „Besetzen“ bzw. „Ändern“. Besetzt wird über die Personensuche, nur mit
 // Vereinsmitgliedern; vorher sagt ein Satz, welche Rechte der Posten bringt, und eine Rückfrage bestätigt es. Führt
 // Dolibarr den Vorstand, ist die Liste nur zum Lesen; kommen die Rechte aus Dolibarr-Funktionen, ist ein Posten hier nur
@@ -118,7 +119,7 @@ export default function AdminBoardPage() {
     <AdminLayout>
       <div className="flex items-start justify-between gap-4 mb-6 flex-wrap">
         <div>
-          <span className="tls-type-label text-[#FFD700]">Verein</span>
+          <span className="tls-type-label text-honor">Verein</span>
           <h1 className="tls-type-title mt-1"><ShortCaps>Vorstand</ShortCaps></h1>
           <p className="mt-2 text-white/60 tls-type-small max-w-2xl" data-testid="board-rights-intro">
             {rightsFromDolibarr
@@ -131,7 +132,7 @@ export default function AdminBoardPage() {
           </p>
         </div>
         {!readOnly && (
-          <button onClick={() => setCreating(true)} data-testid="board-new-btn" className="px-5 py-2.5 bg-[#FFD700] text-black font-bold uppercase tracking-wider rounded-sm inline-flex items-center gap-2"><Plus className="w-4 h-4" /> Eigener Posten</button>
+          <button onClick={() => setCreating(true)} data-testid="board-new-btn" className="px-5 py-2.5 bg-honor text-black font-bold uppercase tracking-wider rounded-sm inline-flex items-center gap-2"><Plus className="w-4 h-4" /> Eigener Posten</button>
         )}
       </div>
 
@@ -150,7 +151,7 @@ export default function AdminBoardPage() {
                 <li key={p.id} className="py-2 flex flex-wrap items-center gap-x-3 gap-y-1" data-testid={`board-dolibarr-${p.slug}`}>
                   <span className="font-bold">{p.display_title}</span>
                   <span className="text-white/70">{p.user ? p.user.display_name : p.name_withheld ? "Name nicht freigegeben" : "unbesetzt"}</span>
-                  {p.represents && <span className="tls-type-label text-[#FFD700]">vertritt nach außen</span>}
+                  {p.represents && <span className="tls-type-label text-honor">vertritt nach außen</span>}
                   {p.vacant && !isDeputyPosition(p) ? <VacancyTextField slug={p.slug} value={p.vacancy_text || ""} onSaved={load} /> : null}
                 </li>
               ))}
@@ -159,7 +160,7 @@ export default function AdminBoardPage() {
         </div>
       )}
       {source && source.switch_on && !source.has_board && (
-        <div className="mb-6 border border-[#FFD700]/40 bg-[#FFD700]/5 rounded-sm p-4 tls-type-small text-white/70" data-testid="board-dolibarr-missing">
+        <div className="mb-6 border border-warn/40 bg-warn/5 rounded-sm p-4 tls-type-small text-white/70" data-testid="board-dolibarr-missing">
           „Vereinsdaten aus Dolibarr“ ist an, aber Dolibarr hat noch keinen Vorstand geliefert – bis dahin gilt die Liste unten. Nachlesen geht unter <Link to="/admin/club" className="text-[#29B6E8] hover:text-white">Verein → Vereinsdaten</Link>.
         </div>
       )}
@@ -169,7 +170,7 @@ export default function AdminBoardPage() {
           <li key={p.id} data-testid={`board-row-${p.slug}`} className={`border border-white/10 bg-[#121212] rounded-sm p-4 ${p.is_active ? "" : "opacity-60"}`}>
             <div className="flex flex-wrap items-start gap-4">
               <div className="flex items-start gap-3 min-w-[12rem] flex-1">
-                <Crown className="w-4 h-4 text-[#FFD700] shrink-0 mt-1" />
+                <Crown className="w-4 h-4 text-honor shrink-0 mt-1" />
                 <div className="min-w-0">
                   <div className="font-semibold">{postTitle(p)}</div>
                   <div className="tls-type-small text-quiet">{p.is_active ? "aktiv" : "inaktiv"}{p.is_default ? " · Standard" : " · eigener Posten"}</div>
@@ -181,7 +182,7 @@ export default function AdminBoardPage() {
               </div>
               {!readOnly && (
                 <div className="flex flex-wrap items-center gap-2">
-                  <button type="button" onClick={() => setAssigning({ position: p, deputy: false })} data-testid={`board-assign-${p.slug}`} className={`px-3 py-1.5 rounded-sm tls-type-label ${p.user ? "border border-white/15 text-white/80 hover:text-white" : "bg-[#FFD700] text-black"}`}>
+                  <button type="button" onClick={() => setAssigning({ position: p, deputy: false })} data-testid={`board-assign-${p.slug}`} className={`px-3 py-1.5 rounded-sm tls-type-label ${p.user ? "border border-white/15 text-white/80 hover:text-white" : "bg-honor text-black"}`}>
                     {p.user ? "Ändern" : "Besetzen"}
                   </button>
                   {p.allow_deputy && (
@@ -201,7 +202,7 @@ export default function AdminBoardPage() {
                 <button type="button" onClick={() => toggle(p)} data-testid={`board-toggle-${p.slug}`} className="text-white/70 hover:text-white">{p.is_active ? "Deaktivieren" : "Aktivieren"}</button>
                 {p.user && <button type="button" onClick={() => clearHolder(p, false)} data-testid={`board-clear-${p.slug}`} className="text-white/70 hover:text-white">Posten leeren</button>}
                 {p.deputy_user && <button type="button" onClick={() => clearHolder(p, true)} className="text-white/70 hover:text-white">Vertretung entfernen</button>}
-                {!p.is_default && <button type="button" onClick={() => remove(p)} data-testid={`board-delete-${p.slug}`} className="text-[#FF6B6B] hover:underline">Löschen</button>}
+                {!p.is_default && <button type="button" onClick={() => remove(p)} data-testid={`board-delete-${p.slug}`} className="text-live hover:underline">Löschen</button>}
               </div>
             )}
           </li>
@@ -281,11 +282,11 @@ function AssignSheet({ position, deputy, rightsFromDolibarr, onClose, onAssigned
   };
 
   return (
-    <AdminSheet title={`${title} besetzen`} eyebrow="Vorstand" accent="#FFD700" onClose={onClose} onSubmit={submit} saving={saving} submitLabel="Besetzen" savingLabel="Besetze …" submitTestId="board-assign-save" testId="board-assign-sheet">
+    <AdminSheet title={`${title} besetzen`} eyebrow="Vorstand" accent={ROLE_COLORS.honor} onClose={onClose} onSubmit={submit} saving={saving} submitLabel="Besetzen" savingLabel="Besetze …" submitTestId="board-assign-save" testId="board-assign-sheet">
       <p className="tls-type-small text-white/60">Jetzt: {current ? <span className="text-white font-semibold">{holderName(current)}</span> : "offen"}. Gesucht werden nur Vereinsmitglieder.</p>
       <PersonPicker purpose="board" value={person} onChange={setPerson} label="Vereinsmitglied" placeholder="Name tippen …" testId="board-person" emptyText="Kein Vereinsmitglied mit diesem Namen." />
       {sentence && (
-        <div className={`border rounded-sm p-3 tls-type-small ${rightsFromDolibarr || person?.has_account === false ? "border-white/15 bg-white/5 text-white/70" : "border-[#FFD700]/40 bg-[#FFD700]/5 text-white/80"}`} data-testid="board-assign-sentence">
+        <div className={`border rounded-sm p-3 tls-type-small ${rightsFromDolibarr || person?.has_account === false ? "border-white/15 bg-white/5 text-white/70" : "border-honor/40 bg-honor/5 text-white/80"}`} data-testid="board-assign-sentence">
           {sentence}
         </div>
       )}
@@ -330,14 +331,14 @@ function BoardForm({ position, rightsFromDolibarr, onClose, onSaved }) {
 
   // Seitenblatt statt Fenster (#435).
   return (
-    <AdminSheet title={isNew ? "Neuer Posten" : "Posten bearbeiten"} eyebrow="Vorstand" accent="#FFD700" onClose={onClose} onSubmit={save} saving={saving} submitTestId="board-save" testId="board-sheet">
+    <AdminSheet title={isNew ? "Neuer Posten" : "Posten bearbeiten"} eyebrow="Vorstand" accent={ROLE_COLORS.honor} onClose={onClose} onSubmit={save} saving={saving} submitTestId="board-save" testId="board-sheet">
       <TextField label="Bezeichnung (männlich)" value={form.title_male} onChange={(v) => setForm({ ...form, title_male: v })} testId="board-title-m" required />
       <TextField label="Bezeichnung (weiblich, optional)" value={form.title_female || ""} onChange={(v) => setForm({ ...form, title_female: v })} testId="board-title-f" />
       <TextAreaField label="Beschreibung (optional)" value={form.description || ""} onChange={(v) => setForm({ ...form, description: v })} testId="board-desc" />
       <TextField label="Wenn offen: ein Satz zum Aufwand (für „Wir suchen …“)" value={vacancy} onChange={setVacancy} maxLength={300} testId="board-vacancy" placeholder="Zwei Stunden im Monat, Einschulung inklusive." />
       <FormGrid>
-        <CheckField label="Vertretung erlaubt" checked={form.allow_deputy} onChange={(v) => setForm({ ...form, allow_deputy: v })} testId="board-allow-deputy" accent="#FFD700" />
-        <CheckField label="Aktiv" checked={form.is_active} onChange={(v) => setForm({ ...form, is_active: v })} testId="board-active" accent="#FFD700" />
+        <CheckField label="Vertretung erlaubt" checked={form.allow_deputy} onChange={(v) => setForm({ ...form, allow_deputy: v })} testId="board-allow-deputy" accent={ROLE_COLORS.honor} />
+        <CheckField label="Aktiv" checked={form.is_active} onChange={(v) => setForm({ ...form, is_active: v })} testId="board-active" accent={ROLE_COLORS.honor} />
       </FormGrid>
     </AdminSheet>
   );

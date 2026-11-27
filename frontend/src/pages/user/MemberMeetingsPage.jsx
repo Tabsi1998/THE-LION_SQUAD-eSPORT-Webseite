@@ -43,18 +43,18 @@ function MeetingCard({ meeting, busy, onRespond, onMotion, askCalendar = false, 
     }
   };
   return (
-    <div id={`meeting-${id}`} className={`border rounded-sm bg-[#121212] p-5 scroll-mt-24 ${meeting.upcoming ? "border-[#FFD700]/40" : "border-white/10"} ${highlight ? "ring-2 ring-[#FFD700]/70" : ""}`} data-testid={`meeting-${id}`}>
+    <div id={`meeting-${id}`} className={`border rounded-sm bg-[#121212] p-5 scroll-mt-24 ${meeting.upcoming ? "border-honor/40" : "border-white/10"} ${highlight ? "ring-2 ring-honor/70" : ""}`} data-testid={`meeting-${id}`}>
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <div className="tls-type-label text-[#FFD700]">{meeting.kind_label}</div>
+          <div className="tls-type-label text-honor">{meeting.kind_label}</div>
           <h2 className="tls-type-section mt-1">{meeting.title}</h2>
           <div className="mt-1 tls-type-small text-white/70 inline-flex flex-wrap items-center gap-x-3 gap-y-1">
-            <span className="inline-flex items-center gap-1"><Calendar className="w-3.5 h-3.5 text-[#FFD700]" /> {meetingWhen(meeting)}</span>
+            <span className="inline-flex items-center gap-1"><Calendar className="w-3.5 h-3.5 text-honor" /> {meetingWhen(meeting)}</span>
             <span>{meeting.format_label}</span>
             {meeting.place ? <span className="inline-flex items-center gap-1"><MapPin className="w-3.5 h-3.5" /> {meeting.place}</span> : null}
           </div>
         </div>
-        <span className={`inline-flex items-center px-2 py-0.5 rounded-sm border tls-type-label ${meeting.status === "invited" ? "border-[#FFD700]/40 text-[#FFD700]" : "border-white/15 text-white/50"}`} data-testid={`meeting-${id}-status`}>
+        <span className={`inline-flex items-center px-2 py-0.5 rounded-sm border tls-type-label ${meeting.status === "invited" ? "border-honor/40 text-honor" : "border-white/15 text-white/50"}`} data-testid={`meeting-${id}-status`}>
           {meeting.status_label}
         </span>
       </div>
@@ -83,7 +83,7 @@ function MeetingCard({ meeting, busy, onRespond, onMotion, askCalendar = false, 
             onClick={() => onRespond(meeting, code)}
             disabled={busy === `respond-${id}` || meeting.response === code}
             data-testid={`meeting-${id}-respond-${code}`}
-            className={`px-3 py-1.5 rounded-sm border tls-type-label transition disabled:opacity-60 ${meeting.response === code ? "border-[#FFD700] text-[#FFD700] bg-[#FFD700]/10" : "border-white/15 text-white/70 hover:border-[#FFD700]/60 hover:text-white"}`}
+            className={`px-3 py-1.5 rounded-sm border tls-type-label transition disabled:opacity-60 ${meeting.response === code ? "border-honor text-honor bg-honor/10" : "border-white/15 text-white/70 hover:border-honor/60 hover:text-white"}`}
           >
             {label}
           </button>
@@ -122,15 +122,15 @@ function MeetingCard({ meeting, busy, onRespond, onMotion, askCalendar = false, 
           {meeting.can_motion ? (
             <form onSubmit={submit} className="space-y-2" data-testid={`meeting-${id}-motion-form`}>
               {meeting.motion_deadline ? (
-                <p className={`tls-type-small ${meeting.motion_late ? "text-[#FFD700]" : "text-white/45"}`} data-testid={`meeting-${id}-motion-deadline`}>
+                <p className={`tls-type-small ${meeting.motion_late ? "text-warn" : "text-white/45"}`} data-testid={`meeting-${id}-motion-deadline`}>
                   {meeting.motion_late
                     ? `Die Frist der Statuten (${formatDay(meeting.motion_deadline)}) ist vorbei – ein Antrag gilt als verspätet; ob er dennoch drankommt, entscheidet der Vorstand.`
                     : `Anträge bis ${formatDay(meeting.motion_deadline)} gelten als rechtzeitig.`}
                 </p>
               ) : null}
-              <input value={title} onChange={(e) => setTitle(e.target.value)} maxLength={255} placeholder="Titel des Antrags" data-testid={`meeting-${id}-motion-title`} className="w-full bg-[#0A0A0A] border border-white/10 focus:border-[#FFD700] px-3 py-2 rounded-sm text-sm" />
-              <textarea value={text} onChange={(e) => setText(e.target.value)} maxLength={5000} rows={3} placeholder="Begründung (optional)" data-testid={`meeting-${id}-motion-text`} className="w-full bg-[#0A0A0A] border border-white/10 focus:border-[#FFD700] px-3 py-2 rounded-sm text-sm" />
-              <button type="submit" disabled={busy === `motion-${id}` || title.trim().length < 3} data-testid={`meeting-${id}-motion-submit`} className="inline-flex items-center gap-1.5 px-4 py-2 bg-[#FFD700] text-black tls-type-label rounded-sm disabled:opacity-50">
+              <input value={title} onChange={(e) => setTitle(e.target.value)} maxLength={255} placeholder="Titel des Antrags" data-testid={`meeting-${id}-motion-title`} className="w-full bg-[#0A0A0A] border border-white/10 focus:border-honor px-3 py-2 rounded-sm text-sm" />
+              <textarea value={text} onChange={(e) => setText(e.target.value)} maxLength={5000} rows={3} placeholder="Begründung (optional)" data-testid={`meeting-${id}-motion-text`} className="w-full bg-[#0A0A0A] border border-white/10 focus:border-honor px-3 py-2 rounded-sm text-sm" />
+              <button type="submit" disabled={busy === `motion-${id}` || title.trim().length < 3} data-testid={`meeting-${id}-motion-submit`} className="inline-flex items-center gap-1.5 px-4 py-2 bg-honor text-black tls-type-label rounded-sm disabled:opacity-50">
                 <Send className="w-3.5 h-3.5" /> Antrag einreichen
               </button>
             </form>
@@ -170,7 +170,7 @@ function BallotCard({ ballot, busy, onVote }) {
               <span className="text-white/45"> · {right.reason_text}</span>
             </div>
             {right.state === "used" ? (
-              <div className="mt-1 inline-flex items-center gap-1.5 tls-type-small text-[#00FF88]" data-testid={`ballot-${id}-right-${right.right_id}-used`}>
+              <div className="mt-1 inline-flex items-center gap-1.5 tls-type-small text-ok" data-testid={`ballot-${id}-right-${right.right_id}-used`}>
                 <CheckCircle2 className="w-4 h-4" /> {ballot.secret ? "Stimmzettel erhalten" : `abgestimmt: ${right.option_label || right.option}`}
               </div>
             ) : open && right.can_use && !ballot.secret ? (
@@ -312,7 +312,7 @@ export default function MemberMeetingsPage() {
               {doneBallots.map((ballot) => <BallotCard key={ballot.id} ballot={ballot} busy={busy} onVote={vote} />)}
             </div>
 
-            <h2 className="mt-10 tls-type-section inline-flex items-center gap-2"><FileText className="w-4 h-4 text-[#FFD700]" /> Versammlungen</h2>
+            <h2 className="mt-10 tls-type-section inline-flex items-center gap-2"><FileText className="w-4 h-4 text-honor" /> Versammlungen</h2>
             {view.meetings_reason ? <p className="mt-2 tls-type-body text-white/60" data-testid="meetings-reason">{view.meetings_text}</p> : null}
             {!view.meetings_reason && !meetings.length ? <p className="mt-2 tls-type-body text-white/45" data-testid="meetings-empty">Keine Einladung – sobald der Verein dich zu einer Versammlung einlädt, steht sie hier.</p> : null}
             <div className="mt-3 space-y-4">

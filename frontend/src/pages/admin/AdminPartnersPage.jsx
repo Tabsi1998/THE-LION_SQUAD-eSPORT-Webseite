@@ -73,7 +73,7 @@ export function SocialsEditor({ socials, onChange }) {
         <div key={index} className="grid grid-cols-1 md:grid-cols-[9.5rem_minmax(0,1fr)_auto] gap-2 items-end border border-white/10 bg-black/20 rounded-sm p-3" data-testid={`partner-social-${index}`}>
           <SelectField label="Plattform" value={link.platform} onChange={(v) => update(index, { platform: v })} options={options} testId={`partner-social-platform-${index}`} />
           <TextField label="Adresse" value={link.url} onChange={(v) => update(index, { url: v })} placeholder={link.platform === "email" ? "name@verein.at" : "https://…"} testId={`partner-social-url-${index}`} />
-          <button type="button" onClick={() => remove(index)} aria-label="Social entfernen" className="h-10 px-3 border border-[#FF3B30]/35 text-[#FF3B30] rounded-sm inline-flex items-center justify-center" data-testid={`partner-social-remove-${index}`}>
+          <button type="button" onClick={() => remove(index)} aria-label="Social entfernen" className="h-10 px-3 border border-live/35 text-live rounded-sm inline-flex items-center justify-center" data-testid={`partner-social-remove-${index}`}>
             <Trash2 className="w-3.5 h-3.5" />
           </button>
           {(link.platform === "custom" || link.label) && (
@@ -158,7 +158,7 @@ export default function AdminPartnersPage() {
                 <div className="min-w-0">
                   <div className="tls-type-label text-[#29B6E8]">{p.kind || "Partner"}</div>
                   <div className="tls-type-card tls-wrap">{p.name}</div>
-                  {p.is_active === false && <div className="tls-type-label text-[#FF3B30]">Archiviert</div>}
+                  {p.is_active === false && <div className="tls-type-label text-quiet">Archiviert</div>}
                   {p.source === "dolibarr" && <div className="tls-type-label text-[#29B6E8]/80" data-testid={`partner-dolibarr-${p.id}`}>Aus Dolibarr</div>}
                 </div>
               </div>
@@ -170,7 +170,7 @@ export default function AdminPartnersPage() {
                 ) : (
                   <button onClick={() => setArchived(p, true)} title="Archivieren" aria-label="Partner archivieren" data-testid={`partner-archive-${p.id}`} className="p-1.5 text-white/40 hover:text-brand"><Archive className="w-4 h-4" /></button>
                 ))}
-                <button onClick={() => remove(p.id)} disabled={dolibarrKeepsEntry(dolibarrSource, p)} title={dolibarrKeepsEntry(dolibarrSource, p) ? DOLIBARR_DELETE_HINT : "Partner löschen"} aria-label="Partner löschen" data-testid={`partner-delete-${p.id}`} className="p-1.5 text-white/40 hover:text-[#FF3B30] disabled:opacity-30 disabled:hover:text-white/40 disabled:cursor-not-allowed"><Trash2 className="w-4 h-4" /></button>
+                <button onClick={() => remove(p.id)} disabled={dolibarrKeepsEntry(dolibarrSource, p)} title={dolibarrKeepsEntry(dolibarrSource, p) ? DOLIBARR_DELETE_HINT : "Partner löschen"} aria-label="Partner löschen" data-testid={`partner-delete-${p.id}`} className="p-1.5 text-white/40 hover:text-live disabled:opacity-30 disabled:hover:text-white/40 disabled:cursor-not-allowed"><Trash2 className="w-4 h-4" /></button>
               </div>
             </div>
             {p.description && <p className="mt-3 tls-type-body text-white/60 line-clamp-2">{p.description}</p>}
@@ -277,7 +277,7 @@ function ToolsEditor({ tools, onChange }) {
         <div key={tool.id || `neu-${index}`} className="border border-white/10 rounded-sm p-3 space-y-3 bg-[#0A0A0A]" data-testid={`partner-tool-${index}`}>
           <div className="flex items-center justify-between gap-2">
             <span className="tls-type-label text-quiet">Eintrag {index + 1}</span>
-            <button type="button" onClick={() => remove(index)} data-testid={`partner-tool-remove-${index}`} aria-label="Eintrag entfernen" className="text-white/40 hover:text-[#FF3B30]"><Trash2 className="w-4 h-4" /></button>
+            <button type="button" onClick={() => remove(index)} data-testid={`partner-tool-remove-${index}`} aria-label="Eintrag entfernen" className="text-white/40 hover:text-live"><Trash2 className="w-4 h-4" /></button>
           </div>
           <FormGrid>
             <TextField label="Titel" value={tool.title} onChange={(v) => update(index, { title: v })} placeholder="TFT Dashboard" testId={`partner-tool-title-${index}`} />

@@ -68,7 +68,7 @@ export function FastLapGuestLinkDialog({ challengeId, guest, onClose, onLinked }
             </div>
             {preview.account_laps > 0 && <div className="text-white/55">Das Konto hat hier schon {plural(preview.account_laps, "Zeit", "Zeiten")} - beide werden zusammengeführt, es zählt die beste.</div>}
             {preview.over_limit?.map((row) => (
-              <div key={row.track_id} className="text-honor">
+              <div key={row.track_id} className="text-warn">
                 Hinweis: {row.track_name || "Strecke"}: {row.attempts} von {row.max_attempts} Versuchen - die Grenze wird überschritten, das ist erlaubt.
               </div>
             ))}

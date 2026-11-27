@@ -8,8 +8,8 @@ test("der Satz zu den Checks nennt rot und gelb, sonst alle grün", () => {
 });
 
 test("die Kachel Betrieb wird rot bei roten Checks oder offenen Fehlern, gelb bei gelben Checks", () => {
-  expect(opsTone(null)).toBe("#00FF88");
-  expect(opsTone({ open_error_groups: 0, slow_requests_24h: 0 })).toBe("#00FF88");
+  expect(opsTone(null)).toBe("#1FD08E");
+  expect(opsTone({ open_error_groups: 0, slow_requests_24h: 0 })).toBe("#1FD08E");
   expect(opsTone({ open_error_groups: 1 })).toBe("#FF3B30");
   expect(opsTone({ checks: { status: "crit" } })).toBe("#FF3B30");
   expect(opsTone({ checks: { status: "warn" } })).toBe("#FFD700");

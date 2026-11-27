@@ -40,12 +40,12 @@ export function MyStandCard({ tournament: t, registration: myReg, team = null, i
   const steps = tournamentSteps(t, myReg);
   const step = tournamentStep(steps, myReg);
   return (
-    <section className="border border-[#FFD700]/40 rounded-sm bg-[#FFD700]/5 p-4" data-testid="tournament-my-stand">
+    <section className="border border-brand/40 rounded-sm bg-brand/5 p-4" data-testid="tournament-my-stand">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="tls-type-label">Dein Stand</div>
         <StatusBadge status={myReg.status} size="lg" />
       </div>
-      {step >= 0 ? <StepBar steps={steps} current={step} className="tls-steps--gold mt-3" testId="tournament-my-steps" /> : null}
+      {step >= 0 ? <StepBar steps={steps} current={step} className="mt-3" testId="tournament-my-steps" /> : null}
       {/* Abgelehnt (#2113, L-C3): sagen, was das heißt und was jetzt geht - der Grund steht in der Nachricht. */}
       {myReg.status === "rejected" ? (
         <div className="mt-3 rounded-sm border border-warn/35 bg-warn/5 p-3 tls-type-small" data-testid="tournament-rejected-note">
@@ -83,7 +83,7 @@ export function MyStandCard({ tournament: t, registration: myReg, team = null, i
         {scheduleTo ? <Link to={scheduleTo} className="tls-type-label text-[#29B6E8] hover:text-white">Zum Spielplan</Link> : null}
         {detailsEdit}
         {canUnregister ? (
-          <button type="button" onClick={onUnregister} disabled={busy} data-testid="tournament-unregister-btn" className="ml-auto tls-type-small text-white/45 hover:text-[#FF3B30] underline underline-offset-2 disabled:opacity-50">Vom Turnier abmelden</button>
+          <button type="button" onClick={onUnregister} disabled={busy} data-testid="tournament-unregister-btn" className="ml-auto tls-type-small text-white/45 hover:text-live underline underline-offset-2 disabled:opacity-50">Vom Turnier abmelden</button>
         ) : leagueSquad && !FINISHED.has(t.status) ? (
           // Liga-Staffel (#2110): ein Co-Team ist zugeteilt - abmelden kann es nur die Liga-Leitung (#2424).
           <span className="ml-auto tls-type-small text-white/45" data-testid="tournament-unregister-league">Austritt nur über die Liga-Leitung</span>

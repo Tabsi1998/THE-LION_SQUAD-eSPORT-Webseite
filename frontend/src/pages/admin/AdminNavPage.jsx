@@ -155,7 +155,7 @@ export default function AdminNavPage() {
 
   return (
     <AdminLayout>
-      <span className="tls-type-label text-[#FFD700]">Content</span>
+      <span className="tls-type-label text-brand">Content</span>
       <h1 className="tls-type-title mt-1"><ShortCaps>Navigation</ShortCaps></h1>
       <p className="mt-2 text-white/55 tls-type-body max-w-2xl">
         Reihenfolge, Namen und Sichtbarkeit des Menüs der Website. Die Unterpunkte eines Menüs siehst du nach dem Aufklappen.
@@ -166,7 +166,7 @@ export default function AdminNavPage() {
           onClick={save}
           disabled={saving || loading || missing.length > 0}
           data-testid="nav-save"
-          className="px-5 py-2 bg-[#FFD700] text-black tls-type-label rounded-sm inline-flex items-center gap-2 disabled:opacity-50"
+          className="px-5 py-2 bg-brand text-black tls-type-label rounded-sm inline-flex items-center gap-2 disabled:opacity-50"
         >
           <Save className="w-3.5 h-3.5" /> {saving ? "Speichere…" : "Speichern"}
         </button>
@@ -190,7 +190,7 @@ export default function AdminNavPage() {
         <span className="tls-type-small text-quiet ml-auto">{items.length} Hauptpunkte</span>
       </div>
       {missing.length > 0 && (
-        <p role="alert" className="mt-3 tls-type-small text-[#FF6B6B]" data-testid="nav-missing-label">Jeder Menüpunkt braucht einen Namen – ein Feld ist leer.</p>
+        <p role="alert" className="mt-3 tls-type-small text-warn" data-testid="nav-missing-label">Jeder Menüpunkt braucht einen Namen – ein Feld ist leer.</p>
       )}
 
       {loading ? (
@@ -241,7 +241,7 @@ export default function AdminNavPage() {
                     aria-label={`Name des Menüpunkts ${it.to || ""}`.trim()}
                     aria-invalid={!String(it.label || "").trim() || undefined}
                     required
-                    className={`min-w-0 flex-1 bg-[#0A0A0A] border rounded-sm px-3 py-1.5 text-sm font-semibold ${String(it.label || "").trim() ? "border-white/10" : "border-[#FF6B6B]"}`}
+                    className={`min-w-0 flex-1 bg-[#0A0A0A] border rounded-sm px-3 py-1.5 text-sm font-semibold ${String(it.label || "").trim() ? "border-white/10" : "border-warn"}`}
                   />
                   {it.to && (
                     <span className="hidden md:inline tls-type-small text-quiet font-mono truncate max-w-[180px]">{it.to}</span>
@@ -250,7 +250,7 @@ export default function AdminNavPage() {
                     onClick={() => toggleVisible(idx)}
                     data-testid={`nav-toggle-${it.key}`}
                     className={`px-3 py-1.5 tls-type-label rounded-sm inline-flex items-center gap-1 ${
-                      visible ? "text-[#00FF88] bg-[#00FF88]/10" : "text-white/40 bg-white/5"
+                      visible ? "text-ok bg-ok/10" : "text-white/40 bg-white/5"
                     }`}
                   >
                     {visible ? <><Eye className="w-3 h-3" /> Sichtbar</> : <><EyeOff className="w-3 h-3" /> Versteckt</>}
@@ -291,7 +291,7 @@ export default function AdminNavPage() {
                               aria-label={`Name des Unterpunkts ${c.to || ""}`.trim()}
                               aria-invalid={!String(c.label || "").trim() || undefined}
                               required
-                              className={`w-full bg-[#121212] border rounded-sm px-2.5 py-1 text-xs ${String(c.label || "").trim() ? "border-white/10" : "border-[#FF6B6B]"}`}
+                              className={`w-full bg-[#121212] border rounded-sm px-2.5 py-1 text-xs ${String(c.label || "").trim() ? "border-white/10" : "border-warn"}`}
                             />
                             {ENTRY_NOTES[c.key] && <span className="mt-0.5 block tls-type-small text-white/45" data-testid={`nav-note-${c.key}`}>{ENTRY_NOTES[c.key]}</span>}
                           </div>
@@ -299,7 +299,7 @@ export default function AdminNavPage() {
                           <button
                             onClick={() => toggleVisible(idx, cIdx)}
                             className={`px-2 py-1 tls-type-label rounded-sm inline-flex items-center gap-1 ${
-                              cVisible ? "text-[#00FF88] bg-[#00FF88]/10" : "text-white/40 bg-white/5"
+                              cVisible ? "text-ok bg-ok/10" : "text-white/40 bg-white/5"
                             }`}
                           >
                             {cVisible ? <><Eye className="w-2.5 h-2.5" /> Sichtbar</> : <><EyeOff className="w-2.5 h-2.5" /> Versteckt</>}
@@ -315,8 +315,8 @@ export default function AdminNavPage() {
         </div>
       )}
 
-      <div className="mt-8 p-4 border border-[#FFD700]/30 bg-[#FFD700]/5 rounded-sm tls-type-small text-white/70">
-        <strong className="text-[#FFD700]">Hinweis:</strong> Versteckte Einträge stehen nicht im Menü der Website. Die Seiten selbst bleiben erreichbar – nur der Link im Menü fällt weg. Eigene Menüpunkte gibt es bewusst nicht; jede Seite hat ihren festen Platz.
+      <div className="mt-8 p-4 border border-brand/30 bg-brand/5 rounded-sm tls-type-small text-white/70">
+        <strong className="text-brand">Hinweis:</strong> Versteckte Einträge stehen nicht im Menü der Website. Die Seiten selbst bleiben erreichbar – nur der Link im Menü fällt weg. Eigene Menüpunkte gibt es bewusst nicht; jede Seite hat ihren festen Platz.
       </div>
     </AdminLayout>
   );

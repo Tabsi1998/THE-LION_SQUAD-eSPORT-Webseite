@@ -53,7 +53,7 @@ export function SeoSection({ brand, savingBrand, submittingIndexNow, indexNowRes
               ))}
             </div>
             {indexNowResult && (
-              <div className={`mt-3 rounded-sm border px-3 py-2 ${indexNowResult.ok ? "border-[#10B981]/25 text-[#10B981]" : "border-[#FF3B30]/25 text-[#FF3B30]"}`}>
+              <div className={`mt-3 rounded-sm border px-3 py-2 ${indexNowResult.ok ? "border-ok/25 text-ok" : "border-warn/25 text-warn"}`}>
                 {indexNowResult.ok ? `${indexNowResult.submitted || 0} URLs gesendet` : indexNowResult.error}
                 {indexNowResult.submitted_at && <span className="text-white/35"> - {viennaDateTime(indexNowResult.submitted_at)}</span>}
               </div>

@@ -73,7 +73,7 @@ function TopicTable({ columns, newsletter, notificationEnabled, notificationTopi
               <td className="px-3 py-3 align-top border-b border-white/10">
                 <div className="font-bold text-white">{topic.l}</div>
                 {topic.requiresNewsletter && !newsletter && columns.some((channel) => channel.k === "email") ? (
-                  <div className="tls-type-small text-[#FFD700] mt-1">Per E-Mail nur mit Newsletter-Zustimmung (unten).</div>
+                  <div className="tls-type-small text-quiet mt-1">Per E-Mail nur mit Newsletter-Zustimmung (unten).</div>
                 ) : null}
               </td>
               {columns.map((channel) => {
@@ -514,7 +514,7 @@ export function NotificationsTab({
                 <p className="tls-type-small text-white/45 mt-3" data-testid="profile-notification-discord-unlinked">Discord als Weg: erst im Reiter Socials „Mit Discord verknüpfen“ – dann kommen Benachrichtigungen auf Wunsch als Direktnachricht vom Vereins-Bot.</p>
               ) : null}
               {discord?.linked && discord?.hint ? (
-                <p className="tls-type-small text-[#FFD700] mt-3" data-testid="profile-notification-discord-hint">{discord.hint}</p>
+                <p className="tls-type-small text-quiet mt-3" data-testid="profile-notification-discord-hint">{discord.hint}</p>
               ) : null}
               {discordChannel.length ? (
                 <div className="mt-3"><TopicTable columns={discordChannel} {...tableProps} testId="notification-discord-table" /></div>
@@ -523,7 +523,7 @@ export function NotificationsTab({
 
             <div className="tls-notify-card" data-testid="profile-ceremony-card">
               <div className="flex items-start gap-3 mb-4">
-                <Sparkles className="w-5 h-5 text-[#FFD700] mt-1 shrink-0" />
+                <Sparkles className="w-5 h-5 text-brand mt-1 shrink-0" />
                 <div>
                   <h3 className="tls-type-card mb-1">Zeremonien</h3>
                   <p className="tls-type-small text-white/50">Wie ein freigeschalteter Erfolg gefeiert wird: mit Klang und voller Bewegung oder dezent, nur mit Einblenden.</p>
@@ -557,7 +557,7 @@ export function NotificationsTab({
                   disabled={form.ceremony_sound === false}
                   onChange={(e) => set("ceremony_volume", Number(e.target.value))}
                   data-testid="profile-ceremony-volume"
-                  className="mt-1 w-full accent-[#FFD700] disabled:opacity-40"
+                  className="mt-1 w-full accent-brand disabled:opacity-40"
                 />
               </label>
             </div>

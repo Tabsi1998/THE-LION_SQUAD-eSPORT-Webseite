@@ -271,7 +271,7 @@ export default function AdminStationsPage() {
       <span className="tls-type-label text-[#29B6E8]">Event-Einrichtung</span>
       <h1 className="tls-type-title mt-1 mb-6"><ShortCaps>Stationen</ShortCaps></h1>
       {pageError && (
-        <div className="mb-4 border border-[#FF3B30]/30 bg-[#FF3B30]/10 text-[#FFB3B3] px-4 py-3 rounded-sm tls-type-small">
+        <div className="mb-4 border border-warn/30 bg-warn/10 text-warn px-4 py-3 rounded-sm tls-type-small">
           {pageError}
         </div>
       )}
@@ -413,7 +413,7 @@ export default function AdminStationsPage() {
             {safeArray(list).map((s) => {
               const currentMatch = s.current_match_id ? matchById[s.current_match_id] : null;
               return (
-              <div key={s.id} className={`border rounded-sm bg-[#121212] p-4 ${s.status === "busy" ? "border-[#FF3B30]/30" : "border-white/10"}`}>
+              <div key={s.id} className={`border rounded-sm bg-[#121212] p-4 ${s.status === "busy" ? "border-live/30" : "border-white/10"}`}>
                 <div className="flex items-start justify-between gap-2">
                   <div>
                     <div className="tls-type-label text-[#29B6E8]">{formatDeviceType(s.device_type)}</div>

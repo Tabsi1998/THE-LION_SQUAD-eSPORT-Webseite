@@ -66,8 +66,8 @@ function SourceField({ value, disabled, onSave, idPrefix }) {
       <span className={LABEL}>Quelle beim Veranstalter (optional)</span>
       <input id={`${idPrefix}-source`} type="url" inputMode="url" value={text} disabled={disabled} placeholder="https://…" maxLength={500}
         onChange={(event) => setText(event.target.value)} onBlur={commit} onKeyDown={(event) => { if (event.key === "Enter") { event.preventDefault(); commit(); } }}
-        aria-invalid={problem ? true : undefined} className={`${SMALL} ${problem ? "!border-red-400/80" : ""}`} data-testid="original-source" />
-      {problem && <span className="mt-1 block tls-type-small text-red-300" role="alert">{problem}</span>}
+        aria-invalid={problem ? true : undefined} className={`${SMALL} ${problem ? "!border-warn/80" : ""}`} data-testid="original-source" />
+      {problem && <span className="mt-1 block tls-type-small text-warn" role="alert">{problem}</span>}
     </label>
   );
 }
@@ -100,7 +100,7 @@ function OriginalRow({ item, board, onChange, onRelease, onDelete, onOpen, busy,
         </div>
         <SourceField value={item.source_url} disabled={!editable || busy} idPrefix={id} onSave={(value) => onChange({ source_url: value })} />
         <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5 tls-type-small">
-          <span className={item.shown ? "text-emerald-300" : "text-white/55"} data-testid="original-status">
+          <span className={item.shown ? "text-ok" : "text-white/55"} data-testid="original-status">
             {item.shown ? "Öffentlich zu sehen" : reason}
           </span>
           {item.origin === "reading" && <span className="text-white/40">aus der Bild-Erkennung</span>}

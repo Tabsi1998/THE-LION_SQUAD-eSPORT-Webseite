@@ -19,8 +19,8 @@ const REASON_MIN = 5;
 function WeekPresets({ block }) {
   if (!block.presets?.length) return null;
   return (
-    <div className="mt-4 rounded-sm border border-[#00D26A]/40 bg-[#00D26A]/5 p-3" data-testid="veto-presets">
-      <h4 className="flex items-center gap-1.5 tls-type-label text-[#00D26A]">
+    <div className="mt-4 rounded-sm border border-ok/40 bg-ok/5 p-3" data-testid="veto-presets">
+      <h4 className="flex items-center gap-1.5 tls-type-label text-ok">
         <Pin className="h-3.5 w-3.5" aria-hidden="true" /> Vorgabe der Woche{block.week ? ` · Spielwoche ${block.week}` : ""}
       </h4>
       <ul className="mt-2 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
@@ -57,9 +57,9 @@ function ReadyToStart({ block, matchId, busy, run, onChanged }) {
       <ul className="grid gap-2 sm:grid-cols-2" aria-label="Bereit zum Veto">
         {(start.sides || []).map((side) => (
           <li key={side.registration_id} data-testid={`veto-ready-side-${side.registration_id}`} data-ready={side.ready ? "true" : "false"}
-            className={`flex min-w-0 items-center justify-between gap-3 rounded-sm border px-3 py-2 tls-type-small ${side.ready ? "border-[#00D26A]/50 bg-[#00D26A]/10 text-white" : "border-white/10 bg-white/[0.03] text-white/75"}`}>
+            className={`flex min-w-0 items-center justify-between gap-3 rounded-sm border px-3 py-2 tls-type-small ${side.ready ? "border-ok/50 bg-ok/10 text-white" : "border-white/10 bg-white/[0.03] text-white/75"}`}>
             <span className="min-w-0 font-bold [overflow-wrap:anywhere]">{side.name}{side.own ? <span className="ml-2 tls-type-label text-[#29B6E8]">Ihr</span> : null}</span>
-            <span className={`inline-flex shrink-0 items-center gap-1 tls-type-small font-bold ${side.ready ? "text-[#00D26A]" : "text-white/50"}`}>
+            <span className={`inline-flex shrink-0 items-center gap-1 tls-type-small font-bold ${side.ready ? "text-ok" : "text-white/50"}`}>
               {side.ready ? <Check className="h-3.5 w-3.5" aria-hidden="true" /> : null}{side.ready ? "bereit" : "noch nicht bereit"}
             </span>
           </li>
@@ -107,8 +107,8 @@ function LeadStart({ block, matchId, busy, run, onChanged }) {
     }, "Starten hat nicht geklappt.");
   };
   return (
-    <div className="mt-4 rounded-sm border border-honor/30 bg-honor/5 p-4" data-testid="veto-lead-start">
-      <h3 className="flex items-center gap-2 tls-type-small font-bold text-honor"><ShieldAlert className="h-4 w-4" aria-hidden="true" /> Notfall: Veto starten (Liga-Leitung)</h3>
+    <div className="mt-4 rounded-sm border border-brand/30 bg-brand/5 p-4" data-testid="veto-lead-start">
+      <h3 className="flex items-center gap-2 tls-type-small font-bold text-brand"><ShieldAlert className="h-4 w-4" aria-hidden="true" /> Notfall: Veto starten (Liga-Leitung)</h3>
       <p className="mt-1 tls-type-small text-white/60">Nur, wenn eine Seite nicht selbst „Bereit“ tippen kann. Ab dem Start läuft die Zeit je Schritt; der Grund steht im Protokoll.</p>
       {needsConflictReason ? <p className="mt-2 tls-type-small text-warn" data-testid="veto-lead-start-conflict">Du bist an diesem Spiel selbst beteiligt – als Superadmin nur als Notausnahme mit Grund.</p> : null}
       <label className="mt-3 block tls-type-small text-white/60">
@@ -173,8 +173,8 @@ function LeadControls({ block, matchId, busy, run, onChanged }) {
     </button>
   ) : null);
   return (
-    <div className="mt-4 rounded-sm border border-honor/30 bg-honor/5 p-4" data-testid="veto-lead">
-      <h3 className="flex items-center gap-2 tls-type-label text-honor"><ShieldAlert className="h-4 w-4" aria-hidden="true" /> Eingriff der Liga-Leitung</h3>
+    <div className="mt-4 rounded-sm border border-brand/30 bg-brand/5 p-4" data-testid="veto-lead">
+      <h3 className="flex items-center gap-2 tls-type-label text-brand"><ShieldAlert className="h-4 w-4" aria-hidden="true" /> Eingriff der Liga-Leitung</h3>
       <p className="mt-1 tls-type-small text-white/60">Nur mit Grund, alles steht im Protokoll und beide Seiten sehen es. Nach dem Start von Map 1 ändert sich nichts mehr.</p>
       {needsConflictReason ? <p className="mt-2 tls-type-small text-warn" data-testid="veto-lead-conflict">Du bist an diesem Spiel selbst beteiligt – als Superadmin nur als Notausnahme mit Grund.</p> : null}
       <label className="mt-3 block tls-type-small text-white/60">
@@ -202,10 +202,10 @@ function PlannedGames({ games }) {
   return (
     <ol className="mt-4 grid gap-2 sm:grid-cols-2 lg:grid-cols-3" data-testid="veto-planned" aria-label="Spielreihenfolge">
       {games.map((game) => (
-        <li key={game.position} className="flex min-w-0 items-center gap-3 rounded-sm border border-[#00D26A]/40 bg-[#00D26A]/5 p-2" data-testid={`veto-planned-${game.position}`}>
+        <li key={game.position} className="flex min-w-0 items-center gap-3 rounded-sm border border-ok/40 bg-ok/5 p-2" data-testid={`veto-planned-${game.position}`}>
           {game.map_image_url ? <LazyImg src={game.map_image_url} alt="" sizes="64px" className="h-12 w-16 shrink-0 rounded-sm object-cover" /> : <span className="h-12 w-16 shrink-0 rounded-sm bg-white/5" />}
           <span className="min-w-0">
-            <span className="block tls-type-label text-[#00D26A]">Map {game.position}{plannedRoleLabel(game.role) ? ` · ${plannedRoleLabel(game.role)}` : ""}</span>
+            <span className="block tls-type-label text-ok">Map {game.position}{plannedRoleLabel(game.role) ? ` · ${plannedRoleLabel(game.role)}` : ""}</span>
             <span className="block truncate font-bold text-white">{game.map_name}</span>
             <span className="flex items-center gap-1 tls-type-small text-white/60"><ModeIcon src={game.mode_icon_url} size="xs" /> {game.mode_label}</span>
           </span>
@@ -236,7 +236,7 @@ export function VetoPanel({ block, matchId, busy, run, onChanged, onPoll, bothIn
     await onChanged();
   }, `${word} hat nicht geklappt.`);
   const tone = blocked ? "border-warn/50" : startReady ? "border-[#29B6E8]/60"
-    : { running: block.own_turn ? "border-[#29B6E8]/60" : "border-honor/40", paused: "border-warn/50", done: "border-[#00D26A]/50", skipped: "border-white/15" }[block.status] || "border-white/15";
+    : { running: block.own_turn ? "border-[#29B6E8]/60" : "border-white/20", paused: "border-warn/50", done: "border-ok/50", skipped: "border-white/15" }[block.status] || "border-white/15";
   return (
     <section className={`mt-5 rounded-sm border bg-[#0A0A0A] p-4 ${tone}`} data-testid="veto-panel" data-status={block.status} data-own-turn={block.own_turn ? "true" : "false"}
       data-blocked={blocked ? "true" : "false"} data-start-ready={startReady ? "true" : "false"} data-read-only={readOnly ? "true" : "false"}>

@@ -316,10 +316,10 @@ function MonthView({ items, month, setMonth, selectedDay, selectDay, goToday, to
                     aria-pressed={selected}
                     data-testid={`calendar-day-${cell.key}`}
                     style={{ gridRow: 1 }}
-                    className={`min-h-12 sm:min-h-16 rounded-sm border-[1.5px] px-1 pt-1.5 pb-1 flex flex-col items-center gap-1 transition ${selected ? "border-[#9F7AEA] bg-[#9F7AEA]/15" : "border-transparent hover:border-white/20"} ${mine ? "tls-you tls-you--inset" : ""} ${cell.inMonth ? "" : "opacity-40"}`}
+                    className={`min-h-12 sm:min-h-16 rounded-sm border-[1.5px] px-1 pt-1.5 pb-1 flex flex-col items-center gap-1 transition ${selected ? "border-[#9F7AEA] bg-[#9F7AEA]/15" : "border-transparent hover:border-white/20"} ${mine ? "tls-you tls-you--inset" : ""} ${cell.inMonth ? "" : "text-quiet"}`}
                   >
                     <span className={`tls-type-small font-bold ${cell.key === todayKey ? "text-[#9F7AEA] underline underline-offset-4" : ""}`}>{cell.day}</span>
-                    <span className="flex gap-0.5 min-h-1.5">
+                    <span className={`flex gap-0.5 min-h-1.5 ${cell.inMonth ? "" : "opacity-40"}`}>
                       {cellKinds.slice(0, 3).map((kind) => <span key={kind} className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: KIND_COLORS[kind] }} data-testid={`calendar-dot-${cell.key}-${kind}`} />)}
                     </span>
                   </button>

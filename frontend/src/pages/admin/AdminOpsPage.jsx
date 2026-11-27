@@ -332,7 +332,7 @@ export default function AdminOpsPage() {
             const isPicked = picked.includes(row.fingerprint);
             const isClient = row.source === "web" || row.source === "app";
             return (
-              <article key={row.fingerprint} className={`border rounded-sm bg-[#121212] ${resolved ? "border-white/10" : isPicked ? "border-ok/40" : "border-[#FF3B30]/30"}`} data-testid={`ops-error-${row.fingerprint}`}>
+              <article key={row.fingerprint} className={`border rounded-sm bg-[#121212] ${resolved ? "border-white/10" : isPicked ? "border-ok/40" : "border-warn/30"}`} data-testid={`ops-error-${row.fingerprint}`}>
                 <div className="flex flex-col md:flex-row md:items-stretch">
                   <div className="flex flex-1 min-w-0 items-start">
                     {!resolved ? (
@@ -349,7 +349,7 @@ export default function AdminOpsPage() {
                     >
                       <div className="flex-1 min-w-0">
                         <div className="flex flex-wrap items-center gap-2">
-                          <span className={`inline-flex items-center gap-1 tls-type-label px-2 py-0.5 rounded-sm border ${resolved ? "border-white/10 text-white/50" : "border-[#FF3B30]/40 bg-[#FF3B30]/10 text-[#FF6B61]"}`}>
+                          <span className={`inline-flex items-center gap-1 tls-type-label px-2 py-0.5 rounded-sm border ${resolved ? "border-white/10 text-white/50" : "border-warn/40 bg-warn/10 text-warn"}`}>
                             <AlertTriangle className="w-3 h-3" /> {row.error_type}
                           </span>
                           {SOURCE_LABELS[row.source] && row.source !== "server" ? (

@@ -4,6 +4,7 @@
 
 import { MATERIAL_LOOKS, materialForLevel } from "../materials";
 
+import { ROLE_COLORS } from "@/lib/categoryColors";
 // Kategorie → Bewegung, mit der das Abzeichen auf die Bühne kommt.
 export const MOTIONS = {
   match: "impact",        // Einschlag von oben mit Bodenwelle
@@ -167,7 +168,7 @@ export function planCeremony(pkg) {
     material,
     motion,
     category: top ? categoryOf(top) : "profile",
-    accent: look?.rim || "#FFD700",
+    accent: look?.rim || ROLE_COLORS.honor,
     duration,
     autoAdvanceMs: sequence === "stack" ? meta.perItem : 0,
     tiers,

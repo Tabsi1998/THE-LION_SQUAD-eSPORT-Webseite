@@ -46,7 +46,7 @@ export function DiscordWidgetStatus() {
 
   if (!widget) return null;
   return (
-    <div className={`border rounded-sm p-3 tls-type-small space-y-2 ${widget.available ? "border-white/10 text-white/60" : "border-[#FFD700]/30 bg-[#FFD700]/5 text-white/75"}`} data-testid="discord-widget">
+    <div className={`border rounded-sm p-3 tls-type-small space-y-2 ${widget.available ? "border-white/10 text-white/60" : "border-warn/30 bg-warn/5 text-white/75"}`} data-testid="discord-widget">
       <div className="tls-type-label text-white/70 inline-flex items-center gap-2"><Users className="w-3.5 h-3.5 text-[#5865F2]" /> Discord auf der Website</div>
       <div data-testid="discord-widget-text">{widgetText(widget)}</div>
       <div className="flex flex-wrap items-center gap-3">

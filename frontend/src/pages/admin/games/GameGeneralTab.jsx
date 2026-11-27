@@ -42,7 +42,7 @@ function DiscordServerField({ form, games, servers, onChange, testId }) {
         options={[["", `Erben (${inherited})`], ...options.map((server) => [server.guild_id, serverOptionLabel(server)])]}
         hint="Wohin Turnier- und Liga-Meldungen dieses Spiels gehen." />
       {current && (!current.enabled || current.left) ? (
-        <div className="tls-type-small text-[#FFD700]" data-testid={`${testId}-off`}>Dieser Server ist {current.left ? "nicht mehr erreichbar" : "ausgeschaltet"} – bis dahin gilt: {inherited}.</div>
+        <div className="tls-type-small text-quiet" data-testid={`${testId}-off`}>Dieser Server ist {current.left ? "nicht mehr erreichbar" : "ausgeschaltet"} – bis dahin gilt: {inherited}.</div>
       ) : null}
     </div>
   );

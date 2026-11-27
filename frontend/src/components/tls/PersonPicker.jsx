@@ -149,7 +149,7 @@ export function PersonPicker({ purpose, contextId = null, value = null, onChange
         />
       </div>
       {hint && <div className="mt-1 tls-type-small text-white/45">{hint}</div>}
-      {state === "error" && <div className="mt-2 tls-type-small text-[#FFB4AE]" role="alert" data-testid={`${testId}-error`}>{error}</div>}
+      {state === "error" && <div className="mt-2 tls-type-small text-warn" role="alert" data-testid={`${testId}-error`}>{error}</div>}
       {(showRecent || (showHits && state !== "error")) && (
         <div id={`${listId}-list`} role="listbox" className="mt-2 sm:absolute sm:inset-x-0 sm:top-full sm:mt-1 z-30 max-h-72 overflow-y-auto border border-white/10 bg-[#121212] rounded-sm shadow-2xl shadow-black/50 divide-y divide-white/5" data-testid={`${testId}-list`}>
           {showRecent && <div className="px-3 pt-2 pb-1 tls-type-label text-quiet">Zuletzt gewählt</div>}

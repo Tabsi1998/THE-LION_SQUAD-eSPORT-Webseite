@@ -35,7 +35,7 @@ export default function AdminFeedbackPage() {
       <h1 className="tls-type-title mt-1"><ShortCaps>Rückmeldungen</ShortCaps></h1>
       <p className="mt-2 mb-5 tls-type-body text-white/60 max-w-2xl">Was Teilnehmende nach Turnieren und Events sagen, ohne Namen. Unter {data?.min_for_details ?? 3} Antworten steht nur die Zahl: Bei zwei Leuten wüsste man sonst, wer was geschrieben hat.</p>
 
-      {error && <div className="mb-4 border border-live/40 bg-live/10 rounded-sm p-3 tls-type-small" data-testid="feedback-overview-error">{error}</div>}
+      {error && <div className="mb-4 border border-warn/40 bg-warn/10 rounded-sm p-3 tls-type-small" data-testid="feedback-overview-error">{error}</div>}
       {!data && !error && <SkeletonTable rows={4} columns={4} label="Lade Rückmeldungen" />}
 
       {data && (

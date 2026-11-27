@@ -188,11 +188,11 @@ export function ResetPasswordPage() {
           {isInvite && <div className="space-y-3 border border-white/10 rounded-sm p-4 bg-black/20">
             <label className="flex items-start gap-3 tls-type-small text-white/70">
               <input type="checkbox" checked={acceptPrivacy} onChange={(event) => setAcceptPrivacy(event.target.checked)} className="mt-1 accent-[#29B6E8]" />
-              <span>Ich akzeptiere die <Link to="/privacy" target="_blank" className="text-[#29B6E8] underline">Datenschutzerklärung</Link>.{fieldErrors.acceptPrivacy && <span role="alert" className="block tls-type-small text-[#FF8A80] mt-1">{fieldErrors.acceptPrivacy}</span>}</span>
+              <span>Ich akzeptiere die <Link to="/privacy" target="_blank" className="text-[#29B6E8] underline">Datenschutzerklärung</Link>.{fieldErrors.acceptPrivacy && <span role="alert" className="block tls-type-small text-warn mt-1">{fieldErrors.acceptPrivacy}</span>}</span>
             </label>
             <label className="flex items-start gap-3 tls-type-small text-white/70">
               <input type="checkbox" checked={acceptTerms} onChange={(event) => setAcceptTerms(event.target.checked)} className="mt-1 accent-[#29B6E8]" />
-              <span>Ich akzeptiere die <Link to="/terms" target="_blank" className="text-[#29B6E8] underline">Nutzungsbedingungen</Link>.{fieldErrors.acceptTerms && <span role="alert" className="block tls-type-small text-[#FF8A80] mt-1">{fieldErrors.acceptTerms}</span>}</span>
+              <span>Ich akzeptiere die <Link to="/terms" target="_blank" className="text-[#29B6E8] underline">Nutzungsbedingungen</Link>.{fieldErrors.acceptTerms && <span role="alert" className="block tls-type-small text-warn mt-1">{fieldErrors.acceptTerms}</span>}</span>
             </label>
           </div>}
           {submitError && <AuthFormAlert id="reset-submit-error">{submitError}</AuthFormAlert>}

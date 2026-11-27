@@ -75,7 +75,7 @@ function AdjustmentSheet({ series, item, participants, rounds, teams, onClose, o
   return (
     <AdminSheet title={isNew ? "Neue Anpassung" : "Anpassung bearbeiten"} eyebrow={kindShows(series.profile, "race_details") ? "Punkte ohne Rennergebnis" : "Punkte ohne Ergebnis"} onClose={onClose} onSubmit={save} saving={saving} submitTestId="adjustment-save" testId="adjustment-sheet">
       {Object.keys(errors).length > 0 && (
-        <ul className="border border-red-400/40 bg-red-400/10 rounded-sm px-3 py-2 tls-type-small text-red-100 space-y-0.5" role="alert" data-testid="adjustment-errors">
+        <ul className="border border-warn/40 bg-warn/10 rounded-sm px-3 py-2 tls-type-small text-white/85 space-y-0.5" role="alert" data-testid="adjustment-errors">
           {Object.values(errors).map((message) => <li key={message}>{message}</li>)}
         </ul>
       )}
@@ -160,7 +160,7 @@ export function SeriesAdjustmentsSection({ series, onChanged }) {
         <ul className="mt-3 divide-y divide-white/5" data-testid="adjustments-list">
           {items.map((item) => (
             <li key={item.id} className="py-2.5 flex items-start gap-3" data-testid="adjustment-row">
-              <span className={`w-12 shrink-0 pt-0.5 tls-type-card tls-type-num ${Number(item.points) < 0 ? "text-red-300" : "text-emerald-300"}`}>{adjustmentText(item.points)}</span>
+              <span className={`w-12 shrink-0 pt-0.5 tls-type-card tls-type-num ${Number(item.points) < 0 ? "text-warn" : "text-ok"}`}>{adjustmentText(item.points)}</span>
               <span className="min-w-0 flex-1">
                 <span className="block tls-type-small font-semibold text-white [overflow-wrap:anywhere]">
                   {adjustmentTarget(item, participants)}
@@ -169,7 +169,7 @@ export function SeriesAdjustmentsSection({ series, onChanged }) {
                 <span className="block tls-type-small text-white/60 [overflow-wrap:anywhere]">{adjustmentDetail(item, rounds)}</span>
                 {/* #2000: für welches Team - bzw. als Ersatz gefahren: für keines (Hinweis). */}
                 {teamNotes[item.id] && (
-                  <span className={`block tls-type-small [overflow-wrap:anywhere] ${teamNotes[item.id].warn ? "text-amber-200/90" : "text-[#29B6E8]/90"}`} data-tone={teamNotes[item.id].warn ? "warn" : "info"} data-testid="adjustment-team-note">
+                  <span className={`block tls-type-small [overflow-wrap:anywhere] ${teamNotes[item.id].warn ? "text-warn/90" : "text-[#29B6E8]/90"}`} data-tone={teamNotes[item.id].warn ? "warn" : "info"} data-testid="adjustment-team-note">
                     {teamNotes[item.id].text}
                   </span>
                 )}

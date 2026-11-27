@@ -323,7 +323,7 @@ export default function AdminGameServersPage() {
         </div>
         <div className="grid grid-cols-1 sm:grid-cols-3 xl:flex gap-2 w-full xl:w-auto">
           {demoTools ? (
-            <button onClick={removeSeededDefaults} data-testid="server-demo-remove" className="w-full sm:w-auto px-4 py-2.5 border border-[#FFD700]/45 text-[#FFD700] rounded-sm font-bold uppercase tracking-wider">
+            <button onClick={removeSeededDefaults} data-testid="server-demo-remove" className="w-full sm:w-auto px-4 py-2.5 border border-live/45 text-live rounded-sm font-bold uppercase tracking-wider">
               Demo-Startliste
             </button>
           ) : null}
@@ -340,7 +340,7 @@ export default function AdminGameServersPage() {
         <Stat label="Server" value={stats.total} />
         <Stat label="Aktiv" value={stats.active} tone="green" />
         <Stat label="Online" value={stats.online} tone="cyan" />
-        <Stat label="Versteckt" value={stats.hidden} tone="gold" />
+        <Stat label="Versteckt" value={stats.hidden} tone="quiet" />
       </div>
 
       <AmpPanelCard />
@@ -475,7 +475,7 @@ export default function AdminGameServersPage() {
             <Field label="Wartungsnotiz" value={form.maintenance_note} onChange={(v) => set("maintenance_note", v)} placeholder="z.B. Mod-Update, neue Map..." />
             <Field label="Wartung bis" type="datetime-local" value={form.maintenance_until} onChange={(v) => set("maintenance_until", v)} />
             <label className="flex items-start gap-2 mt-6 tls-type-small text-white/75">
-              <input type="checkbox" checked={form.site_banner_enabled} onChange={(e) => set("site_banner_enabled", e.target.checked)} className="accent-[#FFD700] mt-1" />
+              <input type="checkbox" checked={form.site_banner_enabled} onChange={(e) => set("site_banner_enabled", e.target.checked)} className="accent-brand mt-1" />
               <span><strong className="text-white">Wartungsbanner anzeigen</strong><br /><span className="tls-type-small text-white/50">Nur wenn dieser Haken aktiv ist und der Server auf Wartung steht.</span></span>
             </label>
             <Field label="Sortierung" type="number" value={form.sort_order} onChange={(v) => set("sort_order", v)} />
@@ -506,7 +506,7 @@ export default function AdminGameServersPage() {
                 <div key={index} className="border border-white/15 rounded-sm p-3 space-y-3" data-testid="mod-resource-row">
                   <div className="flex items-center justify-between gap-3">
                     <label className="flex items-center gap-2 tls-type-small font-bold"><input type="checkbox" checked={!!item.enabled} onChange={(event) => setResource(index, "enabled", event.target.checked)} className="accent-[#29B6E8]" />Link {index + 1} anzeigen</label>
-                    <button type="button" onClick={() => set("mod_resources", form.mod_resources.filter((_item, position) => index !== position))} className="min-h-11 px-3 tls-type-small text-[#FF6B62]" aria-label={`Link ${index + 1} entfernen`}>Entfernen</button>
+                    <button type="button" onClick={() => set("mod_resources", form.mod_resources.filter((_item, position) => index !== position))} className="min-h-11 px-3 tls-type-small text-live" aria-label={`Link ${index + 1} entfernen`}>Entfernen</button>
                   </div>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                     <label className="block tls-type-small">Typ<select value={item.kind} onChange={(event) => setResource(index, "kind", event.target.value)} className="mt-1 block w-full bg-[#0A0A0A] border border-white/15 rounded-sm p-2">{Object.entries(serverResourceLabels).map(([kind, label]) => <option key={kind} value={kind}>{label}</option>)}</select></label>
@@ -540,18 +540,18 @@ export default function AdminGameServersPage() {
                 <div className="tls-type-small text-[#29B6E8] font-bold">{server.game?.short_name || server.game?.name || server.game_name || "Server"}</div>
                 <h2 className="tls-type-section break-words leading-tight">{server.name}</h2>
                 <div className="mt-2 flex gap-1 flex-wrap">
-                  <Badge label={statusLabels[server.status] || server.status} tone={server.status === "online" ? "green" : server.status === "maintenance" ? "gold" : "muted"} />
+                  <Badge label={statusLabels[server.status] || server.status} tone={server.status === "online" ? "green" : server.status === "maintenance" ? "warn" : "muted"} />
                   <Badge label={visibilityLabels[server.visibility] || server.visibility} tone={server.visibility === "members" ? "gold" : server.visibility === "public" ? "cyan" : "muted"} />
                   {server.access_secret_kind && server.access_secret_kind !== "none" && <Badge label={secretLabels[server.access_secret_kind] || "Zugang"} tone="gold" />}
-                  {server.status === "maintenance" && server.site_banner_enabled && <Badge label="Banner aktiv" tone="gold" />}
+                  {server.status === "maintenance" && server.site_banner_enabled && <Badge label="Banner aktiv" tone="warn" />}
                   {server.is_active === false && <Badge label="Inaktiv" tone="red" />}
                 </div>
               </div>
               <div className="grid grid-cols-4 sm:flex gap-1 shrink-0 w-full sm:w-auto">
                 <button onClick={() => syncOne(server)} disabled={syncing === server.id || server.sync_provider === "manual"} title="Live-Daten jetzt abrufen" className="min-h-10 inline-flex items-center justify-center p-2 border border-white/10 sm:border-transparent rounded-sm text-white/45 hover:text-[#29B6E8] disabled:opacity-30"><RefreshCw className={`w-4 h-4 ${syncing === server.id ? "animate-spin" : ""}`} /></button>
-                <button onClick={() => diagnose(server)} disabled={syncing === `${server.id}:diagnose`} title="Verbindung testen" className="min-h-10 inline-flex items-center justify-center p-2 border border-white/10 sm:border-transparent rounded-sm text-white/45 hover:text-[#FFD700] disabled:opacity-30"><Network className={`w-4 h-4 ${syncing === `${server.id}:diagnose` ? "animate-pulse" : ""}`} /></button>
+                <button onClick={() => diagnose(server)} disabled={syncing === `${server.id}:diagnose`} title="Verbindung testen" className="min-h-10 inline-flex items-center justify-center p-2 border border-white/10 sm:border-transparent rounded-sm text-white/45 hover:text-brand disabled:opacity-30"><Network className={`w-4 h-4 ${syncing === `${server.id}:diagnose` ? "animate-pulse" : ""}`} /></button>
                 <button onClick={() => startEdit(server)} title="Bearbeiten" className="min-h-10 inline-flex items-center justify-center p-2 border border-white/10 sm:border-transparent rounded-sm text-white/45 hover:text-[#29B6E8]"><Pencil className="w-4 h-4" /></button>
-                <button onClick={() => remove(server)} title="Löschen" className="min-h-10 inline-flex items-center justify-center p-2 border border-white/10 sm:border-transparent rounded-sm text-white/45 hover:text-[#FF3B30]"><Trash2 className="w-4 h-4" /></button>
+                <button onClick={() => remove(server)} title="Löschen" className="min-h-10 inline-flex items-center justify-center p-2 border border-white/10 sm:border-transparent rounded-sm text-white/45 hover:text-live"><Trash2 className="w-4 h-4" /></button>
               </div>
             </div>
             <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-2 tls-type-small">
@@ -573,8 +573,8 @@ export default function AdminGameServersPage() {
                 </button>
               ))}
             </div>
-            {server.last_sync_note && <div className="mt-3 border border-[#FFD700]/25 bg-[#FFD700]/10 text-[#FFD700] rounded-sm px-3 py-2 tls-type-small">{server.last_sync_note}</div>}
-            {server.last_sync_error && <div role="alert" data-testid={`server-sync-error-${server.slug || server.id}`} className="mt-3 border border-[#FF3B30]/30 bg-[#FF3B30]/10 text-[#FF8A80] rounded-sm px-3 py-2 tls-type-small break-words">Letzter Abruf fehlgeschlagen: {server.last_sync_error}</div>}
+            {server.last_sync_note && <div className="mt-3 border border-brand/25 bg-brand/10 text-brand rounded-sm px-3 py-2 tls-type-small">{server.last_sync_note}</div>}
+            {server.last_sync_error && <div role="alert" data-testid={`server-sync-error-${server.slug || server.id}`} className="mt-3 border border-warn/30 bg-warn/10 text-warn rounded-sm px-3 py-2 tls-type-small break-words">Letzter Abruf fehlgeschlagen: {server.last_sync_error}</div>}
             {diagnostics[server.id] && <DiagnosticsPanel data={diagnostics[server.id]} />}
             {server.description && <p className="mt-3 tls-type-body text-white/55 line-clamp-2">{server.description}</p>}
           </article>
@@ -586,8 +586,8 @@ export default function AdminGameServersPage() {
 
 function DiagnosticsPanel({ data }) {
   return (
-    <div className="mt-3 border border-[#FFD700]/25 bg-[#FFD700]/5 rounded-sm p-3 tls-type-small min-w-0">
-      <div className="font-bold uppercase tracking-widest text-[#FFD700]">Verbindungstest</div>
+    <div className="mt-3 border border-brand/25 bg-brand/5 rounded-sm p-3 tls-type-small min-w-0">
+      <div className="font-bold uppercase tracking-widest text-brand">Verbindungstest</div>
       <div className="mt-2 text-white/60 break-words">{data.recommendation}</div>
       <div className="mt-3 space-y-2">
         {(data.candidates || []).map((item, index) => (
@@ -598,8 +598,8 @@ function DiagnosticsPanel({ data }) {
             </div>
             <div className="mt-1 text-white/40">{item.source}</div>
             {item.resolved_ips?.length > 0 && <div className="mt-1 text-white/55 break-all">DNS: {item.resolved_ips.join(", ")}</div>}
-            {item.hint && <div className="mt-1 text-[#FFD700] break-words">{item.hint}</div>}
-            {item.error && <div className="mt-1 text-[#FF8A80] break-words">{item.error}</div>}
+            {item.hint && <div className="mt-1 text-warn break-words">{item.hint}</div>}
+            {item.error && <div className="mt-1 text-warn break-words">{item.error}</div>}
           </div>
         ))}
       </div>
@@ -608,7 +608,7 @@ function DiagnosticsPanel({ data }) {
 }
 
 function Stat({ label, value, tone }) {
-  const color = tone === "green" ? "text-[#00FF88]" : tone === "gold" ? "text-[#FFD700]" : "text-[#29B6E8]";
+  const color = tone === "green" ? "text-ok" : tone === "gold" ? "text-honor" : tone === "quiet" ? "text-quiet" : "text-[#29B6E8]";
   return (
     <div className="border border-white/10 bg-[#121212] rounded-sm p-3 sm:p-4 min-w-0">
       <div className="tls-type-label text-white/45 break-words">{label}</div>
@@ -628,10 +628,11 @@ function Field({ label, value, onChange, type = "text", placeholder = "", requir
 
 function Badge({ label, tone }) {
   const classes = {
-    green: "bg-[#00FF88]/10 text-[#00FF88]",
+    green: "bg-ok/10 text-ok",
     cyan: "bg-[#29B6E8]/10 text-[#29B6E8]",
-    gold: "bg-[#FFD700]/10 text-[#FFD700]",
-    red: "bg-[#FF3B30]/10 text-[#FF3B30]",
+    gold: "bg-honor/10 text-honor",
+    warn: "bg-warn/10 text-warn",
+    red: "bg-warn/10 text-warn",
     muted: "bg-white/10 text-white/55",
   };
   return <span className={`px-2 py-1 rounded-sm tls-type-label ${classes[tone] || classes.muted}`}>{label}</span>;

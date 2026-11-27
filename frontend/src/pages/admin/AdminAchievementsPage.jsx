@@ -55,7 +55,7 @@ export default function AdminAchievementsPage() {
 
   return (
     <AdminLayout>
-      <span className="tls-type-label text-[#FFD700]">Content</span>
+      <span className="tls-type-label text-honor">Content</span>
       <h1 className="tls-type-title mt-1"><ShortCaps>Erfolge</ShortCaps></h1>
       <p className="mt-2 text-white/55 tls-type-body max-w-2xl">
         Katalog, Vergaben, Saisonabschluss, XP und Vorschau an einem Ort. Jede Aktion steht im Protokoll unter „Vergeben“.
@@ -70,7 +70,7 @@ export default function AdminAchievementsPage() {
             aria-selected={tab === key}
             onClick={() => setTab(key)}
             data-testid={`ach-tab-${key}`}
-            className={`px-4 py-2 tls-type-label inline-flex items-center gap-2 border-b-2 whitespace-nowrap transition ${tab === key ? "border-[#FFD700] text-[#FFD700]" : "border-transparent text-white/50 hover:text-white"}`}
+            className={`px-4 py-2 tls-type-label inline-flex items-center gap-2 border-b-2 whitespace-nowrap transition ${tab === key ? "border-brand text-brand" : "border-transparent text-white/50 hover:text-white"}`}
           >
             <Icon className="w-3.5 h-3.5" /> {label}
           </button>

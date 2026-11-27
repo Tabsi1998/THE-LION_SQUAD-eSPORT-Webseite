@@ -7,6 +7,7 @@ import { INPUT_CLASS } from "@/components/tls/FormFields";
 import { Badge } from "@/components/achievements/Badge";
 import { Panel, PersonPicker, errorText, formatWhen, personName, useCatalog } from "./shared";
 
+import { ROLE_COLORS } from "@/lib/categoryColors";
 /** Negativ und Vorfälle (E10): Vorfall auslösen, die Liste mit der neuen Symbolik, Entfernen mit Grund. */
 export function NegativeTab() {
   const catalog = useCatalog();
@@ -58,7 +59,7 @@ export function NegativeTab() {
 
   return (
     <div className="space-y-6" data-testid="ach-negative">
-      <Panel title="Vorfall eintragen" icon={AlertOctagon} accent="#FF3B30" hint="Fun-Erfolge für kleine Missgeschicke – bis zur Freischaltung geheim, danach im Profil sichtbar." testId="negative-trigger">
+      <Panel title="Vorfall eintragen" icon={AlertOctagon} accent={ROLE_COLORS.warn} hint="Fun-Erfolge für kleine Missgeschicke – bis zur Freischaltung geheim, danach im Profil sichtbar." testId="negative-trigger">
         <div className="grid lg:grid-cols-2 gap-4">
           <PersonPicker value={person} onChange={setPerson} testId="negative-person" />
           <div className="space-y-2">
@@ -70,27 +71,27 @@ export function NegativeTab() {
               </select>
             </label>
             <input value={note} onChange={(e) => setNote(e.target.value)} placeholder="Notiz (z. B. Match) – die Person liest sie unter „Meine Strafen“" aria-label="Notiz" data-testid="negative-note" className={INPUT_CLASS} />
-            <button type="button" onClick={trigger} disabled={busy || !person || !type} data-testid="negative-submit" className="px-4 py-2 bg-[#FF3B30] text-white tls-type-label rounded-sm disabled:opacity-40">Eintragen</button>
+            <button type="button" onClick={trigger} disabled={busy || !person || !type} data-testid="negative-submit" className="px-4 py-2 bg-warn text-[#0A0A0A] tls-type-label rounded-sm disabled:opacity-40">Eintragen</button>
           </div>
         </div>
       </Panel>
 
-      <Panel title={`${list.length} Fun-Erfolge vergeben`} icon={ShieldOff} accent="#FF3B30" testId="negative-list">
+      <Panel title={`${list.length} Fun-Erfolge vergeben`} icon={ShieldOff} accent={ROLE_COLORS.warn} testId="negative-list">
         <ul className="divide-y divide-white/5">
           {list.map((a) => (
             <li key={a.user_id + a.tier_code} className="py-2" data-testid={`negative-row-${a.tier_code}`}>
               <div className="flex items-center gap-3">
                 <Badge material={a.material || "hidden"} art={a.art || undefined} icon={a.icon} size="sm" animate={false} />
                 <div className="min-w-0 flex-1">
-                  <div className="tls-type-small"><span className="text-[#FF3B30] font-semibold">{a.tier_name}</span> · {a.display_name || a.username}</div>
+                  <div className="tls-type-small"><span className="text-warn font-semibold">{a.tier_name}</span> · {a.display_name || a.username}</div>
                   <div className="tls-type-small text-white/45">{formatWhen(a.earned_at)}{a.context?.note ? ` · „${a.context.note}“` : ""}</div>
                 </div>
-                {removing !== a.user_id + a.tier_code && <button type="button" onClick={() => { setRemoving(a.user_id + a.tier_code); setReason(""); }} className="text-[#FF3B30] hover:underline tls-type-small">Entfernen</button>}
+                {removing !== a.user_id + a.tier_code && <button type="button" onClick={() => { setRemoving(a.user_id + a.tier_code); setReason(""); }} className="text-live hover:underline tls-type-small">Entfernen</button>}
               </div>
               {removing === a.user_id + a.tier_code && (
                 <div className="mt-2 flex flex-wrap items-center gap-2">
                   <input value={reason} onChange={(e) => setReason(e.target.value)} placeholder="Grund" aria-label="Grund für das Entfernen" data-testid={`negative-reason-${a.tier_code}`} className={`${INPUT_CLASS} flex-1 min-w-[12rem]`} />
-                  <button type="button" onClick={() => remove(a)} data-testid={`negative-remove-${a.tier_code}`} className="px-3 py-2 bg-[#FF3B30] text-white tls-type-label rounded-sm">Entfernen</button>
+                  <button type="button" onClick={() => remove(a)} data-testid={`negative-remove-${a.tier_code}`} className="px-3 py-2 bg-live text-[#0A0A0A] tls-type-label rounded-sm">Entfernen</button>
                   <button type="button" onClick={() => setRemoving(null)} className="tls-type-label text-white/50">Abbrechen</button>
                 </div>
               )}

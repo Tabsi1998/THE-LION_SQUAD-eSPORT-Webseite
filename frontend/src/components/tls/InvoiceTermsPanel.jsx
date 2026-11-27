@@ -49,14 +49,14 @@ export function InvoiceTermsPanel({ terms, connected, busy, onSave, optionsUrl =
     <div className="border border-white/10 rounded-sm p-3 space-y-3" data-testid="invoice-terms">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div className="tls-type-label text-white/70">Rechnungskonditionen</div>
-        <span className={`tls-type-label ${terms?.complete ? "text-[#00FF88]" : "text-[#FFD700]"}`} data-testid="invoice-terms-state">
+        <span className={`tls-type-label ${terms?.complete ? "text-ok" : "text-warn"}`} data-testid="invoice-terms-state">
           {terms?.complete ? "vollständig" : "unvollständig – Belege bleiben Entwurf"}
         </span>
       </div>
       <p className="tls-type-small text-white/55">Stehen an jedem Beleg, den die Website anlegt. Die Listen kommen aus Dolibarr.</p>
       {options?.available && options.accounts === null && (
-        <div className="border border-[#FFD700]/40 bg-[#FFD700]/5 rounded-sm p-3 tls-type-small space-y-1.5" data-testid="invoice-terms-accounts-help">
-          <div className="font-bold text-[#FFD700]">Die Kontenliste ist nicht lesbar – dem Website-Benutzer fehlt in Dolibarr das Recht „Bankkonten einsehen“.</div>
+        <div className="border border-warn/40 bg-warn/5 rounded-sm p-3 tls-type-small space-y-1.5" data-testid="invoice-terms-accounts-help">
+          <div className="font-bold text-warn">Die Kontenliste ist nicht lesbar – dem Website-Benutzer fehlt in Dolibarr das Recht „Bankkonten einsehen“.</div>
           <div className="text-white/70"><strong>Weg 1 (empfohlen):</strong> Dolibarr → Start → Benutzer &amp; Gruppen → Website-Benutzer → Reiter „Rechte“ → Modul „Banken/Kassen“ → „Bankkonten einsehen“ anhaken. Danach diese Seite neu laden – das Konto steht dann zur Auswahl.</div>
           <div className="text-white/70"><strong>Weg 2 (Nummer von Hand):</strong> Dolibarr → Bank/Kasse → Konten → das Girokonto anklicken. In der Adresszeile des Browsers steht „card.php?id=<strong>3</strong>“ – diese Zahl unten eintragen.</div>
         </div>
@@ -98,7 +98,7 @@ export function InvoiceTermsPanel({ terms, connected, busy, onSave, optionsUrl =
             Vorschlag übernehmen (30 Tage, Überweisung{suggested.bank_account_id ? ", Konto" : ""})
           </button>
         )}
-        {termsDirty && !complete && <span className="tls-type-small text-[#FFD700] self-center">Erst mit allen drei Angaben werden Belege automatisch freigegeben.</span>}
+        {termsDirty && !complete && <span className="tls-type-small text-warn self-center">Erst mit allen drei Angaben werden Belege automatisch freigegeben.</span>}
       </div>
     </div>
   );

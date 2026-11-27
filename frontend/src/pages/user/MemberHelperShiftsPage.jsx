@@ -30,7 +30,7 @@ function MineBadge({ shift }) {
   if (!shift.mine) return null;
   const done = shift.mine === "done" || shift.mine === "confirmed";
   return (
-    <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-sm border tls-type-label ${done ? "border-[#00FF88]/40 text-[#00FF88]" : shift.mine === "requested" ? "border-[#FFD700]/40 text-[#FFD700]" : "border-white/15 text-white/50"}`} data-testid={`shift-${shift.id}-mine`}>
+    <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-sm border tls-type-label ${done ? "border-ok/40 text-ok" : shift.mine === "requested" ? "border-quiet/40 text-quiet" : "border-white/15 text-white/50"}`} data-testid={`shift-${shift.id}-mine`}>
       {done ? <CheckCircle2 className="w-3 h-3" /> : null} {shift.mine_label}
     </span>
   );
@@ -39,13 +39,13 @@ function MineBadge({ shift }) {
 function EventCard({ event, busy, onRequest, onWithdraw, highlight = false, askFor = "", onAskDone }) {
   // Helfer-Aufruf (#1197): die Meldung führt mit ?event=… hierher - diese Veranstaltung steht oben und leuchtet.
   return (
-    <div className={`border rounded-sm bg-[#121212] p-5 ${event.upcoming ? "border-[#FFD700]/40" : "border-white/10"} ${highlight ? "ring-2 ring-[#FFD700]/70" : ""}`} data-testid={`helper-event-${event.id}`} data-highlight={highlight ? "true" : undefined}>
+    <div className={`border rounded-sm bg-[#121212] p-5 ${event.upcoming ? "border-honor/40" : "border-white/10"} ${highlight ? "ring-2 ring-honor/70" : ""}`} data-testid={`helper-event-${event.id}`} data-highlight={highlight ? "true" : undefined}>
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <div className="tls-type-label text-[#FFD700]">{event.visibility_label} · {event.status_label}</div>
+          <div className="tls-type-label text-honor">{event.visibility_label} · {event.status_label}</div>
           <h2 className="tls-type-section mt-1">{event.label}</h2>
           <div className="mt-1 tls-type-small text-white/70 inline-flex flex-wrap items-center gap-x-3 gap-y-1">
-            <span className="inline-flex items-center gap-1"><Calendar className="w-3.5 h-3.5 text-[#FFD700]" /> {formatDay(event.day)}{event.end_day && event.end_day !== event.day ? ` – ${formatDay(event.end_day)}` : ""}</span>
+            <span className="inline-flex items-center gap-1"><Calendar className="w-3.5 h-3.5 text-honor" /> {formatDay(event.day)}{event.end_day && event.end_day !== event.day ? ` – ${formatDay(event.end_day)}` : ""}</span>
             {event.place ? <span className="inline-flex items-center gap-1"><MapPin className="w-3.5 h-3.5" /> {event.place}</span> : null}
             <span className="text-white/45" data-testid={`helper-event-${event.id}-registration`}>{event.registration?.text}</span>
           </div>
@@ -67,7 +67,7 @@ function EventCard({ event, busy, onRequest, onWithdraw, highlight = false, askF
               </div>
             </div>
             {shift.can_request ? (
-              <button type="button" onClick={() => onRequest(event, shift)} disabled={busy === `shift-${shift.id}`} data-testid={`shift-${shift.id}-request`} className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-[#FFD700] text-black rounded-sm tls-type-label disabled:opacity-50">
+              <button type="button" onClick={() => onRequest(event, shift)} disabled={busy === `shift-${shift.id}`} data-testid={`shift-${shift.id}-request`} className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-honor text-black rounded-sm tls-type-label disabled:opacity-50">
                 <HandHelping className="w-3.5 h-3.5" /> Ich helfe
               </button>
             ) : null}

@@ -141,6 +141,6 @@ test("Texte: Termin, Ziel, Abgleich und Rückmeldung", () => {
   expect(totalText({ state: "explained", deviation: -5, explains: [{ text: "Anpassungen", points: -5 }] })).toBe("erklärt: Anpassungen −5");
   expect(totalText({ state: "differs", deviation: 3, reasons: [] })).toBe("weicht +3 ab");
   expect(totalsSummary([{ state: "ok" }, { state: "differs", rank_differs: true }, { state: "no_total" }])).toEqual({ ok: 1, explained: 0, differs: 1, none: 1, ranks: 1 });
-  expect(applySummary([{ status: "saved" }, { status: "saved" }, { status: "unclear" }])).toEqual({ ok: false, text: "2 Runden als Entwurf übernommen · 1 mit offenen gelben Zellen." });
+  expect(applySummary([{ status: "saved" }, { status: "saved" }, { status: "unclear" }])).toEqual({ ok: false, text: "2 Runden als Entwurf übernommen · 1 mit offenen orangen Zellen." });
   expect(applySummary([])).toEqual({ ok: true, text: "Nichts zu übernehmen – alles ist schon da." });
 });

@@ -36,11 +36,11 @@ export function InvitationsBox({ reloadKey = 0 }) {
     <div className="mt-6 border border-white/10 bg-[#121212] rounded-sm p-4" data-testid="invitations-box">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <div className="tls-type-label inline-flex items-center gap-2"><Send className="w-4 h-4 text-[#FFD700]" /> Einladungen zum Antrag</div>
+          <div className="tls-type-label inline-flex items-center gap-2"><Send className="w-4 h-4 text-honor" /> Einladungen zum Antrag</div>
           <p className="tls-type-small text-white/45 mt-1">Eingeladen wird oben mit „+ Zum Antrag einladen“. Die Person sieht den Hinweis beim nächsten Besuch und füllt den Antrag direkt aus; nach 30 Tagen läuft eine Einladung ab.</p>
         </div>
         <label className="tls-type-small inline-flex items-center gap-2 text-white/60">
-          <input type="checkbox" checked={showAll} onChange={(e) => setShowAll(e.target.checked)} data-testid="invitations-show-all" className="accent-[#FFD700]" /> auch erledigte
+          <input type="checkbox" checked={showAll} onChange={(e) => setShowAll(e.target.checked)} data-testid="invitations-show-all" className="accent-honor" /> auch erledigte
         </label>
       </div>
       {rows === null ? <div className="tls-type-small text-quiet mt-3">Lade …</div> : !rows.length ? (
@@ -52,10 +52,10 @@ export function InvitationsBox({ reloadKey = 0 }) {
               <span className="font-bold">{row.user?.display_name || row.user?.username || row.user_id}</span>
               <span className="tls-type-small text-white/45">@{row.user?.username}</span>
               <span className="tls-type-small text-white/45">eingeladen am {formatDay(row.created_at)}{row.invited_by_name ? ` von ${row.invited_by_name}` : ""}</span>
-              <span className={`tls-type-label px-2 py-0.5 rounded-sm border ${row.status === "open" ? "border-[#FFD700]/50 text-[#FFD700]" : row.status === "applied" ? "border-[#00FF88]/40 text-[#00FF88]" : "border-white/15 text-white/45"}`}>{STATUS_LABEL[row.status] || row.status}</span>
+              <span className={`tls-type-label px-2 py-0.5 rounded-sm border ${row.status === "open" ? "border-honor/50 text-honor" : row.status === "applied" ? "border-ok/40 text-ok" : "border-white/15 text-white/45"}`}>{STATUS_LABEL[row.status] || row.status}</span>
               {row.note ? <span className="basis-full tls-type-small text-white/50 italic">„{row.note}“</span> : null}
               {row.status === "open" ? (
-                <button type="button" onClick={() => withdraw(row)} data-testid={`invitation-withdraw-${row.id}`} className="ml-auto inline-flex items-center gap-1 tls-type-small text-white/60 hover:text-[#FF3B30]"><XIcon className="w-3.5 h-3.5" /> zurückziehen</button>
+                <button type="button" onClick={() => withdraw(row)} data-testid={`invitation-withdraw-${row.id}`} className="ml-auto inline-flex items-center gap-1 tls-type-small text-white/60 hover:text-live"><XIcon className="w-3.5 h-3.5" /> zurückziehen</button>
               ) : null}
             </li>
           ))}

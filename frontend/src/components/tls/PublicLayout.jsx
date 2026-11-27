@@ -230,7 +230,7 @@ export function PublicLayout({ children }) {
                           nav("/");
                         }
                       }}
-                      className="w-full text-left px-3 py-2 tls-type-small font-semibold uppercase tracking-wider text-[#FF3B30]"
+                      className="w-full text-left px-3 py-2 tls-type-small font-semibold uppercase tracking-wider text-quiet"
                     >
                       <LogOut className="w-3.5 h-3.5 inline mr-1.5" /> Abmelden
                     </button>

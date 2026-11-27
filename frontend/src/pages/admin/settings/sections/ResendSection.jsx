@@ -14,10 +14,10 @@ export function ResendSection({ email, setEmail, testEmail, setTestEmail, saving
         </div>
       )}
       {emailNotConfigured && (
-        <div data-testid="email-not-configured" className="flex items-start gap-3 border border-[#FFD700]/30 bg-[#FFD700]/5 rounded-sm p-4">
-          <AlertTriangle className="w-5 h-5 text-[#FFD700] shrink-0 mt-0.5" />
+        <div data-testid="email-not-configured" className="flex items-start gap-3 border border-warn/30 bg-warn/5 rounded-sm p-4">
+          <AlertTriangle className="w-5 h-5 text-warn shrink-0 mt-0.5" />
           <div className="tls-type-small">
-            <div className="font-bold text-[#FFD700] tls-type-small">Kein Resend API Key hinterlegt</div>
+            <div className="font-bold text-warn tls-type-small">Kein Resend API Key hinterlegt</div>
             <p className="text-white/70 mt-1">Alle E-Mails (Anmeldungen, Passwort-Reset, Check-in-Erinnerungen, Spiel-Nachrichten) werden aktuell übersprungen. Hole dir einen kostenlosen Key auf <a href="https://resend.com/api-keys" target="_blank" rel="noreferrer" className="text-[#29B6E8] hover:underline">resend.com/api-keys</a> und trage ihn unten ein.</p>
           </div>
         </div>
@@ -34,7 +34,7 @@ export function ResendSection({ email, setEmail, testEmail, setTestEmail, saving
           <div className="tls-type-label text-white/60 mb-1.5">API Key {email.resend_api_key_masked && <span className="text-white/40 normal-case">(aktuell: {email.resend_api_key_masked})</span>}</div>
           <input type="password" placeholder="re_..." value={email.resend_api_key} onChange={(e) => setEmail({ ...email, resend_api_key: e.target.value })} data-testid="email-api-key" className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-sm font-mono" />
           <p className="tls-type-small text-quiet mt-1">Leer lassen um den bestehenden Key beizubehalten.</p>
-          {email.resend_api_key_masked && <button type="button" onClick={() => clearEmailSecret().catch((e) => toast.error(formatApiError(e.response?.data?.detail)))} className="mt-2 tls-type-label text-[#FF6B6B]">Gespeicherten Key entfernen</button>}
+          {email.resend_api_key_masked && <button type="button" onClick={() => clearEmailSecret().catch((e) => toast.error(formatApiError(e.response?.data?.detail)))} className="mt-2 tls-type-label text-live">Gespeicherten Key entfernen</button>}
         </div>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <div>

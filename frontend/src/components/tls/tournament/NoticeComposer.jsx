@@ -185,7 +185,7 @@ export function NoticeComposer({ slug, tournament, stations = [] }) {
           className="mt-2 w-full resize-none rounded-sm border border-white/15 bg-black/40 px-3 py-2 text-base text-white placeholder:text-white/30 focus:border-[#29B6E8] focus:outline-none"
           data-testid="notice-text-input"
         />
-        <div className={`mt-1 text-right tls-type-small tabular-nums ${length > NOTICE_MAX - 20 ? "text-honor" : "text-quiet"}`} data-testid="notice-count">{length}/{NOTICE_MAX}</div>
+        <div className={`mt-1 text-right tls-type-small tabular-nums ${length > NOTICE_MAX - 20 ? "text-warn" : "text-quiet"}`} data-testid="notice-count">{length}/{NOTICE_MAX}</div>
 
         <fieldset className="mt-3">
           <legend className="tls-type-label text-white/50">An wen</legend>
@@ -226,7 +226,7 @@ export function NoticeComposer({ slug, tournament, stations = [] }) {
         </label>
         {canPause ? (
           <label className="flex min-h-[44px] cursor-pointer items-center gap-3 tls-type-small text-white/85" data-testid="notice-pause-row">
-            <input type="checkbox" checked={setPause} onChange={(event) => setSetPause(event.target.checked)} className="h-5 w-5 accent-honor" data-testid="notice-pause" />
+            <input type="checkbox" checked={setPause} onChange={(event) => setSetPause(event.target.checked)} className="h-5 w-5 accent-warn" data-testid="notice-pause" />
             <span>Turnier gleich pausieren bis {pauseClock} <span className="text-white/45">(Pause-Bildschirm am TV)</span></span>
           </label>
         ) : null}
@@ -242,7 +242,7 @@ export function NoticeComposer({ slug, tournament, stations = [] }) {
         {list && !items.length && !list.error ? <div className="mt-2 rounded-sm border border-white/10 bg-[#121212] p-5 text-center tls-type-small text-white/50" data-testid="notice-log-empty">Noch kein Hinweis gesendet.</div> : null}
         <ul className="mt-2 space-y-2" data-testid="notice-log">
           {items.map((item) => (
-            <li key={item.id} className={`rounded-sm border p-3 ${item.active ? "border-honor/40 bg-honor/[0.04]" : "border-white/10 bg-[#121212]"}`} data-testid={`notice-log-${item.id}`}>
+            <li key={item.id} className={`rounded-sm border p-3 ${item.active ? "border-warn/40 bg-warn/[0.04]" : "border-white/10 bg-[#121212]"}`} data-testid={`notice-log-${item.id}`}>
               <div className="flex items-start gap-3">
                 <div className="min-w-0 flex-1">
                   <p className="tls-type-body font-bold text-white [overflow-wrap:anywhere]">{item.text}</p>
@@ -250,7 +250,7 @@ export function NoticeComposer({ slug, tournament, stations = [] }) {
                     {noticeClock(item)} · {item.author || "Turnierleitung"} · {item.target_label}{item.tv ? " · am TV" : ""}
                   </div>
                   <div className="mt-0.5 tls-type-small text-white/60" data-testid={`notice-delivery-${item.id}`}>{deliveryText(item)}</div>
-                  <div className={`mt-0.5 tls-type-small font-bold ${item.active ? "text-honor" : "text-quiet"}`}>
+                  <div className={`mt-0.5 tls-type-small font-bold ${item.active ? "text-warn" : "text-quiet"}`}>
                     {item.removed_at ? `entfernt${item.removed_by ? ` von ${item.removed_by}` : ""}` : item.active ? `steht · ${remainingText(item.expires_at, now)}` : "abgelaufen"}
                   </div>
                 </div>

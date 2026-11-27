@@ -166,7 +166,7 @@ function PlacementRow({ spec, busy, onSave }) {
           <div className="tls-type-small font-bold">{spec.label}</div>
           <div className="tls-type-small text-white/60 mt-0.5">
             Druckbreite <b className="text-white/85">{spec.print_width}</b> · Bereich {spec.area_width} × {spec.area_height} · mind. {spec.min_dpi} DPI = {spec.min_width_px} px Breite
-            {!spec.is_default && <span className="ml-2 text-honor">angepasst</span>}
+            {!spec.is_default && <span className="ml-2 text-brand">angepasst</span>}
           </div>
         </div>
         {!open && (
@@ -873,9 +873,9 @@ function MotifCard({ design, busy, maxExceptions, onColors, onExceptions, onNewF
 // Schwellen der Paar-Prüfung (#2084) - im Server Anteile (0,02), hier in Prozent.
 const PAIR_SETTINGS = [
   { name: "pair_aspect_tolerance", label: "Seitenverhältnis darf abweichen um (%)", hint: "Mehr Abweichung ist Rot: das Paar wird abgelehnt." },
-  { name: "pair_min_overlap", label: "Umrisse decken sich mindestens zu (%)", hint: "Weniger ist Gelb: „Sind das wirklich zwei Fassungen desselben Logos?“" },
-  { name: "pair_contrast_share", label: "Höchstens sehr helle bzw. dunkle Fläche (%)", hint: "Mehr Weiß in der Hell- bzw. Schwarz in der Dunkel-Fassung ist Gelb." },
-  { name: "pair_position_tolerance", label: "Logo darf verschoben sein um (%)", hint: "Sitzt das Logo in den Dateien weiter auseinander, ist es Gelb: Rand oder Position prüfen." },
+  { name: "pair_min_overlap", label: "Umrisse decken sich mindestens zu (%)", hint: "Weniger wird zum Prüfen markiert: „Sind das wirklich zwei Fassungen desselben Logos?“" },
+  { name: "pair_contrast_share", label: "Höchstens sehr helle bzw. dunkle Fläche (%)", hint: "Mehr Weiß in der Hell- bzw. Schwarz in der Dunkel-Fassung wird zum Prüfen markiert." },
+  { name: "pair_position_tolerance", label: "Logo darf verschoben sein um (%)", hint: "Sitzt das Logo in den Dateien weiter auseinander, wird es zum Prüfen markiert: Rand oder Position prüfen." },
 ];
 
 function percent(share) {
@@ -997,7 +997,7 @@ export default function AdminShopDesignsPage() {
   return (
     <AdminLayout>
       <div>
-        <h1 className="tls-type-title inline-flex items-center gap-3"><ShoppingBag className="w-7 h-7 text-honor" aria-hidden="true" /> <ShortCaps>Shop</ShortCaps></h1>
+        <h1 className="tls-type-title inline-flex items-center gap-3"><ShoppingBag className="w-7 h-7 text-brand" aria-hidden="true" /> <ShortCaps>Shop</ShortCaps></h1>
         <ShopTabs />
         <p className="mt-4 tls-type-body text-white/60 max-w-2xl">
           Motive des Vereins: eine Hauptdatei für dunkle Shirts (am besten als SVG) und eine Fassung für helle Shirts – automatisch umgefärbt oder als eigene Datei. Jede Datei wird geprüft, ohne Metadaten neu abgelegt und bekommt als neue Version eine eigene Adresse für Printful. Ältere Versionen bleiben für ihre Bestellungen.

@@ -371,7 +371,7 @@ export default function AdminF1EditPage() {
       </div>
 
       {locked && (
-        <div data-testid="f1-published-lock" className="mb-5 border border-honor/30 bg-honor/5 rounded-sm p-3 tls-type-small text-white/80">
+        <div data-testid="f1-published-lock" className="mb-5 border border-warn/30 bg-warn/5 rounded-sm p-3 tls-type-small text-white/80">
           Ergebnisse veröffentlicht: Zeiten sind gesperrt. Ändern, Nachtragen und Löschen gehen nur noch durch die Turnierleitung mit Begründung - jede Änderung steht im Protokoll.
         </div>
       )}
@@ -482,7 +482,7 @@ export default function AdminF1EditPage() {
                     <option value="official" disabled={forceReferenceScope}>Offizielle Wertung</option>
                     <option value="club_reference">Vereins-Referenz</option>
                   </select>
-                  {forceReferenceScope && <div className="mt-1 tls-type-small text-[#FFD700]">Vereinsmitglied: nur Referenzzeit.</div>}
+                  {forceReferenceScope && <div className="mt-1 tls-type-small text-honor">Vereinsmitglied: nur Referenzzeit.</div>}
                 </div>
                 <div>
                   <div className="tls-type-label text-white/60 mb-1">Strafe (s)</div>
@@ -494,7 +494,7 @@ export default function AdminF1EditPage() {
                 </div>
                 {Number(newTime.penalty_seconds) > 0 && (
                   <div className="w-full">
-                    <div className="tls-type-small font-bold text-[#FF3B30] mb-1">Begründung für Strafe (Pflicht, ≥5 Zeichen)</div>
+                    <div className="tls-type-small font-bold text-warn mb-1">Begründung für Strafe (Pflicht, ≥5 Zeichen)</div>
                     <textarea
                       rows={2}
                       required
@@ -502,7 +502,7 @@ export default function AdminF1EditPage() {
                       onChange={(e) => setNewTime({ ...newTime, admin_note: e.target.value })}
                       placeholder="z. B. Kurve 7 abgekürzt, Runde 3 – im Video bei 0:42"
                       data-testid="f1-add-time-note"
-                      className="w-full bg-[#0A0A0A] border border-[#FF3B30]/40 px-3 py-2 rounded-sm text-sm"
+                      className="w-full bg-[#0A0A0A] border border-warn/40 px-3 py-2 rounded-sm text-sm"
                     />
                   </div>
                 )}
@@ -510,11 +510,11 @@ export default function AdminF1EditPage() {
               </form>
               <div className="space-y-1">
                 {times.map((t) => (
-                  <div key={t.id} className={`flex items-center justify-between px-3 py-2 border rounded-sm hover:border-[#29B6E8]/40 ${t.is_invalid ? "border-[#FF3B30]/30 bg-[#FF3B30]/5" : "border-white/5"}`}>
+                  <div key={t.id} className={`flex items-center justify-between px-3 py-2 border rounded-sm hover:border-[#29B6E8]/40 ${t.is_invalid ? "border-warn/30 bg-warn/5" : "border-white/5"}`}>
                     <div className="flex items-center gap-3 min-w-0">
                       <span className="text-white/50 tls-type-small w-6">#{t.attempt_number}</span>
                       <span className="text-white tls-type-small truncate">{t.user?.display_name || t.user?.username}</span>
-                      {t.user?.is_guest && <span className="tls-type-label text-honor border border-honor/40 rounded-sm px-1">Gast</span>}
+                      {t.user?.is_guest && <span className="tls-type-label text-quiet border border-white/20 rounded-sm px-1">Gast</span>}
                       {t.user?.is_guest && isTournamentLead && (
                         <button type="button" onClick={() => setLinkGuest({ id: t.guest_id, name: t.user?.display_name || "Gast" })} data-testid={`f1-link-guest-${t.id}`} title="Mit Konto verknüpfen" aria-label={`${t.user?.display_name || "Gast"} mit Konto verknüpfen`} className="p-1 text-white/40 hover:text-[#29B6E8]">
                           <Link2 className="w-3.5 h-3.5" />
@@ -523,9 +523,9 @@ export default function AdminF1EditPage() {
                     </div>
                     <div className="flex items-center gap-3">
                       <span className={`tls-type-card tls-type-num ${t.is_invalid ? "line-through text-white/40" : "text-white"}`}>{showLapTime(t.time_str)}</span>
-                      {(t.score_scope || "official") === "club_reference" && <span className="text-[#FFD700] border border-[#FFD700]/30 bg-[#FFD700]/10 px-2 py-1 tls-type-label rounded-sm">Referenz</span>}
-                      {t.penalty_seconds > 0 && <span className="text-[#FF3B30] tls-type-small">+{t.penalty_seconds}s</span>}
-                      {t.is_invalid && <span className="text-[#FF3B30] tls-type-label">Ungültig</span>}
+                      {(t.score_scope || "official") === "club_reference" && <span className="text-honor border border-honor/30 bg-honor/10 px-2 py-1 tls-type-label rounded-sm">Referenz</span>}
+                      {t.penalty_seconds > 0 && <span className="text-warn tls-type-small">+{t.penalty_seconds}s</span>}
+                      {t.is_invalid && <span className="text-warn tls-type-label">Ungültig</span>}
                       {safeHttpUrl(t.proof_url) && <a href={safeHttpUrl(t.proof_url)} target="_blank" rel="noreferrer" className="tls-type-label text-[#29B6E8] hover:underline">Nachweis</a>}
                       <button
                         onClick={() => setEditTime({
@@ -539,7 +539,7 @@ export default function AdminF1EditPage() {
                       >
                         <Pencil className="w-3.5 h-3.5" />
                       </button>
-                      <button onClick={() => delTime(t)} data-testid={`f1-delete-time-${t.id}`} title="Zeit löschen" className="p-1 text-white/40 hover:text-[#FF3B30]"><Trash2 className="w-3.5 h-3.5" /></button>
+                      <button onClick={() => delTime(t)} data-testid={`f1-delete-time-${t.id}`} title="Zeit löschen" className="p-1 text-white/40 hover:text-live"><Trash2 className="w-3.5 h-3.5" /></button>
                     </div>
                   </div>
                 ))}
@@ -585,7 +585,7 @@ export default function AdminF1EditPage() {
                 <option value="club_reference">Vereins-Referenz</option>
               </select>
               {!!challenge?.block_club_member_results && !!editTime.user?.is_club_member && (
-                <div className="mt-1 tls-type-small text-[#FFD700]">Vereinsmitglieder sind bei dieser Challenge nur als Referenz erlaubt.</div>
+                <div className="mt-1 tls-type-small text-honor">Vereinsmitglieder sind bei dieser Challenge nur als Referenz erlaubt.</div>
               )}
             </label>
             <label className="block">
@@ -593,7 +593,7 @@ export default function AdminF1EditPage() {
               <input value={editTime.proof_url || ""} onChange={(e) => setEditTime({ ...editTime, proof_url: e.target.value })} placeholder="Link zu Bild oder Video" data-testid="f1-edit-time-proof" className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-sm" />
             </label>
             <label className="block">
-              <div className={`tls-type-label mb-1 ${(Number(editTime.penalty_seconds) > 0 || editTime.is_invalid) ? "text-[#FF3B30]" : "text-white/60"}`}>
+              <div className={`tls-type-label mb-1 ${(Number(editTime.penalty_seconds) > 0 || editTime.is_invalid) ? "text-warn" : "text-white/60"}`}>
                 {(Number(editTime.penalty_seconds) > 0 || editTime.is_invalid)
                   ? "Begründung (Pflicht, ≥5 Zeichen — wird Spieler angezeigt)"
                   : "Admin-Notiz (intern)"}
@@ -607,7 +607,7 @@ export default function AdminF1EditPage() {
                   ? "z. B. Kurve 7 abgekürzt, Runde 3 – im Video bei 0:42"
                   : "optionale Notiz"}
                 className={`w-full bg-[#0A0A0A] border px-3 py-2 rounded-sm text-sm ${
-                  (Number(editTime.penalty_seconds) > 0 || editTime.is_invalid) ? "border-[#FF3B30]/40" : "border-white/10"
+                  (Number(editTime.penalty_seconds) > 0 || editTime.is_invalid) ? "border-warn/40" : "border-white/10"
                 }`}
               />
             </label>

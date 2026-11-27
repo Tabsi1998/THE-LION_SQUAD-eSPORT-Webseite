@@ -31,6 +31,7 @@ import { FormatHint } from "./FormatHint";
 import { STREAM_ADDRESS_HINT, streamFormValues, streamPayload } from "@/lib/tournamentStream";
 import { BEST_OF_RUNS_HINT, MATCHDAY_DRAW_HINT, NO_MATCH_FORMATS, matchdayDrawMode, matchdayDrawOn, tournamentFieldRules } from "@/lib/tournamentFormFields";
 
+import { ROLE_COLORS } from "@/lib/categoryColors";
 // „Gewinne erzeugen“ erst ab dem Ende (#2123, TA23) - wie der Server (services/tournament_guard.py FINISHED_STATUSES).
 const PRIZE_READY_STATUSES = new Set(["completed", "results_published", "archived"]);
 
@@ -375,7 +376,7 @@ export function TournamentEditForm({ tournament, stages = [], onSaved, onRebuild
             <TextField label="Check-in endet" type="datetime-local" value={f.check_in_until} onChange={(v)=>set("check_in_until",v)} testId="tr-edit-checkin-until"/>
             {/* Planung prüfen (#1938): widersprüchliche Zeiten wie beim Anlegen - gespeichert wird trotzdem. */}
             {timeWarnings.length > 0 && (
-              <div className="rounded-sm border border-[#FFD700]/30 bg-[#FFD700]/5 p-4 tls-type-small text-[#FFD700]" role="status" data-testid="tr-edit-planning-warnings">
+              <div className="rounded-sm border border-warn/30 bg-warn/5 p-4 tls-type-small text-warn" role="status" data-testid="tr-edit-planning-warnings">
                 <div className="flex items-start gap-3">
                   <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0" aria-hidden="true" />
                   <div className="space-y-1">
@@ -389,12 +390,12 @@ export function TournamentEditForm({ tournament, stages = [], onSaved, onRebuild
             {/* Anmeldung im Discord (#885): Vorgabe an. */}
             <CheckField label="Anmeldung über Discord erlauben" hint="Mit verknüpftem Konto über /anmelden oder den Knopf „Anmelden“ – privat, mit denselben Regeln; Teams meldet die Teamleitung an." checked={f.discord_registration} onChange={(v)=>set("discord_registration",v)} accent="#5865F2" testId="tr-edit-discord-registration" />
             <CheckField label="Nur Einladung/manuelle Teilnehmer" checked={f.is_invite_only} onChange={(v)=>set("is_invite_only",v)} />
-            <CheckField label="Automatisches Turnier-Hinweisbanner anzeigen" checked={f.site_banner_enabled} onChange={(v)=>set("site_banner_enabled",v)} accent="#FFD700" />
+            <CheckField label="Automatisches Turnier-Hinweisbanner anzeigen" checked={f.site_banner_enabled} onChange={(v)=>set("site_banner_enabled",v)} accent={ROLE_COLORS.brand} />
             {/* Zahlen der automatischen Banner (#2352): je Vorlage, auch nach dem Ende des Banners. */}
             <AutoBannerStats kind="tournament" refId={tournament.id} />
             {/* Vor Ort startet die Turnierleitung selbst (#2111, W4): der Schalter steht dort nur noch, solange er an ist. */}
             {(f.event_mode !== "local" || f.auto_start_enabled) && <CheckField label="Start-/Endzeit darf Turnier automatisch live/beendet schalten" hint={f.event_mode === "local" ? "Vor Ort startet die Turnierleitung selbst – besser ausschalten." : undefined} checked={f.auto_start_enabled} onChange={(v)=>set("auto_start_enabled",v)} testId="tr-edit-auto-start" />}
-            <CheckField label="Vereinsmitglieder von der Selbstanmeldung ausschließen, z.B. wenn wir das Turnier für externe Teilnehmer veranstalten" checked={f.block_club_member_registration} onChange={(v)=>set("block_club_member_registration",v)} accent="#FFD700" />
+            <CheckField label="Vereinsmitglieder von der Selbstanmeldung ausschließen, z.B. wenn wir das Turnier für externe Teilnehmer veranstalten" checked={f.block_club_member_registration} onChange={(v)=>set("block_club_member_registration",v)} accent={ROLE_COLORS.honor} />
             {/* Turnier nur mit Event-Anmeldung (#875): nur sinnvoll, wenn das Turnier zu einem Event gehört. */}
             {f.event_id && <CheckField label="Anmeldung nur mit Event-Anmeldung – wer nicht beim Event angemeldet ist, kann sich nicht anmelden (Teams: so viele Spieler wie die Teamgröße)" checked={f.requires_event_registration} onChange={(v)=>set("requires_event_registration",v)} accent="#29B6E8" testId="tr-edit-event-gate" />}
           </FormSection>
@@ -561,10 +562,10 @@ export function TournamentEditForm({ tournament, stages = [], onSaved, onRebuild
           <PartnerPicker partners={partners} value={f.partner_ids} onChange={(v)=>set("partner_ids", v)} testPrefix="tr-edit-partner" hint="Das Turnier erscheint auf der Partnerseite unter „Gemeinsam“, und die Turnierseite nennt den Partner." />
         </FormSection>
 
-        {show && <FormSection title="Preise" collapsible accent="#FFD700">
+        {show && <FormSection title="Preise" collapsible accent={ROLE_COLORS.honor}>
           <PrizeEditor value={f.prize_places} onChange={(v)=>set("prize_places", v)} format={f.format} />
           <Txt label="Preise" value={f.prize_pool} onChange={(v)=>set("prize_pool",v)} testId="tr-edit-prizes"/>
-          <div className="border border-[#FFD700]/20 bg-[#FFD700]/5 rounded-sm p-3 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div className="border border-honor/20 bg-honor/5 rounded-sm p-3 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             {/* Erst ab „Beendet“ (#2123, TA23): vorher gäbe es Gewinne und „Gewinn vorgemerkt“ für einen Zwischenstand. */}
             <p className="tls-type-small text-white/55" data-testid="tr-edit-create-prizes-hint">
               {prizesFinished
@@ -576,7 +577,7 @@ export function TournamentEditForm({ tournament, stages = [], onSaved, onRebuild
               onClick={createPrizePickups}
               disabled={!prizesFinished || !((f.prize_places || []).length)}
               data-testid="tr-edit-create-prizes"
-              className="inline-flex items-center justify-center gap-2 rounded-sm border border-[#FFD700]/40 px-4 py-2 tls-type-label text-[#FFD700] hover:bg-[#FFD700]/10 disabled:opacity-50"
+              className="inline-flex items-center justify-center gap-2 rounded-sm border border-honor/40 px-4 py-2 tls-type-label text-honor hover:bg-honor/10 disabled:opacity-50"
             >
               <RefreshCw className="h-4 w-4" />
               Gewinne erzeugen
@@ -606,7 +607,7 @@ export function TournamentEditForm({ tournament, stages = [], onSaved, onRebuild
         </FormSection>
       </FormColumns>
       {hasFormChanges && (
-        <div className="mt-5 rounded-sm border border-[#FFD700]/30 bg-[#FFD700]/5 px-4 py-3 tls-type-small text-[#FFD700]" data-testid="tr-edit-unsaved">
+        <div className="mt-5 rounded-sm border border-warn/30 bg-warn/5 px-4 py-3 tls-type-small text-warn" data-testid="tr-edit-unsaved">
           {staffel ? "Ungespeicherte Änderungen an der Staffel." : "Ungespeicherte Änderungen im Turnierformular."}
         </div>
       )}
@@ -617,7 +618,7 @@ export function TournamentEditForm({ tournament, stages = [], onSaved, onRebuild
         ) : rules.structureRebuild ? (
           // Ohne Turnierbaum zum Vorausbauen (Schweizer System, Zeitfahren, Rennserie) endete der Knopf mit einem Fehler
           // (#2111, TA4).
-          <button onClick={() => save({ rebuildPreview: true })} type="button" data-testid="tr-edit-save-rebuild" className="px-5 py-2.5 border border-[#FFD700]/50 text-[#FFD700] tls-type-label rounded-sm hover:bg-[#FFD700]/10">
+          <button onClick={() => save({ rebuildPreview: true })} type="button" data-testid="tr-edit-save-rebuild" className="px-5 py-2.5 border border-brand/50 text-brand tls-type-label rounded-sm hover:bg-brand/10">
             Speichern & Struktur anwenden
           </button>
         ) : null}
@@ -729,7 +730,7 @@ function RulePresetPicker({ form, onApply }) {
         ))}
       </div>
       <div className="mt-2 tls-type-small text-white/55">{ruleModeSummary(form)}</div>
-      {warnings.length > 0 && <div className="mt-2 tls-type-small text-[#FFD700]">{warnings.join(" ")}</div>}
+      {warnings.length > 0 && <div className="mt-2 tls-type-small text-warn">{warnings.join(" ")}</div>}
     </div>
   );
 }

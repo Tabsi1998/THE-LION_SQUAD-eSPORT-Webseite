@@ -63,7 +63,7 @@ export function DiscordBotPanel({ canSystem = false }) {
           <p className="mt-1 tls-type-small text-white/50 max-w-2xl">Zählt Nachrichten verknüpfter Konten (nur die Zahl, nie den Inhalt – für die Discord-Erfolge), gleicht die Rollen Mitglied/Vorstand/Turnierleitung alle zehn Minuten ab und beantwortet <code>/naechstes-event</code>, <code>/turniere</code>, <code>/meine-erfolge</code>, <code>/status</code>. Gezählt und eingeordnet wird nur, wer sein Discord-Konto im Profil verknüpft hat.</p>
         </div>
         <div className="text-right tls-type-small font-bold space-y-1">
-          <div className={online ? "text-[#00FF88]" : data.enabled ? "text-[#FFD700]" : "text-white/45"} data-testid="discord-bot-state">
+          <div className={online ? "text-ok" : data.enabled ? "text-warn" : "text-white/45"} data-testid="discord-bot-state">
             {online ? `online · ${data.guild_name || "auf keinem Server"}` : data.enabled ? "eingeschaltet, nicht verbunden" : "aus"}
           </div>
           <div className="text-white/45 normal-case tracking-normal">{data.linked_count ?? 0} verknüpfte Konten</div>
@@ -83,7 +83,7 @@ export function DiscordBotPanel({ canSystem = false }) {
         <label className="block">
           <div className="tls-type-label text-white/60 mb-1.5">Bot-Token {data.configured && <span className="text-white/40 normal-case">(gespeichert – leer lassen, um ihn zu behalten)</span>}</div>
           <input type="password" value={draft.bot_token} onChange={(e) => setDraft((d) => ({ ...d, bot_token: e.target.value }))} autoComplete="off" placeholder={data.configured ? "••••••" : "Token aus dem Developer Portal"} data-testid="discord-bot-token" className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-sm font-mono" />
-          {data.configured && canSystem && <button type="button" onClick={() => run("clear", () => api.put("/settings/discord", { clear_bot_token: true, bot_enabled: false }), "Token entfernt, Bot angehalten.")} className="mt-2 tls-type-label text-[#FF6B6B]">Gespeicherten Token entfernen</button>}
+          {data.configured && canSystem && <button type="button" onClick={() => run("clear", () => api.put("/settings/discord", { clear_bot_token: true, bot_enabled: false }), "Token entfernt, Bot angehalten.")} className="mt-2 tls-type-label text-live">Gespeicherten Token entfernen</button>}
         </label>
         <label className="block">
           <div className="tls-type-label text-white/60 mb-1.5">Server-ID (optional)</div>
@@ -101,7 +101,7 @@ export function DiscordBotPanel({ canSystem = false }) {
         ))}
       </div>
       {Array.isArray(data.missing_roles) && data.missing_roles.length > 0 && (
-        <div className="tls-type-small text-[#FFD700]" data-testid="discord-bot-missing-roles">Im Discord fehlen diese Rollen: {data.missing_roles.join(", ")} – anlegen oder hier den Namen anpassen.</div>
+        <div className="tls-type-small text-warn" data-testid="discord-bot-missing-roles">Im Discord fehlen diese Rollen: {data.missing_roles.join(", ")} – anlegen oder hier den Namen anpassen.</div>
       )}
       <label className="inline-flex items-center gap-2 tls-type-small">
         <input type="checkbox" checked={draft.bot_count_messages} onChange={(e) => setDraft((d) => ({ ...d, bot_count_messages: e.target.checked }))} className="accent-[#29B6E8]" data-testid="discord-bot-count" />
@@ -110,7 +110,7 @@ export function DiscordBotPanel({ canSystem = false }) {
       <div className="flex flex-wrap items-center gap-2">
         <button type="button" onClick={save} disabled={!!busy} data-testid="discord-bot-save" className="px-5 py-2 bg-[#5865F2] text-white tls-type-label rounded-sm disabled:opacity-50">{busy === "save" ? "Speichere..." : "Speichern"}</button>
         <label className="inline-flex items-center gap-2 tls-type-small">
-          <input type="checkbox" checked={Boolean(data.enabled)} disabled={!!busy || (!data.configured && !data.enabled)} onChange={(e) => toggle(e.target.checked)} className="accent-[#00FF88]" data-testid="discord-bot-enabled" />
+          <input type="checkbox" checked={Boolean(data.enabled)} disabled={!!busy || (!data.configured && !data.enabled)} onChange={(e) => toggle(e.target.checked)} className="accent-ok" data-testid="discord-bot-enabled" />
           Bot verbinden
         </label>
         <button type="button" onClick={() => run("sync", () => api.post("/settings/discord/bot/sync"), ({ data: res }) => (res?.ok ? `Rollen abgeglichen: ${res.changes} Änderungen bei ${res.linked} verknüpften Konten.` : `Nicht abgeglichen: ${res?.text || res?.reason || "Bot offline"}`))} disabled={!!busy || !online} data-testid="discord-bot-sync" className="px-4 py-2 border border-white/20 text-white/80 tls-type-label rounded-sm inline-flex items-center gap-2 disabled:opacity-40">
@@ -118,10 +118,10 @@ export function DiscordBotPanel({ canSystem = false }) {
         </button>
       </div>
       {(data.last_action || data.last_error || data.last_sync_at) && (
-        <div className={`border rounded-sm p-3 tls-type-small ${data.last_error ? "border-[#FF3B30]/25 bg-[#FF3B30]/5" : "border-white/10"} text-white/60`} data-testid="discord-bot-log">
+        <div className={`border rounded-sm p-3 tls-type-small ${data.last_error ? "border-warn/25 bg-warn/5" : "border-white/10"} text-white/60`} data-testid="discord-bot-log">
           {data.last_action && <div>Letzte Aktion: {data.last_action}</div>}
           {data.last_sync_at && <div>Letzter Rollenabgleich: {viennaDateTime(data.last_sync_at)} · {data.last_sync_changes || 0} Änderungen{data.last_sync_errors ? ` · ${data.last_sync_errors} Fehler` : ""}</div>}
-          {data.last_error && <div className="text-[#FF3B30] break-words">Letzter Fehler: {data.last_error}</div>}
+          {data.last_error && <div className="text-warn break-words">Letzter Fehler: {data.last_error}</div>}
           {data.enabled && !online && <div className="text-white/45" data-testid="discord-bot-retry">Der Bot versucht es alle fünf Minuten von selbst wieder – nach dem Speichern hier sofort.</div>}
         </div>
       )}

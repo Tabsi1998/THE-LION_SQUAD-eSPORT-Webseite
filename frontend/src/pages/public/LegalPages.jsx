@@ -92,7 +92,7 @@ function InfoList({ rows }) {
 function LegalDataNotice({ ready }) {
   if (ready !== false) return null;
   return (
-    <div data-testid="legal-data-incomplete" className="rounded-sm border border-amber-300/30 bg-amber-300/10 p-4 text-amber-100">
+    <div data-testid="legal-data-incomplete" className="rounded-sm border border-warn/30 bg-warn/10 p-4 text-white/85">
       Die rechtlichen Kontaktdaten sind derzeit nicht vollständig verfügbar. Bitte nutze bei Fragen das Kontaktformular.
     </div>
   );

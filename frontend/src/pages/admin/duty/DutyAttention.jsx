@@ -77,8 +77,8 @@ export function DutyAttention({ duty, testId = "duty-attention" }) {
         </li>
       ))}
       {proposals.map((row) => (
-        <li key={`checkin-${row.match_id}`} className="rounded-sm border border-honor/45 bg-[#121212] p-4 md:flex md:items-center md:gap-4" data-testid={`duty-checkin-${row.match_id}`}>
-          <ClipboardX className="hidden h-5 w-5 shrink-0 text-honor md:block" aria-hidden="true" />
+        <li key={`checkin-${row.match_id}`} className="rounded-sm border border-warn/45 bg-[#121212] p-4 md:flex md:items-center md:gap-4" data-testid={`duty-checkin-${row.match_id}`}>
+          <ClipboardX className="hidden h-5 w-5 shrink-0 text-warn md:block" aria-hidden="true" />
           <div className="min-w-0 flex-1">
             <div className="font-bold text-white [overflow-wrap:anywhere]">Check-in abgelaufen: {row.label}</div>
             <div className="mt-1 tls-type-small text-white/70 [overflow-wrap:anywhere]">
@@ -93,8 +93,8 @@ export function DutyAttention({ duty, testId = "duty-attention" }) {
         </li>
       ))}
       {overdue.map((row) => (
-        <li key={`overdue-${row.match_id}`} className="rounded-sm border border-[#FF3B30]/40 bg-[#121212] p-4 md:flex md:items-center md:gap-4" data-testid={`duty-overdue-${row.match_id}`}>
-          <AlarmClock className="hidden h-5 w-5 shrink-0 text-[#FF3B30] md:block" aria-hidden="true" />
+        <li key={`overdue-${row.match_id}`} className="rounded-sm border border-warn/40 bg-[#121212] p-4 md:flex md:items-center md:gap-4" data-testid={`duty-overdue-${row.match_id}`}>
+          <AlarmClock className="hidden h-5 w-5 shrink-0 text-warn md:block" aria-hidden="true" />
           <div className="min-w-0 flex-1">
             <div className="font-bold text-white [overflow-wrap:anywhere]">Überfällig: {row.label}</div>
             <div className="mt-1 tls-type-small text-white/70 [overflow-wrap:anywhere]">

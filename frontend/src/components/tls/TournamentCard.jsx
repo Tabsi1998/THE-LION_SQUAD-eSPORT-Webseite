@@ -84,7 +84,7 @@ export function TournamentCard({ tournament, index = 0 }) {
             {t.participant_count || 0}/{t.max_participants}
           </span>
           {t.prize_pool && (
-            <span className="inline-flex items-center gap-1 text-[#FFD700]">
+            <span className="inline-flex items-center gap-1 text-honor">
               <Trophy className="w-3.5 h-3.5" />
               Preise
             </span>
@@ -92,7 +92,7 @@ export function TournamentCard({ tournament, index = 0 }) {
         </div>
         {finished ? null : (
           <div className={`mt-3 tls-type-label ${
-            registration.canRegister ? "text-[#00FF88]" : registration.state === "scheduled" ? "text-[#29B6E8]" : "text-white/45"
+            registration.canRegister ? "text-ok" : registration.state === "scheduled" ? "text-[#29B6E8]" : "text-quiet"
           }`} data-testid="tournament-card-registration">
             {registration.label}
           </div>

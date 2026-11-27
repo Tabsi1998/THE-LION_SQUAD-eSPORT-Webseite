@@ -20,14 +20,14 @@ function labelContent(label, required) {
   return (
     <span className="flex items-center justify-between gap-3">
       <span>{label}</span>
-      {required && <span className="tls-type-small text-[#FFD700]">Pflichtfeld</span>}
+      {required && <span className="tls-type-small text-quiet">Pflichtfeld</span>}
     </span>
   );
 }
 
 function borderClass(error) {
   return error
-    ? "border-[#FF3B30] focus:border-[#FF3B30]"
+    ? "border-warn focus:border-warn"
     : "border-white/10 focus:border-[#29B6E8]";
 }
 
@@ -177,7 +177,7 @@ export function AuthCheckboxField({ id, checked, onChange, required = false, err
         />
         <span className="min-w-0">
           {children}
-          {required && <span className="ml-1 text-[#FFD700]" aria-label="Pflichtfeld">*</span>}
+          {required && <span className="ml-1 text-quiet" aria-label="Pflichtfeld">*</span>}
         </span>
       </label>
       <FieldHelp ids={ids} error={error} />
@@ -187,10 +187,10 @@ export function AuthCheckboxField({ id, checked, onChange, required = false, err
 
 export function AuthFormAlert({ id, tone = "error", children }) {
   const cls = tone === "success"
-    ? "text-white/75 bg-[#00FF88]/10 border-[#00FF88]/30"
+    ? "text-white/75 bg-ok/10 border-ok/30"
     : tone === "info"
       ? "text-white/75 bg-[#29B6E8]/10 border-[#29B6E8]/30"
-    : "text-[#FF8A80] bg-[#FF3B30]/10 border-[#FF3B30]/35";
+    : "text-warn bg-warn/10 border-warn/35";
 
   return (
     <div id={id} role={tone === "error" ? "alert" : "status"} className={`tls-type-small border p-3 rounded-sm ${cls}`}>
@@ -203,7 +203,7 @@ function FieldHelp({ ids, description, error }) {
   return (
     <>
       {description && <div id={ids.descriptionId} className="mt-1 tls-type-small text-white/45">{description}</div>}
-      {error && <div id={ids.errorId} role="alert" className="mt-1 tls-type-small text-[#FF8A80]">{error}</div>}
+      {error && <div id={ids.errorId} role="alert" className="mt-1 tls-type-small text-warn">{error}</div>}
     </>
   );
 }

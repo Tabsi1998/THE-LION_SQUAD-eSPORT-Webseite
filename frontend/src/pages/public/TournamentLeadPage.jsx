@@ -389,13 +389,13 @@ export default function TournamentLeadPage() {
       {/* Das Cockpit nutzt am Tablet quer die Breite für zwei Spalten (#1653); die übrigen Reiter bleiben schmal. */}
       <section className={`${activeTab === "cockpit" ? "max-w-3xl lg:max-w-6xl" : "max-w-3xl"} mx-auto px-4 sm:px-6 py-8 pb-28`} data-testid="lead-page">
         <Breadcrumbs items={tournamentCrumbs(data?.tournament, trail, { tournamentUrl, current: { label: "Turnierleitung" } })} className="mb-4" />
-        <div className="tls-type-label text-[#FFD700]">Turnierleitung</div>
+        <div className="tls-type-label text-brand">Turnierleitung</div>
         <h1 className="mt-1 tls-type-title [overflow-wrap:anywhere]">{data?.tournament?.title || "…"}</h1>
 
         <div className="mt-6 flex flex-wrap items-center gap-x-1 border-b border-white/10" role="tablist" aria-label="Turnierleitung" data-testid="lead-tabs">
           {[...(queue ? [["cockpit", "Cockpit", Gauge]] : []), ["attention", <><span className={compactTabs ? "hidden sm:inline" : ""}>Braucht </span>Aufmerksamkeit ({cases})</>, AlertTriangle], ...(canCheckIn ? [["checkin", "Check-in", UserCheck]] : []), ...(queue ? [["stations", "Stationen", MonitorPlay]] : []), ["results", "Ergebnisse", ClipboardCheck], ...(canNotice ? [["notice", "Hinweis", Megaphone]] : [])].map(([key, label, Icon]) => (
             <button key={key} type="button" role="tab" aria-selected={activeTab === key} onClick={() => setTab(key)} className={`inline-flex min-h-[44px] shrink-0 items-center gap-1.5 sm:gap-2 whitespace-nowrap border-b-2 px-2 sm:px-3 tls-type-small font-bold uppercase tracking-wider ${activeTab === key ? "border-[#29B6E8] text-white" : "border-transparent text-white/50"}`} data-testid={`lead-tab-${key}`}>
-              <Icon className={`${compactTabs ? "hidden sm:block" : ""} w-4 h-4 shrink-0 ${key === "attention" && cases ? "text-[#FFD700]" : "text-[#29B6E8]"}`} />
+              <Icon className={`${compactTabs ? "hidden sm:block" : ""} w-4 h-4 shrink-0 ${key === "attention" && cases ? "text-warn" : "text-[#29B6E8]"}`} />
               {/* Ein Textblock (Review N8): sonst setzt der Flex-Abstand zwischen „Braucht “ und „Aufmerksamkeit“ eine zweite Lücke. */}
               <span data-testid={`lead-tab-label-${key}`}>{label}</span>
             </button>
@@ -560,7 +560,7 @@ function DrawCard({ card, offset = 0, highlighted, busy, onDraw }) {
   }, []);
   const names = card.pot || [];
   return (
-    <div id={`fall-${card.id}`} tabIndex={-1} className={`outline-none rounded-sm border bg-surface-1 p-3 ${highlighted ? "border-honor/70 ring-2 ring-honor/40" : "border-brand/45"}`} data-testid={`lead-draw-${card.group}`}>
+    <div id={`fall-${card.id}`} tabIndex={-1} className={`outline-none rounded-sm border bg-surface-1 p-3 ${highlighted ? "border-brand/70 ring-2 ring-brand/40" : "border-brand/45"}`} data-testid={`lead-draw-${card.group}`}>
       <div className="flex items-center gap-3">
         <div className="flex h-12 w-14 shrink-0 items-center justify-center rounded-sm border border-brand/40 text-brand" aria-hidden="true">
           <Shuffle className="h-5 w-5" />
@@ -607,15 +607,15 @@ function movedText(done, where) {
 function AttentionRow({ item, highlighted, busy, canEnter, conflict = false, moving, stations, onEnter, onMove, onMoveTo, onNoShow }) {
   const bad = item.kind === "station_broken";
   return (
-    <div id={`fall-${item.id}`} tabIndex={-1} className={`outline-none rounded-sm border bg-[#121212] p-3 ${highlighted ? "border-[#FFD700]/70 ring-2 ring-[#FFD700]/40" : bad ? "border-[#FF3B30]/45" : "border-[#FFD700]/45"}`} data-testid={`lead-case-${item.id}`}>
+    <div id={`fall-${item.id}`} tabIndex={-1} className={`outline-none rounded-sm border bg-[#121212] p-3 ${highlighted ? "border-brand/70 ring-2 ring-brand/40" : bad ? "border-warn/45" : "border-white/15"}`} data-testid={`lead-case-${item.id}`}>
       <div className="flex items-center gap-3">
-        <div className={`flex h-12 w-14 shrink-0 items-center justify-center rounded-sm border text-center tls-type-label leading-tight ${bad ? "border-[#FF3B30]/50 text-[#FF6B60]" : "border-[#29B6E8]/40 text-[#29B6E8]"}`}>
+        <div className={`flex h-12 w-14 shrink-0 items-center justify-center rounded-sm border text-center tls-type-label leading-tight ${bad ? "border-warn/50 text-warn" : "border-[#29B6E8]/40 text-[#29B6E8]"}`}>
           {item.station_text ? item.station_text.split(" · ")[0] : "ohne Station"}
         </div>
         <div className="min-w-0 flex-1">
           <div className="tls-type-small font-bold text-white">{item.title}</div>
           <div className="tls-type-small text-white/55 truncate">{item.label} · {item.names}</div>
-          <div className={`tls-type-small ${bad ? "text-[#FF6B60]" : "text-[#FFD700]"}`}>{item.detail}</div>
+          <div className={`tls-type-small ${bad ? "text-warn" : "text-quiet"}`}>{item.detail}</div>
         </div>
         {item.action === "move" ? (
           <button type="button" disabled={busy} onClick={onMove} className="tls-btn tls-btn--secondary shrink-0 min-h-[44px] px-3 py-2 rounded-sm tls-type-label" data-testid={`lead-case-move-${item.id}`}>Umlegen</button>
@@ -662,7 +662,7 @@ function LeadRow({ item, onEnter }) {
   const clocked = Boolean(item.started_at) && item.timing?.running_minutes != null && item.status !== "disputed";
   const held = item.hold;
   return (
-    <div className={`flex items-center gap-3 rounded-sm border p-3 ${missing ? "border-[#FFD700]/45 bg-[#FFD700]/5" : "border-white/10 bg-[#121212]"}`} data-testid={`lead-row-${item.id}`} data-missing={missing ? "true" : "false"}>
+    <div className={`flex items-center gap-3 rounded-sm border p-3 ${missing ? "border-warn/45 bg-warn/5" : "border-white/10 bg-[#121212]"}`} data-testid={`lead-row-${item.id}`} data-missing={missing ? "true" : "false"}>
       <div className={`flex h-12 w-14 shrink-0 flex-col items-center justify-center rounded-sm border text-center tls-type-label leading-tight ${item.station_text ? "border-[#29B6E8]/40 text-[#29B6E8]" : "border-white/10 text-quiet"}`}>
         {item.station_text ? item.station_text.split(" · ")[0] : "ohne Station"}
       </div>
@@ -673,7 +673,7 @@ function LeadRow({ item, onEnter }) {
           <MatchClock size="sm" startedAt={item.started_at} durationMinutes={item.timing?.duration_minutes} pausedAt={item.paused_at} pausedSeconds={item.paused_seconds} testId={`lead-clock-${item.id}`} className="mt-1" />
         ) : null}
         {!clocked || missing ? (
-          <div className={`mt-0.5 flex items-center gap-1 tls-type-small ${missing ? "text-[#FFD700]" : "text-white/45"}`} data-testid={`lead-line-${item.id}`}>
+          <div className={`mt-0.5 flex items-center gap-1 tls-type-small ${missing ? "text-warn" : "text-white/45"}`} data-testid={`lead-line-${item.id}`}>
             {item.timing?.running_minutes != null ? <Radio className="w-3 h-3" /> : <Clock className="w-3 h-3" />}
             {leadLine(item, (value) => formatWhen(value))}
           </div>

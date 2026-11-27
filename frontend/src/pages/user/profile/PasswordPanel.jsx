@@ -81,12 +81,12 @@ export function PasswordPanel({ googleOnly = false }) {
           <label className="block">
             <div className="tls-type-label text-white/60 mb-1.5">Neues Passwort</div>
             <input type="password" autoComplete="new-password" value={next} onChange={(e) => setNext(e.target.value)} onKeyDown={onEnter} data-testid="profile-password-new" className={inputClass} />
-            {problemText ? <div className="tls-type-small text-[#FFD700] mt-1">{problemText}</div> : null}
+            {problemText ? <div className="tls-type-small text-warn mt-1">{problemText}</div> : null}
           </label>
           <label className="block">
             <div className="tls-type-label text-white/60 mb-1.5">Neues Passwort wiederholen</div>
             <input type="password" autoComplete="new-password" value={repeat} onChange={(e) => setRepeat(e.target.value)} onKeyDown={onEnter} data-testid="profile-password-repeat" className={inputClass} />
-            {mismatch ? <div className="tls-type-small text-[#FFD700] mt-1">Die Passwörter stimmen nicht überein.</div> : null}
+            {mismatch ? <div className="tls-type-small text-warn mt-1">Die Passwörter stimmen nicht überein.</div> : null}
           </label>
           <div className="sm:col-span-3">
             <button

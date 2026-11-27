@@ -50,7 +50,7 @@ export function BrandSection({ brand, siteBanners, bannerForm, editingBannerId, 
             <p className="mt-1">
               Browser ohne Hell/Dunkel-Erkennung und der Home-Bildschirm nehmen den Standard-Favicon.{" "}
               {faviconDarkOnly
-                ? <span className="text-[#FFD700]" data-testid="brand-favicon-dark-only">Deiner ist die Fassung für dunkel – auf hellen Tableisten unsichtbar.</span>
+                ? <span className="text-warn" data-testid="brand-favicon-dark-only">Deiner ist die Fassung für dunkel – auf hellen Tableisten unsichtbar.</span>
                 : "Erzeugt wird das weiße Logo (Favicon dunkel, sonst Maskottchen) auf einem Kreis in der Akzentfarbe."}
             </p>
           </div>
@@ -158,7 +158,7 @@ export function BrandSection({ brand, siteBanners, bannerForm, editingBannerId, 
                         </div>
                         <div className="flex gap-1 shrink-0">
                           <button type="button" onClick={() => editBanner(banner)} className="px-2 py-1 border border-[#29B6E8]/35 text-[#29B6E8] rounded-sm tls-type-label">Edit</button>
-                          <button type="button" onClick={() => deleteSiteBanner(banner)} className="px-2 py-1 border border-[#FF3B30]/35 text-[#FF3B30] rounded-sm tls-type-label"><Trash2 className="w-3 h-3" /></button>
+                          <button type="button" onClick={() => deleteSiteBanner(banner)} className="px-2 py-1 border border-live/35 text-live rounded-sm tls-type-label"><Trash2 className="w-3 h-3" /></button>
                         </div>
                       </div>
                     </div>

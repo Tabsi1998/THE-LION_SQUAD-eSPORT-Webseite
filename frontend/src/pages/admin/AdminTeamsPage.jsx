@@ -38,7 +38,7 @@ function TeamRow({ team }) {
           <div className="font-bold [overflow-wrap:anywhere]">{team.name} <span className="tls-type-small text-[#29B6E8]">[{team.tag}]</span></div>
           <div className="tls-type-small text-white/50 [overflow-wrap:anywhere]">
             {team.leader_gone
-              ? <span className="inline-flex items-center gap-1 text-[#FF6B6B] font-bold" data-testid={`admin-team-orphan-${team.id}`}><UserX className="w-3 h-3" aria-hidden="true" /> Ohne aktive Teamleitung</span>
+              ? <span className="inline-flex items-center gap-1 text-warn font-bold" data-testid={`admin-team-orphan-${team.id}`}><UserX className="w-3 h-3" aria-hidden="true" /> Ohne aktive Teamleitung</span>
               : <>Teamleitung: {leader || "Unbekannt"}</>}
           </div>
         </div>
@@ -170,8 +170,8 @@ export default function AdminTeamsPage() {
       </div>
 
       {data.can_renew_all ? (
-        <section className="mt-10 border border-honor/25 bg-honor/5 rounded-sm p-4 space-y-3 max-w-2xl" data-testid="admin-teams-renew-all">
-          <div className="flex items-center gap-2 tls-type-label text-honor"><KeyRound className="w-4 h-4" aria-hidden="true" /> Beitrittscodes</div>
+        <section className="mt-10 border border-warn/25 bg-warn/5 rounded-sm p-4 space-y-3 max-w-2xl" data-testid="admin-teams-renew-all">
+          <div className="flex items-center gap-2 tls-type-label text-warn"><KeyRound className="w-4 h-4" aria-hidden="true" /> Beitrittscodes</div>
           <p className="tls-type-body text-white/65">Gibt allen Teams auf einmal einen neuen Beitrittscode – zum Beispiel nach einer Bereinigung. Einzelne Teams erneuern ihren Code selbst unter „Einladen“.</p>
           <label className="flex items-center gap-3 min-h-11 cursor-pointer tls-type-small font-bold">
             <input type="checkbox" checked={renewLinks} onChange={(event) => setRenewLinks(event.target.checked)} data-testid="admin-teams-renew-links" className="accent-[#29B6E8]" />

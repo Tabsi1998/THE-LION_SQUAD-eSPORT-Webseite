@@ -37,11 +37,11 @@ export function HeatRebuildBar({ tournament, onDecided }) {
   };
 
   return (
-    <div data-testid="admin-tr-heat-rebuild" role="status" className="border border-honor/40 bg-honor/5 rounded-sm p-4 space-y-3 min-w-0">
+    <div data-testid="admin-tr-heat-rebuild" role="status" className="border border-brand/40 bg-brand/5 rounded-sm p-4 space-y-3 min-w-0">
       <div className="flex items-start gap-2 min-w-0">
-        <GitMerge className="w-4 h-4 mt-0.5 shrink-0 text-honor" aria-hidden="true" />
+        <GitMerge className="w-4 h-4 mt-0.5 shrink-0 text-brand" aria-hidden="true" />
         <div className="min-w-0 flex-1">
-          <div className="tls-type-label text-honor">Vorschlag: Läufe umbauen</div>
+          <div className="tls-type-label text-brand">Vorschlag: Läufe umbauen</div>
           <div className="tls-type-small text-white/60 mt-1">Unterbesetzte Läufe lassen sich zusammenlegen, ausgleichen oder abkürzen. Laufende und aufgerufene Läufe bleiben unangetastet.</div>
         </div>
       </div>
@@ -49,7 +49,7 @@ export function HeatRebuildBar({ tournament, onDecided }) {
         <ul className="space-y-1 tls-type-small text-white/85">
           {ops.map((op, index) => (
             <li key={index} data-testid="admin-tr-heat-rebuild-op" className="flex gap-2 min-w-0 break-words">
-              <span className="shrink-0 tls-type-label text-honor/80 mt-0.5 w-24">{KIND_LABELS[op.kind] || "Umbau"}</span>
+              <span className="shrink-0 tls-type-label text-brand/80 mt-0.5 w-24">{KIND_LABELS[op.kind] || "Umbau"}</span>
               <span className="min-w-0 flex-1 [overflow-wrap:anywhere]">{op.text || KIND_LABELS[op.kind] || "Umbau"}</span>
             </li>
           ))}

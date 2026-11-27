@@ -80,7 +80,7 @@ export function FeedbackDialog({ target, onClose, onDone }) {
               {[1, 2, 3, 4, 5].map((n) => (
                 <button key={n} type="button" role="radio" aria-checked={stars === n} aria-label={`${n} – ${STAR_LABELS[n]}`} onClick={() => setStars(n)} data-testid={`feedback-star-${n}`}
                   className="p-1 rounded-sm transition hover:scale-110">
-                  <Star className={`w-9 h-9 ${n <= stars ? "text-[#FFD700] fill-[#FFD700]" : "text-white/30"}`} />
+                  <Star className={`w-9 h-9 ${n <= stars ? "text-honor fill-honor" : "text-white/30"}`} />
                 </button>
               ))}
             </div>
@@ -104,7 +104,7 @@ export function FeedbackDialog({ target, onClose, onDone }) {
                 className="mt-1.5 w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-sm resize-none" placeholder="Was sollen wir beibehalten oder besser machen?" />
               <span className="block text-right tls-type-small text-quiet">{text.length}/{textMax}</span>
             </label>
-            {error ? <div className="tls-type-small text-[#FF6B6B]" role="alert">{error}</div> : null}
+            {error ? <div className="tls-type-small text-warn" role="alert">{error}</div> : null}
             <button type="button" onClick={() => send(false)} disabled={!stars || submitting || !prompt} data-testid="feedback-submit"
               className="tls-btn tls-btn--primary w-full px-4 py-3 rounded-sm tls-type-label disabled:opacity-45">Abschicken</button>
             <button type="button" onClick={() => send(true)} disabled={submitting || !prompt} data-testid="feedback-decline"

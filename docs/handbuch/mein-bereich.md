@@ -42,7 +42,7 @@ untere Leiste). Der Test dafür steht in `frontend/e2e/mein-bereich.spec.js`.
 
 | Knopf | Wann | Führt nach |
 | --- | --- | --- |
-| Offene Rechnung bezahlen | eine Rechnung ist offen (gelb, wenn überfällig) | Rechnungen & Unterlagen |
+| Offene Rechnung bezahlen | eine Rechnung ist offen (orange, wenn überfällig) | Rechnungen & Unterlagen |
 | Mitgliedsbeitrag offen | der Beitrag ist offen und es gibt dafür noch keine Rechnung | Mitgliedschaft → Beitrag |
 | Einwilligung geändert – bitte neu lesen | du hast einer Einwilligung zugestimmt und ihr Text hat sich seither geändert – die Zustimmung deckt den neuen Text nicht. Nie beantwortete oder widerrufene freiwillige Einwilligungen stehen nur unter Datenschutz → Einwilligungen | Datenschutz → Einwilligungen |
 | Nummer wählen | die Wunschnummer ist frei wählbar und noch nicht gewählt | Mitgliedschaft → Meine Nummer |

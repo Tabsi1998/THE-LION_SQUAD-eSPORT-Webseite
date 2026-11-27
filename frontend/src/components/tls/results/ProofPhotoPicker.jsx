@@ -58,7 +58,7 @@ export function ProofPhotoPicker({ matchId, value = null, onChange, testId = "pr
             {value.status === "uploading" ? <span className="absolute inset-0 flex items-center justify-center bg-black/50"><Loader2 className="w-5 h-5 animate-spin text-white" /></span> : null}
           </div>
           <div className="min-w-0 flex-1 tls-type-small" data-testid={`${testId}-state`}>
-            {value.status === "error" ? <span className="text-[#FF6B60]">{value.error}</span> : value.status === "uploading" ? <span className="text-white/60">Wird hochgeladen …</span> : (
+            {value.status === "error" ? <span className="text-warn">{value.error}</span> : value.status === "uploading" ? <span className="text-white/60">Wird hochgeladen …</span> : (
               <span className="text-white/70">Foto angehängt – sehen nur die Spieler dieses Spiels und die Turnierleitung.</span>
             )}
           </div>

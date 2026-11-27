@@ -122,7 +122,7 @@ export function GermanDateField({
         <label htmlFor={id} id={`${id}-label`} className="block tls-type-label text-white/65 mb-1.5">
           <span className="flex items-center justify-between gap-3">
             <span>{label}</span>
-            {required && <span className="tls-type-small text-[#FFD700]">Pflichtfeld</span>}
+            {required && <span className="tls-type-small text-quiet">Pflichtfeld</span>}
           </span>
         </label>
       )}
@@ -142,7 +142,7 @@ export function GermanDateField({
               aria-labelledby={label ? `${id}-label ${id}-value` : undefined}
               aria-describedby={describedBy}
               className={`w-full bg-[#0A0A0A] border pl-3 py-2.5 rounded-sm text-left flex items-center justify-between gap-2 transition focus:outline-none disabled:opacity-50 disabled:cursor-not-allowed ${showClear ? "pr-14" : "pr-3"} ${
-                error ? "border-[#FF3B30] focus:border-[#FF3B30]" : "border-white/10 focus:border-[#29B6E8] hover:border-white/25"
+                error ? "border-warn focus:border-warn" : "border-white/10 focus:border-[#29B6E8] hover:border-white/25"
               }`}
             >
               <span id={`${id}-value`} className={value ? "text-white" : "text-muted-text"}>
@@ -157,13 +157,13 @@ export function GermanDateField({
               aria-label="Datum entfernen"
               data-testid={testId ? `${testId}-clear` : undefined}
               onClick={clear}
-              className="absolute right-8 top-1/2 -translate-y-1/2 inline-flex h-7 w-7 items-center justify-center rounded-sm text-muted-text hover:text-[#FF3B30] focus:outline-none focus-visible:ring-2 focus-visible:ring-brand transition"
+              className="absolute right-8 top-1/2 -translate-y-1/2 inline-flex h-7 w-7 items-center justify-center rounded-sm text-muted-text hover:text-live focus:outline-none focus-visible:ring-2 focus-visible:ring-brand transition"
             >
               <X className="w-3.5 h-3.5" aria-hidden="true" />
             </button>
           )}
         </div>
-        <PopoverContent align="start" sideOffset={6} onOpenAutoFocus={focusOnOpen} className="w-[19.5rem] p-0 z-[130] border border-white/12 bg-[#101012] rounded-sm shadow-2xl shadow-black/70 text-white">
+        <PopoverContent align="start" sideOffset={6} onOpenAutoFocus={focusOnOpen} className="w-[19.5rem] p-0 z-[130] border border-white/10 bg-[#101012] rounded-sm shadow-2xl shadow-black/70 text-white">
           <div className="flex items-center gap-2 p-3 border-b border-white/10">
             <button
               type="button"
@@ -240,7 +240,7 @@ export function GermanDateField({
                 );
               })}
             </div>
-            <div className="mt-2 pt-2 border-t border-white/8 flex items-center justify-between">
+            <div className="mt-2 pt-2 border-t border-white/10 flex items-center justify-between">
               <span className="tls-type-label text-quiet">
                 {value ? formatGermanDate(value) : "Kein Datum gewählt"}
               </span>
@@ -248,7 +248,7 @@ export function GermanDateField({
                 <button
                   type="button"
                   onClick={() => { onChange(""); setOpen(false); }}
-                  className="tls-type-label text-white/45 hover:text-[#FF3B30] transition"
+                  className="tls-type-label text-white/45 hover:text-live transition"
                 >
                   Entfernen
                 </button>
@@ -259,7 +259,7 @@ export function GermanDateField({
       </Popover>
       {hint && <div id={`${id}-hint`} className="mt-1 tls-type-small text-white/45">{hint}</div>}
       {description && <div id={`${id}-description`} className="mt-1 tls-type-small text-white/45">{description}</div>}
-      {error && <div id={`${id}-error`} role="alert" className="mt-1 tls-type-small text-[#FF8A80]">{error}</div>}
+      {error && <div id={`${id}-error`} role="alert" className="mt-1 tls-type-small text-warn">{error}</div>}
     </div>
   );
 }

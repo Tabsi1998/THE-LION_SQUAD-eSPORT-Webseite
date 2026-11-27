@@ -37,7 +37,7 @@ export function CommendButton({ matchId, completed }) {
   };
   if (state.given) {
     return (
-      <span className="inline-flex items-center gap-1.5 rounded-sm border border-[#00FF88]/30 bg-[#00FF88]/10 px-3 py-1.5 tls-type-label text-[#00FF88]" data-testid="commend-given">
+      <span className="inline-flex items-center gap-1.5 rounded-sm border border-ok/30 bg-ok/10 px-3 py-1.5 tls-type-label text-ok" data-testid="commend-given">
         <HeartHandshake className="w-3.5 h-3.5" /> GG gegeben
       </span>
     );

@@ -45,7 +45,7 @@ export function MemberFileAccountsCard() {
 
   return (
     <div className="mt-6 border border-white/10 rounded-sm bg-[#121212] p-5" data-testid="membership-accounts-card">
-      <h2 className="tls-type-section inline-flex items-center gap-2"><Link2 className="w-4 h-4 text-[#FFD700]" /> Meine Konten in der Mitgliederakte</h2>
+      <h2 className="tls-type-section inline-flex items-center gap-2"><Link2 className="w-4 h-4 text-honor" /> Meine Konten in der Mitgliederakte</h2>
       {!view.available ? (
         <p className="mt-2 tls-type-body text-white/70" data-testid="membership-accounts-reason">{view.text}</p>
       ) : (
@@ -55,7 +55,7 @@ export function MemberFileAccountsCard() {
             „bestätigt durch die Website“. Ausschalten oder Trennen nimmt es wieder heraus. Übertragen werden nur Name und Kennung, nie Kennwörter.
           </p>
           {(view.wishes || []).map((wish) => (
-            <div key={wish.network} className="mt-3 border border-[#FFD700]/40 bg-[#FFD700]/5 rounded-sm px-3 py-2 tls-type-small flex flex-wrap items-center justify-between gap-2" data-testid={`membership-accounts-wish-${wish.network}`}>
+            <div key={wish.network} className="mt-3 border border-honor/40 bg-honor/5 rounded-sm px-3 py-2 tls-type-small flex flex-wrap items-center justify-between gap-2" data-testid={`membership-accounts-wish-${wish.network}`}>
               <span>Der Verein wünscht: <b>{wish.label}</b> verknüpfen.</span>
               <Link to={`/mein-bereich/profil?tab=socials&link=${encodeURIComponent(wish.platform)}`} className="tls-btn tls-btn--secondary inline-flex min-h-11 items-center px-3 py-2 rounded-sm tls-type-label" data-testid={`membership-accounts-link-${wish.network}`}>
                 Jetzt verknüpfen

@@ -14,11 +14,12 @@ import { viennaDateTime } from "@/lib/vienna";
 import { showLapTime } from "@/lib/laptime";
 import { LeagueSanctionCard } from "./LeagueSanctionCard";
 
+import { ROLE_COLORS } from "@/lib/categoryColors";
 const KIND_META = {
-  lap_penalty: { icon: Clock, color: "#FF9500", label: "Strafzeit" },
-  lap_invalid: { icon: Flag, color: "#FF3B30", label: "Runde ungültig" },
-  match_forfeit: { icon: ShieldAlert, color: "#FF3B30", label: "Kampflos verloren" },
-  incident: { icon: AlertTriangle, color: "#FFD700", label: "Vorfall" },
+  lap_penalty: { icon: Clock, color: ROLE_COLORS.warn, label: "Strafzeit" },
+  lap_invalid: { icon: Flag, color: ROLE_COLORS.warn, label: "Runde ungültig" },
+  match_forfeit: { icon: ShieldAlert, color: ROLE_COLORS.warn, label: "Kampflos verloren" },
+  incident: { icon: AlertTriangle, color: ROLE_COLORS.warn, label: "Vorfall" },
 };
 
 export default function MyPenaltiesPage() {
@@ -44,7 +45,7 @@ export default function MyPenaltiesPage() {
             errorTitle="Deine Strafen konnten nicht geladen werden"
             empty={(
               <div className="border border-dashed border-white/15 rounded-sm p-12 text-center">
-                <ShieldAlert className="w-10 h-10 text-[#00FF88] mx-auto mb-3" />
+                <ShieldAlert className="w-10 h-10 text-ok mx-auto mb-3" />
                 <div className="tls-type-card">Saubere Weste</div>
                 <p className="mt-2 text-white/60 tls-type-body">Keine Strafen, keine ungültigen Runden, keine kampflosen Niederlagen – weiter so!</p>
               </div>
@@ -74,7 +75,7 @@ function PenaltyCard({ p }) {
   return (
     <div
       data-testid={`penalty-card-${p.ref_id}`}
-      className="border border-white/10 rounded-sm bg-[#121212] p-5 hover:border-[#FF3B30]/30 transition"
+      className="border border-white/10 rounded-sm bg-[#121212] p-5 hover:border-warn/30 transition"
     >
       <div className="flex items-start gap-4">
         <div

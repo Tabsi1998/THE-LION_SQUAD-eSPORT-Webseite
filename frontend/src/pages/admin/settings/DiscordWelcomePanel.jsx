@@ -102,7 +102,7 @@ export function DiscordWelcomePanel() {
         <input type="checkbox" checked={!!data.enabled} disabled={!!busy} onChange={(e) => save({ enabled: e.target.checked }, e.target.checked ? "Willkommensnachricht an." : "Willkommensnachricht aus.")}
           data-testid="discord-welcome-enabled" className="accent-[#5865F2]" />
         <span>Willkommensnachricht senden</span>
-        {!data.enabled && <span className="tls-type-small text-[#FFD700]">aus – erst den Text prüfen</span>}
+        {!data.enabled && <span className="tls-type-small text-quiet">aus – erst den Text prüfen</span>}
       </label>
       <div className="space-y-2">
         <textarea value={draft} onChange={(e) => changeText(e.target.value)} rows={7} maxLength={max} aria-label="Text der Willkommensnachricht"

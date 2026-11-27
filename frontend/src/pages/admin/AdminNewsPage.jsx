@@ -215,13 +215,13 @@ export default function AdminNewsPage() {
                   <tr key={n.id}>
                     <td className="px-4 py-3">
                       <div className="font-bold text-white flex items-center gap-1.5">
-                        {pin?.active && <Pin className="w-3 h-3 text-honor" aria-label="Angepinnt" />}
+                        {pin?.active && <Pin className="w-3 h-3 text-white" aria-label="Angepinnt" />}
                         {n.title}
                       </div>
                       <div className="tls-type-small text-white/50">/{n.slug}</div>
                       {/* Ende der Anheftung (#1263): die Redaktion sieht, wie lange der Beitrag noch oben steht. */}
                       {pin && (pin.active ? pin.text : pin.until) && (
-                        <div className={`mt-0.5 tls-type-small ${pin.active ? "text-honor/80" : "text-quiet"}`} data-testid={`news-pin-${n.id}`}>
+                        <div className={`mt-0.5 tls-type-small ${pin.active ? "text-white/80" : "text-quiet"}`} data-testid={`news-pin-${n.id}`}>
                           {pin.active ? `Angepinnt ${pin.text}` : `Anpinnen abgelaufen (${pin.text})`}
                         </div>
                       )}
@@ -253,11 +253,11 @@ export default function AdminNewsPage() {
                         </Link>
                       )}
                       {state.key === "withdrawn" ? (
-                        <button type="button" onClick={() => restore(n)} data-testid={`news-restore-${n.id}`} className="tls-type-label px-3 py-1 rounded-sm border border-[#10B981]/40 text-[#10B981] hover:bg-[#10B981]/10 inline-flex items-center gap-1">
+                        <button type="button" onClick={() => restore(n)} data-testid={`news-restore-${n.id}`} className="tls-type-label px-3 py-1 rounded-sm border border-ok/40 text-ok hover:bg-ok/10 inline-flex items-center gap-1">
                           <RotateCcw className="w-3 h-3" /> Wiederherstellen
                         </button>
                       ) : n.can_delete ? (
-                        <button type="button" onClick={() => remove(n)} data-testid={`news-delete-${n.id}`} aria-label={`„${n.title || "Ohne Titel"}“ löschen`} className="tls-type-label px-3 py-1 rounded-sm border border-[#FF3B30]/40 text-[#FF3B30] hover:bg-[#FF3B30]/10 inline-flex items-center gap-1">
+                        <button type="button" onClick={() => remove(n)} data-testid={`news-delete-${n.id}`} aria-label={`„${n.title || "Ohne Titel"}“ löschen`} className="tls-type-label px-3 py-1 rounded-sm border border-live/40 text-live hover:bg-live/10 inline-flex items-center gap-1">
                           <Trash2 className="w-3 h-3" />
                         </button>
                       ) : (

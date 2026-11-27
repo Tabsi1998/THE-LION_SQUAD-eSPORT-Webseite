@@ -27,7 +27,7 @@ const PRIMARY = "tls-btn tls-btn--primary inline-flex min-h-11 items-center just
 const SECONDARY = "tls-btn tls-btn--secondary inline-flex min-h-11 items-center justify-center gap-2 rounded-sm px-4 py-2 tls-type-label disabled:opacity-50";
 const QUIET = "tls-btn tls-btn--quiet inline-flex min-h-11 items-center justify-center gap-2 rounded-sm px-3 py-2 tls-type-label disabled:opacity-50";
 const LEGEND = "tls-type-label text-white/60";
-const TONES = { proposed: "border-honor/45", in_review: "border-warn/55", agreed: "border-[#00D26A]/40", decided: "border-[#29B6E8]/40", withdrawn: "border-white/10", closed: "border-white/10" };
+const TONES = { proposed: "border-warn/45", in_review: "border-warn/55", agreed: "border-ok/40", decided: "border-[#29B6E8]/40", withdrawn: "border-white/10", closed: "border-white/10" };
 
 /**
  * Öffentlich (auch für Gäste): nur, dass eine Map in Klärung ist oder nicht zählt - nie der Vorfall selbst. Höchstens ein Element
@@ -87,7 +87,7 @@ function AnswerCountdown({ incident, offset, onDone }) {
         <span className="tls-type-card tls-type-num text-white" data-testid={`incident-countdown-text-${incident.id}`}>{left > 0 ? remainingText(left) : "vorbei"}</span>
       </div>
       <div className="mt-1 h-1.5 overflow-hidden rounded-full bg-white/10" aria-hidden="true">
-        <div ref={bar} className="tls-incident-bar h-full rounded-full bg-honor" data-moving={moving ? "true" : "false"}
+        <div ref={bar} className="tls-incident-bar h-full rounded-full bg-brand" data-moving={moving ? "true" : "false"}
           style={{ transform: `scaleX(${remainingShare(incident, now, offset)})` }} />
       </div>
     </div>
@@ -100,7 +100,7 @@ function StateBadge({ incident, pulse = false }) {
   const Icon = { proposed: Hourglass, in_review: Scale, agreed: Check, decided: Gavel, withdrawn: Undo2, closed: X }[state] || Hourglass;
   return (
     <span data-testid={`incident-state-${incident.id}`} data-state={state} data-pulse={pulse ? "true" : undefined}
-      className={`inline-flex shrink-0 items-center gap-1.5 rounded-sm border px-2 py-1 tls-type-label ${state === "in_review" ? `${pulse ? "tls-incident-pulse " : ""}border-warn/55 bg-warn/10 text-white` : state === "agreed" ? "border-[#00D26A]/50 bg-[#00D26A]/10 text-[#7CF0B4]" : "border-white/15 bg-white/[0.04] text-white/75"}`}>
+      className={`inline-flex shrink-0 items-center gap-1.5 rounded-sm border px-2 py-1 tls-type-label ${state === "in_review" ? `${pulse ? "tls-incident-pulse " : ""}border-warn/55 bg-warn/10 text-white` : state === "agreed" ? "border-ok/50 bg-ok/10 text-ok" : "border-white/15 bg-white/[0.04] text-white/75"}`}>
       <Icon className={`h-3.5 w-3.5 ${state === "agreed" ? "tls-checkin-tick" : ""}`} aria-hidden="true" />
       {STATE_LABELS[state] || state}
     </span>
@@ -163,14 +163,14 @@ function DecisionForm({ league, info, incident, matchId, busy, run, onChanged })
     }, "Die Entscheidung ließ sich nicht speichern.");
   };
   return (
-    <form onSubmit={submit} className="tls-incident-open mt-4 space-y-4 rounded-sm border border-honor/30 bg-honor/5 p-4" data-testid={`incident-decision-${incident.id}`} noValidate>
-      <h4 className="flex items-center gap-2 tls-type-label text-honor"><Gavel className="h-4 w-4" aria-hidden="true" /> Entscheidung der Liga-Leitung</h4>
+    <form onSubmit={submit} className="tls-incident-open mt-4 space-y-4 rounded-sm border border-brand/30 bg-brand/5 p-4" data-testid={`incident-decision-${incident.id}`} noValidate>
+      <h4 className="flex items-center gap-2 tls-type-label text-brand"><Gavel className="h-4 w-4" aria-hidden="true" /> Entscheidung der Liga-Leitung</h4>
       <fieldset>
         <legend className={LEGEND}>1 · Wie wird entschieden?</legend>
         <div className="mt-2 grid gap-2 sm:grid-cols-2">
           {info.outcomes.map((option) => (
-            <label key={option.key} className={`flex min-h-11 cursor-pointer items-start gap-2 rounded-sm border px-3 py-2 tls-type-small ${form.outcome === option.key ? "border-honor/60 bg-honor/10 text-white" : "border-white/10 text-white/80"}`}>
-              <input type="radio" name={`outcome-${incident.id}`} className="mt-1 accent-honor" checked={form.outcome === option.key} onChange={() => set("outcome", option.key)} data-testid={`incident-decision-${incident.id}-${option.key}`} />
+            <label key={option.key} className={`flex min-h-11 cursor-pointer items-start gap-2 rounded-sm border px-3 py-2 tls-type-small ${form.outcome === option.key ? "border-brand/60 bg-brand/10 text-white" : "border-white/10 text-white/80"}`}>
+              <input type="radio" name={`outcome-${incident.id}`} className="mt-1 accent-brand" checked={form.outcome === option.key} onChange={() => set("outcome", option.key)} data-testid={`incident-decision-${incident.id}-${option.key}`} />
               <span className="min-w-0 font-bold">{option.label}<span className="block tls-type-small font-normal text-white/55">{OUTCOME_HELP[option.key]}</span></span>
             </label>
           ))}
@@ -196,7 +196,7 @@ function DecisionForm({ league, info, incident, matchId, busy, run, onChanged })
       {canSettleAtOnce(form.outcome) ? (
         <div className="space-y-3 rounded-sm border border-white/10 bg-black/20 p-3">
           <label className="flex min-h-11 cursor-pointer items-start gap-2 tls-type-small text-white/85">
-            <input type="checkbox" className="mt-1 accent-honor" checked={form.settle} onChange={(event) => set("settle", event.target.checked)} data-testid={`incident-decision-${incident.id}-settle`} />
+            <input type="checkbox" className="mt-1 accent-brand" checked={form.settle} onChange={(event) => set("settle", event.target.checked)} data-testid={`incident-decision-${incident.id}-settle`} />
             <span className="font-bold">3 · Serie gleich feststellen
               <span className="block tls-type-small font-normal text-white/55">Anhaken, wenn nichts mehr zu spielen ist. Erst dann kann ein Ergebnis gültig werden. Sonst stellst du die Serie später fest.</span></span>
           </label>
@@ -234,8 +234,8 @@ function SettleForm({ league, info, incident, matchId, busy, run, onChanged }) {
     }, "Die Feststellung ließ sich nicht speichern.");
   };
   return (
-    <form onSubmit={submit} className="tls-incident-open mt-4 space-y-4 rounded-sm border border-honor/30 bg-honor/5 p-4" data-testid={`incident-settle-${incident.id}`} noValidate>
-      <h4 className="flex items-center gap-2 tls-type-label text-honor"><Scale className="h-4 w-4" aria-hidden="true" /> Serie feststellen</h4>
+    <form onSubmit={submit} className="tls-incident-open mt-4 space-y-4 rounded-sm border border-brand/30 bg-brand/5 p-4" data-testid={`incident-settle-${incident.id}`} noValidate>
+      <h4 className="flex items-center gap-2 tls-type-label text-brand"><Scale className="h-4 w-4" aria-hidden="true" /> Serie feststellen</h4>
       <p className="tls-type-small text-white/65">{decision.settled_at ? "Schon festgestellt – du kannst es ändern, solange das Ergebnis nicht gilt, etwa nachdem die fehlende Map gespielt ist." : "Sobald alle angesetzten Maps gespielt und gemeldet sind: festhalten, ob noch eine Map fehlt und ob Maps nicht zählen."}</p>
       <SettleFields league={league} form={form} set={set} testId={`incident-settle-${incident.id}`} />
       <label className="block">
@@ -518,7 +518,7 @@ function ReportForm({ league, info, matchId, busy, run, onChanged, onClose }) {
             placeholder={between ? "z. B. beide Teams wollten 10 Minuten Pause" : "Was ist passiert, Ursache soweit bekannt"} data-testid="incident-form-note" />
         </label>
       ) : null}
-      {quota ? <p className="rounded-sm border border-honor/30 bg-honor/5 px-3 py-2 tls-type-small text-white/80" data-testid="incident-form-quota">{quota}</p> : null}
+      {quota ? <p className="rounded-sm border border-white/15 bg-white/[0.04] px-3 py-2 tls-type-small text-white/80" data-testid="incident-form-quota">{quota}</p> : null}
       {form.kind && !between ? (
         <p className="tls-type-small text-white/55" data-testid="incident-form-next">
           {info.as_lead ? "Als Liga-Leitung nimmst du den Vorfall auf: Die Map ist sofort in Klärung, bis du entscheidest."
@@ -569,8 +569,8 @@ export function IncidentPanel({ league, matchId, busy, run, onChanged }) {
       {/* Nur, was an keiner Karte steht: Nach Neustart oder Wiederholung zählen frühere Meldungen nicht - die Serie wird neu gemeldet.
           „In Klärung“, Antwortzeit und Feststellung sagt die Karte selbst (Abzeichen, Countdown, Entscheidung). */}
       {notice ? (
-        <p className="mt-4 flex items-start gap-2 rounded-sm border border-honor/40 bg-honor/5 px-3 py-2.5 tls-type-small text-white/90" data-testid="incident-hold" data-code={info.hold.code}>
-          <RotateCcw className="mt-0.5 h-4 w-4 shrink-0 text-honor" aria-hidden="true" />
+        <p className="mt-4 flex items-start gap-2 rounded-sm border border-warn/40 bg-warn/5 px-3 py-2.5 tls-type-small text-white/90" data-testid="incident-hold" data-code={info.hold.code}>
+          <RotateCcw className="mt-0.5 h-4 w-4 shrink-0 text-warn" aria-hidden="true" />
           <span>{notice}</span>
         </p>
       ) : null}

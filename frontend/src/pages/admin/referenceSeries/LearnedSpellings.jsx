@@ -21,7 +21,7 @@ export function LearnedSpellings({ items, removed = 0, onRemove, hint, testId })
         </ul>
       )}
       {removed > 0 && (
-        <p className="mt-1 tls-type-small text-amber-200" data-testid={testId ? `${testId}-removed` : undefined}>
+        <p className="mt-1 tls-type-small text-warn" data-testid={testId ? `${testId}-removed` : undefined}>
           {removed === 1 ? "1 Schreibweise wird" : `${removed} Schreibweisen werden`} beim Speichern entfernt.
         </p>
       )}

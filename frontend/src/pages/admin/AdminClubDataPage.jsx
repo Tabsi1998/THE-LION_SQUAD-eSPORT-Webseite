@@ -75,7 +75,7 @@ export default function AdminClubDataPage() {
 
   return (
     <AdminLayout>
-      <span className="tls-type-label text-[#FFD700]">Verein</span>
+      <span className="tls-type-label text-honor">Verein</span>
       <h1 className="tls-type-title mt-1 mb-2" data-testid="club-data-title"><ShortCaps>Vereinsdaten</ShortCaps></h1>
       <p className="tls-type-body text-white/55 mb-6 max-w-3xl">
         Name, ZVR, Anschrift, Vertretung und die Texte für Impressum, Datenschutz und Nutzungsbedingungen – die eine Stelle dafür.

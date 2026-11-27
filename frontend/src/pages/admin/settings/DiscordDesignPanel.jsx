@@ -276,7 +276,7 @@ export function DiscordDesignPanel({ initialKind = "stream_live" }) {
                       </label>
                       <button type="button" disabled={index === 0} onClick={() => change("fields", fields.map((_, i) => (i === index - 1 ? fields[index] : i === index ? fields[index - 1] : fields[i])))} className="p-1 text-white/50 disabled:opacity-30" aria-label="nach oben"><ArrowUp className="w-3.5 h-3.5" /></button>
                       <button type="button" disabled={index === fields.length - 1} onClick={() => change("fields", fields.map((_, i) => (i === index + 1 ? fields[index] : i === index ? fields[index + 1] : fields[i])))} className="p-1 text-white/50 disabled:opacity-30" aria-label="nach unten"><ArrowDown className="w-3.5 h-3.5" /></button>
-                      <button type="button" onClick={() => change("fields", fields.filter((_, i) => i !== index))} className="p-1 text-[#FF3B30]/80" aria-label={`Feld ${index + 1} entfernen`} data-testid={`discord-design-field-remove-${index}`}><Trash2 className="w-3.5 h-3.5" /></button>
+                      <button type="button" onClick={() => change("fields", fields.filter((_, i) => i !== index))} className="p-1 text-live/80" aria-label={`Feld ${index + 1} entfernen`} data-testid={`discord-design-field-remove-${index}`}><Trash2 className="w-3.5 h-3.5" /></button>
                     </div>
                   </div>
                 ))}
@@ -315,7 +315,7 @@ export function DiscordDesignPanel({ initialKind = "stream_live" }) {
                 <div className="flex flex-wrap gap-1.5">
                   {rowPlaceholders.map((entry) => (
                     <button key={entry.name} type="button" onClick={() => insert(entry.name)} title={`${entry.text}${entry.sample ? ` – z. B. ${entry.sample}` : ""}`} data-testid={`discord-design-placeholder-${entry.name}`}
-                      className="px-2 py-1 rounded-sm bg-white/5 border border-white/10 tls-type-small font-mono text-[#00FF88]/80 hover:border-[#00FF88]/50">{`{${entry.name}}`}</button>
+                      className="px-2 py-1 rounded-sm bg-white/5 border border-white/10 tls-type-small font-mono text-ok/80 hover:border-ok/50">{`{${entry.name}}`}</button>
                   ))}
                 </div>
               </>
@@ -339,7 +339,7 @@ export function DiscordDesignPanel({ initialKind = "stream_live" }) {
               className="inline-flex items-center gap-2 px-4 py-2 border border-white/15 text-white/60 tls-type-label rounded-sm disabled:opacity-40">
               <RotateCcw className="w-3.5 h-3.5" /> Standard wiederherstellen
             </button>
-            {dirty && <span className="self-center tls-type-small text-[#FFD700]">nicht gespeichert</span>}
+            {dirty && <span className="self-center tls-type-small text-warn">nicht gespeichert</span>}
           </div>
         </div>
 
@@ -362,7 +362,7 @@ export function DiscordDesignPanel({ initialKind = "stream_live" }) {
           {preview?.note && <div className="tls-type-small text-white/50" data-testid="discord-design-note">{preview.note}</div>}
           {typeof preview?.length === "number" && <div className="tls-type-small text-quiet" data-testid="discord-design-length">{preview.length} / {data.limits?.total || 6000} Zeichen</div>}
           {errors.length > 0 && (
-            <ul className="border border-[#FF3B30]/40 bg-[#FF3B30]/10 rounded-sm p-3 tls-type-small text-white/80 list-disc pl-5 space-y-1" data-testid="discord-design-errors">
+            <ul className="border border-warn/40 bg-warn/10 rounded-sm p-3 tls-type-small text-white/80 list-disc pl-5 space-y-1" data-testid="discord-design-errors">
               {errors.map((error) => <li key={error}>{error}</li>)}
             </ul>
           )}

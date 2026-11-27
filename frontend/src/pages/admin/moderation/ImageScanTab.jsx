@@ -13,7 +13,7 @@ const PROVIDERS = [
   ["off", "Aus – keine Prüfung"],
 ];
 const STATE_LABEL = { pending: "wartet", safe: "unauffällig", review: "Prüfung nötig", blocked: "entfernt", failed: "Anbieter-Fehler (sichtbar)" };
-const STATE_TONE = { pending: "text-white/50", safe: "text-[#00FF88]", review: "text-[#FFD700]", blocked: "text-[#FF3B30]", failed: "text-[#FF6B6B]" };
+const STATE_TONE = { pending: "text-white/50", safe: "text-ok", review: "text-warn", blocked: "text-warn", failed: "text-warn" };
 const FILTERS = [["review", "Prüfung nötig"], ["blocked", "Entfernt"], ["failed", "Fehler"], ["safe", "Unauffällig"], ["all", "Alle"]];
 
 export function percent(value) {
@@ -144,7 +144,7 @@ export default function ImageScanTab() {
               <div className="tls-type-small font-bold text-white/60 mb-1.5">Google Cloud Vision API-Schlüssel {form.google_api_key_masked && <span className="text-white/40 normal-case">(aktuell gespeichert)</span>}</div>
               <input type="password" value={form.google_api_key} onChange={(e) => set("google_api_key", e.target.value)} data-testid="image-scan-google-key" autoComplete="off" className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-sm font-mono" placeholder={form.google_api_key_masked ? "Leer lassen, um den Schlüssel zu behalten" : "API-Schlüssel aus der Google Cloud Console (Vision API)"} />
               <p className="mt-1 tls-type-small text-quiet">Bilder gehen dann an Google – das steht automatisch in der Datenschutzerklärung.</p>
-              {form.google_api_key_masked && <button type="button" onClick={clearKey} className="mt-2 tls-type-label text-[#FF6B6B]">Gespeicherten Schlüssel entfernen</button>}
+              {form.google_api_key_masked && <button type="button" onClick={clearKey} className="mt-2 tls-type-label text-live">Gespeicherten Schlüssel entfernen</button>}
             </label>
           )}
           <div className="grid sm:grid-cols-3 gap-3">
@@ -185,10 +185,10 @@ export default function ImageScanTab() {
 function StatCard({ title, ok, detail, problem = "", testId }) {
   const Icon = ok ? ShieldCheck : ShieldAlert;
   return (
-    <div className={`border rounded-sm p-3 ${ok ? "border-[#00FF88]/25 bg-[#00FF88]/5" : "border-[#FF3B30]/30 bg-[#FF3B30]/5"}`} data-testid={testId}>
-      <div className="flex items-center gap-2 tls-type-label text-white/50"><Icon className={`w-3.5 h-3.5 ${ok ? "text-[#00FF88]" : "text-[#FF3B30]"}`} /> {title}</div>
+    <div className={`border rounded-sm p-3 ${ok ? "border-ok/25 bg-ok/5" : "border-warn/30 bg-warn/5"}`} data-testid={testId}>
+      <div className="flex items-center gap-2 tls-type-label text-white/50"><Icon className={`w-3.5 h-3.5 ${ok ? "text-ok" : "text-warn"}`} /> {title}</div>
       <div className="mt-1 tls-type-small text-white/85">{detail}</div>
-      {problem && <div className="mt-1 tls-type-small text-[#FF6B6B]">{problem}</div>}
+      {problem && <div className="mt-1 tls-type-small text-warn">{problem}</div>}
     </div>
   );
 }
@@ -227,16 +227,16 @@ function ScanRow({ row, note, onNote, onDecide, busy }) {
           {scores.racy > 0 && <span className="px-2 py-0.5 border border-white/10 rounded-sm text-white/50">anzüglich {percent(scores.racy)} %</span>}
           <span className="px-2 py-0.5 border border-white/10 rounded-sm text-white/40">{row.provider_label}</span>
         </div>
-        {row.error && <div className="tls-type-small text-[#FF6B6B]">Fehler: {row.error}</div>}
+        {row.error && <div className="tls-type-small text-warn">Fehler: {row.error}</div>}
         {row.note && <div className="tls-type-small text-white/60">Notiz: {row.note}</div>}
         {row.decided_by && row.decided_by !== "system" && <div className="tls-type-small text-quiet">Entschieden von der Moderation {formatMoment(row.decided_at)}</div>}
         <div className="flex flex-col sm:flex-row gap-2 pt-1">
           <input value={note} onChange={(e) => onNote(e.target.value)} data-testid={`image-scan-note-${row.id}`} placeholder="Grund (optional)" className="flex-1 bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-sm" />
           {row.state !== "safe" && (
-            <button type="button" onClick={() => onDecide("approve")} disabled={Boolean(busy)} data-testid={`image-scan-approve-${row.id}`} className="inline-flex items-center justify-center gap-1.5 px-4 py-2 border border-[#00FF88]/50 text-[#00FF88] rounded-sm tls-type-label hover:bg-[#00FF88]/10 disabled:opacity-50"><Eye className="w-3.5 h-3.5" /> Freigeben</button>
+            <button type="button" onClick={() => onDecide("approve")} disabled={Boolean(busy)} data-testid={`image-scan-approve-${row.id}`} className="inline-flex items-center justify-center gap-1.5 px-4 py-2 border border-ok/50 text-ok rounded-sm tls-type-label hover:bg-ok/10 disabled:opacity-50"><Eye className="w-3.5 h-3.5" /> Freigeben</button>
           )}
           {row.state !== "blocked" && (
-            <button type="button" onClick={() => onDecide("remove")} disabled={Boolean(busy)} data-testid={`image-scan-remove-${row.id}`} className="inline-flex items-center justify-center gap-1.5 px-4 py-2 border border-[#FF3B30]/50 text-[#FF3B30] rounded-sm tls-type-label hover:bg-[#FF3B30]/10 disabled:opacity-50"><ShieldAlert className="w-3.5 h-3.5" /> Entfernen</button>
+            <button type="button" onClick={() => onDecide("remove")} disabled={Boolean(busy)} data-testid={`image-scan-remove-${row.id}`} className="inline-flex items-center justify-center gap-1.5 px-4 py-2 border border-live/50 text-live rounded-sm tls-type-label hover:bg-live/10 disabled:opacity-50"><ShieldAlert className="w-3.5 h-3.5" /> Entfernen</button>
           )}
         </div>
       </div>

@@ -14,6 +14,7 @@ import { toast } from "sonner";
 import { Plus, Trash2, Gift } from "lucide-react";
 import { ShortCaps } from "@/components/tls/ShortCaps";
 
+import { ROLE_COLORS } from "@/lib/categoryColors";
 const TYPE_LABELS = {
   ordinary: "Ordentlich",
   supporting: "Unterstützend",
@@ -59,10 +60,10 @@ export default function AdminBenefitsPage() {
     <AdminLayout>
       <div className="flex items-center justify-between mb-6 flex-wrap gap-3">
         <div>
-          <span className="tls-type-label text-[#FFD700]">VEREIN</span>
+          <span className="tls-type-label text-honor">VEREIN</span>
           <h1 className="tls-type-title mt-1"><ShortCaps>Mitglieder&shy;vorteile</ShortCaps></h1>
         </div>
-        <button onClick={() => setEditing({})} data-testid="benefits-new" className="inline-flex items-center gap-2 px-4 py-2 bg-[#FFD700] text-black tls-type-label rounded-sm hover:bg-[#e8c200] transition">
+        <button onClick={() => setEditing({})} data-testid="benefits-new" className="inline-flex items-center gap-2 px-4 py-2 bg-honor text-black tls-type-label rounded-sm hover:bg-[#e8c200] transition">
           <Plus className="w-3.5 h-3.5" /> Neuer Vorteil
         </button>
       </div>
@@ -79,16 +80,16 @@ export default function AdminBenefitsPage() {
             <div key={b.id} className={`border rounded-sm bg-[#121212] p-5 ${b.is_active ? "border-white/10" : "border-white/5 opacity-60"}`}>
               <div className="flex items-start justify-between gap-3">
                 <div>
-                  {b.category && <div className="tls-type-label text-[#FFD700]/70">{b.category}</div>}
+                  {b.category && <div className="tls-type-label text-honor/70">{b.category}</div>}
                   <h3 className="tls-type-card">{b.title}</h3>
                 </div>
                 {!b.is_active && <span className="tls-type-label text-quiet">inaktiv</span>}
-                {b.is_active && benefitTimeLabel(b) && <span className="tls-type-label text-[#FF9500]" data-testid={`benefit-time-${b.id}`}>{benefitTimeLabel(b)}</span>}
+                {b.is_active && benefitTimeLabel(b) && <span className="tls-type-label text-warn" data-testid={`benefit-time-${b.id}`}>{benefitTimeLabel(b)}</span>}
               </div>
               {b.description && <p className="mt-2 tls-type-body text-white/65 line-clamp-3">{b.description}</p>}
               <div className="mt-4 flex gap-2">
-                <button onClick={() => setEditing(b)} data-testid={`benefit-edit-${b.id}`} className="tls-type-label px-3 py-1 border border-[#FFD700]/40 text-[#FFD700] rounded-sm hover:bg-[#FFD700]/10">Bearbeiten</button>
-                <button onClick={() => remove(b.id)} data-testid={`benefit-delete-${b.id}`} className="tls-type-label px-3 py-1 border border-[#FF3B30]/40 text-[#FF3B30] rounded-sm hover:bg-[#FF3B30]/10 inline-flex items-center gap-1">
+                <button onClick={() => setEditing(b)} data-testid={`benefit-edit-${b.id}`} className="tls-type-label px-3 py-1 border border-honor/40 text-honor rounded-sm hover:bg-honor/10">Bearbeiten</button>
+                <button onClick={() => remove(b.id)} data-testid={`benefit-delete-${b.id}`} className="tls-type-label px-3 py-1 border border-live/40 text-live rounded-sm hover:bg-live/10 inline-flex items-center gap-1">
                   <Trash2 className="w-3 h-3" /> Löschen
                 </button>
               </div>
@@ -145,7 +146,7 @@ function BenefitModal({ benefit, meta, onClose, onSaved }) {
 
   // Seitenblatt statt Fenster (#435).
   return (
-    <AdminSheet title={isNew ? "Neuer Vorteil" : "Vorteil bearbeiten"} eyebrow="Mitglieder" accent="#FFD700" onClose={onClose} onSubmit={submit} saving={saving} submitTestId="benefit-save" testId="benefit-sheet">
+    <AdminSheet title={isNew ? "Neuer Vorteil" : "Vorteil bearbeiten"} eyebrow="Mitglieder" accent={ROLE_COLORS.honor} onClose={onClose} onSubmit={submit} saving={saving} submitTestId="benefit-save" testId="benefit-sheet">
       <TextField label="Titel" value={form.title} onChange={(v) => set("title", v)} required testId="benefit-title" />
       <TextAreaField label="Beschreibung" value={form.description} onChange={(v) => set("description", v)} rows={3} testId="benefit-desc" />
       <FormGrid>
@@ -161,13 +162,13 @@ function BenefitModal({ benefit, meta, onClose, onSaved }) {
       <FieldLabel label="Sichtbar für Mitgliedsarten (leer = alle)">
         <div className="flex flex-wrap gap-2">
           {meta.types.map((t) => (
-            <button key={t} type="button" onClick={() => toggleType(t)} className={`tls-type-small px-3 py-1.5 rounded-sm border ${form.visible_for_membership_types.includes(t) ? "border-[#FFD700] bg-[#FFD700]/15 text-[#FFD700]" : "border-white/15 text-white/50"}`}>
+            <button key={t} type="button" onClick={() => toggleType(t)} className={`tls-type-small px-3 py-1.5 rounded-sm border ${form.visible_for_membership_types.includes(t) ? "border-honor bg-honor/15 text-honor" : "border-white/15 text-white/50"}`}>
               {TYPE_LABELS[t] || t}
             </button>
           ))}
         </div>
       </FieldLabel>
-      <CheckField label="Aktiv (für Mitglieder sichtbar)" checked={form.is_active} onChange={(v) => set("is_active", v)} accent="#FFD700" testId="benefit-active" />
+      <CheckField label="Aktiv (für Mitglieder sichtbar)" checked={form.is_active} onChange={(v) => set("is_active", v)} accent={ROLE_COLORS.honor} testId="benefit-active" />
     </AdminSheet>
   );
 }

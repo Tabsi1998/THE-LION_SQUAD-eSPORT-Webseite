@@ -63,7 +63,7 @@ export function DiscordStatsPanel() {
         </p>
       </div>
       {!data.counting && (
-        <div className="border border-[#FFD700]/30 bg-[#FFD700]/5 rounded-sm p-3 tls-type-small text-white/70" data-testid="discord-stats-off">
+        <div className="border border-brand/30 bg-brand/5 rounded-sm p-3 tls-type-small text-white/70" data-testid="discord-stats-off">
           „Nachrichten zählen“ ist aus (Reiter „Bot &amp; Aktivität“) – Nachrichten und aktive Konten werden nicht gezählt. Beitritte und Austritte zählen trotzdem.
         </div>
       )}
@@ -85,8 +85,8 @@ export function DiscordStatsPanel() {
             <div className="min-w-[7.5rem]">
               <div className="tls-type-small font-bold text-white/45">Kommen und Gehen (30 Tage)</div>
               <div className="mt-0.5 tls-type-small" data-testid={`discord-stats-members-${server.guild_id}`}>
-                <span className="font-bold text-[#00FF88]">+{count(server.joins?.["30"])}</span><span className="text-white/45"> · </span>
-                <span className="font-bold text-[#FF3B30]">−{count(server.leaves?.["30"])}</span>
+                <span className="font-bold text-ok">+{count(server.joins?.["30"])}</span><span className="text-white/45"> · </span>
+                <span className="font-bold text-quiet">−{count(server.leaves?.["30"])}</span>
               </div>
             </div>
             <Sparkline series={server.series || []} label={`Nachrichten der letzten 30 Tage auf ${server.name}`} />

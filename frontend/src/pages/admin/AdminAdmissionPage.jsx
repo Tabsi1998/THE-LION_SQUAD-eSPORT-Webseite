@@ -14,9 +14,9 @@ const ADMISSION_RESOURCES = ["admission"];
 // Ob die scannende Person heute im Vorstand ist, entscheidet das Vereinsmodul bei jedem Einlass.
 
 const TONES = {
-  ok: { box: "border-[#00FF88]/50 bg-[#00FF88]/10", text: "text-[#00FF88]", Icon: CheckCircle2 },
-  info: { box: "border-[#FFD700]/50 bg-[#FFD700]/10", text: "text-[#FFD700]", Icon: Info },
-  error: { box: "border-[#FF3B30]/50 bg-[#FF3B30]/10", text: "text-[#FF3B30]", Icon: XCircle },
+  ok: { box: "border-ok/50 bg-ok/10", text: "text-ok", Icon: CheckCircle2 },
+  info: { box: "border-brand/50 bg-brand/10", text: "text-brand", Icon: Info },
+  error: { box: "border-warn/50 bg-warn/10", text: "text-warn", Icon: XCircle },
 };
 
 export function quorumText(counts) {
@@ -134,7 +134,7 @@ export default function AdminAdmissionPage() {
             ) : null}
             <div className="border border-white/10 rounded-sm bg-[#121212] p-4" data-testid="admission-meeting-card">
               <div className="font-bold">{meeting.title}{meeting.time ? ` · ${meeting.time}` : ""}{meeting.place ? ` · ${meeting.place}` : ""}</div>
-              <div className={`tls-type-small mt-1 ${meeting.counts?.quorum_reached ? "text-[#00FF88]" : "text-[#FFD700]"}`} data-testid="admission-counts">{quorumText(meeting.counts)}</div>
+              <div className={`tls-type-small mt-1 ${meeting.counts?.quorum_reached ? "text-ok" : "text-warn"}`} data-testid="admission-counts">{quorumText(meeting.counts)}</div>
             </div>
 
             <ResultCard result={result} />
@@ -176,7 +176,7 @@ export default function AdminAdmissionPage() {
                           <input value={reason} onChange={(e) => setReason(e.target.value)} placeholder="Grund, z. B. falscher Ausweis" maxLength={200}
                             data-testid="admission-undo-reason" className="flex-1 min-w-48 bg-[#0A0A0A] border border-white/10 px-3 py-1.5 rounded-sm text-sm" />
                           <button type="submit" disabled={busy || !reason.trim()} data-testid="admission-undo-confirm"
-                            className="px-3 py-1.5 border border-[#FF3B30]/50 text-[#FF3B30] rounded-sm tls-type-label disabled:opacity-40">
+                            className="px-3 py-1.5 border border-live/50 text-live rounded-sm tls-type-label disabled:opacity-40">
                             Rücknahme bestätigen
                           </button>
                           <button type="button" onClick={() => setUndoFor(null)} className="tls-type-small text-white/50 hover:text-white">Abbrechen</button>

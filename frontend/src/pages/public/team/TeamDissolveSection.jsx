@@ -41,8 +41,8 @@ export function TeamDissolveSection({ team, onDissolved }) {
   };
 
   return (
-    <section className="border border-[#FF3B30]/35 bg-[#FF3B30]/[0.04] rounded-sm p-4 space-y-3" data-testid="team-dissolve">
-      <div className="font-bold text-[#FF6B6B]">Team auflösen</div>
+    <section className="border border-live/35 bg-live/[0.04] rounded-sm p-4 space-y-3" data-testid="team-dissolve">
+      <div className="font-bold text-live">Team auflösen</div>
       <p className="tls-type-small text-white/70" data-testid="team-dissolve-sentence">{preview ? dissolveSentence(preview) : "Alle Mitglieder verlieren das Team und der Team-Chat ist nicht mehr erreichbar."}</p>
       {blocked.length ? (
         <div className="tls-type-small text-white/70 border border-white/10 rounded-sm p-3 bg-black/30" data-testid="team-dissolve-blocked">

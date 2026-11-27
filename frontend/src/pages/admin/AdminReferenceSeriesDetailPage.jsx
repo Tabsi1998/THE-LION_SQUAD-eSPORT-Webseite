@@ -136,7 +136,7 @@ export default function AdminReferenceSeriesDetailPage() {
               </div>
               <h1 className="tls-type-title mt-1">{seasonLabel(series)}</h1>
               <div className="mt-1 tls-type-label text-white/45">{STATUS_LABELS[series.status] || series.status}</div>
-              {cancelledText(series) && <p className="mt-1 tls-type-small text-amber-200/90" data-testid="series-detail-cancelled">{cancelledText(series)}</p>}
+              {cancelledText(series) && <p className="mt-1 tls-type-small text-quiet" data-testid="series-detail-cancelled">{cancelledText(series)}</p>}
               {board && current && (
                 <p className="mt-2 tls-type-small text-white/70" data-testid="series-detail-reference">
                   Referenz: <span className="text-white font-semibold tabular-nums">{referenceLine(current)}</span> · <Link to={`/references/${current.id}`} className="text-[#29B6E8] hover:text-white underline-offset-2 hover:underline">ansehen</Link>

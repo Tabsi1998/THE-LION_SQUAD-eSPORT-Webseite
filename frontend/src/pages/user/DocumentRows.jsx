@@ -1,6 +1,7 @@
 import { Download, Eye, FileText, Pin } from "lucide-react";
 import { API } from "@/lib/api";
 
+import { ROLE_COLORS } from "@/lib/categoryColors";
 // Eine Zeile je Dokument - gemeinsam für die Vereinsdokumente im Mitgliederbereich und „Deine Unterlagen“ im Profil
 // (#1255). PDFs öffnen im gemeinsamen Betrachter (#325), alles andere in einem neuen Tab.
 
@@ -15,10 +16,10 @@ export const CATEGORY_LABELS = {
 };
 
 const CATEGORY_COLORS = {
-  statutes: "#FFD700", minutes: "#9F7AEA", form: "#29B6E8",
-  regulations: "#FF3B30", guideline: "#10B981", download: "#29B6E8",
-  media_kit: "#FFD700", presentation: "#9F7AEA", template: "#10B981", other: "#6B7280",
-  resolution: "#9F7AEA", audit_report: "#FF3B30", account: "#10B981", payout: "#10B981", letter: "#29B6E8", ballot: "#FFD700",
+  statutes: ROLE_COLORS.honor, minutes: "#9F7AEA", form: "#29B6E8",
+  regulations: ROLE_COLORS.quiet, guideline: "#10B981", download: "#29B6E8",
+  media_kit: ROLE_COLORS.brand, presentation: "#9F7AEA", template: "#10B981", other: "#6B7280",
+  resolution: "#9F7AEA", audit_report: ROLE_COLORS.quiet, account: "#10B981", payout: "#10B981", letter: "#29B6E8", ballot: ROLE_COLORS.honor,
 };
 
 function fmtSize(bytes) {
@@ -51,7 +52,7 @@ export function DocumentRow({ d, onView }) {
         <div className="flex items-center gap-2 flex-wrap">
           <span className="tls-type-label" style={{ color: c }}>{CATEGORY_LABELS[d.category] || d.category}</span>
           {d.source === "dolibarr" && <span className="tls-type-small font-bold px-1.5 py-0.5 rounded-sm border border-white/15 text-white/55" data-testid={`doc-source-${d.id}`}>{d.personal ? "Vereinsakte · nur für dich" : "Vereinsakte"}</span>}
-          {d.pinned && <Pin className="w-3 h-3 text-[#FFD700]" />}
+          {d.pinned && <Pin className="w-3 h-3 text-white" />}
         </div>
         <div className="font-bold text-white mt-0.5">{d.title}</div>
         {d.description && <div className="tls-type-small text-white/55 mt-1 line-clamp-2">{d.description}</div>}
@@ -67,7 +68,7 @@ export function DocumentRow({ d, onView }) {
           type="button"
           onClick={() => onView(d)}
           data-testid={`doc-view-${d.id}`}
-          className="w-full sm:w-auto justify-center shrink-0 inline-flex items-center gap-2 px-4 py-2 bg-[#FFD700]/15 hover:bg-[#FFD700]/25 text-[#FFD700] border border-[#FFD700]/40 tls-type-label rounded-sm transition"
+          className="w-full sm:w-auto justify-center shrink-0 inline-flex items-center gap-2 px-4 py-2 bg-brand/15 hover:bg-brand/25 text-brand border border-brand/40 tls-type-label rounded-sm transition"
         >
           <Eye className="w-3.5 h-3.5" /> Ansehen
         </button>
@@ -77,7 +78,7 @@ export function DocumentRow({ d, onView }) {
           target="_blank"
           rel="noreferrer"
           data-testid={`doc-view-${d.id}`}
-          className="w-full sm:w-auto justify-center shrink-0 inline-flex items-center gap-2 px-4 py-2 bg-[#FFD700]/15 hover:bg-[#FFD700]/25 text-[#FFD700] border border-[#FFD700]/40 tls-type-label rounded-sm transition"
+          className="w-full sm:w-auto justify-center shrink-0 inline-flex items-center gap-2 px-4 py-2 bg-brand/15 hover:bg-brand/25 text-brand border border-brand/40 tls-type-label rounded-sm transition"
         >
           <Eye className="w-3.5 h-3.5" /> Ansehen
         </a>

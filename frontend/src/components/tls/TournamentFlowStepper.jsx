@@ -106,7 +106,7 @@ export function TournamentFlowStepper({ tournament, registrations = [], matchesV
           const state = isCurrent ? "current" : isDone ? "done" : "todo";
           const ring =
             state === "current"
-              ? "border-[#FFD700] text-[#FFD700] shadow-[0_0_18px_rgba(255,215,0,0.35)]"
+              ? "border-brand text-brand shadow-[0_0_18px_rgba(41,182,232,0.35)]"
               : state === "done"
               ? "border-[#29B6E8] bg-[#29B6E8] text-black"
               : "border-white/15 text-white/40";
@@ -128,7 +128,7 @@ export function TournamentFlowStepper({ tournament, registrations = [], matchesV
                 </span>
                 <span
                   className={`tls-type-label ${stack ? "flex-1 sm:flex-none sm:text-center" : "text-center"} transition-colors ${
-                    state === "current" ? "text-[#FFD700]" : state === "done" ? "text-white" : "text-white/45"
+                    state === "current" ? "text-brand" : state === "done" ? "text-white" : "text-white/45"
                   }`}
                 >
                   {step.label}

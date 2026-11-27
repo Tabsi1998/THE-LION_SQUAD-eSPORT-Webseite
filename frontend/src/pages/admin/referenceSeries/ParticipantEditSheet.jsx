@@ -113,7 +113,7 @@ export function ParticipantEditSheet({ series, row, profiles = [], onClose, onSa
 
   const footer = row.in_results ? null : (
     <button type="button" onClick={remove} data-testid="participant-edit-remove"
-      className="inline-flex items-center gap-1.5 px-3 py-2.5 tls-type-label rounded-sm text-white/55 hover:text-[#FF3B30] transition-colors">
+      className="inline-flex items-center gap-1.5 px-3 py-2.5 tls-type-label rounded-sm text-white/55 hover:text-live transition-colors">
       <Trash2 className="w-3.5 h-3.5" /> Entfernen
     </button>
   );

@@ -118,12 +118,12 @@ export function WebPushHost() {
             </>
           ) : (
             <>
-              <p className="tls-type-label text-[#FFD700]" data-testid="web-push-hint-eyebrow">{WEB_PUSH_EYEBROW[request.reason] || WEB_PUSH_EYEBROW.own}</p>
+              <p className="tls-type-label text-brand" data-testid="web-push-hint-eyebrow">{WEB_PUSH_EYEBROW[request.reason] || WEB_PUSH_EYEBROW.own}</p>
               <h2 id="web-push-hint-title" className="mt-0.5 tls-type-small font-bold">{WEB_PUSH_TITLE}</h2>
               <StaggerIn as="ul" className="mt-2 space-y-1.5 tls-type-small" data-testid="web-push-hint-lines">
                 {WEB_PUSH_LINES.map(({ icon: Icon, title, text }) => (
                   <li key={title} className="flex items-center gap-2 text-white/70" data-testid={`web-push-hint-line-${title}`}>
-                    <Icon className="w-4 h-4 shrink-0 text-[#FFD700]" aria-hidden="true" />
+                    <Icon className="w-4 h-4 shrink-0 text-brand" aria-hidden="true" />
                     <span><strong className="text-white">{title}:</strong> {text}</span>
                   </li>
                 ))}

@@ -39,7 +39,7 @@ export function TournamentLiveStreams({ tournament }) {
   return (
     <section className="border border-[#9146FF]/35 bg-[#0A0A0A] rounded-sm overflow-hidden" data-testid="tournament-live-streams">
       <div className="flex flex-wrap items-center gap-2 px-4 py-2 bg-[#9146FF]/10 border-b border-[#9146FF]/20">
-        <Radio className="w-4 h-4 text-[#FF3B30] animate-pulse" />
+        <Radio className="w-4 h-4 text-live animate-pulse" />
         <span className="tls-type-small font-bold text-white">Live: <NumText text={streams.length === 1 ? `${name} streamt das Turnier` : `${streams.length} Teilnehmer streamen das Turnier`} /></span>
         <a href={first.stream_url || `https://www.twitch.tv/${channel}`} target="_blank" rel="noopener noreferrer" data-testid="tournament-live-open" className="ml-auto tls-type-label text-white/70 hover:text-white inline-flex items-center gap-1">
           <ExternalLink className="w-3 h-3" /> Zuschauen

@@ -199,7 +199,7 @@ export function FriendsPanel({ onChanged }) {
                     <div key={candidate.id} data-testid={`friends-candidate-${candidate.id}`} className="p-3 flex flex-wrap items-center gap-3">
                       <Person user={candidate} />
                       {relation.kind === "friend" ? (
-                        <span className="tls-type-label text-[#00FF88]">Befreundet</span>
+                        <span className="tls-type-label text-ok">Befreundet</span>
                       ) : relation.kind === "sent" ? (
                         <span className="tls-type-label text-white/50">Anfrage gesendet</span>
                       ) : relation.kind === "incoming" ? (
@@ -241,7 +241,7 @@ export function FriendsPanel({ onChanged }) {
               {(row) => (
                 <>
                   <Link to={`/messages/${row.user?.id}`} className={`${buttonBase} border border-[#29B6E8]/45 text-[#29B6E8]`}><MessageSquare className="w-3 h-3" /> Schreiben</Link>
-                  <button type="button" onClick={() => act(row, "remove")} className={`${buttonBase} border border-[#FF3B30]/40 text-[#FF3B30]`}>Entfernen</button>
+                  <button type="button" onClick={() => act(row, "remove")} className={`${buttonBase} border border-live/40 text-live`}>Entfernen</button>
                 </>
               )}
             </Section>

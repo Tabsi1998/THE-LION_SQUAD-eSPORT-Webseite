@@ -42,7 +42,7 @@ export function EventFactsSection({ bringText, onBringText, highlights, onHighli
         <span className="block tls-type-small text-white/50 font-bold mb-1.5">Mitbringen – eine Zeile je Punkt</span>
         <textarea value={bringText} onChange={(ev) => onBringText(ev.target.value)} rows={4} data-testid="event-bring-along"
           placeholder={"eigener Controller\nKopfhörer"} className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-sm" />
-        <span className={`block mt-1 tls-type-small ${lines.length > BRING_ALONG_MAX ? "text-[#FF6B6B]" : "text-quiet"}`}>
+        <span className={`block mt-1 tls-type-small ${lines.length > BRING_ALONG_MAX ? "text-warn" : "text-quiet"}`}>
           {lines.length} von höchstens {BRING_ALONG_MAX} Zeilen · steht im Fakten-Kasten oben auf der Event-Seite.
         </span>
       </label>
@@ -60,7 +60,7 @@ export function EventFactsSection({ bringText, onBringText, highlights, onHighli
               <span className="inline-flex gap-1">
                 <button type="button" onClick={() => move(index, -1)} disabled={index === 0} aria-label="Nach oben" className="p-1.5 text-white/60 hover:text-white disabled:opacity-30"><ArrowUp className="w-3.5 h-3.5" /></button>
                 <button type="button" onClick={() => move(index, 1)} disabled={index === highlights.length - 1} aria-label="Nach unten" className="p-1.5 text-white/60 hover:text-white disabled:opacity-30"><ArrowDown className="w-3.5 h-3.5" /></button>
-                <button type="button" onClick={() => onHighlights(highlights.filter((_, at) => at !== index))} aria-label="Highlight entfernen" data-testid={`event-highlight-remove-${index}`} className="p-1.5 text-white/60 hover:text-[#FF6B6B]"><Trash2 className="w-3.5 h-3.5" /></button>
+                <button type="button" onClick={() => onHighlights(highlights.filter((_, at) => at !== index))} aria-label="Highlight entfernen" data-testid={`event-highlight-remove-${index}`} className="p-1.5 text-white/60 hover:text-live"><Trash2 className="w-3.5 h-3.5" /></button>
               </span>
             </li>
           ))}

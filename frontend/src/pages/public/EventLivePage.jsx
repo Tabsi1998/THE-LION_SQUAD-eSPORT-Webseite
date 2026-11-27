@@ -8,7 +8,8 @@ import { formatMatchKind, formatMatchStatus, formatScheduleGroupLabel, matchSche
 import { useLiveRefresh } from "@/hooks/useLiveRefresh";
 import { viennaTime } from "@/lib/vienna";
 import { finderFor, sourceLabel } from "@/lib/slotSource";
-import { eventIsOver } from "@/lib/afterEnd";
+import { eventIsOver } from "@/lib/afterEnd";
+import { KIND_COLORS } from "@/lib/categoryColors";
 
 const ACTIVE_MATCH_STATUSES = new Set(["in_progress", "running", "waiting_result", "disputed"]);
 const NEXT_MATCH_STATUSES = new Set(["ready", "scheduled", "pending", "preview"]);
@@ -158,7 +159,7 @@ export function EventLiveBoard({ event, accessToken = "" }) {
       </div>
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
         <LiveStat icon={Radio} label="Jetzt live" value={liveMatches.length} tone="cyan" />
-        <LiveStat icon={CalendarClock} label="Als nächstes" value={nextMatches.length} tone="gold" />
+        <LiveStat icon={CalendarClock} label="Als nächstes" value={nextMatches.length} tone="brand" />
         <LiveStat icon={CheckCircle2} label="Ergebnisse" value={resultMatches.length} tone="green" />
         <LiveStat icon={Monitor} label="Freie Stationen" value={freeStations.length} tone="white" />
       </div>
@@ -230,7 +231,7 @@ function MatchCard({ match, stationMap, featured = false }) {
       </div>
       <div className="mt-4 flex flex-wrap gap-3 tls-type-small text-white/55">
         <span className="inline-flex items-center gap-1.5"><CalendarClock className="w-3.5 h-3.5" />{formatWhen(match.scheduled_at, { fallback: "Termin offen" })}</span>
-        {station && <span className="inline-flex items-center gap-1.5 text-[#FFD700]"><Monitor className="w-3.5 h-3.5" />{station}</span>}
+        {station && <span className="inline-flex items-center gap-1.5 text-brand"><Monitor className="w-3.5 h-3.5" />{station}</span>}
         <span className="inline-flex items-center gap-1.5"><Users className="w-3.5 h-3.5" />{formatMatchKind(match)}</span>
       </div>
     </Link>
@@ -244,7 +245,7 @@ function ResultRow({ match }) {
         <div className="min-w-0">
           <div className="tls-wrap tls-type-small text-quiet">{match.tournament?.title || "Turnier"}</div>
           <div className="tls-wrap mt-1 font-bold uppercase">{match.labels.join(" vs. ") || match.groupLabel}</div>
-          {match.resultText && <div className="tls-wrap mt-1 tls-type-small text-[#00FF88]">{match.resultText}</div>}
+          {match.resultText && <div className="tls-wrap mt-1 tls-type-small text-ok">{match.resultText}</div>}
         </div>
         <span className="tls-type-label text-white/45">{formatMatchStatus(match.status)}</span>
       </div>
@@ -259,7 +260,7 @@ function ActivityRow({ item, accessToken }) {
   const suffix = item.access_link && accessToken ? `?access=${encodeURIComponent(accessToken)}` : "";
   return (
     <Link to={`${href}${suffix}`} className="flex items-center gap-3 border border-white/10 bg-black/20 rounded-sm p-3 hover:border-[#29B6E8]/40 transition min-w-0">
-      <div className={`w-10 h-10 rounded-sm border flex items-center justify-center shrink-0 ${isFastLap ? "border-[#FFD700]/35 text-[#FFD700]" : "border-[#29B6E8]/35 text-[#29B6E8]"}`}>
+      <div className={`w-10 h-10 rounded-sm border flex items-center justify-center shrink-0 ${isFastLap ? "" : "border-[#29B6E8]/35 text-[#29B6E8]"}`} style={isFastLap ? { color: KIND_COLORS.fastlap, borderColor: `${KIND_COLORS.fastlap}59` } : undefined}>
         <Icon className="w-5 h-5" />
       </div>
       <div className="min-w-0">
@@ -280,7 +281,7 @@ function StationRow({ station }) {
         {/* Notizen sind Vorschau-Text (#1314): eine Zeile, der volle Text im title. */}
         <div className="tls-type-small text-quiet truncate" title={station.notes || undefined}>{station.notes || station.device_type || "Station"}</div>
       </div>
-      <span className={`shrink-0 rounded-sm border px-2 py-1 tls-type-label ${broken ? "border-[#FF3B30]/40 text-[#FF3B30]" : busy ? "border-[#29B6E8]/40 text-[#29B6E8]" : "border-[#00FF88]/35 text-[#00FF88]"}`}>
+      <span className={`shrink-0 rounded-sm border px-2 py-1 tls-type-label ${broken ? "border-warn/40 text-warn" : busy ? "border-live/40 text-live" : "border-ok/35 text-ok"}`}>
         {broken ? "Defekt" : busy ? "Belegt" : "Frei"}
       </span>
     </div>
@@ -302,7 +303,7 @@ function LivePanel({ icon: Icon, title, count, children }) {
 }
 
 function LiveStat({ icon: Icon, label, value, tone }) {
-  const color = tone === "gold" ? "text-[#FFD700]" : tone === "green" ? "text-[#00FF88]" : tone === "white" ? "text-white" : "text-[#29B6E8]";
+  const color = tone === "green" ? "text-ok" : tone === "white" ? "text-white" : "text-[#29B6E8]";
   return (
     <div className="border border-white/10 bg-[#121212] rounded-sm p-4">
       <div className="flex items-center justify-between gap-3">

@@ -47,7 +47,7 @@ export default function AdminTournamentGuidePage() {
       </section>
 
       <section id="turnierformen" className="mt-10 scroll-mt-24" data-testid="guide-game-types">
-        <h2 className="tls-type-section inline-flex items-center gap-2"><Gamepad2 className="w-5 h-5 text-[#FFD700]" /> 2 · Nach Turnierform</h2>
+        <h2 className="tls-type-section inline-flex items-center gap-2"><Gamepad2 className="w-5 h-5 text-brand" /> 2 · Nach Turnierform</h2>
         <p className="mt-2 tls-type-body text-white/55">Teamgröße, übliche Serie und was im Regelwerk stehen sollte. Die Liste wächst mit den Spielen, die der Verein wirklich spielt.</p>
         <div className="mt-4 border border-white/10 rounded-sm bg-[#121212] tls-swipe pb-0">
           <table className="w-full tls-type-small min-w-[720px]">
@@ -67,7 +67,7 @@ export default function AdminTournamentGuidePage() {
                   <td className="px-4 py-3"><div className="font-bold text-white">{kind.label}</div><div className="tls-type-small text-white/45">{kind.examples}</div></td>
                   <td className="px-4 py-3 text-white/80 whitespace-nowrap">{kind.team}</td>
                   <td className="px-4 py-3 text-white/80">{kind.series}</td>
-                  <td className="px-4 py-3 text-[#FFD700] whitespace-nowrap">{formatLabel(kind.format)}</td>
+                  <td className="px-4 py-3 text-brand whitespace-nowrap">{formatLabel(kind.format)}</td>
                   <td className="px-4 py-3 text-white/65">{kind.notes}</td>
                   <td className="px-4 py-3 text-right">
                     {/* Schritt 2 (#368): der Weg vom Leitfaden ins Formular - Format, Teamgröße,

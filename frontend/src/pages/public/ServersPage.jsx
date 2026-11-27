@@ -18,9 +18,9 @@ const statusLabels = { online: "Online", offline: "Offline", maintenance: "Wartu
 const visibilityLabels = { public: "Öffentlich", community: "Community", members: "Vereinsmitglieder", internal: "Intern" };
 const secretLabels = { password: "Passwort", invite_code: "Invite-Code", whitelist: "Whitelist", discord: "Discord" };
 const statusClasses = {
-  online: "border-[#00FF88]/40 bg-[#00FF88]/10 text-[#00FF88]",
+  online: "border-ok/40 bg-ok/10 text-ok",
   offline: "border-white/15 bg-white/5 text-white/45",
-  maintenance: "border-[#FFD700]/40 bg-[#FFD700]/10 text-[#FFD700]",
+  maintenance: "border-warn/40 bg-warn/10 text-warn",
   planned: "border-[#29B6E8]/40 bg-[#29B6E8]/10 text-[#29B6E8]",
 };
 
@@ -143,7 +143,7 @@ export default function ServersPage() {
 }
 
 function Stat({ label, value, icon: Icon, tone }) {
-  const color = tone === "green" ? "text-[#00FF88]" : tone === "gold" ? "text-[#FFD700]" : "text-[#29B6E8]";
+  const color = tone === "green" ? "text-ok" : tone === "gold" ? "text-honor" : "text-[#29B6E8]";
   return (
     <div className="border border-white/10 bg-[#121212] rounded-sm p-4">
       <div className="flex items-center justify-between gap-2">
@@ -242,8 +242,8 @@ function ServerCard({ server }) {
   const tags = serverTags(server);
 
   return (
-    <article className={`group relative overflow-hidden border rounded-sm bg-[#101010] min-h-[19rem] flex flex-col transition ${status === "maintenance" ? "border-[#FFD700]/45" : "border-white/10 hover:border-white/20"}`}>
-      <div className={`h-1 ${status === "online" ? "bg-[#00FF88]" : status === "maintenance" ? "bg-[#FFD700]" : status === "planned" ? "bg-[#29B6E8]" : "bg-white/10"}`} />
+    <article className={`group relative overflow-hidden border rounded-sm bg-[#101010] min-h-[19rem] flex flex-col transition ${status === "maintenance" ? "border-warn/45" : "border-white/10 hover:border-white/20"}`}>
+      <div className={`h-1 ${status === "online" ? "bg-ok" : status === "maintenance" ? "bg-warn" : status === "planned" ? "bg-[#29B6E8]" : "bg-white/10"}`} />
       {status === "maintenance" && <MaintenanceTape text={maintenanceBandText} />}
 
       <div className="p-5 flex flex-col grow">
@@ -311,7 +311,7 @@ function ServerCard({ server }) {
               <span>{pct}%</span>
             </div>
             <div className="mt-2 h-1.5 bg-white/10 rounded-sm overflow-hidden">
-              <div className={`h-full ${status === "online" ? "bg-[#00FF88]" : "bg-[#29B6E8]"}`} style={{ width: `${pct}%` }} />
+              <div className={`h-full ${status === "online" ? "bg-ok" : "bg-[#29B6E8]"}`} style={{ width: `${pct}%` }} />
             </div>
           </div>
         )}
@@ -329,12 +329,12 @@ function ServerCard({ server }) {
               <Clipboard className="w-3.5 h-3.5 shrink-0 text-[#29B6E8]" />
             </button>
           )}
-          {server.password_hint && <div className="tls-type-small text-[#FFD700]/80">{server.password_hint}</div>}
+          {server.password_hint && <div className="tls-type-small text-brand/80">{server.password_hint}</div>}
           {server.access_secret_kind && server.access_secret_kind !== "none" && (
-            <div className="border border-[#FFD700]/25 bg-[#FFD700]/10 rounded-sm p-3">
+            <div className="border border-brand/25 bg-brand/10 rounded-sm p-3">
               <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
                 <div className="min-w-0">
-                  <div className="tls-type-label text-[#FFD700]">{server.access_label || secretLabels[server.access_secret_kind] || "Zugang"}</div>
+                  <div className="tls-type-label text-brand">{server.access_label || secretLabels[server.access_secret_kind] || "Zugang"}</div>
                   <div className="font-mono tls-type-small text-white/70 mt-1 break-all">{server.has_access_secret ? (revealedSecret || server.access_secret_masked || "••••••") : "siehe Hinweis"}</div>
                 </div>
                 {server.has_access_secret && (

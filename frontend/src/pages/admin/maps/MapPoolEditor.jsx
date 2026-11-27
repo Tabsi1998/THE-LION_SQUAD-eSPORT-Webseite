@@ -231,7 +231,7 @@ export function MapPoolEditor({ title, hint = "", game, library = [], entry = nu
       ) : null}
 
       {entry?.stale ? (
-        <p role="status" className="rounded-sm border border-[#FFD700]/30 bg-[#FFD700]/5 px-3 py-2 tls-type-small text-[#FFD700]" data-testid={`${testId}-stale`}>
+        <p role="status" className="rounded-sm border border-warn/30 bg-warn/5 px-3 py-2 tls-type-small text-warn" data-testid={`${testId}-stale`}>
           Der gespeicherte Pool gehört zu einem anderen Spiel und gilt nicht mehr. Bitte neu wählen – Spiele, die ihn schon festhalten, behalten ihn.
         </p>
       ) : null}

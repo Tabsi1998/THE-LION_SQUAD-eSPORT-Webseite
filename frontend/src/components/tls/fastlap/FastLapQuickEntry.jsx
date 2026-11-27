@@ -122,7 +122,7 @@ export function FastLapQuickEntry({ challenge, track, times, guests, onGuestCrea
 
   const status = useMemo(() => {
     if (!driver) return { text: "Fahrer wählen", tone: "text-white/45" };
-    if (!allowed) return { text: attemptLabel(used, max), tone: "text-[#FFB4AE]" };
+    if (!allowed) return { text: attemptLabel(used, max), tone: "text-warn" };
     return { text: attemptLabel(used, max), tone: "text-[#29B6E8]" };
   }, [driver, allowed, used, max]);
 
@@ -162,10 +162,10 @@ export function FastLapQuickEntry({ challenge, track, times, guests, onGuestCrea
             placeholder="1:24,587"
             data-testid="fl-quick-time"
             aria-describedby="fl-quick-preview"
-            className={`w-full bg-black border rounded-sm px-4 py-3 tls-type-title tls-type-num text-center focus:outline-none ${correcting ? "border-honor/60" : "border-white/15 focus:border-[#29B6E8]"}`}
+            className={`w-full bg-black border rounded-sm px-4 py-3 tls-type-title tls-type-num text-center focus:outline-none ${correcting ? "border-warn/60" : "border-white/15 focus:border-[#29B6E8]"}`}
           />
         </label>
-        <div id="fl-quick-preview" className={`mt-1 min-h-[1.25rem] text-center tls-type-small tabular-nums ${preview.text && !preview.ok ? "text-[#FFB4AE]" : "text-white/55"}`} aria-live="polite">
+        <div id="fl-quick-preview" className={`mt-1 min-h-[1.25rem] text-center tls-type-small tabular-nums ${preview.text && !preview.ok ? "text-warn" : "text-white/55"}`} aria-live="polite">
           {correcting ? `Korrektur für ${last?.driverName || "die letzte Zeit"}${preview.ok ? ` · ${preview.text}` : ""}` : preview.ok ? `= ${preview.text}` : preview.text}
         </div>
 

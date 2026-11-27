@@ -6,6 +6,7 @@ import { Badge } from "@/components/achievements/Badge";
 import { AccountLevelProgress, accountLevelTier } from "@/components/tls/AccountLevel";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 
+import { ROLE_COLORS } from "@/lib/categoryColors";
 // Dashboard-Kachel „Deine Erfolge“ (#619): Level-Leiste, „Als Nächstes“ in einer Zeile, die letzte
 // Freischaltung - aus /achievements/me/summary, damit das Dashboard nicht den ganzen Katalog lädt.
 export function AchievementsTile({ className = "" }) {
@@ -48,7 +49,7 @@ export function AchievementsTile({ className = "" }) {
             <span className="tls-type-card" data-testid="dashboard-achievements-level">Level {level?.level || 1}</span>
             <span className="tls-type-label" style={{ color: tier.color }}>{level?.title || tier.title}</span>
             {prestige > 0 && (
-              <span className="inline-flex items-center gap-0.5 text-[#FFD700]" title={`Prestige ${prestige}`} data-testid="dashboard-achievements-prestige">
+              <span className="inline-flex items-center gap-0.5 text-honor" title={`Prestige ${prestige}`} data-testid="dashboard-achievements-prestige">
                 {Array.from({ length: Math.min(5, prestige) }).map((_, i) => <Star key={i} className="w-3 h-3 fill-current" />)}
               </span>
             )}
@@ -64,7 +65,7 @@ export function AchievementsTile({ className = "" }) {
           )}
           {next ? (
             <div className="mt-3 flex items-center gap-2 tls-type-small" data-testid="dashboard-achievements-next">
-              <Target className="w-3.5 h-3.5 shrink-0" style={{ color: next.group_accent || "#00FF88" }} />
+              <Target className="w-3.5 h-3.5 shrink-0" style={{ color: next.group_accent || ROLE_COLORS.ok }} />
               <span className="text-white/45 tls-type-label shrink-0">Als Nächstes</span>
               <span className="truncate font-semibold">{next.name}</span>
               <span className="ml-auto tls-type-small text-white/50 tabular-nums shrink-0">{next.current}/{next.target}</span>
@@ -75,7 +76,7 @@ export function AchievementsTile({ className = "" }) {
               <Badge material={last.material} rank={last.rank} art={last.art} icon={last.icon} size="xs" title={last.name} />
               <span className="text-white/45 tls-type-label shrink-0">Zuletzt</span>
               <span className="truncate font-semibold">{last.name}</span>
-              <span className="ml-auto tls-type-small shrink-0" style={{ color: last.material_color || "#FFD700" }}>{last.material_name}</span>
+              <span className="ml-auto tls-type-small shrink-0" style={{ color: last.material_color || ROLE_COLORS.honor }}>{last.material_name}</span>
             </div>
           ) : (
             <div className="mt-2 tls-type-small text-white/45" data-testid="dashboard-achievements-empty">Noch keine Freischaltung – spiel mit, dann geht es los.</div>

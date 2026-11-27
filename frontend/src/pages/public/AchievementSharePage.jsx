@@ -11,6 +11,7 @@ import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 import { shareAchievement } from "@/lib/shareAchievement";
 import { viennaDate } from "@/lib/vienna";
 
+import { ROLE_COLORS } from "@/lib/categoryColors";
 // Die Teilen-Seite eines Erfolgs (#619): /achievements/a/<award_id>. Zeigt die serverseitig gezeichnete
 // Karte (dieselbe, die Discord als Vorschau bekommt), die Person und die Seltenheit - mit Teilen,
 // Bild speichern und dem Weg zum Profil. Nur öffentliche Vergaben; sonst „nicht öffentlich“.
@@ -42,7 +43,7 @@ export default function AchievementSharePage() {
     else if (result.status === "failed") toast.error("Teilen geht in diesem Browser nicht – kopiere die Adresse aus der Leiste.");
   };
 
-  const color = card?.material_color || "#FFD700";
+  const color = card?.material_color || ROLE_COLORS.honor;
   return (
     <PublicLayout>
       <div className="max-w-4xl mx-auto px-4 md:px-6 py-10 md:py-14">

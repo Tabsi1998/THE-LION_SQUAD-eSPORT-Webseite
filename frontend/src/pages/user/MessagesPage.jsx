@@ -298,7 +298,7 @@ export default function MessagesPage() {
                     >
                       <div className="font-bold tls-type-small truncate">{candidate.display_name || candidate.username}</div>
                       <div className="tls-type-small text-quiet truncate">@{candidate.username}</div>
-                      {!candidate.can_message ? <div className="mt-1 tls-type-small text-[#FFD700]">{candidate.message_hint}</div> : null}
+                      {!candidate.can_message ? <div className="mt-1 tls-type-small text-quiet">{candidate.message_hint}</div> : null}
                     </button>
                   ))}
                   {candidates.length === 0 ? <div className="p-3 tls-type-small text-quiet">Keine passenden Benutzer gefunden.</div> : null}
@@ -311,7 +311,7 @@ export default function MessagesPage() {
                     const unread = Number(item.unread_count || 0);
                     const body = (
                       <>
-                        <span className={`mt-0.5 shrink-0 inline-flex h-9 w-9 items-center justify-center rounded-sm ${item.kind === "tournament" ? "bg-[#FFD700]/10 text-[#FFD700]" : "bg-[#29B6E8]/10 text-[#29B6E8]"}`}>
+                        <span className={`mt-0.5 shrink-0 inline-flex h-9 w-9 items-center justify-center rounded-sm ${item.kind === "tournament" ? "bg-brand/10 text-brand" : "bg-[#29B6E8]/10 text-[#29B6E8]"}`}>
                           <Icon className="w-4 h-4" />
                         </span>
                         <span className="min-w-0 flex-1">
@@ -358,9 +358,9 @@ export default function MessagesPage() {
                     </div>
                   </div>
                   <div className="flex flex-wrap items-center justify-end gap-2">
-                    {!canSend && hint ? <div className="tls-type-small text-[#FFD700] max-w-xs text-right">{hint}</div> : null}
-                    <button type="button" onClick={report} className="px-2 py-1 border border-[#FFD700]/35 text-[#FFD700] tls-type-label">Melden</button>
-                    <button type="button" onClick={toggleBlock} className="px-2 py-1 border border-[#FF3B30]/35 text-[#FF6B6B] tls-type-label">{blockedByMe ? "Freigeben" : "Blockieren"}</button>
+                    {!canSend && hint ? <div className="tls-type-small text-quiet max-w-xs text-right">{hint}</div> : null}
+                    <button type="button" onClick={report} className="px-2 py-1 border border-warn/35 text-warn tls-type-label">Melden</button>
+                    <button type="button" onClick={toggleBlock} className="px-2 py-1 border border-warn/35 text-warn tls-type-label">{blockedByMe ? "Freigeben" : "Blockieren"}</button>
                   </div>
                 </div>
                 <ConversationView

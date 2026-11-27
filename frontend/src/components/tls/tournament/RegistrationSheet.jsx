@@ -149,7 +149,7 @@ export function RegistrationSheet({ tournament, user, myTeams = [], loading, err
                   {manageableTeams.map((team) => <option key={team.id} value={team.id}>[{team.tag}] {team.name}</option>)}
                 </select>
                 {manageableTeams.length === 0 && (
-                  <div className="mt-2 tls-type-small text-[#FF3B30]">Du bist aktuell bei keinem Team als Teamleitung oder Co-Leitung eingetragen.</div>
+                  <div className="mt-2 tls-type-small text-warn">Du bist aktuell bei keinem Team als Teamleitung oder Co-Leitung eingetragen.</div>
                 )}
               </label>
             )}
@@ -166,8 +166,8 @@ export function RegistrationSheet({ tournament, user, myTeams = [], loading, err
               </label>
             ))}
             {offer && (
-              <div className="space-y-2 rounded-sm border border-[#FFD700]/40 p-3" data-testid="tournament-register-costs">
-                <div className="tls-type-label text-[#FFD700]">Startgeld</div>
+              <div className="space-y-2 rounded-sm border border-brand/40 p-3" data-testid="tournament-register-costs">
+                <div className="tls-type-label text-brand">Startgeld</div>
                 {offer.positions.some((position) => position.optional) && (
                   <div className="space-y-1">
                     {offer.positions.filter((position) => position.optional).map((position) => (

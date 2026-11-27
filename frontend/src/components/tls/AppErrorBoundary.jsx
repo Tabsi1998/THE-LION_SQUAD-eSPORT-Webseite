@@ -78,8 +78,8 @@ function ErrorCard({ error, report }) {
   const auth = useOptionalAuth();
   const isAdmin = Boolean(auth?.user && auth?.isAdmin);
   return (
-    <div className="max-w-xl w-full mx-auto border border-[#FF3B30]/30 bg-[#121212] rounded-sm p-6 text-center" role="alert" data-testid="page-error">
-      <div className="mx-auto mb-5 w-14 h-14 rounded-sm border border-[#FF3B30]/40 bg-[#FF3B30]/10 flex items-center justify-center text-[#FF3B30]">
+    <div className="max-w-xl w-full mx-auto border border-warn/30 bg-[#121212] rounded-sm p-6 text-center" role="alert" data-testid="page-error">
+      <div className="mx-auto mb-5 w-14 h-14 rounded-sm border border-warn/40 bg-warn/10 flex items-center justify-center text-warn">
         <AlertTriangle className="w-7 h-7" />
       </div>
       <h1 className="tls-type-title"><ShortCaps>Diese Seite konnte nicht angezeigt werden</ShortCaps></h1>

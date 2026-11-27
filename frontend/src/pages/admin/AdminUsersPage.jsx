@@ -99,7 +99,7 @@ export default function AdminUsersPage() {
         )}
       </div>
       <input placeholder="Name, Benutzername, E-Mail oder Mitgliedsnummer suchen …" value={q} onChange={(e) => setQ(e.target.value)} data-testid="users-search" className="w-full max-w-md bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-sm mb-4" />
-      {listLimitHint(list.length) && <p className="mb-4 border border-[#FF9500]/40 bg-[#FF9500]/5 rounded-sm p-3 tls-type-small text-white/80" data-testid="users-limit-hint">{listLimitHint(list.length)}</p>}
+      {listLimitHint(list.length) && <p className="mb-4 border border-warn/40 bg-warn/5 rounded-sm p-3 tls-type-small text-white/80" data-testid="users-limit-hint">{listLimitHint(list.length)}</p>}
 
       <details className="mb-5 border border-white/10 bg-[#121212] rounded-sm group" data-testid="roles-info">
         <summary className="cursor-pointer list-none px-4 py-3 flex items-center justify-between gap-3">
@@ -113,7 +113,7 @@ export default function AdminUsersPage() {
               const info = ROLE_INFO[role] || { can: [], cannot: [] };
               const count = roleCounts[role] || 0;
               return (
-                <div key={role} className={`rounded-sm border px-3 py-3 ${role === "superadmin" ? "border-[#FFD700]/25 bg-[#FFD700]/5" : "border-white/10 bg-black/15"}`}>
+                <div key={role} className={`rounded-sm border px-3 py-3 ${role === "superadmin" ? "border-brand/25 bg-brand/5" : "border-white/10 bg-black/15"}`}>
                   <div className="flex items-start justify-between gap-3">
                     <div>
                       <div className="tls-type-small font-bold text-white">{roleLabel(role)}</div>
@@ -164,7 +164,7 @@ export default function AdminUsersPage() {
                   </div>
                 </td>
                 <td className="px-4 py-3 tls-type-small">
-                  {statusText(u) ? <span className={u.is_banned ? "text-[#FF6B6B] font-bold" : "text-[#FFD700]"}>{statusText(u)}</span> : <span className="text-white/35">–</span>}
+                  {statusText(u) ? <span className={u.is_banned ? "text-warn font-bold" : "text-quiet"}>{statusText(u)}</span> : <span className="text-white/35">–</span>}
                 </td>
                 <td className="px-4 py-3 text-right">
                   <button type="button" onClick={() => setEditingId(u.id)} data-testid={`user-edit-${u.username}`} className="inline-flex items-center gap-1.5 px-3 py-1.5 border border-white/15 text-white/80 hover:border-[#29B6E8]/50 hover:text-white rounded-sm tls-type-label">
@@ -192,7 +192,7 @@ export default function AdminUsersPage() {
             {(areaBadges(u).length > 0 || statusText(u)) && (
               <div className="mt-2 flex flex-wrap gap-1">
                 {areaBadges(u).map((area) => <span key={area.key} className="tls-type-label px-2 py-0.5 rounded-sm border border-[#29B6E8]/30 text-[#29B6E8]">{area.label}</span>)}
-                {statusText(u) && <span className={`tls-type-label px-2 py-0.5 rounded-sm border ${u.is_banned ? "border-[#FF3B30]/40 text-[#FF6B6B]" : "border-[#FFD700]/40 text-[#FFD700]"}`}>{statusText(u)}</span>}
+                {statusText(u) && <span className={`tls-type-label px-2 py-0.5 rounded-sm border ${u.is_banned ? "border-warn/40 text-warn" : "border-quiet/40 text-quiet"}`}>{statusText(u)}</span>}
               </div>
             )}
           </li>
@@ -336,7 +336,7 @@ function UserSheet({ target, me, isSuperAdmin, canClub, onClose, onChanged }) {
                   })}
                 </div>
               </div>
-              {change.changed ? <p className="tls-type-small text-[#FFD700]" data-testid="user-sheet-pending">{change.sentence} Gespeichert wird erst mit „Speichern“.</p> : null}
+              {change.changed ? <p className="tls-type-small text-warn" data-testid="user-sheet-pending">{change.sentence} Gespeichert wird erst mit „Speichern“.</p> : null}
             </>
           ) : (
             <>
@@ -381,8 +381,8 @@ function UserSheet({ target, me, isSuperAdmin, canClub, onClose, onChanged }) {
                   <p className="tls-type-small text-white/45">Ein neuer Link, um das Passwort zu setzen – etwa wenn die erste Mail nicht ankam.</p>
                 </div>
                 {target.id !== me?.id && target.role !== "superadmin" && (
-                  <div className="border border-[#FF3B30]/30 rounded-sm p-3 space-y-2" data-testid="user-sheet-delete-box">
-                    <div className="tls-type-small font-bold text-[#FF6B6B]">Konto löschen</div>
+                  <div className="border border-live/30 rounded-sm p-3 space-y-2" data-testid="user-sheet-delete-box">
+                    <div className="tls-type-small font-bold text-live">Konto löschen</div>
                     <p className="tls-type-small text-white/55">Anmeldung und persönliche Daten werden entfernt; Ergebnisse bleiben ohne Namen erhalten. Zum Bestätigen den Namen eintippen: <strong className="text-white">{name}</strong></p>
                     <input value={deleteName} onChange={(event) => setDeleteName(event.target.value)} aria-label="Namen zum Löschen eintippen" data-testid="user-sheet-delete-name" className="w-full bg-[#0A0A0A] border border-white/10 px-3 py-2 rounded-sm text-sm" />
                     <button type="button" disabled={deleteName.trim() !== name} onClick={removeAccount} data-testid="user-sheet-delete" className="tls-btn tls-btn--danger px-4 py-2 rounded-sm tls-type-label disabled:opacity-40">Endgültig löschen</button>
@@ -422,7 +422,7 @@ function RightsHistorySection({ target }) {
         Rechte-Verlauf <ChevronDown className={`w-3.5 h-3.5 transition ${open ? "rotate-180" : ""}`} />
       </button>
       {open && state.status === "loading" && <p className="mt-2 tls-type-small text-white/45">Lade Verlauf …</p>}
-      {open && state.status === "error" && <p className="mt-2 tls-type-small text-[#FF6B6B]" data-testid="user-sheet-history-error">Der Verlauf lässt sich gerade nicht laden.</p>}
+      {open && state.status === "error" && <p className="mt-2 tls-type-small text-warn" data-testid="user-sheet-history-error">Der Verlauf lässt sich gerade nicht laden.</p>}
       {open && state.status === "ready" && (
         state.items.length ? (
           <ul className="mt-3 space-y-2" data-testid="user-sheet-history-list">
@@ -540,7 +540,7 @@ function BanDialog({ target, onCancel, onBanned }) {
     >
       <form ref={dialogRef} tabIndex={-1} onSubmit={submit} role="dialog" aria-modal="true" aria-labelledby="ban-dialog-title" data-testid="ban-dialog" className="w-full max-w-md bg-[#121212] border border-white/10 rounded-sm shadow-2xl focus:outline-none">
         <div className="flex items-start gap-3 p-5 border-b border-white/10">
-          <div className="w-10 h-10 rounded-sm border border-[#FF3B30]/45 text-[#FF3B30] bg-[#FF3B30]/10 flex items-center justify-center shrink-0">
+          <div className="w-10 h-10 rounded-sm border border-warn/45 text-warn bg-warn/10 flex items-center justify-center shrink-0">
             <AlertTriangle className="w-5 h-5" />
           </div>
           <div className="min-w-0 flex-1">
@@ -556,7 +556,7 @@ function BanDialog({ target, onCancel, onBanned }) {
               data-testid="ban-dialog-reason"
               className="mt-1 input min-h-24 resize-y"
             />
-            {trimmed && missing ? <p className="mt-1 tls-type-small text-[#FFD700]" data-testid="ban-dialog-hint">Noch {missing} Zeichen.</p> : null}
+            {trimmed && missing ? <p className="mt-1 tls-type-small text-warn" data-testid="ban-dialog-hint">Noch {missing} Zeichen.</p> : null}
           </div>
           <button type="button" onClick={onCancel} className="p-1 text-white/45 hover:text-white" aria-label="Schließen">
             <X className="w-4 h-4" />
@@ -630,8 +630,8 @@ function CreateUserModal({ onClose, onSaved, onCreated }) {
       <CheckField label="Aktiv" checked={form.is_active} onChange={(v) => set("is_active", v)} testId="create-user-active" />
       <CheckField label="Öffentliches Profil" checked={form.privacy_public_profile} onChange={(v) => set("privacy_public_profile", v)} testId="create-user-public" />
       {inviteUrl && (
-        <div className="border border-[#FFD700]/30 bg-[#FFD700]/10 p-3 rounded-sm" data-testid="create-user-invite">
-          <div className="tls-type-label text-[#FFD700]">Link zum Passwort-Setzen</div>
+        <div className="border border-brand/30 bg-brand/10 p-3 rounded-sm" data-testid="create-user-invite">
+          <div className="tls-type-label text-brand">Link zum Passwort-Setzen</div>
           <div className="mt-1 tls-type-small break-all text-white/80">{inviteUrl}</div>
         </div>
       )}

@@ -17,6 +17,7 @@ import { MediaPreview, UploadEventsPanel } from "./media/parts";
 import { BACKEND, IMG_EXT, MEDIA_SCOPE_LABELS, VIDEO_EXT, cacheBustedMediaUrl, fmtBytes } from "./media/shared";
 import { ShortCaps } from "@/components/tls/ShortCaps";
 
+import { ROLE_COLORS } from "@/lib/categoryColors";
 const ORIGINAL_EXT = ORIGINAL_MEDIA_EXTENSIONS;
 
 const parseUploadMb = (value, fallback) => {
@@ -389,7 +390,7 @@ export default function AdminMediaPage() {
 
   return (
     <AdminLayout>
-      <span className="tls-type-label text-[#FFD700]">Content</span>
+      <span className="tls-type-label text-brand">Content</span>
       <h1 className="tls-type-title mt-1"><ShortCaps>Medien</ShortCaps></h1>
       <p className="mt-2 text-white/55 tls-type-body max-w-2xl">
         Alle hochgeladenen Bilder und Dateien an einem Ort: ansehen, Adresse kopieren, drehen oder löschen.
@@ -404,7 +405,7 @@ export default function AdminMediaPage() {
               data-testid={`media-filter-${k}`}
               onClick={() => setFilter(k)}
               className={`px-3 py-1.5 tls-type-label rounded-sm ${
-                filter === k ? "bg-[#FFD700] text-black" : "text-white/60 hover:text-white"
+                filter === k ? "bg-brand text-black" : "text-white/60 hover:text-white"
               }`}
             >
               {label}
@@ -448,7 +449,7 @@ export default function AdminMediaPage() {
         >
           <RefreshCw className="w-3.5 h-3.5" /> Neu laden
         </button>
-        <label className={`px-3 py-2 bg-[#FFD700] text-black rounded-sm tls-type-label inline-flex items-center gap-2 cursor-pointer ${uploading ? "opacity-60" : ""}`} data-testid="media-upload">
+        <label className={`px-3 py-2 bg-brand text-black rounded-sm tls-type-label inline-flex items-center gap-2 cursor-pointer ${uploading ? "opacity-60" : ""}`} data-testid="media-upload">
           <Upload className="w-3.5 h-3.5" /> {uploading ? "Lade hoch…" : "Medien hochladen"}
           <input type="file" accept={MEDIA_ACCEPT} multiple disabled={uploading} className="hidden" onChange={(e) => { uploadMediaFiles(e.target.files); e.target.value = ""; }} />
         </label>
@@ -463,11 +464,11 @@ export default function AdminMediaPage() {
         <div className="mt-4 grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-3">
           {[
             ["Dateien", mediaAudit.total || 0, "text-white"],
-            ["Ungenutzt", mediaAudit.unused || 0, mediaAudit.unused ? "text-[#FFD700]" : "text-white"],
-            ["Nicht erfasst", mediaAudit.untracked || 0, mediaAudit.untracked ? "text-[#FFD700]" : "text-white"],
-            ["Duplikate", mediaAudit.duplicate_files || 0, mediaAudit.duplicate_files ? "text-[#FFD700]" : "text-white"],
-            ["Einträge ohne Datei", mediaAudit.metadata_missing_files || 0, mediaAudit.metadata_missing_files ? "text-[#FF3B30]" : "text-white"],
-            ["Verweise ins Leere", mediaAudit.reference_summary?.missing_file || 0, mediaAudit.reference_summary?.missing_file ? "text-[#FF3B30]" : "text-white"],
+            ["Ungenutzt", mediaAudit.unused || 0, mediaAudit.unused ? "text-quiet" : "text-white"],
+            ["Nicht erfasst", mediaAudit.untracked || 0, mediaAudit.untracked ? "text-warn" : "text-white"],
+            ["Duplikate", mediaAudit.duplicate_files || 0, mediaAudit.duplicate_files ? "text-warn" : "text-white"],
+            ["Einträge ohne Datei", mediaAudit.metadata_missing_files || 0, mediaAudit.metadata_missing_files ? "text-warn" : "text-white"],
+            ["Verweise ins Leere", mediaAudit.reference_summary?.missing_file || 0, mediaAudit.reference_summary?.missing_file ? "text-warn" : "text-white"],
           ].map(([label, value, color]) => (
             <button
               key={label}
@@ -522,7 +523,7 @@ export default function AdminMediaPage() {
               onClick={repairScopes}
               disabled={repairingScopes}
               data-testid="media-scope-repair"
-              className="px-3 py-2 border border-[#FFD700]/40 text-[#FFD700] hover:bg-[#FFD700]/10 rounded-sm tls-type-label inline-flex items-center gap-2 disabled:opacity-50"
+              className="px-3 py-2 border border-brand/40 text-brand hover:bg-brand/10 rounded-sm tls-type-label inline-flex items-center gap-2 disabled:opacity-50"
             >
               {repairingScopes ? "Sortiere..." : "Alte Uploads einsortieren"}
             </button>
@@ -558,7 +559,7 @@ export default function AdminMediaPage() {
           <div className="mt-4 grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
             {qualityChecks.map((check) => {
               const ok = Number(check.value || 0) === 0;
-              const color = ok ? "#00FF88" : check.tone === "danger" ? "#FF3B30" : "#FFD700";
+              const color = ok ? ROLE_COLORS.ok : check.tone === "danger" ? ROLE_COLORS.warn : ROLE_COLORS.warn;
               const clickable = !!check.filter && !ok;
               return (
                 <button
@@ -571,7 +572,7 @@ export default function AdminMediaPage() {
                 >
                   <div className="flex items-center justify-between gap-3">
                     <span className="tls-type-label text-white/50">{check.label}</span>
-                    {ok ? <CheckCircle2 className="h-4 w-4 text-[#00FF88]" /> : <AlertTriangle className="h-4 w-4" style={{ color }} />}
+                    {ok ? <CheckCircle2 className="h-4 w-4 text-ok" /> : <AlertTriangle className="h-4 w-4" style={{ color }} />}
                   </div>
                   <div className="mt-2 tls-type-section tls-type-num" style={{ color }}>{check.value || 0}</div>
                   <div className="mt-1 tls-type-small text-white/45">{ok ? "Sauber." : check.detail}</div>
@@ -589,7 +590,7 @@ export default function AdminMediaPage() {
               <div className="tls-type-label text-white/50">Medien-Einsortierung</div>
               <p className="mt-1 tls-type-small text-white/45">Zeigt, wie viele Uploads persönliche Profilbilder, Medien der Redaktion oder aus anderen Bereichen sind.</p>
             </div>
-            {scopeAudit.repair && <span className="tls-type-label text-[#00FF88]">Einsortiert</span>}
+            {scopeAudit.repair && <span className="tls-type-label text-ok">Einsortiert</span>}
           </div>
           <div className="mt-3 grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-2 tls-type-small">
             {[
@@ -641,7 +642,7 @@ export default function AdminMediaPage() {
                   data-testid={`media-tile-${it.filename}`}
                   aria-label={it.filename}
                   aria-describedby={`${infoId}-tags ${infoId}-size${it.kept_for_results ? ` ${infoId}-kept` : ""}`}
-                  className="block w-full text-left border border-white/10 bg-[#121212] rounded-sm overflow-hidden hover:border-[#FFD700]/60 transition group cursor-pointer"
+                  className="block w-full text-left border border-white/10 bg-[#121212] rounded-sm overflow-hidden hover:border-brand/60 transition group cursor-pointer"
                   onClick={() => setSelected(it)}
                 >
                   <span className="aspect-square bg-[#0A0A0A] flex items-center justify-center overflow-hidden">
@@ -663,9 +664,9 @@ export default function AdminMediaPage() {
                     <span className="block tls-type-small font-mono text-white/70 truncate" title={it.filename}>{it.filename}</span>
                     <span id={`${infoId}-tags`} className="mt-1 flex flex-wrap gap-1">
                       <span className="tls-type-label border border-white/10 px-1.5 py-0.5 text-white/45">{MEDIA_SCOPE_LABELS[it.media_scope] || MEDIA_SCOPE_LABELS.legacy}</span>
-                      {it.is_unused && <span className="tls-type-label border border-[#FFD700]/30 px-1.5 py-0.5 text-[#FFD700]">ungenutzt</span>}
-                      {!it.tracked && <span className="tls-type-label border border-[#FF3B30]/30 px-1.5 py-0.5 text-[#FF3B30]">nicht erfasst</span>}
-                      {it.duplicate_count > 1 && <span className="tls-type-label border border-[#FFD700]/30 px-1.5 py-0.5 text-[#FFD700]">duplikat</span>}
+                      {it.is_unused && <span className="tls-type-label border border-quiet/30 px-1.5 py-0.5 text-quiet">ungenutzt</span>}
+                      {!it.tracked && <span className="tls-type-label border border-warn/30 px-1.5 py-0.5 text-warn">nicht erfasst</span>}
+                      {it.duplicate_count > 1 && <span className="tls-type-label border border-warn/30 px-1.5 py-0.5 text-warn">duplikat</span>}
                     </span>
                     <span id={`${infoId}-size`} className="block tls-type-small text-quiet mt-1">{fmtBytes(it.size)} · {it.usage_count || 0}x genutzt</span>
                     {it.kept_for_results && <span id={`${infoId}-kept`} className="block tls-type-small text-white/60 mt-1" data-testid={`media-kept-${it.filename}`}>wird noch von gespeicherten Ergebnissen gezeigt</span>}

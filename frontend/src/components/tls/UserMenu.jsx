@@ -30,7 +30,7 @@ function Avatar({ user }) {
 const itemBase = "flex items-center gap-2.5 px-3 py-2.5 tls-type-label transition";
 const itemClass = `${itemBase} text-white/80 hover:bg-white/5 hover:text-white`;
 const adminClass = `${itemBase} text-[#29B6E8] hover:bg-[#29B6E8]/10`;
-const logoutClass = `${itemBase} w-full text-left text-[#FF3B30] hover:bg-[#FF3B30]/10 border-t border-white/10`;
+const logoutClass = `${itemBase} w-full text-left text-quiet hover:bg-quiet/10 border-t border-white/10`;
 
 export function UserMenu() {
   const { user, logout, isAdmin, adminNeedsSecondFactor } = useAuth();

@@ -30,14 +30,14 @@ export function TeamSchedule({ overview }) {
                 data-testid={`team-upcoming-${row.registration_id}`}
                 className="tls-card group flex items-center gap-4 border border-white/10 bg-[#121212] rounded-sm p-3 sm:p-4"
               >
-                <div className="w-12 h-12 sm:w-14 sm:h-14 shrink-0 rounded-sm border border-[#FFD700]/30 bg-[#FFD700]/[0.06] flex items-center justify-center">
-                  <Trophy className="w-5 h-5 text-[#FFD700]" />
+                <div className="w-12 h-12 sm:w-14 sm:h-14 shrink-0 rounded-sm border border-brand/30 bg-brand/[0.06] flex items-center justify-center">
+                  <Trophy className="w-5 h-5 text-brand" />
                 </div>
                 <div className="min-w-0 flex-1">
-                  <div className="tls-type-label text-[#FFD700]">Turnier</div>
+                  <div className="tls-type-label text-brand">Turnier</div>
                   <div className="tls-card__title tls-type-card truncate">{row.tournament.title}</div>
                   <div className="tls-type-small text-white/55 truncate">{upcomingLine(row)}</div>
-                  <span className="mt-1.5 inline-flex px-2 py-0.5 border border-[#FFD700]/40 bg-[#FFD700]/10 text-[#FFD700] rounded-sm tls-type-label" data-testid={`team-upcoming-status-${row.registration_id}`}>
+                  <span className="mt-1.5 inline-flex px-2 py-0.5 border border-brand/40 bg-brand/10 text-brand rounded-sm tls-type-label" data-testid={`team-upcoming-status-${row.registration_id}`}>
                     {row.status_label}
                   </span>
                 </div>

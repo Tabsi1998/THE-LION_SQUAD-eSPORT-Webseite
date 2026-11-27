@@ -43,14 +43,14 @@ export default function MemberNewsPage() {
                 key={n.id}
                 to={`/news/${n.slug}`}
                 data-testid={`member-news-${n.slug}`}
-                className="block border border-[#FFD700]/15 hover:border-[#FFD700]/40 rounded-sm bg-[#121212] p-5 transition group"
+                className="block border border-brand/15 hover:border-brand/40 rounded-sm bg-[#121212] p-5 transition group"
               >
                 <div className="flex items-center gap-2 tls-type-label">
-                  <span className="text-[#FFD700]">{newsCategoryLabel(n.category)}</span>
-                  {n.pinned && <Pin className="w-3 h-3 text-[#FFD700]" />}
+                  <span className="text-brand">{newsCategoryLabel(n.category)}</span>
+                  {n.pinned && <Pin className="w-3 h-3 text-white" />}
                   <span className="text-white/30 ml-auto">{viennaDate(n.created_at)}</span>
                 </div>
-                <h3 className="mt-2 tls-type-card group-hover:text-[#FFD700] transition">{n.title}</h3>
+                <h3 className="mt-2 tls-type-card group-hover:text-brand transition">{n.title}</h3>
                 {n.excerpt && <p className="mt-2 tls-type-body text-white/65 line-clamp-2">{n.excerpt}</p>}
               </Link>
             ))}

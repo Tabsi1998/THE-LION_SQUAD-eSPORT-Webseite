@@ -114,8 +114,8 @@ export function TeamInviteSheet({ team, onClose, onCodeRenewed }) {
       </section>
 
       {joinCode ? (
-        <section className="border border-[#FFD700]/25 bg-[#FFD700]/5 rounded-sm p-4" data-testid="team-join-code-box">
-          <div className="tls-type-label text-[#FFD700]">Beitrittscode</div>
+        <section className="border border-brand/25 bg-brand/5 rounded-sm p-4" data-testid="team-join-code-box">
+          <div className="tls-type-label text-brand">Beitrittscode</div>
           <p className="mt-1 tls-type-small text-white/55" data-testid="team-join-code-hint">
             {team.is_public === false
               ? "Das Team ist privat: Außenstehende sehen die Teamseite nicht und können den Code dort nicht eingeben. Lade über den Link oder persönlich ein."

@@ -5,6 +5,7 @@
 // das Loch sitzt (cx, cy) und wie groß es ist (r), alles als Anteil der Kantenlänge.
 import RING from "./loewenRangRing.json";
 
+import { ROLE_COLORS } from "@/lib/categoryColors";
 export const MAX_LEVEL = 60;
 export const RANK_SIZE = 5;
 export const RANK_NAMES = [
@@ -20,7 +21,7 @@ export const FRAME_SIZES = { profile: 285, card: 150, list: 92, mini: 64 };
 export const PROFILE_SMALL = 220;
 export const TOP_OVERHANG = 0.15;
 const CYAN = "#29B6E8";
-const GOLD = "#FFD700";
+const GOLD = ROLE_COLORS.honor;
 
 function clampLevel(level) {
   const value = Math.floor(Number(level) || 1);

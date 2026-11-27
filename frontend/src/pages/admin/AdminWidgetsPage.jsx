@@ -153,7 +153,7 @@ export default function AdminWidgetsPage() {
       <h1 className="tls-type-title mt-1 mb-6"><ShortCaps>Downloads & QR</ShortCaps></h1>
       <div className="mb-5 flex flex-wrap gap-2">
         <button type="button" onClick={() => setMode("embed")} className={`px-4 py-2 rounded-sm tls-type-label ${mode === "embed" ? "bg-[#29B6E8] text-black" : "border border-white/10 text-white/60 hover:text-white"}`}>Display-Links</button>
-        <button type="button" onClick={() => setMode("qr")} className={`inline-flex items-center gap-2 px-4 py-2 rounded-sm tls-type-label ${mode === "qr" ? "bg-[#FFD700] text-black" : "border border-white/10 text-white/60 hover:text-white"}`}><QrCode className="w-3.5 h-3.5" /> Vor-Ort QR</button>
+        <button type="button" onClick={() => setMode("qr")} className={`inline-flex items-center gap-2 px-4 py-2 rounded-sm tls-type-label ${mode === "qr" ? "bg-brand text-black" : "border border-white/10 text-white/60 hover:text-white"}`}><QrCode className="w-3.5 h-3.5" /> Vor-Ort QR</button>
       </div>
 
       {mode === "embed" ? (
@@ -209,7 +209,7 @@ export default function AdminWidgetsPage() {
             <button type="button" onClick={copyQrLinks} disabled={!qrLinks.length} className="inline-flex items-center justify-center gap-2 px-4 py-2 border border-white/15 text-white/70 rounded-sm tls-type-label hover:text-white disabled:opacity-40">
               <Copy className="w-3.5 h-3.5" /> Links kopieren
             </button>
-            <button type="button" onClick={() => window.print()} disabled={!qrLinks.length} className="inline-flex items-center justify-center gap-2 px-4 py-2 bg-[#FFD700] text-black rounded-sm tls-type-label disabled:opacity-40">
+            <button type="button" onClick={() => window.print()} disabled={!qrLinks.length} className="inline-flex items-center justify-center gap-2 px-4 py-2 bg-brand text-black rounded-sm tls-type-label disabled:opacity-40">
               <Printer className="w-3.5 h-3.5" /> Drucken
             </button>
           </div>
@@ -347,7 +347,7 @@ function QrCard({ item }) {
           <button type="button" onClick={copyUrl} className="mt-3 inline-flex items-center gap-2 px-3 py-2 border border-white/15 text-white/70 rounded-sm tls-type-label hover:text-white print:hidden">
             <Copy className="w-3 h-3" /> Kopieren
           </button>
-          <a href={pdfUrl} target="_blank" rel="noreferrer" className="mt-3 ml-2 inline-flex items-center gap-2 px-3 py-2 border border-[#FFD700]/40 text-[#FFD700] rounded-sm tls-type-label hover:bg-[#FFD700]/10 print:hidden">
+          <a href={pdfUrl} target="_blank" rel="noreferrer" className="mt-3 ml-2 inline-flex items-center gap-2 px-3 py-2 border border-brand/40 text-brand rounded-sm tls-type-label hover:bg-brand/10 print:hidden">
             <Printer className="w-3 h-3" /> PDF
           </a>
           <button type="button" onClick={exportPng} data-testid={`qr-png-${item.kind}-${item.id}`} className="mt-3 ml-2 inline-flex items-center gap-2 px-3 py-2 border border-white/15 text-white/70 rounded-sm tls-type-label hover:text-white print:hidden">

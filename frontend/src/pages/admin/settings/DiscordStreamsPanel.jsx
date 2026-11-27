@@ -106,13 +106,13 @@ export function DiscordStreamsPanel({ onDesign }) {
           )}
           <div className="mt-1 text-white/40">Pingt einmal beim Start – nie @everyone.</div>
           {chosenRole && chosenRole.mentionable === false && (
-            <div className="mt-1 text-[#FFD700]" data-testid="discord-streams-role-hint">
+            <div className="mt-1 text-brand" data-testid="discord-streams-role-hint">
               Discord pingt diese Rolle nicht: Servereinstellungen → Rollen → @{chosenRole.name} → „Jedem erlauben, diese Rolle zu @erwähnen“ einschalten.
             </div>
           )}
         </label>
       </div>
-      <div className={`tls-type-small ${state.last_error || state.reason ? "text-[#FFD700]" : "text-white/50"}`} data-testid="discord-streams-state">{streamStateText(state)}</div>
+      <div className={`tls-type-small ${state.last_error || state.reason ? "text-warn" : "text-white/50"}`} data-testid="discord-streams-state">{streamStateText(state)}</div>
       <button type="button" disabled={busy || !dirty} onClick={save} data-testid="discord-streams-save"
         className="px-4 py-2 bg-[#9146FF] text-white tls-type-label rounded-sm disabled:opacity-40">Speichern</button>
     </section>

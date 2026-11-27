@@ -52,7 +52,7 @@ function DeskItem({ item, group, now }) {
           ) : null}
           <dl className="mt-2 flex flex-wrap gap-x-4 gap-y-1 tls-type-small text-white/55">
             {when ? (
-              <div className={when.over ? "text-[#FF6B60]" : when.kind === "due" ? "text-white/75" : ""}>
+              <div className={when.over ? "text-warn" : when.kind === "due" ? "text-white/75" : ""}>
                 <dt className="sr-only">{when.kind === "due" ? "Frist" : "Offen"}</dt>
                 <dd className="tabular-nums" data-testid={`desk-item-when-${item.id}`}>{when.text}</dd>
               </div>

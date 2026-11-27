@@ -22,6 +22,7 @@ import { changedPlaces, seasonAnchorUrl } from "@/lib/seasonTabs";
 import { viennaDate } from "@/lib/vienna";
 import { ShortCaps } from "@/components/tls/ShortCaps";
 
+import { ROLE_COLORS } from "@/lib/categoryColors";
 const LONG_DAY = { day: "2-digit", month: "2-digit", year: "numeric" };
 const QUIET = "tls-btn tls-btn--quiet inline-flex items-center gap-1.5 rounded-sm px-3 py-1.5 tls-type-label disabled:opacity-50";
 const PRIMARY = "tls-btn tls-btn--primary inline-flex items-center gap-1.5 rounded-sm px-4 py-2 tls-type-label disabled:opacity-50";
@@ -121,7 +122,7 @@ function PendingRelease({ changes, proposal, hasDraft, busy, today, leagueWide, 
               hint="Captain und Vertreter sehen „Neue Fassung, bitte zustimmen“ - auf Startseite, Regelseite, Team-Seite und Matchseite." testId="rules-approve-consent" />
             {emptyVars.length ? (
               <CheckField className="mt-2" label="Trotzdem veröffentlichen - im Text steht dann „(nicht festgelegt)“" checked={release.confirm_empty}
-                onChange={(value) => setRelease((row) => ({ ...row, confirm_empty: value }))} accent="#FFD700"
+                onChange={(value) => setRelease((row) => ({ ...row, confirm_empty: value }))} accent={ROLE_COLORS.brand}
                 hint={`Ohne Wert ${whereEmpty(leagueWide)}: ${emptyVars.map((name) => `{{${name}}}`).join(", ")}.`} testId="rules-approve-confirm-empty" />
             ) : null}
             <div className="mt-4 flex flex-wrap gap-2">
@@ -520,7 +521,7 @@ export default function AdminLeagueRulesPage() {
                     hint="Fehlt die Zustimmung, gibt es eine Aufgabe auf der Startseite, und das Team kann vor dem Spiel nicht einchecken, bis Captain oder Vertreter zugestimmt hat." testId="rules-requires-consent" />
                   {emptyVars.length ? (
                     <CheckField label="Trotzdem veröffentlichen - im Text steht dann „(nicht festgelegt)“" checked={publish.confirm_empty}
-                      onChange={(value) => setPublish((row) => ({ ...row, confirm_empty: value }))} accent="#FFD700"
+                      onChange={(value) => setPublish((row) => ({ ...row, confirm_empty: value }))} accent={ROLE_COLORS.brand}
                       hint={`Ohne Wert ${whereEmpty(leagueWide)}: ${emptyVars.map((name) => `{{${name}}}`).join(", ")}.`} testId="rules-confirm-empty" />
                   ) : null}
                   <button type="button" className={PRIMARY} disabled={!canPublish} onClick={onPublish} data-testid="rules-publish">Version veröffentlichen</button>

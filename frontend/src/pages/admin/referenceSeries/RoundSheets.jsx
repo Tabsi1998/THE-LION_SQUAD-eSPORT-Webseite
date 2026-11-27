@@ -221,11 +221,11 @@ export function PasteSheet({ series, lineage, version, onClose, onSaved, onStale
       <TextAreaField label="Je Zeile ein Termin" value={text} onChange={edit} rows={8} testId="paste-text" placeholder={placeholder}
         hint={`${what} ${undated} Ohne Uhrzeit: ${defaults || "ohne Uhrzeit"}.${lineage?.kind === "racing" ? " Rennliga: Eine Zeile je Runde legt alle Läufe an, die die Saison vorgibt (Ablauf je Runde); „R1 Sprint“, „R1S“ oder „R1 Q“ nur diesen Lauf." : ""}${weekendHint ? ` ${weekendHint}.` : ""}${teamHint}`} />
       {preview && preview.errors.length > 0 && (
-        <div className="border border-red-400/40 bg-red-400/10 rounded-sm p-3 tls-type-small text-red-200 space-y-1" data-testid="paste-errors" role="alert">
+        <div className="border border-warn/40 bg-warn/10 rounded-sm p-3 tls-type-small text-warn space-y-1" data-testid="paste-errors" role="alert">
           <div className="font-bold">Die Liste hat Fehler – übernommen wird erst eine fehlerfreie Liste.</div>
           <ul className="space-y-0.5">
             {preview.errors.map((error, index) => (
-              <li key={index}>{error.line ? `Zeile ${error.line}: ` : ""}{error.message}{error.text ? <span className="text-red-200/60"> – „{error.text}“</span> : null}</li>
+              <li key={index}>{error.line ? `Zeile ${error.line}: ` : ""}{error.message}{error.text ? <span className="text-white/60"> – „{error.text}“</span> : null}</li>
             ))}
           </ul>
         </div>
@@ -250,7 +250,7 @@ export function PasteSheet({ series, lineage, version, onClose, onSaved, onStale
                       {row.open ? <span className="text-white/60" data-testid="paste-open">Termin offen</span> : dayLabel(row.day)}
                       {row.day_end && <span className="block tls-type-small text-white/60" data-testid="paste-day-end">bis {dayLabel(row.day_end)}</span>}
                       {row.derived_day && <span className="block tls-type-small text-white/45">aus dem Wochentag</span>}
-                      {row.warning && <span className="block tls-type-small text-amber-300">{row.warning}</span>}
+                      {row.warning && <span className="block tls-type-small text-warn">{row.warning}</span>}
                     </td>
                     <td className="py-1.5 pr-3" data-testid="paste-sessions">
                       {withSessions ? (

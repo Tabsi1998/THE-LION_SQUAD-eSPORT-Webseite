@@ -76,7 +76,7 @@ export function EventLocationsSection({ value, onChange }) {
                 <span className="flex items-center gap-1">
                   <button type="button" onClick={() => move(index, -1)} disabled={index === 0} className="p-1.5 border border-white/10 rounded-sm disabled:opacity-30" aria-label={`Standort ${index + 1} nach oben`}><ArrowUp className="w-3.5 h-3.5" /></button>
                   <button type="button" onClick={() => move(index, 1)} disabled={index === places.length - 1} className="p-1.5 border border-white/10 rounded-sm disabled:opacity-30" aria-label={`Standort ${index + 1} nach unten`}><ArrowDown className="w-3.5 h-3.5" /></button>
-                  <button type="button" onClick={() => onChange(places.filter((_, i) => i !== index))} className="p-1.5 border border-[#FF3B30]/40 text-[#FF3B30] rounded-sm" aria-label={`Standort ${index + 1} entfernen`}><Trash2 className="w-3.5 h-3.5" /></button>
+                  <button type="button" onClick={() => onChange(places.filter((_, i) => i !== index))} className="p-1.5 border border-live/40 text-live rounded-sm" aria-label={`Standort ${index + 1} entfernen`}><Trash2 className="w-3.5 h-3.5" /></button>
                 </span>
               </div>
               <label className="md:col-span-6 tls-type-small"><div className="uppercase tracking-widest text-white/45 font-bold mb-1">Veranstaltungsort (Name, optional)</div><input value={place.name} onChange={(ev) => setPlace(index, { name: ev.target.value })} className={input} placeholder="Vereinsheim, Gemeindesaal Telfs" data-testid={`event-location-name-${index}`} /></label>
@@ -91,7 +91,7 @@ export function EventLocationsSection({ value, onChange }) {
               <label className="md:col-span-12 tls-type-small"><div className="uppercase tracking-widest text-white/45 font-bold mb-1">Hinweis</div><input value={place.note} onChange={(ev) => setPlace(index, { note: ev.target.value })} className={input} placeholder="z. B. Treffpunkt Parkplatz, Fahrt mit dem Bus" /></label>
             </div>
           ))}
-          {error && <div className="tls-type-small text-[#FF3B30]" data-testid="event-locations-error">{error}</div>}
+          {error && <div className="tls-type-small text-warn" data-testid="event-locations-error">{error}</div>}
           <p className="tls-type-small text-white/45">Ohne eigene Zeit gilt für einen Standort die Zeit des Events. Die Karte sucht nach der Adresse; der Name steht daneben.</p>
         </>
       )}

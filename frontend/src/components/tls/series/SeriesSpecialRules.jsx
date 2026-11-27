@@ -17,7 +17,7 @@ export function AdjustmentMark({ row, rounds = [] }) {
   if (!sum || !(row?.adjustments || []).length) return null;
   const title = adjustmentTitle(row, rounds);
   return (
-    <span className={`ml-1.5 tls-type-small font-bold tabular-nums cursor-help underline decoration-dotted underline-offset-[3px] ${sum < 0 ? "text-red-300 decoration-red-300/50" : "text-emerald-300 decoration-emerald-300/50"}`}
+    <span className={`ml-1.5 tls-type-small font-bold tabular-nums cursor-help underline decoration-dotted underline-offset-[3px] ${sum < 0 ? "text-warn decoration-warn/50" : "text-ok decoration-ok/50"}`}
       title={title} data-testid="series-adjustment">
       <span aria-hidden="true">{adjustmentText(sum)}</span>
       <span className="sr-only">{` (${title})`}</span>
@@ -33,7 +33,7 @@ export function AdjustmentList({ row, rounds = [], className = "" }) {
     <ul className={`space-y-0.5 tls-type-small text-white/70 ${className}`} aria-label="Anpassungen" data-testid="series-adjustments">
       {items.map((item, index) => (
         <li key={`${item.day}-${index}`} className="flex gap-2 min-w-0">
-          <span className={`shrink-0 font-bold tabular-nums ${Number(item.points) < 0 ? "text-red-300" : "text-emerald-300"}`}>{adjustmentText(item.points)}</span>
+          <span className={`shrink-0 font-bold tabular-nums ${Number(item.points) < 0 ? "text-warn" : "text-ok"}`}>{adjustmentText(item.points)}</span>
           <span className="min-w-0 [overflow-wrap:anywhere]">
             {adjustmentDetail(item, rounds)}
             {/* #2000: zählt auch fürs Team - für welches bzw. warum für keines. */}
@@ -53,7 +53,7 @@ export function DriverAdjustmentMarks({ row, rows = [], rounds = [] }) {
   return (
     <span className="mt-0.5 flex flex-col items-end gap-0.5">
       {marks.map((mark) => (
-        <span key={mark.key} className={`tls-type-small font-bold tabular-nums whitespace-nowrap cursor-help underline decoration-dotted underline-offset-[3px] ${mark.negative ? "text-red-300 decoration-red-300/50" : "text-emerald-300 decoration-emerald-300/50"}`}
+        <span key={mark.key} className={`tls-type-small font-bold tabular-nums whitespace-nowrap cursor-help underline decoration-dotted underline-offset-[3px] ${mark.negative ? "text-warn decoration-warn/50" : "text-ok decoration-ok/50"}`}
           title={mark.title} data-testid="racing-driver-adjustment">
           <span aria-hidden="true">{mark.text}</span>
           <span className="sr-only">{` (${mark.title})`}</span>
@@ -69,10 +69,10 @@ export function SeasonNotice({ series, successor }) {
   const next = successorLink(successor);
   if (!text && !next) return null;
   return (
-    <div className="mt-6 border border-amber-400/30 bg-amber-400/[0.06] rounded-md px-4 py-3 tls-type-small text-white/80 flex flex-wrap items-center gap-x-4 gap-y-2" role="note" data-testid="series-season-notice">
+    <div className="mt-6 border border-warn/30 bg-warn/[0.06] rounded-md px-4 py-3 tls-type-small text-white/80 flex flex-wrap items-center gap-x-4 gap-y-2" role="note" data-testid="series-season-notice">
       {text && (
         <span className="flex items-start gap-2 min-w-0" data-testid="series-cancelled">
-          <AlertTriangle className="w-4 h-4 mt-0.5 shrink-0 text-amber-300" aria-hidden="true" />
+          <AlertTriangle className="w-4 h-4 mt-0.5 shrink-0 text-warn" aria-hidden="true" />
           <span className="[overflow-wrap:anywhere]">{text}. Die gefahrenen Ergebnisse bleiben stehen – ohne Meister.</span>
         </span>
       )}
@@ -147,5 +147,5 @@ export function SessionRuleNotes({ session }) {
 export function NoScoreNote({ round, label = "", className = "", profile = null }) {
   const text = noScoreText(round, profile);
   if (!text) return null;
-  return <span className={`block tls-type-small text-amber-200/80 [overflow-wrap:anywhere] ${className}`} data-testid="series-no-score">{label ? `${label}: ${text}` : text}</span>;
+  return <span className={`block tls-type-small text-warn/80 [overflow-wrap:anywhere] ${className}`} data-testid="series-no-score">{label ? `${label}: ${text}` : text}</span>;
 }

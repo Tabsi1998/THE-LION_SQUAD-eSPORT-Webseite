@@ -3,13 +3,14 @@ import { Link } from "react-router-dom";
 import { bestPlacement, displayTitle, entriesOf, gameTitle, medalOf, timeOf } from "@/components/tls/references/referenceParts";
 import { referenceHref } from "@/lib/seasonClose";
 
+import { ROLE_COLORS } from "@/lib/categoryColors";
 // Die Erfolgswand als Vitrine (#1334): jeder Podestplatz ein gezeichneter Pokal in Gold, Silber oder Bronze auf einem
 // Regalbrett, darunter Platz, Wettbewerb (zwei Zeilen erlaubt) und „11 Teams“. Ein Klick öffnet die Details wie bisher -
 // ein Pokal aus einer Saison führt zur Saison-Seite (#1750).
 // Gold bekommt beim Drüberfahren einen ruhigen Lichtschimmer - nie mit „Bewegung reduzieren“ (index.css, --tls-motion-on).
 
 export const METALS = {
-  gold: { label: "Gold", light: "#FFF2A8", base: "#FFD700", dark: "#8A6A12", text: "text-[#FFD700]" },
+  gold: { label: "Gold", light: "#FFF2A8", base: ROLE_COLORS.honor, dark: "#8A6A12", text: "text-honor" },
   silver: { label: "Silber", light: "#FFFFFF", base: "#C9CED6", dark: "#6F7682", text: "text-[#E2E2E2]" },
   bronze: { label: "Bronze", light: "#F2C08E", base: "#D08A4E", dark: "#6E3F16", text: "text-[#E4A464]" },
 };

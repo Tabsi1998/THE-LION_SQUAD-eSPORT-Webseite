@@ -30,7 +30,7 @@
 .tls-overall-table td, .tls-overall-table th { padding: 0.6rem 0.5rem; vertical-align: middle; }
 .tls-overall-table tbody tr { border-top: 1px solid rgb(255 255 255 / 0.06); }
 .tls-overall-row[data-leader="true"] .tls-overall-rank { color: var(--tls-honor); }
-.tls-overall-row[data-leader="true"] { background: linear-gradient(90deg, rgb(255 215 0 / 0.08), transparent 60%); }
+.tls-overall-row[data-leader="true"] { background: linear-gradient(90deg, rgb(var(--tls-honor-rgb) / 0.08), transparent 60%); }
 .tls-overall-rank { font-family: var(--font-display, inherit); font-weight: 700; font-size: 1rem; color: #fff; }
 .tls-overall-total { font-family: var(--font-display, inherit); font-weight: 700; font-size: 1rem; color: #fff; text-align: right; }
 .tls-overall-cell { text-align: right; color: rgb(255 255 255 / 0.78); white-space: nowrap; }

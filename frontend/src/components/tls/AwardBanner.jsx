@@ -12,7 +12,7 @@ export { awardDay };
 // dem Text. Dieselbe Karte im Profilkopf (groß) und in der Liste (klein).
 
 const TONES = {
-  1: { border: "border-[#FFD700]/60", text: "text-[#FFD700]", glow: "from-[#FFD700]/25", label: "Gold" },
+  1: { border: "border-honor/60", text: "text-honor", glow: "from-honor/25", label: "Gold" },
   2: { border: "border-[#C0C0C0]/60", text: "text-[#E6E6E6]", glow: "from-[#C0C0C0]/20", label: "Silber" },
   3: { border: "border-[#CD7F32]/60", text: "text-[#E0A06A]", glow: "from-[#CD7F32]/20", label: "Bronze" },
 };

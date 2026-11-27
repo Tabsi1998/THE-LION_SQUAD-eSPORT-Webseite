@@ -79,7 +79,7 @@ function Identitaet({ user }) {
         <span className="tls-wrap block font-bold text-white" data-testid="mein-bereich-name">{name}</span>
         <span className="tls-wrap block tls-type-small text-white/50">
           @{user?.username}
-          {user?.is_club_member ? <span className="ml-2 inline-flex items-center gap-1 text-[#FFD700]"><Crown className="w-3 h-3" aria-hidden="true" /> Mitglied</span> : null}
+          {user?.is_club_member ? <span className="ml-2 inline-flex items-center gap-1 text-honor"><Crown className="w-3 h-3" aria-hidden="true" /> Mitglied</span> : null}
         </span>
       </span>
     </div>

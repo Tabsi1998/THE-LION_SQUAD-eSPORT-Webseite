@@ -89,8 +89,8 @@ export function MitgliedschaftSeite() {
   return (
     <BereichSeite title={meta.label} intro={mitglied ? "Status, Ausweis, Beitrag, Wunschnummer und deine Daten beim Verein." : "Du bist noch kein Vereinsmitglied."} testId="mein-bereich-mitgliedschaft">
       {mitglied ? <Inhalt><MyMembershipPage /></Inhalt> : (
-        <div className="border border-[#FFD700]/30 bg-[#FFD700]/[0.04] rounded-sm p-6" data-testid="membership-join">
-          <Crown className="w-6 h-6 text-[#FFD700]" aria-hidden="true" />
+        <div className="border border-honor/30 bg-honor/[0.04] rounded-sm p-6" data-testid="membership-join">
+          <Crown className="w-6 h-6 text-honor" aria-hidden="true" />
           <h2 className="mt-3 tls-type-section">Mitglied werden</h2>
           <p className="mt-2 max-w-xl tls-type-body text-white/70">Als Mitglied bekommst du deinen Ausweis, wählst deine Nummer und bist bei Versammlungen, Helferdiensten und internen Events dabei.</p>
           <Link to="/membership/join" data-testid="membership-join-cta" className="tls-btn tls-btn--honor mt-4 inline-flex min-h-11 items-center px-5 py-2.5 rounded-sm tls-type-label">Antrag stellen</Link>
