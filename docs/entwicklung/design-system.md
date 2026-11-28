@@ -160,7 +160,10 @@ Jahr nur bei einem anderen Jahr, Nahes als „heute 18:00“ / „morgen 18:00�
   nach der Uhrzeit allein bleibt „Uhr“ („Antreten bis 18:00 Uhr“).
 - **Amtlich „23.05.2026“** bleibt für Rechnungen, Urkunden, PDF-Listen, Mitgliedsausweis, Rechtstexte, Statuten und das
   Regelwerk. CSV-Ausfuhren schreiben „14.03.2026“ bzw. „14.03.2026 18:05“ (`formatAdminDate`/`formatOfficialDate`, Server
-  `format_official_moment`) – sortierbar, mit Jahr, nie „morgen“.
+  `format_official_moment`) – sortierbar, mit Jahr, nie „morgen“. Eine neue Server-Ausfuhr kommt mit ihrer Funktion in
+  `CSV_OFFICIAL` (Wächter: ruft nie die Anzeigeform) und bekommt einen Verhaltenstest in `test_csv_dates_unit.py`.
+- **Countdown** (`lib/countdownRule.js`, #1264): eigene Sätze („in 3 Tagen“, „im März“), das Datum dazwischen aus
+  `formatWhen`/`formatRange` – im Dezember also „Sa 9. Jänner 2027“.
 - **Barrierefreiheit:** `components/tls/When.jsx` schreibt einen Termin als `<time dateTime>`; der Mittelpunkt steht
   `aria-hidden` da und wird nicht vorgelesen. Im Einsatz auf Turnierkarten, Startseite (News), News-Liste, Glocke und
   Benachrichtigungen, Match-, Event-, Turnier- und Live-Seite, Spielplan, Event-Leitung, Team-Chat und Dashboard.
@@ -170,6 +173,7 @@ Jahr nur bei einem anderen Jahr, Nahes als „heute 18:00“ / „morgen 18:00�
 
 Dieselben Fälle für Web, Server und App: `docs/date-cases.json` (Sommerzeit, Mitternacht in Wien, Jahreswechsel,
 Zeiträume über Monats- und Jahresgrenzen). Wächter: `lib/dateForms.test.js` (keine eigenen Datumsformen in `src/`,
-Ausnahmen mit Grund, die noch abweichen müssen) und `backend/tests/test_date_text_inventory_unit.py` (kein `%d.%m`,
-`%d. %B`, `{tag}.{monat}` außerhalb der amtlichen Stellen). Advent-Sonderformen folgen in #2619. Tests mit Datums-Texten laufen mit fester Uhr: `runAtTestClock()` aus `src/testClock.js`, in Playwright
+Ausnahmen mit Grund, die noch abweichen müssen; `Intl.DateTimeFormat` mit Tag oder Monat in jedem Gebietsschema außer
+den ISO-Schlüsseln `en-CA`/`sv-SE`) und `backend/tests/test_date_text_inventory_unit.py` (kein `%d.%m`, `%-d.%-m`,
+`%d. %B`, `{tag}.{monat}`, `"{}.{}.".format(...)` außerhalb der amtlichen Stellen). Advent-Sonderformen folgen in #2619. Tests mit Datums-Texten laufen mit fester Uhr: `runAtTestClock()` aus `src/testClock.js`, in Playwright
 `page.clock.install`.
