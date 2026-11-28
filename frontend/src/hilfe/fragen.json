@@ -173,8 +173,8 @@
   },
   {
     "id": "event-mindestanzahl",
-    "frage": "Was heißt „Findet ab 8 Anmeldungen statt“?",
-    "antwort": "Das Event findet nur statt, wenn bis zur Frist genug dabei sind. Darunter steht, wie viele noch fehlen und bis wann. Sagt der Verein ab, bekommst du eine Nachricht mit dem Grund.",
+    "frage": "Was heißt „Findet ab 8 Anmeldungen statt“ auf der Website?",
+    "antwort": "Das Event findet nur statt, wenn bis zur Frist genug dabei sind. Auf der Event-Seite der Website steht, wie viele noch fehlen und bis wann. Sagt der Verein ab, bekommst du eine Nachricht mit dem Grund.",
     "bereich": "events-kalender", "rollen": ["spieler", "mitglied"], "sichtbar_fuer": "alle",
     "link": { "to": "/faq/events-und-kalender#event-anmelden", "label": "Zur Anleitung" }
   },
