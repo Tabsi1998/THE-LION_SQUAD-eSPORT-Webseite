@@ -5,16 +5,16 @@ const { test, expect } = require("@playwright/test");
  * - Event-Seite: im Fakten-Kasten „Findet ab 8 Personen statt“ und „Noch 3 bis Fr 18. Dezember · 18:00“.
  * - Verwaltung: Einstellung und Stand (Frist vorbei, zu wenige) mit Vorschlag; „Event absagen …“ öffnet das Blatt mit dem
  *   Vorschlag als Grund und schickt Status und Grund in einem Schritt.
- * Die API ist nachgestellt, die Uhr steht fest, der Rechner tut so, als stünde er in Wien. Namen sind erfunden.
+ * Die API ist nachgestellt, die Uhr steht fest, der Rechner tut so, als stünde er in Wien (Sprache de-AT wie bei Fabian - sonst zeigt\n * Chromium das Fristfeld amerikanisch). Namen sind erfunden.
  * Mit SHOT_DIR legt der Lauf Bildschirmfotos dort ab (nicht im Repo).
  */
 
 const WIDTHS = [["handy", 390, 844], ["pc", 1440, 900]];
-test.use({ timezoneId: "Europe/Vienna" });
+test.use({ timezoneId: "Europe/Vienna", locale: "de-AT" });
 
 const json = (body, status = 200) => ({ status, contentType: "application/json", body: JSON.stringify(body) });
 const DEADLINE = "2026-12-18T17:00:00+00:00";
-const PROPOSAL = "Zu wenige Anmeldungen: Bis Fr 18.12. 18:00 waren 5 von mindestens 8 Personen dabei.";
+const PROPOSAL = "Zu wenige Anmeldungen: Bis Fr 18. Dezember · 18:00 waren 5 von mindestens 8 Personen dabei.";
 
 const EVENT = {
   id: "ev-1", slug: "silvester-2026", name: "Silvester im Vereinsheim", status: "registration_open", visibility: "public", event_type: "general",
@@ -66,7 +66,7 @@ async function mockPublic(page) {
   });
 }
 
-async function mockAdmin(page, patches) {
+async function mockAdmin(page, patches, adminEvent = ADMIN_EVENT) {
   await base(page, "2026-12-18T18:00:00+00:00");
   await page.route("**/api/**", (route) => {
     const request = route.request();
@@ -80,10 +80,10 @@ async function mockAdmin(page, patches) {
       return route.fulfill(json({ types: [{ k: "general", l: "Allgemein" }], statuses: [{ k: "scheduled", l: "Angekündigt" }, { k: "registration_open", l: "Anmeldung offen" }, { k: "cancelled", l: "Abgesagt" }],
         visibilities: [{ k: "public", l: "Öffentlich", short: "Alle" }] }));
     }
-    if (path === "/api/admin/events/ev-1") return route.fulfill(json(ADMIN_EVENT));
+    if (path === "/api/admin/events/ev-1") return route.fulfill(json(adminEvent));
     if (path === "/api/events/ev-1" && request.method() === "PATCH") {
       patches.push(request.postDataJSON());
-      return route.fulfill(json({ ...ADMIN_EVENT, status: "cancelled", cancellation: { registrations: 3, notified: 3, orders: 0 } }));
+      return route.fulfill(json({ ...adminEvent, status: "cancelled", cancellation: { registrations: 3, notified: 3, orders: 0 } }));
     }
     if (path === "/api/events/ev-1/program") return route.fulfill(json({ event: { id: "ev-1", name: EVENT.name }, tournaments: [], fastlaps: [], candidates: { tournaments: [], fastlaps: [] }, defaults: {}, sponsors: { items: [], own_choice: false } }));
     if (path === "/api/events") return route.fulfill(json([]));
@@ -135,5 +135,42 @@ test.describe("Mindestanzahl bis zu einer Frist", () => {
       await expect.poll(() => patches.length).toBe(1);
       expect(patches[0]).toEqual({ status: "cancelled", cancel_reason: PROPOSAL });
     });
+
+    test(`Absage ohne Mindestzahl bei ${width} px (${label}): dasselbe Blatt, Grund freiwillig`, async ({ page }) => {
+      await page.setViewportSize({ width, height });
+      const patches = [];
+      const plain = { ...EVENT, active_registration_count: 3 };
+      delete plain.min_registrations;
+      delete plain.minimum;
+      await mockAdmin(page, patches, plain);
+      await page.goto("/admin/events/ev-1");
+      await expect(page.getByTestId("event-minimum-enabled")).not.toBeChecked();
+      await page.getByTestId("event-status").selectOption("cancelled");
+      await page.getByTestId("event-save").click();
+      const sheet = page.getByTestId("event-cancel-sheet");
+      await expect(sheet).toContainText("Grund (freiwillig)");
+      await expect(page.getByTestId("event-cancel-reason")).toHaveValue("");
+      await shot(page, `absage-ohne-mindestzahl-${width}`);
+      await page.getByTestId("event-cancel-confirm").click();
+      await expect.poll(() => patches.length).toBe(1);
+      expect(patches[0]).toEqual({ status: "cancelled" });
+    });
   }
+
+  test("Anzeige aus: die Event-Seite zeigt keine Zeile", async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    await base(page, "2026-12-15T10:00:00+00:00");
+    const hidden = { ...EVENT, minimum: { ...EVENT.minimum, public: false } };
+    await page.route("**/api/**", (route) => {
+      const path = new URL(route.request().url()).pathname;
+      if (path === "/api/events/silvester-2026") return route.fulfill(json(hidden));
+      if (path === "/api/events/silvester-2026/friends") return route.fulfill(json({ sharing: true, hint: false, friends: [] }));
+      if (path === "/api/settings/public") return route.fulfill(json({ club_name: "THE LION SQUAD", domain: "lionsquad.at" }));
+      if (path === "/api/auth/me") return route.fulfill(json({ detail: "anonym" }, 401));
+      return route.fulfill(json([]));
+    });
+    await page.goto("/events/silvester-2026");
+    await expect(page.getByTestId("event-facts")).toBeVisible();
+    await expect(page.getByTestId("event-facts-minimum")).toHaveCount(0);
+  });
 });
