@@ -705,16 +705,37 @@ neue Liga an. Spielt eine Solo-Liga das Spiel, lässt sich **Einzelspieler erlau
   eigene Teamgröße und keinen Mindestkader. In einer Team-Liga bleibt die Teamgröße wie bisher je Season und je Liga N einstellbar.
 - **Veröffentlichen** geht. **Was fehlt noch?** im Überblick zeigt aber gelb die Warnung „Solo-Liga: Spielbetrieb folgt – Spiele
   lassen sich noch nicht austragen.“, bis der Spielbetrieb für Spieler fertig ist.
-- Im Reiter **Anmeldung und Kader** stehen nur **Mindestalter**, **Jede Spiel-ID nur einmal** und die **Plattform**. Der Kader ist die
-  Person selbst.
+- Im Reiter **Anmeldung und Kader** stehen die **Selbstanmeldung** (wie bei Co-Teams, ohne „Zwei Co-Teams eines Hauptteams“), dann
+  **Mindestalter**, **Jede Spiel-ID nur einmal**, die **Plattform** und der **Eingang**. Der Kader ist die Person selbst, Transfers gibt
+  es nicht.
+
+**Spieler melden sich selbst an** (seit P2):
+
+1. Im Reiter **Anmeldung und Kader** stellst du **Anmeldung ab** und **Anmeldung bis** ein, dazu wie bei Co-Teams Startplätze,
+   Warteliste, **Wer darf sich anmelden**, **Anmeldungen automatisch annehmen**, **Neue Spieler starten in der untersten Liga** und den
+   **Hinweis zum Datenschutz**. Für die Anmeldung braucht es ein gültiges Regelwerk.
+2. Auf der Ligaseite steht dann **Als Spieler anmelden**. Die Person meldet sich selbst an, ein Co-Team braucht sie nicht. Sie sieht
+   die Prüfung im Klartext, stimmt dem Regelwerk und dem Datenschutz **selbst** zu und reicht ein. Konten ohne Mitgliedschaft sehen
+   beim Datenschutz den Platzhalter, bis der Superadmin den Wortlaut der Season freigibt (wie bei [Gastteams](#25c-gastteams-anderer-vereine-und-schulen)).
+3. Was die Anmeldung aufhält, steht als Grund da: schon eine Anmeldung in dieser Season, schon in einer Staffel der Season (auch, wenn
+   du die Person zugeteilt hast), gesperrtes Konto, eine laufende Sperre der Liga-Leitung oder „Nur Vereinsmitglieder“. Fehlende
+   Angaben (Geburtsdatum, Alter, Spiel-ID, Plattform) halten nichts auf, sie stehen als offene Punkte da – wie beim Co-Team.
+4. Im **Eingang** stehen die Anträge der Spieler mit „meldet sich selbst als Spieler an“. **Annehmen**, **Ablehnen** (mit Grund),
+   **Warteliste** und **Zuteilen** gehen wie beim Co-Team. Über deine **eigene** Anmeldung entscheidet eine andere Person, der
+   Superadmin nur als Notausnahme mit Grund. Neue Spieler starten in der untersten Liga, eine höhere nur mit Grund.
+5. Die Person bekommt zu jedem Schritt eine Nachricht und eine Mail, per Du: eingereicht, angenommen, Liga und Staffel, abgelehnt,
+   Warteliste. Zieht sie zurück, hörst du es. Zurückziehen geht, bis du sie einer Staffel zuteilst (automatisch zugeteilt: bis zum
+   Check-in, solange kein Spielplan steht).
+6. Löscht eine Person ihr Konto, gilt ihre offene Anmeldung als zurückgezogen, der Platz ist frei.
 
 **Spieler zuteilen:**
 
 1. Season-Seite, Reiter **Ligen und Staffeln** → bei der Staffel **Staffel öffnen** → Reiter **Teilnehmer**.
 2. **Spieler zuteilen** → Namen oder Benutzernamen eintippen (ab zwei Zeichen) → die Person wählen → **Zuteilen**.
-3. Wer nicht passt, steht grau mit dem Grund da: schon in dieser Staffel, schon in einer anderen Staffel der Season oder die Staffel
-   ist voll. Gesperrte und deaktivierte Konten erscheinen in der Suche gar nicht. Fehlendes Geburtsdatum, andere Plattform oder fehlende
-   Spiel-ID stehen nur als Hinweis da.
+3. Wer nicht passt, steht grau mit dem Grund da: schon in dieser Staffel, schon in einer anderen Staffel der Season, eine laufende
+   Sperre der Liga-Leitung oder die Staffel ist voll. Gesperrte und deaktivierte Konten erscheinen in der Suche gar nicht. Fehlendes
+   Geburtsdatum, andere Plattform oder fehlende Spiel-ID stehen nur als Hinweis da. Hat die Person einen offenen Antrag, gilt er mit dem
+   Zuteilen als angenommen – über die eigene Anmeldung entscheidet dann auch hier eine andere Person.
 4. **Entfernen** nimmt die Person wieder heraus, solange der Spielplan nicht fest ist. Selbst abmelden kann sich die Person nicht – das
    macht die Leitung, wie beim Co-Team.
 
@@ -724,7 +745,8 @@ Zeichen) über den Weg für Notausnahmen; er steht im Protokoll.
 
 **Was noch folgt** (die Seite sagt es an der Stelle):
 
-- **Selbstanmeldung als Spieler** mit Eingang, Los und Nachmeldung: bis dahin teilst du alle Spieler zu.
+- **Staffeln auslosen**, **Startrechte**, **Nachmeldungen** und die **Kaderübersicht** rechnen mit Co-Teams: In der Solo-Liga teilst du
+  die Spieler im Eingang einer Staffel zu, ein Satz unter dem Eingang sagt es.
 - **Spielbetrieb** (Check-in, Veto, Ergebnis melden): **Liga starten** ist bis dahin gesperrt, die Staffel bleibt vor dem Start. Einen
   festen Spielplan und den Check-in gibt es bis dahin auf keinem Weg; die Vorschau des Spielplans schon.
 - **Neue Season aus der Vorgänger-Season** mit Auf- und Abstieg und Startrechten: Der Knopf ist gesperrt, bis dahin legst du die nächste
