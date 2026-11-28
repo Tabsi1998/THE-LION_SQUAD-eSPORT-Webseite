@@ -52,6 +52,7 @@ import { LeagueEmblem } from "@/components/tls/league/public/LeagueLook";
 import { noteOwnMatches } from "@/lib/liveQueue";
 import { GuestBadge } from "@/components/tls/league/GuestBadge";
 import { teamLeadsWord } from "@/lib/words";
+import { When } from "@/components/tls/When";
 
 const DECISION_TOASTS = {
   accept: "Termin bestätigt.",
@@ -486,7 +487,7 @@ function MatchPageView() {
               <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
                 {/* Zustands-Schild (#1306): dasselbe „Beendet“ wie überall. */}
                 <StatusChip status="completed" testId="match-finished-state" />
-                {match.scheduled_at && <span className="tls-type-small text-white/65" data-testid="match-when">{formatWhen(match.scheduled_at)}</span>}
+                {match.scheduled_at && <span className="tls-type-small text-white/65" data-testid="match-when"><When value={match.scheduled_at} /></span>}
               </div>
               <div className="mt-2 font-black text-white" data-testid="match-outcome">{finishedMatchText(participants, match)}</div>
               {station && <div className="mt-1 tls-type-label text-[#29B6E8]" data-testid="match-station">{station}</div>}

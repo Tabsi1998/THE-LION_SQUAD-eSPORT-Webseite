@@ -60,6 +60,7 @@ import { TournamentMapPools } from "@/components/tls/maps/TournamentMapPools";
 import { markPlacementShown, placementFor, placementShown } from "@/lib/placementMoment";
 import { ceremonyQueue } from "@/components/achievements/ceremony/queue";
 import { youLabel } from "@/lib/youLabel";
+import { When } from "@/components/tls/When";
 
 // Eigener Stand je Turnier und Konto (#1047): ein Wechsel des Turniers oder ein echter Kontowechsel baut die Seite
 // neu auf - Chat-Entwurf und Anhänge gehen weg, späte Antworten laufen ins Leere. Das erste Laden der Anmeldung
@@ -537,7 +538,7 @@ function TournamentDetailView() {
                   <Link key={c.id} to={`/fastlap/${c.slug || c.id}`} className="tls-card border border-white/10 rounded-sm bg-[#121212] p-4">
                     <PhaseBadge phase={c.public_phase} status={c.status} />
                     <div className="mt-2 font-bold">{c.title}</div>
-                    {c.start_date && <div className="mt-1 tls-type-small text-white/50">{formatWhen(c.start_date)}</div>}
+                    {c.start_date && <div className="mt-1 tls-type-small text-white/50"><When value={c.start_date} /></div>}
                   </Link>
                 ))}
               </div>

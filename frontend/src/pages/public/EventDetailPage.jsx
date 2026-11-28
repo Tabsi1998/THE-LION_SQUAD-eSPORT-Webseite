@@ -49,6 +49,7 @@ import {
   Monitor, Music, Newspaper, Pizza, Radio, Star, Trophy, UserPlus, Users, Wifi, XCircle,
 } from "lucide-react";
 import { ShareButton } from "@/components/tls/ShareButton";
+import { When } from "@/components/tls/When";
 
 // Die Event-Seite als Startpunkt (#1183) mit Kopf und Bild (#1273) und Fakten-Kasten (#1346). Feste Reihenfolge, gleich in
 // der App (EventDetailScreen): 1. Dein Event, 2. Was läuft beim Event, 3. Live verfolgen, 4. Fotos, 5. News, 6. Infos
@@ -304,7 +305,7 @@ function EventHeader({ e, notices = [] }) {
             <div className="mt-4 flex flex-wrap gap-x-5 gap-y-2 tls-type-small text-white/70 min-w-0">
               {e.schedule?.multi_day
                 ? <span className="inline-flex min-w-0 items-center gap-2" data-testid="event-days-summary"><Calendar className="w-4 h-4 text-[#9F7AEA] shrink-0" /><span className="min-w-0 break-words">{[e.schedule.label, e.schedule.now?.state !== "after" && e.schedule.now?.text].filter(Boolean).join(" · ")}</span></span>
-                : e.start_date && <span className="inline-flex min-w-0 items-center gap-2"><Calendar className="w-4 h-4 text-[#9F7AEA] shrink-0" /><span className="min-w-0 break-words">{formatWhen(e.start_date)}</span></span>}
+                : e.start_date && <span className="inline-flex min-w-0 items-center gap-2"><Calendar className="w-4 h-4 text-[#9F7AEA] shrink-0" /><span className="min-w-0 break-words"><When value={e.start_date} /></span></span>}
               {(e.locations?.length || 0) > 1
                 ? <span className="inline-flex min-w-0 items-center gap-2" data-testid="event-location-count"><MapPin className="w-4 h-4 text-[#9F7AEA] shrink-0" /><span>{e.locations.length} Standorte</span></span>
                 : (e.location || e.city) && <span className="inline-flex min-w-0 items-center gap-2"><MapPin className="w-4 h-4 text-[#9F7AEA] shrink-0" /><span className="min-w-0 break-words">{e.location || e.city}</span></span>}

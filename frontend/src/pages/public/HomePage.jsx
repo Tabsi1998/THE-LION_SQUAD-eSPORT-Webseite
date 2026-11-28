@@ -27,7 +27,7 @@ import { liveCountLine, nextCountdownTarget, timelineSignature } from "@/lib/liv
 import { SkeletonCards, SkeletonDetailHeader } from "@/components/tls/Skeleton";
 import { ArrowRight, Flag, Trophy, Calendar, ListOrdered, Newspaper, Pin, Radio, Timer, Users } from "lucide-react";
 import { leagueSeatsLine, leagueSortTime, leagueTimelineItem, periodLine } from "@/lib/leagueHome";
-import { formatAgo, formatWhen } from "@/lib/datetime";
+import { formatWhen } from "@/lib/datetime";
 import { KIND_COLORS, ROLE_COLORS } from "@/lib/categoryColors";
 import { withoutRepeatedBanners } from "@/lib/newsCards";
 import { NewsTextCard } from "@/components/tls/NewsTextCard";
@@ -38,6 +38,7 @@ import { eventSortTime, scheduleLine } from "@/lib/eventDays";
 import { childSummary, nestUnderEvents } from "@/lib/eventGroups";
 import { LoadState, LoadStaleNotice } from "@/components/tls/LoadState";
 import { useLoad } from "@/hooks/useLoad";
+import { When } from "@/components/tls/When";
 
 const HOME_DESCRIPTION = "THE LION SQUAD eSports ist ein Gaming und eSports Verein aus Tirol mit Community, Turnieren, Fast-Lap-Challenges, Events, Mitgliedschaft und Vereinsleben.";
 
@@ -549,7 +550,7 @@ function NewsCard({ news, featured = false, index = 0, count = 1 }) {
           {news.pinned && <Pin className="w-3 h-3 text-white" aria-label="Angepinnt" />}
         </div>
         <h3 className={`tls-card__title mt-2 leading-tight tls-wrap ${featured && !isLongTitle(news.title) ? "tls-type-section" : "tls-type-card"}`}>{news.title}</h3>
-        {(news.published_at || news.created_at) && <div className="mt-2 tls-type-small text-quiet">{formatAgo(news.published_at || news.created_at)}</div>}
+        {(news.published_at || news.created_at) && <div className="mt-2 tls-type-small text-quiet"><When value={news.published_at || news.created_at} ago /></div>}
         {news.excerpt && <p className="mt-2 tls-type-small text-white/60 line-clamp-3">{news.excerpt}</p>}
       </div>
     </Link>

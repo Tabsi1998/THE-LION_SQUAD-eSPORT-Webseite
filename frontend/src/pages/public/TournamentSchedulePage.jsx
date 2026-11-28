@@ -28,6 +28,7 @@ import { formatRange, formatWhen } from "@/lib/datetime";
 import { seoTextPreview } from "@/lib/textPreview";
 import { groupByRound, groupByStation, hasStations, onlyMine, scheduleEntries } from "@/lib/scheduleView";
 import { ShortCaps } from "@/components/tls/ShortCaps";
+import { When as TimeOf } from "@/components/tls/When";
 
 // Öffentlicher Spielplan (#1562) im Bild des neuen Turnierbaums (#1561): ruhige Karten, Sieger mit Cyan-Strich, laufende
 // Spiele atmen in der Live-Farbe. Zwei Sichten - nach Runden und, vor Ort, je Station als einfache Liste nach Zeit -
@@ -338,7 +339,7 @@ function When({ entry, resolved }) {
   const source = SCHEDULE_SOURCE_LABELS[match.schedule_source === "manual" ? "manual" : resolved?.schedule_source || match.schedule_source];
   return (
     <span className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5 min-w-0">
-      <span className="tls-type-small text-white/70 tabular-nums" data-testid={`schedule-when-${match.id}`}>{formatWhen(scheduledAt, { fallback: "Termin offen" })}</span>
+      <span className="tls-type-small text-white/70 tabular-nums" data-testid={`schedule-when-${match.id}`}><TimeOf value={scheduledAt} fallback="Termin offen" /></span>
       {entry.forecast && scheduledAt && <span className="tls-type-small text-white/45" data-testid={`schedule-forecast-${match.id}`}>voraussichtlich</span>}
       {source && !entry.forecast && (
         <span className="tls-type-label text-quiet" data-testid={`schedule-source-${match.id}`}>{source}</span>

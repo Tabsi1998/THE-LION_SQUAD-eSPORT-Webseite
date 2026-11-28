@@ -14,6 +14,7 @@ import { formatWhen } from "@/lib/datetime";
 import { compareByNearestDate, sortByNearestDate } from "@/lib/contentSort";
 import { ArrowRight, CalendarDays, Flag, Medal, Radio, Shield, Trophy, Users } from "lucide-react";
 import { ShortCaps } from "@/components/tls/ShortCaps";
+import { When } from "@/components/tls/When";
 
 const ACTIVE_PHASES = new Set(["registration", "check_in", "live", "upcoming"]);
 const ACTIVE_STATUSES = new Set(["scheduled", "registration_open", "registration_closed", "check_in", "live"]);
@@ -274,7 +275,7 @@ function ActivityMeta({ item, compact = false }) {
   const classes = compact ? "mt-1 gap-3 tls-type-small" : "mt-4 gap-4 tls-type-small";
   return (
     <div className={`flex flex-wrap items-center ${classes} text-white/55`}>
-      {item.start_date && <span className="inline-flex items-center gap-1.5"><CalendarDays className="h-3.5 w-3.5 text-[#29B6E8]" />{formatWhen(item.start_date)}</span>}
+      {item.start_date && <span className="inline-flex items-center gap-1.5"><CalendarDays className="h-3.5 w-3.5 text-[#29B6E8]" /><When value={item.start_date} /></span>}
       {item.kind === "fastlap" ? (
         <>
           <span className="inline-flex items-center gap-1.5"><Flag className="h-3.5 w-3.5 text-[#29B6E8]" />{item.track_count || 0} Strecken</span>

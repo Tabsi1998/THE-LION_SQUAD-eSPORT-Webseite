@@ -1,10 +1,11 @@
 import { Link } from "react-router-dom";
 import { PhaseBadge } from "./PhaseBadge";
 import { ArrowRight, Calendar, Users, Trophy } from "lucide-react";
-import { formatWhen, getRegistrationState } from "@/lib/datetime";
+import { getRegistrationState } from "@/lib/datetime";
 import { formatTournamentDisplay } from "@/lib/tournamentLabels";
 import { statusKind } from "@/lib/statusKinds";
 import { LazyImg } from "@/components/tls/LazyImg";
+import { When } from "@/components/tls/When";
 
 // Nach dem Ende sagt die Plakette oben, wie es ausging - „Anmeldung geschlossen“ wäre dort nur Lärm (#833).
 const FINISHED = new Set(["completed", "results_published", "archived", "cancelled"]);
@@ -97,7 +98,7 @@ export function TournamentCard({ tournament, index = 0 }) {
           {t.start_date && (
             <span className="inline-flex items-center gap-1">
               <Calendar className="w-3.5 h-3.5" />
-              {formatWhen(t.start_date)}
+              <When value={t.start_date} />
             </span>
           )}
           <span className="inline-flex items-center gap-1">

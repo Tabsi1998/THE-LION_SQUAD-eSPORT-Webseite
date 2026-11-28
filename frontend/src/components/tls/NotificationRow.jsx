@@ -6,6 +6,7 @@ import { api, formatApiError } from "@/lib/api";
 import { Badge } from "@/components/achievements/Badge";
 import { isExternalUrl, previewText } from "@/lib/notifications";
 import { formatAgo } from "@/lib/datetime";
+import { When } from "@/components/tls/When";
 
 // Eine Benachrichtigung (oder ein Bündel) als anklickbare Zeile (#255):
 // Titel, eine Zeile Vorschau, Zeit. Der Klick führt ans Ziel und meldet
@@ -69,7 +70,7 @@ export function NotificationRow({ bundle, onOpen, onDelete, compact = false, tes
           <div className="mt-0.5 tls-type-small text-white/55 truncate" data-testid={`${testIdPrefix}-preview-${bundle.id}`}>{previewText(bundle.body)}</div>
         ) : null}
         <div className="mt-1 tls-type-label text-quiet">
-          {notificationDate(bundle.created_at)}
+          <When value={bundle.created_at} ago />
           {bundle.count > 1 ? ` · ${bundle.count} gebündelt` : ""}
         </div>
       </div>
