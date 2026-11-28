@@ -37,8 +37,9 @@ const TONES = {
   called: ["Aufgerufen", "soon"],
   broken: ["Defekt", "problem"],
   free: ["Frei", "free"],
-  // Geteilte Event-Station (#1162): hier spielt gerade ein anderes Turnier - dessen Leitung bedient sie.
-  other: ["Anderes Turnier", "live"],
+  // Geteilte Event-Station (#1162): hier spielt gerade ein anderes Turnier - dessen Leitung bedient sie. Ruhig grau ohne
+  // Puls (Fabian Nr. 304): für dieses Turnier läuft hier nichts, die Station wartet.
+  other: ["Anderes Turnier", "waiting"],
   // Als belegt gespeichert, aber ohne offenes Spiel (#1162) - etwa nach dem Löschen einer Phase.
   stuck: ["Hängt", "problem"],
 };
