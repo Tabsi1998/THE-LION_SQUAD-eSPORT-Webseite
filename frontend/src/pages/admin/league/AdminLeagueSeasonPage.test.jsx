@@ -957,7 +957,7 @@ const SOLO_BODY = {
   divisions: [{ ...BODY.divisions[0], settings: { ...BODY.divisions[0].settings, team_size: 1, min_squad_size: 1 } }],
 };
 
-test("Solo-Liga: Kopf nennt die Art, Teamgröße fest auf 1, Anmeldung mit „folgt“ statt Eingang und Kaderregeln", async () => {
+test("Solo-Liga: Kopf nennt die Art, Teamgröße fest auf 1, Selbstanmeldung als Spieler mit Eingang, ohne Kaderregeln", async () => {
   body = SOLO_BODY;
   const first = renderPage("#spielbetrieb");
   expect(await screen.findByTestId("season-head")).toHaveTextContent("Probe Shooter · Spieler (1 gegen 1) · ab");
@@ -966,15 +966,19 @@ test("Solo-Liga: Kopf nennt die Art, Teamgröße fest auf 1, Anmeldung mit „fo
   first.unmount();
 
   renderPage("#anmeldung");
-  expect(await screen.findByTestId("season-solo-entry-follows")).toHaveTextContent("Die Selbstanmeldung als Spieler folgt");
-  expect(screen.getByTestId("season-form-deadline")).toBeInTheDocument();
-  expect(screen.queryByTestId("season-form-application-opens")).toBeNull();
+  // Seit P2 (#1629): Fenster, Plätze und Eingang wie bei Co-Teams - die Sätze sprechen von Spielern, Geschwister-Co-Teams gibt es nicht.
+  expect(await screen.findByTestId("season-form-application-opens")).toBeInTheDocument();
+  expect(screen.getByTestId("season-application-settings")).toHaveTextContent("Spieler melden sich auf der Ligaseite selbst an");
+  expect(screen.queryByTestId("season-form-sibling-squads")).toBeNull();
+  expect(screen.getByText("Neue Spieler starten in der untersten Liga")).toBeInTheDocument();
   expect(screen.queryByTestId("season-form-min-squad")).toBeNull();
   expect(screen.queryByTestId("season-form-one-team")).toBeNull();
   expect(screen.getByTestId("season-form-min-age")).toBeInTheDocument();
   expect(screen.getAllByRole("button").map((row) => row.textContent)).not.toContain("Startrechte");
-  // Eingang, Startrechte, Los und Kaderübersicht rechnen mit Co-Teams - in der Solo-Liga fragt die Seite sie gar nicht erst ab.
-  expect(apiMock.get).not.toHaveBeenCalledWith("/admin/leagues/seasons/s1/applications");
+  expect(screen.getByTestId("season-solo-entry-follows")).toHaveTextContent("Startrechte, Auslosen auf mehrere Staffeln, Nachmeldungen und die Kaderübersicht folgen");
+  // Der Eingang gilt auch für Spieler; Startrechte, Los und Kaderübersicht rechnen mit Co-Teams und werden gar nicht erst abgefragt.
+  await waitFor(() => expect(apiMock.get).toHaveBeenCalledWith("/admin/leagues/seasons/s1/applications"));
+  expect(apiMock.get).not.toHaveBeenCalledWith("/admin/leagues/seasons/s1/draws");
 });
 
 test("Solo-Liga: Liga N ohne eigene Teamgröße und Mindestkader, Staffel anlegen spricht von Spielern", async () => {

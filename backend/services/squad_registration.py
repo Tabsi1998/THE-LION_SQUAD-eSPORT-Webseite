@@ -595,6 +595,8 @@ async def person_candidates(db, tournament: dict, query: str | None, actor: dict
     rows = []
     for person in people:
         problems = person_problems(person, tournament, taken=taken, seats_taken=seats, other_staffel=other)
+        # Eine laufende Sperre der Person (E.3, #1629 P2) hält das Zuteilen auf - wie die Teamsperre beim Co-Team.
+        problems += league_eligibility.person_problems(eligibility, person["id"], person_name(person))
         if actor and person.get("id") == actor.get("id"):
             problems.append((403, SELF_ASSIGN_ROW))
         alone = {"id": None, "name": person_name(person), "member_ids": [person["id"]]}
@@ -614,8 +616,12 @@ async def person_candidates(db, tournament: dict, query: str | None, actor: dict
     }
 
 
-async def build_person_registration(db, tournament: dict, user_id: str, actor: dict) -> dict:
-    """Prüft die Person und baut ihre Einzel-Anmeldung für die Solo-Staffel - ohne zu schreiben. Wirft ``SquadAssignError``."""
+async def build_person_registration(db, tournament: dict, user_id: str, actor: dict, *, consent: bool = False, via: str = "league_assign",
+                                    source: str = "staff_add", application_id: str | None = None, registered_by: str | None = None) -> dict:
+    """Prüft die Person und baut ihre Einzel-Anmeldung für die Solo-Staffel - ohne zu schreiben. Wirft ``SquadAssignError``.
+
+    Wie ``build_registration``: Die Selbstanmeldung (#1629, P2) sagt, woher sie kommt (``via``, ``source``, ``application_id``,
+    ``registered_by``) und ob die Person ausdrücklich zugestimmt hat (``consent``). Ohne diese Angaben bleibt es das Zuteilen durch die Leitung."""
     _check_solo_staffel(tournament)
     if tournament.get("status") in FINISHED_TOURNAMENT_STATUSES:
         raise SquadAssignError(409, "Diese Staffel ist schon beendet.")
@@ -624,6 +630,9 @@ async def build_person_registration(db, tournament: dict, user_id: str, actor: d
         raise SquadAssignError(404, "Dieses Konto gibt es nicht.")
     taken, seats, other = await _person_state(db, tournament, [user_id])
     problems = person_problems(person, tournament, taken=taken, seats_taken=seats, other_staffel=other)
+    # Sperre der Person (E.3): auf jedem Weg in die Staffel - Zuteilen, Annehmen, automatische Zuteilung.
+    problems += league_eligibility.person_problems(await league_eligibility.context_for_tournament(db, tournament, [user_id]), user_id,
+                                                   person_name(person))
     if problems:
         code, text = problems[0]
         raise SquadAssignError(code, text)
@@ -642,17 +651,19 @@ async def build_person_registration(db, tournament: dict, user_id: str, actor: d
         "display_name": name,
         "ingame_name": name,
         "player_ids": {},
-        # Wie beim Co-Team (D-7, #1646): Das Zuteilen ist keine Zustimmung - Regeln stehen in league_rule_consents.
-        "accepted_rules": False,
-        "accepted_privacy": False,
+        # Wie beim Co-Team (D-7, #1646): Das Zuteilen ist keine Zustimmung - Regeln stehen in league_rule_consents. Wahr nur, wenn ein
+        # Antrag beide Zustimmungen der Person trägt (#1629, P2).
+        "accepted_rules": consent,
+        "accepted_privacy": consent,
         "seed": None,
         "registration_type": "solo",
-        "registered_via": "league_assign",
-        "registered_by": actor.get("id"),
-        "source": "staff_add",
+        "registered_via": via,
+        "registered_by": registered_by or actor.get("id"),
+        "source": source,
         "is_guest": False,
         "identity_key": f"{tid}:user:{user_id}",
         **({"league_squad_key": key} if key else {}),
+        **({"application_id": application_id} if application_id else {}),
         "created_by": actor.get("id"),
         "created_at": now_iso,
         "updated_at": now_iso,

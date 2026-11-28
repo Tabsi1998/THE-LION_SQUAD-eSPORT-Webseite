@@ -2,7 +2,7 @@ const { test, expect } = require("@playwright/test");
 const path = require("node:path");
 
 // Solo-Liga, Paket P1 (#1629, docs/LIGA.md „S.1 Solo-Liga“) im echten Browser, Server nachgestellt: Liga mit „Spieler (1 gegen 1)“
-// anlegen, Season einer Solo-Liga mit fester Teamgröße und „Anmeldung folgt“, auf der Staffel-Seite eine Person zuteilen - und daneben die
+// anlegen, Season einer Solo-Liga mit fester Teamgröße und Selbstanmeldung als Spieler (seit P2), auf der Staffel-Seite eine Person zuteilen - und daneben die
 // Team-Liga, die sich verhält wie vorher (Gegenprobe). Bei 390 und 1440 px ohne seitliches Scrollen, feste Uhr. Mit E2E_SCREENS_DIR legt
 // der Test die Bilder der Masken ab. Nur erfundene Namen.
 
@@ -162,7 +162,9 @@ for (const [width, height] of [[390, 844], [1440, 900]]) {
     await expect(page.getByTestId("season-form-team-size")).toBeDisabled();
     await noSideScroll(page);
     await page.getByTestId("season-tab-anmeldung").click();
-    await expect(page.getByTestId("season-solo-entry-follows")).toContainText("Die Selbstanmeldung als Spieler folgt");
+    // Seit P2: Selbstanmeldung als Spieler wie bei Co-Teams - was noch mit Co-Teams rechnet, sagt ein Satz.
+    await expect(page.getByTestId("season-application-settings")).toContainText("Spieler melden sich auf der Ligaseite selbst an");
+    await expect(page.getByTestId("season-solo-entry-follows")).toContainText("Startrechte, Auslosen auf mehrere Staffeln");
     await expect(page.getByTestId("season-form-min-squad")).toHaveCount(0);
     await noSideScroll(page);
     await shot(page, `season-anmeldung-solo-${width}`);

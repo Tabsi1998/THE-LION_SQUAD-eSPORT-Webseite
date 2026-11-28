@@ -1,6 +1,9 @@
 """Gemeinsamer Aufbau der Solo-Liga-Tests (#1629, P1): Spiel, Liga, Season, Liga N und Staffel über die Verwaltung.
-Nur erfundene Namen."""
+Dazu (P2) eine Solo-Liga mit Anmeldefenster und Regelwerk, in der sich Spieler selbst anmelden. Nur erfundene Namen."""
 from __future__ import annotations
+
+# Solo-Season (S11): Teamgröße und Mindestkader sind dort fest 1 - die Vorgaben der Team-Testwelt (4) passen nicht.
+SOLO_SIZES = {"team_size": 1, "min_squad_size": 1, "max_squad_size": 1, "lineup_min_players": 1}
 
 ADMIN = "/api/admin/leagues"
 DUELL = {"name": "Probe Duell", "slug": "probe-duell", "match_modes": [{"mode": "duell", "label": "Duell"}]}
@@ -45,3 +48,44 @@ async def solo_world(flow) -> dict:
     league = await make_league(flow, game, "solo", "Duell Liga")
     season, division, tournament = await make_staffel(flow, league)
     return {"admin": admin, "game": game, "league": league, "season": season, "division": division, "tournament": tournament}
+
+
+# ---------------------------------------------------------------- Selbstanmeldung als Spieler (#1629, P2)
+
+async def solo_application_world(flow, *, players: int = 3, staffeln: int = 1, rules: bool = True, open_window: bool = True,
+                                 **season) -> dict:
+    """Wie ``league_application_world.application_world``, nur als Solo-Liga: oeffentliche Season mit Fenster und Regelwerk, Liga 1 mit
+    ``staffeln`` leeren Staffeln, dazu ``players`` Konten ohne Team. Dieselben Schluessel, damit ``base_url``, ``inbox_url`` und
+    ``decide`` passen."""
+    from league_application_world import window
+    from league_rules_world import ADMIN_LEAGUES, GAME, publish
+    from league_start_world import ok, season_body
+
+    lead = await flow.add_staff()
+    flow.act_as(lead)
+    game = ok(await flow.post("/api/games", json=GAME))
+    league = ok(await flow.post(ADMIN_LEAGUES, json={"name": "Duell Anmeldung", "game_id": game["id"], "participant_kind": "solo"}))
+    fields = {**(window() if open_window else {}), **SOLO_SIZES, **season}
+    row = ok(await flow.post(f"{ADMIN_LEAGUES}/{league['id']}/seasons", json=season_body(visibility="public", **fields)))
+    division = ok(await flow.post(f"{ADMIN_LEAGUES}/seasons/{row['id']}/divisions", json={}))
+    tids = [ok(await flow.post(f"{ADMIN_LEAGUES}/divisions/{division['id']}/staffeln", json={}))["tournament_id"] for _ in range(staffeln)]
+    world = {"lead": lead, "game": game, "league": league, "season": row, "division": division, "tid": tids[0], "tids": tids}
+    world["players"] = [await flow.add_user(name=f"Duellant {chr(65 + index)}") for index in range(players)]
+    if rules:
+        world["rule"] = await publish(flow, world)
+    return world
+
+
+async def submit_person(flow, world: dict, player: dict, **body):
+    """Einreichen wie das Web in der Solo-Liga: ohne Co-Team, mit der gezeigten Fassung und beiden Zustimmungen."""
+    from league_application_world import base_url
+
+    flow.act_as(player)
+    payload = {"rule_version_id": (world.get("rule") or {}).get("id"), "accept_rules": True, "accept_privacy": True, **body}
+    return await flow.post(f"{base_url(world)}/applications", json=payload)
+
+
+async def submitted_person(flow, world: dict, player: dict) -> dict:
+    answer = await submit_person(flow, world, player)
+    assert answer.status_code == 200, answer.text
+    return answer.json()

@@ -99,8 +99,9 @@ STAFFEL_REGISTRATION_REFUSED = ("In einer Liga-Staffel spielen nur Co-Teams – 
 SQUAD_UNREGISTER_REFUSED = ("Ein zugeteiltes Co-Team nimmt nur die Turnierleitung wieder aus der Staffel – bitte "
                             "bei der Turnierleitung melden.")
 # Solo-Staffel (#1629): dieselben Sperren mit den Wörtern der Solo-Liga.
-PERSON_REGISTRATION_REFUSED = ("In einer Solo-Staffel teilt die Leitung die Spieler zu – bitte über „Spieler zuteilen“ eintragen. Die "
-                               "Selbstanmeldung als Spieler folgt in einem späteren Ausbau.")
+# Seit P2 melden sich Spieler selbst an - über die Ligaseite, nie direkt an der Staffel vorbei.
+PERSON_REGISTRATION_REFUSED = ("In einer Solo-Staffel meldest du dich auf der Ligaseite als Spieler an. Sonst teilt die Leitung über "
+                               "„Spieler zuteilen“ zu.")
 PERSON_UNREGISTER_REFUSED = "Eine zugeteilte Person nimmt nur die Leitung aus der Staffel."
 
 

@@ -233,3 +233,76 @@ test("ein Nachrücker im Modus „automatisch“ liest seinen eigenen Satz - nic
   expect(row).not.toHaveTextContent("Ihr seid automatisch dabei");
   expect(screen.getByTestId("league-start-right-decline-a6")).toBeInTheDocument();
 });
+
+
+// ---------------------------------------------------------------- Solo-Liga (#1629, P2): Anmeldung als Spieler
+
+const PLAYER = { user_id: "u1", display_name: "Duellant Eins", can_apply: true, state: "open", application: null, problems: [], warnings: [], shortfall: null, can_submit: true };
+
+function soloView(player = PLAYER, extra = {}) {
+  return view([], { kind: "solo", player, application: { ...BLOCK, participant_kind: "solo" }, ...extra });
+}
+
+test("Solo-Liga: ein Gast liest „Anmelden, dann mitspielen“, der Knopf für Co-Teams fehlt", () => {
+  authMock.current = null;
+  renderPanel({ ...BLOCK, participant_kind: "solo" });
+
+  expect(screen.getByTestId("league-application-login")).toHaveTextContent("Anmelden, dann mitspielen");
+  expect(screen.getByTestId("league-application-solo")).toHaveTextContent("Du meldest dich selbst als Spieler an");
+});
+
+test("Solo-Liga: „Als Spieler anmelden“ statt „Mit Co-Team anmelden“", async () => {
+  apiMock.get.mockResolvedValue({ data: soloView() });
+  renderPanel({ ...BLOCK, participant_kind: "solo" });
+
+  expect(await screen.findByTestId("league-application-start-player")).toHaveAttribute("href", "/liga/probe-liga/season-1/anmelden");
+  expect(screen.getByTestId("league-application-start-player")).toHaveTextContent("Als Spieler anmelden");
+  expect(screen.queryByTestId("league-application-start")).toBeNull();
+  expect(screen.queryByTestId("league-application-player")).toBeNull();
+});
+
+test("Solo-Liga: Was nicht geht, steht im Klartext - ohne Knopf", async () => {
+  apiMock.get.mockResolvedValue({ data: soloView({ ...PLAYER, can_submit: false, problems: ["Diese Season ist nur für Mitglieder. Du bist kein Vereinsmitglied."] }) });
+  renderPanel({ ...BLOCK, participant_kind: "solo" });
+
+  expect(await screen.findByTestId("league-application-season-problems")).toHaveTextContent("Du bist kein Vereinsmitglied.");
+  expect(screen.queryByTestId("league-application-start-player")).toBeNull();
+});
+
+test("Solo-Liga: Stand per Du, offene Punkte und Zurückziehen der eigenen Anmeldung", async () => {
+  const application = { id: "a1", status: "submitted", can_withdraw: true, staffel: null };
+  apiMock.get.mockResolvedValue({ data: soloView({ ...PLAYER, state: "submitted", application, can_submit: false, warnings: ["Dein Geburtsdatum fehlt im Profil."] }) });
+  apiMock.post.mockResolvedValue({ data: {} });
+  renderPanel({ ...BLOCK, participant_kind: "solo" });
+
+  expect(await screen.findByTestId("league-application-player-state")).toHaveTextContent("Eingereicht");
+  expect(screen.getByTestId("league-application-player")).toHaveTextContent("Die Liga-Leitung prüft deine Anmeldung");
+  expect(screen.getByTestId("league-application-player-open")).toHaveTextContent("Dein Geburtsdatum fehlt im Profil.");
+  expect(screen.getByTestId("league-application-player")).not.toHaveTextContent("Co-Team");
+  fireEvent.click(screen.getByTestId("league-application-player-withdraw"));
+
+  await waitFor(() => expect(apiMock.post).toHaveBeenCalledWith("/leagues/probe-liga/season-1/applications/a1/withdraw", {}));
+  expect(confirmMock.mock.calls.at(-1)[0].description).toMatch(/^Du bist dann nicht mehr angemeldet/);
+});
+
+test("Solo-Liga: zugeteilt - „Du spielst in …“, Zurückziehen nur über die Leitung", async () => {
+  const application = { id: "a1", status: "accepted", can_withdraw: false, staffel: "Liga 1 · Staffel A" };
+  apiMock.get.mockResolvedValue({ data: soloView({ ...PLAYER, state: "accepted", application, can_submit: false }) });
+  renderPanel({ ...BLOCK, participant_kind: "solo" });
+
+  expect(await screen.findByTestId("league-application-player-state")).toHaveTextContent("Angemeldet");
+  expect(screen.getByTestId("league-application-player")).toHaveTextContent("Du spielst in Liga 1 · Staffel A.");
+  expect(screen.queryByTestId("league-application-player-withdraw")).toBeNull();
+});
+
+test("Solo-Liga ohne Fenster: eigener Satz statt „Eure Co-Teams sind automatisch dabei“, kein Satz für die App", async () => {
+  const application = { id: "a1", status: "accepted", can_withdraw: false, staffel: "Liga 1 · Staffel A" };
+  apiMock.get.mockResolvedValue({ data: soloView({ ...PLAYER, state: "accepted", application, can_submit: false }, { application: null,
+    hint: "Als Spieler meldest du dich bis zum App-Ausbau auf der Website an." }) });
+  renderPanel(null);
+
+  expect(await screen.findByTestId("league-application-player")).toHaveTextContent("Du spielst in Liga 1 · Staffel A.");
+  expect(screen.getByTestId("league-application-window")).toHaveTextContent("Gerade kein Anmeldefenster");
+  expect(screen.getByTestId("league-application-window")).not.toHaveTextContent("Co-Teams");
+  expect(screen.queryByTestId("league-application-hint")).toBeNull();
+});

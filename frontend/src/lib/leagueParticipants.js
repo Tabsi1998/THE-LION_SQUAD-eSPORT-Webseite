@@ -10,7 +10,10 @@ const LABELS = Object.fromEntries(PARTICIPANT_OPTIONS);
 // Dieselben Sätze wie im Server - die Verwaltung sagt vorab, was der Server sonst ablehnt.
 export const KIND_FIXED_HINT = "Steht seit dem Anlegen fest. Für die andere Art eine neue Liga anlegen.";
 export const SOLO_ONLY_ONE = "Solo-Liga: Jede Person spielt für sich – immer 1 gegen 1.";
-export const SOLO_APPLICATIONS_FOLLOW = "Die Selbstanmeldung als Spieler folgt in einem späteren Ausbau – bis dahin teilt die Leitung die Spieler auf der Staffel-Seite zu.";
+// Seit P2 (#1629) melden sich Spieler selbst an - die Staffel-Seite sagt, dass Zuteilen der zweite Weg ist.
+export const SOLO_ASSIGN_HINT = "Spieler melden sich auf der Ligaseite selbst an, die Anträge stehen im Eingang der Season. Hier teilst du eine Person direkt zu – hat sie einen offenen Antrag, gilt er damit als angenommen.";
+// Was in der Solo-Liga noch mit Co-Teams rechnet (P3, P4): Startrechte, Los, Nachmeldungen, Kaderübersicht.
+export const SOLO_TEAM_PANELS_FOLLOW = "Solo-Liga: Startrechte, Auslosen auf mehrere Staffeln, Nachmeldungen und die Kaderübersicht folgen in einem späteren Ausbau. Spieler teilst du im Eingang einer Staffel zu.";
 export const SOLO_SUCCESSOR_FOLLOWS = "Die Folge-Season mit Auf- und Abstieg und Startrechten folgt für Solo-Ligen in einem späteren Ausbau – bis dahin eine neue Season anlegen und die Spieler zuteilen.";
 export const SOLO_OPERATIONS_FOLLOW ="Der Spielbetrieb einer Solo-Liga (Check-in, Veto, Ergebnis melden) folgt in einem späteren Ausbau – die Staffel bleibt bis dahin im Entwurf.";
 

@@ -238,6 +238,11 @@ def squad_ban(found: Bans | None, squad_id: str | None) -> dict | None:
     return found.squads.get(squad_id) if found and squad_id else None
 
 
+def person_ban(found: Bans | None, user_id: str | None) -> dict | None:
+    """Solo-Liga (#1629, P2): Die Person ist der Teilnehmer - ihre laufende Sperre wirkt wie die Teamsperre beim Co-Team."""
+    return found.users.get(user_id) if found and user_id else None
+
+
 # ---------------------------------------------------------------- Aufbewahrung der Nachweise (Nr. 31, 136)
 
 

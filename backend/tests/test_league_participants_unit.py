@@ -36,7 +36,8 @@ def test_solo_season_defaults_and_their_limits():
     assert lp.season_problem(SOLO, {"team_size": 1, "min_squad_size": 1, "max_staffel_size": 12, "min_age": 16}) is None
     assert lp.season_problem(SOLO, {"team_size": 2}) == lp.TEAM_SIZE_SOLO
     assert lp.season_problem(SOLO, {"team_size": 1, "min_squad_size": 3}) == lp.SQUAD_SIZE_SOLO
-    assert lp.season_problem(SOLO, {"application_opens_at": "2026-11-01T10:00:00Z"}) == lp.APPLICATIONS_FOLLOW
+    # Seit P2 gibt es das Anmeldefenster auch in der Solo-Liga (Anmeldung als Spieler).
+    assert lp.season_problem(SOLO, {"application_opens_at": "2026-11-01T10:00:00Z"}) is None
     # Gegenprobe: eine Team-Liga prüft hier nichts.
     assert lp.season_problem({}, {"team_size": 5, "min_squad_size": 6, "application_opens_at": "2026-11-01T10:00:00Z"}) is None
 
@@ -58,9 +59,18 @@ def test_a_solo_staffel_stays_in_draft_until_the_match_flow_exists():
     assert staffel_guard.staffel_status_problem(solo, "cancelled") is None
 
 
-def test_no_application_in_a_solo_league_even_with_a_window():
-    season = {"id": "s", "application_opens_at": "2026-11-01T10:00:00Z", "application_closes_at": "2026-11-08T10:00:00Z"}
+def test_a_solo_season_without_window_has_no_self_registration_like_a_team_season():
+    # Seit P2 (#1629) gelten dieselben Gründe wie bei Team-Ligen - ohne Fenster keine Selbstanmeldung.
+    season = {"id": "s"}
 
-    problems = asyncio.run(league_applications.season_problems(None, SOLO, season))
+    assert asyncio.run(league_applications.season_problems(None, SOLO, season)) == [league_applications.NO_WINDOW]
+    assert asyncio.run(league_applications.season_problems(None, {}, season)) == [league_applications.NO_WINDOW]
 
-    assert problems == [lp.APPLICATIONS_FOLLOW]
+
+def test_a_person_application_is_told_apart_from_a_team_application():
+    assert lp.is_person_application({"user_id": "u1", "squad_id": None})
+    assert lp.is_person_application({"user_id": None, "squad_id": None}), "nach der Kontolöschung bleibt es ein Antrag einer Person"
+    assert not lp.is_person_application({"squad_id": "q1", "team_id": "t1"})
+    assert lp.application_entry({"user_id": "u1", "squad_id": None}) == "user:u1"
+    assert lp.application_entry({"squad_id": "q1"}) == "q1"
+    assert lp.application_entry({"user_id": None, "squad_id": None}) is None

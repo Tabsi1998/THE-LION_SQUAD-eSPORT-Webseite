@@ -63,7 +63,7 @@ function PromoCard({ row, index, compact }) {
             {!isFull(block) ? (
               <Link to={row.apply_url} data-testid={`home-league-promo-apply-${row.slug}`}
                 className="tls-btn tls-btn--primary inline-flex min-h-[44px] items-center justify-center rounded-sm px-4 py-2.5 tls-type-label">
-                Mit Co-Team anmelden
+                {block.participant_kind === "solo" ? "Als Spieler anmelden" : "Mit Co-Team anmelden"}
               </Link>
             ) : null}
             <Link to={row.url} data-testid={`home-league-promo-page-${row.slug}`}

@@ -617,8 +617,9 @@ test("Solo-Staffel: Spieler statt Co-Teams, Spieler zuteilen und Entfernen der P
   expect(await screen.findByTestId("staffel-teams-count")).toHaveTextContent("Spieler 2 von 8");
   expect(screen.getByTestId("staffel-kind")).toHaveTextContent("Spieler · 1 gegen 1");
   expect(screen.getByTestId("staffel-entrants-note")).toHaveTextContent("jede Person spielt für sich");
-  expect(screen.getByTestId("staffel-entry-hint")).toHaveTextContent("Die Selbstanmeldung als Spieler folgt");
-  expect(screen.queryByTestId("staffel-entry-link")).toBeNull();
+  // Seit P2: Spieler melden sich selbst an, der Eingang der Season ist verlinkt - Zuteilen ist der zweite Weg.
+  expect(screen.getByTestId("staffel-entry-hint")).toHaveTextContent("Spieler melden sich auf der Ligaseite selbst an");
+  expect(screen.getByTestId("staffel-entry-link")).toBeInTheDocument();
   expect(screen.queryByTestId("squad-assign-open")).toBeNull();
   await user.click(screen.getByTestId("person-assign-open"));
   expect(await screen.findByTestId("person-assign-dialog")).toHaveTextContent("Spieler zuteilen");
