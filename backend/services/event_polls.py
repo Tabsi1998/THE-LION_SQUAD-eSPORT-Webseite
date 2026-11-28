@@ -96,23 +96,37 @@ def _event_over(event: dict | None) -> bool:
     return (event or {}).get("status") in FINISHED_EVENT_STATUSES
 
 
-def is_closed(poll: dict, now: datetime, event: dict | None = None) -> bool:
-    """Zu, wenn die Verwaltung sie beendet hat, die Frist erreicht ist (genau zur Frist ist sie schon zu) oder das Event
-    beendet, archiviert oder abgesagt ist."""
-    if poll.get("closed_at") or poll.get("final_result") or _event_over(event):
+def has_ended(poll: dict, now: datetime) -> bool:
+    """Das eigene Ende der Abstimmung: „Jetzt beenden“ oder die Frist (genau zur Frist ist sie schon zu). Nur dann wird
+    das Ergebnis eingefroren - der Status des Events allein nie (Nachprüfung N2: eine Absage lässt sich zurücknehmen)."""
+    if poll.get("closed_at") or poll.get("final_result"):
         return True
     closes = _dt(poll.get("closes_at"))
     return bool(closes and now >= closes)
 
 
+def is_closed(poll: dict, now: datetime, event: dict | None = None) -> bool:
+    """Zu zum Abstimmen und Anzeigen: eigenes Ende, oder das Event ist beendet, archiviert oder abgesagt."""
+    return has_ended(poll, now) or _event_over(event)
+
+
 def end_of(poll: dict, now: datetime) -> datetime:
-    """Wann die Abstimmung zu war: beendet, Frist - der frühere Zeitpunkt; sonst jetzt (Event beendet)."""
+    """Wann die Abstimmung zu war: beendet, Frist - der frühere Zeitpunkt."""
     ends = [moment for moment in (_dt(poll.get("closed_at")), _dt(poll.get("closes_at"))) if moment]
     return min(ends) if ends else now
 
 
-def results_visible(poll: dict, now: datetime, event: dict | None = None) -> bool:
-    return poll.get("results_visibility") == "live" or is_closed(poll, now, event)
+def results_visible(poll: dict, now: datetime) -> bool:
+    """Ergebnis sofort, oder erst nach dem eigenen Ende - ein abgesagtes Event deckt ein verdecktes Ergebnis nicht auf."""
+    return poll.get("results_visibility") == "live" or has_ended(poll, now)
+
+
+def _same_minute(a, b) -> bool:
+    """Die Maske schickt eine Frist auf die Minute genau zurück - Sekunden machen sie nicht zu einer anderen."""
+    first, second = _dt(a), _dt(b)
+    if not first or not second:
+        return first == second
+    return first.replace(second=0, microsecond=0) == second.replace(second=0, microsecond=0)
 
 
 # ---------------------------------------------------------------- Prüfen
@@ -188,7 +202,7 @@ def _closes(raw, now: datetime, *, must_be_future: bool) -> str | None:
     if not moment:
         raise PollError(400, "Die Frist ist kein gültiger Zeitpunkt.")
     if must_be_future and moment <= now:
-        raise PollError(400, "Die Frist liegt in der Vergangenheit.")
+        raise PollError(400, "Die Frist liegt in der Vergangenheit – zum sofortigen Schließen ‚Jetzt beenden‘ nutzen.")
     return moment.astimezone(timezone.utc).isoformat()
 
 
@@ -253,7 +267,7 @@ async def _freeze_locked(db, event: dict, poll: dict, now: datetime) -> dict:
     """Das Ergebnis festschreiben (nur einmal, nur Zahlen): die Stimmen der Angemeldeten, die vor dem Ende ankamen.
     Spätere Abmeldungen und Kontolöschungen ändern es danach nicht mehr. Der Aufrufer hält die Sperre."""
     fresh = await db.event_polls.find_one({"id": poll["id"]}, {"_id": 0}) or poll
-    if fresh.get("final_result") or not is_closed(fresh, now, event):
+    if fresh.get("final_result") or not has_ended(fresh, now):
         return fresh
     counted = await _counted(db, fresh, await _active_user_ids(db, event["id"]), before=end_of(fresh, now))
     final = {**_tally(fresh, counted), "frozen_at": now.isoformat()}
@@ -263,7 +277,7 @@ async def _freeze_locked(db, event: dict, poll: dict, now: datetime) -> dict:
 
 async def _frozen(db, event: dict, poll: dict, now: datetime) -> dict:
     """Ist die Abstimmung zu, aber noch nicht eingefroren, jetzt einfrieren (beim ersten Lesen nach der Frist)."""
-    if poll.get("final_result") or not is_closed(poll, now, event):
+    if poll.get("final_result") or not has_ended(poll, now):
         return poll
     try:
         async with _lock(db, poll["id"]):
@@ -305,7 +319,7 @@ async def poll_view(db, poll: dict, user: dict | None, *, now: datetime, eligibl
             "option": choices[0] if choices else "", "option_label": labels.get(choices[0], "") if choices else "",
             "can_use": view["status"] == "open",
         })
-    visible = results_visible(poll, now, event)
+    visible = results_visible(poll, now)
     view.update({
         "rights": rights, "can_vote": bool(rights) and view["status"] == "open",
         "reason": None if ok else reason, "reason_text": "" if ok else REASON_TEXTS.get(reason or "", ""),
@@ -408,7 +422,7 @@ async def update_poll(db, event: dict, poll_id: str, raw: dict, me: dict) -> dic
     """Ändern: Frage, Antworten, Frist und Einstellungen. Eine Antwort mit Stimmen bleibt - nur ihre Beschriftung ändert sich."""
     now = now_utc()
     poll = await _poll(db, event, poll_id)
-    closed = is_closed(poll, now, event)
+    closed = has_ended(poll, now)
     updates: dict = {}
     if "question" in raw:
         updates["question"] = _question(raw.get("question"))
@@ -434,11 +448,13 @@ async def update_poll(db, event: dict, poll_id: str, raw: dict, me: dict) -> dic
             raise PollError(409, f"Es wurde schon mit bis zu {most} Antworten abgestimmt – weniger erlauben geht nicht mehr.")
         if closed and updates["max_choices"] != int(poll.get("max_choices") or 1):
             raise PollError(409, "Die Abstimmung ist beendet – die Zahl der Antworten bleibt.")
-    if "closes_at" in raw:
-        updates["closes_at"] = _closes(raw.get("closes_at"), now, must_be_future=False)
-        # Verlängern geht nur, solange sie läuft - eine neue Frist öffnet eine beendete nicht wieder (Review #2612-8).
-        if closed and updates["closes_at"] != poll.get("closes_at"):
+    if "closes_at" in raw and not _same_minute(raw.get("closes_at") or None, poll.get("closes_at")):
+        # Unverändert (auf die Minute) bleibt die gespeicherte Frist. Sonst: Verlängern geht nur, solange sie läuft - eine
+        # neue Frist öffnet eine beendete nicht wieder (Review #2612-8), und eine laufende bekommt keine Frist in der
+        # Vergangenheit, die Stimmen still herausfallen ließe (Nachprüfung N1) - dafür gibt es „Jetzt beenden“.
+        if closed:
             raise PollError(409, "Die Abstimmung ist beendet – eine neue Frist öffnet sie nicht wieder.")
+        updates["closes_at"] = _closes(raw.get("closes_at"), now, must_be_future=True)
     if "results_visibility" in raw:
         updates["results_visibility"] = _results(raw.get("results_visibility"))
     if updates:
@@ -456,7 +472,7 @@ async def close_poll(db, event: dict, poll_id: str, me: dict) -> dict:
         async with _lock(db, poll["id"]):
             now = now_utc()
             fresh = await db.event_polls.find_one({"id": poll["id"]}, {"_id": 0}) or poll
-            if not is_closed(fresh, now, event):
+            if not has_ended(fresh, now):
                 ended = await db.event_polls.update_one({"id": poll["id"], "closed_at": None},
                                                         {"$set": {"closed_at": now.isoformat(), "updated_at": now.isoformat()}})
                 if ended.modified_count:

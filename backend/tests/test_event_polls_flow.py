@@ -577,3 +577,53 @@ async def test_a_finished_event_takes_no_more_votes(flow, status):
     assert response.status_code == 409
     view = (await public_polls(flow, people["paula"], event))[0]
     assert view["status"] == "closed" and view["can_vote"] is False
+
+
+# --------------------------------------------------------------------------- Nachprüfung (N1, N2, Frist auf Minuten)
+@pytest.mark.asyncio
+async def test_a_running_poll_does_not_take_a_deadline_in_the_past(flow):
+    """N1: Eine Frist in der Vergangenheit ließe Stimmen still herausfallen - zum Schließen gibt es „Jetzt beenden“."""
+    leitung, event, people = await setup_event(flow)
+    poll = await create_poll(flow, leitung, event, closes_at=(now_utc() + timedelta(days=1)).isoformat())
+    assert (await vote(flow, people["paula"], event, poll, [poll["options"][0]["code"]])).status_code == 200
+    flow.act_as(leitung)
+    past = await flow.patch(f"/api/admin/events/{event['id']}/polls/{poll['id']}", json={"closes_at": (now_utc() - timedelta(minutes=10)).isoformat()})
+    assert past.status_code == 400
+    assert past.json()["detail"] == "Die Frist liegt in der Vergangenheit – zum sofortigen Schließen ‚Jetzt beenden‘ nutzen."
+    view = (await public_polls(flow, None, event))[0]
+    assert view["status"] == "open" and view["result"]["valid"] == 1
+    flow.act_as(leitung)
+    created = await flow.post(f"/api/admin/events/{event['id']}/polls", json=poll_body(closes_at=(now_utc() - timedelta(minutes=1)).isoformat()))
+    assert created.status_code == 400 and "Jetzt beenden" in created.json()["detail"]
+
+
+@pytest.mark.asyncio
+async def test_a_cancelled_and_restored_event_keeps_its_polls_open(flow):
+    """N2: Der Event-Status sperrt nur Anzeige und Stimme - eingefroren wird nur beim eigenen Ende der Abstimmung."""
+    leitung, event, people = await setup_event(flow)
+    poll = await create_poll(flow, leitung, event, results_visibility="after_close")
+    flow.act_as(leitung)
+    assert (await flow.patch(f"/api/events/{event['id']}", json={"status": "cancelled"})).status_code == 200
+    seen = (await public_polls(flow, None, event))[0]
+    assert seen["status"] == "closed" and seen["result"] is None and seen["result_hidden"] is True
+    assert (await flow.db.event_polls.find_one({"id": poll["id"]})).get("final_result") is None
+    flow.act_as(leitung)
+    assert (await flow.patch(f"/api/events/{event['id']}", json={"status": "registration_open"})).status_code == 200
+    await register(flow, event, people["paula"])
+    again = await vote(flow, people["paula"], event, poll, [poll["options"][0]["code"]])
+    assert again.status_code == 200, again.text
+    assert (await public_polls(flow, people["paula"], event))[0]["status"] == "open"
+
+
+@pytest.mark.asyncio
+async def test_renaming_an_ended_poll_with_a_deadline_in_seconds_works(flow, monkeypatch):
+    """Hinweis: Über die API mit Sekunden angelegt, schickt die Maske die Frist nur auf die Minute zurück - das ist dieselbe Frist."""
+    leitung, event, _people = await setup_event(flow)
+    closes = (now_utc() + timedelta(days=1)).replace(second=37, microsecond=123456)
+    poll = await create_poll(flow, leitung, event, closes_at=closes.isoformat())
+    at(monkeypatch, closes + timedelta(hours=1))
+    flow.act_as(leitung)
+    minute = closes.replace(second=0, microsecond=0).isoformat()
+    renamed = await flow.patch(f"/api/admin/events/{event['id']}/polls/{poll['id']}", json={"question": "Welche Rodelbahn am 31.?", "closes_at": minute})
+    assert renamed.status_code == 200, renamed.text
+    assert (await flow.db.event_polls.find_one({"id": poll["id"]}))["closes_at"] == poll["closes_at"]
