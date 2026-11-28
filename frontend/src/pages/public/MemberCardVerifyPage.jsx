@@ -2,11 +2,10 @@ import { useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { CheckCircle2, XCircle, ShieldCheck } from "lucide-react";
 import { api } from "@/lib/api";
-import { formatDate } from "@/lib/dolibarr";
 import { verdictText } from "@/lib/memberCard";
 import { PublicLayout } from "@/components/tls/PublicLayout";
 import { useDocumentTitle } from "@/hooks/useDocumentTitle";
-import { viennaDateTime } from "@/lib/vienna";
+import { formatOfficialDate, formatWhen } from "@/lib/datetime";
 import { ShortCaps } from "@/components/tls/ShortCaps";
 
 // Prüfseite der Mitgliedskarte (#346): Wer den QR-Code scannt, landet hier - ohne Anmeldung -
@@ -54,8 +53,8 @@ export default function MemberCardVerifyPage() {
               <dl className="mt-4 space-y-2 tls-type-small">
                 <div><dt className="tls-type-label text-quiet">Mitglied</dt><dd className="tls-type-card text-white">{result.name}</dd></div>
                 <div><dt className="tls-type-label text-quiet">Mitgliedsart</dt><dd className="text-white/85">{result.type_label}</dd></div>
-                <div><dt className="tls-type-label text-quiet">Gültig</dt><dd className="text-white/85">{result.valid_until ? `bis ${formatDate(result.valid_until)}` : "solange die Mitgliedschaft besteht"}</dd></div>
-                {result.checked_at && <div className="pt-2 tls-type-small text-quiet">Geprüft am {viennaDateTime(result.checked_at)}</div>}
+                <div><dt className="tls-type-label text-quiet">Gültig</dt><dd className="text-white/85">{result.valid_until ? `bis ${formatOfficialDate(result.valid_until)}` : "solange die Mitgliedschaft besteht"}</dd></div>
+                {result.checked_at && <div className="pt-2 tls-type-small text-quiet">Geprüft am {formatWhen(result.checked_at, { relative: false })}</div>}
               </dl>
             ) : result ? (
               <p className="mt-3 tls-type-body text-white/70">Dieser Code ist nicht (mehr) gültig. Das Mitglied kann in der App oder auf der Website einen frischen Code anzeigen.</p>
