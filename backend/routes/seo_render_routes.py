@@ -35,10 +35,6 @@ DEFAULT_SITE_DESCRIPTION = (
     "THE LION SQUAD eSports ist ein Gaming und eSports Verein aus Tirol mit "
     "Community, Turnieren, Fast-Lap-Challenges, Events, Mitgliedschaft und Vereinsleben."
 )
-MONTHS_DE = [
-    "Januar", "Februar", "März", "April", "Mai", "Juni",
-    "Juli", "August", "September", "Oktober", "November", "Dezember",
-]
 
 
 def effective_favicon_url(branding: dict) -> str:
@@ -1186,11 +1182,12 @@ def parse_dt(value) -> datetime | None:
 
 
 def format_date_label(value) -> str:
+    """„Sa 23. Mai“ in Wiener Zeit (#1307) - fest, Vorschauen liest man später. Bisher rechnete die Vorschau in der Zone
+    des Servers (UTC, ein Termin um 00:30 stand am Vortag) und schrieb „Januar“."""
+    from services.date_text import format_moment
+
     dt = parse_dt(value)
-    if not dt:
-        return ""
-    local = dt.astimezone()
-    return f"{local.day}. {MONTHS_DE[local.month - 1]} {local.year}"
+    return format_moment(dt, time=False) if dt else ""
 
 
 def tournament_game_label(tournament: dict) -> str:
