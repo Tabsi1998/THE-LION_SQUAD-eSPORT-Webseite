@@ -7,6 +7,13 @@ import { NewsSignupCards, signupItems } from "./NewsSignupCard";
 
 const START = "2026-11-14T17:00:00Z";
 
+// Feste Uhr (#1307): ob das Jahr beim Datum steht, hängt am laufenden Jahr.
+beforeEach(() => {
+  vi.useFakeTimers({ toFake: ["Date"] });
+  vi.setSystemTime(new Date("2026-11-01T10:00:00Z"));
+});
+afterEach(() => vi.useRealTimers());
+
 function tournament(slug, signup, title = slug) {
   return { id: `t-${slug}`, slug, title, signup: { start_date: START, taken: null, max: null, spots_left: null, opens_at: null, ...signup } };
 }
@@ -19,7 +26,7 @@ test("offen: Datum, freie Plätze und Anmelden führt zur Anmeldung dieses Turni
   renderCards({ linked_tournaments: [tournament("kart-cup", { state: "open", taken: 11, max: 16, spots_left: 5 }, "Kart-Cup")] });
   const card = screen.getByTestId("news-signup-kart-cup");
   expect(card).toHaveTextContent("Kart-Cup");
-  expect(card).toHaveTextContent("14.11.2026");
+  expect(card).toHaveTextContent("Sa 14. November · 18:00");
   expect(card).toHaveTextContent("Noch 5 von 16 Plätzen frei");
   expect(within(card).getByRole("link", { name: /Anmelden/ })).toHaveAttribute("href", "/tournaments/kart-cup?anmelden=1");
 });

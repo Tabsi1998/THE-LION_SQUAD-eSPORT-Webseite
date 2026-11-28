@@ -1,4 +1,4 @@
-import { asInstant, dayBefore, dayNoon, viennaDate, viennaDateTime, viennaDay, viennaTime } from "@/lib/vienna";
+import { asInstant, dayBefore, dayNoon, viennaDate, viennaDay, viennaTime } from "@/lib/vienna";
 
 // Ein Datumsformat (#1220, #1307, Wahl des Betreibers vom 07.10.2026): „Sa 23. Mai · 18:00“ - Wochentag kurz, Monat
 // ausgeschrieben, das Jahr nur, wenn es nicht das laufende ist. Tag und Uhrzeit gelten in Wien (lib/vienna.js), der Monat
@@ -10,6 +10,9 @@ const MINUTE_MS = 60 * 1000;
 const HOUR_MS = 60 * MINUTE_MS;
 
 const nextDay = (day) => new Date(dayNoon(day).getTime() + DAY_MS).toISOString().slice(0, 10);
+// Ein reiner Kalendertag („2026-12-31“, etwa ein Ablauf- oder Stichtag) hat keine Uhrzeit - er steht ohne „· 01:00“ da.
+const PURE_DAY = /^\d{4}-\d{2}-\d{2}$/;
+const isPureDay = (value) => typeof value === "string" && PURE_DAY.test(value.trim());
 
 /** Ein Wiener Kalendertag als „Sa 23. Mai“ - ohne Monat („Sa 23.“) für den Anfang eines Zeitraums, mit Jahr auf Wunsch. */
 function dayText(day, { withMonth = true, withYear = false } = {}) {
@@ -21,19 +24,50 @@ function dayText(day, { withMonth = true, withYear = false } = {}) {
 
 /**
  * Wann etwas ist - ganz und kurz, die eine Schreibweise der Seite: „Sa 23. Mai · 18:00“, heute „heute 18:00“, morgen
- * „morgen 18:00“, ein anderes Jahr „Sa 23. Mai 2027 · 18:00“. Mit `time: false` nur der Tag („Sa 23. Mai“, „heute“).
- * `now` ist der Bezugszeitpunkt. Ohne gültigen Wert kommt `fallback`.
+ * „morgen 18:00“, ein anderes Jahr „Sa 23. Mai 2027 · 18:00“. Mit `time: false` nur der Tag („Sa 23. Mai“, „heute“);
+ * ein reiner Kalendertag („2026-05-23“) steht immer ohne Uhrzeit. `relative: false` lässt „heute“ und „morgen“ weg -
+ * für Sätze wie „Gesendet am Mi 20. Mai · 18:00“. `now` ist der Bezugszeitpunkt. Ohne gültigen Wert kommt `fallback`.
+ * Der Server schreibt dasselbe (backend/services/date_text.py, Fälle in docs/date-cases.json).
  */
-export function formatWhen(value, { now = new Date(), fallback = "", time = true } = {}) {
+export function formatWhen(value, { now = new Date(), fallback = "", time = true, relative = true } = {}) {
   if (value == null || value === "") return fallback;
   const day = viennaDay(value);
   if (!day) return fallback;
-  const clock = time ? viennaTime(value, { hour: "2-digit", minute: "2-digit" }) : "";
+  const withClock = time && !isPureDay(value);
+  const clock = withClock ? formatClock(value) : "";
   const today = viennaDay(now);
-  if (day === today) return time ? `heute ${clock}` : "heute";
-  if (day === nextDay(today)) return time ? `morgen ${clock}` : "morgen";
+  if (relative && day === today) return withClock ? `heute ${clock}` : "heute";
+  if (relative && day === nextDay(today)) return withClock ? `morgen ${clock}` : "morgen";
   const text = dayText(day, { withYear: day.slice(0, 4) !== today.slice(0, 4) });
-  return time ? `${text} · ${clock}` : text;
+  return withClock ? `${text} · ${clock}` : text;
+}
+
+/** Nur die Uhrzeit in Wien: „18:00“. Ohne gültigen Wert ein leerer Text. */
+export function formatClock(value) {
+  if (value == null || value === "") return "";
+  const date = asInstant(value);
+  if (Number.isNaN(date.getTime())) return "";
+  return viennaTime(date, { hour: "2-digit", minute: "2-digit", hourCycle: "h23" });
+}
+
+/** Ein Monat als Überschrift oder „Dabei seit“: „Februar 2026“, ohne Jahr `year: false` („Februar“). */
+export function formatMonth(value, { year = true } = {}) {
+  if (value == null || value === "") return "";
+  const date = isPureDay(value) ? dayNoon(value.trim()) : asInstant(value);
+  if (Number.isNaN(date.getTime())) return "";
+  return viennaDate(date, year ? { month: "long", year: "numeric" } : { month: "long" });
+}
+
+/**
+ * Das amtliche Datum „23.05.2026“ - nur für Rechnungen, Urkunden, Ausweise und Rechtstexte (#1307). Alles andere
+ * schreibt formatWhen. Ein reiner Kalendertag bleibt dieser Tag.
+ */
+export function formatOfficialDate(value) {
+  if (value == null || value === "") return "";
+  const day = viennaDay(isPureDay(value) ? dayNoon(value.trim()) : value);
+  if (!day) return "";
+  const [year, month, date] = day.split("-");
+  return `${date}.${month}.${year}`;
 }
 
 /**
@@ -93,28 +127,16 @@ export function formatDuration(ms, { round = "down" } = {}) {
   return `${total % 60} Sek.`;
 }
 
-export function formatDateTime(value, options = {}) {
-  if (!value) return options.fallback || "TBD";
-  const date = asInstant(value);
-  if (Number.isNaN(date.getTime())) return String(value);
-  return viennaDateTime(date, {
-    day: "2-digit",
-    month: "2-digit",
-    year: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-  });
+// Die beiden alten Namen schreiben seit #1307 dieselbe Form wie formatWhen: formatDateTime „Sa 23. Mai · 18:00“,
+// formatDate nur den Tag („Sa 23. Mai“). Ohne Wert kommt der Platzhalter, ein unlesbarer Wert bleibt, wie er ist.
+export function formatDateTime(value, { fallback, now, relative } = {}) {
+  if (!value) return fallback || "TBD";
+  return formatWhen(value, { now, relative, fallback: String(value) });
 }
 
-export function formatDate(value, options = {}) {
-  if (!value) return options.fallback || "TBD";
-  const date = asInstant(value);
-  if (Number.isNaN(date.getTime())) return String(value);
-  return viennaDate(date, {
-    day: "2-digit",
-    month: "short",
-    year: "numeric",
-  });
+export function formatDate(value, { fallback, now, relative } = {}) {
+  if (!value) return fallback || "TBD";
+  return formatWhen(value, { now, relative, time: false, fallback: String(value) });
 }
 
 // Die beiden Wandler für Eingabefelder (datetime-local) rechnen in der Zeit des Geräts - so zeigt der Browser das Feld.

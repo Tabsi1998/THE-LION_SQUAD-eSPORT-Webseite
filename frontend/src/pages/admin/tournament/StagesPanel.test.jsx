@@ -51,7 +51,7 @@ test("Spiele: keine Planungsfelder mehr, Hinweis und Weg in den Matchplan", () =
   fireEvent.click(screen.getByRole("button", { name: "Zum Matchplan" }));
   expect(onOpenMatchplan).toHaveBeenCalled();
   // Gelesen wird der Termin weiter an der Karte.
-  expect(screen.getByText(/Termin offen|31\.10\./)).toBeInTheDocument();
+  expect(screen.getByText(/Termin offen|Sa 31\. Oktober/)).toBeInTheDocument();
 });
 
 // Online gibt es keine Stationen (#2111, T7): der Hinweis spricht von Terminen und Fristen.

@@ -28,9 +28,9 @@ test("von Hand früher geöffnet, Beginn nicht nachgezogen: kein Beginn nach dem
 });
 
 test("checkInLine: „ab … bis …“, nur „bis …“ oder nur „ab …“", () => {
-  expect(checkInLine({ status: "check_in", check_in_from: "2026-10-21T08:45:00+00:00", check_in_until: "2026-10-21T08:55:00+00:00" }, NOW)).toBe("ab 21.10.2026, 10:45 bis 21.10.2026, 10:55");
-  expect(checkInLine({ status: "live", check_in_from: at(6), check_in_until: "2026-10-21T08:48:00+00:00" }, NOW)).toBe("bis 21.10.2026, 10:48");
-  expect(checkInLine({ status: "registration_open", check_in_from: "2026-10-21T09:00:00+00:00" }, NOW)).toBe("ab 21.10.2026, 11:00");
+  expect(checkInLine({ status: "check_in", check_in_from: "2026-10-21T08:45:00+00:00", check_in_until: "2026-10-21T08:55:00+00:00" }, NOW)).toBe("ab heute 10:45 bis 10:55");
+  expect(checkInLine({ status: "live", check_in_from: at(6), check_in_until: "2026-10-21T08:48:00+00:00" }, NOW)).toBe("bis heute 10:48");
+  expect(checkInLine({ status: "registration_open", check_in_from: "2026-10-21T09:00:00+00:00" }, NOW)).toBe("ab heute 11:00");
   expect(checkInLine({}, NOW)).toBe("");
 });
 
