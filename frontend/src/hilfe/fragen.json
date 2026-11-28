@@ -160,6 +160,13 @@
     "link": { "to": "/faq/events-und-kalender#anmeldung-aendern", "label": "Zur Anleitung" }
   },
   {
+    "id": "event-mindestanzahl",
+    "frage": "Was heißt „Findet ab 8 Anmeldungen statt“?",
+    "antwort": "Das Event findet nur statt, wenn bis zur Frist genug dabei sind. Darunter steht, wie viele noch fehlen und bis wann. Sagt der Verein ab, bekommst du eine Nachricht mit dem Grund.",
+    "bereich": "events-kalender", "rollen": ["spieler", "mitglied"], "sichtbar_fuer": "alle",
+    "link": { "to": "/faq/events-und-kalender#event-anmelden", "label": "Zur Anleitung" }
+  },
+  {
     "id": "wann-bin-ich-dran",
     "frage": "Woher weiß ich vor Ort, wann ich dran bin?",
     "antwort": "Dein Stand auf der Turnierseite zeigt dein nächstes Spiel mit Station und Zeit. Bist du dran, kommt eine Benachrichtigung.",

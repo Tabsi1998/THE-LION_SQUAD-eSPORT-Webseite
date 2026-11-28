@@ -40,6 +40,7 @@ Mal senden nur Redaktion und System.
 | **Mehrere Standorte** | Treffpunkt, Halle, Lokal – je mit Adresse, Zeiten und Karte | Formular, Kasten „Ort und Veranstalter“ |
 | **Event als Klammer** | Turniere und Fast Laps gehören zum Event und stehen in seiner Karte | Formular, Kasten „Programm und eSports-Inhalte“ |
 | **Anmeldung** | Plätze, Begleitpersonen, Warteliste, Frist, optional Kosten | Formular, Kasten „Anmeldung“ |
+| **Mindestanzahl** | Findet nur statt, wenn bis zu einer Frist genug dabei sind; sonst Hinweis an die Turnierleitung, nie von selbst abgesagt | Formular, Kasten „Anmeldung“ |
 | **Spielst du auch mit?** | Nach der Event-Anmeldung gleich für die Turniere des Events anmelden | von selbst, sobald das Event Turniere hat |
 | **Kosten** | Kostenbeitrag je Person oder Anmeldung, Rechnung über Dolibarr | Formular, Kasten „Anmeldung“ (Bereich Finanzen) |
 | **Kalender und Abo** | Monatsansicht, „In den Kalender“, Abo-Link für alle Termine, persönlicher Link | `/calendar`, Knopf am Event |
@@ -110,7 +111,9 @@ Mal senden nur Redaktion und System.
   Anmeldung; in der öffentlichen Liste bleibt das Event bis zum Termin unter **Kommend** stehen, gedämpft und mit dem Kennzeichen **Abgesagt**
   (die Startseite zeigt es nicht mehr). Die Zahl zählt alle bestehenden Anmeldungen, auch wenn die Anmeldung inzwischen ausgeschaltet ist. Wird die Absage
   zurückgenommen, bleiben die Anmeldungen storniert. Solange die Absage steht, lässt sich unter **Anmeldungen & Einlass** niemand wieder
-  aktivieren oder einchecken.
+  aktivieren oder einchecken. Hat das Event eine **Mindestanzahl** (3.5), öffnet sich statt der Rückfrage das Blatt **Event absagen**
+  mit Pflichtfeld **Grund** (mindestens 5 Zeichen); der Grund steht in der Benachrichtigung, in der Mail und oben auf der Event-Seite.
+  Wird die Absage zurückgenommen, fällt der Grund weg.
 - **Termin oder Ort ändern:** Gibt es Anmeldungen, fragt das Formular beim Speichern **Angemeldete informieren?**.
   **Informieren** schickt allen (samt Warteliste) den neuen Termin und Ort, **Ohne Nachricht speichern** nur das Formular. Turniere und Fast
   Laps bleiben auf ihrem Tag: Liegen sie danach außerhalb des Events, sagt das Speichern das, und im Programm steht bei ihnen **Liegt außerhalb
@@ -262,6 +265,32 @@ zeigt die Nachricht noch einmal mit der Zahl; erst **An … senden** schickt sie
   bestätigt noch einmal. Gleich nach einer Nachricht (1 Minute) geht keine zweite – weder beim selben Event noch von derselben
   Person bei einem anderen Event.
 - Jede Nachricht steht unter der Liste bei **Nachrichten an alle** (wann, wer, an wie viele) und im Protokoll.
+
+#### Mindestanzahl bis zu einer Frist
+
+Für Events, die sich erst ab einer bestimmten Zahl lohnen (Silvester, Ausflug, Grillabend): Im Kasten **Anmeldung** den Haken
+**Findet nur mit Mindestanzahl statt** setzen. Das geht nur mit der Anmeldung auf der Website, nicht mit einem externen Anmeldelink.
+Ohne Haken bleibt alles wie bisher.
+
+| Feld | Bedeutung | Vorgabe |
+| --- | --- | --- |
+| **Mindestanzahl** | So viele müssen bis zur Frist dabei sein (1 bis 10 000, nicht mehr als **Max. Teilnehmer**) | – |
+| **Frist** | Bis wann; spätestens der Beginn des Events | – |
+| **Begleitpersonen zählen mit** | An: jede Anmeldung samt Begleitpersonen (gezählt werden Personen). Aus: nur die Anmeldungen | an |
+| **Auf der Event-Seite zeigen** | Im Fakten-Kasten „Findet ab 8 Personen statt“ mit „Noch 3 bis Fr 18. Dezember · 18:00“ | an |
+
+- **Gezählt** wird wie bei den Plätzen: **Angemeldet** und **Da**, nicht die Warteliste.
+- **Stand:** Unter den Feldern steht, sobald das Event gespeichert ist, das Schild **Noch offen**, **Erreicht** oder **Zu wenige**
+  und der Satz „5 von 8 Personen (davon 2 Begleitpersonen) · Frist …“. Auf der Event-Seite steht nach Erreichen „Mindestzahl
+  erreicht.“, nach der Frist ohne genug Anmeldungen „Bis zur Frist nicht erreicht – der Verein entscheidet, ob das Event stattfindet.“
+- **Frist vorbei, zu wenige:** Die Turnierleitung bekommt **einmal** die Benachrichtigung **Zu wenige Anmeldungen** (Glocke, App, Push
+  nach Einstellung) mit Link auf das Event. Die Seite prüft alle 15 Minuten; nach dem Beginn des Events kommt kein Hinweis mehr.
+  Wird die Frist verschoben, gilt die neue Frist – ist sie wieder vorbei und es sind weiter zu wenige, kommt ein neuer Hinweis.
+- **Nie von selbst abgesagt.** Ihr entscheidet: so stattfinden lassen, die Frist verschieben oder absagen.
+- **Absagen in einem Schritt:** Knopf **Event absagen …** unter dem Stand. Im Blatt steht der Vorschlag als Grund schon drin („Zu wenige
+  Anmeldungen: Bis Fr 18.12. 18:00 waren 5 von mindestens 8 Personen dabei.“); ihr könnt ihn ändern. **Event absagen** storniert
+  Anmeldungen und Warteliste und schickt jeder Person genau eine Nachricht samt Mail mit dem Grund (siehe **Absagen** in 3.1). Gibt es
+  noch andere ungespeicherte Änderungen, zuerst speichern.
 
 ### 3.6 Kosten und Rechnung
 
@@ -448,6 +477,11 @@ Name, Bild und dem Ort: Event und Turniere, bei Teams mit Teamname. Wichtig für
 | „Ein Turnier dieses Events hat noch Anmeldungen“ beim Löschen | Ein verknüpftes Turnier hat noch Anmeldungen | Das Turnier aus dem Programm lösen oder dort die Anmeldungen klären |
 | Absage wieder zurückgenommen, Anmeldungen fehlen | Die Absage hat alle Anmeldungen storniert | Gewollt; die Personen melden sich neu an |
 | Max. Teilnehmer: Fehler beim Speichern | 0 oder eine negative Zahl | Feld leeren (unbegrenzt) oder eine Zahl ab 1 eintragen |
+| „Die Frist für die Mindestzahl muss vor dem Beginn des Events liegen“ | Frist nach dem Beginn, oder der Beginn wurde vor die Frist verschoben | Frist früher setzen oder den Beginn prüfen |
+| „Die Mindestzahl … ist größer als die Plätze“ | Mindestanzahl über **Max. Teilnehmer** – sie würde nie erreicht | Mindestanzahl senken oder Plätze erhöhen |
+| Mindestanzahl lässt sich nicht einschalten | Externer Anmeldelink oder Anmeldung aus – die Website zählt dann nichts | Anmeldung auf der Website einschalten |
+| Absagen geht nicht, „Bitte einen Grund angeben“ | Bei einer Mindestanzahl ist der Grund Pflicht | Grund mit mindestens 5 Zeichen eintragen |
+| Kein Hinweis „Zu wenige Anmeldungen“ | Frist noch nicht vorbei, genug dabei, Event schon begonnen oder abgesagt – oder der Hinweis kam schon (einmal je Frist) | Stand im Kasten **Anmeldung** lesen |
 
 ---
 
@@ -472,6 +506,12 @@ der Preis wird dabei eingefroren und sie bekommt Bescheid.
 **Sehen Teilnehmende, wer sonst angemeldet ist?**
 Die Event-Seite zeigt eine Liste der Angemeldeten und getrennt die Warteliste, wenn **Teilnehmer öffentlich anzeigen** an ist. An der Tür
 Eingetragene stehen dort nicht. Freunde sehen sich nur, wenn beide das erlauben (3.12).
+
+**Sagt die Seite ein Event ab, wenn die Mindestanzahl nicht erreicht ist?**
+Nein, nie. Die Turnierleitung bekommt nach der Frist einen Hinweis mit dem Vorschlag abzusagen und entscheidet selbst (3.5).
+
+**Zählen Begleitpersonen bei der Mindestanzahl?**
+Wie eingestellt: Mit **Begleitpersonen zählen mit** zählt jede Person, sonst nur die Anmeldungen. Die Warteliste zählt nie.
 
 **Wie viele Fotos kann ein Mitglied einsenden?**
 Bis zu 20 je Album, bis sieben Tage nach dem Event; Einzelheiten in [Inhalte](inhalte.md).
