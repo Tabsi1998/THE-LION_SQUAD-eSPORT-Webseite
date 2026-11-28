@@ -3807,7 +3807,8 @@ Logik in `services/league_season_cancel.py`, Routen in `routes/league_routes.py`
 - **Wann:** Season weder beendet noch archiviert, keine Staffel (auch Playoffs und Relegation) live, pausiert, beendet, mit Endstand oder
   mit einem gewerteten Spiel (`completed`, `forfeit`, ohne Vorschau). Sonst 409 mit dem Grund je Staffel. Team- und Solo-Season gleich.
 - **In einem Schritt, unter Sperre:** erst die Turnier-Sperren aller Staffeln (sortiert), dann die Season-Sperre, zuletzt die Sperre des
-  Map-Pools - dieselbe Reihenfolge wie beim Zuteilen und beim Anlegen einer Staffel. Dann:
+  Map-Pools - dieselbe Reihenfolge wie beim Zuteilen und beim Anlegen einer Staffel. Unter der Sperre liest es die Staffeln neu: Kam
+  inzwischen eine dazu oder ging eine weg, antwortet es 409 `CHANGED_MEANWHILE` (neu laden, noch einmal). Dann:
   1. Season `status: "cancelled"` mit `cancel_reason`, `cancelled_at`, `cancelled_by`, `status_before_cancel`. Damit ist die Anmeldung zu
      (`window_state` antwortet `closed`, das Fenster bleibt gespeichert).
   2. Jeder offene Antrag (`submitted`, `in_review`, `waitlist`, `accepted`, auch zugeteilt) wird `rejected` mit dem Grund,
@@ -3818,9 +3819,13 @@ Logik in `services/league_season_cancel.py`, Routen in `routes/league_routes.py`
   4. Je Person **genau eine** Nachricht samt Mail (`create_user_notification`, Art `tournament_cancelled`, `meta.reason`
      `league_season_cancelled`, `dedupe_key` `league-season-cancelled:<season>:<user>` mit `unique_dedupe`, Mail über `send_league_mail` mit
      `never_collect`): Captain und Vertreter je Co-Team (ohne beide die Hauptteam-Leitung), in der Solo-Liga die Person (aktives Konto).
-     Dazu Zugeteilte ohne offenen Antrag (Sonderweg „Co-Team zuteilen“ bzw. „Spieler zuteilen“). Wer für zwei Co-Teams zuständig ist, bekommt
-     eine Nachricht mit beiden Namen. Zeitkritisch wie jede Absage (Nr. 261, 267): nie in der Sammel-Mail, der Push wartet die Ruhezeit ab.
+     Dazu Zugeteilte ohne offenen Antrag (Sonderweg „Co-Team zuteilen“ bzw. „Spieler zuteilen“) - aber nur aus den Staffeln, die mit der
+     Season abgesagt werden (`told_staffeln`): Wer nur in einer vorher einzeln abgesagten Staffel stand, hat seine Absage schon. Das Blatt
+     zählt dieselbe Menge. Wer für zwei Co-Teams zuständig ist, bekommt eine Nachricht mit beiden Namen. Zeitkritisch wie jede Absage
+     (Nr. 261, 267): nie in der Sammel-Mail, der Push wartet die Ruhezeit ab. Verschickt wird erst nach dem Lösen der Sperren.
   5. Protokoll `league.season.cancel` mit Grund, Anträgen, Staffeln, Zahl der Nachrichten und dem Stand davor.
+- **Keine Befangenheit:** Das Absagen lehnt jeden Antrag gleich ab - auch den des eigenen Teams der Leitung. Es entscheidet über keinen
+  einzelnen Antrag, darum gibt es hier keine Prüfung nach Nr. 73 (B.1) und keine Notausnahme.
 - **Idempotent:** Ein zweites Absagen - auch gleichzeitig von einer zweiten Leitung oder nach einem Abbruch mittendrin - läuft dieselben
   Schritte noch einmal, findet nichts mehr zu tun und verschickt nichts doppelt (`already: true`, Grund und Protokoll bleiben die ersten).
 - **Gleichzeitig ein Antrag:** Das Einreichen wartet auf die Season-Sperre. Kommt es vorher an, wird der Antrag mit abgelehnt; danach
@@ -3828,8 +3833,11 @@ Logik in `services/league_season_cancel.py`, Routen in `routes/league_routes.py`
 - **Danach kommt nichts mehr hinein** (409 mit `SEASON_CANCELLED` bzw. dem Satz des Wegs): Einreichen (`season_problems`), Entscheiden
   (Antrag abgelehnt), Zuteilen und Sonderweg (Staffel abgesagt), Statuswechsel der Staffel (`POST /tournaments/{id}/status`,
   `staffel_guard.season_cancelled_problem`, auch zurück in den Entwurf), Liga N anlegen und ändern, Staffel anlegen, Los, Verlängern der
-  Nachmeldung, Startrechte einstellen, zusagen lassen und nachrücken, Kader (`CLOSED_SEASON_STATUSES`), Folge-Season aus der abgesagten
-  Season (Vorschau nennt `NO_SUCCESSOR_CANCELLED`). Der „Stand“ lässt sich nicht mehr ändern (409, auch nicht archivieren); `cancelled`
+  Nachmeldung, Startrechte einstellen, zusagen lassen und nachrücken, Kader (`CLOSED_SEASON_STATUSES`), „Vorgaben übertragen“
+  (`…/sync`), Regelwerk veröffentlichen und zustimmen (`league_rules._publish`, `_give_consent`), Folge-Season aus der abgesagten
+  Season (Vorschau nennt `NO_SUCCESSOR_CANCELLED`). Löschen einer abgesagten Season oder ihrer Liga N geht nicht; `delete-plan` trägt
+  `cancelled: true`, das Blatt bietet kein Archivieren an und der Satz nennt die Sichtbarkeit „Aus“ (`CANCELLED_DELETE_HINT`). Der „Stand“
+  lässt sich nicht mehr ändern (409, auch nicht archivieren); `cancelled`
   selbst setzt der Stand nie (409 „Absagen geht nur über …“), unverändert mitschicken stört nicht. Andere Felder (Sichtbarkeit,
   Gestaltung) bleiben änderbar. Der Job der Startrechte fasst abgesagte Seasons nicht an.
 - **Kein Zurücknehmen.** Für einen Neustart eine neue Season anlegen, mit Vorgänger über „Neue Season aus …“.
@@ -3837,11 +3845,14 @@ Logik in `services/league_season_cancel.py`, Routen in `routes/league_routes.py`
   frei (jetzt `cancelled_predecessor_id`, der eindeutige Index hält nur eine Folge-Season je Vorgänger); `predecessor` bleibt zur Anzeige.
   „Neue Season aus …“ beim Vorgänger geht dann wieder und vergibt dieselben Startrechte nach demselben Endstand neu, mit neuer Frist. Eine
   schon gegebene **Zusage** in der abgesagten Season gilt nicht weiter: Sie galt deren Terminen und Regeln, in der neuen Season sagt das
-  Team neu zu (Vorschlag an Fabian, siehe PR). Die Nachricht der Absage sagt bei übernommenen Teams „Startrechte aus der Vorgänger-Season
-  gelten für die nächste Season weiter.“
+  Team neu zu (Fabian, Nr. 307). Den Satz „Startrechte aus der Vorgänger-Season gelten für die nächste Season weiter.“ lesen nur Captain
+  und Vertreter übernommener Co-Teams (`carry_over`), nicht neu angemeldete.
 - **Anzeige:** `GET /api/leagues`, `GET /api/leagues/{liga}/{season}` und der Kopf jeder Season tragen `cancel_reason` und `cancelled_at`
-  (nie `cancelled_by`). Ligaseite: auf jeder Unterseite das Schild „Abgesagt“ (`PhaseBadge`, Rolle `quiet`) mit Datum und Grund; die
-  Liga-Übersicht `/liga` sagt „Abgesagt am …“. Verwaltung: dasselbe Schild oben mit dem Weg zum Neustart, „Season absagen“, „Season
+  (nie `cancelled_by`). Der Block `application` trägt `cancelled: true` und `cancelled_at`, `closes_at` ist höchstens die Absage - die
+  Seite sagt „Abgesagt am …“ statt „Vorbei seit …“. Ligaseite: auf jeder Unterseite das Schild „Abgesagt“ (`PhaseBadge`, Rolle `quiet`)
+  mit Datum und Grund, abgesagte Staffeln holen die Tabellen nicht nach oben; die Liga-Übersicht `/liga` sagt „Abgesagt am …“, die
+  Esports-Kachel übergeht abgesagte Seasons wie beendete; die Teilen-Karte (`seo_render_routes.league_season_meta`) heißt „… · Abgesagt“
+  mit dem Grund. Verwaltung: dasselbe Schild oben mit dem Weg zum Neustart, „Season absagen“, „Season
   löschen“ und „Neue Season aus …“ entfallen, der Stand steht nur lesend, die Ablaufleiste endet mit „Abschluss · abgesagt“. Die
   Zustands-Schilder aus #2609 übernehmen die Art „Abgesagt“, sobald sie da sind.
 - **Discord:** eine Meldung „Season abgesagt · …“ mit Grund und Link im Liga-Kanal, nur mit dem Schalter „Saisonende“ der Season und nur
@@ -3855,7 +3866,8 @@ Logik in `services/league_season_cancel.py`, Routen in `routes/league_routes.py`
 **Warnung ohne Mindestzahl** (`league_season_cancel.entry_shortfall`): Ist die Anmeldung zu (Fenster samt Nachmeldefrist vorbei, ohne
 Fenster der Meldeschluss `registration_deadline` vorbei) und hat noch keine reguläre Staffel begonnen, zählt sie je aktiver Liga N die
 zugeteilten (`seat_stats`-Abfrage) und angenommenen ohne Zuteilung (bei ihrer `carry_over.division_id`, sonst bei der einzigen Liga N)
-gegen das, was die Staffeln brauchen: je Staffel mindestens 2, ohne Staffel 2. Fehlt etwas, steht in „Was fehlt noch?“ die Warnung
+gegen das, was die Staffeln brauchen: je Staffel mindestens 2, ohne Staffel 2 (Fabian, Nr. 309). Reicht die Summe und wartet in der Liga N
+niemand mehr ohne Zuteilung, prüft sie zusätzlich jede Staffel einzeln (3 und 1: „Liga 1 · Staffel B … 1 zugeteilt“). Fehlt etwas, steht in „Was fehlt noch?“ die Warnung
 `entries_short` („Liga 1: Für den Spielplan sind zu wenige dabei – 1 angenommen oder zugeteilt, nötig sind mindestens 2. …“), und der
 Job `league_season_shortfall` (alle 30 Minuten) schickt der Leitung mit `manage` einmal je Season die Meldung „Zu wenige für den
 Spielplan“ (`dedupe_key` `league-season-shortfall:<season>:<user>`, Mail). Kein Text an Teams, nie automatisch abgesagt.

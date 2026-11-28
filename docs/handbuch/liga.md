@@ -1124,8 +1124,10 @@ Danach:
 - Jede Teamleitung bekommt **genau eine** Nachricht mit Mail: Captain und Vertreter je Co-Team, in einer Solo-Liga der Spieler
   selbst – auch wer von dir direkt zugeteilt war. Die Nachricht kommt immer sofort, nie in der Sammel-Mail.
 - Ligaseite, Liga-Übersicht und die Season-Seite zeigen **Abgesagt** mit Grund und Datum. Die Season verschwindet nicht.
-- Anmelden, Zuteilen, Staffel starten, Liga N oder Staffel anlegen und den **Stand** ändern geht nicht mehr. Sichtbarkeit und
-  Gestaltung kannst du weiter ändern.
+- Anmelden, Zuteilen, Staffel starten, Liga N oder Staffel anlegen, Vorgaben übertragen, ein Regelwerk veröffentlichen und den
+  **Stand** ändern geht nicht mehr. Sichtbarkeit und Gestaltung kannst du weiter ändern.
+- Löschen und Archivieren gehen nicht: Die Season bleibt mit Grund erhalten. Willst du sie nicht mehr zeigen, stell die
+  **Sichtbarkeit** auf **Aus**.
 - Ist **Saisonende** unter den Discord-Meldungen der Season an (2.7g), kommt eine Meldung „Season abgesagt“ in den Liga-Kanal.
 - Zweimal absagen – auch zwei Leitungen gleichzeitig – ändert nichts und schickt nichts doppelt.
 
@@ -1135,7 +1137,8 @@ mit neuer Frist. Eine Zusage, die ein Team in der abgesagten Season schon gegebe
 Season neu zu.
 
 **Warnung, wenn zu wenige da sind:** Ist die Anmeldung zu (Fenster vorbei, ohne Fenster der Meldeschluss) und sind für den Spielplan
-einer Liga N zu wenige angenommen oder zugeteilt (weniger als 2 je Staffel), steht das unter **Was fehlt noch?** im **Überblick**, und
+einer Liga N zu wenige angenommen oder zugeteilt (weniger als 2 je Staffel – auch wenn die Summe reicht, aber eine Staffel nur 1 hat),
+steht das unter **Was fehlt noch?** im **Überblick**, und
 du bekommst einmal eine Nachricht. Die Teams hören davon nichts. Ob du startest, Staffeln zusammenlegst oder absagst, entscheidest du.
 
 ### 2.10 Gestaltung: Emblem, Banner, Farbe und Gewinne
@@ -2482,6 +2485,7 @@ die Wertung unter **Gesamtwertung** (mit PDF), Profil und Teamseite den Platz.
 | „Bitte einen Grund angeben (mindestens 5 Zeichen). Er steht auf der Ligaseite und in der Nachricht an alle.“ | **Season absagen** ohne Grund | Grund eintragen (2.9a) |
 | „Staffel A läuft schon – absagen geht nur vor dem Start …“ / „… hat schon Ergebnisse …“ | **Season absagen** nach dem Start | Laufende Staffeln einzeln auf **Abgesagt**; die Season schließt über den Abschluss (3.10) |
 | „Diese Season ist abgesagt. Zurücknehmen geht nicht …“ | In einer abgesagten Season etwas ändern, anmelden, zuteilen oder eine Staffel starten | Neue Season anlegen, mit Vorgänger über **Neue Season aus …** (2.9a) |
+| „Löschen geht nicht: … Die Season ist abgesagt und bleibt mit Grund erhalten …“ | Abgesagte Season oder ihre Liga N löschen | Sichtbarkeit **Aus**, wenn sie nicht mehr zu sehen sein soll (2.9a) |
 | „Absagen geht nur über „Season absagen“ …“ | Stand auf *Abgesagt* setzen wollen | Knopf **Season absagen** oben auf der Season-Seite (2.9a) |
 | „Diese Season ist abgesagt – aus ihr lässt sich keine neue Season anlegen …“ | **Neue Season aus …** bei einer abgesagten Season | **Neue Season aus …** bei der Vorgänger-Season (2.9a) |
 | „Das Spiel bleibt, sobald eine Season eine Staffel hat …“ | Spiel einer Liga mit Staffel ändern | Neue Liga anlegen, die alte archivieren |
