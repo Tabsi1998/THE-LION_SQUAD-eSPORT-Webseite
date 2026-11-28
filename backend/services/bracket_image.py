@@ -181,7 +181,7 @@ def render(tournament: dict, matches: list[dict], stages: list[dict], registrati
     draw.text((MARGIN, 22), _ellipsis(draw, title, title_font, width - 2 * MARGIN), font=title_font, fill=COLORS["final"] if final else COLORS["title"])
     from services.date_text import format_moment
 
-    stamp = format_moment(now or now_utc())
+    stamp = format_moment(now or now_utc(), now=now)
     draw.text((MARGIN, 60), f"{'Endstand' if final else 'Stand'}: {stamp}", font=small, fill=COLORS["dim"])
 
     for section, ys, top in layouts:

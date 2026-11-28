@@ -207,7 +207,7 @@ def _relative(target: datetime, now: datetime) -> str:
         return f"morgen um {clock}"
     from services.date_text import format_moment
 
-    return f"am {format_moment(local_target)}"
+    return f"am {format_moment(local_target, now=now)}"
 
 
 def now_text(event: dict | None, now: datetime | None = None) -> str:

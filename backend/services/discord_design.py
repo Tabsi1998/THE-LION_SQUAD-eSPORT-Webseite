@@ -671,4 +671,4 @@ async def common_values(db, now: datetime | None = None) -> dict:
     branding = await db.settings.find_one({"id": "branding"}, {"_id": 0, "club_name": 1}) or {}
     current = (now or now_utc()).astimezone(VIENNA)
     return {"site": origin, "club": branding.get("club_name") or "THE LION SQUAD", "logo": f"{origin}/assets/brand/tls-favicon.png",
-            "now": format_moment(current)}
+            "now": format_moment(current, now=current)}

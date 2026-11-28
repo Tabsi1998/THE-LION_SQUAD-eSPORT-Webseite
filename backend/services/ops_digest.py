@@ -73,7 +73,7 @@ async def send_daily_summary(db, now: datetime | None = None) -> dict:
         return {"sent": False, "reason": "already"}
     from services.date_text import format_moment
 
-    title = f"Betrieb: Tageszusammenfassung {format_moment(local, time=False)}"
+    title = f"Betrieb: Tageszusammenfassung {format_moment(local, now=current, time=False)}"
     outcome = await ops_alerts.notify(db, "daily_summary", title, summary["description"], summary["fields"], key=key, force=True,
                                       event_key="ops_daily_summary", log_gate=lambda: ops_alerts.claim_failure_log(db, key))
     await db.ops_alert_log.update_many({"key": key, "resolved_at": None}, {"$set": {"resolved_at": current.isoformat()}})

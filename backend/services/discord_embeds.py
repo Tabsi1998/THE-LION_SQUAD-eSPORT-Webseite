@@ -66,7 +66,7 @@ def _dt(value) -> datetime | None:
 
 
 def stand_footer(now: datetime | None = None) -> str:
-    return f"Stand: {format_moment(now or now_utc())}"
+    return f"Stand: {format_moment(now or now_utc(), now=now)}"
 
 
 def vienna(value) -> str:
@@ -152,7 +152,7 @@ def achievement_week_context(doc: dict | None, origin: str) -> tuple[dict, list[
 
 def _common(origin: str, now: datetime | None) -> dict:
     return {"site": origin, "club": "THE LION SQUAD", "logo": f"{origin}/assets/brand/tls-favicon.png",
-            "now": format_moment(now or now_utc())}
+            "now": format_moment(now or now_utc(), now=now)}
 
 
 def _standard(kind: str, context: tuple[dict, list[dict]], origin: str, now: datetime | None) -> dict:

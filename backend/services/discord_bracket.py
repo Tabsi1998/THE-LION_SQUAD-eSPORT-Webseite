@@ -209,7 +209,7 @@ def bracket_embed(tournament: dict, matches: list[dict], stages: list[dict], reg
         lines.append(f"\n{done} Partien gespielt. Alle Ergebnisse: {link}")
     else:
         lines = [f"{done} von {len(matches)} Partien gespielt – Bracket ansehen: {link}"] if matches else [f"Noch keine Partien – Bracket ansehen: {link}"]
-    stamp = format_moment(now or now_utc())
+    stamp = format_moment(now or now_utc(), now=now)
     return {"title": title[:256], "description": "\n".join(lines)[:4000], "color": 0xFFD700 if final else 0x29B6E8, "url": link,
             "fields": bracket_fields(matches, stages, registrations, names, tournament=tournament), "image_url": None,
             "footer": f"{'Endstand' if final else 'Stand'}: {stamp}"}
