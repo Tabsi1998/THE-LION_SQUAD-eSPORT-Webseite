@@ -22,6 +22,7 @@ const DIRECT_ALLOWED = {
 // Selbst gebaute Datumsformen, die bleiben dürfen - mit Grund.
 const BUILT_ALLOWED = {
   "lib/datetime.js": "die Hilfen selbst",
+  "lib/vienna.js": "Wiener Zeit, Grundlage der Hilfen - liest die Teile der Wiener Uhr, schreibt kein Datum für Menschen",
   "lib/matchdayPaste.js": "Fehlermeldung zur eingefügten Eingabe - nennt das Datum so, wie es getippt wurde",
   "pages/admin/AdminDashboardPage.jsx": "Achse im Diagramm: fünf Zeichen je Tag („24.11.“)",
   "advent/doors.js": "Advent-Sonderform („5. Dezember, 6 Uhr“) - eigenes Folge-Issue #2619",
@@ -40,8 +41,10 @@ const BUILT = [
   { name: "Datumsmuster wie „dd.MM.“", pattern: /["'`][^"'`\n]*\bdd\.MM\b/ },
   { name: "Tag mit Monatsnamen („${tag}. ${monatsname}“)", pattern: /\$\{[^{}]+\}\.\s?\$\{[^{}]*(?:month|Month|MONTH|monat|Monat)[^{}]*\}/ },
   { name: "Datum aus Verkettung („getDate() + \".\"“)", pattern: /get(?:UTC)?(?:Date|Month)\(\)\s*(?:\+\s*1\s*)?\)?\s*\+\s*["']\.["']/ },
-  { name: "Intl.DateTimeFormat mit Tag oder Monat für die Anzeige", pattern: /new Intl\.DateTimeFormat\(\s*["']de[^"']*["'][^)]*\b(?:day|month)\s*:/ },
+  // Jedes Gebietsschema, auch ein variables - frei sind nur en-CA und sv-SE: die schreiben den ISO-Schlüssel („2026-05-23“).
+  { name: "Intl.DateTimeFormat mit Tag oder Monat für die Anzeige", pattern: /new Intl\.DateTimeFormat\(\s*(?!["'](?:en-CA|sv-SE)["'])[^,)]*,[^)]*\b(?:day|month)\s*:/ },
   { name: "Tag, dann Uhrzeit mit „Uhr“", pattern: /format(?:When|Date)\([^`\n]*\$\{formatClock\([^)]*\)\}\s*Uhr\b/ },
+  { name: "toLocaleDateString/toLocaleString mit Tag oder Monat", pattern: /\.toLocale(?:Date)?String\(\s*[^,)]*,[^)]*\b(?:day|month)\s*:/ },
 ];
 
 const sources = [];
@@ -73,6 +76,13 @@ describe("Gegenprobe: die Muster erkennen, was sie sollen", () => {
     expect('d.getDate() + "." + (d.getMonth() + 1) + "."').toMatch(BUILT[6].pattern);
     expect('const STAMP = new Intl.DateTimeFormat("de-AT", { timeZone: "Europe/Vienna", day: "numeric", month: "numeric", year: "numeric" });').toMatch(BUILT[7].pattern);
     expect("`${formatWhen(x, { time: false })} ${formatClock(x)} Uhr`").toMatch(BUILT[8].pattern);
+    // Nachprüfung: anderes oder variables Gebietsschema.
+    expect('new Intl.DateTimeFormat("en-GB", { day: "2-digit", month: "short" })').toMatch(BUILT[7].pattern);
+    expect('new Intl.DateTimeFormat(locale, { weekday: "short", day: "numeric", month: "long" })').toMatch(BUILT[7].pattern);
+    expect('new Intl.DateTimeFormat(undefined, { month: "long" })').toMatch(BUILT[7].pattern);
+    expect('new Intl.DateTimeFormat([], {\n  day: "numeric",\n})').toMatch(BUILT[7].pattern);
+    expect('date.toLocaleDateString("de-AT", { day: "numeric", month: "long" })').toMatch(BUILT[9].pattern);
+    expect('when.toLocaleString(navigator.language, { day: "2-digit", month: "2-digit", hour: "2-digit" })').toMatch(BUILT[9].pattern);
     expect("viennaDateTime(value, WHEN)").toMatch(DIRECT);
     expect("const text = exitLine(row, viennaDate);").toMatch(DIRECT);
     expect('import { viennaDate } from "@/lib/vienna";').not.toMatch(DIRECT);
@@ -90,6 +100,9 @@ describe("Gegenprobe: die Muster erkennen, was sie sollen", () => {
       "`${row.rank}. ${nameOf(item)}`",
       "`${index + 1}. ${value}`",
       'new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/Vienna", year: "numeric", month: "2-digit", day: "2-digit" })',
+      'new Intl.DateTimeFormat("sv-SE", { timeZone: "Europe/Vienna", year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit" })',
+      'new Intl.DateTimeFormat("de-AT", { timeZone: "Europe/Vienna", hour: "2-digit", minute: "2-digit" })',
+      'Number(value).toLocaleString("de-AT", { maximumFractionDigits: 1 })',
       'count + "." + suffix',
     ];
     for (const line of harmless) for (const { pattern } of BUILT) expect(line).not.toMatch(pattern);
