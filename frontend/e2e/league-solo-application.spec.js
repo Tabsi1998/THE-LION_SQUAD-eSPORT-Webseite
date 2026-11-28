@@ -104,11 +104,11 @@ for (const [width, height] of WIDTHS) {
   test.describe(`Anmeldung als Spieler bei ${width} px`, () => {
     test.use({ viewport: { width, height } });
 
-    test("Gast: Solo-Liga sagt „Einloggen, dann mitspielen“, kein Knopf für Co-Teams", async ({ page }) => {
+    test("Gast: Solo-Liga sagt „Anmelden, dann mitspielen“, kein Knopf für Co-Teams", async ({ page }) => {
       await mock(page, null, soloRoutes(MINE));
       await page.goto("/liga/duell/season-1");
       await expect(page.getByTestId("league-application-solo")).toContainText("Du meldest dich selbst als Spieler an");
-      await expect(page.getByTestId("league-application-login")).toContainText("Einloggen, dann mitspielen");
+      await expect(page.getByTestId("league-application-login")).toContainText("Anmelden, dann mitspielen");
       await expect(page.getByTestId("league-application-start")).toHaveCount(0);
       await expect(page.getByTestId("league-application-start-player")).toHaveCount(0);
       await noSideScroll(page);

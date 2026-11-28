@@ -179,7 +179,7 @@ export function LeagueApplicationPanel({ leagueSlug, seasonSlug, block }) {
         {!signedIn && current.state === "open" ? (
           <Link to={`/login?next=${encodeURIComponent(applyPath)}`} data-testid="league-application-login"
             className="tls-btn tls-btn--secondary inline-flex min-h-[44px] items-center gap-2 rounded-sm px-4 py-2.5 tls-type-label">
-            <LogIn className="h-4 w-4" aria-hidden="true" /> {solo ? "Einloggen, dann mitspielen" : "Anmelden, dann Team melden"}
+            <LogIn className="h-4 w-4" aria-hidden="true" /> {solo ? "Anmelden, dann mitspielen" : "Anmelden, dann Team melden"}
           </Link>
         ) : null}
       </div>

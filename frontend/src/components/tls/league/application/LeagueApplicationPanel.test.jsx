@@ -243,11 +243,11 @@ function soloView(player = PLAYER, extra = {}) {
   return view([], { kind: "solo", player, application: { ...BLOCK, participant_kind: "solo" }, ...extra });
 }
 
-test("Solo-Liga: ein Gast liest „Einloggen, dann mitspielen“, der Knopf für Co-Teams fehlt", () => {
+test("Solo-Liga: ein Gast liest „Anmelden, dann mitspielen“, der Knopf für Co-Teams fehlt", () => {
   authMock.current = null;
   renderPanel({ ...BLOCK, participant_kind: "solo" });
 
-  expect(screen.getByTestId("league-application-login")).toHaveTextContent("Einloggen, dann mitspielen");
+  expect(screen.getByTestId("league-application-login")).toHaveTextContent("Anmelden, dann mitspielen");
   expect(screen.getByTestId("league-application-solo")).toHaveTextContent("Du meldest dich selbst als Spieler an");
 });
 

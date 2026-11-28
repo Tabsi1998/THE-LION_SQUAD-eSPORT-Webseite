@@ -18,11 +18,13 @@ import { dayNoon, viennaDate } from "@/lib/vienna";
 import "@/components/tls/league/public/league.css";
 import { ShortCaps } from "@/components/tls/ShortCaps";
 
+// Je Schritt der passende Abschnitt der Hilfe (#2295).
+const HELP_STEPS = ["co-team-auswahl", "passt-alles", "regelwerk", "einreichen"];
 const TEAM_STEPS = [
-  { key: "choice", label: "Co-Team", title: "Welches Co-Team meldest du an?", help: "co-team-auswahl" },
-  { key: "check", label: "Prüfung", title: "Passt alles?", help: "passt-alles" },
-  { key: "consent", label: "Zustimmen", title: "Regeln und Datenschutz", help: "regelwerk" },
-  { key: "summary", label: "Einreichen", title: "Alles richtig?", help: "einreichen" },
+  { key: "choice", label: "Co-Team", title: "Welches Co-Team meldest du an?", help: HELP_STEPS[0] },
+  { key: "check", label: "Prüfung", title: "Passt alles?", help: HELP_STEPS[1] },
+  { key: "consent", label: "Zustimmen", title: "Regeln und Datenschutz", help: HELP_STEPS[2] },
+  { key: "summary", label: "Einreichen", title: "Alles richtig?", help: HELP_STEPS[3] },
 ];
 // Solo-Liga (#1629, P2): keine Auswahl - die Hilfe hat einen eigenen Schritt für Spieler.
 const SOLO_STEPS = [
@@ -259,7 +261,6 @@ export default function LeagueApplyPage() {
     </PublicLayout>
   );
   const back = <Link to={backPath} className={`${QUIET} mt-4`}><ArrowLeft className="h-4 w-4" aria-hidden="true" /> Zur Ligaseite</Link>;
-  const heading1 = solo ? "Als Spieler anmelden" : "Mit Co-Team anmelden";
 
   if (missing) {
     return shell(<div data-testid="apply-missing"><h1 className="tls-type-title"><ShortCaps>Liga nicht gefunden</ShortCaps></h1><p className="mt-3 text-white/60">Diese Season gibt es nicht oder sie ist (noch) nicht sichtbar.</p>{back}</div>);
@@ -285,7 +286,7 @@ export default function LeagueApplyPage() {
 
   return shell(
     <>
-      <h1 className="tls-type-title"><ShortCaps>{heading1}</ShortCaps></h1>
+      <h1 className="tls-type-title">{solo ? <ShortCaps>Als Spieler anmelden</ShortCaps> : <ShortCaps>Mit Co-Team anmelden</ShortCaps>}</h1>
       <Stepper steps={steps} step={step} />
       <section key={step} className="tls-apply-step mt-6" aria-labelledby="apply-step-title">
         <div className="mb-3 flex items-start justify-between gap-2">
