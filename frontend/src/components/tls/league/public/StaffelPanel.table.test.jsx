@@ -1,5 +1,9 @@
 import { render, screen, within } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
+import { runAtTestClock } from "@/testClock";
+
+// Feste Uhr (#1307): die Datums-Texte lassen das laufende Jahr weg und sagen „heute“/„morgen“.
+runAtTestClock();
 
 // Staffel-Tabelle auf der Ligaseite (E.1, #1625): Hinweis, was den Gleichstand entschied, „kampflos“, Tabellenende,
 // keine Spalte „U“ ohne Remis, „beide nicht erschienen“ im Spielplan.
@@ -71,7 +75,7 @@ test("Endstand (F.1, #1645): die abgeschlossene Staffel nennt Tag und Meister - 
     final: { version: 2, closed_at: "2026-11-12T17:00:00+00:00", champion: { registration_id: "b", display_name: "Team b" }, decisions: [] } },
   standings: [row("a", 2), row("b", 1)] } });
   render(<MemoryRouter><StaffelPanel leagueSlug="liga" seasonSlug="season-1" staffel={{ tournament_id: "t1", staffel: "A" }} /></MemoryRouter>);
-  expect(await screen.findByTestId("league-final-A")).toHaveTextContent("Endstand · abgeschlossen am 12.11.2026");
+  expect(await screen.findByTestId("league-final-A")).toHaveTextContent("Endstand · abgeschlossen am Do 12. November");
   expect(screen.getByTestId("league-champion-A")).toHaveTextContent("Meister Team b");
 });
 
