@@ -1,5 +1,5 @@
 import { eventFacts } from "./eventPage";
-import { formToMinimum, minimumChip, minimumFact, minimumFormError, minimumSummary, minimumToForm, minimumUnit, reasonProblem } from "./eventMinimum";
+import { formToMinimum, minimumChip, minimumExample, minimumFact, minimumFormError, minimumSummary, minimumToForm, minimumUnit, reasonProblem } from "./eventMinimum";
 
 // Mindestanzahl bis zu einer Frist (#2614): die Wörter für Event-Seite und Verwaltung. Feste Uhr, Frist in Wiener Zeit.
 const NOW = new Date("2026-12-01T10:00:00Z");
@@ -30,6 +30,11 @@ test("keine Zeile ohne Mindestzahl, nach der Absage und nach dem Event", () => {
   expect(minimumFact({ minimum: view() }, { now: NOW, over: true })).toBeNull();
 });
 
+test("„Auf der Event-Seite zeigen“ aus: auch die Verwaltung sieht auf der Event-Seite keine Zeile", () => {
+  // Die Leitung bekommt den Stand vom Server mit - die Event-Seite soll ihr nicht vorgaukeln, dass Besucher ihn sehen.
+  expect(minimumFact({ minimum: view({ public: false }), status: "registration_open" }, { now: NOW })).toBeNull();
+});
+
 test("Fakten-Kasten: die Zeile steht nach dem Eintritt", () => {
   const rows = eventFacts({ start_date: "2026-12-31T17:00:00Z", minimum: view(), bring_along: ["Schlitten"] }, { now: NOW });
   expect(rows.map((row) => row.key)).toEqual(["when", "entry", "minimum", "bring"]);
@@ -58,8 +63,17 @@ test("Formular-Prüfung wie am Server: Zahl, Frist, vor dem Beginn, nicht mehr a
   expect(minimumFormError({ ...form, count: "0" })).toContain("ab 1");
   expect(minimumFormError({ ...form, deadline: "" })).toContain("Frist eintragen");
   expect(minimumFormError(form, { startDate: "2026-12-18T17:00" })).toContain("vor dem Beginn");
+  // Mindestens 1 Stunde Abstand (wie der Server): genau 1 Stunde geht, 59 Minuten nicht.
+  expect(minimumFormError(form, { startDate: "2026-12-18T19:00" })).toBe("");
+  expect(minimumFormError(form, { startDate: "2026-12-18T18:59" })).toBe("Mindestanzahl: Die Frist muss mindestens 1 Stunde vor dem Beginn des Events liegen.");
   expect(minimumFormError(form, { maxParticipants: "6" })).toContain("mehr als die Plätze (6)");
   expect(minimumFormError({ ...form, enabled: false, count: "" })).toBe("");
+});
+
+test("Wortwahl der Verwaltung passt zur Zählung", () => {
+  expect(minimumExample({ count: "8", count_companions: true }, { allowCompanions: true })).toBe("„Findet ab 8 Personen statt – noch … bis …“");
+  expect(minimumExample({ count: "8", count_companions: true }, { allowCompanions: false })).toBe("„Findet ab 8 Anmeldungen statt – noch … bis …“");
+  expect(minimumExample({ count: "", count_companions: false }, { allowCompanions: true })).toBe("„Findet ab X Anmeldungen statt – noch … bis …“");
 });
 
 test("Grund der Absage: mindestens fünf Zeichen", () => {

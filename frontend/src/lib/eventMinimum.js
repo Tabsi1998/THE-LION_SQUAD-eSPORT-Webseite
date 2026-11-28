@@ -5,6 +5,8 @@ import { formatWhen, fromDateTimeLocal, toDateTimeLocalInput } from "@/lib/datet
 
 /** Grund der Absage: so lang muss er mindestens sein (Server: event_minimum.REASON_MIN). */
 export const MIN_REASON = 5;
+/** Abstand zwischen Frist und Beginn (Server: event_minimum.DEADLINE_GAP) - sonst käme der Hinweis erst nach dem Beginn. */
+const DEADLINE_GAP_MS = 60 * 60 * 1000;
 
 /** „Person“/„Personen“, wenn Begleitpersonen mitzählen, sonst „Anmeldung“/„Anmeldungen“. */
 export function minimumUnit(countCompanions, count) {
@@ -14,11 +16,12 @@ export function minimumUnit(countCompanions, count) {
 
 /**
  * Die Zeile im Fakten-Kasten der Event-Seite: „Findet ab 8 Anmeldungen statt“ und darunter „Noch 3 bis Fr 18. Dezember · 18:00“.
- * Keine Zeile ohne Mindestzahl und bei einem abgesagten oder vergangenen Event.
+ * Keine Zeile ohne Mindestzahl, bei einem abgesagten oder vergangenen Event und wenn die Verwaltung die Anzeige ausgeschaltet hat -
+ * auch nicht für die Verwaltung selbst, damit die Seite nicht vorgaukelt, Besucher sähen den Stand (er steht in der Verwaltung).
  */
 export function minimumFact(event, { now = new Date(), over = false } = {}) {
   const minimum = event?.minimum;
-  if (!minimum || over || event.status === "cancelled") return null;
+  if (!minimum || minimum.public === false || over || event.status === "cancelled") return null;
   const title = `Findet ab ${minimum.count} ${minimumUnit(minimum.count_companions, minimum.count)} statt`;
   let line;
   if (minimum.state === "reached") line = "Mindestzahl erreicht.";
@@ -42,6 +45,14 @@ export function minimumSummary(minimum, { now = new Date() } = {}) {
   const deadline = formatWhen(minimum.deadline, { now });
   return `${minimum.have} von ${minimum.count} ${minimumUnit(minimum.count_companions, minimum.count)}${companions} · `
     + `${minimum.deadline_passed ? "Frist war" : "Frist"} ${deadline}`;
+}
+
+/** Das Beispiel in der Verwaltung, wie es die Event-Seite schreiben wird - mit der Zählung, die gerade gilt (Begleitpersonen nur, wo
+ *  sie erlaubt sind; Server: event_minimum.settings). */
+export function minimumExample(form, { allowCompanions = false } = {}) {
+  const count = Number.parseInt(form?.count, 10);
+  const shown = Number.isInteger(count) && count > 0 ? count : null;
+  return `„Findet ab ${shown ?? "X"} ${minimumUnit(Boolean(allowCompanions && form?.count_companions), shown ?? 2)} statt – noch … bis …“`;
 }
 
 /** Das Formular aus der gespeicherten Einstellung. */
@@ -72,8 +83,8 @@ export function minimumFormError(form, { startDate = "", maxParticipants = "" } 
   const count = Number(form.count);
   if (!Number.isInteger(count) || count < 1) return "Mindestanzahl: Bitte eine Zahl ab 1 eintragen.";
   if (!form.deadline || !fromDateTimeLocal(form.deadline)) return "Mindestanzahl: Bitte eine Frist eintragen.";
-  if (startDate && fromDateTimeLocal(startDate) && new Date(form.deadline) > new Date(startDate)) {
-    return "Mindestanzahl: Die Frist muss vor dem Beginn des Events liegen.";
+  if (startDate && fromDateTimeLocal(startDate) && new Date(form.deadline).getTime() > new Date(startDate).getTime() - DEADLINE_GAP_MS) {
+    return "Mindestanzahl: Die Frist muss mindestens 1 Stunde vor dem Beginn des Events liegen.";
   }
   const seats = Number(maxParticipants);
   if (seats && count > seats) return `Mindestanzahl: ${count} ist mehr als die Plätze (${seats}) – so würde sie nie erreicht.`;
