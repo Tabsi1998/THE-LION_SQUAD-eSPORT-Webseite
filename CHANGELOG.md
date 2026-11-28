@@ -1,5 +1,69 @@
 # Changelog
 
+## 1.102.0 (28.11.2026)
+
+### Neu
+
+* „Plan B aktiv“ auf Event-Seite, im Kalender und in der ICS-Datei (#2613)
+* Abstimmungen am Event – Angemeldete stimmen ab, mit Frist und einstellbarem Ergebnis (#2612)
+* Abstimmungen in der Verwaltung – anlegen, ändern, beenden, löschen; nur Zahlen, nie Namen (#2612)
+* Ausweichorte wieder entfernen – der aktive Plan bleibt als Ort (#2613)
+* Ergebnis einer Abstimmung steht nach dem Ende fest (#2612)
+* Ergebnis einer Abstimmung über die Ort-Pläne als Ort übernehmen (#2613)
+* **liga:** „Was fehlt noch?“ warnt bei einer Solo-Season deutlich, dass der Spielbetrieb folgt (#1629)
+* **liga:** „Was fehlt noch?“ warnt nach Anmeldeschluss bei zu wenigen Teilnehmern, einmal Meldung an die Leitung (#2607)
+* **liga:** abgesagte Season bleibt mit Grund und Datum auf Ligaseite und Liga-Übersicht sichtbar (#2607)
+* **liga:** Discord-Meldung „Season abgesagt“ im Liga-Kanal (#2607)
+* **liga:** Eingang der Leitung für Spieler – annehmen, ablehnen, Warteliste, zuteilen, eigene Anmeldung nur durch eine andere Person (#1629)
+* **liga:** nach der Absage kommt nichts mehr in die Season, Startrechte des Vorgängers gelten für die nächste Season weiter (#2607)
+* **liga:** Nachrichten und Mails zur Anmeldung gehen in der Solo-Liga an den Spieler selbst (#1629)
+* **liga:** Prüfung je Spieler im Klartext – Sperre, Mitgliedschaft, schon in einer Staffel; fehlende Angaben als offene Punkte (#1629)
+* **liga:** Season absagen mit Pflichtgrund – Anmeldungen abgelehnt, Staffeln abgesagt, je Teamleitung bzw. Spieler genau eine Nachricht (#2607)
+* **liga:** Season einer Solo-Liga startet mit 1 gegen 1, Check-in mit der Person selbst (#1629)
+* **liga:** Solo-Liga – Anmeldung, Spielbetrieb und Folge-Season mit Hinweis „folgt“ gesperrt (#1629)
+* **liga:** Solo-Liga anlegen – Teilnehmer „Spieler (1 gegen 1)“, geprüft gegen das Spiel und ab dem Anlegen fest (#1629)
+* **liga:** Spieler melden sich in der Solo-Liga selbst an – derselbe Antrag, dasselbe Fenster, dieselben Startplätze und Warteliste (#1629)
+* **liga:** Spieler zuteilen – sich selbst nur als Notausnahme mit Grund, Suche ohne gesperrte Konten (#1629)
+* **liga:** Staffel-Seite einer Solo-Liga – Spieler zuteilen mit Kontosuche und Entfernen (#1629)
+* **liga:** Verwaltung zeigt die Teilnehmerart in Übersicht, Season und Staffel (#1629)
+* neue Abstimmung auf Wunsch mit Nachricht an die Angemeldeten (#2612)
+* Plan A/B/C beim Ort – Ausweichorte hinterlegen und mit einem Klick umschalten (#2613)
+* **spiele:** Spielseite – Schalter „Einzelspieler erlaubt“, gesperrt solange Solo-Ligen das Spiel spielen (#1629)
+* Umschalten des Orts mit „Angemeldete informieren?“ – eine Nachricht je Person (#2613)
+* **web:** „Mein Kalender“ zeigt den eigenen Stand als Zustands-Schild (#1306)
+* **web:** Countdown steht neben dem Zustands-Schild statt darin (#1306)
+* **web:** Dashboard – „Läuft“ rot wie überall, eigener Stand in Du-Form (#1306)
+* **web:** Ein Zustands-Schild für alle Zustände – zehn Arten mit Symbol und Wort, normal geschrieben (#1306)
+* **web:** Eventliste und Event-Programm zeigen den eigenen Stand als Zustands-Schild (#1306)
+* **web:** Kalender nennt bei mehrtägigen Events den Tag neben dem Schild (#1306)
+* **web:** Kalender zeigt die Phase als Zustands-Schild (#1306)
+* **web:** Laufende Saison zeigt „Läuft“ ohne Puls (#1306)
+* **web:** Ligaseite „Als Spieler anmelden“ mit Prüfung, Zustimmung, Stand und Zurückziehen (#1629)
+* **web:** Matchseite – „Beendet“ als Zustands-Schild (#1306)
+* **web:** Rennserien, Teamliga und Liga-Anmeldung mit Zustands-Schildern (#1306)
+* **web:** Startseite zeigt bei offener Solo-Season „Als Spieler anmelden“ (#1629)
+* **web:** Station eines anderen Turniers ruhig grau statt rotem „Läuft“ (#1306)
+* **web:** Stationen mit Zustands-Schildern, freie Station mit eigenem Schild „Frei“ (#1306)
+* **web:** Tage mehrtägiger Events mit Zustands-Schild (#1306)
+* **web:** Teilnehmerlisten – fremde Anmeldungen „Bestätigt“ ruhig grau, nur die eigene in Cyan (#1306)
+* **web:** Turnierkarte – ruhige Anmeldezeile ohne Doppelung zum Schild (#1306)
+* **web:** Turnierkarten – Zustands-Schild auf Bildern lesbar und ohne Umbruch (#1306)
+* **web:** TV-Pille und Hallen-Tafel mit denselben Zustands-Arten in Beamer-Größe (#1306)
+* **web:** Verwaltung – Selbstanmeldung und Eingang für Spieler in der Solo-Season (#1629)
+
+### Fehlerbehebungen
+
+* **liga:** Anmeldeblock und Teilen-Karte einer abgesagten Season sagen „Abgesagt“, Esports-Kachel übergeht sie (#2607)
+* **liga:** eine Anmeldung direkt an der Solo-Staffel vorbei verweist auf die Ligaseite (#1629)
+* **liga:** eine Sperre der Person hält auch das Zuteilen in die Solo-Staffel auf (#1629)
+
+### Dokumentation
+
+* Handbuch und Hilfe zu Abstimmungen und Ort-Plänen ([#2612](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/2612), [#2613](https://github.com/Tabsi1998/THE-LION_SQUAD-eSPORT-Webseite/issues/2613))
+* **liga:** Hilfe und Handbuch – als Spieler anmelden (#1629)
+* **liga:** Season absagen in Handbuch, LIGA.md und FAQ (#2607)
+* **liga:** Solo-Liga im Handbuch „Liga leiten“ und in LIGA.md (#1629)
+
 ## 1.101.0 (27.11.2026)
 
 ### Neu
