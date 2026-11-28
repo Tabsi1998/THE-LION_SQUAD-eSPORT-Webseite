@@ -215,6 +215,16 @@ for (const [label, width, height] of [["handy", 390, 844], ["pc", 1440, 900]]) {
       expect(switches[1]).toEqual({ key: "plan-b", notify: false, expected: "plan-c" });
       await expect(plans.getByTestId("event-place-plan-active-1")).toContainText("Gilt jetzt");
 
+      // Ausweichorte entfernen (Review #2613-4): Rückfrage in der Seite; „Zurück“ lässt alles, wie es ist.
+      await page.mouse.move(0, 0);
+      await plans.getByTestId("event-place-plans-remove-all").click();
+      const removeDialog = page.getByRole("dialog");
+      await expect(removeDialog).toContainText("Ausweichorte entfernen?");
+      await expect(removeDialog).toContainText("Rodelbahn Gaisalm");
+      await shot(removeDialog, `ausweichorte-entfernen-frage-${width}`);
+      await removeDialog.getByRole("button", { name: "Zurück" }).click();
+      await expect(plans).toBeVisible();
+
       // Neue Abstimmung mit Ergebnis nach der Frist und Nachricht an die Angemeldeten.
       await polls.getByTestId("event-poll-new").click();
       const form = polls.getByTestId("event-poll-form");
