@@ -4,8 +4,9 @@
   Event-Seite bekommt dieselbe Liste in ``polls``).
 - ``PUT  /api/events/{event}/polls/{poll}/vote`` - abstimmen oder die Stimme ändern, nur als Angemeldete.
 - ``/api/admin/events/{event}/polls`` - anlegen, ändern, beenden, löschen; die Verwaltung sieht nur Zahlen.
+- ``POST /api/admin/events/{event}/place-plan`` - auf einen anderen Ort-Plan umschalten, auf Wunsch mit Nachricht.
 
-Logik in ``services/event_polls.py``.
+Logik in ``services/event_polls.py`` und ``services/event_place_plans.py``.
 """
 from __future__ import annotations
 
@@ -16,7 +17,7 @@ from pydantic import BaseModel, Field
 
 from auth import get_current_user, get_optional_user, require_admin
 from database import get_db
-from services import event_polls
+from services import event_place_plans, event_polls
 from services.access_links import validate_access_link
 from services.permissions import is_confirmed_tournament_lead
 from services.slug_utils import find_by_slug_or_history
@@ -51,6 +52,14 @@ class PollUpdate(BaseModel):
 
 class VoteIn(BaseModel):
     choices: List[str] = Field(default_factory=list, max_length=event_polls.OPTION_MAX)
+
+
+class PlaceSwitchIn(BaseModel):
+    key: str = Field(max_length=40)
+    # Die Frage „Angemeldete informieren?“ (wie beim Verschieben) - wird nicht gespeichert.
+    notify: bool = False
+    # Der Plan, den die Verwaltung beim Klick aktiv sah: hat inzwischen jemand anderer umgeschaltet, gibt es 409.
+    expected: Optional[str] = Field(default=None, max_length=40)
 
 
 def _raise(exc: Exception) -> None:
@@ -131,4 +140,15 @@ async def admin_delete_poll(event_id: str, poll_id: str, me: dict = Depends(requ
     try:
         return await event_polls.delete_poll(get_db(), await _event(event_id), poll_id, me)
     except event_polls.PollError as exc:
+        _raise(exc)
+
+
+# ---------------------------------------------------------------- Ort-Pläne
+
+@admin_router.post("/{event_id}/place-plan")
+async def admin_switch_place_plan(event_id: str, body: PlaceSwitchIn, me: dict = Depends(require_admin())):
+    try:
+        return await event_place_plans.switch(get_db(), await _event(event_id), body.key, me, notify=body.notify,
+                                              expected=body.expected)
+    except event_place_plans.PlanError as exc:
         _raise(exc)

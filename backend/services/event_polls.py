@@ -258,12 +258,18 @@ async def poll_view(db, poll: dict, user: dict | None, *, now: datetime, eligibl
 
 
 async def admin_view(db, event: dict, poll: dict, *, now: datetime, active: set[str] | None = None) -> dict:
-    """Für die Verwaltung: immer das Ergebnis als Zahlen, dazu wie viele abstimmen dürfen und abgestimmt haben."""
+    """Für die Verwaltung: immer das Ergebnis als Zahlen, dazu wie viele abstimmen dürfen und abgestimmt haben.
+    ``place_plan_poll``: die Antworten sind die Ort-Pläne (#2613) - das Ergebnis lässt sich als Ort übernehmen."""
+    from services.event_place_plans import stored_plans
+
     if active is None:
         active = await _active_user_ids(db, event["id"])
     counted = await _counted(db, poll, active)
     view = _base(poll, now)
+    plan_keys = {plan["key"] for plan in stored_plans(event)}
+    codes = [option["code"] for option in view["options"]]
     view.update({"result": _result(poll, counted), "voters_count": len(counted), "eligible_count": len(active),
+                 "place_plan_poll": bool(plan_keys and codes) and all(code in plan_keys for code in codes),
                  "created_at": poll.get("created_at"), "updated_at": poll.get("updated_at")})
     return view
 
