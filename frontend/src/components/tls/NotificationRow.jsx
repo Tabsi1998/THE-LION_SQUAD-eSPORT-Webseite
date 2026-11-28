@@ -5,7 +5,8 @@ import { toast } from "sonner";
 import { api, formatApiError } from "@/lib/api";
 import { Badge } from "@/components/achievements/Badge";
 import { isExternalUrl, previewText } from "@/lib/notifications";
-import { viennaDateTime } from "@/lib/vienna";
+import { formatAgo } from "@/lib/datetime";
+import { When } from "@/components/tls/When";
 
 // Eine Benachrichtigung (oder ein Bündel) als anklickbare Zeile (#255):
 // Titel, eine Zeile Vorschau, Zeit. Der Klick führt ans Ziel und meldet
@@ -14,7 +15,7 @@ import { viennaDateTime } from "@/lib/vienna";
 export function notificationDate(value) {
   if (!value) return "";
   try {
-    return viennaDateTime(value, { dateStyle: "short", timeStyle: "short" });
+    return formatAgo(value);
   } catch {
     return "";
   }
@@ -56,7 +57,7 @@ function ConfirmResultButton({ bundle, onDone, testId }) {
 
 // `pending` (#987): „gelesen“ ist unterwegs - die Zeile ist kenntlich, bis der Server es bestätigt oder ablehnt.
 // `leading` (#1205): ein Symbol für das Thema vor dem Titel - Glocke und Postfach geben es mit.
-export function NotificationRow({ bundle, onOpen, onDelete, compact = false, testIdPrefix = "notification-row", pending = false, leading = null }) {
+export function NotificationRow({ bundle, onOpen, onDelete, compact = false, testIdPrefix = "notification-row", pending = false, leading = null, day = null }) {
   const badge = notificationBadge(bundle);
   const content = (
     <div className="flex items-start gap-2 min-w-0">
@@ -69,7 +70,8 @@ export function NotificationRow({ bundle, onOpen, onDelete, compact = false, tes
           <div className="mt-0.5 tls-type-small text-white/55 truncate" data-testid={`${testIdPrefix}-preview-${bundle.id}`}>{previewText(bundle.body)}</div>
         ) : null}
         <div className="mt-1 tls-type-label text-quiet">
-          {notificationDate(bundle.created_at)}
+          {/* Unter „Gestern“ steht der Tag schon im Kopf - dort nur die Uhrzeit, sonst „vor 12 Min.“ bzw. der Tag (#1307). */}
+          <When value={bundle.created_at} ago={day !== "yesterday"} clock={day === "yesterday"} />
           {bundle.count > 1 ? ` · ${bundle.count} gebündelt` : ""}
         </div>
       </div>

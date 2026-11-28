@@ -2,14 +2,14 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link, Navigate, useParams, useSearchParams } from "react-router-dom";
 import { Activity, CalendarClock, CheckCircle2, Flag, Monitor, Radio, RotateCw, Trophy, Users } from "lucide-react";
 import { api } from "@/lib/api";
-import { formatWhen } from "@/lib/datetime";
+import { formatClock } from "@/lib/datetime";
 import { sortByNearestDate } from "@/lib/contentSort";
 import { formatMatchKind, formatMatchStatus, formatScheduleGroupLabel, matchScheduleStatusText, slotName, stationText } from "@/lib/tournamentLabels";
 import { useLiveRefresh } from "@/hooks/useLiveRefresh";
-import { viennaTime } from "@/lib/vienna";
 import { finderFor, sourceLabel } from "@/lib/slotSource";
 import { eventIsOver } from "@/lib/afterEnd";
 import { KIND_COLORS } from "@/lib/categoryColors";
+import { When } from "@/components/tls/When";
 
 const ACTIVE_MATCH_STATUSES = new Set(["in_progress", "running", "waiting_result", "disputed"]);
 const NEXT_MATCH_STATUSES = new Set(["ready", "scheduled", "pending", "preview"]);
@@ -152,7 +152,7 @@ export function EventLiveBoard({ event, accessToken = "" }) {
   return (
     <div className="space-y-8" data-testid="event-live-board">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        {lastUpdated ? <span className="inline-flex items-center gap-2 tls-type-small text-white/45"><RotateCw className="w-3.5 h-3.5" /> Aktualisiert {viennaTime(lastUpdated, { hour: "2-digit", minute: "2-digit" })}</span> : <span />}
+        {lastUpdated ? <span className="inline-flex items-center gap-2 tls-type-small text-white/45"><RotateCw className="w-3.5 h-3.5" /> Aktualisiert {formatClock(lastUpdated)}</span> : <span />}
         <button type="button" onClick={load} className="tls-btn tls-btn--quiet inline-flex items-center gap-2 px-3 py-1.5 tls-type-label rounded-sm" data-testid="event-live-refresh">
           <RotateCw className="w-3.5 h-3.5" /> Aktualisieren
         </button>
@@ -230,7 +230,7 @@ function MatchCard({ match, stationMap, featured = false }) {
         <span className="shrink-0 rounded-sm border border-[#29B6E8]/35 px-2 py-1 tls-type-label text-[#29B6E8]">{matchScheduleStatusText(match)}</span>
       </div>
       <div className="mt-4 flex flex-wrap gap-3 tls-type-small text-white/55">
-        <span className="inline-flex items-center gap-1.5"><CalendarClock className="w-3.5 h-3.5" />{formatWhen(match.scheduled_at, { fallback: "Termin offen" })}</span>
+        <span className="inline-flex items-center gap-1.5"><CalendarClock className="w-3.5 h-3.5" /><When value={match.scheduled_at} fallback="Termin offen" /></span>
         {station && <span className="inline-flex items-center gap-1.5 text-brand"><Monitor className="w-3.5 h-3.5" />{station}</span>}
         <span className="inline-flex items-center gap-1.5"><Users className="w-3.5 h-3.5" />{formatMatchKind(match)}</span>
       </div>

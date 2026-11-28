@@ -4,6 +4,10 @@ import { singleElimination } from "../../e2e/fixtures/tvBrackets.mjs";
 import { call } from "../../e2e/fixtures/tvHall.mjs";
 import { getRegistrationState } from "./datetime";
 import { checkInView, dayAndTime, nextUp, pauseClock, pauseView, registrationOpen, registrationView, tvScreenFor } from "./tvScreens";
+import { runAtTestClock } from "@/testClock";
+
+// Feste Uhr (#1307): die Datums-Texte lassen das laufende Jahr weg und sagen „heute“/„morgen“.
+runAtTestClock();
 
 const NOW = Date.parse("2026-10-10T14:32:00+02:00");
 const at = (minutes) => new Date(NOW + minutes * 60000).toISOString();
@@ -114,11 +118,11 @@ test("Anmeldung: freie Plätze aus der Zahl vom Server, Beginn mit Tag", () => {
   const view = registrationView({ max_participants: 16, start_date: "2026-10-18T14:00:00+02:00", registration_open_until: "2026-10-17T20:00:00+02:00" }, { taken: 10, capacity: 16 }, [], NOW);
   expect(view.seatsText).toBe("Noch 6 von 16 Plätzen frei");
   expect(view).toMatchObject({ capacity: 16, taken: 10, free: 6 });
-  expect(view.startText).toBe("Sonntag, 18. Oktober · 14:00");
-  expect(view.untilText).toBe("Anmeldung bis Samstag, 17. Oktober · 20:00");
+  expect(view.startText).toBe("So 18. Oktober · 14:00");
+  expect(view.untilText).toBe("Anmeldung bis Sa 17. Oktober · 20:00");
   expect(registrationView({ max_participants: 8 }, { taken: 9, capacity: 8 }).seatsText).toBe("Alle 8 Plätze vergeben – Warteliste offen");
   expect(registrationView({}, null, [{ status: "approved" }]).seatsText).toBe("");
-  expect(dayAndTime(at(30), NOW)).toBe("Heute · 15:02");
+  expect(dayAndTime(at(30), NOW)).toBe("heute 15:02");
 });
 
 test("nach dem Check-in-Ende (#1551) zeigt der TV wieder die Wiedergabeliste, auch wenn der Status noch Check-in ist", () => {

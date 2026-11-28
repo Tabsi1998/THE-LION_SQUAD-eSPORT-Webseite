@@ -1,5 +1,10 @@
 const { test, expect } = require("@playwright/test");
 
+// Feste Uhr (#1307): die Datums-Texte lassen das laufende Jahr weg und sagen „heute“/„morgen“ - Samstag, 28.11.2026.
+test.beforeEach(async ({ page }) => {
+  await page.clock.install({ time: new Date("2026-11-28T10:00:00Z") });
+});
+
 // Adventkalender (#1360): die Redaktion schaltet ihn oben auf der eigenen Seite ein - ohne Umweg über Auftritt →
 // Jahreszeiten. Bei 390, 768 und 1440 px; der Server ist eine Attrappe.
 
@@ -56,11 +61,11 @@ for (const [label, width, height] of WIDTHS) {
       await mockApi(page, state);
       await page.goto("/admin/advent");
       await expect(page.getByTestId("season-switch-title")).toHaveText("Adventkalender ist aus");
-      await expect(page.getByTestId("season-switch-window")).toContainText("Eingeschaltet zu sehen von 1. Dezember 2026");
+      await expect(page.getByTestId("season-switch-window")).toContainText("Eingeschaltet zu sehen von Di 1. Dezember · 06:00");
       await page.getByTestId("season-switch-enabled").check();
       await expect.poll(() => state.saved).toEqual({ enabled: true });
       await expect(page.getByTestId("season-switch-title")).toHaveText("Adventkalender ist an");
-      await expect(page.getByTestId("season-switch-window")).toContainText("Sichtbar von 1. Dezember 2026");
+      await expect(page.getByTestId("season-switch-window")).toContainText("Sichtbar von Di 1. Dezember · 06:00");
       await expect(page.getByRole("link", { name: "Auftritt → Jahreszeiten" })).toHaveCount(0);
       const overflow = await page.evaluate(() => Math.max(document.documentElement.scrollWidth, document.body.scrollWidth) - document.documentElement.clientWidth);
       expect(overflow).toBeLessThanOrEqual(2);

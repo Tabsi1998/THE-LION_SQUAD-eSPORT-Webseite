@@ -1,4 +1,8 @@
 import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { runAtTestClock } from "@/testClock";
+
+// Feste Uhr (#1307): die Datums-Texte lassen das laufende Jahr weg und sagen „heute“/„morgen“.
+runAtTestClock();
 
 // Staffeln auslosen (docs/LIGA.md, B.4, #1623): Platzprüfung, Vorschau des Loses, Tausch mit Grund, Übernehmen. Nur erfundene Namen.
 const apiMock = { get: vi.fn(), post: vi.fn() };
@@ -75,7 +79,7 @@ test("Auslosen öffnet die Vorschau: Seed, Verteilung, wer schon steht - und Üb
   expect(within(sheet).getByTestId("draw-staffel-A")).toHaveTextContent("3 von 8 Plätzen");
   expect(within(sheet).getByTestId("draw-staffel-A")).toHaveTextContent("Probe Alt · Eins · schon zugeteilt");
   expect(within(sheet).getByTestId("draw-staffel-B")).toHaveTextContent("Probe Gelb · Eins");
-  expect(within(sheet).getByTestId("draw-log")).toHaveTextContent("23.11.2026, 14:05: Ausgelost (Los Nr. 1), Probe Leitung");
+  expect(within(sheet).getByTestId("draw-log")).toHaveTextContent("Mo 23. November · 14:05: Ausgelost (Los Nr. 1), Probe Leitung");
   const apply = within(sheet).getByTestId("draw-apply");
   expect(apply).toHaveTextContent("4 Co-Teams zuteilen");
   fireEvent.click(apply);
@@ -153,7 +157,7 @@ test("ein übernommenes Los lässt sich nachlesen, aber nicht mehr ändern", asy
     swaps: [{ a: "s1", b: "s4", a_name: "Probe Rot · Eins", b_name: "Probe Gelb · Eins", reason: "Terminwunsch", at: AT, by_name: "Probe Leitung" }] };
   apiMock.get.mockResolvedValue({ data: body({ ...DIVISION, waiting: [], can_draw: false, draw: applied }) });
   render(<SeasonDrawPanel seasonId="s1" />);
-  expect(await screen.findByTestId("draw-state-1")).toHaveTextContent("Los Nr. 1 – übernommen am 23.11.2026, 14:05");
+  expect(await screen.findByTestId("draw-state-1")).toHaveTextContent("Los Nr. 1 – übernommen am Mo 23. November · 14:05");
   fireEvent.click(screen.getByTestId("draw-open-1"));
   expect(await screen.findByTestId("draw-swaps")).toHaveTextContent("Tausch: Probe Rot · Eins und Probe Gelb · Eins – Terminwunsch (Probe Leitung)");
   expect(screen.queryByTestId("draw-apply")).toBeNull();

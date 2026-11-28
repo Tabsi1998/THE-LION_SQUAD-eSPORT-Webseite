@@ -52,7 +52,9 @@ def _number(value) -> int | None:
 
 
 def _german(day: date) -> str:
-    return day.strftime("%d.%m.%Y")
+    from services.date_text import format_moment
+
+    return format_moment(day)
 
 
 def _date_warnings(doc: dict, today: date | None, settings: dict) -> list[dict]:

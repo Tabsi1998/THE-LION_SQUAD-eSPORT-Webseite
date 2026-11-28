@@ -16,7 +16,7 @@ import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 import { useReducedMotion } from "@/hooks/useLiveChanges";
 import { useAuth } from "@/context/AuthContext";
-import { viennaDate } from "@/lib/vienna";
+import { formatWhen } from "@/lib/datetime";
 import { NumText } from "@/components/tls/NumText";
 
 import { ROLE_COLORS } from "@/lib/categoryColors";
@@ -594,7 +594,7 @@ function WeekTile({ week, loading }) {
             <Link to={award.user?.username ? `/u/${encodeURIComponent(award.user.username)}` : "#"} className="mt-3 inline-flex items-center gap-2 tls-type-small hover:text-[#29B6E8]" data-testid="week-award-user">
               <Avatar entry={award.user || {}} size={7} />
               <span className="font-semibold truncate">{award.user?.display_name || "Spieler"}</span>
-              {award.earned_at && <span className="text-quiet tls-type-small">{viennaDate(award.earned_at)}</span>}
+              {award.earned_at && <span className="text-quiet tls-type-small">{formatWhen(award.earned_at, { time: false })}</span>}
             </Link>
             {award.award_id && (
               <Link to={`/achievements/a/${encodeURIComponent(award.award_id)}`} className="mt-2 ml-1 inline-flex items-center gap-1 tls-type-label hover:underline" style={{ color }} data-testid="week-award-card">

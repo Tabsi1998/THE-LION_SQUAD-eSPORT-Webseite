@@ -4,7 +4,7 @@ import { toast } from "sonner";
 import { api, formatApiError } from "@/lib/api";
 import { AdminLayout } from "@/components/tls/AdminLayout";
 import { useConfirm } from "@/components/tls/ConfirmDialog";
-import { viennaDateTime } from "@/lib/vienna";
+import { formatWhen } from "@/lib/datetime";
 import { pushErrorLabel, pushStateLabel } from "@/lib/pushStatus";
 import { ShortCaps } from "@/components/tls/ShortCaps";
 
@@ -31,7 +31,7 @@ function oldDevices(count) {
 function formatTime(value) {
   if (!value) return "-";
   try {
-    return viennaDateTime(value);
+    return formatWhen(value);
   } catch {
     return value;
   }

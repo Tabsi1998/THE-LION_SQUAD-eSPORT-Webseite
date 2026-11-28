@@ -138,12 +138,14 @@ def derived_range(days: list[dict]) -> dict:
 
 
 def day_label(day: dict) -> str:
-    """„Fr 17.10.“ - Wochentag und Datum, so kurz wie auf einem Plakat."""
+    """„Fr 17. Oktober“ (#1307) - Wochentag und Datum wie überall."""
+    from services.date_text import format_moment
+
     try:
         value = date_cls.fromisoformat(str(day.get("date")))
     except ValueError:
         return str(day.get("date") or "")
-    return f"{WEEKDAYS[value.weekday()]} {value.day:02d}.{value.month:02d}."
+    return format_moment(value)
 
 
 def time_label(day: dict) -> str:
@@ -151,7 +153,14 @@ def time_label(day: dict) -> str:
 
 
 def range_label(days: list[dict]) -> str:
-    return f"{day_label(days[0])} – {day_label(days[-1])}"
+    """„Fr 17. – So 19. Oktober“ (#1307) - erster bis letzter Tag."""
+    from services.date_text import format_range
+
+    try:
+        first, last = date_cls.fromisoformat(str(days[0].get("date"))), date_cls.fromisoformat(str(days[-1].get("date")))
+    except ValueError:
+        return f"{day_label(days[0])} – {day_label(days[-1])}"
+    return format_range(first, last)
 
 
 def position(event: dict | None, now: datetime | None = None) -> dict | None:
@@ -196,7 +205,9 @@ def _relative(target: datetime, now: datetime) -> str:
         return f"heute um {clock}"
     if delta == 1:
         return f"morgen um {clock}"
-    return f"am {WEEKDAYS[local_target.weekday()]} {local_target.day:02d}.{local_target.month:02d}. um {clock}"
+    from services.date_text import format_moment
+
+    return f"am {format_moment(local_target, now=now)}"
 
 
 def now_text(event: dict | None, now: datetime | None = None) -> str:
@@ -224,7 +235,7 @@ def phase_label(where: dict) -> str:
 
 
 def day_line(day: dict, *, location_name: str | None = None) -> str:
-    """Eine Zeile je Tag für Mail, Discord und Kalendertext: „Sa 18.10. · 10:00–22:00 · Einlass 09:00 · Finaltag“."""
+    """Eine Zeile je Tag für Mail, Discord und Kalendertext: „Sa 18. Oktober · 10:00–22:00 · Einlass 09:00 · Finaltag“."""
     parts = [day_label(day), time_label(day)]
     if day.get("door"):
         parts.append(f"Einlass {day['door']}")
@@ -249,7 +260,7 @@ def lines(event: dict | None) -> list[str]:
 
 
 def summary_text(event: dict | None) -> str:
-    """„3 Tage · Fr 17.10. – So 19.10.“ - leer bei eintägigen Events."""
+    """„3 Tage · Fr 17. – So 19. Oktober“ - leer bei eintägigen Events."""
     days = stored_days(event)
     return f"{len(days)} Tage · {range_label(days)}" if days else ""
 

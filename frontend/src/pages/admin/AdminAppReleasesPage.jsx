@@ -4,7 +4,7 @@ import { toast } from "sonner";
 import { api, formatApiError } from "@/lib/api";
 import { AdminLayout } from "@/components/tls/AdminLayout";
 import { useConfirm } from "@/components/tls/ConfirmDialog";
-import { viennaDateTime } from "@/lib/vienna";
+import { formatWhen } from "@/lib/datetime";
 import { ShortCaps } from "@/components/tls/ShortCaps";
 
 // App-Versionen (#250): Der Server hält je Build eine APK für angemeldete
@@ -15,7 +15,7 @@ import { ShortCaps } from "@/components/tls/ShortCaps";
 function formatTime(value) {
   if (!value) return "-";
   try {
-    return viennaDateTime(value);
+    return formatWhen(value);
   } catch {
     return value;
   }

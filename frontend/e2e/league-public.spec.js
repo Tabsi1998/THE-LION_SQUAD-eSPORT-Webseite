@@ -1,5 +1,10 @@
 const { test, expect } = require("@playwright/test");
 
+// Feste Uhr (#1307): die Datums-Texte lassen das laufende Jahr weg und sagen „heute“/„morgen“ - Samstag, 28.11.2026.
+test.beforeEach(async ({ page }) => {
+  await page.clock.install({ time: new Date("2026-11-28T10:00:00Z") });
+});
+
 // Ligaseite (docs/LIGA.md, P5, #1625) im echten Browser, Server nachgestellt: Übersicht, Season mit Kopf, Staffel mit
 // Tabelle, Spielwochen (Pause sichtbar), Ergebnis mit Maps; „Liga“ im Menü. Bei 390 und 1440 px ohne seitliches
 // Scrollen - die Tabelle scrollt in ihrem eigenen Bereich. Nur erfundene Namen.
@@ -88,7 +93,7 @@ for (const [width, height] of [[390, 844], [1440, 900]]) {
     await page.setViewportSize({ width, height });
     await mockServer(page);
     await page.goto("/liga/probe-liga/season-1");
-    await expect(page.getByTestId("league-fact-breaks")).toContainText("Weihnachtspause 21.12.–3.1.");
+    await expect(page.getByTestId("league-fact-breaks")).toContainText("Weihnachtspause Mo 21. Dezember 2026 – So 3. Jänner 2027");
     const staffel = page.getByTestId("league-staffel-A");
     await expect(staffel.getByTestId("standing-row-r1")).toContainText("Löwen · Löwen Nachwuchs B");
     await expect(staffel.getByTestId("league-match-m2-1")).toBeVisible();

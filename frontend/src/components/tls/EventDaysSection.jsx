@@ -1,11 +1,11 @@
 import { ArrowDown, ArrowUp, CalendarDays, Plus, Trash2 } from "lucide-react";
+import { formatWhen } from "@/lib/datetime";
 
 // Mehrtägige Events (#884): ein LAN-Wochenende hat drei Tage mit eigenen Zeiten. Mit dem Schalter
 // „Mehrere Tage mit eigenen Zeiten“ ersetzen die Tage die Felder Start, Ende und Einlass - der Server
 // leitet Beginn und Ende aus dem ersten und letzten Tag ab. Zeiten sind Wiener Uhrzeiten („18:00“);
 // eine Endzeit vor dem Beginn zählt zum nächsten Morgen (Sa 20:00 – 02:00).
 
-const WEEKDAYS = ["So", "Mo", "Di", "Mi", "Do", "Fr", "Sa"];
 
 export function emptyDay(date = "", start = "", end = "") {
   return { date, start, end, door: "", title: "", location_key: "" };
@@ -53,9 +53,7 @@ export function daysFormError(form) {
 
 export function dayLabel(date) {
   if (!date) return "";
-  const parsed = new Date(`${date}T12:00:00`);
-  if (Number.isNaN(parsed.getTime())) return "";
-  return `${WEEKDAYS[parsed.getDay()]} ${String(parsed.getDate()).padStart(2, "0")}.${String(parsed.getMonth() + 1).padStart(2, "0")}.`;
+  return formatWhen(String(date).slice(0, 10), { time: false, relative: false });
 }
 
 export function shiftDate(date, days) {

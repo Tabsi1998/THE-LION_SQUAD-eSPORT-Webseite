@@ -3,7 +3,7 @@ import { ArrowRightLeft, BellRing, Eraser, Hourglass, ListPlus, Play, RotateCcw,
 import { StatusChip } from "@/components/tls/StatusChip";
 import { delayText } from "@/lib/liveQueue";
 import { stationWho, queueWhat } from "@/lib/tvQueue";
-import { viennaTime } from "@/lib/vienna";
+import { formatClock } from "@/lib/datetime";
 import { MatchClock } from "./MatchClock";
 import "./live.css";
 
@@ -13,7 +13,7 @@ import "./live.css";
 // aufrufbar ist, kommen vom Server (services/live_queue.py). Knöpfe nur mit Recht (`canOperate`) und nur, wenn die Seite
 // den passenden Handler mitgibt - die Matchplan-Ansicht der Verwaltung zeigt so weiter nur Aufrufen und Starten.
 
-const clock = (value) => (value ? viennaTime(value, { hour: "2-digit", minute: "2-digit" }) : "");
+const clock = (value) => (value ? formatClock(value) : "");
 
 function when(entry) {
   const parts = [entry?.forecast_at ? `${entry.forecast ? "voraussichtlich " : ""}ca. ${clock(entry.forecast_at)}` : "", delayText(entry?.delay_minutes)];

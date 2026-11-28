@@ -1,5 +1,9 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
+import { runAtTestClock } from "@/testClock";
+
+// Feste Uhr (#1307): die Datums-Texte lassen das laufende Jahr weg und sagen „heute“/„morgen“.
+runAtTestClock();
 
 // Ligaseite (docs/LIGA.md, B.4, #2205): Fenster und Plätze für alle, Knopf und Status nur für Berechtigte. Nur erfundene Namen.
 const apiMock = { get: vi.fn(), post: vi.fn() };
@@ -35,7 +39,7 @@ test("ein Gast sieht Fenster, Plätze und den Weg zum Einloggen, aber keine Abfr
   authMock.current = null;
   renderPanel();
 
-  expect(screen.getByTestId("league-application-window")).toHaveTextContent("Offen bis 20.11.2026, 20:00 Uhr");
+  expect(screen.getByTestId("league-application-window")).toHaveTextContent("Offen bis Fr 20. November · 20:00");
   expect(screen.getByTestId("league-application-seats")).toHaveTextContent("3 von 8 Startplätzen frei");
   expect(screen.getByTestId("league-application-waitlist-note")).toHaveTextContent("nach Eingang");
   expect(screen.getByTestId("league-application-login")).toHaveAttribute("href", "/login?next=%2Fliga%2Fprobe-liga%2Fseason-1%2Fanmelden");
@@ -178,7 +182,7 @@ test("Season aus dem Vorgänger ohne Fenster (F.2, #1627): nur Co-Teams mit Antr
 test("Nachmeldung (Nr. 180): läuft das Fenster über den Season-Start, sagt die Ligaseite es - geschlossen nicht mehr", () => {
   authMock.current = null;
   const { unmount } = renderPanel({ ...BLOCK, season_starts_at: "2026-11-17T00:00:00" });
-  expect(screen.getByTestId("league-application-after-start")).toHaveTextContent("Anmeldung läuft nach Season-Start weiter (bis 20.11.2026, 20:00 Uhr).");
+  expect(screen.getByTestId("league-application-after-start")).toHaveTextContent("Anmeldung läuft nach Season-Start weiter (bis Fr 20. November · 20:00).");
   unmount();
   renderPanel({ ...BLOCK, season_starts_at: "2026-11-17T00:00:00", state: "closed" });
   expect(screen.queryByTestId("league-application-after-start")).toBeNull();
@@ -194,7 +198,7 @@ test("ein offenes Startrecht zeigt Frist und „Startrecht annehmen“ statt „
   renderPanel();
   const row = await screen.findByTestId("league-application-row-s1");
   expect(screen.getByTestId("league-application-state-s1")).toHaveTextContent("Startrecht – Zusage offen");
-  expect(row).toHaveTextContent("Startrecht für Liga 1: bitte bis 15.12.2026, 18:00 Uhr zusagen.");
+  expect(row).toHaveTextContent("Startrecht für Liga 1: bitte bis Di 15. Dezember · 18:00 zusagen.");
   expect(row).not.toHaveTextContent("automatisch dabei");
   fireEvent.click(screen.getByTestId("league-start-right-accept-a9"));
   await waitFor(() => expect(apiMock.post).toHaveBeenCalledWith("/me/league-applications/a9/start-right", { action: "accept" }));

@@ -1,5 +1,9 @@
 import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
+import { runAtTestClock } from "@/testClock";
+
+// Feste Uhr (#1307): die Datums-Texte lassen das laufende Jahr weg und sagen „heute“/„morgen“.
+runAtTestClock();
 
 // Regelseite (docs/LIGA.md, #1646): Inhaltsverzeichnis, Änderungen mit Schalter, Versionen, Vergleich, Rückfall, Zustimmung,
 // noindex. Erfundene Regeln.
@@ -76,7 +80,7 @@ test("Kopf mit Version, Stand und PDF, Inhaltsverzeichnis mit Anlagen und festen
   expect(await screen.findByRole("heading", { level: 1 })).toHaveTextContent("Regelwerk Probe");
   const head = screen.getByTestId("rules-meta");
   expect(head).toHaveTextContent("Version 2");
-  expect(head).toHaveTextContent("gültig ab 05.03.2030");
+  expect(head).toHaveTextContent("gültig ab Di 5. März 2030");
   expect(screen.getByTestId("rules-pdf")).toHaveAttribute("href", "/api/league-rules/seasons/probe/s1/versions/v2/pdf");
   const toc = screen.getByTestId("rules-toc");
   expect(within(toc).getByRole("link", { name: "§ 1 Fairplay" })).toHaveAttribute("href", "#fairplay");
@@ -184,7 +188,7 @@ test("Künftige Fassung wird angekündigt", async () => {
   serve({ ...PAGE, upcoming: { id: "v3", version: 3, label: "Version 3", valid_from: "2031-01-02" } });
   renderPage();
   const note = await screen.findByTestId("rules-upcoming");
-  expect(note).toHaveTextContent("Version 3 gilt ab 02.01.2031");
+  expect(note).toHaveTextContent("Version 3 gilt ab Do 2. Jänner 2031");
   expect(within(note).getByRole("link")).toHaveAttribute("href", "/liga/probe/s1/regeln?version=v3");
 });
 

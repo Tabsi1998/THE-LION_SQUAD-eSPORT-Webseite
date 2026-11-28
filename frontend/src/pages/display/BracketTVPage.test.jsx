@@ -1,5 +1,9 @@
 import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
+import { runAtTestClock } from "@/testClock";
+
+// Feste Uhr (#1307): die Datums-Texte lassen das laufende Jahr weg und sagen „heute“/„morgen“.
+runAtTestClock();
 
 // Turnierbaum-TV (#1110, #1113, #1115): der Anzeige-Schlüssel geht mit an die API, ein widerrufener zeigt nichts mehr vom
 // Turnier; leere Plätze sagen im Klartext, wer kommt - kein „W:A:1“, kein „Freier Slot“, keine „Keine Station“. Seit

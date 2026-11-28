@@ -7,7 +7,7 @@ import { Crown, Search, X } from "lucide-react";
 import { api, formatApiError, resolveMediaUrl } from "@/lib/api";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { INPUT_CLASS } from "@/components/tls/FormFields";
-import { asInstant, viennaDate, viennaDateTime } from "@/lib/vienna";
+import { formatWhen as formatMoment } from "@/lib/datetime";
 
 import { ROLE_COLORS } from "@/lib/categoryColors";
 const LEVEL_NAMES = { 1: "Bronze", 2: "Silber", 3: "Gold", 4: "Platin", 5: "Legendär" };
@@ -74,10 +74,7 @@ export function errorText(err, fallback = "Das hat nicht geklappt.") {
 }
 
 export function formatWhen(value, withTime = true) {
-  if (!value) return "–";
-  const date = asInstant(value);
-  if (Number.isNaN(date.getTime())) return "–";
-  return withTime ? viennaDateTime(date, { dateStyle: "short", timeStyle: "short" }) : viennaDate(date);
+  return formatMoment(value, { time: withTime, fallback: "–" });
 }
 
 export function personName(person) {

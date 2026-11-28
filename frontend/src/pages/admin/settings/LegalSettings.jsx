@@ -3,7 +3,7 @@ import { toast } from "sonner";
 import { api, formatApiError } from "@/lib/api";
 import { Link } from "react-router-dom";
 import { BrandField, LegalTextArea } from "./fields";
-import { viennaDateTime } from "@/lib/vienna";
+import { formatOfficialDate, formatWhen } from "@/lib/datetime";
 
 // Reiter Rechtliches (#223: aus AdminSettingsPage herausgelöst, Verhalten unverändert): Vereinsdaten
 // für Impressum und Datenschutz, der Stand „Vereinsdaten aus Dolibarr“ (#326; der Schalter liegt seit
@@ -17,8 +17,8 @@ export function mergedLegacyText(primary, legacy) {
 
 // Statuten aus Dolibarr (#326 Teil 3) im Reiter Rechtliches: ein Satz, der sagt, was die Vorstandsseite zeigt.
 function statutesDay(value) {
-  const match = /^(\d{4})-(\d{2})-(\d{2})/.exec(String(value || ""));
-  return match ? `${match[3]}.${match[2]}.${match[1]}` : "";
+  // Statuten sind ein Rechtstext - amtliches Datum (#1307).
+  return /^\d{4}-\d{2}-\d{2}/.test(String(value || "")) ? formatOfficialDate(String(value).slice(0, 10)) : "";
 }
 
 export function statutesSummary(statutes) {
@@ -75,7 +75,7 @@ export function LegalTab({ brand, setBrandField, setCanonicalLegalText, saveBran
               : !dolibarrPublic.has_data ? <span className="text-warn">Noch nichts aus Dolibarr gelesen – „Jetzt nachlesen“ oder auf den stündlichen Abgleich warten.</span>
               : (
                 <>
-                  <span className="text-white/60">Stand {viennaDateTime(dolibarrPublic.fetched_at, { dateStyle: "short", timeStyle: "short" })}: <span className="text-white">{dolibarrPublic.overlay?.legal_name}</span>, ZVR {dolibarrPublic.overlay?.zvr_number || "–"}</span>
+                  <span className="text-white/60">Stand {formatWhen(dolibarrPublic.fetched_at)}: <span className="text-white">{dolibarrPublic.overlay?.legal_name}</span>, ZVR {dolibarrPublic.overlay?.zvr_number || "–"}</span>
                   <span className="text-white/60">Vertretung: {dolibarrPublic.representative ? <span className="text-white">{dolibarrPublic.representative.name} ({dolibarrPublic.representative.role})</span> : <span className="text-warn">kein freigegebener Name – bleibt von Hand</span>}</span>
                   {dolibarrPublic.statutes && <span className="text-white/60" data-testid="legal-dolibarr-statutes">Statuten: <span className={dolibarrPublic.statutes.state === "in_force" ? "text-white" : "text-warn"}>{statutesSummary(dolibarrPublic.statutes)}</span></span>}
                   {dolibarrPublic.error && <span className="text-warn">Letzter Abgleich fehlgeschlagen ({dolibarrPublic.error_text || dolibarrPublic.error}) – alter Stand bleibt.</span>}

@@ -2,6 +2,10 @@ import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router-dom";
 import { SocialsTab } from "./SocialsTab";
+import { runAtTestClock } from "@/testClock";
+
+// Feste Uhr (#1307): die Datums-Texte lassen das laufende Jahr weg und sagen „heute“/„morgen“.
+runAtTestClock();
 
 // Konten verknüpfen (#521): je verknüpfbarer Plattform eine Zeile mit dem offiziellen Knopf; verknüpft
 // steht der Name mit Häkchen, das Textfeld ist weg, nur „Verknüpfung lösen“ bleibt. Getippt wird nur, was
@@ -24,7 +28,7 @@ test("verknüpft: Name mit Häkchen, kein Textfeld, Verknüpfung lösen; unverkn
   const props = renderTab();
   expect(screen.queryByTestId("profile-discord")).toBeNull();
   expect(screen.getByTestId("profile-discord-verified")).toHaveTextContent("verifiziert");
-  expect(screen.getByTestId("profile-discord-linked-since")).toHaveTextContent("verknüpft als Paula B. · seit 22.09.2026");
+  expect(screen.getByTestId("profile-discord-linked-since")).toHaveTextContent("verknüpft als Paula B. · seit Di 22. September");
   expect(screen.getByTestId("profile-discord-official")).toHaveAttribute("href", "https://discord.com/users/123");
   expect(screen.queryByTestId("profile-discord-link")).toBeNull();
   await user.click(screen.getByTestId("profile-discord-unlink"));

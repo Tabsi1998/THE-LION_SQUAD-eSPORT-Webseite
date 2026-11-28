@@ -10,7 +10,7 @@ import { LazyImg } from "@/components/tls/LazyImg";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 import { Image as ImageIcon, Crown, Film, Layers } from "lucide-react";
-import { viennaDate } from "@/lib/vienna";
+import { formatWhen } from "@/lib/datetime";
 import { GALLERY_LIST_GRID_SIZES } from "@/lib/gallerySizes";
 import { ShortCaps } from "@/components/tls/ShortCaps";
 
@@ -113,7 +113,7 @@ function AlbumCard({ a }) {
         <div className="tls-card__title tls-wrap tls-type-card">{a.title}</div>
         {/* Leere Alben (#1224) sieht nur, wer Inhalte pflegt - mit diesem Hinweis. */}
         {a.is_empty && <div className="mt-1 tls-type-label text-quiet" data-testid={`album-empty-${a.slug}`}>leer – für Besucher unsichtbar</div>}
-        {a.taken_at && <div className="tls-type-small text-white/45 mt-1">{viennaDate(a.taken_at)}</div>}
+        {a.taken_at && <div className="tls-type-small text-white/45 mt-1">{formatWhen(a.taken_at, { time: false })}</div>}
         {a.description && <p className="tls-type-small text-white/55 mt-2 line-clamp-2">{a.description}</p>}
       </div>
     </Link>

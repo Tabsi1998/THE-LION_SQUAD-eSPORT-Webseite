@@ -1,5 +1,10 @@
 const { test, expect } = require("@playwright/test");
 
+// Feste Uhr (#1307): die Datums-Texte lassen das laufende Jahr weg und sagen „heute“/„morgen“ - Samstag, 28.11.2026.
+test.beforeEach(async ({ page }) => {
+  await page.clock.install({ time: new Date("2026-11-28T10:00:00Z") });
+});
+
 // Inhalte vervollständigen (#2122): neuer Beitrag als Entwurf mit Auswahl und Rückfrage „geht an N Personen“, Vorschau mit
 // Band „Noch nicht öffentlich“, zurückgezogener Beitrag mit Hinweis, Navigation-Editor mit Liga und die Kachel „Liga“ auf
 // der eSports-Übersicht. Bei 390 und 1440 px, ohne seitliches Scrollen. Alles gegen Attrappen, nichts wird verschickt.
@@ -17,10 +22,9 @@ const NAV = { items: [
     { key: "fastlap", to: "/fastlap", label: "Fast Lap", visible: true, order: 3 },
   ] },
 ] };
-// Starttermin immer in der Zukunft - ein festes Datum laeuft ab.
-const START = new Date(Date.now() + 30 * 24 * 3600 * 1000);
-const START_ISO = `${START.getFullYear()}-${String(START.getMonth() + 1).padStart(2, "0")}-${String(START.getDate()).padStart(2, "0")}`;
-const START_SHOWN = `${START_ISO.slice(8, 10)}.${START_ISO.slice(5, 7)}.${START_ISO.slice(0, 4)}`;
+// Starttermin 30 Tage nach dem festen Tag der Uhr (28.11.2026, siehe beforeEach) - so läuft er nie ab (#1307).
+const START_ISO = "2026-12-28";
+const START_SHOWN = "Mo 28. Dezember";
 const LEAGUES = { leagues: [{ id: "l1", slug: "cod-liga", name: "CoD-Liga", seasons: [{ id: "s1", slug: "season-1", name: "Season 1", status: "draft", start_date: START_ISO }] }] };
 
 async function mockApi(page, state, { user = EDITOR } = {}) {

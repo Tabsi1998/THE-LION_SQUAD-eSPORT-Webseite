@@ -1,4 +1,5 @@
-import { asInstant, viennaDate, viennaDateTime } from "@/lib/vienna";
+import { formatWhen } from "@/lib/datetime";
+import { asInstant } from "@/lib/vienna";
 // Dolibarr-Anbindung (#295, #297, #316): Texte und kleine Entscheidungen für die
 // Admin-Seite und „Meine Mitgliedschaft“. Die Regeln selbst liegen im Backend.
 
@@ -68,7 +69,8 @@ export function formatDate(value) {
   if (!value) return "–";
   const date = asInstant(value);
   if (Number.isNaN(date.getTime())) return value;
-  return value.length === 10 ? viennaDate(date) : viennaDateTime(date);
+  // Einträge aus der Vereinsakte stehen fest da - ohne „heute“, damit „am …“ und „vom …“ stimmen (#1307).
+  return formatWhen(value.length === 10 ? value : date, { time: value.length !== 10, relative: false });
 }
 
 export function formatMoney(amount, currency = "EUR") {

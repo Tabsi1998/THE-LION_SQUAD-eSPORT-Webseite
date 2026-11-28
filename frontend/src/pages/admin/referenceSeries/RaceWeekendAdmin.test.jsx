@@ -1,4 +1,8 @@
 import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { runAtTestClock } from "@/testClock";
+
+// Feste Uhr (#1307): die Datums-Texte lassen das laufende Jahr weg und sagen „heute“/„morgen“.
+runAtTestClock();
 
 // Runde mit Läufen in der Verwaltung (#1930): „Ablauf je Runde“ in der Saison (auch ab Runde X anders), der Kalender mit
 // einem Kopf je Runde und ihren Läufen, Ergebnisse je Lauf über Chips, ein neuer Termin mit Lauf (Qualifying zählt nicht)
@@ -120,11 +124,11 @@ test("Kalender: je Runde ein Kopf, darunter die Läufe mit eigenem Status und ei
   render(<SeriesCalendarSection series={SERIES} />);
   const weekends = await screen.findAllByTestId("calendar-weekend");
   expect(weekends.map((item) => item.dataset.state)).toEqual(["missing", "planned"]);
-  expect(weekends[0]).toHaveTextContent("Sa., 07.03.2026");
+  expect(weekends[0]).toHaveTextContent("Sa 7. März");
   expect(within(weekends[0]).getAllByTestId("calendar-session").map((item) => item.textContent)).toEqual(["Qualifying", "Sprint", "Rennen"]);
   const sessions = within(weekends[0]).getAllByTestId("calendar-round");
   // Ein anderer Tag steht beim Lauf, sonst nur die Uhrzeit.
-  expect(sessions[2]).toHaveTextContent("So., 08.03.2026 · 20:00");
+  expect(sessions[2]).toHaveTextContent("So 8. März · 20:00");
   expect(sessions[0]).toHaveTextContent("zählt nicht zur Wertung");
   fireEvent.click(within(sessions[1]).getByTestId("round-cancel"));
   await waitFor(() => expect(apiMock.post).toHaveBeenCalledWith("/reference-series/admin/series/serie-1/rounds/s1/cancel", { expected_version: 3 }));
@@ -137,7 +141,7 @@ test("Ergebnisse: je Runde eine Zeile, jeder Lauf ein Chip, der sein Blatt öffn
   expect(weekends).toHaveLength(2);
   const chips = within(weekends[0]).getAllByTestId("session-chip");
   expect(chips.map((chip) => chip.dataset.state)).toEqual(["scored", "missing", "planned"]);
-  expect(chips[1]).toHaveAttribute("title", "Sprint, Sa., 07.03.2026 · 20:30, Ergebnis fehlt");
+  expect(chips[1]).toHaveAttribute("title", "Sprint, Sa 7. März · 20:30, Ergebnis fehlt");
   // Ein abgesagter Lauf bekommt kein Ergebnis.
   expect(within(weekends[1]).getAllByTestId("session-chip")).toHaveLength(1);
   fireEvent.click(chips[1]);
@@ -207,6 +211,6 @@ test("Terminliste: die Vorschau zeigt je Zeile die Läufe, übernommen werden al
   fireEvent.click(screen.getByTestId("paste-submit"));
   const cell = await screen.findByTestId("paste-sessions");
   expect(cell).toHaveTextContent("Qualifying 20:00 · zählt nicht");
-  expect(cell).toHaveTextContent("Rennen So., 22.03.2026 20:00");
+  expect(cell).toHaveTextContent("Rennen So 22. März · 20:00");
   expect(screen.getByTestId("paste-submit")).toHaveTextContent("3 Termine übernehmen");
 });

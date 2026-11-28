@@ -1,6 +1,10 @@
 import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router-dom";
+import { runAtTestClock } from "@/testClock";
+
+// Feste Uhr (#1307): die Datums-Texte lassen das laufende Jahr weg und sagen „heute“/„morgen“.
+runAtTestClock();
 
 // Alle Benutzer (#1357): die Liste ist nur zum Lesen, „Bearbeiten“ öffnet ein Blatt. Rolle und Freigaben ändert nur der
 // Superadmin - erst mit „Speichern“ und einer Rückfrage mit Satz. Gesperrt wird im Blatt mit dem Grund-Fenster; Konten mit
@@ -118,7 +122,7 @@ test("Sperren im Blatt mit Grund-Fenster – die Person bekommt den Grund per Ma
   const user = userEvent.setup();
   renderPage();
   const sheet = await openSheet(user, "spieler");
-  expect(within(sheet).getByTestId("user-sheet-invitation")).toHaveTextContent("Zum Mitgliedsantrag eingeladen am 1.10.2026 – noch offen.");
+  expect(within(sheet).getByTestId("user-sheet-invitation")).toHaveTextContent("Zum Mitgliedsantrag eingeladen am Do 1. Oktober – noch offen.");
   await user.click(within(sheet).getByTestId("user-sheet-ban-open"));
   const dialog = screen.getByTestId("ban-dialog");
   expect(dialog).toHaveTextContent("Spieler Eins sperren?");

@@ -403,7 +403,9 @@ async def send_test_alert(db) -> dict:
     any_discord = any(rule.get("discord") for rule in settings["rules"].values())
     any_email = any(rule.get("email") for rule in settings["rules"].values()) and bool(settings["emails"])
     channels: list[str] = []
-    fields = [{"name": "Zeit", "value": now_utc().strftime("%d.%m.%Y %H:%M UTC"), "inline": True}]
+    from services.date_text import format_moment
+
+    fields = [{"name": "Zeit", "value": format_moment(now_utc()), "inline": True}]
     if any_discord:
         try:
             if (await _send("Testalarm aus Betrieb → Alarme", "Wenn diese Meldung ankommt, passt der Betriebskanal.", fields, "ops_test")).get("ok"):
@@ -424,15 +426,15 @@ async def send_test_alert(db) -> dict:
 # ---------------------------------------------------------------- Bestehende Anlässe (#265)
 
 def _vienna_time(value) -> str:
-    from zoneinfo import ZoneInfo
-
     try:
         moment = datetime.fromisoformat(str(value).replace("Z", "+00:00"))
     except ValueError:
         return str(value or "")
     if moment.tzinfo is None:
         moment = moment.replace(tzinfo=timezone.utc)
-    return moment.astimezone(ZoneInfo("Europe/Vienna")).strftime("%d.%m.%Y %H:%M")
+    from services.date_text import format_moment
+
+    return format_moment(moment)
 
 
 def check_red_message(check: dict, run: dict, *, still_red_since: str | None = None) -> dict:

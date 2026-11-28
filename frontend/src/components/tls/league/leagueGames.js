@@ -1,9 +1,8 @@
 // Ergebnis je Map mit Aufstellung (docs/LIGA.md, #1650): was das Melde-Formular der Liga rechnet. Der Server prüft
 // alles noch einmal (services/league_games.py) - hier geht es darum, dass man gar nicht erst etwas Falsches eingibt.
-import { viennaDay, viennaTime } from "@/lib/vienna";
+import { formatWhen } from "@/lib/datetime";
 import { mapRuleProblem, ruleFor } from "./leagueResultRules";
 
-const WEEKDAYS = ["So", "Mo", "Di", "Mi", "Do", "Fr", "Sa"];
 // Zusatzfelder einer Map (docs/LIGA.md, C.3): Stand, Wiederholung, Wertung, Seite, Nachweis.
 const GAME_EXTRAS = ["status", "replay_reason", "decision", "host_registration_id", "proof_id"];
 
@@ -24,14 +23,10 @@ export function personIds(people) {
 }
 
 /**
- * Der Standardtermin der Spielwoche als Satz (#2096): „So 15.11., 20:00“ in Wiener Zeit - oder leer ohne Wert.
+ * Der Standardtermin der Spielwoche als Satz (#2096): „So 15. November · 20:00“ in Wiener Zeit (#1307) - oder leer ohne Wert.
  */
 export function defaultTimeText(value) {
-  const day = value ? viennaDay(value) : "";
-  if (!day) return "";
-  const [year, month, date] = day.split("-").map(Number);
-  const weekday = WEEKDAYS[new Date(Date.UTC(year, month - 1, date, 12)).getUTCDay()];
-  return `${weekday} ${date}.${month}., ${viennaTime(value, { hour: "2-digit", minute: "2-digit" })}`;
+  return value ? formatWhen(value) : "";
 }
 
 /**

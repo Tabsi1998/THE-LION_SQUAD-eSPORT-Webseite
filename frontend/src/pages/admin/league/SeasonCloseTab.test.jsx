@@ -1,5 +1,9 @@
 import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
+import { runAtTestClock } from "@/testClock";
+
+// Feste Uhr (#1307): die Datums-Texte lassen das laufende Jahr weg und sagen „heute“/„morgen“.
+runAtTestClock();
 
 // Reiter „Abschluss“ der Season (F.1, #1645): Checkliste mit Link, Entscheid bei Gleichstand auf Platz 1, Abschließen mit
 // Bestätigung, Verlauf und Wieder öffnen durch eine zweite Person. Erfundene Namen.
@@ -55,7 +59,7 @@ test("die Checkliste nennt jeden Sperrgrund mit Link und hält den Knopf zu", as
   const open = screen.getByTestId("close-blocker-t1-open_matches");
   expect(open).toHaveTextContent("Offene Spiele (2)");
   expect(within(open).getByRole("link", { name: "Spieltag 3: Probe 3 – Probe 4" })).toHaveAttribute("href", "/matches/m1");
-  expect(screen.getByTestId("close-blocker-t1-deadlines")).toHaveTextContent("bis 14.11.2026, 18:00");
+  expect(screen.getByTestId("close-blocker-t1-deadlines")).toHaveTextContent("bis Sa 14. November · 18:00");
   expect(screen.getByTestId("close-button-t1")).toBeDisabled();
   expect(screen.getByRole("table", { name: "Vorschau Liga 1 · Staffel A" })).toBeInTheDocument();
 });
@@ -109,7 +113,7 @@ test("abgeschlossen: Endstand, Meister und Verlauf - wer abgeschlossen hat, öff
   renderTab(data([staffel({ closed: true, status: "completed", final: FINAL, history: HISTORY, closed_by_me: true, can_reopen: false, can_close: false })],
     { season: { id: "s1", closed: true } }));
   expect(await screen.findByTestId("season-close-summary")).toHaveTextContent("Die Staffel ist abgeschlossen – die Season ist beendet.");
-  expect(screen.getByTestId("close-final-t1")).toHaveTextContent("Abgeschlossen am 12.11.2026, 18:00 von Erste Leitung · Fassung 1 · Regelwerk Fassung 1.0");
+  expect(screen.getByTestId("close-final-t1")).toHaveTextContent("Abgeschlossen am Do 12. November · 18:00 von Erste Leitung · Fassung 1 · Regelwerk Fassung 1.0");
   expect(screen.getByTestId("close-final-t1")).toHaveTextContent("Meister: Probe 1");
   expect(screen.getByRole("table", { name: "Endstand Liga 1 · Staffel A" })).toBeInTheDocument();
   expect(screen.queryByTestId("reopen-button-t1")).toBeNull();

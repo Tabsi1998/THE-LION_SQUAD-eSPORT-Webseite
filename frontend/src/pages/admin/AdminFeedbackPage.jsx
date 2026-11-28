@@ -4,7 +4,7 @@ import { api, formatRequestError } from "@/lib/api";
 import { AdminLayout } from "@/components/tls/AdminLayout";
 import { SkeletonTable } from "@/components/tls/Skeleton";
 import { averageLabel } from "@/lib/feedback";
-import { viennaDate } from "@/lib/vienna";
+import { formatWhen } from "@/lib/datetime";
 import { FeedbackReport } from "./feedback/FeedbackReport";
 import { ShortCaps } from "@/components/tls/ShortCaps";
 
@@ -72,7 +72,7 @@ export default function AdminFeedbackPage() {
                     <div className="p-4 flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4">
                       <div className="flex-1 min-w-0">
                         <div className="font-bold break-words">{item.title}</div>
-                        <div className="tls-type-small text-white/50">{KIND_LABEL[item.kind] || item.kind}{item.day ? ` · ${viennaDate(item.day)}` : ""}{item.declined ? ` · ${item.declined} wollten nichts sagen` : ""}</div>
+                        <div className="tls-type-small text-white/50">{KIND_LABEL[item.kind] || item.kind}{item.day ? ` · ${formatWhen(item.day, { time: false })}` : ""}{item.declined ? ` · ${item.declined} wollten nichts sagen` : ""}</div>
                       </div>
                       <div className="flex items-center gap-4 shrink-0">
                         <div className="tls-type-small text-white/70">{item.count === 1 ? "1 Antwort" : `${item.count} Antworten`}</div>

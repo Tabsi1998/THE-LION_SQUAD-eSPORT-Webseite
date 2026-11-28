@@ -1,5 +1,9 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { shareDateLabel, shareText, shareUrl } from "@/lib/sharePage";
+import { runAtTestClock } from "@/testClock";
+
+// Feste Uhr (#1307): die Datums-Texte lassen das laufende Jahr weg und sagen „heute“/„morgen“.
+runAtTestClock();
 
 // Teilen (#1154): mit Teilen-Menü des Browsers (Handy) öffnet es sich mit Titel, Satz und Adresse; ohne (PC) kommt der
 // Link in die Zwischenablage mit kurzer Bestätigung. Der Satz rechnet wie in der App (mobile/src/lib/share.ts).
@@ -17,8 +21,8 @@ afterEach(() => {
 });
 
 test("Satz und Adresse wie in der App", () => {
-  expect(shareText({ title: "Herbst-LAN 2026", start: "2026-11-14T09:00:00+01:00", end: "2026-11-16T18:00:00+01:00", now: NOW })).toBe("Herbst-LAN 2026 · 14.–16. November · THE LION SQUAD");
-  expect(shareDateLabel("2026-10-30T09:00:00+01:00", "2026-11-02T18:00:00+01:00", NOW)).toBe("30. Oktober – 2. November");
+  expect(shareText({ title: "Herbst-LAN 2026", start: "2026-11-14T09:00:00+01:00", end: "2026-11-16T18:00:00+01:00", now: NOW })).toBe("Herbst-LAN 2026 · Sa 14. – Mo 16. November · THE LION SQUAD");
+  expect(shareDateLabel("2026-10-30T09:00:00+01:00", "2026-11-02T18:00:00+01:00", NOW)).toBe("Fr 30. Oktober – Mo 2. November");
   expect(shareDateLabel("2027-05-22T16:00:00+02:00", null, NOW)).toBe("Sa 22. Mai 2027 · 16:00");
   expect(shareUrl("album", "sommerfest", "https://lionsquad.at")).toBe("https://lionsquad.at/galerie/sommerfest");
   expect(shareUrl("fastlap", "monza", "https://lionsquad.at")).toBe("https://lionsquad.at/fastlap/monza");

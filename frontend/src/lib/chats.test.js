@@ -1,4 +1,8 @@
 import { chatHref, chatPreview, chatTime, normalizeChatList } from "./chats";
+import { runAtTestClock } from "@/testClock";
+
+// Feste Uhr (#1307): die Datums-Texte lassen das laufende Jahr weg und sagen „heute“/„morgen“.
+runAtTestClock();
 
 // Die Liste der Chats (#1148): Zeit wie in der Vorschau (heute die Uhrzeit, „gestern“, sonst der Tag - in Wien), die
 // Vorschauzeile und wohin ein Eintrag führt.
@@ -11,7 +15,7 @@ test("heute die Uhrzeit, gestern „gestern“, sonst der Tag - gezählt in Wien
   expect(chatTime("2026-10-07T12:02:00Z", NOW)).toBe("14:02");
   expect(chatTime("2026-10-06T19:00:00Z", NOW)).toBe("gestern");
   // 23:30 in Wien am 5.10. ist schon der 5. - nicht der 6. wie in UTC gerechnet.
-  expect(chatTime("2026-10-05T21:30:00Z", NOW)).toBe("05.10.");
+  expect(chatTime("2026-10-05T21:30:00Z", NOW)).toBe("Mo 5. Oktober");
   expect(chatTime("", NOW)).toBe("");
 });
 

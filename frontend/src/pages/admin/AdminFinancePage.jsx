@@ -8,7 +8,7 @@ import { SkeletonTable } from "@/components/tls/Skeleton";
 import { TableScroll } from "@/components/tls/TableScroll";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { ATTENTION_ORDER, PAYMENT_TONE, csvFilename, formatCents, parseEuro, shownOf, sourceName, sourcesFrom, summaryLines, syncLine } from "@/lib/billing";
-import { viennaDate, viennaDateTime } from "@/lib/vienna";
+import { formatWhen } from "@/lib/datetime";
 import { InvoiceDetailsTab } from "./finance/InvoiceDetailsTab";
 import { ShortCaps } from "@/components/tls/ShortCaps";
 
@@ -362,7 +362,7 @@ export default function AdminFinancePage() {
                   <tr key={row.id} data-testid={`finance-order-${row.id}`}>
                     <td className="px-4 py-3">
                       {row.source?.slug ? <Link to={row.source.kind === "tournament" ? `/tournaments/${row.source.slug}` : `/events/${row.source.slug}`} className="text-white hover:text-[#29B6E8]">{row.source.name}</Link> : sourceName(row)}
-                      <div className="tls-type-small text-quiet">{viennaDateTime(row.created_at, { dateStyle: "medium", timeStyle: "short" })}</div>
+                      <div className="tls-type-small text-quiet">{formatWhen(row.created_at)}</div>
                       {Array.isArray(row.invoice_text) && (
                         <InvoiceTextEditor row={row} busy={busy} onSave={(text) => run(`text-${row.id}`, () => api.put(`/admin/finance/orders/${row.id}/text`, { extra_text: text }), "Rechnungstext gespeichert.")} />
                       )}
@@ -459,7 +459,7 @@ export default function AdminFinancePage() {
                             <div className={PAYMENT_TONE[row.payment_state] || "text-white/80"} data-testid={`finance-payment-${row.id}`}>
                               {row.payment_label || (row.paid ? "bezahlt" : INVOICE_STATUS[row.invoice_status] || row.invoice_status)}
                               {row.payment_state === "partial" && row.remaining_cents != null && <span className="text-white/50"> · {formatCents(row.remaining_cents, row.currency)} offen</span>}
-                              {row.payment_state === "overdue" && row.due_on && <span className="text-white/50"> · fällig {viennaDate(row.due_on)}</span>}
+                              {row.payment_state === "overdue" && row.due_on && <span className="text-white/50"> · fällig {formatWhen(row.due_on, { time: false })}</span>}
                               {row.waived_cents > 0 && <span className="text-white/50"> · {formatCents(row.waived_cents, row.currency)} erlassen</span>}
                             </div>
                             <CloseInfo order={row} />
@@ -537,7 +537,7 @@ function ResolvedCases({ data, onOpen }) {
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div className="min-w-0">
               <div className="font-bold text-white">{item.label} <span className="text-white/50 font-normal">· {sourceName(item)} · {item.person || item.user_id} · {item.total}</span></div>
-              <div className="mt-1 tls-type-small text-white/70">Erledigt {viennaDateTime(item.resolved_at, { dateStyle: "short", timeStyle: "short" })} von {item.resolved_by_name}{item.resolution ? `: ${item.resolution}` : ""}</div>
+              <div className="mt-1 tls-type-small text-white/70">Erledigt {formatWhen(item.resolved_at)} von {item.resolved_by_name}{item.resolution ? `: ${item.resolution}` : ""}</div>
               <CaseFacts item={item} />
             </div>
             <button type="button" onClick={() => onOpen(item.order_id)} className="tls-type-label text-[#29B6E8] hover:underline">Auftrag ansehen</button>
@@ -551,8 +551,8 @@ function ResolvedCases({ data, onOpen }) {
 // Der Verlauf (#2131) in Wiener Uhr; ein reiner Tag (Zahlung aus Dolibarr) bleibt ein Tag - ohne erfundene Uhrzeit.
 function timelineMoment(value) {
   const text = String(value || "");
-  if (/^\d{4}-\d{2}-\d{2}$/.test(text)) return viennaDate(text);
-  return viennaDateTime(text, { dateStyle: "short", timeStyle: "short" }) || text;
+  if (/^\d{4}-\d{2}-\d{2}$/.test(text)) return formatWhen(text, { time: false });
+  return formatWhen(text) || text;
 }
 
 // Kennung einer Erstattungs-Erfassung (#1034): Wer dieselbe Eingabe nochmals abschickt (Antwort verloren, Netz

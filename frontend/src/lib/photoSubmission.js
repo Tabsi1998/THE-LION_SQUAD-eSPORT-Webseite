@@ -1,4 +1,5 @@
-import { dayNoon, viennaDate } from "@/lib/vienna";
+import { formatWhen } from "@/lib/datetime";
+import { dayNoon } from "@/lib/vienna";
 
 // Fotos vom Event einsenden (#1186): Mitglieder schicken bis eine Woche nach dem Event bis zu 20 Bilder ins Album.
 // Der Server prüft alles noch einmal (Mitglied, Frist, Zahl, Bildart, Größe); hier steht nur, was die Seite vorher
@@ -28,7 +29,7 @@ export function pickSubmissionFiles(files, remaining) {
 }
 
 function dayLabel(day) {
-  return viennaDate(dayNoon(day), { weekday: "short", day: "numeric", month: "long" });
+  return formatWhen(dayNoon(day), { time: false });
 }
 
 /** Eine Zeile unter dem Knopf: bis wann und wie viele noch gehen, was schon wartet. */

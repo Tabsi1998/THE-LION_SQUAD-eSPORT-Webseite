@@ -4,7 +4,8 @@
 // Setzplätze bleiben vor dem Start leer (Entscheidung des Betreibers vom 23.09.), „Freilos“ bleibt.
 // Gemischt (#1548) steht bis zur Auslosung „Platz aus Runde 1“ (`source.draw`), danach der Name.
 // „L“ zählt wie am Server ab den Weiterkommern: L:A:1 ist der Beste, der nicht weiterkommt (services/match_v2_results).
-import { viennaDate, viennaDay, viennaTime } from "@/lib/vienna";
+import { formatClock } from "@/lib/datetime";
+import { viennaDate, viennaDay } from "@/lib/vienna";
 import { effectiveMatchDuration } from "@/lib/matchDuration";
 
 const RAW_RANK = /^([WLR]):([A-Za-z0-9_.-]+):([1-9][0-9]*)$/;
@@ -116,10 +117,12 @@ export function plannedText(match, now = new Date(), context = {}) {
   const duration = effectiveMatchDuration(match, context);
   const parts = [];
   if (match.scheduled_at) {
-    const time = viennaTime(match.scheduled_at, { hour: "2-digit", minute: "2-digit" });
+    const time = formatClock(match.scheduled_at);
     const sameDay = viennaDay(match.scheduled_at) === viennaDay(now);
+    // Noch die alte Kurzform „11.10. 14:20“: die App prüft dieselben Fälle (slotSource.cases.json) - die neue Form
+    // („morgen 14:20“) kommt mit dem App-Teil von #1307, beide zugleich.
     const day = sameDay ? "" : `${viennaDate(match.scheduled_at, { day: "2-digit", month: "2-digit" })} `;
-    if (time && time !== "Invalid Date") parts.push(`geplant ca. ${day}${time}`);
+    if (time) parts.push(`geplant ca. ${day}${time}`);
   }
   if (duration > 0) parts.push(`${duration} Minuten`);
   return parts.join(" · ");

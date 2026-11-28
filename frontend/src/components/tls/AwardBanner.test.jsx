@@ -1,6 +1,10 @@
 import { render, screen } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { AwardBanner, awardLines, awardTone } from "./AwardBanner";
+import { runAtTestClock } from "@/testClock";
+
+// Feste Uhr (#1307): die Datums-Texte lassen das laufende Jahr weg und sagen „heute“/„morgen“.
+runAtTestClock();
 
 // Auszeichnungen (#230): das Banner steht aus den Daten – Platz, Bilanz, Turnier, Spiel, Saison;
 // Platz 1–3 sind Trophäen mit Gold/Silber/Bronze, ein hochgeladenes Bild liegt dahinter.
@@ -22,7 +26,7 @@ test("Trophäe mit Gold, Bilanz und den Zeilen zum Turnier; das hochgeladene Bil
   expect(screen.getByTestId("award-record-a1")).toHaveTextContent("4 Siege · 0 Niederlagen");
   expect(card.querySelector("img")).toHaveAttribute("src", "https://x.example/api/static/uploads/gold.png");
   expect(screen.getByRole("link")).toHaveAttribute("href", "/tournaments/herbst-cup");
-  expect(awardLines(cup)).toEqual(["FIFA 26", "2.10.2026", "12 Teilnehmer", "Saison 2026"]);
+  expect(awardLines(cup)).toEqual(["FIFA 26", "Fr 2. Oktober", "12 Teilnehmer", "Saison 2026"]);
   expect(awardTone(cup).label).toBe("Gold");
 });
 

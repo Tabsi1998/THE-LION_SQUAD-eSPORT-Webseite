@@ -1,4 +1,8 @@
 import { deadlineText, leagueSeatsLine, leagueSortTime, nextDeadline, openSignups, periodLine } from "./leagueHome";
+import { runAtTestClock } from "@/testClock";
+
+// Feste Uhr (#1307): die Datums-Texte lassen das laufende Jahr weg und sagen „heute“/„morgen“.
+runAtTestClock();
 
 // Liga auf der Startseite (#2324): offene Fenster, Zeitraum, freie Plätze und Sortierung.
 const NOW = Date.parse("2026-11-09T12:00:00Z");
@@ -14,9 +18,9 @@ test("nur offene Fenster mit Anmeldeschluss in der Zukunft werben, der nächste 
 });
 
 test("Zeitraum und Anmeldeschluss in Wiener Zeit", () => {
-  expect(periodLine({ start_date: "2026-11-15T23:00:00Z", end_date: "2027-01-24T22:59:59Z" })).toBe("16.11.2026 – 24.01.2027");
-  expect(periodLine({ start_date: "2026-11-15T23:00:00Z" })).toBe("16.11.2026");
-  expect(deadlineText("2026-11-21T22:59:00Z")).toMatch(/21\.11\.2026, 23:59 Uhr$/);
+  expect(periodLine({ start_date: "2026-11-15T23:00:00Z", end_date: "2027-01-24T22:59:59Z" })).toBe("Mo 16. November 2026 – So 24. Jänner 2027");
+  expect(periodLine({ start_date: "2026-11-15T23:00:00Z" })).toBe("Mo 16. November");
+  expect(deadlineText("2026-11-21T22:59:00Z")).toBe("Sa 21. November · 23:59");
   expect(deadlineText(null)).toBe("");
 });
 

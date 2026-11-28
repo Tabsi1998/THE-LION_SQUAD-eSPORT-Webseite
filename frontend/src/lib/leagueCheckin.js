@@ -1,7 +1,7 @@
 // Liga-Check-in auf der Matchseite (#1652, docs/LIGA.md D.2): Stand, Sätze und Countdown im Klartext, damit Captains ohne
 // Vorwissen sehen, was jetzt zu tun ist. Die Zahlen und der Stand kommen vom Server (`checkin`), hier wird nur formuliert.
 import { shortWhen } from "@/lib/leagueSchedule";
-import { viennaTime } from "@/lib/vienna";
+import { formatClock } from "@/lib/datetime";
 
 export const STATE_LABELS = {
   no_time: "Termin offen",
@@ -16,7 +16,7 @@ export const STATE_LABELS = {
 
 /** „19:52“ in Wiener Zeit. */
 export function clock(value) {
-  return value ? viennaTime(value, { hour: "2-digit", minute: "2-digit" }) : "";
+  return value ? formatClock(value) : "";
 }
 
 export function ownSide(block) {
@@ -38,7 +38,7 @@ export function stateText(block) {
     case "no_time":
       return `Der Check-in öffnet ${rules.opens_minutes_before} Minuten vor dem Termin – sobald einer feststeht.`;
     case "waiting":
-      return `Der Check-in öffnet um ${shortWhen(block.window?.opens_at)} (${rules.opens_minutes_before} Minuten vor dem Termin) und schließt um ${closes}.`;
+      return `Der Check-in öffnet ${shortWhen(block.window?.opens_at)} (${rules.opens_minutes_before} Minuten vor dem Termin) und schließt ${closes}.`;
     case "open":
       if (own?.checked_in) return `Ihr seid eingecheckt – jetzt fehlt noch ${other?.name || "die Gegenseite"}. Bis ${closes} könnt ihr Anwesende ergänzen.`;
       if (own) return `Hakt an, wer da ist (mindestens ${rules.min_present}), und tippt auf „Einchecken“ – bis ${closes}.`;

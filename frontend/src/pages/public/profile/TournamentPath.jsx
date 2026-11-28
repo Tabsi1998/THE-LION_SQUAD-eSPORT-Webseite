@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { ChevronDown, Swords } from "lucide-react";
 import { api } from "@/lib/api";
-import { viennaDate } from "@/lib/vienna";
+import { formatWhen } from "@/lib/datetime";
 import { ResultShareButton } from "@/components/tls/ResultShareButton";
 import { clarificationNote } from "@/lib/resultShare";
 
@@ -52,7 +52,7 @@ export function PathSteps({ path, testId }) {
       <li className="relative pl-6" data-testid="tournament-path-final">
         <span className="absolute left-0 top-1 w-3 h-3 rounded-full bg-white/80" aria-hidden="true" />
         <div className="font-bold tls-type-small">{final.rank ? `${final.rank}. Platz${final.participant_count ? ` von ${final.participant_count}` : ""}` : "Teilgenommen"}</div>
-        <div className="tls-type-small text-white/45">{[path?.team_name, path?.date ? viennaDate(path.date) : null].filter(Boolean).join(" · ")}</div>
+        <div className="tls-type-small text-white/45">{[path?.team_name, path?.date ? formatWhen(path.date, { time: false }) : null].filter(Boolean).join(" · ")}</div>
       </li>
     </ol>
   );

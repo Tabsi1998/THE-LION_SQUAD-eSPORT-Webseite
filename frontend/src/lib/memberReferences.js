@@ -4,7 +4,7 @@ import { safeHttpUrl } from "@/lib/safeLink";
 import { seriesAddress } from "@/lib/referenceSeries";
 import { seasonHref } from "@/lib/seasonClose";
 import { appearancesText } from "@/lib/teamLeagueEntry";
-import { viennaDate } from "@/lib/vienna";
+import { formatMonth } from "@/lib/datetime";
 
 // Vereinsplatzierungen im Mitgliederprofil (#1944): die Logik hinter Kopf, Liga-Weg und Chronik der Person - ohne
 // Oberfläche, damit sie für sich getestet ist. Platzierungen und Medaillen kommen vom Server (#859); hier wird nur
@@ -57,7 +57,7 @@ export function profileFacts(references) {
 /** Monat und Jahr der Teilnahme in Wiener Zeit: „Mai 2025“. */
 export function monthOf(item) {
   const instant = referenceInstant(item || {});
-  return instant ? viennaDate(instant, { month: "long", year: "numeric" }) : "";
+  return instant ? formatMonth(instant) : "";
 }
 
 /** Wie groß das Feld war: „von 8 Teams“, bei Einzelstartern „von 20 Teilnehmern“. */

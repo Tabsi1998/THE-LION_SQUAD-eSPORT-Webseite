@@ -1,6 +1,10 @@
 import {
   AREA_JUMPS, areaCard, boardContacts, dateTileParts, helperEvents, isRecent, jumpEntries, memberNews, tileNote,
 } from "./memberArea";
+import { runAtTestClock } from "@/testClock";
+
+// Feste Uhr (#1307): die Datums-Texte lassen das laufende Jahr weg und sagen „heute“/„morgen“.
+runAtTestClock();
 
 const now = new Date("2026-09-16T10:00:00Z");
 
@@ -75,8 +79,8 @@ test("neu heißt: in den letzten zwei Wochen erschienen", () => {
 });
 
 test("Datums-Kachel: Monat auf Österreichisch und Tag", () => {
-  expect(dateTileParts("2026-10-24")).toEqual({ month: "Okt", day: "24", full: "24.10.2026" });
-  expect(dateTileParts("2027-01-05")).toEqual({ month: "Jän", day: "5", full: "05.01.2027" });
+  expect(dateTileParts("2026-10-24")).toEqual({ month: "Okt", day: "24", full: "Sa 24. Oktober" });
+  expect(dateTileParts("2027-01-05")).toEqual({ month: "Jän", day: "5", full: "Di 5. Jänner 2027" });
   expect(dateTileParts("")).toBeNull();
   expect(dateTileParts("2026-13-01")).toBeNull();
 });

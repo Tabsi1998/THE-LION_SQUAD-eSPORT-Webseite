@@ -638,6 +638,8 @@ def _apply_pin_end(doc: dict, existing: dict | None = None) -> None:
     """Ende der Anheftung (#1263) setzen: Lösen nimmt das Ende mit; Anheften ohne gültiges Ende bekommt 14 Tage ab dem Tag,
     an dem der Beitrag erscheint (heute oder sein Termin, Wiener Tag). Ein Ende davor lehnt der Server ab - der Beitrag wäre
     nie oder nur kurz angeheftet."""
+    from services.date_text import format_moment
+
     existing = existing or {}
     first_day = publish_day({"published_at": doc.get("published_at", existing.get("published_at"))})
     pinned = doc.get("pinned", existing.get("pinned"))
@@ -651,7 +653,7 @@ def _apply_pin_end(doc: dict, existing: dict | None = None) -> None:
             raise HTTPException(400, "Das Ende der Anheftung ist kein gültiger Tag.")
         if day < first_day:
             raise HTTPException(400, f"Das Ende der Anheftung liegt vor dem Tag, an dem der Beitrag erscheint "
-                                     f"({first_day.strftime('%d.%m.%Y')}) - bitte einen späteren Tag wählen.")
+                                     f"({format_moment(first_day)}) - bitte einen späteren Tag wählen.")
         doc["pinned_until"] = day.isoformat()
         return
     doc.pop("pinned_until", None)

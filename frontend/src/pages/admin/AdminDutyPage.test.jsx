@@ -1,5 +1,9 @@
 import { render, screen, within } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
+import { runAtTestClock } from "@/testClock";
+
+// Feste Uhr (#1307): die Datums-Texte lassen das laufende Jahr weg und sagen „heute“/„morgen“.
+runAtTestClock();
 
 // „Mein Dienst“ (#1352): Helfer sehen genau ihre Turniere mit ihrer Rolle, heute zuerst, je mit einem Knopf zur
 // Turnierleitung; Moderation sieht die Meldungen; wer nichts hat, liest einen Satz statt einer leeren Seite.
@@ -71,7 +75,7 @@ test("Captain: Meine Serien mit Ablauf, Entwurfs-Hinweis und Knopf zur Saison - 
   expect(await screen.findByTestId("duty-series")).toBeInTheDocument();
   expect(screen.getByTestId("duty-series-row-s-1")).toHaveTextContent("Probe Racing F1");
   expect(screen.getByTestId("duty-series-row-s-1")).toHaveTextContent("Entwürfe");
-  expect(screen.getByTestId("duty-series-until-s-1")).toHaveTextContent("bis 31.12.2026");
+  expect(screen.getByTestId("duty-series-until-s-1")).toHaveTextContent("bis Do 31. Dezember");
   expect(screen.getByTestId("duty-series-open-s-1")).toHaveAttribute("href", "/admin/reference-series/s-1");
   expect(screen.queryByTestId("duty-empty")).toBeNull();
   expect(screen.queryByTestId("duty-series-mfa")).toBeNull();

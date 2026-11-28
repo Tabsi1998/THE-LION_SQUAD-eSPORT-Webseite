@@ -1,5 +1,10 @@
 const { test, expect } = require("@playwright/test");
 
+// Feste Uhr (#1307): die Datums-Texte lassen das laufende Jahr weg und sagen „heute“/„morgen“ - Samstag, 28.11.2026.
+test.beforeEach(async ({ page }) => {
+  await page.clock.install({ time: new Date("2026-11-28T10:00:00Z") });
+});
+
 // Sonderregeln einer Rennliga (#1960) im echten Browser, Server nachgestellt: Serienseite mit „−5“ samt Grund,
 // Fahrer-Detail mit Anpassung und „im Team seit“, Teamwertung mit Quelle und Modus, Regeländerung ab Runde 5, Termin
 // ohne Wertung, umgekehrte Startaufstellung; die abgebrochene Saison mit Nachfolger; in der Verwaltung Anpassungen,
@@ -158,7 +163,7 @@ for (const [width, height] of [[1440, 900], [390, 844]]) {
     await noSidewaysScroll(page);
     await shot(page.getByTestId("series-page"), "abgebrochen", width);
     if (PHASE !== "nachher") return;
-    await expect(page.getByTestId("series-cancelled")).toContainText("Saison abgebrochen am 20.10.2026 – Neustart mit anderem Auto");
+    await expect(page.getByTestId("series-cancelled")).toContainText("Saison abgebrochen am Di 20. Oktober – Neustart mit anderem Auto");
     await expect(page.getByTestId("series-successor")).toHaveAttribute("href", "/references/series/probe-racing/2026-f2");
   });
 

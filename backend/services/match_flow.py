@@ -176,7 +176,7 @@ def side_refusal(match: dict, tournament: dict, rules: dict, now: datetime) -> s
     if not window:
         return NO_TIME_DETAIL
     if now < window[0]:
-        return (f"Der Check-in öffnet erst um {when_text(window[0])} ({int(rules['opens_minutes_before'])} Minuten vor dem "
+        return (f"Der Check-in öffnet erst {when_text(window[0])} ({int(rules['opens_minutes_before'])} Minuten vor dem "
                 f"Termin).")
     if now >= window[1]:
         return f"Der Check-in ist seit {when_text(window[1])} geschlossen – das entscheidet die Liga-Leitung. {LEAD_HINT}"

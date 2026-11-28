@@ -1,5 +1,9 @@
 import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
+import { runAtTestClock } from "@/testClock";
+
+// Feste Uhr (#1307): die Datums-Texte lassen das laufende Jahr weg und sagen „heute“/„morgen“.
+runAtTestClock();
 
 // Playoffs und Relegation im Reiter „Abschluss“ (#2404): Vorschau der Setzung, Anlegen mit dem Fingerabdruck der Vorschau, Sperrgründe,
 // Befangenheit, Setzliste neu berechnen, Einstellungen. Erfundene Namen.
@@ -59,7 +63,7 @@ test("die Vorschau zeigt Setzliste, Paarungen und Wochen - anlegen schickt den F
   expect(within(screen.getByTestId("postseason-pairings-d1")).getAllByRole("listitem")).toHaveLength(2);
   expect(screen.getByTestId("postseason-pairing-d1-1")).toHaveAttribute("aria-label", "1 Probe A1 – 4 Probe A4");
   expect(screen.getByTestId("postseason-pairing-d1-1")).toHaveTextContent("Probe A4");
-  expect(screen.getByTestId("postseason-rounds-d1")).toHaveTextContent("Finale · Best of 3 · 07.04.–13.04.2031");
+  expect(screen.getByTestId("postseason-rounds-d1")).toHaveTextContent("Finale · Best of 3 · Mo 7. – So 13. April 2031");
   fireEvent.click(screen.getByTestId("postseason-create-playoffs-d1"));
   expect(apiMock.post).not.toHaveBeenCalled();
   const sheet = screen.getByTestId("postseason-create-sheet");
@@ -140,7 +144,7 @@ test("die Relegation zeigt Paarungen mit Heimrecht und die Woche hinter den Play
   expect(block).toHaveTextContent("Relegation gegen Liga 2");
   expect(screen.getByTestId("postseason-pairs-d1")).toHaveTextContent("Liga 1 · Staffel A · Platz 3 · Heim");
   expect(screen.getByTestId("postseason-pairs-d1")).toHaveTextContent("Liga 2 · Staffel B · Platz 2");
-  expect(screen.getByTestId("postseason-relegation-week-d1")).toHaveTextContent("Woche 14.04.–20.04.2031 · nach den Playoffs von Liga 2");
+  expect(screen.getByTestId("postseason-relegation-week-d1")).toHaveTextContent("Woche Mo 14. – So 20. April 2031 · nach den Playoffs von Liga 2");
   fireEvent.click(screen.getByTestId("postseason-create-relegation-d1"));
   fireEvent.click(screen.getByTestId("postseason-create-confirm"));
   await waitFor(() => expect(apiMock.post).toHaveBeenCalledWith("/admin/leagues/seasons/s1/postseason/relegation", { division_id: "d1", stamp: "rel789", confirm: true }));

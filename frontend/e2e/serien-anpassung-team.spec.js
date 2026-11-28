@@ -123,7 +123,8 @@ for (const [width, height] of [[1440, 900], [390, 844]]) {
     // Tabelle (breit) und Karten (Handy) stehen beide im Dokument - gezählt wird, was sichtbar ist.
     const mark = teams.locator("[data-testid=\"racing-driver-adjustment\"]:visible");
     await expect(mark).toContainText("−5 (Probe Lion Eins)");
-    await expect(mark).toHaveAttribute("title", /WM-Abzug: Nichtteilnahme nach Anmeldung · R2 · 18\.10\.2026 – Probe Lion Eins, zählt auch fürs Team/);
+    // Datum in der einen Form (#1307); das Jahr steht nur, wenn der Lauf nicht mehr 2026 ist.
+    await expect(mark).toHaveAttribute("title", /WM-Abzug: Nichtteilnahme nach Anmeldung · R2 · So 18\. Oktober( 2026)? – Probe Lion Eins, zählt auch fürs Team/);
     await expect(page.getByTestId("racing-driver").getByTestId("series-adjustment-team")).toHaveText("zählt auch fürs Team · Probe Löwen");
   });
 

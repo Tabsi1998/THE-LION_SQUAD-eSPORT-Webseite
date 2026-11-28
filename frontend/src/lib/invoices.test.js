@@ -1,4 +1,8 @@
 import { amountLine, dueLine, filterInvoices, invoiceLine, outageText, sourceFilters, sourceLine, splitInvoices, summaryText } from "./invoices";
+import { runAtTestClock } from "@/testClock";
+
+// Feste Uhr (#1307): die Datums-Texte lassen das laufende Jahr weg und sagen „heute“/„morgen“.
+runAtTestClock();
 
 // Meine Rechnungen (#296): was in Worten dasteht.
 
@@ -16,8 +20,8 @@ test("Beträge in Worten: offen, Teilzahlung, bezahlt, Gutschrift", () => {
   expect(amountLine(row({ remaining: 15 }))).toMatch(/15,00.*offen von.*60,00/);
   expect(amountLine(row({ status: "paid", remaining: 0 }))).toMatch(/60,00.*bezahlt/);
   expect(amountLine(row({ type: "credit_note", total: -20, remaining: 0 }))).toMatch(/20,00.*Gutschrift/);
-  expect(invoiceLine(row())).toBe("Rechnung · Mitgliedsbeitrag · 1.8.2026");
-  expect(dueLine(row({ status: "overdue" }))).toBe("Fällig war der 15.8.2026");
+  expect(invoiceLine(row())).toBe("Rechnung · Mitgliedsbeitrag · 01.08.2026");
+  expect(dueLine(row({ status: "overdue" }))).toBe("Fällig war der 15.08.2026");
   expect(dueLine(row({ status: "paid" }))).toBe("");
 });
 

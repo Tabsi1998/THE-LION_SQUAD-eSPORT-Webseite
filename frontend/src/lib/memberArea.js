@@ -1,3 +1,4 @@
+import { formatWhen } from "@/lib/datetime";
 import { asInstant } from "@/lib/vienna";
 
 // Was nur Mitglieder oder der Vorstand sehen (#283, #284).
@@ -64,7 +65,7 @@ const MONTHS = ["Jän", "Feb", "Mär", "Apr", "Mai", "Jun", "Jul", "Aug", "Sep",
 export function dateTileParts(day) {
   const match = /^(\d{4})-(\d{2})-(\d{2})/.exec(String(day || ""));
   if (!match || !MONTHS[Number(match[2]) - 1]) return null;
-  return { month: MONTHS[Number(match[2]) - 1], day: String(Number(match[3])), full: `${match[3]}.${match[2]}.${match[1]}` };
+  return { month: MONTHS[Number(match[2]) - 1], day: String(Number(match[3])), full: formatWhen(match[0], { time: false }) };
 }
 
 const CARD_TYPES = {

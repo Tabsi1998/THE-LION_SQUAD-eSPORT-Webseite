@@ -1,4 +1,5 @@
-import { dayNoon, viennaDate, viennaDay } from "@/lib/vienna";
+import { formatWhen } from "@/lib/datetime";
+import { dayNoon, viennaDay } from "@/lib/vienna";
 
 // Angeheftete News laufen ab (#1263): das Ende ist ein Wiener Kalendertag („JJJJ-MM-TT“), angeheftet bleibt der Beitrag
 // bis zum Ende dieses Tages. Beim Anheften schlägt der Editor 14 Tage vor - derselbe Wert wie am Server.
@@ -30,7 +31,7 @@ export function defaultPinUntil(now = new Date(), publishAt = null) {
 /** „bis 21.10.2026“ für das Ende - leer ohne gültigen Tag. */
 export function pinUntilText(day) {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(String(day || ""))) return "";
-  return `bis ${viennaDate(dayNoon(day), { day: "2-digit", month: "2-digit", year: "numeric" })}`;
+  return `bis ${formatWhen(dayNoon(day), { time: false })}`;
 }
 
 /**

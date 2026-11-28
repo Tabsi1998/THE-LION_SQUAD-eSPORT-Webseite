@@ -17,8 +17,7 @@ import { SeoPreviewPanel } from "@/components/tls/SeoPreviewPanel";
 import { SkeletonDetailHeader, SkeletonLines } from "@/components/tls/Skeleton";
 import { appendEmbedToken } from "@/components/tls/RichContent";
 import { PersonPicker } from "@/components/tls/PersonPicker";
-import { toDateTimeLocalInput } from "@/lib/datetime";
-import { viennaDateTime } from "@/lib/vienna";
+import { formatWhen, toDateTimeLocalInput } from "@/lib/datetime";
 import { PIN_DEFAULT_DAYS, defaultPinUntil, pinBaseDay, pinUntilText } from "@/lib/newsPin";
 import { fromViennaInput } from "@/lib/vienna";
 import { buildDirtyPayload, hasPayloadChanges } from "@/lib/dirtyPayload";
@@ -216,13 +215,13 @@ function NewsForm({ post, meta, onDone, onReload }) {
     const when = mode === "scheduled" ? new Date(scheduleAt) : null;
     return confirm(publishQuestion({
       mode,
-      whenText: when && !Number.isNaN(when.getTime()) ? viennaDateTime(when, { dateStyle: "medium", timeStyle: "short" }) : "",
+      whenText: when && !Number.isNaN(when.getTime()) ? formatWhen(when) : "",
       audience: audience.status === "fulfilled" && audience.value?.data && typeof audience.value.data === "object" ? audience.value.data : null,
       appOnly,
       // Öffentlich und nur App (#1532): ein App-Push an alle mit Zustimmung - nur, wenn er noch nicht hinausging.
       appPush: appOnly && ["public", "community"].includes(form.visibility) && !post.app_push_notified_at,
       sentAt: post.newsletter_sent_at || "",
-      sentText: post.newsletter_sent_at ? viennaDateTime(post.newsletter_sent_at, { dateStyle: "medium" }) : "",
+      sentText: post.newsletter_sent_at ? formatWhen(post.newsletter_sent_at, { time: false }) : "",
       discord: discord.status === "fulfilled" && typeof discord.value?.data?.would_send === "boolean" ? discord.value.data.would_send : null,
     }));
   };
@@ -336,7 +335,7 @@ function NewsForm({ post, meta, onDone, onReload }) {
           {post.withdrawn_at && (
             <div role="status" className="border border-warn/40 bg-warn/10 rounded-sm p-4 space-y-3" data-testid="news-withdrawn">
               <p className="tls-type-small text-white/85">
-                <strong className="text-warn">Zurückgezogen</strong> am {viennaDateTime(post.withdrawn_at, { dateStyle: "medium", timeStyle: "short" })}{post.withdrawn_by_name ? ` von ${post.withdrawn_by_name}` : ""}. Besucher sehen statt des Beitrags nur einen Hinweis.
+                <strong className="text-warn">Zurückgezogen</strong> am {formatWhen(post.withdrawn_at, { relative: false })}{post.withdrawn_by_name ? ` von ${post.withdrawn_by_name}` : ""}. Besucher sehen statt des Beitrags nur einen Hinweis.
               </p>
               <button type="button" onClick={restore} disabled={saving} data-testid="news-restore" className="tls-btn tls-btn--quiet px-4 py-2 rounded-sm tls-type-label disabled:opacity-50">Wiederherstellen (als Entwurf)</button>
             </div>
@@ -374,7 +373,7 @@ function NewsForm({ post, meta, onDone, onReload }) {
               <PersonPicker purpose="news_author" value={author} onChange={setAuthor} label="Autor" placeholder="Name tippen …" hint="Steht auf der News-Seite unter „Von“." testId="news-author" />
               {post.updated_at && (
                 <p className="tls-type-small text-white/55" data-testid="news-last-change">
-                  Zuletzt geändert {post.updated_by_name ? <>von <strong className="text-white/80">{post.updated_by_name}</strong> </> : ""}am {viennaDateTime(post.updated_at, { dateStyle: "medium", timeStyle: "short" })}.
+                  Zuletzt geändert {post.updated_by_name ? <>von <strong className="text-white/80">{post.updated_by_name}</strong> </> : ""}am {formatWhen(post.updated_at, { relative: false })}.
                 </p>
               )}
               <NewsHistory rows={post.history || []} />
@@ -527,7 +526,7 @@ export function NewsHistory({ rows }) {
       <ol className="mt-2 space-y-1.5">
         {rows.map((row, index) => (
           <li key={`${row.at}-${index}`} className="text-white/65">
-            <span className="text-white/85 font-semibold">{row.label}</span> von {row.by} · {viennaDateTime(row.at, { dateStyle: "medium", timeStyle: "short" })}
+            <span className="text-white/85 font-semibold">{row.label}</span> von {row.by} · {formatWhen(row.at)}
             {row.fields?.length > 0 && <span className="block text-white/45">{row.fields.join(", ")}</span>}
           </li>
         ))}

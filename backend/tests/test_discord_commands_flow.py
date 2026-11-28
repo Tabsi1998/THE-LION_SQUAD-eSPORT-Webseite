@@ -237,7 +237,7 @@ def test_membership_text_covers_every_state():
     assert text({"member_status": "pending"}) == "Dein Mitgliedsantrag ist eingegangen und wartet auf den Vorstand."
     assert text({"member_status": "blocked"}).startswith("Zu deiner Mitgliedschaft wende dich")
     assert text({"member_status": "honorary", "membership_type": "honorary", "member_since": "2019-05-04", "member_since_precision": "year"}, "x").startswith("✅ Du bist aktives Vereinsmitglied (Ehrenmitglied, seit 2019)")
-    assert "seit 04.05.2019" in text({"member_status": "active", "member_since": "2019-05-04"})
+    assert "seit Sa 4. Mai 2019" in text({"member_status": "active", "member_since": "2019-05-04"})
     ended = text({"member_status": "active", "dolibarr": {"membership_ends": "2026-01-31"}}, "https://x", today="2026-10-03")
-    assert ended == "Deine Mitgliedschaft ist am 31.01.2026 ausgelaufen. Wieder Mitglied werden: https://x/membership/apply"
+    assert ended == "Deine Mitgliedschaft ist am Sa 31. Jänner ausgelaufen. Wieder Mitglied werden: https://x/membership/apply"
     assert text(None, "https://x") == "Du bist (noch) kein Vereinsmitglied. Mitglied werden: https://x/membership/apply"

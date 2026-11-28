@@ -1,4 +1,8 @@
 import { addDays, dayLabel, moveIds, opponentText, roundLabel, roundPayload, roundToForm, roundWhen, sideLabel, suggestNextDay, weekdayOf } from "./referenceCalendar";
+import { runAtTestClock } from "@/testClock";
+
+// Feste Uhr (#1307): die Datums-Texte lassen das laufende Jahr weg und sagen „heute“/„morgen“.
+runAtTestClock();
 
 // Kalender externer Serien (#1742): nur Beschriftung und Vorschläge in Kalendertagen - der Status kommt vom Server.
 
@@ -21,9 +25,9 @@ test("der nächste Termin folgt dem Standard-Wochentag nach dem letzten Termin",
 });
 
 test("Beschriftung: Tag, Uhrzeit, offener Termin, Kürzel", () => {
-  expect(dayLabel("2026-11-05")).toBe("Do., 05.11.2026");
-  expect(roundWhen({ club_day: "2026-11-05", time: "20:30" })).toBe("Do., 05.11.2026 · 20:30");
-  expect(roundWhen({ club_day: "2026-11-05", time: null })).toBe("Do., 05.11.2026");
+  expect(dayLabel("2026-11-05")).toBe("Do 5. November");
+  expect(roundWhen({ club_day: "2026-11-05", time: "20:30" })).toBe("Do 5. November · 20:30");
+  expect(roundWhen({ club_day: "2026-11-05", time: null })).toBe("Do 5. November");
   expect(roundWhen({ club_day: null })).toBe("Termin offen");
   expect(roundLabel({ code: "R3", position: 3 })).toBe("R3");
   expect(roundLabel({ code: "", position: 4 })).toBe("Termin 4");
@@ -45,8 +49,8 @@ test("Team-Liga (#1931): Heim/Auswärts und Ende des Spieltags im Formular, Gegn
   expect(roundPayload(form)).not.toHaveProperty("at_home");
   expect(roundToForm({ id: "r2", at_home: true }).at_home).toBe("home");
 
-  expect(roundWhen({ club_day: "2026-05-13", club_day_end: "2026-05-17", time: "20:00" })).toBe("Mi., 13.05. – So., 17.05.2026");
-  expect(roundWhen({ club_day: "2026-12-29", club_day_end: "2027-01-02" })).toBe("Di., 29.12.2026 – Sa., 02.01.2027");
+  expect(roundWhen({ club_day: "2026-05-13", club_day_end: "2026-05-17", time: "20:00" })).toBe("Mi 13. – So 17. Mai");
+  expect(roundWhen({ club_day: "2026-12-29", club_day_end: "2027-01-02" })).toBe("Di 29. Dezember 2026 – Sa 2. Jänner 2027");
   expect(opponentText({ opponent: "Probe Falken", at_home: true })).toBe("vs Probe Falken");
   expect(opponentText({ opponent: "Probe Falken", at_home: false })).toBe("@ Probe Falken");
   expect(opponentText({ opponent: "Probe Falken" })).toBe("gegen Probe Falken");

@@ -3,7 +3,8 @@ import { api, formatRequestError } from "@/lib/api";
 import { useConfirm } from "@/components/tls/ConfirmDialog";
 import { toast } from "sonner";
 import { Laptop, LogOut, ShieldCheck, Smartphone } from "lucide-react";
-import { asInstant, viennaDateTime } from "@/lib/vienna";
+import { formatWhen } from "@/lib/datetime";
+import { asInstant } from "@/lib/vienna";
 
 // Gerät der App (#942): der Server kennt seit Build 89 Modell und System („Pixel 9 / Android 16“) - ältere App-Sitzungen
 // stehen weiter als „Mobile“.
@@ -29,7 +30,7 @@ function formatSessionTime(value) {
   if (!value) return "—";
   const date = asInstant(value);
   if (Number.isNaN(date.getTime())) return "—";
-  return viennaDateTime(date, { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" });
+  return formatWhen(date);
 }
 
 export function SessionsPanel() {

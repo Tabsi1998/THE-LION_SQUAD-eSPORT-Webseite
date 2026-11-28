@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
 import { api, formatRequestError } from "@/lib/api";
 import { InvoiceTermsPanel } from "@/components/tls/InvoiceTermsPanel";
-import { viennaDate } from "@/lib/vienna";
+import { formatWhen } from "@/lib/datetime";
 
 // Rechnungsangaben (#1358): der Kassier pflegt Zahlungsziel, Zahlungsart, Bankkonto, Sprache der PDFs, „Steuersätze
 // geprüft“ und „Rechnungen gleich freigeben“ selbst - über einen schmalen Weg mit dem Bereich Finanzen. Die Listen kommen
@@ -62,7 +62,7 @@ export function InvoiceDetailsTab({ onSaved }) {
             data-testid="invoice-details-tax-confirmed" />
           <span>
             Steuersätze geprüft (Kassier oder Steuerberatung)
-            {details.tax_confirmed?.at && <span className="block tls-type-small text-white/45" data-testid="invoice-details-tax-by">{details.tax_confirmed.by || "bestätigt"} am {viennaDate(details.tax_confirmed.at)}</span>}
+            {details.tax_confirmed?.at && <span className="block tls-type-small text-white/45" data-testid="invoice-details-tax-by">{details.tax_confirmed.by || "bestätigt"} am {formatWhen(details.tax_confirmed.at, { time: false, relative: false })}</span>}
           </span>
         </label>
         <label className="flex items-start gap-2 tls-type-small">

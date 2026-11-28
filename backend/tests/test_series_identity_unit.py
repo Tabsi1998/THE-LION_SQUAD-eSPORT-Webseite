@@ -104,7 +104,7 @@ def test_a_confirmed_alias_wins_and_names_its_date():
     found = suggest(index, "Pr0Berenner")
     assert [item["profile_id"] for item in found] == ["p-bert", "p-anna"]
     # Wiener Tag: 23:30 UTC am 1. März ist in Wien schon der 2. März.
-    assert found[0]["reason"] == "Alias bestätigt am 02.03.2026" and found[0]["basis"] == "alias"
+    assert found[0]["reason"] == "Alias bestätigt am Mo 2. März" and found[0]["basis"] == "alias"
 
 
 def test_an_alias_can_point_to_a_guest():

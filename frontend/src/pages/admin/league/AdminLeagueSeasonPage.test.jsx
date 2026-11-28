@@ -1,5 +1,10 @@
 import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { MemoryRouter, Route, Routes, useLocation } from "react-router-dom";
+import { runAtTestClock } from "@/testClock";
+import { formatWhen } from "@/lib/datetime";
+
+// Feste Uhr (#1307): die Datums-Texte lassen das laufende Jahr weg und sagen „heute“/„morgen“.
+runAtTestClock();
 
 // Eine Season verwalten (docs/LIGA.md, #1622) - seit #2267 in Reitern: Überblick mit Ablauf und Prüfung, Speichern je Reiter (nur die
 // eigenen Felder), Punkt bei Ungespeichertem, Rückfrage beim Reiterwechsel, Sprungmarken (auch die alte #anmeldungen), Kalender,
@@ -345,7 +350,7 @@ test("Regelwerk: kein Freitextfeld mehr - mit Regelwerk nur der Stand, ohne ein 
   extra["/admin/league-rules/league_season/s1"] = { current: { label: "Version 2", valid_from: "2026-11-01" }, inherited: null, versions: [{}], draft: null,
     data_changes: { label: "Version 2", rows: [{ block: "map_pool" }] } };
   renderPage("#regelwerk");
-  await waitFor(() => expect(screen.getByTestId("season-rules-state")).toHaveTextContent("Gültig: Version 2, gilt ab 01.11.2026"));
+  await waitFor(() => expect(screen.getByTestId("season-rules-state")).toHaveTextContent("Gültig: Version 2, gilt ab So 1. November"));
   expect(screen.queryByTestId("season-rules-legacy")).toBeNull();
   expect(screen.queryByTestId("season-rules-missing")).toBeNull();
   // Im Überblick: „Regelwerk muss freigegeben werden“.
@@ -381,7 +386,7 @@ test("Ligen und Staffeln: der Stand nennt das wirksame Ende der Anmeldung (Nachm
     divisions: [{ ...BODY.divisions[0], staffeln: [{ tournament_id: "t1", staffel: "A", status: "draft", participant_count: 1, max_participants: 8 }] }] };
   renderPage("#ligen");
   const stand = await screen.findByTestId("staffel-stand-1-A");
-  const expected = effective.toLocaleString("de-AT", { timeZone: "Europe/Vienna", day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" });
+  const expected = formatWhen(effective);
   expect(stand).toHaveTextContent(`Anmeldung offen bis ${expected}`);
 });
 

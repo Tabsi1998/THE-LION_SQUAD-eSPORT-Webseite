@@ -20,10 +20,9 @@ import {
   attachmentModes, attachmentSlots, banAttachmentEverywhere, bannedAttachmentCount, classRow, copyAttachmentsToClass, countText, effectiveRows, fitsWeapon, formPayload, formProblem,
   groupByCategory, groupBySubcategory, listToForm, matchesSearch, NO_SUBCATEGORY, rowKey, sameRows, statusOf, subcategoryOf,
 } from "@/lib/loadoutBans";
-import { viennaDate } from "@/lib/vienna";
+import { formatWhen } from "@/lib/datetime";
 import { toast } from "sonner";
 
-const DAY = { day: "2-digit", month: "2-digit", year: "numeric" };
 const CHIP = "inline-flex max-w-full items-center gap-1.5 rounded-sm border px-2 py-0.5 tls-type-small cursor-pointer select-none focus-within:outline focus-within:outline-1 focus-within:outline-[#29B6E8]";
 const ON = "border-[#29B6E8]/70 bg-[#29B6E8]/10 text-white";
 const OFF = "border-white/10 bg-[#0A0A0A] text-white/70 hover:border-white/25";
@@ -57,7 +56,7 @@ function ItemNote({ item, className = "" }) {
 }
 
 function versionLabel(row) {
-  const day = row.saved_at ? ` · ${viennaDate(row.saved_at, DAY)}` : "";
+  const day = row.saved_at ? ` · ${formatWhen(row.saved_at, { time: false })}` : "";
   return `Version ${row.version}${day}${row.cleared ? " · entfernt" : ` · ${countText(row.entries, "Eintrag", "Einträge")}`}`;
 }
 

@@ -2,9 +2,12 @@ import { readFileSync } from "node:fs";
 import path from "node:path";
 import {
   formatAgo,
+  formatClock,
   formatDate,
   formatDateTime,
   formatDuration,
+  formatMonth,
+  formatOfficialDate,
   formatRange,
   formatWhen,
   fromDateTimeLocal,
@@ -198,6 +201,60 @@ describe("gemeinsame Datumsfälle (docs/date-cases.json)", () => {
 
   test("weit in der Zukunft sagt formatAgo das Datum statt „gerade eben“", () => {
     expect(formatAgo("2026-05-23T16:00:00Z", { now: new Date(CASES.now) })).toBe("Sa 23. Mai · 18:00");
+  });
+
+  test.each(CASES.when_fixed)("formatWhen ohne heute/morgen: $note", (row) => {
+    expect(formatWhen(row.value, { now: caseNow(row), time: row.time !== false, relative: false })).toBe(row.expected);
+  });
+
+  test.each(CASES.day)("reiner Kalendertag: $note", (row) => {
+    expect(formatWhen(row.value, { now: caseNow(row) })).toBe(row.expected);
+  });
+
+  test.each(CASES.official)("amtliches Datum: $note", (row) => {
+    expect(formatOfficialDate(row.value)).toBe(row.expected);
+  });
+
+  // Randfälle (#1307, Review): Web und Server schreiben auch hier gleich.
+  test.each(CASES.edges)("Randfall ($fn): $note", (row) => {
+    const now = caseNow(row);
+    if (row.fn === "ago") expect(formatAgo(row.value, { now })).toBe(row.expected);
+    else if (row.fn === "when_bad_now") expect(formatWhen(row.value, { now: "kein Datum" })).toBe(row.expected);
+    else expect(formatWhen(row.value, { now })).toBe(row.expected);
+  });
+});
+
+// Die alten Namen schreiben dieselbe Form (#1307) - Seiten, die sie noch rufen, ändern sich ohne eigenes Zutun mit.
+describe("formatDateTime, formatDate, formatClock und formatMonth", () => {
+  const now = new Date(CASES.now);
+
+  test("formatDateTime ist formatWhen, formatDate der Tag", () => {
+    expect(formatDateTime("2026-05-23T16:00:00Z", { now })).toBe("Sa 23. Mai · 18:00");
+    expect(formatDateTime("2026-05-20T16:00:00Z", { now })).toBe("heute 18:00");
+    expect(formatDateTime("2026-05-20T16:00:00Z", { now, relative: false })).toBe("Mi 20. Mai · 18:00");
+    expect(formatDate("2026-05-23T16:00:00Z", { now })).toBe("Sa 23. Mai");
+    expect(formatDate("2026-12-31", { now })).toBe("Do 31. Dezember");
+    expect(formatDate("2025-03-01", { now })).toBe("Sa 1. März 2025");
+  });
+
+  test("die Uhrzeit allein - auch um Mitternacht zweistellig", () => {
+    expect(formatClock("2026-05-20T22:00:00Z")).toBe("00:00");
+    expect(formatClock("2026-01-15T18:05:00Z")).toBe("19:05");
+    expect(formatClock(null)).toBe("");
+    expect(formatClock("kaputt")).toBe("");
+  });
+
+  test("der Monat als Überschrift", () => {
+    expect(formatMonth("2026-02-10T10:00:00Z")).toBe("Februar 2026");
+    expect(formatMonth("2026-01-01")).toBe("Jänner 2026");
+    expect(formatMonth("2026-12-31T23:30:00Z", { year: false })).toBe("Jänner");
+    expect(formatMonth(undefined)).toBe("");
+  });
+
+  test("kein Wochentag mit Punkt, kein „Mi.,“ und keine Zahlen-Monate", () => {
+    for (const value of ["2026-05-23T16:00:00Z", "2026-11-30T09:00:00Z", "2027-01-02T12:00:00Z"]) {
+      expect(formatDateTime(value, { now })).not.toMatch(/\.,|\d{2}\.\d{2}\./);
+    }
   });
 });
 

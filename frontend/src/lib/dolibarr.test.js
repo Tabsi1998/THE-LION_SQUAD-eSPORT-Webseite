@@ -1,4 +1,8 @@
 import { describeSync, feeBadge, feeCard, formatMoney } from "./dolibarr";
+import { runAtTestClock } from "@/testClock";
+
+// Feste Uhr (#1307): die Datums-Texte lassen das laufende Jahr weg und sagen „heute“/„morgen“.
+runAtTestClock();
 
 // Dolibarr (#295): was auf „Meine Mitgliedschaft“ und oben auf der Admin-Seite steht.
 
@@ -17,17 +21,17 @@ test("bezahlt, fällig, Familie und Austritt stehen in ganzen Sätzen", () => {
   const paid = feeCard(view());
   expect(paid.label).toBe("bezahlt");
   expect(paid.tone).toBe("ok");
-  expect(paid.lines).toEqual(["Bezahlt bis 31.12.2026", "Nächster Beitrag ab 1.1.2027"]);
+  expect(paid.lines).toEqual(["Bezahlt bis Do 31. Dezember", "Nächster Beitrag ab Fr 1. Jänner 2027"]);
 
   const due = feeCard(view({ status: "due", next_due: "2026-01-01" }, { paid_until: "2025-12-31" }));
   expect(due.tone).toBe("warn");
-  expect(due.lines).toContain("Nächster Beitrag seit 1.1.2026 offen");
+  expect(due.lines).toContain("Nächster Beitrag seit Do 1. Jänner offen");
 
   const family = feeCard(view({ status: "invoiced", payer: "other", discount: { kind: "age", label: "Jugend" } }, { membership_ends: "2026-12-31" }));
   expect(family.tone).toBe("info");
   expect(family.lines).toContain("Den Beitrag zahlt eine andere Person für dich (z. B. Familie).");
   expect(family.lines).toContain("Ermäßigung: Jugend");
-  expect(family.lines).toContain("Mitgliedschaft endet am 31.12.2026");
+  expect(family.lines).toContain("Mitgliedschaft endet am Do 31. Dezember");
 
   expect(feeCard(view({ required: false, status: "not_required", amount: null })).amount).toBeNull();
 });

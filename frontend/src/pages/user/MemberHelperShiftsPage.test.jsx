@@ -1,6 +1,10 @@
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router-dom";
+import { runAtTestClock } from "@/testClock";
+
+// Feste Uhr (#1307): die Datums-Texte lassen das laufende Jahr weg und sagen „heute“/„morgen“.
+runAtTestClock();
 
 // Helferdienste (#331): Schichten mit Plätzen und eigenem Stand; „Ich helfe“ nach Rückfrage, Rücknahme nur
 // unbestätigt; ohne Weg zur Akte der Grund.
@@ -48,7 +52,7 @@ test("Schichten mit Plätzen und Stand; „Ich helfe“ nach Rückfrage, Rückna
   const user = userEvent.setup();
   render(<MemoryRouter><MemberHelperShiftsPage /></MemoryRouter>);
   await waitFor(() => expect(screen.getByTestId("helper-event-5")).toBeInTheDocument());
-  expect(shiftWhen(EVENT.shifts[0])).toBe("10.10.2026 · 14:00–16:00 Uhr");
+  expect(shiftWhen(EVENT.shifts[0])).toBe("Sa 10. Oktober · 14:00–16:00 Uhr");
   expect(screen.getByTestId("helper-event-5-registration")).toHaveTextContent("Anmeldung beim Verein");
   expect(screen.getByTestId("helper-event-5-open")).toHaveTextContent("4 freie Plätze");
   expect(screen.getByTestId("helper-shifts-mine")).toHaveTextContent("einem Dienst");

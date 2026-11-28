@@ -16,7 +16,7 @@ const ROW_BUTTON = "tls-btn min-h-11 min-w-11 inline-flex items-center justify-c
 const ACCEPT = "border border-ok/45 text-ok hover:bg-ok/10";
 const DECLINE = "tls-btn--danger";
 // Zur Auswahl mit Wochentag: „Do 12.11. 20:00 Uhr“ - so vergleicht man Tage auf einen Blick.
-const dayTime = (value) => (value ? `${shortWhen(value)} Uhr` : "ohne Zeit");
+const dayTime = (value) => (value ? shortWhen(value) : "ohne Zeit");
 const TEXT_BUTTON = "tls-btn shrink-0 min-h-11 px-3 py-2 rounded-sm tls-type-label disabled:opacity-50";
 
 /**

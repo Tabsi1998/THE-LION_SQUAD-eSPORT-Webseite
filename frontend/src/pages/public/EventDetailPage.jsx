@@ -33,7 +33,7 @@ import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 import { useSubmissionGuard } from "@/hooks/useSubmissionGuard";
 import { renderMarkdownLite } from "@/lib/markdownLite";
 import { seoTextPreview } from "@/lib/textPreview";
-import { formatWhen } from "@/lib/datetime";
+import { formatClock, formatWhen } from "@/lib/datetime";
 import { eventIsOver, photosComingWindow } from "@/lib/afterEnd";
 import { countText, ownSeatsSentence, participantLists, seatsLabel, waitlistNotice } from "@/lib/eventSeats";
 import { cancelledNotice, eventFacts, eventTabs, stripHeadingEmoji, visibilityChip, whatsOnRows } from "@/lib/eventPage";
@@ -50,8 +50,8 @@ import {
   Calendar, Camera, CheckCircle, Clock, CupSoda, ExternalLink, Flag, Gamepad2, Gift, Glasses, Handshake, Image as ImageIcon, Joystick, Mail, MapPin,
   Monitor, Music, Newspaper, Pizza, Radio, Star, Trophy, UserPlus, Users, Wifi, XCircle,
 } from "lucide-react";
-import { viennaDate, viennaDateTime, viennaTime } from "@/lib/vienna";
 import { ShareButton } from "@/components/tls/ShareButton";
+import { When } from "@/components/tls/When";
 
 // Die Event-Seite als Startpunkt (#1183) mit Kopf und Bild (#1273) und Fakten-Kasten (#1346). Feste Reihenfolge, gleich in
 // der App (EventDetailScreen): 1. Dein Event, 2. Was läuft beim Event, 3. Live verfolgen, 4. Fotos, 5. News, 6. Infos
@@ -127,8 +127,8 @@ function EventDaysBlock({ schedule }) {
 
 function placeTimeLine(place) {
   if (!place.start_date) return "";
-  const start = viennaDateTime(place.start_date, { dateStyle: "medium", timeStyle: "short" });
-  const end = place.end_date ? viennaDateTime(place.end_date, { dateStyle: "medium", timeStyle: "short" }) : "";
+  const start = formatWhen(place.start_date);
+  const end = place.end_date ? formatWhen(place.end_date) : "";
   return end ? `${start} – ${end}` : start;
 }
 
@@ -307,7 +307,7 @@ function EventHeader({ e, notices = [] }) {
             <div className="mt-4 flex flex-wrap gap-x-5 gap-y-2 tls-type-small text-white/70 min-w-0">
               {e.schedule?.multi_day
                 ? <span className="inline-flex min-w-0 items-center gap-2" data-testid="event-days-summary"><Calendar className="w-4 h-4 text-[#9F7AEA] shrink-0" /><span className="min-w-0 break-words">{[e.schedule.label, e.schedule.now?.state !== "after" && e.schedule.now?.text].filter(Boolean).join(" · ")}</span></span>
-                : e.start_date && <span className="inline-flex min-w-0 items-center gap-2"><Calendar className="w-4 h-4 text-[#9F7AEA] shrink-0" /><span className="min-w-0 break-words">{formatWhen(e.start_date)}</span></span>}
+                : e.start_date && <span className="inline-flex min-w-0 items-center gap-2"><Calendar className="w-4 h-4 text-[#9F7AEA] shrink-0" /><span className="min-w-0 break-words"><When value={e.start_date} /></span></span>}
               {(e.locations?.length || 0) > 1
                 ? <span className="inline-flex min-w-0 items-center gap-2" data-testid="event-location-count"><MapPin className="w-4 h-4 text-[#9F7AEA] shrink-0" /><span>{e.locations.length} Standorte</span></span>
                 : (e.location || e.city) && <span className="inline-flex min-w-0 items-center gap-2"><MapPin className="w-4 h-4 text-[#9F7AEA] shrink-0" /><span className="min-w-0 break-words">{e.location || e.city}</span></span>}
@@ -503,7 +503,7 @@ function EventOverview({ e, user, over, accessToken, hasConsent, onChanged, regi
           <div className="grid sm:grid-cols-2 gap-4">
             {e.news.map((n) => (
               <Link key={n.id} to={`/news/${n.slug}`} className="tls-card border border-white/10 rounded-sm bg-[#121212] p-4">
-                <div className="tls-type-label text-quiet">{viennaDate(n.published_at || n.created_at)}</div>
+                <div className="tls-type-label text-quiet"><When value={n.published_at || n.created_at} time={false} /></div>
                 <div className="font-bold mt-1">{n.title}</div>
                 {n.excerpt && <div className="tls-type-small text-white/60 mt-1 line-clamp-2">{n.excerpt}</div>}
               </Link>
@@ -540,7 +540,7 @@ function EventOverview({ e, user, over, accessToken, hasConsent, onChanged, regi
                     <div className="tls-type-label text-[#9F7AEA]">Standort {index + 1}</div>
                     {place.name && <div className="tls-type-card">{place.name}</div>}
                     {placeTimeLine(place) && <div className="tls-type-small text-white/75 inline-flex items-center gap-2"><Calendar className="w-4 h-4 text-[#9F7AEA]" /> {placeTimeLine(place)}</div>}
-                    {place.door_time && <div className="tls-type-small text-white/50">Einlass {viennaTime(place.door_time, { timeStyle: "short" })}</div>}
+                    {place.door_time && <div className="tls-type-small text-white/50">Einlass {formatClock(place.door_time)}</div>}
                     {place.address_line && <div className="tls-type-small text-white/65 inline-flex items-start gap-2"><MapPin className="w-4 h-4 text-[#9F7AEA] shrink-0 mt-0.5" /> <span>{place.address_line}</span></div>}
                     {place.max_participants != null && <div className="tls-type-small text-white/50 inline-flex items-center gap-2"><Users className="w-3.5 h-3.5" /> {place.max_participants} Plätze</div>}
                     {place.note && <div className="tls-type-small text-white/60">{place.note}</div>}
@@ -791,8 +791,8 @@ function EventRegistrationPanel({ event, user, accessToken = "", onChanged, open
         </div>
       )}
       <div className="mt-4 space-y-1 tls-type-small text-white/65">
-        {event.registration_opens_at && <div>Öffnet: {viennaDateTime(event.registration_opens_at, { dateStyle: "medium", timeStyle: "short" })}</div>}
-        {event.registration_closes_at && <div>Schließt: {viennaDateTime(event.registration_closes_at, { dateStyle: "medium", timeStyle: "short" })}</div>}
+        {event.registration_opens_at && <div>Öffnet: <When value={event.registration_opens_at} /></div>}
+        {event.registration_closes_at && <div>Schließt: <When value={event.registration_closes_at} /></div>}
         {!event.registration_url && summary.spots_left != null && <div>Freie Plätze: {summary.spots_left}</div>}
       </div>
       {event.registration_url ? (

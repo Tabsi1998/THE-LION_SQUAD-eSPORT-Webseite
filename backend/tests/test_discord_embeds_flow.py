@@ -92,7 +92,7 @@ def test_embeds_are_pure_functions():
 
     items = [{"kind": "tournament", "title": "Sommer-Cup", "start": "2026-10-03T16:00:00+00:00", "path": "/tournaments/sommer-cup", "phase": {"label": "Anmeldung offen"}}]
     events = discord_embeds.events_embed(items, "https://lionsquad.at")
-    assert events["fields"][0]["name"].startswith("🏆 ") and events["fields"][0]["name"].endswith("03.10.2026 · 18:00 Uhr")
+    assert events["fields"][0]["name"].startswith("🏆 ") and events["fields"][0]["name"].endswith("Sa 3. Oktober · 18:00")
     assert events["fields"][0]["value"] == "**[Sommer-Cup](https://lionsquad.at/tournaments/sommer-cup)**\nTurnier · Anmeldung offen"
     without_state = discord_embeds.events_embed([{**items[0], "phase": None}], "https://lionsquad.at")
     assert without_state["fields"][0]["value"].endswith("\nTurnier"), "ohne Stand kein loser Trennpunkt"

@@ -10,7 +10,7 @@ import { SkeletonList } from "@/components/tls/Skeleton";
 import { useConfirm, usePrompt } from "@/components/tls/ConfirmDialog";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { AlertTriangle, Clock, ExternalLink, Flag, Gavel, ShieldAlert, RefreshCw, Undo2 } from "lucide-react";
-import { viennaDateTime } from "@/lib/vienna";
+import { formatWhen } from "@/lib/datetime";
 import { toast } from "sonner";
 import { ShortCaps } from "@/components/tls/ShortCaps";
 
@@ -140,9 +140,7 @@ const LAP_KINDS = new Set(["lap_penalty", "lap_invalid"]);
 function Row({ p, onTakeBack }) {
   const meta = KIND_META[p.kind] || KIND_META.incident;
   const Icon = meta.icon;
-  const date = p.issued_at ? viennaDateTime(p.issued_at, {
-    dateStyle: "short", timeStyle: "short",
-  }) : "—";
+  const date = p.issued_at ? formatWhen(p.issued_at) : "—";
   return (
     <div
       data-testid={`pen-row-${p.ref_id}`}

@@ -175,9 +175,10 @@ def _when(value) -> str:
         moment = datetime.fromisoformat(str(value).replace("Z", "+00:00"))
     except ValueError:
         return str(value)
-    if moment.tzinfo is not None:
-        moment = moment.astimezone(CLUB_TZ)
-    return moment.strftime("%d.%m.%Y %H:%M")
+    from services.date_text import format_moment
+
+    # Ohne Zone ist es die Wiener Uhr, wie eingetragen - so stand es schon vor #1307 da.
+    return format_moment(moment if moment.tzinfo else moment.replace(tzinfo=CLUB_TZ))
 
 
 def next_event_text(events: list[dict], base_url: str = "") -> str:

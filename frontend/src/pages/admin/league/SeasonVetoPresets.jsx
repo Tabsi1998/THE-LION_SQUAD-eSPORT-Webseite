@@ -12,10 +12,9 @@ import {
   applyRotation, changedWeeks, missingWeeks, overwriteCount, presetChangeLine, presetStale, presetValue, presetsPayload, presetsToForm, staleWeeks,
   weekDates, weekList, weekLocked, withPreset,
 } from "@/lib/leagueVeto";
-import { viennaDateTime } from "@/lib/vienna";
+import { formatWhen } from "@/lib/datetime";
 
 // „10.11.2026, 19:30“ - ohne Sekunden.
-const WHEN = { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" };
 const FIELD = "min-h-11 w-full rounded-sm border bg-[#121212] px-2 py-1 tls-type-small text-white focus:border-[#29B6E8] focus:outline-none disabled:opacity-50";
 
 function WeekRow({ row, modes, form, problems, changed, onChange }) {
@@ -212,7 +211,7 @@ export function SeasonVetoPresets({ seasonId, unsaved }) {
           <ol className="mt-2 space-y-2">
             {state.history.map((entry) => (
               <li key={entry.at} data-testid="veto-presets-history-entry">
-                <div className="text-white/75">{viennaDateTime(entry.at, WHEN)} · {entry.by_name}</div>
+                <div className="text-white/75">{formatWhen(entry.at)} · {entry.by_name}</div>
                 <ul className="mt-0.5 space-y-0.5 pl-3">
                   {entry.changes.map((change) => <li key={`${change.week}-${change.mode}`}>{presetChangeLine(change, modes)}</li>)}
                 </ul>

@@ -1,4 +1,8 @@
 import { INVITE_PARAM, inviteTokenFrom, outcomeLabel, recentLine, upcomingLine } from "@/lib/teamPage";
+import { runAtTestClock } from "@/testClock";
+
+// Feste Uhr (#1307): die Datums-Texte lassen das laufende Jahr weg und sagen „heute“/„morgen“.
+runAtTestClock();
 
 // Team-Seite (#1191): Zeilen für Termine und letzte Spiele, der Schlüssel aus der Adresse.
 
@@ -15,7 +19,7 @@ test("letzte Spiele: Ergebnis mit Gegner, bei Durchgängen der Platz", () => {
 test("kommende Turniere: Event, Wochentag, Datum und Uhrzeit in Wien", () => {
   const line = upcomingLine({ tournament: { event_name: "Herbst-LAN", start_date: "2026-10-17T14:00:00Z", game_name: "Rocket League" } });
   expect(line).toContain("Herbst-LAN");
-  expect(line).toContain("17.10.");
+  expect(line).toContain("Herbst-LAN · Sa 17. Oktober · 16:00");
   expect(line).toContain("16:00");
   expect(upcomingLine({ tournament: { start_date: null, game_name: "Rocket League" } })).toBe("Rocket League");
 });

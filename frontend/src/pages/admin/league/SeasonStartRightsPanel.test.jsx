@@ -1,4 +1,8 @@
 import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { runAtTestClock } from "@/testClock";
+
+// Feste Uhr (#1307): die Datums-Texte lassen das laufende Jahr weg und sagen „heute“/„morgen“.
+runAtTestClock();
 
 // Startrechte für die nächste Season (#1627, docs/LIGA.md „F.2a“): Einstellung, Übersicht mit Frist, Zusage eintragen, Nachrücken.
 // Nur erfundene Namen.
@@ -67,7 +71,7 @@ test("die Übersicht zeigt je Co-Team den Stand mit Frist - Zusage ist nicht Tei
   const rows = await screen.findByTestId("start-rights-rows");
   expect(screen.getByTestId("start-rights-counts")).toHaveTextContent("1 Zusage offen · 1 zugesagt · 1 verfallen");
   expect(within(rows).getByTestId("start-right-a1")).toHaveTextContent("Zusage offen");
-  expect(within(rows).getByTestId("start-right-a1")).toHaveTextContent("bis 15.12.2026, 18:00 Uhr");
+  expect(within(rows).getByTestId("start-right-a1")).toHaveTextContent("bis Di 15. Dezember · 18:00");
   expect(within(rows).getByTestId("start-right-a2")).toHaveTextContent("Zugesagt");
   expect(within(rows).getByTestId("start-right-a3")).toHaveTextContent("Verfallen");
   expect(within(rows).getByTestId("start-right-a3")).toHaveTextContent("Aufstieg · Liga 2 · Staffel A, Platz 1");

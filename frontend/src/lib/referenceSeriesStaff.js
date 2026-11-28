@@ -1,11 +1,12 @@
 // Captains externer Serien (#1749): Texte für Verwaltung und „Mein Dienst“. Ob ein Recht gilt und wer veröffentlichen
 // darf, entscheidet der Server (services/reference_series_access.py) - hier wird nur beschriftet.
-import { dayNoon, viennaDate, viennaDay } from "@/lib/vienna";
+import { formatWhen } from "@/lib/datetime";
+import { viennaDay } from "@/lib/vienna";
 
-/** „31.12.2026“ für einen Kalendertag „JJJJ-MM-TT“; leer ohne Tag. */
+/** „Do 31. Dezember“ für einen Kalendertag „JJJJ-MM-TT“ (#1307, ohne „heute“ - steht hinter „am“); leer ohne Tag. */
 export function dayLabel(day) {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(String(day || ""))) return "";
-  return viennaDate(dayNoon(day), { day: "2-digit", month: "2-digit", year: "numeric" });
+  return formatWhen(day, { time: false, relative: false });
 }
 
 /** Heute in Wien - kleinster Wert für „Gilt bis“. */

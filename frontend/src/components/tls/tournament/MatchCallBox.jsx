@@ -1,7 +1,8 @@
 import { useEffect, useState } from "react";
 import { BellRing } from "lucide-react";
 import { countdown } from "@/lib/tvCalls";
-import { asInstant, viennaTime } from "@/lib/vienna";
+import { formatClock } from "@/lib/datetime";
+import { asInstant } from "@/lib/vienna";
 import { serverNow } from "@/seasons/clock";
 import { useSeason } from "@/seasons/SeasonContext";
 
@@ -28,7 +29,7 @@ export function MatchCallBox({ call }) {
         <div className="min-w-0">
           <div className="tls-type-label text-brand flex items-center gap-2"><BellRing className="w-4 h-4" /> Aufgerufen</div>
           <div className="mt-1 tls-type-section text-white [overflow-wrap:anywhere]" data-testid="match-call-station">Bitte jetzt zu {station}</div>
-          {call.report_by && <div className="mt-1 tls-type-small text-white/70">Antreten bis {viennaTime(call.report_by, { hour: "2-digit", minute: "2-digit" })}</div>}
+          {call.report_by && <div className="mt-1 tls-type-small text-white/70">Antreten bis {formatClock(call.report_by)}</div>}
         </div>
         {left.seconds !== null && (
           <div className="text-right" data-testid="match-call-countdown">

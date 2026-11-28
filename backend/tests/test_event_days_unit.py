@@ -85,13 +85,13 @@ def test_laeuft_nur_innerhalb_der_tageszeiten():
 
 def test_texte_fuer_alle_kanaele():
     ev = event()
-    assert event_days.summary_text(ev) == "3 Tage · Fr 16.10. – So 18.10."
+    assert event_days.summary_text(ev) == "3 Tage · Fr 16. – So 18. Oktober"
     assert event_days.lines(ev) == [
-        "Fr 16.10. · 18:00–23:00 · Einlass 17:00 · Warm-up",
-        "Sa 17.10. · 10:00–22:00 · Vereinsheim",
-        "So 18.10. · 10:00–16:00 · Finaltag",
+        "Fr 16. Oktober · 18:00–23:00 · Einlass 17:00 · Warm-up",
+        "Sa 17. Oktober · 10:00–22:00 · Vereinsheim",
+        "So 18. Oktober · 10:00–16:00 · Finaltag",
     ]
-    assert event_days.now_text(ev, utc("2026-10-10T10:00:00+00:00")) == "Beginnt am Fr 16.10. um 18:00"
+    assert event_days.now_text(ev, utc("2026-10-10T10:00:00+00:00")) == "Beginnt am Fr 16. Oktober · 18:00"
     assert event_days.now_text(ev, utc("2026-10-16T06:00:00+00:00")) == "Beginnt heute um 18:00"
     assert event_days.now_text(ev, utc("2026-10-16T18:00:00+00:00")) == "Heute 18:00–23:00"
     assert event_days.now_text(ev, utc("2026-10-17T00:00:00+00:00")) == "Tag 2 beginnt heute um 10:00"
@@ -109,7 +109,7 @@ def test_tag_eines_turniers_und_eintaegige_events_bleiben_unberuehrt():
     ev = event()
     assert event_days.day_of(ev, "2026-10-17T12:00:00+00:00")["index"] == 2
     # Vor dem Einlass des Tages zählt das Datum.
-    assert event_days.day_of(ev, "2026-10-18T05:00:00+00:00")["label"] == "So 18.10."
+    assert event_days.day_of(ev, "2026-10-18T05:00:00+00:00")["label"] == "So 18. Oktober"
     assert event_days.day_of(ev, "2026-10-20T12:00:00+00:00") is None
     single = {"status": "live", "start_date": "2026-10-16T16:00:00+00:00", "end_date": "2026-10-16T21:00:00+00:00"}
     assert event_days.schedule_view(single) is None
@@ -125,10 +125,10 @@ def test_discord_und_mail_nennen_die_tage():
 
     ev = {**event(), "name": "LAN-Wochenende", "slug": "lan", "location": "Vereinsheim"}
     fields = {field["name"]: field["value"] for field in event_message(ev)["fields"]}
-    assert fields["Wann"] == "3 Tage · Fr 16.10. – So 18.10."
+    assert fields["Wann"] == "3 Tage · Fr 16. – So 18. Oktober"
     assert fields["Tage"].split("\n") == event_days.lines(ev)
-    assert _event_when(ev) == "3 Tage · Fr 16.10. – So 18.10. – " + "; ".join(event_days.lines(ev))
+    assert _event_when(ev) == "3 Tage · Fr 16. – So 18. Oktober – " + "; ".join(event_days.lines(ev))
     # Eintägig wie bisher: nur „Wann“ mit dem Beginn.
     single = {"name": "Stammtisch", "start_date": "2026-10-16T16:00:00+00:00"}
     assert "Tage" not in {field["name"] for field in event_message(single)["fields"]}
-    assert _event_when(single).startswith("16.10.2026")
+    assert _event_when(single).startswith("Fr 16. Oktober")

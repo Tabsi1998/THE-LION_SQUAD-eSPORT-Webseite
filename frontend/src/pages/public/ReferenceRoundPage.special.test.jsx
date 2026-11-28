@@ -1,5 +1,9 @@
 import { fireEvent, render, screen, within } from "@testing-library/react";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
+import { runAtTestClock } from "@/testClock";
+
+// Feste Uhr (#1307): die Datums-Texte lassen das laufende Jahr weg und sagen „heute“/„morgen“.
+runAtTestClock();
 
 // Rundenseite (#1950) mit den Sonderregeln (#1960): ein Sprint in umgekehrter Quali-Reihenfolge zeigt Startplatz 1 und
 // keine Pole, die Pole steht in der Zusammenfassung aus dem Qualifying; ein Lauf ohne Wertung nennt seinen Grund; eine
@@ -70,7 +74,7 @@ test("umgekehrter Sprint: Startaufstellung genannt, Startplatz 1 und keine Pole;
 
 test("Lauf ohne Wertung nennt seinen Grund, die abgebrochene Saison steht oben", async () => {
   renderAt("/references/series/probe-racing/2026/runde/1");
-  expect(await screen.findByTestId("series-cancelled")).toHaveTextContent("Saison abgebrochen am 20.11.2026 – Serverwechsel");
+  expect(await screen.findByTestId("series-cancelled")).toHaveTextContent("Saison abgebrochen am Fr 20. November – Serverwechsel");
   const panel = screen.getByTestId("round-panel");
   expect(within(panel).getByTestId("series-no-score")).toHaveTextContent("Ohne Wertung · Zu wenig Fahrer – Nur zwei am Start");
   expect(within(panel).queryByTestId("round-session-grid")).toBeNull();

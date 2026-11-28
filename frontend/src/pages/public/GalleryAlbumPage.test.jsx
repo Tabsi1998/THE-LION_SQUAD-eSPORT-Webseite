@@ -1,5 +1,9 @@
 import { act, fireEvent, render, screen } from "@testing-library/react";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
+import { runAtTestClock } from "@/testClock";
+
+// Feste Uhr (#1307): die Datums-Texte lassen das laufende Jahr weg und sagen „heute“/„morgen“.
+runAtTestClock();
 
 // Galerie (#1079): Öffnen, Weiterblättern, Schließen. Beim Schließen fliegt die Bühne zurück in die Kachel des Bildes,
 // das gerade offen ist; danach liegt der Fokus wieder auf dieser Kachel.
@@ -131,7 +135,7 @@ test("ohne Einsende-Angaben (Gäste, Nicht-Mitglieder, Alben ohne Event) kein Kn
 
 test("nach der Frist nur ein Satz, kein Knopf", async () => {
   renderWith({ ...album, photo_submission: { ...openWindow, open: false, can_submit: false } });
-  expect(await screen.findByTestId("photo-submit-closed")).toHaveTextContent("Einsenden war bis Do., 22. Oktober möglich.");
+  expect(await screen.findByTestId("photo-submit-closed")).toHaveTextContent("Einsenden war bis Do 22. Oktober möglich.");
   expect(screen.queryByTestId("photo-submit-open")).toBeNull();
 });
 
@@ -140,7 +144,7 @@ test("Fotos einsenden: ohne Haken kein Senden, danach je Foto ein Upload mit Ein
   globalThis.URL.revokeObjectURL = vi.fn();
   apiMock.post.mockResolvedValue({ data: { id: "s1", status: "pending" } });
   renderWith({ ...album, photo_submission: openWindow });
-  expect(await screen.findByTestId("photo-submit-hint")).toHaveTextContent("Bis Do., 22. Oktober · noch 20 Fotos");
+  expect(await screen.findByTestId("photo-submit-hint")).toHaveTextContent("Bis Do 22. Oktober · noch 20 Fotos");
   fireEvent.click(screen.getByTestId("photo-submit-open"));
   const files = [new File(["a"], "a.jpg", { type: "image/jpeg" }), new File(["b"], "b.png", { type: "image/png" })];
   fireEvent.change(screen.getByTestId("photo-submit-input"), { target: { files } });

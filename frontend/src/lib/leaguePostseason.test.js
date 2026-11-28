@@ -2,6 +2,10 @@ import {
   championLine, divisionBody, formOf, formProblem, fullDay, kindLabel, lotLine, missingLine, pairingLine, partState, placeText, playoffLine,
   reachedText, relegationLine, relegationPairState, relegationRowText, roundLine, seasonBody, seedOrigin, shortDay, tieText, weekRange,
 } from "./leaguePostseason";
+import { runAtTestClock } from "@/testClock";
+
+// Feste Uhr (#1307): die Datums-Texte lassen das laufende Jahr weg und sagen „heute“/„morgen“.
+runAtTestClock();
 
 // Playoffs und Relegation (#2404): Texte und kleine Rechnungen für Cockpit und Ligaseite. Erfundene Namen.
 
@@ -14,10 +18,10 @@ test("der Stand heißt wartet, bereit, angelegt oder abgeschlossen", () => {
 });
 
 test("Kalendertage ohne Zeitzone: Tag, Woche, leer bei fehlendem Wert", () => {
-  expect(shortDay("2031-03-31")).toBe("31.03.");
-  expect(fullDay("2031-03-31")).toBe("31.03.2031");
-  expect(weekRange("2031-03-31", "2031-04-06")).toBe("31.03.–06.04.2031");
-  expect(weekRange("2031-03-31", null)).toBe("31.03.2031");
+  expect(shortDay("2031-03-31")).toBe("Mo 31. März 2031");
+  expect(fullDay("2031-03-31")).toBe("Mo 31. März 2031");
+  expect(weekRange("2031-03-31", "2031-04-06")).toBe("Mo 31. März – So 6. April 2031");
+  expect(weekRange("2031-03-31", null)).toBe("Mo 31. März 2031");
   expect(fullDay("")).toBe("");
   expect(shortDay(null)).toBe("");
 });
@@ -31,7 +35,7 @@ test("Setzliste: Herkunft, Grund der Reihung, Paarung mit Freilos, Runde", () =>
   expect(tieText({ tie: null })).toBe("");
   expect(pairingLine({ a: { seed: 1, display_name: "Probe A" }, b: { seed: 4, display_name: "Probe D" } })).toBe("1 Probe A – 4 Probe D");
   expect(pairingLine({ a: { seed: 1, display_name: "Probe A" }, b: null })).toBe("1 Probe A – Freilos");
-  expect(roundLine({ label: "Finale", best_of: 5, start_day: "2031-04-14", end_day: "2031-04-20" })).toBe("Finale · Best of 5 · 14.04.–20.04.2031");
+  expect(roundLine({ label: "Finale", best_of: 5, start_day: "2031-04-14", end_day: "2031-04-20" })).toBe("Finale · Best of 5 · Mo 14. – So 20. April 2031");
 });
 
 test("Sätze zu den Einstellungen einer Liga", () => {

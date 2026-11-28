@@ -15,6 +15,28 @@ test("mehr als 60 Tage: der Monat, kein Countdown - 154 Tage sind „im März“
   expect(text(at("2027-10-01T12:00:00+02:00"))).toBe("im Oktober 2027");
 });
 
+test("das Datum über den Jahreswechsel trägt das Jahr (#1307) - wie formatWhen/formatRange", () => {
+  const december = Date.parse("2026-12-10T10:00:00+01:00"); // Do 10. Dezember 2026
+  const dec = (target, options) => whenText(target, { now: december, days: 14, ...options })?.text;
+  expect(dec(at("2027-01-09T18:00:00+01:00"))).toBe("Sa 9. Jänner 2027");
+  expect(dec(at("2027-01-08T10:00:00+01:00"), { end: at("2027-01-10T20:00:00+01:00") })).toBe("Fr 8. – So 10. Jänner 2027");
+  expect(dec(at("2026-12-30T10:00:00+01:00"), { end: at("2027-01-02T20:00:00+01:00") })).toBe("Mi 30. Dezember 2026 – Sa 2. Jänner 2027");
+  expect(whenPhrase("startet", whenText(at("2027-01-09T18:00:00+01:00"), { now: december }))).toBe("startet am Sa 9. Jänner 2027");
+});
+
+test("Texte ohne Zone sind Wiener Uhr, auch wenn das Gerät anders steht", () => {
+  const zone = process.env.TZ;
+  process.env.TZ = "UTC";
+  try {
+    // 23:30 in Wien ist noch der Samstag - als UTC gelesen wäre es schon Sonntag 00:30.
+    expect(text("2026-11-14T23:30:00")).toBe("Sa 14. November");
+    expect(text("2026-10-08T00:30:00")).toBe("morgen 00:30");
+  } finally {
+    if (zone === undefined) delete process.env.TZ;
+    else process.env.TZ = zone;
+  }
+});
+
 test("15 bis 60 Tage: das Datum, mehrtägig als Bereich", () => {
   expect(text(at("2026-12-06T12:00:00+01:00"))).toBe("So 6. Dezember"); // genau 60 Tage
   expect(text(at("2026-11-14T18:00:00+01:00"))).toBe("Sa 14. November");

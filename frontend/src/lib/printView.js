@@ -13,7 +13,7 @@ import { describeSlot, finderFor } from "@/lib/slotSource";
 import { formatBracketSection, stationText } from "@/lib/tournamentLabels";
 import { groupByStation, scheduleEntries } from "@/lib/scheduleView";
 import { dayIndexOf, eventDays, planItems } from "@/lib/tvDayPlan";
-import { viennaDate, viennaTime } from "@/lib/vienna";
+import { formatClock, formatWhen } from "@/lib/datetime";
 
 // ------------------------------------------------------------------------------------------------------- Teile, Seite
 
@@ -105,7 +105,7 @@ export function parseParts(value, scope = "tournament", { staff = false, mode = 
 
 /** „Stand 30.10. 19:12“ - Datum dazu, weil am Vorabend gedruckt wird. */
 export function stampText(now = Date.now()) {
-  return `Stand ${viennaDate(now, { day: "2-digit", month: "2-digit" })} ${viennaTime(now, { hour: "2-digit", minute: "2-digit" })}`;
+  return `Stand ${formatWhen(now, { relative: false })}`;
 }
 
 // ------------------------------------------------------------------------------------------------------------- Baum
@@ -169,7 +169,7 @@ export function printMatch(match, regMap, findMatch) {
   return {
     id: match.id,
     key: String(match.match_key || ""),
-    time: match.scheduled_at && !done ? viennaTime(match.scheduled_at, { hour: "2-digit", minute: "2-digit" }) : "",
+    time: match.scheduled_at && !done ? formatClock(match.scheduled_at) : "",
     forecast: Boolean((match.is_preview || match.schedule_forecast) && !done),
     station: stationText(match),
     done,
@@ -393,7 +393,7 @@ function scheduleRow(entry) {
   const sides = entry.sides.map((side) => ({ label: side.label, known: side.known, score: side.score == null ? "" : String(side.score), winner: side.winner }));
   return {
     id: entry.id,
-    time: entry.scheduledAt ? viennaTime(entry.scheduledAt, { hour: "2-digit", minute: "2-digit" }) : "",
+    time: entry.scheduledAt ? formatClock(entry.scheduledAt) : "",
     forecast: entry.forecast,
     station: entry.stationLabel,
     round: entry.roundLabel,
@@ -420,7 +420,7 @@ export function scheduleSections(bracket, { order = PRINT_DEFAULTS.scheduleOrder
   });
   const sections = new Map();
   for (const entry of timed) {
-    const key = entry.scheduledAt ? viennaDate(entry.scheduledAt, { weekday: "long", day: "numeric", month: "long" }) : "Ohne Termin";
+    const key = entry.scheduledAt ? formatWhen(entry.scheduledAt, { time: false, relative: false }) : "Ohne Termin";
     if (!sections.has(key)) sections.set(key, { key: `d-${key}`, title: key, rows: [] });
     sections.get(key).rows.push(scheduleRow(entry));
   }
@@ -533,7 +533,7 @@ export function checkinPages(sections, { orientation = PRINT_DEFAULTS.listOrient
 export const DAYPLAN = { tableHead: 8, sectionHead: 9, row: 9 };
 
 function clock(time) {
-  return viennaTime(time, { hour: "2-digit", minute: "2-digit" });
+  return formatClock(time);
 }
 
 /** Der Tagesplan je Tag: Einlass, Turniere und Fast Laps mit Zeit und Check-in - aus der Event-Antwort. */
@@ -557,7 +557,7 @@ export function dayPlanSections(event) {
       });
     }
     rows.sort((a, b) => a.from - b.from);
-    const weekday = viennaDate(day.startAt, { weekday: "long", day: "numeric", month: "long" });
+    const weekday = formatWhen(day.startAt, { time: false, relative: false });
     return {
       key: `tag-${day.index}`,
       title: days.length > 1 ? `Tag ${day.index + 1} von ${days.length} · ${weekday}` : weekday,

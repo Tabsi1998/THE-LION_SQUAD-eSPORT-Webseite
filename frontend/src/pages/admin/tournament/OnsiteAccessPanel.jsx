@@ -4,17 +4,16 @@ import { Printer, QrCode, RefreshCw } from "lucide-react";
 import { toast } from "sonner";
 import { api, formatRequestError } from "@/lib/api";
 import { useConfirm } from "@/components/tls/ConfirmDialog";
-import { viennaDateTime } from "@/lib/vienna";
+import { formatWhen } from "@/lib/datetime";
 
 // Vor-Ort-Zugang (#1592): Über den QR-Code auf TV und Aushang melden sich auch Nicht-Mitglieder an - nur im
 // Zeitfenster (Öffnung der Anmeldung bzw. des Check-ins bis Turnierende). Vorgabe: an bei Turnieren vor Ort und hybrid,
 // aus online. Den Code selbst zeigt nur der Aushang; hier stehen Zustand, an/aus und „Neuer Code“.
 
-const WHEN = { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" };
 
 export function windowText(window) {
-  const from = window?.from ? viennaDateTime(window.from, WHEN) : "";
-  const until = window?.until ? viennaDateTime(window.until, WHEN) : "";
+  const from = window?.from ? formatWhen(window.from) : "";
+  const until = window?.until ? formatWhen(window.until) : "";
   if (from && until) return `${from} bis ${until}`;
   if (from) return `ab ${from}, bis das Turnier endet`;
   if (until) return `ab Öffnung der Anmeldung bis ${until}`;

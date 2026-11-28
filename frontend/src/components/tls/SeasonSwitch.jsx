@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
 import { api, formatRequestError } from "@/lib/api";
-import { viennaDateTime } from "@/lib/vienna";
+import { formatWhen } from "@/lib/datetime";
 
 // Adventkalender und Ostereiersuche (#1360): wer sie füllt, schaltet sie oben auf der eigenen Seite ein und aus - mit
 // Zeitraum und wo sie erscheinen (Website, App). Redaktion und Vereinsverwaltung dürfen das; alle anderen Jahreszeiten
@@ -10,7 +10,7 @@ import { viennaDateTime } from "@/lib/vienna";
 const CHANNEL_LABELS = { web: "Website", app: "App" };
 
 function when(value) {
-  return value ? viennaDateTime(value, { dateStyle: "long", timeStyle: "short" }) : "";
+  return value ? formatWhen(value) : "";
 }
 
 /** Der Zeitraum in einem Satz - für den Kopf der Seite. */

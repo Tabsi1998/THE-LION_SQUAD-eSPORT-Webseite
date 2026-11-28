@@ -17,7 +17,7 @@ import { BoardPortrait, VacancyPortrait } from "@/components/tls/BoardPortrait";
 import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { FileText } from "lucide-react";
-import { viennaDate } from "@/lib/vienna";
+import { formatMonth, formatOfficialDate } from "@/lib/datetime";
 import { statutesHref } from "@/lib/statutes";
 import { isDeputyPosition } from "@/lib/boardSeats";
 import { ShortCaps } from "@/components/tls/ShortCaps";
@@ -33,7 +33,7 @@ export function boardSections(positions) {
   const entry = (p) => ({
     key: p.id, slug: p.slug, person: p.user || null, title: p.user ? p.display_title : (p.neutral_title || p.display_title || p.title_male),
     label: "", withheld: Boolean(p.name_withheld), vacant: !p.user && !p.name_withheld, text: p.vacancy_text || "",
-    since: p.since ? viennaDate(p.since, { month: "long", year: "numeric" }) : "",
+    since: p.since ? formatMonth(p.since) : "",
   });
   // Stellvertretung an Obmann, Kassier, Schriftführer („Vertretung erlaubt“) - nur, wenn jemand eingetragen ist.
   const coreDeputies = core.filter((p) => p.allow_deputy && p.deputy_user).map((p) => ({
@@ -122,9 +122,9 @@ export function BoardPage() {
   );
 }
 
+// Statuten-Fassungen sind ein Rechtstext - amtliches Datum (#1307).
 export function formatDay(value) {
-  const match = /^(\d{4})-(\d{2})-(\d{2})/.exec(String(value || ""));
-  return match ? `${match[3]}.${match[2]}.${match[1]}` : "";
+  return /^\d{4}-\d{2}-\d{2}/.test(String(value || "")) ? formatOfficialDate(String(value).slice(0, 10)) : "";
 }
 
 // Eine Fassung in einem Satz: künftig „gilt ab“, aufgehoben „von … bis“, geltend „seit“.

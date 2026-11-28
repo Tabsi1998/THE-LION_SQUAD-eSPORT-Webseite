@@ -3,7 +3,7 @@ import { Link } from "react-router-dom";
 import { chronicleCount, filterChronicle, formatLabel, gameOptions, medalCounts, medalLine, startersOf, timelineGroups } from "@/lib/referencesOverview";
 import { bestPlacement, displayTitle, formatDate, gameTitle, memberEntryOf, referenceInstant, shortTitle } from "@/components/tls/references/referenceParts";
 import { Chevron, Mark, PlaceRing, SectionHead } from "@/components/tls/references/overviewParts";
-import { viennaDate } from "@/lib/vienna";
+import { formatWhen } from "@/lib/datetime";
 import { referenceHref } from "@/lib/seasonClose";
 import { chronicleHost } from "@/lib/seriesPartners";
 import { PartnerHostBadge } from "@/components/tls/references/PartnerHostBadge";
@@ -97,7 +97,7 @@ function ChronicleRow({ item, link, memberId }) {
   const game = gameTitle(item);
   const format = formatLabel(item, link);
   const instant = referenceInstant(item);
-  const shortDate = instant ? viennaDate(instant, { day: "2-digit", month: "2-digit" }) : "";
+  const shortDate = instant ? formatWhen(instant, { time: false }) : "";
   // Kurzer Titel wie im Mitgliederprofil (#1944), der lange im Tooltip; steht der Veranstalter schon darin, nicht doppelt.
   const title = shortTitle(item, link);
   const full = displayTitle(item);

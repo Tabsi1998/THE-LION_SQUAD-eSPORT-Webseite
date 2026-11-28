@@ -3,7 +3,7 @@ import { Link } from "react-router-dom";
 import { CalendarHeart, Eye, LogIn, RefreshCw } from "lucide-react";
 import { PublicLoadingState } from "@/components/tls/PublicLoadingState";
 import { useReducedMotion } from "@/hooks/useLiveChanges";
-import { viennaDate } from "@/lib/vienna";
+import { formatWhen } from "@/lib/datetime";
 import { AdventBoard } from "./AdventBoard";
 import { DoorDialog } from "./DoorDialog";
 import { DOORS, doorVariant, opensLabel } from "./doors";
@@ -111,7 +111,7 @@ export function AdventCalendarPanel({ titleId }) {
             <p className="mt-3 inline-flex items-start gap-2 rounded-sm border border-[#e9c46a]/40 bg-[#e9c46a]/10 px-3 py-2 tls-type-body text-[#ffd98a]" data-testid="advent-preview-note">
               <Eye className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
               <span>
-                Vorschau: so sieht der Kalender am {calendar?.now ? viennaDate(calendar.now, { day: "numeric", month: "long" }) : "gewählten Tag"} aus. Öffnen zählt nicht, bei Verlosungen wird nicht mitgemacht.
+                Vorschau: so sieht der Kalender am {calendar?.now ? formatWhen(calendar.now, { time: false, relative: false }) : "gewählten Tag"} aus. Öffnen zählt nicht, bei Verlosungen wird nicht mitgemacht.
                 {calendar?.placeholder ? " Für dieses Jahr sind noch keine Türchen angelegt – hier stehen Platzhalter (Verwaltung → Adventkalender)." : ""}
               </span>
             </p>

@@ -1,5 +1,9 @@
 import { render, screen, waitFor } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
+import { runAtTestClock } from "@/testClock";
+
+// Feste Uhr (#1307): die Datums-Texte lassen das laufende Jahr weg und sagen „heute“/„morgen“.
+runAtTestClock();
 
 // „Nur für dich“ (#1149, #1255): die Zeile „Deine Unterlagen“ steht da, sobald die Vereinsakte eigene Schreiben
 // liefert - mit Anzahl und dem Datum des neuesten; ohne Unterlagen, ohne Mitgliedschaft oder bei einem Ausfall keine Zeile.
@@ -40,7 +44,7 @@ test("die Zeile „Deine Unterlagen“ mit Anzahl und neuestem Datum", async () 
   const row = await screen.findByTestId("profile-private-documents");
   expect(row).toHaveAttribute("href", "/mein-bereich/rechnungen?tab=unterlagen");
   expect(row).toHaveTextContent("Deine Unterlagen");
-  expect(row).toHaveTextContent("2 Dokumente · neuestes vom 01.09.2026");
+  expect(row).toHaveTextContent("2 Dokumente · neuestes vom Di 1. September");
 });
 
 test("ohne eigene Unterlagen, ohne Mitgliedschaft oder bei einem Ausfall: keine Zeile", async () => {
@@ -57,7 +61,7 @@ test("ohne eigene Unterlagen, ohne Mitgliedschaft oder bei einem Ausfall: keine 
 });
 
 test("die Zeile in Worten", () => {
-  expect(documentsLine(OWN.slice(0, 1))).toBe("1 Dokument · neuestes vom 02.03.2026");
+  expect(documentsLine(OWN.slice(0, 1))).toBe("1 Dokument · neuestes vom Mo 2. März");
   expect(documentsLine([{ id: "x" }, { id: "y" }])).toBe("2 Dokumente");
   expect(documentsLine([])).toBe("");
   expect(documentsLine(null)).toBe("");

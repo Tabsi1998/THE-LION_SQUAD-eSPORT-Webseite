@@ -12,7 +12,7 @@ import { methodOptions } from "@/lib/leagueFinal";
 import { byMaps, hidesDraws, tiebreakOrder } from "@/lib/leagueTable";
 import { staffelAdminUrl } from "@/lib/staffelTabs";
 import { staffelBeforeStart } from "@/pages/admin/tournament/StaffelParts";
-import { viennaDateTime } from "@/lib/vienna";
+import { formatWhen } from "@/lib/datetime";
 import { ConflictReasonField, CONFLICT_REASON_MIN, OwnTeamNote, overrideMissing, overridePayload } from "@/components/tls/league/ConflictOverride";
 
 // Gleichstände je Staffel (E.1, #1625, docs/LIGA.md „E.1 Tabelle“): Wo Teams nach allen Kriterien gleich stehen, legt die
@@ -23,7 +23,7 @@ const MIN_REASON = 5;
 
 function when(value) {
   try {
-    return value ? viennaDateTime(value, { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" }) : "";
+    return value ? formatWhen(value) : "";
   } catch {
     return "";
   }

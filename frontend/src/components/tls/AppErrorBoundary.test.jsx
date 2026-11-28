@@ -2,6 +2,10 @@ import { describe, expect, it, vi, beforeEach, afterEach } from "vitest";
 import { act, fireEvent, render, screen, within } from "@testing-library/react";
 import { MemoryRouter, useLocation, useNavigate } from "react-router-dom";
 import { AppErrorBoundary, OptionalBoundary, RootErrorBoundary } from "./AppErrorBoundary";
+import { runAtTestClock } from "@/testClock";
+
+// Feste Uhr (#1307): die Datums-Texte lassen das laufende Jahr weg und sagen „heute“/„morgen“.
+runAtTestClock();
 
 // #944: ein Fehler beim Zeichnen einer Seite zeigt einen Hinweis mit „Neu laden“ - Kopf und Footer bleiben stehen.
 

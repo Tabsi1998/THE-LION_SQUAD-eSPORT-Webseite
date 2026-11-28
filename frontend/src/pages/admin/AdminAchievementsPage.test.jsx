@@ -1,5 +1,9 @@
 import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
+import { runAtTestClock } from "@/testClock";
+
+// Feste Uhr (#1307): die Datums-Texte lassen das laufende Jahr weg und sagen „heute“/„morgen“.
+runAtTestClock();
 
 // Erfolge im Admin (E10, #620): neun Reiter an einem Ort (der Jahresrückblick kam mit #1195). Die API ist eine Attrappe; geprüft wird, was die
 // Reiter zeigen und was sie an den Server schicken.
@@ -228,7 +232,7 @@ describe("Katalog", () => {
     apiMock.get.mockImplementation((url) => (url === "/admin/achievements/groups" ? Promise.resolve({ data: groups }) : routeGet(url)));
     renderAt("catalog");
     expect(await screen.findByTestId("group-retired-matches_played")).toHaveTextContent("nicht mehr erreichbar");
-    expect(screen.getByTestId("group-retired-season_mvp")).toHaveTextContent("erreichbar bis 01.01.2999");
+    expect(screen.getByTestId("group-retired-season_mvp")).toHaveTextContent("erreichbar bis Di 1. Jänner 2999");
     // Review N4: der Grund hängt am Hinweis und steht in der aufgeklappten Gruppe.
     const chip = screen.getByTestId("group-retired-matches_played");
     expect(document.getElementById(chip.getAttribute("aria-describedby"))).toHaveTextContent("Grund: Vorbei.");

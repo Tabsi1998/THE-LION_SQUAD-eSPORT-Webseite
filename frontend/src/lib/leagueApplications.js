@@ -1,7 +1,7 @@
 // Selbstanmeldung mit Co-Team (docs/LIGA.md, B.4, #2205): Texte zu dem, was der Server schickt, und das Formular der Season. Geprüft wird auf dem Server.
-import { asInstant, fromViennaInput, viennaDateTime, viennaInputValue } from "@/lib/vienna";
+import { formatWhen } from "@/lib/datetime";
+import { asInstant, fromViennaInput, viennaInputValue } from "@/lib/vienna";
 
-const LONG = { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" };
 
 export const APPLICATION_STATES = {
   none: { label: "Nicht angemeldet", tone: "quiet" },
@@ -61,7 +61,8 @@ export const ENTRY_POLICY_OPTIONS = [["all", "Alle Konten, auch externe Teams"],
 export const ENTRY_POLICY_OPTIONS_SOLO = [["all", "Alle Konten"], ["members", "Nur Vereinsmitglieder"]];
 
 function when(value) {
-  return `${viennaDateTime(value, LONG)} Uhr`;
+  // Steht hinter „am“ und „bis“ in Sätzen über Fristen - fest, ohne „heute“ (#1307).
+  return formatWhen(value, { relative: false });
 }
 
 /** Der Stand des Fensters als kurzer Satz. */

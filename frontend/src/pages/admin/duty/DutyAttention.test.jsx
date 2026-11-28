@@ -1,6 +1,10 @@
 import { render, screen } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { DutyAttention, hasDutyAttention } from "./DutyAttention";
+import { runAtTestClock } from "@/testClock";
+
+// Feste Uhr (#1307): die Datums-Texte lassen das laufende Jahr weg und sagen „heute“/„morgen“.
+runAtTestClock();
 
 // „Braucht deine Entscheidung“ (#2194): nach dem Ende noch „Live“ und überfällige Liga-Spiele, je mit Weg dorthin.
 
@@ -36,7 +40,7 @@ test("zeigt alle Arten mit Satz und Weg", () => {
   render(<MemoryRouter><DutyAttention duty={DUTY} /></MemoryRouter>);
   expect(screen.getByTestId("duty-rules-s1")).toHaveTextContent("Regelwerk muss freigegeben werden");
   expect(screen.getByTestId("duty-checkin-m2")).toHaveTextContent("Check-in abgelaufen: Spieltag 3");
-  expect(screen.getByTestId("duty-checkin-m2")).toHaveTextContent("Falken · Horst nicht eingecheckt, Fenster bis So 08.11. 20:15");
+  expect(screen.getByTestId("duty-checkin-m2")).toHaveTextContent("Falken · Horst nicht eingecheckt, Fenster bis So 8. November · 20:15");
   expect(screen.getByTestId("duty-checkin-open-m2")).toHaveAttribute("href", "/tournaments/staffel-a/leitung?fall=ns-m2");
   expect(screen.getByTestId("duty-ended-t1")).toHaveTextContent("alle Spiele sind fertig");
   expect(screen.getByTestId("duty-ended-open-t1")).toHaveTextContent("Beenden");
@@ -46,7 +50,7 @@ test("zeigt alle Arten mit Satz und Weg", () => {
   expect(screen.getByTestId("duty-ended-open-t3")).toHaveTextContent("Staffel öffnen");
   expect(screen.getByTestId("duty-ended-open-t3")).toHaveAttribute("href", "/admin/leagues/staffeln/t3");
   expect(screen.getByTestId("duty-overdue-m1")).toHaveTextContent("Überfällig: Spieltag 2");
-  expect(screen.getByTestId("duty-overdue-m1")).toHaveTextContent("So 01.11. 20:00");
+  expect(screen.getByTestId("duty-overdue-m1")).toHaveTextContent("So 1. November · 20:00");
   expect(screen.getByTestId("duty-overdue-open-m1")).toHaveAttribute("href", "/matches/m1");
 });
 

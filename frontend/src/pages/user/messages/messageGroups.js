@@ -1,4 +1,5 @@
-import { asInstant, dayBefore, viennaDate, viennaDay, viennaTime } from "@/lib/vienna";
+import { formatClock, formatWhen } from "@/lib/datetime";
+import { asInstant, dayBefore, viennaDay } from "@/lib/vienna";
 // Reine Logik der Unterhaltung (#254): Datum-Trenner („Heute“, „Gestern“,
 // „12.09.2026“), zusammengefasste Köpfe wie in der App (#220) und das
 // Zusammenführen von nachgeladenen oder neu eingetroffenen Nachrichten.
@@ -14,13 +15,13 @@ export function dayLabel(value, now = new Date()) {
   const today = viennaDay(now);
   if (day === today) return "Heute";
   if (day === dayBefore(today)) return "Gestern";
-  return viennaDate(value, { day: "2-digit", month: "2-digit", year: "numeric" });
+  return formatWhen(value, { time: false });
 }
 
 export function timeLabel(value) {
   const date = asInstant(value);
   if (Number.isNaN(date.getTime())) return "";
-  return viennaTime(date, { hour: "2-digit", minute: "2-digit" });
+  return formatClock(date);
 }
 
 // Aus der zeitlich sortierten Liste wird eine Folge aus Tages-Trennern und

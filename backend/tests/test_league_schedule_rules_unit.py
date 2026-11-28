@@ -111,7 +111,7 @@ def test_request_needs_fixed_time_and_respects_notice():
     assert "kein fester Termin" not in (request_refusal(match(**FIXED), rules, utc("2026-10-21T17:59:00")) or "")
     assert request_refusal(match(**FIXED), rules, utc("2026-10-21T17:59:00")) is None
     late = request_refusal(match(**FIXED), rules, utc("2026-10-21T18:01:00"))
-    assert "24 Stunden" in late and "Mi 21.10. 20:00" in late and "@leitung" in late
+    assert "24 Stunden" in late and "Mi 21. Oktober · 20:00" in late and "@leitung" in late
     assert "noch kein fester Termin" in request_refusal(match(scheduled_at=FIXED["scheduled_at"], schedule_source="default"), rules,
                                                         utc("2026-10-20T10:00:00"))
     assert league_schedule.request_until(match(**FIXED), rules) == utc("2026-10-21T18:00:00")
@@ -131,7 +131,7 @@ def test_target_must_stay_in_the_week_and_outside_breaks():
     t = staffel(blocked_periods=[{"start_date": "2026-10-23", "end_date": "2026-10-23", "label": "Pause"}])
     m = match(**FIXED)
     outside = target_refusal(t, m, DEFAULTS, utc("2026-10-27T19:00:00"))
-    assert "Spielwoche" in outside and "Di 20.10. 00:00" in outside and "Mo 26.10. 23:59" in outside
+    assert "Spielwoche" in outside and "Di 20. Oktober · 00:00" in outside and "Mo 26. Oktober · 23:59" in outside
     assert target_refusal(t, m, {**DEFAULTS, "reschedule_same_week": False}, utc("2026-10-27T19:00:00")) is None
     assert "nicht gespielt" in target_refusal(t, m, DEFAULTS, utc("2026-10-23T18:00:00"))
     assert "schon der geltende" in target_refusal(t, m, DEFAULTS, utc("2026-10-22T18:00:00"))
@@ -139,8 +139,8 @@ def test_target_must_stay_in_the_week_and_outside_breaks():
 
 
 def test_when_text_is_vienna_wall_time_on_both_sides_of_the_change():
-    assert league_schedule.when_text("2026-10-24T18:00:00+00:00") == "Sa 24.10. 20:00"
-    assert league_schedule.when_text("2026-10-26T19:00:00+00:00") == "Mo 26.10. 20:00"
+    assert league_schedule.when_text("2026-10-24T18:00:00+00:00") == "Sa 24. Oktober · 20:00"
+    assert league_schedule.when_text("2026-10-26T19:00:00+00:00") == "Mo 26. Oktober · 20:00"
 
 
 def test_blocks_proposals_only_with_rules_and_fixed_time():

@@ -1,8 +1,8 @@
 // Hinweis der Turnierleitung (#1166): Vorlagen, Ablauf und Restzeit - für das Formular in der Turnierleitung, das Banner
 // auf Turnier- und Event-Seite und den TV. Die Regeln (Empfänger, Rechte, Doppelversand) stehen im Server
 // (backend/services/tournament_notices.py); hier nur, was die Oberfläche rechnet.
-import { fromViennaInput, viennaInputValue, viennaTime } from "@/lib/vienna";
-import { formatDuration } from "@/lib/datetime";
+import { fromViennaInput, viennaInputValue } from "@/lib/vienna";
+import { formatClock, formatDuration } from "@/lib/datetime";
 
 export const NOTICE_MAX = 140;
 export const NOTICE_DURATION_DEFAULT = 120;
@@ -17,7 +17,7 @@ export const NOTICE_DURATIONS = [
 
 const MINUTE = 60000;
 
-const clock = (value) => viennaTime(value, { hour: "2-digit", minute: "2-digit" });
+const clock = (value) => formatClock(value);
 
 /** „Pause bis …“ als Vorschlag: in einer Viertelstunde, auf fünf Minuten aufgerundet - Wiener Uhr („14:30“). */
 export function suggestedPauseClock(now = Date.now()) {

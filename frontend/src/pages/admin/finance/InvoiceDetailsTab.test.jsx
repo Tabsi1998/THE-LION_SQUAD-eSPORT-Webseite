@@ -1,5 +1,9 @@
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { runAtTestClock } from "@/testClock";
+
+// Feste Uhr (#1307): die Datums-Texte lassen das laufende Jahr weg und sagen „heute“/„morgen“.
+runAtTestClock();
 
 // Rechnungsangaben (#1358): der Kassier pflegt Zahlungsziel, Zahlungsart, Bankkonto, Sprache und Steuersätze selbst - die
 // Listen kommen weiter aus Dolibarr, gespeichert wird über den schmalen Weg der Finanzen.
@@ -58,7 +62,7 @@ test("Steuersätze geprüft: mit Name und Datum; ohne Schreibzugriff ein Satz, w
   apiMock.put.mockResolvedValue({ data: { ...DETAILS, tax_confirmed: null } });
   const user = userEvent.setup();
   render(<InvoiceDetailsTab />);
-  expect(await screen.findByTestId("invoice-details-tax-by")).toHaveTextContent("Kai Kassa am 1.10.2026");
+  expect(await screen.findByTestId("invoice-details-tax-by")).toHaveTextContent("Kai Kassa am Do 1. Oktober");
   expect(screen.getByTestId("invoice-details-write")).toHaveTextContent("das schaltet System unter Dolibarr → Funktionen ein");
   await user.click(screen.getByTestId("invoice-details-tax-confirmed"));
   await waitFor(() => expect(apiMock.put).toHaveBeenCalledWith("/admin/finance/invoice-details", { tax_confirmed: false }));

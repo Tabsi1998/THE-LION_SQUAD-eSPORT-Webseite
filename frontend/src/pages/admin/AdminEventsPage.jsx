@@ -10,7 +10,7 @@ import { downloadCsv, formatAdminDate, normalizeSearch } from "@/lib/adminListTo
 import { sortByNearestDate } from "@/lib/contentSort";
 import { toast } from "sonner";
 import { Plus, Trash2, Calendar, UserCheck, Search, Download, FileText } from "lucide-react";
-import { viennaDate } from "@/lib/vienna";
+import { formatWhen } from "@/lib/datetime";
 import { affectedRegistrations, deleteConfirmText, eventIsOver, visibilityWord } from "@/lib/eventAdmin";
 import { ShortCaps } from "@/components/tls/ShortCaps";
 
@@ -270,7 +270,7 @@ export default function AdminEventsPage() {
                 <div className="min-w-0">
                   <div className="font-bold break-words">{e.name}</div>
                   <div className="mt-1 tls-type-small text-white/55">
-                    {[e.start_date ? viennaDate(e.start_date) : "", e.location, meta.statuses.find((s) => s.k === e.status)?.l || e.status].filter(Boolean).join(" · ")}
+                    {[e.start_date ? formatWhen(e.start_date, { time: false }) : "", e.location, meta.statuses.find((s) => s.k === e.status)?.l || e.status].filter(Boolean).join(" · ")}
                   </div>
                   <div className="mt-1 tls-type-small text-white/45">Sichtbar für: {visibilityWord(e.visibility, meta.visibilities)}</div>
                 </div>
@@ -310,7 +310,7 @@ export default function AdminEventsPage() {
                     <td className="px-4 py-3 tls-type-label text-[#9F7AEA]">{eventTypeLabel(e.event_type, meta.types)}</td>
                     <td className="px-4 py-3 tls-type-label text-white/70">{meta.statuses.find((s) => s.k === e.status)?.l || e.status}</td>
                     <td className="px-4 py-3 tls-type-small text-white/60" data-testid={`event-visibility-${e.id}`}>{visibilityWord(e.visibility, meta.visibilities)}</td>
-                    <td className="px-4 py-3 tls-type-small text-white/70">{e.start_date ? viennaDate(e.start_date) : "—"}</td>
+                    <td className="px-4 py-3 tls-type-small text-white/70">{e.start_date ? formatWhen(e.start_date, { time: false }) : "—"}</td>
                     <td className="px-4 py-3 tls-type-small text-white/55">{e.location || "—"}</td>
                     <td className="px-4 py-3 tls-type-small text-white/65">
                       {/* Externer Anmeldelink (#2127, EV11): die Anmeldungen stehen woanders - keine Plätze, kein „Anm.“. */}

@@ -1,6 +1,7 @@
 import { forwardRef, useEffect, useState } from "react";
 import { WifiOff } from "lucide-react";
 import { motionAllowed } from "@/lib/motion";
+import { formatOfficialDate } from "@/lib/datetime";
 
 // Die Mitgliedskarte als Bild (#1335, Wahl des Betreibers: Variante A - schwarz mit Gold): Format einer Bankkarte, feines
 // Löwen-Muster, Vereinslogo und Lichtkante in Gold, Name, Mitgliedsnummer, Art und „gültig bis“. Dieselbe Karte steht als
@@ -19,8 +20,9 @@ export function cardNumberLine(number, since) {
 
 /** „gültig bis 31.12.2026“ oder „gültig, solange die Mitgliedschaft besteht“. */
 export function validLine(validUntil) {
-  const match = /^(\d{4})-(\d{2})-(\d{2})/.exec(String(validUntil || ""));
-  return match ? `gültig bis ${match[3]}.${match[2]}.${match[1]}` : "";
+  // Der Ausweis trägt das amtliche Datum (#1307).
+  const match = /^\d{4}-\d{2}-\d{2}/.exec(String(validUntil || ""));
+  return match ? `gültig bis ${formatOfficialDate(match[0])}` : "";
 }
 
 function useShineOnce(node, enabled) {

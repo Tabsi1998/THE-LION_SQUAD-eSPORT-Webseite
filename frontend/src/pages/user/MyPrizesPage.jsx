@@ -5,7 +5,8 @@ import { useLoad } from "@/hooks/useLoad";
 import { LoadNotice, LoadState } from "@/components/tls/LoadState";
 import { Award, Download, Gift, CheckCircle2, Clock, XCircle, MapPin, Trophy, Users, CalendarDays } from "lucide-react";
 import { Link } from "react-router-dom";
-import { asInstant, viennaDate } from "@/lib/vienna";
+import { formatWhen } from "@/lib/datetime";
+import { asInstant } from "@/lib/vienna";
 
 import { ROLE_COLORS } from "@/lib/categoryColors";
 const STATUS = {
@@ -19,7 +20,7 @@ function formatDate(value) {
   if (!value) return "—";
   const date = asInstant(value);
   if (Number.isNaN(date.getTime())) return "—";
-  return viennaDate(date);
+  return formatWhen(date, { time: false });
 }
 
 function daysUntil(value) {

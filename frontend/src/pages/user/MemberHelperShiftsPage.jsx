@@ -10,6 +10,7 @@ import { HelperCallPanel } from "@/pages/user/helper/HelperCallPanel";
 import { AddToCalendar } from "@/components/tls/AddToCalendar";
 import { calendarAskDue, rememberCalendarAsked, shiftCalendarItem } from "@/lib/clubCalendar";
 import { Calendar, CheckCircle2, HandHelping, MapPin, Users } from "lucide-react";
+import { formatWhen } from "@/lib/datetime";
 
 // Helferdienste (#331): Veranstaltungen mit Schichten aus der Vereinsakte (Vereine 1.4). Plätze, Bestätigung und
 // Anmeldestelle kommen vom Verein; die Website zeigt und reicht Anfrage und Rücknahme durch. Selbst eingetragen
@@ -17,8 +18,7 @@ import { Calendar, CheckCircle2, HandHelping, MapPin, Users } from "lucide-react
 
 export function formatDay(day) {
   if (!day) return "";
-  const [y, m, d] = String(day).split("-");
-  return y && m && d ? `${d}.${m}.${y}` : day;
+  return formatWhen(String(day).slice(0, 10), { time: false, fallback: String(day) });
 }
 
 export function shiftWhen(shift) {

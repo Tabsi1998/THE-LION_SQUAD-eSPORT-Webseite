@@ -1,5 +1,9 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
+import { runAtTestClock } from "@/testClock";
+
+// Feste Uhr (#1307): die Datums-Texte lassen das laufende Jahr weg und sagen „heute“/„morgen“.
+runAtTestClock();
 
 // Liga-Spiel auf der Matchseite (#1650): statt Plus/Minus das Formular je Map; nach dem Ergebnis die Maps mit
 // Aufstellungen und - wenn die eigene fehlt - der Nachtrag über PUT /lineups. Erfundene Namen.
@@ -58,7 +62,7 @@ test("zeigt das Regelwerk der Liga mit dem Stand der eigenen Zustimmung", async 
   renderMatch({ ...BASE, league: { ...LEAGUE, rules }, report_state: { status: "open" } });
   const note = await screen.findByTestId("match-rules");
   expect(note).toHaveAttribute("data-consent", "open");
-  expect(note).toHaveTextContent("Version 2 · gültig ab 05.03.2030");
+  expect(note).toHaveTextContent("Version 2 · gültig ab Di 5. März 2030");
   expect(note).toHaveTextContent("Neue Fassung, bitte zustimmen");
   expect(screen.getByTestId("match-rules-link")).toHaveAttribute("href", "/liga/probe/s1/regeln");
   expect(screen.getByTestId("match-rules-pdf")).toHaveAttribute("href", "/api/league-rules/seasons/probe/s1/versions/v2/pdf");
@@ -104,7 +108,7 @@ test("nach dem Ergebnis: Maps mit Aufstellungen und Nachtrag der fehlenden", asy
 
 test("ohne Einigung nennt der Terminkasten den Standardtermin der Spielwoche (#2096)", async () => {
   renderMatch({ ...BASE, league: { ...LEAGUE, default_time: "2026-11-15T19:00:00+00:00" }, report_state: { status: "open" } });
-  expect(await screen.findByTestId("match-when")).toHaveTextContent("Standardtermin So 15.11., 20:00 (ohne Einigung)");
+  expect(await screen.findByTestId("match-when")).toHaveTextContent("Standardtermin So 15. November · 20:00 (ohne Einigung)");
   expect(screen.getByTestId("match-schedule")).toHaveTextContent("Standardtermin");
 });
 

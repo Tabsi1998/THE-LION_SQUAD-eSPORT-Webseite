@@ -455,11 +455,11 @@ async def test_auswahllisten_fuer_die_pflege(flow):
     res = await flow.get("/api/seasonal/advent/admin/options")
     assert res.status_code == 200 and res.headers["cache-control"] == "private, no-store"
     options = res.json()
-    assert {"id": shown["id"], "label": "Wintercup", "hint": "4.12.2026"} in options["news"]
+    assert {"id": shown["id"], "label": "Wintercup", "hint": "Fr 4. Dezember"} in options["news"]
     assert next(row for row in options["news"] if row["id"] == draft["id"])["hint"].endswith("Entwurf · nur Mitglieder")
     assert options["events"] == [
-        {"id": "e2", "label": "Sommerfest", "hint": "1.7.2027 · Entwurf"},
-        {"id": "e1", "label": "Weihnachtsfeier", "hint": "19.12.2026 · nur Mitglieder"},
+        {"id": "e2", "label": "Sommerfest", "hint": "Do 1. Juli 2027 · Entwurf"},
+        {"id": "e1", "label": "Weihnachtsfeier", "hint": "Sa 19. Dezember · nur Mitglieder"},
     ]
     assert options["members"] == [{"id": "p2", "label": "Kai K.", "hint": "Mitglied"}, {"id": "p1", "label": "Pauli", "hint": "Kapitänin"}]
     assert options["stickers"] and all(set(sticker) == {"id", "name", "url"} for pack in options["stickers"] for sticker in pack["stickers"])

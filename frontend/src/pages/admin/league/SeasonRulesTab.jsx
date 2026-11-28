@@ -4,16 +4,16 @@
 import { Link } from "react-router-dom";
 import { ArrowRight, FileText } from "lucide-react";
 import { FormSection } from "@/components/tls/AdminForm";
-import { dayNoon, viennaDate } from "@/lib/vienna";
+import { formatWhen } from "@/lib/datetime";
+import { dayNoon } from "@/lib/vienna";
 import { SeasonLoadoutBansPanel } from "./SeasonLoadoutBansPanel";
 
-const LONG_DAY = { day: "2-digit", month: "2-digit", year: "numeric" };
 
 function versionLine(version) {
   if (!version) return "";
   const from = String(version.valid_from || "");
   const day = /^\d{4}-\d{2}-\d{2}$/.test(from) ? dayNoon(from) : from;
-  return `${version.label}${from ? `, gilt ab ${viennaDate(day, LONG_DAY)}` : ""}`;
+  return `${version.label}${from ? `, gilt ab ${formatWhen(day, { time: false })}` : ""}`;
 }
 
 export function SeasonRulesTab({ seasonId, season, canSeason, canRules, rulesView, rulesNotice, rulesLink, onPendingSync }) {

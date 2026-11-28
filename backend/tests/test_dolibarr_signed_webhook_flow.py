@@ -407,8 +407,8 @@ async def test_the_module_is_shown_as_able_and_stand_lines_use_vienna_time(flow,
 
     assert capabilities_for({"api_version": 1})["signed_webhooks"] is True
     assert capabilities_for(None)["signed_webhooks"] is False
-    assert _vienna_moment("2026-01-15T22:30:00+00:00") == "15.01.2026 23:30"
-    assert _vienna_moment("2026-07-15T22:30:00+00:00") == "16.07.2026 00:30", "Sommerzeit, über Mitternacht"
+    assert _vienna_moment("2026-01-15T22:30:00+00:00") == "Do 15. Jänner · 23:30"
+    assert _vienna_moment("2026-07-15T22:30:00+00:00") == "Do 16. Juli · 00:30", "Sommerzeit, über Mitternacht"
     assert _vienna_moment(None) == ""
     assert _vienna_moment("kein Datum") == "kein Datum"
 

@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { api, formatRequestError } from "@/lib/api";
-import { viennaDateTime } from "@/lib/vienna";
+import { formatWhen } from "@/lib/datetime";
 
 const KIND_LABELS = { news: "News", event: "Event" };
 const VISIBILITY_LABELS = { public: "Öffentlich", community: "Angemeldete", members: "Nur Mitglieder", internal: "Nur intern" };
@@ -33,7 +33,7 @@ export function NewsletterSection() {
             <li key={`${row.kind}-${row.id}`} className="px-4 py-3 flex flex-wrap items-center gap-x-4 gap-y-1 tls-type-small" data-testid={`newsletter-history-${row.id}`}>
               <span className="tls-type-label px-2 py-0.5 rounded-sm border border-white/15 text-white/60">{KIND_LABELS[row.kind] || "Beitrag"}</span>
               <Link to={row.kind === "event" ? `/admin/events/${row.id}` : `/admin/news/${row.id}`} className="font-semibold hover:text-[#29B6E8] min-w-0 break-words">{row.title || "Ohne Titel"}</Link>
-              <span className="text-white/55">{viennaDateTime(row.sent_at)} · an {row.sent_count === 1 ? "1 Person" : `${row.sent_count} Personen`}</span>
+              <span className="text-white/55">{formatWhen(row.sent_at)} · an {row.sent_count === 1 ? "1 Person" : `${row.sent_count} Personen`}</span>
               <span className="text-white/45 tls-type-small">{VISIBILITY_LABELS[row.visibility] || "Öffentlich"}{row.sent_by ? ` · von Hand: ${row.sent_by}` : " · beim Veröffentlichen"}</span>
             </li>
           ))}

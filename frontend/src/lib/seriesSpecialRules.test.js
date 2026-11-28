@@ -5,6 +5,10 @@ import {
   noScoreText, parseTeamTotals, ruleChangeLines, successorLink, teamCountHint, teamDeviationText, teamModeLabel, teamSinceLabel, teamSourceLabel,
   teamTotalsObject,
 } from "@/lib/seriesSpecialRules";
+import { runAtTestClock } from "@/testClock";
+
+// Feste Uhr (#1307): die Datums-Texte lassen das laufende Jahr weg und sagen „heute“/„morgen“.
+runAtTestClock();
 
 test("Ergebnisblatt: leeres Team zählt für kein Team - mit Stammteam zum Eintragen; „Ersatzfahrer“ ebenso (#1960)", () => {
   const scoring = { enabled: true, no_team_names: ["Ersatzfahrer"] };
@@ -32,9 +36,9 @@ describe("Anpassungen", () => {
     expect(adjustmentText(-5)).toBe("−5");
     expect(adjustmentText(2.5)).toBe("+2,5");
     const item = { points: -5, reason: "Nichtteilnahme nach Anmeldung", round_id: "r4", day: "2026-03-12" };
-    expect(adjustmentLine(item, ROUNDS)).toBe("−5 · Nichtteilnahme nach Anmeldung · R4 · 12.03.2026");
+    expect(adjustmentLine(item, ROUNDS)).toBe("−5 · Nichtteilnahme nach Anmeldung · R4 · Do 12. März");
     expect(adjustmentTitle({ adjustments: [item, { points: 3, reason: "Korrektur", day: "2026-03-13" }] }, ROUNDS))
-      .toBe("Anpassung −5 · Nichtteilnahme nach Anmeldung · R4 · 12.03.2026; Anpassung +3 · Korrektur · 13.03.2026");
+      .toBe("Anpassung −5 · Nichtteilnahme nach Anmeldung · R4 · Do 12. März; Anpassung +3 · Korrektur · Fr 13. März");
     expect(adjustmentSum({ adjustment_points: -5 })).toBe(-5);
     expect(adjustmentSum({ adjustments: [{ points: -5 }, { points: 2 }] })).toBe(-3);
   });
@@ -90,8 +94,8 @@ describe("Fahrer-Anpassung in der Teamwertung (#2000)", () => {
       { points: 2, reason: "Korrektur", day: "2026-03-05", round_id: null, driver: "p2" },
     ] };
     expect(driverAdjustmentMarks(team, rows, ROUNDS)).toEqual([
-      { key: "p1-0", negative: true, text: "−5 (Anna Probe)", title: "Anpassung −5 · Video fehlt · R4 · 04.03.2026 – Anna Probe, zählt auch fürs Team" },
-      { key: "p2-1", negative: false, text: "+2 (Name ausgeblendet)", title: "Anpassung +2 · Korrektur · 05.03.2026 – Name ausgeblendet, zählt auch fürs Team" },
+      { key: "p1-0", negative: true, text: "−5 (Anna Probe)", title: "Anpassung −5 · Video fehlt · R4 · Mi 4. März – Anna Probe, zählt auch fürs Team" },
+      { key: "p2-1", negative: false, text: "+2 (Name ausgeblendet)", title: "Anpassung +2 · Korrektur · Do 5. März – Name ausgeblendet, zählt auch fürs Team" },
     ]);
     expect(driverAdjustmentMarks({}, rows, ROUNDS)).toEqual([]);
   });
@@ -120,7 +124,7 @@ describe("Teamwertung", () => {
 describe("Saison, Termin und Regeländerungen", () => {
   test("abgebrochene Saison mit Nachfolger", () => {
     expect(cancelledText({ status: "cancelled", cancelled_on: "2026-11-20", cancel_reason: "Neustart mit anderem Auto" }))
-      .toBe("Saison abgebrochen am 20.11.2026 – Neustart mit anderem Auto");
+      .toBe("Saison abgebrochen am Fr 20. November – Neustart mit anderem Auto");
     expect(cancelledText({ status: "completed" })).toBe("");
     expect(successorLink({ lineage_slug: "probe-racing", season_slug: "2026-f1-neustart", season: "2026", tier: "F1 Neustart" }))
       .toEqual({ href: "/references/series/probe-racing/2026-f1-neustart", label: "2026 · F1 Neustart" });
@@ -143,9 +147,9 @@ describe("Saison, Termin und Regeländerungen", () => {
       { kind: "rules", version: 3, day: "2026-11-21", note: "" },
     ]);
     expect(lines.map((line) => [line.head, line.text])).toEqual([
-      ["R5–R8 · 12.11.2026", "Ab R5 kein Qualifying"],
+      ["R5–R8 · Do 12. November", "Ab R5 kein Qualifying"],
       ["Ab R9", "Ablauf: Rennen"],
-      ["Regeländerung · 20.11.2026", "Ein Streichergebnis"],
+      ["Regeländerung · Fr 20. November", "Ein Streichergebnis"],
     ]);
   });
 });

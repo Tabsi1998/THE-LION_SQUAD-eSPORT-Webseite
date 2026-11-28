@@ -10,13 +10,22 @@ import { useConfirm } from "@/components/tls/ConfirmDialog";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { toast } from "sonner";
 import { Download, Globe, Plus, Pin, RotateCcw, Smartphone, Trash2, Search, Newspaper, Undo2 } from "lucide-react";
-import { viennaDate } from "@/lib/vienna";
+import { formatOfficialDate, formatWhen } from "@/lib/datetime";
 import { pinState } from "@/lib/newsPin";
 import { ShortCaps } from "@/components/tls/ShortCaps";
 
 function csvCell(value) {
   const text = String(value ?? "").replace(/\r?\n/g, " ");
   return /[",;]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text;
+}
+
+/** Zeilen für die CSV: Stand als Wort, Datum amtlich „01.08.2026“ (#1307) - sortierbar, mit Jahr, nie „gestern“. */
+export function newsCsvRows(list) {
+  return list.map((item) => ({
+    ...item,
+    status_label: newsPublicationState(item).label,
+    date_label: formatOfficialDate(item.published_at || item.created_at),
+  }));
 }
 
 export function exportNewsCsv(rows) {
@@ -169,14 +178,7 @@ export default function AdminNewsPage() {
             </select>
             <button
               type="button"
-              onClick={() => exportNewsCsv(filteredList.map((item) => {
-                const state = publicationState(item);
-                return {
-                  ...item,
-                  status_label: state.label,
-                  date_label: viennaDate(item.published_at || item.created_at),
-                };
-              }))}
+              onClick={() => exportNewsCsv(newsCsvRows(filteredList))}
               disabled={filteredList.length === 0}
               className="inline-flex items-center justify-center gap-2 rounded-sm border border-white/15 px-3 py-2 tls-type-label text-white/65 hover:border-[#29B6E8]/45 hover:text-white disabled:opacity-40"
             >
@@ -244,7 +246,7 @@ export default function AdminNewsPage() {
                       <span className={`${state.className} font-bold uppercase`}>{state.label}</span>
                       {state.detail && <div className="mt-0.5 tls-type-small text-white/45">{state.detail}</div>}
                     </td>
-                    <td className="px-4 py-3 tls-type-small text-white/55">{viennaDate(n.published_at || n.created_at)}</td>
+                    <td className="px-4 py-3 tls-type-small text-white/55">{formatWhen(n.published_at || n.created_at, { time: false })}</td>
                     <td className="px-4 py-3 text-center space-x-2 whitespace-nowrap">
                       <Link to={`/admin/news/${n.id}`} data-testid={`news-edit-${n.id}`} className="inline-flex tls-type-label px-3 py-1 rounded-sm border border-[#29B6E8]/40 text-[#29B6E8] hover:bg-[#29B6E8]/10">Bearbeiten</Link>
                       {n.slug && (

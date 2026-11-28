@@ -8,6 +8,7 @@ import { AddToCalendar } from "@/components/tls/AddToCalendar";
 import { calendarAskDue, meetingCalendarItem, rememberCalendarAsked } from "@/lib/clubCalendar";
 import { BallotResult } from "@/components/tls/ballot/BallotParts";
 import { Calendar, CheckCircle2, FileText, MapPin, Send, Vote, Video } from "lucide-react";
+import { formatWhen } from "@/lib/datetime";
 
 // Versammlungen und Abstimmungen (#327): alles kommt aus der Vereinsakte (Vereine 1.4) - Einladung,
 // Tagesordnung, Anträge, Stimmrechte, Ergebnis. Die Website zeigt und reicht durch; sie hat keine eigene
@@ -16,8 +17,7 @@ import { Calendar, CheckCircle2, FileText, MapPin, Send, Vote, Video } from "luc
 
 export function formatDay(day) {
   if (!day) return "";
-  const [y, m, d] = String(day).split("-");
-  return y && m && d ? `${d}.${m}.${y}` : day;
+  return formatWhen(String(day).slice(0, 10), { time: false, fallback: String(day) });
 }
 
 export function meetingWhen(meeting) {

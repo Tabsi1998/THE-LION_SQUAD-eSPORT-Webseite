@@ -1,7 +1,7 @@
 import { Link } from "react-router-dom";
 import { PUBLIC_STATE_LABELS, STATE_LABELS, STATE_TONES, dayLabel } from "@/lib/referenceCalendar";
 import { chipLabel } from "@/lib/raceWeekend";
-import { dayNoon, viennaDate } from "@/lib/vienna";
+import { formatWeekday, formatWhen } from "@/lib/datetime";
 
 // Lauf-Chips einer Runde (#1930): „Quali · Sprint · Rennen“ in einer Zeile, je Chip in der Farbe seines
 // Status (wie die Status-Abzeichen des Kalenders), optional mit Uhrzeit - an einem anderen Tag als der erste Lauf mit
@@ -12,7 +12,7 @@ const BASE = "inline-flex items-center gap-1.5 px-2 py-1 border rounded-sm tls-t
 const PRESS = "tls-session-chip transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#29B6E8] hover:border-white/40 hover:text-white";
 
 function weekday(day) {
-  return day ? viennaDate(dayNoon(day), { weekday: "short" }).replace(/\.$/, "") : "";
+  return day ? formatWeekday(day) : "";
 }
 
 /** Uhrzeit eines Laufs - an einem anderen Tag als `leadDay` mit Wochentag („Sa 20:00“). */
@@ -22,7 +22,7 @@ export function chipWhen(round, leadDay) {
 }
 
 function chipTitle(round, labels) {
-  const when = [dayLabel(round?.club_day), round?.time].filter(Boolean).join(" · ");
+  const when = round?.club_day && /^\d{2}:\d{2}$/.test(round?.time || "") ? formatWhen(`${round.club_day}T${round.time}`) : [dayLabel(round?.club_day), round?.time].filter(Boolean).join(" · ");
   return [round?.session || "Rennen", when, labels[round?.state] || ""].filter(Boolean).join(", ");
 }
 

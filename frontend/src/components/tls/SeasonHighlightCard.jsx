@@ -5,7 +5,7 @@ import { Download, Share2, X, Trophy, Medal, Zap, Flag } from "lucide-react";
 import { resolveMediaUrl } from "@/lib/api";
 import { LevelAvatarFrame, CROWN_LABELS, crownVariant } from "@/components/tls/LevelAvatarFrame";
 import { accountLevelTier } from "@/components/tls/AccountLevel";
-import { viennaDate } from "@/lib/vienna";
+import { formatWhen } from "@/lib/datetime";
 import { useModalBehavior } from "@/hooks/useModalBehavior";
 
 import { ROLE_COLORS } from "@/lib/categoryColors";
@@ -140,7 +140,7 @@ export function SeasonHighlightCard({ profile, level, stats, awards, crown, seas
 
           <div className="relative mt-5 pt-3 border-t border-white/10 flex items-center justify-between">
             <span className="tls-type-label text-quiet">lionsquad · esports</span>
-            <span className="tls-type-small text-quiet">{viennaDate(new Date())}</span>
+            <span className="tls-type-small text-quiet">{formatWhen(new Date(), { time: false, relative: false })}</span>
           </div>
         </div>
 

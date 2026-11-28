@@ -1,10 +1,9 @@
 // Startrechte für die nächste Season (#1627, docs/LIGA.md „F.2a Startrechte für die nächste Season“): Wörter und Sätze für die
 // Verwaltung (Reiter „Anmeldung und Kader“) und für das eigene Team (unter Teams, Ligaseite). Zustände, Fristen und die
 // Nachrückerregel rechnet der Server - hier steht nur, wie sie heißen.
-import { viennaDateTime } from "@/lib/vienna";
+import { formatWhen } from "@/lib/datetime";
 import { MOVEMENT_TEXT } from "@/lib/leagueSuccessor";
 
-const LONG = { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" };
 
 // Getrennte Zustände: Prognose, bestätigt, Zusage, Teilnahme. „Zugesagt“ ist nicht „Spielt mit“ - das ist erst die Zuteilung.
 const STATE_LABEL = {
@@ -29,7 +28,7 @@ export const whyText = (why) => WHY_TEXT[why] || "";
 
 /** „15.12.2026, 18:00 Uhr“ in Wiener Zeit - leer ohne Frist. */
 export function untilText(value) {
-  return value ? `${viennaDateTime(value, LONG)} Uhr` : "";
+  return value ? `${formatWhen(value)}` : "";
 }
 
 /** Die Zeile über der Übersicht: „4 Zusage offen · 3 zugesagt · 1 verfallen“ - nur, was es gibt. */

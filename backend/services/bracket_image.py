@@ -122,7 +122,7 @@ def _slots(match: dict, names: dict[str, str]) -> list[dict]:
 
 def _note(match: dict) -> str:
     """Die kleine Zeile unter der Karte: in Klärung (#2363), kampflos, live oder der Termin (Wiener Zeit)."""
-    from services.bracket_common import LIVE, VIENNA, _dt
+    from services.bracket_common import LIVE, _dt
 
     if in_clarification(match):
         return CLARIFICATION
@@ -132,7 +132,9 @@ def _note(match: dict) -> str:
     if status in LIVE:
         return "live"
     when = _dt(match.get("scheduled_at"))
-    return f"{when.astimezone(VIENNA).strftime('%d.%m., %H:%M')} Uhr" if when and status not in ("completed",) else ""
+    from services.date_text import format_moment
+
+    return format_moment(when) if when and status not in ("completed",) else ""
 
 
 def note_top(card_top: float) -> float:
@@ -155,7 +157,7 @@ def render(tournament: dict, matches: list[dict], stages: list[dict], registrati
            now: datetime | None = None) -> bytes | None:
     """Das Bracket als PNG - oder None (keine K.-o.-Phase, zu groß)."""
     from services.achievement_share import _ellipsis, _font
-    from services.bracket_common import VIENNA, round_label
+    from services.bracket_common import round_label
 
     sections = bracket_sections(matches, stages)
     if not sections or any(len(round_matches) > MAX_ROUND_MATCHES for section in sections for round_matches in section["rounds"]):
@@ -177,8 +179,10 @@ def render(tournament: dict, matches: list[dict], stages: list[dict], registrati
 
     title = f"{tournament.get('title') or 'Turnier'} – {'Endstand' if final else 'Bracket'}"
     draw.text((MARGIN, 22), _ellipsis(draw, title, title_font, width - 2 * MARGIN), font=title_font, fill=COLORS["final"] if final else COLORS["title"])
-    stamp = (now or now_utc()).astimezone(VIENNA).strftime("%d.%m.%Y, %H:%M")
-    draw.text((MARGIN, 60), f"{'Endstand' if final else 'Stand'}: {stamp} Uhr", font=small, fill=COLORS["dim"])
+    from services.date_text import format_moment
+
+    stamp = format_moment(now or now_utc(), now=now)
+    draw.text((MARGIN, 60), f"{'Endstand' if final else 'Stand'}: {stamp}", font=small, fill=COLORS["dim"])
 
     for section, ys, top in layouts:
         if section["label"]:

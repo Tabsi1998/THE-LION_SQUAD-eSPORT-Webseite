@@ -123,7 +123,7 @@ async def test_mitmachen_ist_ein_eigener_klick_und_laesst_sich_zurueckziehen(flo
     assert prize["entries"] == 0 and prize["entered"] is False and prize["can_enter"] is True and prize["can_withdraw"] is False and prize["won"] is False and prize["hint"] is None
     assert prize["terms"] == [
         "Mitmachen kann, wer ein Konto hat. Vorstand und Verwaltung machen nicht mit.",
-        "Die Teilnahme ist kostenlos und bis 6.1.2027, 23:59 Uhr möglich. Bis dahin kannst du sie auch zurückziehen.",
+        "Die Teilnahme ist kostenlos und bis Mi 6. Jänner 2027 · 23:59 möglich. Bis dahin kannst du sie auch zurückziehen.",
         "Gezogen wird per Zufall; jede Person hat ein Los. Es gewinnen 2 Personen.",
         "Wer gewinnt, bekommt eine Nachricht auf der Plattform und findet den Gewinn unter „Meine Gewinne“. Namen werden nicht veröffentlicht.",
         "Der Gewinn wird beim Verein abgeholt; eine Auszahlung in bar gibt es nicht.",
@@ -219,7 +219,7 @@ async def test_ziehung_mit_protokoll_gewinner_privat_und_nie_ein_name_nach_ausse
 
     flow.act_as(staff)
     early = await flow.post("/api/seasonal/advent/admin/2026/12/draw", json={})
-    assert early.status_code == 409 and early.json()["detail"] == "Die Teilnahme läuft noch bis 13.12. um 20:00 Uhr. Früher ziehen geht nur mit „Teilnahme jetzt beenden“."
+    assert early.status_code == 409 and early.json()["detail"] == "Die Teilnahme läuft noch bis So 13. Dezember · 20:00. Früher ziehen geht nur mit „Teilnahme jetzt beenden“."
     assert (await flow.post("/api/seasonal/advent/admin/2026/11/draw", json={})).status_code == 404
     assert (await flow.post("/api/seasonal/advent/admin/2026/13/draw", json={})).status_code == 409
     assert await flow.db.prize_pickups.count_documents({}) == 0

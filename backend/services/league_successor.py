@@ -523,10 +523,11 @@ async def _tell_captains(db, league: dict, season: dict, rows: list[dict], *, ki
     from services.league_applications import _responsible
     from services.league_mail import send_league_mail
     from services.user_notifications import create_user_notification
-    from services.matchday_schedule import LOCAL_TZ
 
     until = leagues._aware(withdraw_until(season))
-    day = until.astimezone(LOCAL_TZ).strftime("%d.%m.%Y, %H:%M Uhr") if until else ""
+    from services.date_text import format_moment
+
+    day = format_moment(until) if until else ""
     title = " ".join(part for part in (league.get("name"), season.get("name")) if part)
     # Solange die Season „Aus“ ist, gibt es keine Ligaseite - dann nur der Weg unter Teams.
     where = "unter Teams beim Co-Team" if (season.get("visibility") or "off") == "off" else "unter Teams beim Co-Team oder auf der Ligaseite"
@@ -547,7 +548,7 @@ async def _tell_captains(db, league: dict, season: dict, rows: list[dict], *, ki
                 headline = "Neue Season: Nachrücken entfällt"
                 right = carry.get("start_right") if isinstance(carry.get("start_right"), dict) else None
                 if offered:
-                    follow = (f"Eure Zusage dort ist noch offen: bitte bis {offered.astimezone(LOCAL_TZ).strftime('%d.%m.%Y, %H:%M Uhr')} "
+                    follow = (f"Eure Zusage dort ist noch offen: bitte bis {format_moment(offered)} "
                               f"zusagen: {where}. Ohne Zusage verfällt das Startrecht.")
                 elif right:
                     follow = "Eure Zusage dort gilt weiter."
@@ -561,7 +562,7 @@ async def _tell_captains(db, league: dict, season: dict, rows: list[dict], *, ki
                 headline = "Neue Season: neue Liga" if kind == "moved" else "Neue Season: euer Startrecht"
                 lead = (f"Die Liga-Leitung hat den Endstand von {carry.get('from_season_name') or 'der Vorgänger-Season'} korrigiert. "
                         if kind == "moved" else "")
-                until = offered.astimezone(LOCAL_TZ).strftime("%d.%m.%Y, %H:%M Uhr")
+                until = format_moment(offered)
                 text = (f"{lead}{row['display_name']} hat ein Startrecht für {carry['division_label']} der neuen Season {title}{way}. "
                         f"Bitte bis {until} zusagen: {where}. Ohne Zusage verfällt das Startrecht. Es ist noch keine Anmeldung zu einer "
                         "Staffel und keine Zustimmung zum Regelwerk.")

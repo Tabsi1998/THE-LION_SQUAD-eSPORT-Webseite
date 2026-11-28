@@ -1,6 +1,6 @@
-import { formatWhen } from "@/lib/datetime";
+import { formatClock, formatWhen } from "@/lib/datetime";
 import { plainTextPreview } from "@/lib/textPreview";
-import { viennaDay, viennaTime } from "@/lib/vienna";
+import { viennaDay } from "@/lib/vienna";
 
 // Bestätigungs-Blatt der Turnier-Anmeldung (#1261): was das Blatt vor „Verbindlich anmelden“ zusammenfasst.
 
@@ -29,7 +29,7 @@ export function checkInWindow(tournament, now = new Date()) {
   const fromText = formatWhen(from, { now });
   const untilText = formatWhen(until, { now });
   if (fromText && untilText) {
-    if (viennaDay(from) === viennaDay(until)) return `${fromText}–${viennaTime(until, { hour: "2-digit", minute: "2-digit" })}`;
+    if (viennaDay(from) === viennaDay(until)) return `${fromText}–${formatClock(until)}`;
     return `${fromText} – ${untilText}`;
   }
   if (fromText) return `ab ${fromText}`;

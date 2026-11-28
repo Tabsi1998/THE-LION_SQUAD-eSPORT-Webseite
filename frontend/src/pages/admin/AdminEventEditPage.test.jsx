@@ -1,5 +1,9 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
+import { runAtTestClock } from "@/testClock";
+
+// Feste Uhr (#1307): die Datums-Texte lassen das laufende Jahr weg und sagen „heute“/„morgen“.
+runAtTestClock();
 
 // Event als eigene Seite (#434): Anlegen unter /admin/events/new, Bearbeiten unter
 // /admin/events/:id mit dem Einzelabruf (#2127); Speichern führt zurück zur Liste.
@@ -183,7 +187,7 @@ test("Mehrtägig (#884): ein Event mit Tagen zeigt sie, eine Änderung schickt d
   expect(screen.queryByTestId("event-start")).toBeNull();
   expect(screen.getByTestId("event-day-door-0")).toHaveValue("17:00");
   expect(screen.getByTestId("event-day-title-0")).toHaveValue("Warm-up");
-  expect(screen.getByTestId("event-day-0")).toHaveTextContent("Tag 1 · Fr 16.10.");
+  expect(screen.getByTestId("event-day-0")).toHaveTextContent("Tag 1 · Fr 16. Oktober");
 
   fireEvent.change(screen.getByTestId("event-day-end-1"), { target: { value: "18:00" } });
   fireEvent.submit(screen.getByTestId("event-form"));

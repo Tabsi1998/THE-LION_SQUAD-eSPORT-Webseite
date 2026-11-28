@@ -16,6 +16,7 @@ from datetime import date
 from models import now_utc
 from services.league_scope import NOT_LEAGUE
 from services.discord_texts import LINK_PATH, NOT_LINKED, answer  # noqa: F401 - Bausteine, auch für andere Module
+from services.date_text import format_moment
 
 RUNNING_STATUSES = ("live", "paused")
 MEMBER_AREA_PATH = "/member-area"
@@ -106,7 +107,7 @@ def _since_text(membership: dict) -> str:
         return f"seit {day.year}"
     if precision == "month":
         return f"seit {day.month:02d}/{day.year}"
-    return f"seit {day.strftime('%d.%m.%Y')}"
+    return f"seit {format_moment(day)}"
 
 
 def membership_text(membership: dict | None, base_url: str = "", today: str | None = None) -> str:
@@ -126,7 +127,7 @@ def membership_text(membership: dict | None, base_url: str = "", today: str | No
     if state == "ended":
         ends = str((membership.get("dolibarr") or {}).get("membership_ends") or "")[:10]
         try:
-            ends = date.fromisoformat(ends).strftime("%d.%m.%Y")
+            ends = format_moment(date.fromisoformat(ends))
         except ValueError:
             pass  # kein gültiges Datum: dann steht es da, wie Dolibarr es liefert
         return f"Deine Mitgliedschaft ist am {ends} ausgelaufen. Wieder Mitglied werden: {base_url}{APPLY_PATH}"

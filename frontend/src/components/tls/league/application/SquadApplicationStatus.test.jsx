@@ -1,5 +1,9 @@
 import { render, screen, waitFor } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
+import { runAtTestClock } from "@/testClock";
+
+// Feste Uhr (#1307): die Datums-Texte lassen das laufende Jahr weg und sagen „heute“/„morgen“.
+runAtTestClock();
 
 // Team-Seite (docs/LIGA.md, B.4, #2205): der Stand der Liga-Anmeldung am richtigen Co-Team. Nur erfundene Namen.
 const apiMock = { get: vi.fn(), post: vi.fn(), patch: vi.fn(), delete: vi.fn() };
@@ -53,7 +57,7 @@ test("übernommen aus der Vorgänger-Season (F.2, #1627): Herkunft, Frist, ohne 
   apiMock.post.mockResolvedValue({ data: { status: "withdrawn" } });
   render(<MemoryRouter><TeamsPanel /></MemoryRouter>);
   const row = await screen.findByTestId("squad-application-a3");
-  expect(screen.getByTestId("squad-application-carry-a3")).toHaveTextContent("Übernommen aus Season 1: Liga 2 (Abstieg aus Liga 1). Abmelden bis zum Start am 05.01.2027, 00:00 Uhr.");
+  expect(screen.getByTestId("squad-application-carry-a3")).toHaveTextContent("Übernommen aus Season 1: Liga 2 (Abstieg aus Liga 1). Abmelden bis zum Start am Di 5. Jänner 2027 · 00:00.");
   expect(row.querySelector("a")).toBeNull();
   screen.getByTestId("squad-application-withdraw-a3").click();
   await waitFor(() => expect(apiMock.post).toHaveBeenCalledWith("/me/league-applications/a3/withdraw", {}));
@@ -74,7 +78,7 @@ test("Startrecht mit Zusage: Frist, Knopf „Startrecht annehmen“ - und „Zus
   const row = await screen.findByTestId("squad-application-a4");
   expect(row).toHaveTextContent("Startrecht – Zusage offen");
   expect(row).not.toHaveTextContent("Angemeldet");
-  expect(screen.getByTestId("squad-start-right-line-a4")).toHaveTextContent("Startrecht für Liga 1: bitte bis 15.12.2026, 18:00 Uhr zusagen. Ohne Zusage verfällt es.");
+  expect(screen.getByTestId("squad-start-right-line-a4")).toHaveTextContent("Startrecht für Liga 1: bitte bis Di 15. Dezember · 18:00 zusagen. Ohne Zusage verfällt es.");
   expect(screen.queryByTestId("squad-start-right-decline-a4")).toBeNull();
   screen.getByTestId("squad-start-right-accept-a4").click();
   await waitFor(() => expect(apiMock.post).toHaveBeenCalledWith("/me/league-applications/a4/start-right", { action: "accept" }));

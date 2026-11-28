@@ -6,18 +6,18 @@ import { CalendarOff, Trash2 } from "lucide-react";
 import { FormGrid, FormSection } from "@/components/tls/AdminForm";
 import { SelectField, TextField } from "@/components/tls/FormFields";
 import { LEGS_OPTIONS, WEEKDAY_OPTIONS } from "@/lib/league";
-import { dayNoon, viennaDate } from "@/lib/vienna";
+import { formatWhen } from "@/lib/datetime";
+import { dayNoon } from "@/lib/vienna";
 import { SeasonCheckinRulesPanel } from "./SeasonCheckinRulesPanel";
 import { SeasonReminderRulesPanel } from "./SeasonReminderRulesPanel";
 import { SeasonDiscordPanel } from "./SeasonDiscordPanel";
 import { SeasonScheduleRulesPanel } from "./SeasonScheduleRulesPanel";
 import { SeasonTabForm } from "./SeasonTabForm";
 
-const SHORT_DAY = { day: "2-digit", month: "2-digit" };
 const ICON_DANGER = "p-1.5 text-white/50 hover:text-live focus-visible:outline focus-visible:outline-1 focus-visible:outline-[#29B6E8] rounded-sm";
 
 function dayText(day) {
-  return day ? viennaDate(dayNoon(day), SHORT_DAY) : "";
+  return day ? formatWhen(dayNoon(day), { time: false }) : "";
 }
 
 export function CalendarStrip({ calendar }) {

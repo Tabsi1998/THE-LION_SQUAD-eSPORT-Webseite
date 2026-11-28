@@ -3,7 +3,8 @@ import { Link, useLocation } from "react-router-dom";
 import { CalendarDays, Clock, Newspaper, RotateCcw, ScrollText, Search, Trophy, UserRound, Users, X } from "lucide-react";
 import { clearRecentSearches, forgetSearch, loadRecentSearches, rememberSearch } from "@/lib/recentSearches";
 import { api, resolveMediaUrl } from "@/lib/api";
-import { asInstant, viennaDate } from "@/lib/vienna";
+import { formatWhen } from "@/lib/datetime";
+import { asInstant } from "@/lib/vienna";
 import { useLoad } from "@/hooks/useLoad";
 import { useModalBehavior } from "@/hooks/useModalBehavior";
 
@@ -28,7 +29,7 @@ function formatDate(value) {
   if (!value) return "";
   const date = asInstant(value);
   if (Number.isNaN(date.getTime())) return "";
-  return viennaDate(date, { dateStyle: "medium" });
+  return formatWhen(date, { time: false });
 }
 
 // Die Suche (#1145): dieselbe wie in der App - ab zwei Buchstaben, Treffer nach Art gruppiert. Neu sind die letzten fünf

@@ -401,7 +401,9 @@ def decline_fields(application: dict | None, now: str) -> dict:
 
 
 def day_text(moment: datetime | None) -> str:
-    return moment.astimezone(league_calendar.VIENNA).strftime("%d.%m.%Y, %H:%M Uhr") if moment else ""
+    from services.date_text import format_moment
+
+    return format_moment(moment) if moment else ""
 
 
 def assign_problem(application: dict | None, season: dict | None) -> str | None:

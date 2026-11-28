@@ -106,6 +106,7 @@ export function NotificationGroupedList({
                   testIdPrefix={testIdPrefix}
                   pending={bundle.ids.some((id) => pendingIds?.has?.(id))}
                   leading={<TopicIcon bundle={bundle} compact={compact} />}
+                  day={group.key}
                 />
               </div>
             ))}

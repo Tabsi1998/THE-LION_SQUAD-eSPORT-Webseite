@@ -1,6 +1,6 @@
 // Turnier nach dem Ende noch „Live“ (#2194): Hinweis für die Leitung - „Läuft laut Stand noch, Ende war am … – beenden?“.
 // Umgestellt wird nie automatisch; mit offenen Spielen läuft das Turnier öffentlich weiter, ohne fertig zu „Beendet“.
-import { viennaDate, viennaTime } from "@/lib/vienna";
+import { formatWhen } from "@/lib/datetime";
 
 /** Steht das Turnier laut Stand auf „live“, obwohl sein Ende vorbei ist? */
 export function liveAfterEnd(tournament, now = Date.now()) {
@@ -11,7 +11,7 @@ export function liveAfterEnd(tournament, now = Date.now()) {
 
 export function endText(value) {
   if (!value) return "";
-  return `${viennaDate(value, { weekday: "short", day: "2-digit", month: "2-digit", year: "numeric" }).replace(".,", "")}, ${viennaTime(value, { hour: "2-digit", minute: "2-digit" })}`;
+  return formatWhen(value, { relative: false });
 }
 
 /** Der Satz des Hinweises: mit offenen Spielen „läuft länger“, sonst „beenden?“. */

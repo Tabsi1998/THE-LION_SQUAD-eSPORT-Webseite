@@ -21,7 +21,7 @@ import { AuthFormAlert } from "@/components/tls/AuthFormFields";
 import { SkeletonLines } from "@/components/tls/Skeleton";
 import { toast } from "sonner";
 import { Crown, FileText, Mail, Clock, Send, Undo2, AlertTriangle } from "lucide-react";
-import { viennaDate } from "@/lib/vienna";
+import { formatWhen } from "@/lib/datetime";
 import { statutesHref } from "@/lib/statutes";
 import { feeLine } from "@/lib/membershipFees";
 import { BIRTH_MISSING_TEXT, MEMBERSHIP_AGE_TEXT } from "@/lib/minimumAge";
@@ -191,7 +191,7 @@ export default function MembershipApplyPage() {
         ) : !showForm && status === "pending" ? (
           <StatusCard testId="apply-pending" icon={existing.dolibarr?.application_status === "in_review" ? Clock : Mail} color="#29B6E8"
             title={existing.dolibarr?.application_status === "in_review" ? "Antrag in Prüfung" : existing.coupled ? "Antrag eingegangen" : "Bewerbung eingegangen"}
-            body={`Eingereicht am ${viennaDate(existing.created_at)}. ${existing.coupled ? "Der Verein prüft den Antrag in der Mitgliederverwaltung; du erhältst eine E-Mail, sobald entschieden ist." : "Du erhältst eine E-Mail sobald entschieden wurde."}`}
+            body={`Eingereicht am ${formatWhen(existing.created_at, { time: false, relative: false })}. ${existing.coupled ? "Der Verein prüft den Antrag in der Mitgliederverwaltung; du erhältst eine E-Mail, sobald entschieden ist." : "Du erhältst eine E-Mail sobald entschieden wurde."}`}
             action={<button type="button" onClick={withdraw} data-testid="apply-withdraw" className="tls-type-label text-white/50 hover:text-live inline-flex items-center gap-1"><Undo2 className="w-3.5 h-3.5" /> Antrag zurückziehen</button>} />
         ) : !showForm && status === "approved" ? (
           <StatusCard testId="apply-approved" icon={Crown} color={ROLE_COLORS.honor} title="Du bist Mitglied 🦁" body="Willkommen im Rudel! Schau in den Mitgliederbereich für Benefits und Dokumente." />

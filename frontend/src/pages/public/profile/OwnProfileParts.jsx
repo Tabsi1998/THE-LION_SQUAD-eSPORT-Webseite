@@ -9,7 +9,7 @@ import { enqueueCeremony } from "@/components/achievements/ceremony/queue";
 import { describePackage } from "@/components/achievements/ceremony/select";
 import { AchievementsTab } from "@/pages/user/profile/AchievementsTab";
 import { achievementInsights } from "@/pages/user/profile/form";
-import { viennaDate } from "@/lib/vienna";
+import { formatWhen } from "@/lib/datetime";
 
 // Was nur das eigene Profil zeigt (#1149): der Kasten „Nur für dich“ (Rechnungen, eigene Unterlagen aus der Vereinsakte,
 // Gewinne, Strafen, was im Profil noch fehlt) und die eigenen Erfolge mit Fortschritt. Mit „So sehen dich andere“ ist
@@ -21,7 +21,7 @@ export function documentsLine(documents) {
   if (!list.length) return "";
   const newest = list.map((doc) => doc?.created_at || doc?.updated_at || "").filter(Boolean).sort().at(-1);
   const count = list.length === 1 ? "1 Dokument" : `${list.length} Dokumente`;
-  return newest ? `${count} · neuestes vom ${viennaDate(newest, { day: "2-digit", month: "2-digit", year: "numeric" })}` : count;
+  return newest ? `${count} · neuestes vom ${formatWhen(newest, { time: false, relative: false })}` : count;
 }
 
 function money(amount, currency = "EUR") {

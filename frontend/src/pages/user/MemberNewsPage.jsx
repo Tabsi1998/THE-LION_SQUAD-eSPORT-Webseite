@@ -6,7 +6,7 @@ import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { useLoad } from "@/hooks/useLoad";
 import { LoadState } from "@/components/tls/LoadState";
 import { Pin, Newspaper } from "lucide-react";
-import { viennaDate } from "@/lib/vienna";
+import { formatWhen } from "@/lib/datetime";
 
 export default function MemberNewsPage() {
   // „Keine internen News“ nur nach einer erfolgreichen Antwort ohne interne Beiträge (#984). Der Server filtert die
@@ -48,7 +48,7 @@ export default function MemberNewsPage() {
                 <div className="flex items-center gap-2 tls-type-label">
                   <span className="text-brand">{newsCategoryLabel(n.category)}</span>
                   {n.pinned && <Pin className="w-3 h-3 text-white" />}
-                  <span className="text-white/30 ml-auto">{viennaDate(n.created_at)}</span>
+                  <span className="text-white/30 ml-auto">{formatWhen(n.created_at, { time: false })}</span>
                 </div>
                 <h3 className="mt-2 tls-type-card group-hover:text-brand transition">{n.title}</h3>
                 {n.excerpt && <p className="mt-2 tls-type-body text-white/65 line-clamp-2">{n.excerpt}</p>}

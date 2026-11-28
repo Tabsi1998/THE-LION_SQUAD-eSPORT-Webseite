@@ -10,7 +10,7 @@ Event-Anmeldung geht. Discord schickt die Kennung mit jedem Klick, darum überle
 """
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import datetime, timezone
 
 from fastapi import HTTPException
 
@@ -51,14 +51,16 @@ async def linked_user(db, discord_user_id) -> dict | None:
 
 
 def vienna(value) -> str:
-    """Zeit wie in den Ankündigungen: „16.10.2026, 18:00 Uhr“ in Wiener Zeit."""
+    """Zeit wie in den Ankündigungen: „Fr 16. Oktober · 18:00“ in Wiener Zeit (#1307)."""
+    from services.date_text import format_moment
+
     if not value:
         return ""
     try:
         parsed = value if isinstance(value, datetime) else datetime.fromisoformat(str(value).replace("Z", "+00:00"))
     except ValueError:
         return ""
-    return parsed.astimezone(event_days.VIENNA).strftime("%d.%m.%Y, %H:%M Uhr")
+    return format_moment(parsed if parsed.tzinfo else parsed.replace(tzinfo=timezone.utc))
 
 
 def _event_url(event: dict) -> str:

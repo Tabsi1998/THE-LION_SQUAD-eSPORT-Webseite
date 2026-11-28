@@ -4,7 +4,7 @@ import { toast } from "sonner";
 import { api, formatApiError } from "@/lib/api";
 import { useLiveRefresh } from "@/hooks/useLiveRefresh";
 import { CountUp, Glow } from "@/components/tls/motion";
-import { viennaTime } from "@/lib/vienna";
+import { formatClock } from "@/lib/datetime";
 import { checkinStatusText, placementMessage } from "@/lib/tournamentFillIn";
 import {
   checkinCounterText, checkinCounts, checkinFilter, checkinMatches, checkinSummary, feeAmount, memberGroups, shownStatus,
@@ -264,7 +264,7 @@ function NoShowQuestion({ row, onConfirm, onCancel }) {
 export function CheckinRow({ row, status, saving, fresh, asking = false, adminUrl = "", onStatus, onConfirm, onCancel }) {
   const here = status === "checked_in";
   const gone = status === "no_show";
-  const at = here && row.checked_in_at ? viennaTime(row.checked_in_at, { hour: "2-digit", minute: "2-digit" }) : "";
+  const at = here && row.checked_in_at ? formatClock(row.checked_in_at) : "";
   return (
     <li
       className={`tls-lead-checkin-row rounded-sm border p-3 ${here ? "border-ok/45 bg-ok/[0.06]" : gone ? "border-warn/30 bg-surface-1" : "border-white/10 bg-surface-1"}`}

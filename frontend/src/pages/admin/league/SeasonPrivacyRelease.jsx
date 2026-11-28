@@ -5,9 +5,8 @@ import { useState } from "react";
 import { toast } from "sonner";
 import { api, formatRequestError } from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
-import { viennaDateTime } from "@/lib/vienna";
+import { formatWhen } from "@/lib/datetime";
 
-const WHEN = { day: "2-digit", month: "2-digit", year: "numeric" };
 
 export function privacyReleaseState(season) {
   const text = season?.application_privacy_text || "";
@@ -41,7 +40,7 @@ export function SeasonPrivacyRelease({ season, seasonId, formText = "", onReload
   return (
     <div className="rounded-sm border border-white/10 bg-white/[0.03] p-3 text-sm" data-testid="season-privacy-release" data-state={state}>
       {state === "released" ? (
-        <p className="text-white/80">Für Gäste freigegeben am {viennaDateTime(at, WHEN)}. Ändert sich der Text, sehen Gäste wieder den Platzhalter-Satz.</p>
+        <p className="text-white/80">Für Gäste freigegeben am {formatWhen(at, { time: false, relative: false })}. Ändert sich der Text, sehen Gäste wieder den Platzhalter-Satz.</p>
       ) : (
         <p className="text-white/80">
           Gäste – Konten ohne Mitgliedschaft – sehen bei der Anmeldung den Platzhalter-Satz, bis der Superadmin diesen Text nach der

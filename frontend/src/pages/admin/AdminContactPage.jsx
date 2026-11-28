@@ -6,7 +6,7 @@ import { useConfirm } from "@/components/tls/ConfirmDialog";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { toast } from "sonner";
 import { Inbox, MailOpen, Trash2, ArrowLeft, AlertCircle, ShieldCheck, Search, Send } from "lucide-react";
-import { viennaDate, viennaDateTime } from "@/lib/vienna";
+import { formatWhen } from "@/lib/datetime";
 import { ShortCaps } from "@/components/tls/ShortCaps";
 
 const STATUS_LABEL = {
@@ -80,13 +80,13 @@ function ReplyHistory({ message }) {
     <div className="mt-5 border-t border-white/10 pt-4" data-testid="contact-history">
       <div className="tls-type-label text-white/60 mb-3">Verlauf</div>
       {answeredByHand && (
-        <p className="tls-type-small text-white/70" data-testid="contact-answered-by">Als beantwortet markiert von {message.answered_by_name || "der Verwaltung"} · {viennaDateTime(message.answered_at)}</p>
+        <p className="tls-type-small text-white/70" data-testid="contact-answered-by">Als beantwortet markiert von {message.answered_by_name || "der Verwaltung"} · {formatWhen(message.answered_at)}</p>
       )}
       <ol className="space-y-3">
         {replies.map((reply) => (
           <li key={reply.id} className="border-l-2 border-ok/40 pl-3" data-testid={`contact-reply-${reply.id}`}>
             <div className="tls-type-small text-white/50">
-              Antwort von {reply.by_name || "der Verwaltung"} · {viennaDateTime(reply.at)}
+              Antwort von {reply.by_name || "der Verwaltung"} · {formatWhen(reply.at)}
               {REPLY_DELIVERY[reply.delivery] && <span className={REPLY_DELIVERY[reply.delivery].tone} data-testid={`contact-reply-delivery-${reply.id}`}> · {REPLY_DELIVERY[reply.delivery].text}</span>}
             </div>
             <pre className="mt-1 whitespace-pre-wrap tls-type-body text-white/85 font-sans leading-relaxed">{reply.text}</pre>
@@ -257,7 +257,7 @@ export default function AdminContactPage() {
             </div>
             <h1 className="tls-type-title mb-3 break-words">{active.subject}</h1>
             <div className="tls-type-small text-white/60 mb-4 break-words">
-              <strong>{active.name}</strong> &lt;<a href={`mailto:${active.email}`} className="text-[#29B6E8] hover:underline">{active.email}</a>&gt; · {viennaDateTime(active.created_at)}
+              <strong>{active.name}</strong> &lt;<a href={`mailto:${active.email}`} className="text-[#29B6E8] hover:underline">{active.email}</a>&gt; · {formatWhen(active.created_at)}
             </div>
             <div className="border-t border-white/10 pt-4">
               <pre className="whitespace-pre-wrap break-words tls-type-body text-white/85 font-sans leading-relaxed">{active.message}</pre>
@@ -395,7 +395,7 @@ export default function AdminContactPage() {
                 const s = STATUS_LABEL[m.status] || STATUS_LABEL.new;
                 return (
                   <tr key={m.id} onClick={() => openMessage(m)} data-testid={`contact-row-${m.id}`} className="cursor-pointer hover:bg-white/5">
-                    <td className="px-4 py-3 text-white/50 tls-type-small whitespace-nowrap">{viennaDate(m.created_at)}</td>
+                    <td className="px-4 py-3 text-white/50 tls-type-small whitespace-nowrap">{formatWhen(m.created_at, { time: false })}</td>
                     <td className="px-4 py-3"><div className="text-white/85">{m.name}</div><div className="tls-type-small text-quiet">{m.email}</div></td>
                     <td className="px-4 py-3 tls-type-small text-[#29B6E8]" data-testid={`contact-topic-${m.id}`}>{topics[m.topic] || m.topic}</td>
                     <td className="px-4 py-3"><div className="font-semibold tls-wrap max-w-md">{m.subject}</div></td>

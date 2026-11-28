@@ -128,7 +128,7 @@ for (const kind of ["team", "solo"]) {
         const notice = page.getByTestId("season-admin-cancelled");
         await expect(notice).toBeVisible();
         await expect(notice.locator("[data-kind=cancelled]")).toContainText("Abgesagt");
-        await expect(notice.getByTestId("season-admin-cancelled-date")).toContainText("am 28.11.2026");
+        await expect(notice.getByTestId("season-admin-cancelled-date")).toContainText("am Sa 28. November");
         await expect(notice.getByTestId("season-admin-cancelled-reason")).toContainText(REASON);
         if (kind === "team") {
           await expect(notice.getByTestId("season-admin-cancelled-predecessor")).toHaveAttribute("href", "/admin/leagues/seasons/s1");
@@ -155,16 +155,16 @@ for (const kind of ["team", "solo"]) {
         const notice = page.getByTestId("season-cancelled");
         await expect(notice).toBeVisible();
         await expect(notice.locator("[data-kind=cancelled]")).toContainText("Abgesagt");
-        await expect(notice.getByTestId("season-cancelled-date")).toContainText("am 28.11.2026");
+        await expect(notice.getByTestId("season-cancelled-date")).toContainText("am Sa 28. November");
         await expect(notice.getByTestId("season-cancelled-reason")).toHaveText(`Grund: ${REASON}`);
         // Die Anmeldung endete mit der Absage - nie „Vorbei seit <Fensterende>“.
-        await expect(page.getByText("Abgesagt am 28.11.2026, 11:30 Uhr")).toBeVisible();
+        await expect(page.getByText("Abgesagt am Sa 28. November · 11:30")).toBeVisible();
         await expect(page.getByText(/Vorbei seit/)).toHaveCount(0);
         await noSideScroll(page);
         await shot(page, `season-absagen-ligaseite-${kind}-${width}`);
 
         await page.goto("/liga");
-        await expect(page.getByTestId("league-index-season-state-season-2")).toHaveText("Abgesagt am 28.11.2026");
+        await expect(page.getByTestId("league-index-season-state-season-2")).toHaveText("Abgesagt am Sa 28. November");
         await noSideScroll(page);
       });
     }

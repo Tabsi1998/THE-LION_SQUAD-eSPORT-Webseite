@@ -1,4 +1,8 @@
 import { act, render, screen, waitFor, within } from "@testing-library/react";
+import { runAtTestClock } from "@/testClock";
+
+// Feste Uhr (#1307): die Datums-Texte lassen das laufende Jahr weg und sagen „heute“/„morgen“.
+runAtTestClock();
 
 // Saison-Fundstücke im Profil (#678): je Saison eine Karte - die laufende zuerst, mit dem Stand von heute und dem
 // Tagesdeckel; leere Fundstücke sind blass; ohne alles ein erklärender Satz; nach einem neuen Fundstück lädt die Karte
@@ -41,13 +45,13 @@ afterEach(() => {
 });
 
 test("Tag, Hinweis und Reihenfolge: laufende Saison zuerst, dann die mit Fundstücken, dann der Rest", () => {
-  expect(dayText("2026-11-01T23:59:59+01:00")).toBe("01.11.");
-  expect(dayText("2026-12-31T23:30:00Z")).toBe("01.01.");
+  expect(dayText("2026-11-01T23:59:59+01:00")).toBe("So 1. November");
+  expect(dayText("2026-12-31T23:30:00Z")).toBe("Fr 1. Jänner 2027");
   expect(dayText("")).toBe("");
   expect(dayText("kaputt")).toBe("");
-  expect(seasonHint({ active: true, ends_at: "2026-11-01T23:59:59+01:00" })).toBe("läuft bis 01.11.");
+  expect(seasonHint({ active: true, ends_at: "2026-11-01T23:59:59+01:00" })).toBe("läuft bis So 1. November");
   expect(seasonHint({ active: true })).toBe("läuft gerade");
-  expect(seasonHint({ active: false, next_start: "2026-11-29T00:00:00+01:00" })).toBe("ab 29.11.");
+  expect(seasonHint({ active: false, next_start: "2026-11-29T00:00:00+01:00" })).toBe("ab morgen");
   expect(seasonHint({ active: false })).toBe("");
   const mixed = [{ key: "a", count: 0 }, { key: "b", count: 5 }, { key: "c", count: 0, active: true }, { key: "d", count: 9 }];
   expect(orderSeasons(mixed).map((season) => season.key)).toEqual(["c", "b", "d", "a"]);
@@ -77,7 +81,7 @@ test("Karte: Summe, laufende Saison mit Stand von heute und Deckel, leere Fundst
   const halloween = screen.getByTestId("season-finds-halloween");
   expect(halloween.className).toContain("tls-finds__season--active");
   expect(within(halloween).getByText("läuft")).toBeInTheDocument();
-  expect(screen.getByTestId("season-finds-halloween-hint")).toHaveTextContent("läuft bis 01.11.");
+  expect(screen.getByTestId("season-finds-halloween-hint")).toHaveTextContent("läuft bis So 1. November");
   const bats = screen.getByTestId("season-find-halloween_bats_scared");
   expect(bats).toHaveTextContent("32");
   expect(bats).toHaveTextContent("Fledermäuse verscheucht");
@@ -92,7 +96,7 @@ test("Karte: Summe, laufende Saison mit Stand von heute und Deckel, leere Fundst
   expect(flakes).toHaveTextContent("1.260");
   expect(flakes).toHaveTextContent("zuletzt 60");
   expect(screen.queryByTestId("season-find-snowflakes_clicked-today")).toBeNull();
-  expect(screen.getByTestId("season-finds-snow-hint")).toHaveTextContent("ab 29.11.");
+  expect(screen.getByTestId("season-finds-snow-hint")).toHaveTextContent("ab morgen");
   expect(screen.getByTestId("season-finds-snow").className).not.toContain("tls-finds__season--active");
   expect(panel).toHaveTextContent("Nur du siehst diese Karte");
 });

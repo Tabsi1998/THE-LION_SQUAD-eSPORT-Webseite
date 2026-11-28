@@ -1,5 +1,9 @@
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { runAtTestClock } from "@/testClock";
+
+// Feste Uhr (#1307): die Datums-Texte lassen das laufende Jahr weg und sagen „heute“/„morgen“.
+runAtTestClock();
 
 // Adventkalender und Ostereiersuche (#1360): der Schalter steht auf der eigenen Seite - an/aus, Zeitraum, wo sie erscheinen.
 
@@ -19,8 +23,8 @@ beforeEach(() => {
 });
 
 test("Zeitraum in Worten - aus, an, läuft", () => {
-  expect(switchWindowText(STATE)).toMatch(/^Aus – erscheint nicht\. Eingeschaltet zu sehen von 1\. Dezember 2026/);
-  expect(switchWindowText({ ...STATE, enabled: true })).toMatch(/^Sichtbar von 1\. Dezember 2026.*06:00 bis 6\. Jänner 2027/);
+  expect(switchWindowText(STATE)).toMatch(/^Aus – erscheint nicht\. Eingeschaltet zu sehen von Di 1\. Dezember · \d\d:\d\d/);
+  expect(switchWindowText({ ...STATE, enabled: true })).toMatch(/^Sichtbar von Di 1\. Dezember · \d\d:\d\d bis Mi 6\. Jänner 2027 · \d\d:\d\d/);
   expect(switchWindowText({ ...STATE, enabled: true, active_now: true })).toBe("Läuft gerade.");
 });
 

@@ -35,7 +35,7 @@ import { statsTiles } from "@/lib/tvStats";
 import { hasQueue } from "@/lib/tvQueue";
 import { presentedBy, sponsorFor, sponsorPlan } from "@/lib/tvSponsors";
 import { tvScreenFor } from "@/lib/tvScreens";
-import { viennaTime } from "@/lib/vienna";
+import { formatClock } from "@/lib/datetime";
 
 // Turnierbaum-TV (#1110, #1115-#1127): derselbe Baum wie auf der Turnierseite, mit Linien, auf einer festen Bühne - und
 // seit Meilenstein 60 eine Wiedergabeliste (#1121): Baum, Live-Spiele, Aufrufe, zwischendurch Sponsor und Zahlen, jede
@@ -503,7 +503,7 @@ function BracketTv() {
     : active === "sponsor" && !sponsorShown ? (settings.sponsor_moment ? "Gerade kein Sponsor für den TV" : "Sponsoren am TV sind ausgeschaltet")
       : active === "stats" && !tiles.length ? (settings.stats ? `Noch keine ${kindWords.stats}` : `${kindWords.stats} sind ausgeschaltet`) : null;
   const subtitle = !t ? null
-    : screen === "pause" ? (t.paused_until ? `Pause bis ${viennaTime(t.paused_until, { hour: "2-digit", minute: "2-digit" })}` : "Kurze Pause")
+    : screen === "pause" ? (t.paused_until ? `Pause bis ${formatClock(t.paused_until)}` : "Kurze Pause")
       : screen === "checkin" ? "Check-in"
         : screen === "registration" ? "Anmeldung offen"
           : finale ? [data.league_finale?.league, data.league_finale?.season].filter(Boolean).join(" · ") || null

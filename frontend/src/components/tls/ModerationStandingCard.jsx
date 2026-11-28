@@ -3,7 +3,8 @@ import { Link } from "react-router-dom";
 import { Send, ShieldAlert, ShieldCheck } from "lucide-react";
 import { toast } from "sonner";
 import { api, formatRequestError } from "@/lib/api";
-import { asInstant, viennaDateTime } from "@/lib/vienna";
+import { formatWhen } from "@/lib/datetime";
+import { asInstant } from "@/lib/vienna";
 
 import { ROLE_COLORS } from "@/lib/categoryColors";
 // Der eigene Stand bei der Moderation (#416): laufende Maßnahme (Hinweis, Verwarnung mit
@@ -16,7 +17,7 @@ const ACTION_TONE = { notice: ROLE_COLORS.quiet, warning: ROLE_COLORS.warn, susp
 export function formatMoment(value) {
   if (!value) return "";
   const date = asInstant(value);
-  return Number.isNaN(date.getTime()) ? "" : viennaDateTime(date, { dateStyle: "medium", timeStyle: "short" });
+  return Number.isNaN(date.getTime()) ? "" : formatWhen(date);
 }
 
 function appealState(appeal) {

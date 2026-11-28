@@ -10,7 +10,7 @@ import { useCanonicalSlugRedirect } from "@/hooks/useCanonicalSlugRedirect";
 import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 import { seoTextPreview } from "@/lib/textPreview";
 import { Award, BarChart3, CalendarDays, CheckCircle2, CircleGauge, Flag, Medal, MessageCircle, ShieldCheck, Star, Timer, Trophy, Users, Zap } from "lucide-react";
-import { viennaDate } from "@/lib/vienna";
+import { formatWhen } from "@/lib/datetime";
 
 function rankColor(rank) {
   if (rank === 1) return "text-honor";
@@ -111,7 +111,7 @@ export default function SeasonPage() {
               {s.description && <p className="mt-3 text-white/70 max-w-2xl">{s.description}</p>}
               <div className="mt-6 flex flex-wrap gap-2">
                 <StatusBadge status={s.status} size="lg"/>
-                {s.start_date && <span className="inline-flex items-center gap-2 tls-type-label border border-white/10 bg-black/25 px-3 py-1 rounded-sm text-white/60"><CalendarDays className="w-3.5 h-3.5" /> {viennaDate(s.start_date)}{s.end_date ? ` - ${viennaDate(s.end_date)}` : ""}</span>}
+                {s.start_date && <span className="inline-flex items-center gap-2 tls-type-label border border-white/10 bg-black/25 px-3 py-1 rounded-sm text-white/60"><CalendarDays className="w-3.5 h-3.5" /> {formatWhen(s.start_date, { time: false })}{s.end_date ? ` - ${formatWhen(s.end_date, { time: false })}` : ""}</span>}
               </div>
             </div>
             <div className="grid grid-cols-2 gap-2">

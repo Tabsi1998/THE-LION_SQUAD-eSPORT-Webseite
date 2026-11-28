@@ -18,6 +18,7 @@ from models import now_utc
 from services import checkin_rules, league_platform, league_roster, league_sanction_bans
 from services.dolibarr_policy import club_today
 from services.matchday_schedule import LOCAL_TZ
+from services.date_text import format_moment
 
 OTHER_TEAM, AGE_MISSING, AGE_NOT_MET_STATE, WAITING = "other_team", "age_missing", "age_not_met", "waiting"
 # Strafen (E.3): eine laufende Sperre der Liga-Leitung - geht jedem Stand außer ``banned`` vor.
@@ -185,7 +186,7 @@ def status(ctx: EligibilityContext | None, user_id: str, squad_id: str | None = 
         return {**out, "state": platform[0], "ok": False, "reason": platform[1]}
     until = league_roster.wait_until(ctx.roster, user_id, squad_id)
     if until and now_utc() < until:
-        text = until.astimezone(LOCAL_TZ).strftime("%d.%m.%Y, %H:%M")
+        text = format_moment(until.astimezone(LOCAL_TZ))
         return {**out, "state": WAITING, "ok": False, "until": until.isoformat(),
                 "reason": f"Neu im Kader: darf ab {text} spielen."}
     return out

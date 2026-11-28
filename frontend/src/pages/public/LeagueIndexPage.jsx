@@ -12,17 +12,16 @@ import { LeagueEmblem } from "@/components/tls/league/public/LeagueLook";
 import { accentStyle, bannerFocus } from "@/lib/leagueLook";
 import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 import { seasonPath } from "@/lib/leaguePage";
-import { viennaDate } from "@/lib/vienna";
+import { formatWhen } from "@/lib/datetime";
 import "@/components/tls/league/public/league.css";
 import { ShortCaps } from "@/components/tls/ShortCaps";
 
 const STATUS = { draft: "Startet bald", active: "Läuft", completed: "Beendet", cancelled: "Abgesagt" };
-const DAY = { day: "numeric", month: "numeric", year: "numeric" };
 
 /** Die Zeile unter dem Namen: Stand und Beginn - eine abgesagte Season (#2607) nennt statt des Beginns den Tag der Absage. */
 function seasonLine(season) {
-  if (season.status === "cancelled") return `${STATUS.cancelled}${season.cancelled_at ? ` am ${viennaDate(season.cancelled_at, DAY)}` : ""}`;
-  return `${STATUS[season.status] || ""}${season.start_date ? ` · ab ${viennaDate(season.start_date, DAY)}` : ""}`;
+  if (season.status === "cancelled") return `${STATUS.cancelled}${season.cancelled_at ? ` am ${formatWhen(season.cancelled_at, { time: false, relative: false })}` : ""}`;
+  return `${STATUS[season.status] || ""}${season.start_date ? ` · ab ${formatWhen(season.start_date, { time: false })}` : ""}`;
 }
 
 export default function LeagueIndexPage() {

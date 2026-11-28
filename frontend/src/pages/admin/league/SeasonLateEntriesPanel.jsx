@@ -9,10 +9,9 @@ import { ConflictReasonField, OwnTeamNote, overrideMissing, overridePayload } fr
 import { FormSection } from "@/components/tls/AdminForm";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { api, formatApiError } from "@/lib/api";
-import { viennaDateTime } from "@/lib/vienna";
+import { formatWhen } from "@/lib/datetime";
 
 const BUTTON = "inline-flex min-h-[40px] items-center rounded-sm px-3 py-1.5 tls-type-label disabled:opacity-50";
-const WHEN = { weekday: "short", day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" };
 const KIND_TEXT = { bye: "Freilos des Gegners", reserve: "Reservewoche", free: "Gegner frei" };
 
 /** Die Zeile im Panel: offen mit Knopf, erledigt mit Ergebnis. */
@@ -87,7 +86,7 @@ export function LateEntrySheet({ item, onClose, onDone }) {
                       <span className="font-semibold text-white">{row.home_name}</span> <span className="text-white/50">gegen</span> <span className="font-semibold text-white">{row.away_name}</span>
                       <span className="block tls-type-small text-white/55">{KIND_TEXT[row.kind] || ""}{row.reason ? ` – ${row.reason}` : ""}</span>
                     </span>
-                    <span className="tls-type-small text-white/70">{row.default_at ? `${viennaDateTime(row.default_at, WHEN)} Uhr` : "Termin festlegen"}</span>
+                    <span className="tls-type-small text-white/70">{row.default_at ? `${formatWhen(row.default_at)}` : "Termin festlegen"}</span>
                   </li>
                 ))}
               </ul>

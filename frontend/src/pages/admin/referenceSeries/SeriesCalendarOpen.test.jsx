@@ -1,4 +1,8 @@
 import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { runAtTestClock } from "@/testClock";
+
+// Feste Uhr (#1307): die Datums-Texte lassen das laufende Jahr weg und sagen „heute“/„morgen“.
+runAtTestClock();
 
 // Termine ohne Datum und geplante Termine (#2015): offene Termine im Kalender, „fehlende Termine anlegen“ bis zur
 // geplanten Zahl, die Vorschau der Terminliste mit „offen“ und die Hilfe dazu. Nur erfundene Orte.
@@ -68,5 +72,5 @@ test("Terminliste: die Hilfe nennt „offen“, die Vorschau zeigt „Termin off
   fireEvent.click(screen.getByTestId("paste-submit"));
   const preview = await screen.findByTestId("paste-preview");
   expect(within(preview).getByTestId("paste-open")).toHaveTextContent("Termin offen");
-  expect(preview).toHaveTextContent("Do., 12.11.2026");
+  expect(preview).toHaveTextContent("Do 12. November");
 });

@@ -175,7 +175,7 @@ def test_iso_dates_and_plain_numbers_work_too():
 # ---------------------------------------------------------------- Zeitumstellung
 def test_a_clock_that_does_not_exist_in_vienna_is_refused():
     # Letzter Sonntag im März: 02:00 springt auf 03:00.
-    with pytest.raises(ClockError, match="02:30 Uhr gibt es am 29.03.2026 in Wien nicht"):
+    with pytest.raises(ClockError, match="02:30 Uhr gibt es am So 29. März in Wien nicht"):
         vienna_start("2026-03-29", "02:30")
     assert vienna_start("2026-03-29", "03:00") == "2026-03-29T01:00:00+00:00"
 
@@ -189,7 +189,7 @@ def test_a_clock_that_exists_twice_means_the_first_one_in_summer_time():
 def test_a_pasted_line_with_a_missing_clock_is_named():
     result = _parse("R1 29.03. 02:30 Nord\nR2 25.10. 02:30 Süd")
     assert [(error["line"], error["message"]) for error in result["errors"]] == [
-        (1, "02:30 Uhr gibt es am 29.03.2026 in Wien nicht (Umstellung auf Sommerzeit).")]
+        (1, "02:30 Uhr gibt es am So 29. März in Wien nicht (Umstellung auf Sommerzeit).")]
 
 
 def test_the_29th_of_february_after_new_year_takes_the_leap_year():

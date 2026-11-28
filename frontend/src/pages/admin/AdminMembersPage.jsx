@@ -12,12 +12,13 @@ import { JerseyNumbersBox } from "@/pages/admin/members/JerseyNumbersBox";
 import { download } from "@/pages/admin/achievements/shared";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { STATUS_MAIL, exitLine, listLimitHint, mailOutcome, statusChangeSentence } from "@/lib/membershipMail";
-import { viennaDate, viennaDay } from "@/lib/vienna";
+import { viennaDay } from "@/lib/vienna";
 import { toast } from "sonner";
 import { Crown, Download, Search } from "lucide-react";
 import { ShortCaps } from "@/components/tls/ShortCaps";
 
 import { ROLE_COLORS } from "@/lib/categoryColors";
+import { formatWhen } from "@/lib/datetime";
 const STATUS_LABELS = {
   none: "Kein Mitglied",
   // Entsteht nur aus einem Dolibarr-Entwurf; offene Bewerbungen der Website stehen unter „Bewerbungen“ (#2125).
@@ -314,7 +315,7 @@ function EditModal({ entry, meta, onClose, onSave }) {
   // Ein Statuswechsel mailt (#2125): erst mit Rückfrage, und nach einem Fehlklick auch ohne Mail.
   const statusChanged = !led && form.member_status !== (m.member_status || "none");
   const statusMails = statusChanged && Boolean(STATUS_MAIL[form.member_status]);
-  const exitText = exitLine(m.exit_request, viennaDate);
+  const exitText = exitLine(m.exit_request, (value) => formatWhen(value, { time: false, relative: false }));
 
   const set = (k, v) => setForm((f) => ({ ...f, [k]: v }));
 

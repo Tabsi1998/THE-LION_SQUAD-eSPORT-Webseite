@@ -5,7 +5,7 @@ import { Breadcrumbs } from "@/components/tls/Breadcrumbs";
 import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { api } from "@/lib/api";
-import { asInstant, viennaDate } from "@/lib/vienna";
+import { formatOfficialDate } from "@/lib/datetime";
 import { SkeletonLines } from "@/components/tls/Skeleton";
 
 // Rechtstexte kommen fertig als Abschnitte vom Backend (#545, eine Quelle für Website und Crawler-Vorschau):
@@ -22,11 +22,9 @@ const PAGE_META = {
   terms: { title: "Nutzungsbedingungen", intro: "Regeln für Konten, Community-Funktionen und Wettbewerbe." },
 };
 
+// Rechtstexte tragen das amtliche Datum „23.05.2026“ (#1307).
 function formatLegalDate(value) {
-  if (!value) return "";
-  const date = asInstant(value);
-  if (Number.isNaN(date.getTime())) return "";
-  return viennaDate(date, { day: "2-digit", month: "2-digit", year: "numeric" });
+  return formatOfficialDate(value);
 }
 
 export function Inline({ text }) {

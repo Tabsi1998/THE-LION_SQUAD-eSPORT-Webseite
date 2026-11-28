@@ -1,8 +1,7 @@
 // Neue Season aus der Vorgänger-Season (F.2, #1627): Wörter für Vorschau, Eingang und Team-Seite. Gerechnet wird auf dem Server.
-import { viennaDateTime } from "@/lib/vienna";
+import { formatWhen } from "@/lib/datetime";
 
 export const MOVEMENT_TEXT = { up: "Aufstieg", down: "Abstieg", stay: "bleibt" };
-const LONG = { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" };
 
 /** Was mit einem Team geschieht: „Aufstieg“, über den Vergleich der Staffeln (#1627) „Aufstieg als bester Nächstplatzierter“. */
 export function movementText(team) {
@@ -29,6 +28,6 @@ export function rulesLine(rules) {
 export function carryLine(carry) {
   if (!carry) return "";
   const way = carry.movement === "up" ? ` (Aufstieg aus ${carry.from_label})` : carry.movement === "down" ? ` (Abstieg aus ${carry.from_label})` : "";
-  const until = carry.withdraw_until ? ` Abmelden bis zum Start am ${viennaDateTime(carry.withdraw_until, LONG)} Uhr.` : "";
+  const until = carry.withdraw_until ? ` Abmelden bis zum Start am ${formatWhen(carry.withdraw_until, { relative: false })}.` : "";
   return `Übernommen aus ${carry.from_season_name || "der Vorgänger-Season"}: ${carry.division_label}${way}.${until}`;
 }

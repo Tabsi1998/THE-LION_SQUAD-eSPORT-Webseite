@@ -1,3 +1,4 @@
+import { formatOfficialDate } from "@/lib/datetime";
 import { formatDate, formatMoney } from "@/lib/dolibarr";
 
 // Eigene Rechnungen (#296): Texte und Reihenfolge für „Meine Rechnungen“. Was ein Beleg
@@ -15,7 +16,8 @@ export function splitInvoices(rows) {
 export function invoiceLine(row) {
   const parts = [row.type_label];
   if (row.is_fee) parts.push("Mitgliedsbeitrag");
-  if (row.date) parts.push(formatDate(row.date));
+  // Rechnungen schreiben das amtliche Datum - wie auf dem PDF (#1307).
+  if (row.date) parts.push(formatOfficialDate(row.date));
   return parts.join(" · ");
 }
 
@@ -32,8 +34,8 @@ export function amountLine(row, currency = "EUR") {
 }
 
 export function dueLine(row) {
-  if (row.status === "overdue") return `Fällig war der ${formatDate(row.due_date)}`;
-  if (row.status === "open" && row.due_date) return `Fällig am ${formatDate(row.due_date)}`;
+  if (row.status === "overdue") return `Fällig war der ${formatOfficialDate(row.due_date)}`;
+  if (row.status === "open" && row.due_date) return `Fällig am ${formatOfficialDate(row.due_date)}`;
   return "";
 }
 

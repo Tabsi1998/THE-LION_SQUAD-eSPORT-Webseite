@@ -1,5 +1,9 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
+import { runAtTestClock } from "@/testClock";
+
+// Feste Uhr (#1307): die Datums-Texte lassen das laufende Jahr weg und sagen „heute“/„morgen“.
+runAtTestClock();
 
 // News-Liste (#2122 NW4): Sichtbarkeit und Kategorie mit Namen statt Rohwert - in der Tabelle, den Filtern und der CSV.
 
@@ -11,7 +15,7 @@ vi.mock("sonner", () => ({ toast: { success: vi.fn(), error: vi.fn(), info: vi.f
 const confirmMock = vi.fn(async () => true);
 vi.mock("@/components/tls/ConfirmDialog", () => ({ useConfirm: () => confirmMock }));
 
-const { default: AdminNewsPage, exportNewsCsv } = await import("./AdminNewsPage");
+const { default: AdminNewsPage, exportNewsCsv, newsCsvRows } = await import("./AdminNewsPage");
 
 const META = { categories: [{ k: "club", l: "Verein" }], visibilities: [{ k: "public", l: "Öffentlich" }, { k: "members", l: "Nur Vereinsmitglieder" }] };
 const POSTS = [
@@ -42,7 +46,8 @@ test("CSV nennt Begriffe und die Adresse statt Rohwerten", async () => {
   globalThis.URL.revokeObjectURL = vi.fn();
   const click = vi.spyOn(window.HTMLAnchorElement.prototype, "click").mockImplementation(() => {});
   try {
-    exportNewsCsv([{ ...POSTS[0], status_label: "Veröffentlicht", date_label: "01.08.2026" }]);
+    // Echte Zeilen wie die Seite (#1307): das Datum amtlich aus published_at, nicht vorgegeben.
+    exportNewsCsv(newsCsvRows(POSTS));
   } finally {
     globalThis.Blob = OriginalBlob;
     click.mockRestore();
@@ -93,8 +98,8 @@ test("die Liste nennt das Ende der Anheftung", async () => {
     return { data: [] };
   });
   render(<MemoryRouter><AdminNewsPage /></MemoryRouter>);
-  expect(await screen.findByTestId("news-pin-n1")).toHaveTextContent("Angepinnt bis 21.10.2099");
-  expect(screen.getByTestId("news-pin-n2")).toHaveTextContent("Anpinnen abgelaufen (bis 05.01.2020)");
+  expect(await screen.findByTestId("news-pin-n1")).toHaveTextContent("Angepinnt bis Mi 21. Oktober 2099");
+  expect(screen.getByTestId("news-pin-n2")).toHaveTextContent("Anpinnen abgelaufen (bis So 5. Jänner 2020)");
   expect(screen.queryByTestId("news-pin-n3")).toBeNull();
 });
 

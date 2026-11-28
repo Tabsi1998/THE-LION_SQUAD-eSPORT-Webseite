@@ -1,6 +1,10 @@
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router-dom";
+import { runAtTestClock } from "@/testClock";
+
+// Feste Uhr (#1307): die Datums-Texte lassen das laufende Jahr weg und sagen „heute“/„morgen“.
+runAtTestClock();
 
 // Versammlungen und Abstimmungen (#327): Einladung mit Tagesordnung und Zu-/Absage, Antrag mit Frist, Stimme
 // nur nach Bestätigung und nur mit nutzbarem Stimmrecht, Ergebnis nach Bestätigung; ohne Weg zur Akte der Grund.
@@ -43,8 +47,8 @@ beforeEach(() => {
 });
 
 test("Helfer: Tag und Zeit lesbar", () => {
-  expect(formatDay("2026-10-24")).toBe("24.10.2026");
-  expect(meetingWhen(MEETING)).toBe("24.10.2026 · 18:00 Uhr");
+  expect(formatDay("2026-10-24")).toBe("Sa 24. Oktober");
+  expect(meetingWhen(MEETING)).toBe("Sa 24. Oktober · 18:00 Uhr");
 });
 
 test("Einladung: Tagesordnung, Online-Zugang, Zusage und Antrag gehen an den Server", async () => {
@@ -55,7 +59,7 @@ test("Einladung: Tagesordnung, Online-Zugang, Zusage und Antrag gehen an den Ser
   expect(screen.getByTestId("meeting-7-agenda")).toHaveTextContent("Entlastung des Vorstands");
   expect(screen.getByTestId("meeting-7-access")).toHaveAttribute("href", "https://meet.example.test/gv");
   expect(screen.getByTestId("meeting-7-response")).toHaveTextContent("noch keine Antwort");
-  expect(screen.getByTestId("meeting-7-motion-deadline")).toHaveTextContent("bis 21.10.2026");
+  expect(screen.getByTestId("meeting-7-motion-deadline")).toHaveTextContent("bis Mi 21. Oktober");
   expect(screen.getByTestId("motion-web-motion-1")).toHaveTextContent("eingegangen");
 
   await user.click(screen.getByTestId("meeting-7-respond-yes"));

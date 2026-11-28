@@ -1,5 +1,10 @@
 const { test, expect } = require("@playwright/test");
 
+// Feste Uhr (#1307): die Datums-Texte lassen das laufende Jahr weg und sagen „heute“/„morgen“ - Samstag, 28.11.2026.
+test.beforeEach(async ({ page }) => {
+  await page.clock.install({ time: new Date("2026-11-28T10:00:00Z") });
+});
+
 // Liga-Termine (#2194) bei 390 und 1440 px mit nachgestellter API: Matchseite mit festem Termin (Grenze im Klartext, Antrag mit
 // Grund, Verlauf), Antwort der Gegenseite, Hinweis auf die Leitung, „Termin festlegen“ der Leitung; „Mein Dienst“ mit
 // „Braucht deine Entscheidung“. Kein seitlicher Überlauf. Erfundene Namen.
@@ -74,8 +79,8 @@ test.describe("Liga: Termine und Verschiebung", () => {
       const posts = [];
       await setup(page, CAPTAIN, PAGE, posts);
       await page.goto("/matches/m1");
-      await expect(page.getByTestId("schedule-limit")).toHaveText("Noch 1 Verschiebung möglich, beantragen bis Mi 13.11. 20:00.");
-      await expect(page.getByTestId("schedule-week")).toContainText("Di 12.11. 00:00 bis Mo 18.11. 23:59");
+      await expect(page.getByTestId("schedule-limit")).toHaveText("Noch 1 Verschiebung möglich, beantragen bis Mi 13. November 2030 · 20:00.");
+      await expect(page.getByTestId("schedule-week")).toContainText("Di 12. November 2030 · 00:00 bis Mo 18. November 2030 · 23:59");
       await expect(page.getByTestId("match-proposal-at")).toHaveCount(0);
       await expect(page.getByTestId("schedule-history-reschedule")).toContainText("Zwei Spieler auf Dienstreise");
       await page.getByTestId("reschedule-form-at").fill("2030-11-15T20:00");
@@ -122,7 +127,7 @@ test.describe("Liga: Termine und Verschiebung", () => {
       await expectNoSideScroll(page);
 
       await page.goto("/admin/dienst");
-      await expect(page.getByTestId("duty-ended-t9")).toContainText("Läuft laut Stand noch, Ende war am Sa 31.10.2026, 23:00");
+      await expect(page.getByTestId("duty-ended-t9")).toContainText("Läuft laut Stand noch, Ende war am Sa 31. Oktober · 23:00");
       await expect(page.getByTestId("duty-ended-open-t9")).toHaveAttribute("href", "/admin/tournaments/t9");
       await expect(page.getByTestId("duty-overdue-m1")).toContainText("Überfällig: Spieltag 2");
       await expectNoSideScroll(page);

@@ -2,6 +2,10 @@ import {
   agenda, currentMonth, dayKey, dayLabel, feedUrls, filterKinds, filterMine, itemsByDay, mergeEventDays, monthMatrix, nextAfter, preferredView, shiftMonth,
   spanLabel, splitSpans, startPhrase, upcomingItems, weekBars,
 } from "./calendar";
+import { runAtTestClock } from "@/testClock";
+
+// Feste Uhr (#1307): die Datums-Texte lassen das laufende Jahr weg und sagen „heute“/„morgen“.
+runAtTestClock();
 
 // Kalender auf der Website (#402): Raster ab Montag, Termine je Tag, Abo-Adressen - dieselbe
 // Rechnung wie in der App.
@@ -53,8 +57,8 @@ test("ein Termin steht am Wiener Tag und der Tag heißt, wie er im Raster steht"
   expect(map.get("2026-10-04")?.map((item) => item.id)).toEqual(["nacht"]);
   expect(map.get("2026-10-03")).toBeUndefined();
   expect(map.get("2027-01-01")?.map((item) => item.id)).toEqual(["silvester"]);
-  expect(dayLabel("2026-10-04")).toBe("Sonntag, 4. Oktober");
-  expect(dayLabel("2027-01-01")).toBe("Freitag, 1. Jänner");
+  expect(dayLabel("2026-10-04")).toBe("So 4. Oktober");
+  expect(dayLabel("2027-01-01")).toBe("Fr 1. Jänner 2027");
   // Halb eins am Neujahrstag in Wien: der Kalender steht im Jänner, auch wenn es in UTC noch Dezember ist.
   expect(currentMonth(new Date("2026-12-31T23:30:00Z"))).toEqual({ year: 2027, month: 0 });
 });

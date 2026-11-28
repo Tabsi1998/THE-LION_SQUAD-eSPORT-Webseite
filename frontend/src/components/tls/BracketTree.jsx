@@ -5,7 +5,8 @@ import { AnimatePresence, MotionConfig, motion } from "framer-motion";
 import { ChevronLeft, ChevronRight, Trophy } from "lucide-react";
 import { formatBracketSection } from "@/lib/tournamentLabels";
 import { isTableFormat } from "@/lib/bracketSections";
-import { asInstant, viennaTime } from "@/lib/vienna";
+import { formatClock } from "@/lib/datetime";
+import { asInstant } from "@/lib/vienna";
 import { finderFor, initials } from "@/lib/slotSource";
 import { buildPodiumMap, finalMatchOf, isBronzeMatch, lastStageId, normalizeSection } from "@/lib/bracketPodium";
 import { bracketEdges, drawRails, isCancelled, isDone, isLive, orderEdges, pathFor, sectionGroup } from "@/lib/bracketGraph";
@@ -341,7 +342,7 @@ function roundHeading(list, number, sectionTitle) {
     .map((value) => ({ value, at: asInstant(value).getTime() })).filter((entry) => !Number.isNaN(entry.at));
   if (!times.length || list.every((match) => isDone(match))) return title;
   const earliest = times.reduce((best, entry) => (entry.at < best.at ? entry : best));
-  const time = viennaTime(earliest.value, { hour: "2-digit", minute: "2-digit" });
+  const time = formatClock(earliest.value);
   const forecast = list.some((match) => match.is_preview || match.schedule_forecast);
   return [title, forecast && time ? `voraussichtlich ${time}` : time].filter(Boolean).join(" · ");
 }

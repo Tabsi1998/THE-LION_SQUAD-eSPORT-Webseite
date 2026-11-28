@@ -19,7 +19,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { ChevronDown, CircleHelp, Pin, PinOff, Share2 } from "lucide-react";
 import { AchievementIcon } from "@/components/tls/AchievementIcon";
 import { Badge } from "@/components/achievements/Badge";
-import { viennaDate } from "@/lib/vienna";
+import { formatWhen } from "@/lib/datetime";
 
 import { ROLE_COLORS } from "@/lib/categoryColors";
 const LEVEL_META = {
@@ -547,7 +547,7 @@ function TierRow({ tier, group, accent, isNegative = false, rarityPercent, pins 
         {tier.earned ? (
           <div className="tls-type-label text-white/70">
             +{tier.points} Pkt.
-            {tier.earned_at && <div className="text-white/45">{viennaDate(tier.earned_at)}</div>}
+            {tier.earned_at && <div className="text-white/45">{formatWhen(tier.earned_at, { time: false })}</div>}
           </div>
         ) : (
           <div className="tls-type-label text-white/50">+{tier.points}</div>

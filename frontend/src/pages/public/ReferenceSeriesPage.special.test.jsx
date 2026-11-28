@@ -1,5 +1,9 @@
 import { render, screen, within } from "@testing-library/react";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
+import { runAtTestClock } from "@/testClock";
+
+// Feste Uhr (#1307): die Datums-Texte lassen das laufende Jahr weg und sagen „heute“/„morgen“.
+runAtTestClock();
 
 // Sonderregeln einer Rennliga (#1960) auf der Serienseite: „−5“ mit Grund an den Punkten und im Fahrer-Detail, „im Team
 // seit“, Quelle und Modus der Teamwertung samt Prüfhinweis, kein leerer Teamreiter ohne Teamwertung, Regeländerung ab
@@ -74,9 +78,9 @@ test("Anpassung: „−5“ mit Grund an den Punkten und im Fahrer-Detail, dazu 
   const table = await screen.findByTestId("racing-drivers");
   const marks = within(table).getAllByTestId("series-adjustment");
   expect(marks[0]).toHaveTextContent("−5");
-  expect(marks[0]).toHaveAttribute("title", "Anpassung −5 · Nichtteilnahme nach Anmeldung · 02.11.2026");
+  expect(marks[0]).toHaveAttribute("title", "Anpassung −5 · Nichtteilnahme nach Anmeldung · Mo 2. November");
   const detail = screen.getByTestId("racing-driver");
-  expect(within(detail).getByTestId("series-adjustments")).toHaveTextContent("−5Nichtteilnahme nach Anmeldung · R2 · 02.11.2026");
+  expect(within(detail).getByTestId("series-adjustments")).toHaveTextContent("−5Nichtteilnahme nach Anmeldung · R2 · Mo 2. November");
   expect(within(detail).getByTestId("racing-driver-team-since")).toHaveTextContent("im Team seit R2");
 });
 
@@ -105,7 +109,7 @@ test("Startaufstellung: Sprint in umgekehrter Quali-Reihenfolge (Top 8) steht be
 test("Regeländerung ab Runde X und Termin ohne Wertung (anders als abgesagt)", async () => {
   renderPage();
   const changes = await screen.findByTestId("series-rule-changes");
-  expect(within(changes).getByTestId("series-rule-change")).toHaveTextContent("R5–R8 · 12.11.2026Ab R5 kein Qualifying, Start in umgekehrter WM-Reihenfolge");
+  expect(within(changes).getByTestId("series-rule-change")).toHaveTextContent("R5–R8 · Do 12. NovemberAb R5 kein Qualifying, Start in umgekehrter WM-Reihenfolge");
   const calendar = screen.getByTestId("racing-calendar");
   expect(within(calendar).getByTestId("series-no-score")).toHaveTextContent("Ohne Wertung · Zu wenig Fahrer – Nur zwei Fahrer am Start");
 });
@@ -116,7 +120,7 @@ test("Saison abgebrochen: Hinweis mit Grund, Ergebnisse bleiben, Link zum Nachfo
     series: { ...BODY.series, status: "cancelled", cancelled_on: "2026-11-20", cancel_reason: "Neustart mit anderem Auto" },
     successor: { season: "2026", tier: "F2 Neustart", title: null, season_slug: "2026-f2-neustart", status: "active", lineage_slug: "probe-racing" },
   });
-  expect(await screen.findByTestId("series-cancelled")).toHaveTextContent("Saison abgebrochen am 20.11.2026 – Neustart mit anderem Auto.");
+  expect(await screen.findByTestId("series-cancelled")).toHaveTextContent("Saison abgebrochen am Fr 20. November – Neustart mit anderem Auto.");
   expect(screen.getByTestId("series-successor")).toHaveAttribute("href", "/references/series/probe-racing/2026-f2-neustart");
   expect(screen.getByTestId("racing-drivers")).toHaveTextContent("Probe Lion Eins");
 });

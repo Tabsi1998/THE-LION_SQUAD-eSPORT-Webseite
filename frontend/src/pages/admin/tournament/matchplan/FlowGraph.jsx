@@ -1,7 +1,7 @@
 import { useMemo } from "react";
 import { flowLayout, relatedOf } from "@/lib/matchFlow";
 import { formatBracketSection } from "@/lib/tournamentLabels";
-import { viennaTime } from "@/lib/vienna";
+import { formatClock } from "@/lib/datetime";
 import "./matchplan.css";
 
 // „Wer wartet auf wen“ (#1557): die Abhängigkeiten als Ablauf von links nach rechts. Durchgezogen kommt weiter,
@@ -9,7 +9,7 @@ import "./matchplan.css";
 // gestrichelten Rahmen. Antippen hebt hervor, was das Spiel braucht und wer danach darauf wartet.
 
 const SIZE = { columnWidth: 176, nodeWidth: 140, nodeHeight: 56, gap: 12, top: 28 };
-const hm = (ms) => viennaTime(ms, { hour: "2-digit", minute: "2-digit" }) || "–";
+const hm = (ms) => formatClock(ms) || "–";
 
 function columnTitle(depth) {
   if (depth === 0) return "Start";

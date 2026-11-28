@@ -3,7 +3,7 @@ import { Megaphone } from "lucide-react";
 import { toast } from "sonner";
 import { api, formatApiError } from "@/lib/api";
 import { useConfirm } from "@/components/tls/ConfirmDialog";
-import { viennaDateTime } from "@/lib/vienna";
+import { formatWhen } from "@/lib/datetime";
 
 // Helfer-Aufruf (#1197) für den Vorstand: fehlen für ein Event noch Helfer, geht mit einem Knopf eine Meldung an alle
 // Mitglieder - mit den offenen Schichten. Höchstens ein Aufruf je Event und Tag; wer das Thema „Helferdienste“ aus-
@@ -55,7 +55,7 @@ export function HelperCallPanel() {
                 <div className="font-bold">{event.label}</div>
                 <div className="tls-type-small text-white/60 mt-0.5" data-testid={`helper-call-text-${event.id}`}>{event.text || (event.open_shifts?.length ? `Noch ${event.open_places} freie Plätze.` : "Alle Schichten sind besetzt.")}</div>
                 {event.last_call_at ? (
-                  <div className="tls-type-small text-white/45 mt-1">Zuletzt gerufen: {viennaDateTime(event.last_call_at, { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" })}{event.last_call_recipients != null ? ` · an ${event.last_call_recipients} Mitglieder` : ""}</div>
+                  <div className="tls-type-small text-white/45 mt-1">Zuletzt gerufen: {formatWhen(event.last_call_at)}{event.last_call_recipients != null ? ` · an ${event.last_call_recipients} Mitglieder` : ""}</div>
                 ) : null}
               </div>
               <button

@@ -70,7 +70,7 @@ async def test_new_tournament_in_event_takes_place_day_partners_and_discord_sett
     assert program.status_code == 200, program.text
     data = program.json()
     assert [row["title"] for row in data["tournaments"]] == ["Kart-Cup", "Abend-Cup"]
-    assert data["event"]["window"] == "vom 14.11.2026 bis 15.11.2026"
+    assert data["event"]["window"] == "vom Sa 14. November bis So 15. November"
     assert data["defaults"]["tournament"]["location"] == "Vereinsheim · Telfs"
 
 
@@ -79,7 +79,7 @@ async def test_day_outside_the_event_is_refused(flow):
     _, event = await setup(flow)
     late = await in_event(flow, event, start_date=AFTER)
     assert late.status_code == 400
-    assert "17.11.2026" in late.json()["detail"] and "vom 14.11.2026 bis 15.11.2026" in late.json()["detail"]
+    assert "Di 17. November" in late.json()["detail"] and "vom Sa 14. November bis So 15. November" in late.json()["detail"]
 
     # Eine Fast Lap darf vorher beginnen, solange sie in das Event hineinreicht.
     lap = await flow.post(f"/api/events/{event['id']}/fastlaps", json={

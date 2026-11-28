@@ -1,6 +1,10 @@
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router-dom";
+import { runAtTestClock } from "@/testClock";
+
+// Feste Uhr (#1307): die Datums-Texte lassen das laufende Jahr weg und sagen „heute“/„morgen“.
+runAtTestClock();
 
 // Dolibarr-Seite (#295, #297, #316): wer welchen Reiter sieht, und dass eine
 // Zuordnung erst nach ausdrücklicher Bestätigung gesendet wird.
@@ -235,7 +239,7 @@ test("Teilnahmen: letzter Abgleich, Abgelehntes mit Grund und der Nachzug über 
   renderPage();
   await user.click(await screen.findByTestId("dolibarr-tab-features"));
   expect(await screen.findByTestId("dolibarr-participations-last")).toHaveTextContent("3 gemeldet, 0 ersetzt, 1 zurückgenommen, 1 abgelehnt.");
-  expect(screen.getByTestId("dolibarr-participations-failed")).toHaveTextContent("21.09.2026 · Turnier „Herbstcup“: Diese Art ist im Wörterbuch");
+  expect(screen.getByTestId("dolibarr-participations-failed")).toHaveTextContent("Mo 21. September · Turnier „Herbstcup“: Diese Art ist im Wörterbuch");
   expect(screen.getByTestId("dolibarr-switch-participations")).toBeChecked();
   await user.click(screen.getByTestId("dolibarr-participations-backfill"));
   await waitFor(() => expect(apiMock.post).toHaveBeenCalledWith("/admin/dolibarr/participations/backfill"));

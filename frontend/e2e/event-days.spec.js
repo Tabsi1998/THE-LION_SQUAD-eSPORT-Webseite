@@ -102,7 +102,7 @@ test("Admin-Formular: Schalter ersetzt Start, Ende und Einlass durch die Tage", 
 
   await expect(page.getByTestId("event-days-toggle")).toBeChecked();
   await expect(page.getByTestId("event-start")).toHaveCount(0);
-  await expect(page.getByTestId("event-day-0")).toContainText("Tag 1 · Fr 16.10.");
+  await expect(page.getByTestId("event-day-0")).toContainText("Tag 1 · Fr 16. Oktober");
   await expect(page.getByTestId("event-day-door-0")).toHaveValue("17:00");
   await expect(page.getByTestId("event-day-title-2")).toHaveValue("Finaltag mit Siegerehrung");
   await expect(page.getByTestId("event-days-error")).toHaveCount(0);

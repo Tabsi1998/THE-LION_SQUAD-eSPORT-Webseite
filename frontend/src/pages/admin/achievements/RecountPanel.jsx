@@ -46,7 +46,7 @@ function TierTable({ rows, testPrefix }) {
 
 /** Was der Abschluss gerade tut - in Worten. */
 export function finishLabel(finish = {}) {
-  if (finish.done) return `Abgeschlossen am ${formatWhen(finish.finished_at)} · ${plural(finish.notified || 0, "Sammel-Nachricht", "Sammel-Nachrichten")}`;
+  if (finish.done) return `Abgeschlossen am ${formatWhen(finish.finished_at, { relative: false })} · ${plural(finish.notified || 0, "Sammel-Nachricht", "Sammel-Nachrichten")}`;
   if (finish.running) {
     // Vor der Auswertung ergänzt der Abschluss an alten Pokalen, wer im Finale stand - dann gibt es noch keinen Schritt.
     if (!finish.phase) return "Läuft: Finalisten an alten Pokalen werden ergänzt";

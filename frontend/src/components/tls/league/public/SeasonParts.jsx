@@ -14,7 +14,8 @@ import { blockedLines, seasonPeriod, weekSpan } from "@/lib/leaguePage";
 import { platformLines } from "@/lib/leaguePlatform";
 import { formatFacts, mapOrder, nextSteps, playModes, pointsLines, scheduleLines, weeksText } from "@/lib/leagueSeasonPage";
 import { publicGroups } from "@/lib/loadoutBans";
-import { dayNoon, viennaDate } from "@/lib/vienna";
+import { formatWhen } from "@/lib/datetime";
+import { dayNoon } from "@/lib/vienna";
 import { LeagueBadge } from "@/components/tls/league/LeagueBadge";
 
 function SectionTitle({ id, icon: Icon, children, aside }) {
@@ -187,7 +188,7 @@ export function SeasonRulesCard({ rules }) {
         <Link to={rules.url} className="inline-flex items-center gap-2 tls-type-card hover:underline">
           <ScrollText className="h-5 w-5 tls-league-accent" aria-hidden="true" /> Regelwerk
         </Link>
-        <p className="mt-1 tls-type-small text-white/70" data-testid="league-rules-version">{rules.label} · gültig ab {viennaDate(dayNoon(rules.valid_from), { day: "2-digit", month: "2-digit", year: "numeric" })}</p>
+        <p className="mt-1 tls-type-small text-white/70" data-testid="league-rules-version">{rules.label} · gültig ab {formatWhen(dayNoon(rules.valid_from), { time: false })}</p>
         {rules.consent_open ? <p className="mt-1 tls-type-body font-semibold text-warn" data-testid="league-rules-consent">Dein Co-Team hat noch nicht zugestimmt. Ohne Zustimmung geht vor dem Spiel kein Check-in.</p> : null}
       </div>
       <div className="flex flex-wrap gap-2">

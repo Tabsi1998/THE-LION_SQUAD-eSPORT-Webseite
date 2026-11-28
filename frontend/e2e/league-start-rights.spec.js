@@ -1,6 +1,11 @@
 const path = require("node:path");
 const { test, expect } = require("@playwright/test");
 
+// Feste Uhr (#1307): die Datums-Texte lassen das laufende Jahr weg und sagen „heute“/„morgen“ - Samstag, 28.11.2026.
+test.beforeEach(async ({ page }) => {
+  await page.clock.install({ time: new Date("2026-11-28T10:00:00Z") });
+});
+
 // Startrechte für die nächste Season (#1627, docs/LIGA.md „F.2a Startrechte für die nächste Season“) im echten Browser, Server
 // nachgestellt: die Übersicht der Verwaltung mit Frist, „Zusage eintragen“ und „Nachrücken lassen“; das Blatt „Neue Season aus …“ mit
 // der Wahl „mit Zusage“; unter Teams das Startrecht mit „Startrecht annehmen“ und die Prognose. Bei 390 und 1440 px ohne seitliches
@@ -136,7 +141,7 @@ test.describe("Liga: Startrechte für die nächste Season", () => {
       await expect(section.getByTestId("start-rights-counts")).toHaveText("3 Zusage offen · 2 zugesagt · 1 spielen mit · 1 verfallen");
       // Getrennte Zustände: offen mit Frist, zugesagt, Teilnahme (zugeteilt), verfallen.
       await expect(section.getByTestId("start-right-a2")).toContainText("Zusage offen");
-      await expect(section.getByTestId("start-right-a2")).toContainText("Zusage bis 15.01.2027, 18:00 Uhr");
+      await expect(section.getByTestId("start-right-a2")).toContainText("Zusage bis Fr 15. Jänner 2027 · 18:00");
       await expect(section.getByTestId("start-right-a1")).toContainText("Zugesagt");
       await expect(section.getByTestId("start-right-a3")).toContainText("Spielt mit");
       await expect(section.getByTestId("start-right-a5")).toContainText("Verfallen");
@@ -201,7 +206,7 @@ test.describe("Liga: Startrechte für die nächste Season", () => {
       await page.goto("/teams");
       const row = page.getByTestId("squad-application-a5");
       await expect(row.getByTestId("squad-start-right-line-a5")).toHaveText(
-        "Nachgerückt: In Liga 1 ist ein Platz frei geworden. Bitte bis 15.01.2027, 18:00 Uhr zusagen oder ablehnen. Eure Frist für Liga 2 ruht so lange. Ablehnen gilt als Zusage für Liga 2. Ohne Antwort bleibt ihr in Liga 2 und habt dort noch die restliche Frist, mindestens 3 Tage.");
+        "Nachgerückt: In Liga 1 ist ein Platz frei geworden. Bitte bis Fr 15. Jänner 2027 · 18:00 zusagen oder ablehnen. Eure Frist für Liga 2 ruht so lange. Ablehnen gilt als Zusage für Liga 2. Ohne Antwort bleibt ihr in Liga 2 und habt dort noch die restliche Frist, mindestens 3 Tage.");
       await noSideScroll(page);
       await shot(row.locator("xpath=ancestor::div[contains(@class,'rounded-sm')][1]"), `startrechte-nachruecker-${width}`);
       await row.getByTestId("squad-start-right-decline-a5").click();
@@ -270,7 +275,7 @@ test.describe("Liga: Startrechte für die nächste Season", () => {
       await page.goto("/teams");
       const row = page.getByTestId("squad-application-a5");
       await expect(row).toContainText("Startrecht – Zusage offen");
-      await expect(row.getByTestId("squad-start-right-line-a5")).toHaveText("Startrecht für Liga 1: bitte bis 15.01.2027, 18:00 Uhr zusagen. Ohne Zusage verfällt es.");
+      await expect(row.getByTestId("squad-start-right-line-a5")).toHaveText("Startrecht für Liga 1: bitte bis Fr 15. Jänner 2027 · 18:00 zusagen. Ohne Zusage verfällt es.");
       // Prognose ist nur Anzeige - mit dem Wort dafür und ohne Knopf.
       const forecast = page.getByTestId("squad-start-right-outlook-q9-s7");
       await expect(forecast).toContainText("Prognose nach der laufenden Tabelle: Aufstieg (Platz 1). Fest ist das erst, wenn die Season abgeschlossen ist.");

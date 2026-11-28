@@ -1,5 +1,9 @@
 import { fireEvent, render, screen, within } from "@testing-library/react";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
+import { runAtTestClock } from "@/testClock";
+
+// Feste Uhr (#1307): die Datums-Texte lassen das laufende Jahr weg und sagen „heute“/„morgen“.
+runAtTestClock();
 
 // Serienseite einer Team-Liga (#1747): Spieltage mit nächstem Gegner, Tabelle über die Rangliste der Turniere (eigenes
 // Team als „Verein“ markiert, Punkte und Vorrang aus den Regeln), Platzierungsverlauf, Spielplan mit Ergebnis und Maps
@@ -77,7 +81,7 @@ test("Spieltage, nächster Gegner und Tabelle mit Regeln aus der Serie", async (
   expect(await screen.findByTestId("team-league")).toBeInTheDocument();
   expect(screen.queryByText("Gesamtwertung")).not.toBeInTheDocument();
   expect(screen.getByTestId("team-league-progress")).toHaveTextContent("2 von 3 gespielt");
-  expect(screen.getByTestId("team-league-next")).toHaveTextContent("Nächster Spieltag: ST3 · Mo., 30.11.2026 · 20:00 · gegen Fremd Adler");
+  expect(screen.getByTestId("team-league-next")).toHaveTextContent("Nächster Spieltag: ST3 · Mo 30. November · 20:00 · gegen Fremd Adler");
   const rules = screen.getByTestId("team-league-rules");
   expect(rules).toHaveTextContent("Sieg 2 · Unentschieden 1 · Niederlage 0");
   expect(rules).toHaveTextContent("bessere Map-Differenz, dann mehr Siege");
@@ -153,7 +157,7 @@ test("Bilanz (#1931): S-U-N, Maps und Runden mit Differenz", async () => {
 test("Spieltage als Karten (#1931): Uhrzeit des Spiels, Wahl je Map, Banns und die übrigen Spiele", async () => {
   renderPage({ ...BODY, team_league: SEASON_1931 });
   const days = await screen.findAllByTestId("team-league-matchday");
-  expect(days[0]).toHaveTextContent("Mo., 02.11. – Fr., 06.11.2026 · 21:15");
+  expect(days[0]).toHaveTextContent("Mo 2. – Fr 6. November · 21:15");
   expect(within(days[0]).getAllByTestId("team-league-map-pick").map((item) => item.textContent)).toEqual(["Unsere Wahl", "Decider"]);
   expect(within(days[0]).getByTestId("team-league-bans")).toHaveTextContent("Bann: Karte Ost (wir) · Karte Hafen (Gegner)");
   const others = within(days[0]).getByTestId("team-league-others");

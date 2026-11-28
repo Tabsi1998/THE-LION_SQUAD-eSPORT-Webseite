@@ -2,7 +2,7 @@ import { useState } from "react";
 import { AlertTriangle, ChevronDown, IdCard, Trophy } from "lucide-react";
 import { LazyImg } from "@/components/tls/LazyImg";
 import { ModeIcon } from "@/components/tls/ModeIcon";
-import { viennaDateTime } from "@/lib/vienna";
+import { formatWhen } from "@/lib/datetime";
 import { LineupPicker, ParticipantsPicker } from "./LeagueReportForm";
 import { followLineups, gamesProblem, isSeries, lineupAmendClosed, participantsProblem, personIds } from "./leagueGames";
 import { notPlayedText } from "./leagueResultRules";
@@ -12,7 +12,7 @@ import { notPlayedText } from "./leagueResultRules";
 
 function until(value) {
   try {
-    return value ? viennaDateTime(value, { weekday: "short", day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" }) : "";
+    return value ? formatWhen(value) : "";
   } catch {
     return "";
   }

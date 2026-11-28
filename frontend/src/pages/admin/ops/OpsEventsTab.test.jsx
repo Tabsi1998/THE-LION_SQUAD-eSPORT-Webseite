@@ -1,6 +1,10 @@
 import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router-dom";
+import { runAtTestClock } from "@/testClock";
+
+// Feste Uhr (#1307): die Datums-Texte lassen das laufende Jahr weg und sagen „heute“/„morgen“.
+runAtTestClock();
 
 // Ereignisse (#517 Teil 2): eine Liste über alle Quellen, Filter gehen an den Server, die Quelle steht in
 // der Adresse (alte Seiten leiten mit ?source= hierher), der Audit-Schnellfilter erscheint nur bei Adminaktionen.
@@ -124,8 +128,8 @@ test("quittierte und behobene Einträge sagen von wem bzw. wann, nur offene habe
   const open = { ...PAYLOAD.items[0], id: "o1", ack_id: "f2", open: true, ackable: true };
   apiMock.get.mockResolvedValue({ data: { ...PAYLOAD, items: [open, acked, fixed] } });
   render(page("/admin/ops?tab=events&state=all"));
-  expect(await screen.findByTestId("ops-event-state-q1")).toHaveTextContent("Quittiert von Obmann · 16.11.2026");
-  expect(screen.getByTestId("ops-event-state-ep1")).toHaveTextContent("Behoben um 13.11.2026");
+  expect(await screen.findByTestId("ops-event-state-q1")).toHaveTextContent("Quittiert von Obmann · Mo 16. November · 09:00");
+  expect(screen.getByTestId("ops-event-state-ep1")).toHaveTextContent("Behoben um Fr 13. November · 10:30");
   expect(screen.getByTestId("ops-event-ack-o1")).toBeInTheDocument();
   expect(screen.queryByTestId("ops-event-ack-q1")).toBeNull();
   expect(screen.queryByTestId("ops-event-ack-ep1")).toBeNull();

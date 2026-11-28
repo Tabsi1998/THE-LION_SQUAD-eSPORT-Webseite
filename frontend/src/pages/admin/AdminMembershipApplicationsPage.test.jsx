@@ -1,6 +1,10 @@
 import { act, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router-dom";
+import { runAtTestClock } from "@/testClock";
+
+// Feste Uhr (#1307): die Datums-Texte lassen das laufende Jahr weg und sagen „heute“/„morgen“.
+runAtTestClock();
 
 // Bewerbungen (#1356): einladen direkt hier mit Personensuche, jeder Stand als Satz mit nächstem Schritt, Annehmen und
 // Ablehnen nur bei Anträgen der Website.
@@ -82,7 +86,7 @@ test("wer schon eingeladen ist, steht mit Datum da – kein zweites Einladen", a
   await user.type(screen.getByTestId("apps-invite-person-search"), "leo");
   await act(async () => { await new Promise((resolve) => setTimeout(resolve, 250)); });
   await user.click(await screen.findByTestId("apps-invite-person-option-u-6"));
-  expect(screen.getByTestId("apps-invite-already")).toHaveTextContent("Leo Löwe ist schon eingeladen – offen seit 1.10.2026.");
+  expect(screen.getByTestId("apps-invite-already")).toHaveTextContent("Leo Löwe ist schon eingeladen – offen seit Do 1. Oktober.");
   await user.click(screen.getByTestId("apps-invite-save"));
   expect(apiMock.post).not.toHaveBeenCalled();
 });

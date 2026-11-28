@@ -1,6 +1,10 @@
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router-dom";
+import { runAtTestClock } from "@/testClock";
+
+// Feste Uhr (#1307): die Datums-Texte lassen das laufende Jahr weg und sagen „heute“/„morgen“.
+runAtTestClock();
 
 // Vor-Ort-Zugang (#1592): an/aus, erneuern, Zeitfenster - der Code selbst steht nur auf dem Aushang.
 
@@ -30,7 +34,7 @@ test("zeigt Zustand und Zeitfenster, aber nie den Code", async () => {
   const state = await screen.findByTestId("onsite-access-state");
   expect(state).toHaveTextContent("An");
   expect(state).toHaveTextContent("gilt gerade");
-  expect(screen.getByTestId("onsite-access-window")).toHaveTextContent("31.10.");
+  expect(screen.getByTestId("onsite-access-window")).toHaveTextContent("Sa 31. Oktober · 09:00");
   expect(document.body).not.toHaveTextContent("geheimer-code");
   expect(screen.getByTestId("onsite-access-poster")).toHaveAttribute("href", "/admin/tournaments/t1/aushang");
 });

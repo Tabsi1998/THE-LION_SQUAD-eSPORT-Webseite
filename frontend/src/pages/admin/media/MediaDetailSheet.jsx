@@ -3,7 +3,7 @@ import { AdminSheet } from "@/components/tls/AdminSheet";
 import { FileText, Trash2, Copy, ExternalLink, RotateCcw, RotateCw, Download } from "lucide-react";
 import { MediaImage } from "./parts";
 import { BACKEND, IMG_EXT, MEDIA_SCOPE_LABELS, VIDEO_EXT, cacheBustedMediaUrl, fmtBytes } from "./shared";
-import { viennaDateTime } from "@/lib/vienna";
+import { formatWhen } from "@/lib/datetime";
 
 import { ROLE_COLORS } from "@/lib/categoryColors";
 export function MediaDetailSheet({ item, onClose, onCopy, onRotateLeft, onRotateRight, onDelete, onKeepDuplicate }) {
@@ -63,7 +63,7 @@ export function MediaDetailSheet({ item, onClose, onCopy, onRotateLeft, onRotate
         </div>
         <div>
           <div className="tls-type-label text-quiet">Geändert</div>
-          <div className="text-white/80">{viennaDateTime(item.mtime)}</div>
+          <div className="text-white/80">{formatWhen(item.mtime)}</div>
         </div>
         {item.width && item.height ? (
           <div>

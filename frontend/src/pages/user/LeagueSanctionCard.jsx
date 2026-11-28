@@ -9,9 +9,8 @@ import { TextAreaField } from "@/components/tls/FormFields";
 import { api, formatApiError } from "@/lib/api";
 import { deadlineTone, remainingText } from "@/lib/leagueProcedures";
 import { APPEAL_STATE_LABELS, SANCTION_STATUS } from "@/lib/leagueSanctions";
-import { viennaDateTime } from "@/lib/vienna";
+import { formatWhen } from "@/lib/datetime";
 
-const WHEN = { dateStyle: "medium", timeStyle: "short" };
 const CHIP = { warn: "border-warn/50 text-warn", live: "border-warn bg-warn/15 text-warn", calm: "border-white/15 text-white/60" };
 const TONE = { none: "text-white/60", calm: "text-white/75", soon: "text-warn", over: "text-white/50" };
 export const APPEAL_MIN = 10;
@@ -61,9 +60,9 @@ export function LeagueSanctionCard({ p, onChanged }) {
             <dt className="text-white/50">Regelverstoß</dt><dd className="min-w-0 break-words text-white/90">{sanction.rule_ref}</dd>
             <dt className="text-white/50">Begründung</dt><dd className="min-w-0 whitespace-pre-line break-words text-white/90">{sanction.reason}</dd>
             {sanction.period ? <><dt className="text-white/50">{sanction.points ? "Höhe" : "Zeitraum"}</dt><dd className="tabular-nums text-white/90" data-testid={`sanction-period-${sanction.id}`}>{sanction.period}</dd></> : null}
-            <dt className="text-white/50">Verhängt</dt><dd className="text-white/70">{viennaDateTime(p.issued_at, WHEN)} durch die Liga-Leitung</dd>
+            <dt className="text-white/50">Verhängt</dt><dd className="text-white/70">{formatWhen(p.issued_at)} durch die Liga-Leitung</dd>
             {sanction.status === "revoked" ? (
-              <><dt className="text-white/50">Aufgehoben</dt><dd className="min-w-0 break-words text-white/80" data-testid={`sanction-revoked-${sanction.id}`}>{viennaDateTime(sanction.revoked_at, WHEN)}: {sanction.revoke_reason}</dd></>
+              <><dt className="text-white/50">Aufgehoben</dt><dd className="min-w-0 break-words text-white/80" data-testid={`sanction-revoked-${sanction.id}`}>{formatWhen(sanction.revoked_at)}: {sanction.revoke_reason}</dd></>
             ) : null}
           </dl>
           {sanction.match_id ? <Link to={`/matches/${sanction.match_id}`} className="mt-1 inline-flex min-h-11 items-center tls-type-label text-[#29B6E8] hover:underline">Zum Spiel</Link> : null}
@@ -71,7 +70,7 @@ export function LeagueSanctionCard({ p, onChanged }) {
           {sanction.appeal ? (
             <div className="mt-3 rounded-sm border border-warn/30 p-3" data-testid={`sanction-appeal-${sanction.id}`}>
               <div className="flex items-center gap-2 tls-type-label text-warn"><Scale className="h-3.5 w-3.5" aria-hidden="true" /> {APPEAL_STATE_LABELS[sanction.appeal.state]}</div>
-              <p className="mt-1 tls-type-small text-white/50">Eingelegt {viennaDateTime(sanction.appeal.at, WHEN)}{sanction.appeal.by_name ? ` von ${sanction.appeal.by_name}` : ""}</p>
+              <p className="mt-1 tls-type-small text-white/50">Eingelegt {formatWhen(sanction.appeal.at)}{sanction.appeal.by_name ? ` von ${sanction.appeal.by_name}` : ""}</p>
               <p className="mt-1 whitespace-pre-line break-words tls-type-body text-white/85">{sanction.appeal.text}</p>
               {sanction.appeal.state === "open" ? <p className="mt-2 tls-type-body text-white/75">Eine andere Person der Liga-Leitung entscheidet. Bis dahin gilt die Strafe weiter.</p>
                 : <p className="mt-2 break-words tls-type-body text-white/85">Begründung der Entscheidung: {sanction.appeal.note}</p>}
@@ -79,7 +78,7 @@ export function LeagueSanctionCard({ p, onChanged }) {
           ) : sanction.can_appeal ? (
             <div className="mt-3 rounded-sm border border-white/15 p-3" data-testid={`sanction-appeal-box-${sanction.id}`}>
               <p className={`tls-type-small tabular-nums ${TONE[deadlineTone(sanction.appeal_until, now)]}`} data-testid={`sanction-deadline-${sanction.id}`}>
-                Einspruch möglich bis {viennaDateTime(sanction.appeal_until, WHEN)} ({remainingText(sanction.appeal_until, now)}).
+                Einspruch möglich bis {formatWhen(sanction.appeal_until)} ({remainingText(sanction.appeal_until, now)}).
               </p>
               {open ? (
                 <div className="mt-3 space-y-3">
@@ -104,7 +103,7 @@ export function LeagueSanctionCard({ p, onChanged }) {
           ) : sanction.status === "provisional" ? (
             <p className="mt-3 tls-type-body text-white/75" data-testid={`sanction-provisional-${sanction.id}`}>Die Sperre gilt vorläufig, bis die Liga-Leitung den Fall geprüft hat. Einspruch ist ab der endgültigen Entscheidung möglich.</p>
           ) : sanction.status !== "revoked" && sanction.appeal_until ? (
-            <p className="mt-3 tls-type-small text-white/50" data-testid={`sanction-deadline-${sanction.id}`}>Die Einspruchsfrist ist am {viennaDateTime(sanction.appeal_until, WHEN)} abgelaufen.</p>
+            <p className="mt-3 tls-type-small text-white/50" data-testid={`sanction-deadline-${sanction.id}`}>Die Einspruchsfrist ist am {formatWhen(sanction.appeal_until, { relative: false })} abgelaufen.</p>
           ) : null}
         </div>
       </div>

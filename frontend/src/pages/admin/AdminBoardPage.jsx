@@ -10,7 +10,7 @@ import { useConfirm } from "@/components/tls/ConfirmDialog";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { toast } from "sonner";
 import { ChevronDown, Crown, Plus } from "lucide-react";
-import { viennaDate, viennaDateTime } from "@/lib/vienna";
+import { formatWhen } from "@/lib/datetime";
 import { CLUB_ACCESS, boardSentence, clearSentence, deleteSentence, postTitle, statusSentence } from "@/lib/boardRights";
 import { isDeputyPosition } from "@/lib/boardSeats";
 import { ShortCaps } from "@/components/tls/ShortCaps";
@@ -142,7 +142,7 @@ export default function AdminBoardPage() {
           <p className="tls-type-body text-white/70">
             Der Schalter „Vereinsdaten aus Dolibarr übernehmen“ ist an (<Link to="/admin/club" className="text-[#29B6E8] hover:text-white">Verein → Vereinsdaten</Link>).
             Die Vorstandsseite, „Über uns“ und die Ansprechpartner auf der Startseite zeigen die Funktionen und Inhaber aus dem Vereinsmodul
-            (Stand {source.fetched_at ? viennaDateTime(source.fetched_at, { dateStyle: "short", timeStyle: "short" }) : "–"}, stündlich nachgelesen).
+            (Stand {source.fetched_at ? formatWhen(source.fetched_at) : "–"}, stündlich nachgelesen).
             Funktionen und Inhaber pflegst du in Dolibarr; ein Name erscheint nur, wenn die Person der Nennung zugestimmt hat. Die Liste unten ist nur zum Lesen.
           </p>
           {dolibarrBoard.length > 0 && (
@@ -177,7 +177,7 @@ export default function AdminBoardPage() {
                 </div>
               </div>
               <div className="min-w-[12rem] flex-1 tls-type-small">
-                <div data-testid={`board-holder-${p.slug}`}>{p.user ? <><span className="font-semibold">{holderName(p.user)}</span>{p.user_since ? <span className="text-quiet tls-type-small"> · seit {viennaDate(p.user_since)}</span> : null}</> : <span className="text-white/45">offen</span>}</div>
+                <div data-testid={`board-holder-${p.slug}`}>{p.user ? <><span className="font-semibold">{holderName(p.user)}</span>{p.user_since ? <span className="text-quiet tls-type-small"> · seit {formatWhen(p.user_since, { time: false })}</span> : null}</> : <span className="text-white/45">offen</span>}</div>
                 {p.allow_deputy && <div className="tls-type-small text-white/50 mt-0.5" data-testid={`board-deputy-${p.slug}`}>Vertretung: {p.deputy_user ? holderName(p.deputy_user) : "keine"}</div>}
               </div>
               {!readOnly && (

@@ -1,5 +1,6 @@
 import { bestPlacement, entriesOf, entryPeople, gameKey, gameTitle, hasMember, memberEntryOf, referenceInstant, timeOf } from "@/components/tls/references/referenceParts";
-import { dayNoon, viennaDate, viennaDay } from "@/lib/vienna";
+import { formatRange, formatWhen } from "@/lib/datetime";
+import { dayNoon, viennaDay } from "@/lib/vienna";
 import { seasonNote, tierRank } from "@/lib/seriesTiers";
 import { opponentText } from "@/lib/referenceCalendar";
 import { NO_ROUND, OPEN_ROUND, kindWord } from "@/lib/seriesKinds";
@@ -252,7 +253,7 @@ export function nextTitle(kind, next, profile = null) {
 
 function shortDay(day) {
   const noon = day ? dayNoon(day) : null;
-  return noon ? `${viennaDate(noon, { weekday: "short" }).replace(/\.$/, "")} ${viennaDate(noon, { day: "2-digit", month: "2-digit" })}` : "";
+  return noon ? formatWhen(noon, { time: false }) : "";
 }
 
 /**
@@ -268,7 +269,7 @@ export function nextValue(next) {
   // Ohne Datum (#2015, #2024): „T5 · Termin folgt“ statt nur des Kürzels - mit gemerkter Uhrzeit dahinter.
   if (!next.club_day) return [label, OPEN_ROUND, next.time, opponent].filter(Boolean).join(" · ");
   const window = next.club_day_end && next.club_day_end !== next.club_day;
-  const day = window ? `${shortDay(next.club_day)}–${shortDay(next.club_day_end)}` : shortDay(next.club_day);
+  const day = window ? formatRange(next.club_day, next.club_day_end) : shortDay(next.club_day);
   return [day, window ? "" : next.time, label, opponent].filter(Boolean).join(" · ");
 }
 

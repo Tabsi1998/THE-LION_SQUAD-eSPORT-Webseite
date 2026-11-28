@@ -17,7 +17,7 @@ import { toast } from "sonner";
 import { Check, X as XIcon, Inbox, Eye, ExternalLink, Plus, Undo2 } from "lucide-react";
 import { InvitationsBox } from "./membership/InvitationsBox";
 import { JoinPageBox } from "./membership/JoinPageBox";
-import { viennaDate, viennaDateTime } from "@/lib/vienna";
+import { formatWhen } from "@/lib/datetime";
 import { STATE_TONE_CLASS, applicationState } from "@/lib/applicationState";
 import { mailOutcome } from "@/lib/membershipMail";
 import { ShortCaps } from "@/components/tls/ShortCaps";
@@ -39,7 +39,7 @@ const PREF_LABEL = { full: "Vollmitglied", supporter: "Unterstützer", youth: "J
 
 function day(value) {
   try {
-    return viennaDate(value);
+    return formatWhen(value, { time: false });
   } catch {
     return "";
   }
@@ -227,7 +227,7 @@ export default function AdminMembershipApplicationsPage() {
             <Row k="Person" v={`${selected.user_display_name || selected.user_username} (@${selected.user_username})`} />
             <Row k="E-Mail" v={selected.user_email} />
             <Row k="Wunsch" v={wish(selected)} />
-            <Row k="Eingereicht" v={viennaDateTime(selected.created_at)} />
+            <Row k="Eingereicht" v={formatWhen(selected.created_at)} />
             <div className="border border-white/10 rounded-sm p-3" data-testid="application-sheet-state">
               <StateBadge state={selectedState} />
               <p className="mt-1 tls-type-small text-white/70">{selectedState.next}</p>

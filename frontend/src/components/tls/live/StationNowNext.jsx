@@ -1,14 +1,14 @@
 import { BellRing, Radio } from "lucide-react";
 import { delayText } from "@/lib/liveQueue";
 import { queueWhat, stationWho } from "@/lib/tvQueue";
-import { viennaTime } from "@/lib/vienna";
+import { formatClock } from "@/lib/datetime";
 import { MatchClock } from "./MatchClock";
 
 // Öffentlicher Spielplan, Sicht je Station (#1556): oben „Jetzt“ mit Spielzeit-Uhr und „Als Nächstes“ aus der
 // Warteschlange des Servers (`stations[]` von GET /tournaments/<id>/live-queue). Die Liste darunter bleibt der Plan.
 // Über den Namen Runde und Durchgang wie in der Turnierleitung (#1824). Ohne Eintrag für die Station: nichts.
 
-const clock = (value) => (value ? viennaTime(value, { hour: "2-digit", minute: "2-digit" }) : "");
+const clock = (value) => (value ? formatClock(value) : "");
 
 function nextLine(entry) {
   if (entry.state === "called") return ["Aufgerufen", entry.report_by ? `antreten bis ${clock(entry.report_by)}` : ""].filter(Boolean).join(" · ");

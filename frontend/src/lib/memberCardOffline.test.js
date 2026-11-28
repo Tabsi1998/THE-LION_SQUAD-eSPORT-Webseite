@@ -1,4 +1,8 @@
 import { cardChanged, cardSnapshot, clearOfflineCard, loadOfflineCard, offlineCardOwner, saveOfflineCard, standLine, STORAGE_KEY } from "./memberCardOffline";
+import { runAtTestClock } from "@/testClock";
+
+// Feste Uhr (#1307): die Datums-Texte lassen das laufende Jahr weg und sagen „heute“/„morgen“.
+runAtTestClock();
 
 // Mitgliedskarte offline (#1256): gespeichert wird nur, was auf der Karte steht - nie der Prüfcode; je Konto; ohne
 // Browser-Speicher für diesen Besuch; Abmelden löscht.
@@ -47,6 +51,6 @@ test("ein neues Bild nur bei geänderter Karte; Stand in Wiener Zeit", () => {
   expect(cardChanged(null, snapshot)).toBe(true);
   expect(cardChanged(snapshot, { ...CARD, verify_url: "anders" })).toBe(false);
   expect(cardChanged(snapshot, { ...CARD, type_label: "Ehrenmitglied" })).toBe(true);
-  expect(standLine(snapshot)).toBe("Stand: 7.10.2026, 18:05");
+  expect(standLine(snapshot)).toBe("Stand: Mi 7. Oktober · 18:05");
   expect(standLine({})).toBe("");
 });

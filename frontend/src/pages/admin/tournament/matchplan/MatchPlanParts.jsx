@@ -6,13 +6,14 @@ import { durationSourceText, matchDurationSource, ownDurationInput, ownDurationP
 import { countOf } from "@/lib/schedulePlanText";
 import { motionTransition } from "@/lib/motion";
 import { formatDeviceType } from "@/lib/tournamentLabels";
-import { fromViennaInput, viennaDateTime, viennaInputValue, viennaTime } from "@/lib/vienna";
+import { formatClock, formatWhen } from "@/lib/datetime";
+import { fromViennaInput, viennaInputValue } from "@/lib/vienna";
 import "./matchplan.css";
 
 // Bausteine der Matchplan-Seite (#1557). Sie zeigen nur an, was der Planer gerechnet hat oder am Turnier steht.
 
-const hm = (ms) => viennaTime(ms, { hour: "2-digit", minute: "2-digit" }) || "–";
-const when = (value) => viennaDateTime(value, { weekday: "short", day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" }) || "nicht gesetzt";
+const hm = (ms) => formatClock(ms) || "–";
+const when = (value) => formatWhen(value) || "nicht gesetzt";
 
 function Field({ label, hint, render }) {
   const id = useId();

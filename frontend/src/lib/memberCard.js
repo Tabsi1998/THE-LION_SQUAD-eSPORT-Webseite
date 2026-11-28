@@ -1,4 +1,4 @@
-import { formatDate } from "@/lib/dolibarr";
+import { formatOfficialDate } from "@/lib/datetime";
 
 // Digitale Mitgliedskarte (#346), Web-Seite. Der Prüfcode gilt fünf Minuten; die Karte holt
 // eine Minute vorher einen neuen - ein Foto oder Screenshot des Codes ist damit wertlos.
@@ -15,7 +15,7 @@ export function refreshDelayMs(card, now = Date.now()) {
 
 export function validUntilLine(card) {
   if (!card || card.status !== "valid") return "";
-  return card.valid_until ? `Gültig bis ${formatDate(card.valid_until)}` : "Gültig, solange die Mitgliedschaft besteht";
+  return card.valid_until ? `Gültig bis ${formatOfficialDate(card.valid_until)}` : "Gültig, solange die Mitgliedschaft besteht";
 }
 
 /** Was die Prüfseite sagt - gültig oder nicht, ohne zu verraten, warum nicht. */

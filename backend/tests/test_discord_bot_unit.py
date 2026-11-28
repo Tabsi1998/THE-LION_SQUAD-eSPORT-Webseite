@@ -40,9 +40,9 @@ def test_command_texts():
         {"name": "Später", "start_date": "2026-12-01T18:00:00+01:00", "slug": "spaeter"},
         {"name": "LAN-Party", "start_date": "2026-10-03T17:00:00+02:00", "slug": "lan", "location": "Vereinsheim", "city": "Telfs"},
     ], "https://lionsquad.at")
-    assert text.startswith("**LAN-Party** – 03.10.2026 17:00 · Vereinsheim, Telfs") and text.endswith("/events/lan")
+    assert text.startswith("**LAN-Party** – Sa 3. Oktober · 17:00 · Vereinsheim, Telfs") and text.endswith("/events/lan")
     assert "keine Turnier-Anmeldung offen" in discord_bot.open_tournaments_text([{"title": "x", "status": "live"}])
-    assert "• **Herbst-Cup** – 02.10.2026" in discord_bot.open_tournaments_text([{"title": "Herbst-Cup", "status": "registration_open", "start_date": "2026-10-02T17:00:00+00:00"}])
+    assert "• **Herbst-Cup** – Fr 2. Oktober" in discord_bot.open_tournaments_text([{"title": "Herbst-Cup", "status": "registration_open", "start_date": "2026-10-02T17:00:00+00:00"}])
     assert "Noch kein Erfolg" in discord_bot.achievements_text([], 0)
     assert discord_bot.achievements_text([{"name": "Hallo Welt"}, {"name": "Talker"}], 30) == "Deine Erfolge (2, 30 Punkte): Hallo Welt, Talker"
     status = discord_bot.status_text({"connected": True, "guild_name": "LION", "linked_count": 3, "last_error": "x"})

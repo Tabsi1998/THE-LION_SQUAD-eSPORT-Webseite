@@ -1,5 +1,10 @@
 const { test, expect } = require("@playwright/test");
 
+// Feste Uhr (#1307): die Datums-Texte lassen das laufende Jahr weg und sagen „heute“/„morgen“ - Samstag, 28.11.2026.
+test.beforeEach(async ({ page }) => {
+  await page.clock.install({ time: new Date("2026-11-28T10:00:00Z") });
+});
+
 // Regelwerk der Liga (docs/LIGA.md, #1646) im echten Browser, Server nachgestellt: Regelseite und Pflege bei 390 und 1440 px, mit langen
 // Texten, langen Wörtern und einer breiten Tabelle. Inhaltsverzeichnis, Sprung auf einen Paragrafen, Suche, Markierung, Vergleich,
 // Zustimmung. Erfundene Regeln, erfundene Namen.
@@ -91,7 +96,7 @@ for (const [width, height] of [[390, 844], [1440, 900]]) {
     await mockServer(page);
     await page.goto("/liga/probe/s1/regeln");
     await expect(page.getByTestId("rules-document")).toBeVisible();
-    await expect(page.getByTestId("rules-meta")).toContainText("Version 2 · gültig ab 05.03.2030");
+    await expect(page.getByTestId("rules-meta")).toContainText("Version 2 · gültig ab Di 5. März 2030");
     await noSideScroll(page);
     const table = page.locator("[id='3-tabelle'] .prose-cms-table");
     const box = await table.evaluate((node) => ({ scrolls: node.scrollWidth > node.clientWidth, overflow: getComputedStyle(node).overflowX }));

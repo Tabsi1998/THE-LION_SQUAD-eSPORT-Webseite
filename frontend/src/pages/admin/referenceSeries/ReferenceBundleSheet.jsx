@@ -6,7 +6,8 @@ import { CheckField, SelectField, TextField } from "@/components/tls/FormFields"
 import { useConfirm } from "@/components/tls/ConfirmDialog";
 import { KIND_OPTIONS } from "@/lib/referenceSeries";
 import { SEASON_NOTE_TONES } from "@/lib/seriesTiers";
-import { dayNoon, viennaDate, viennaDateTime } from "@/lib/vienna";
+import { formatWhen } from "@/lib/datetime";
+import { dayNoon } from "@/lib/vienna";
 import {
   HINT_LABELS, VISIBILITY_LABELS, WARN_HINTS, bundleSummary, initialSelection, previewPath, selectedHints, selectedSeasons,
   seasonText, undoText,
@@ -23,7 +24,7 @@ const KIND_LABELS = Object.fromEntries(KIND_OPTIONS);
 
 function dayText(day) {
   const noon = day ? dayNoon(String(day).slice(0, 10)) : null;
-  return noon ? viennaDate(noon, { day: "2-digit", month: "2-digit", year: "numeric" }) : "ohne Datum";
+  return noon ? formatWhen(noon, { time: false }) : "ohne Datum";
 }
 
 export function ReferenceBundleSheet({ onClose, onDone }) {
@@ -260,7 +261,7 @@ function BundleHistory({ bundles, onDone }) {
               <span className="min-w-0">
                 <span className="block font-bold text-white break-words [overflow-wrap:anywhere]">{item.lineage_title}</span>
                 <span className="block tls-type-small text-white/50 tabular-nums">
-                  {[`${item.linked} ${item.linked === 1 ? "Referenz" : "Referenzen"}`, item.created_at ? viennaDateTime(item.created_at, { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" }) : "",
+                  {[`${item.linked} ${item.linked === 1 ? "Referenz" : "Referenzen"}`, item.created_at ? formatWhen(item.created_at) : "",
                     item.status === "undone" ? "zurückgenommen" : ""].filter(Boolean).join(" · ")}
                 </span>
               </span>

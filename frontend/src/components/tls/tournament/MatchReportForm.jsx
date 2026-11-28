@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import { Check, ClipboardCheck, X } from "lucide-react";
 import { chatAttachmentSrc } from "@/lib/chatAttachments";
-import { viennaDateTime } from "@/lib/vienna";
+import { formatClock } from "@/lib/datetime";
 import { REPORT_STATE_TEXT, rankingMode } from "@/lib/matchReport";
 import { initialState, inputKind, resultSentence, resultsFor, tapGame } from "@/lib/resultEntry";
 import { BestOfInput, OrderInput, ScoreInput, WinnerInput } from "@/components/tls/results/ResultInputs";
@@ -34,7 +34,7 @@ function fallbackEntry(participants, match, allowsDraw) {
 
 function clock(value) {
   try {
-    return value ? viennaDateTime(value, { hour: "2-digit", minute: "2-digit" }) : "";
+    return value ? formatClock(value) : "";
   } catch {
     return "";
   }

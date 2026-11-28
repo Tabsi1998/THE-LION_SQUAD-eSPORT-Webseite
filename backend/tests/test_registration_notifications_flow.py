@@ -47,7 +47,7 @@ async def test_own_registration_confirms_and_staff_changes_are_announced(flow):
     assert response.status_code == 200, response.text
     [own] = await notes(flow, first)
     assert own["title"] == "Du bist dabei: Testturnier"
-    assert "Check-in ab 14.11.2026, 18:00 Uhr" in own["body"], "der Check-in-Hinweis in Wiener Zeit"
+    assert "Check-in ab Sa 14. November · 18:00" in own["body"], "der Check-in-Hinweis in Wiener Zeit"
     assert own["meta"]["in_app_only"] is True, "wer selbst angemeldet hat, sieht es schon - kein Push"
     approved_mails = await mails(flow, "registration_approved")
     assert [mail["to"] for mail in approved_mails] == [first["email"]]

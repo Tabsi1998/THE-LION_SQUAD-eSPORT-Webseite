@@ -398,6 +398,9 @@ test("Start-Kachel mit ganzem Datum in Klartext", async () => {
     const tile = await screen.findByTestId("tournament-start-tile");
     expect(tile).toHaveTextContent("Sa 23. Mai · 21:00");
     expect(tile.querySelector(".truncate")).toBeNull();
+    // Barrierefreiheit (#1307): <time> mit ISO-Wert, der Mittelpunkt wird nicht vorgelesen.
+    expect(tile.querySelector("time")).toHaveAttribute("dateTime", "2026-05-23T19:00:00.000Z");
+    expect(tile.querySelector('time [aria-hidden="true"]')).toHaveTextContent("·");
   } finally {
     vi.useRealTimers();
   }

@@ -4,6 +4,7 @@ Die Änderung lief still: kein Eintrag im Protokoll, keine Nachricht. Jetzt steh
 ``audit_logs``, und in Spielwochen erfahren es die Verantwortlichen beider Seiten - einmal je Änderung.
 """
 import pathlib
+import re
 import sys
 from datetime import timedelta
 
@@ -59,7 +60,7 @@ async def test_a_new_time_is_logged_and_tells_both_sides_once(flow):
     assert change["from"] == before and change["to"] == target
     sent = await notes(flow)
     assert {row["user_id"] for row in sent} == set(ids(world, "Kapitaen", "Falke1")), "die Verantwortlichen beider Seiten"
-    assert "Die Turnierleitung" in sent[0]["body"] and "Uhr" in sent[0]["body"]
+    assert "Die Turnierleitung" in sent[0]["body"] and re.search(r"auf \w\w \d{1,2}\. \w+(?: \d{4})? · \d\d:\d\d gelegt", sent[0]["body"])
     assert sent[0]["url"] == f"/matches/{world['match']['id']}"
 
     replay = await patch(flow, world, scheduled_at=target)

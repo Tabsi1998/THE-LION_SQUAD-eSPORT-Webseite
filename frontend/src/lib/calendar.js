@@ -1,5 +1,5 @@
-import { formatRange, formatWhen } from "@/lib/datetime";
-import { asInstant, dayNoon, viennaDate, viennaDay, viennaTime } from "@/lib/vienna";
+import { formatClock, formatRange, formatWhen } from "@/lib/datetime";
+import { asInstant, dayNoon, viennaDay } from "@/lib/vienna";
 // Kalender auf der Website (#402): Monatsraster, Termine je Tag und der Abo-Link - dieselbe
 // Rechnung wie in der App (mobile/src/lib/calendar.ts), ohne React, damit sie sich testen lässt.
 // Ein Tag ist ein Kalendertag in Wien („JJJJ-MM-TT“) - wie die Uhrzeit daneben; die Termine kommen vom Server
@@ -280,9 +280,9 @@ export function feedUrls(origin, feedPath = "/api/calendar/feed.ics") {
 export function timeLabel(value) {
   const date = parseIso(value);
   if (!date) return "";
-  return viennaTime(date, { hour: "2-digit", minute: "2-digit" });
+  return formatClock(date);
 }
 
 export function dayLabel(key) {
-  return viennaDate(dayNoon(key), { weekday: "long", day: "numeric", month: "long" });
+  return formatWhen(dayNoon(key), { time: false });
 }

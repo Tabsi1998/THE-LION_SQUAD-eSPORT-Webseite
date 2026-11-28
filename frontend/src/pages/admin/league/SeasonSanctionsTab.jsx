@@ -16,10 +16,9 @@ import {
   APPEAL_STATE_LABELS, EMPTY_SANCTION_FORM, SANCTION_STATUS, applyCatalog, applyKind, kindOf, matchesOf, needsPeriod, periodPayload,
   sanctionPayload, sanctionProblem,
 } from "@/lib/leagueSanctions";
-import { viennaDateTime } from "@/lib/vienna";
+import { formatWhen } from "@/lib/datetime";
 import { ROLE_COLORS } from "@/lib/categoryColors";
 
-const WHEN = { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" };
 const CHIP = {
   warn: "border-warn/50 text-warn", live: "border-warn bg-warn/15 text-warn", calm: "border-white/15 text-white/60",
 };
@@ -150,7 +149,7 @@ function SanctionForm({ seasonId, data, onDone, onCancel }) {
             <label key={proof.id} className="flex min-h-11 items-center gap-2 tls-type-small text-white/80">
               <input type="checkbox" checked={form.proof_ids.includes(proof.id)} data-testid={`sanction-proof-${proof.id}`}
                 onChange={(event) => set("proof_ids", event.target.checked ? [...form.proof_ids, proof.id] : form.proof_ids.filter((id) => id !== proof.id))} />
-              <span>{proof.type === "link" ? "Video-Link" : proof.type === "file" ? "MOSS-Datei" : "Bild"} {index + 1} · {viennaDateTime(proof.created_at, WHEN)}</span>
+              <span>{proof.type === "link" ? "Video-Link" : proof.type === "file" ? "MOSS-Datei" : "Bild"} {index + 1} · {formatWhen(proof.created_at)}</span>
               <a href={proof.type === "link" ? proof.link : chatAttachmentSrc(proof.url)} target="_blank" rel="noopener noreferrer nofollow" className="text-[#29B6E8] hover:underline">ansehen</a>
             </label>
           )) : <p className="tls-type-small text-white/50">Zu diesem Spiel liegen keine Nachweise vor, die du sehen darfst. Sie kommen über Meldung, Vorfall oder Protest am Spiel dazu.</p>}
@@ -280,9 +279,9 @@ function SanctionCard({ item, superadmin, seasonId, onChanged }) {
         <dt className="text-white/50">Regelverstoß</dt><dd className="min-w-0 break-words text-white/90">{item.rule_ref}</dd>
         <dt className="text-white/50">Begründung</dt><dd className="min-w-0 whitespace-pre-line break-words text-white/90">{item.reason}</dd>
         {item.period ? <><dt className="text-white/50">{item.points ? "Höhe" : "Zeitraum"}</dt><dd className="tabular-nums text-white/90" data-testid={`sanction-period-${item.id}`}>{item.period}</dd></> : null}
-        <dt className="text-white/50">Verhängt</dt><dd className="text-white/70">{viennaDateTime(item.created_at, WHEN)}{item.created_by_name ? ` von ${item.created_by_name}` : ""}</dd>
+        <dt className="text-white/50">Verhängt</dt><dd className="text-white/70">{formatWhen(item.created_at)}{item.created_by_name ? ` von ${item.created_by_name}` : ""}</dd>
         {item.status === "revoked" ? (
-          <><dt className="text-white/50">Widerrufen</dt><dd className="min-w-0 break-words text-white/70">{viennaDateTime(item.revoked_at, WHEN)}{item.revoked_by_name ? ` von ${item.revoked_by_name}` : ""}: {item.revoke_reason}</dd></>
+          <><dt className="text-white/50">Widerrufen</dt><dd className="min-w-0 break-words text-white/70">{formatWhen(item.revoked_at)}{item.revoked_by_name ? ` von ${item.revoked_by_name}` : ""}: {item.revoke_reason}</dd></>
         ) : null}
       </dl>
       <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1">
@@ -293,7 +292,7 @@ function SanctionCard({ item, superadmin, seasonId, onChanged }) {
       {appeal ? (
         <div className="mt-3 rounded-sm border border-warn/30 p-3" data-testid={`sanction-appeal-${item.id}`}>
           <div className="flex items-center gap-2 tls-type-label text-warn"><Scale className="h-3.5 w-3.5" aria-hidden="true" /> {APPEAL_STATE_LABELS[appeal.state]}</div>
-          <p className="mt-1 tls-type-small text-white/50">{appeal.by_name || "Gelöschter User"} · {viennaDateTime(appeal.at, WHEN)}</p>
+          <p className="mt-1 tls-type-small text-white/50">{appeal.by_name || "Gelöschter User"} · {formatWhen(appeal.at)}</p>
           <p className="mt-1 whitespace-pre-line break-words tls-type-body text-white/90">{appeal.text}</p>
           {appeal.note ? <p className="mt-2 break-words tls-type-body text-white/75">Entscheidung{item.decided_by_name ? ` von ${item.decided_by_name}` : ""}: {appeal.note}</p> : null}
           {appeal.state === "open" && !action ? (

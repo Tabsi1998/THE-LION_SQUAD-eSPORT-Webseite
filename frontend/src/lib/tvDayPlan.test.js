@@ -2,6 +2,10 @@
 // Uhr weiter; was läuft und was als Nächstes kommt, mit Hinweis.
 import { hallEvent } from "../../e2e/fixtures/tvHall.mjs";
 import { dayIndexOf, dayPlan, eventDays, packLane, pickDay } from "./tvDayPlan";
+import { runAtTestClock } from "@/testClock";
+
+// Feste Uhr (#1307): die Datums-Texte lassen das laufende Jahr weg und sagen „heute“/„morgen“.
+runAtTestClock();
 
 const NOW = Date.parse("2026-10-10T14:32:00+02:00");
 const at = (text) => Date.parse(text);
@@ -10,7 +14,7 @@ test("ein Tag: Zeitraum mit Stunden, Einlass, Turniere und Fast Lap in eigenen B
   const { event } = hallEvent({ now: NOW, stations: 6 });
   const plan = dayPlan(event, NOW);
   expect(plan.multi).toBe(false);
-  expect(plan.title).toBe("Samstag, 10. Oktober");
+  expect(plan.title).toBe("Sa 10. Oktober");
   expect(plan.from).toBe(at("2026-10-10T09:00:00+02:00"));
   expect(plan.to).toBe(at("2026-10-10T22:00:00+02:00"));
   expect(plan.ticks[0].label).toBe("09:00");

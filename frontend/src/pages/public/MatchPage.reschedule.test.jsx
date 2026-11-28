@@ -1,5 +1,9 @@
 import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
+import { runAtTestClock } from "@/testClock";
+
+// Feste Uhr (#1307): die Datums-Texte lassen das laufende Jahr weg und sagen „heute“/„morgen“.
+runAtTestClock();
 
 // Liga-Termine auf der Matchseite (#2194): Grenzen im Klartext, Verschiebung beantragen und beantworten, Verlauf und das Feld
 // der Liga-Leitung. Erfundene Namen.
@@ -63,7 +67,7 @@ beforeEach(() => {
 
 test("fester Termin: Grenze im Klartext, kein Vorschlagsfeld, Verlauf, Antrag mit Grund", async () => {
   renderMatch(BASE);
-  expect(await screen.findByTestId("schedule-limit")).toHaveTextContent("Noch 1 Verschiebung möglich, beantragen bis Sa 14.11. 20:00.");
+  expect(await screen.findByTestId("schedule-limit")).toHaveTextContent("Noch 1 Verschiebung möglich, beantragen bis Sa 14. November · 20:00.");
   expect(screen.queryByTestId("match-proposal-at")).toBeNull();
   expect(screen.queryByText("Noch kein Terminvorschlag vorhanden.")).toBeNull();
   expect(screen.getByTestId("schedule-history-agreement")).toHaveTextContent("Einigung");

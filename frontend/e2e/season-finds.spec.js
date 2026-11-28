@@ -1,5 +1,10 @@
 const { test, expect } = require("@playwright/test");
 
+// Feste Uhr (#1307): die Datums-Texte lassen das laufende Jahr weg und sagen „heute“/„morgen“ - Samstag, 28.11.2026.
+test.beforeEach(async ({ page }) => {
+  await page.clock.install({ time: new Date("2026-11-28T10:00:00Z") });
+});
+
 // Saison-Fundstücke im Profil (#678): die Karte steht im Reiter „Erfolge“ des eigenen Profils (seit #1149 unter /u/me;
 // /profile?tab=achievements leitet dorthin), die laufende Saison zuerst und über
 // die ganze Breite, die anderen darunter; nichts ist abgeschnitten, nichts läuft über den Rand - am PC wie am Handy.
@@ -56,7 +61,7 @@ for (const viewport of [{ width: 1440, height: 1000 }, { width: 390, height: 844
     const panel = page.getByTestId("season-finds");
     await expect(panel).toBeVisible({ timeout: 20000 });
     await expect(page.getByTestId("season-finds-total")).toHaveText("1.389");
-    await expect(page.getByTestId("season-finds-halloween-hint")).toHaveText(/läuft bis 01\.11\./i);
+    await expect(page.getByTestId("season-finds-halloween-hint")).toHaveText(/läuft bis So 1\. November/i);
     await expect(page.getByTestId("season-find-halloween_bats_scared-today")).toHaveText("heute 12 von 30");
     await expect(page.getByTestId("season-find-snowflakes_clicked")).toContainText("1.342");
     const facts = await panel.evaluate((node) => {

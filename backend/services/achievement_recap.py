@@ -17,12 +17,13 @@ MAX_LISTED = 6
 
 
 def week_label(start: datetime, end: datetime) -> str:
-    """„29.09. – 05.10.2026“: Montag bis Sonntag (Wien) - die Woche endet formal Montag 08:00."""
+    """„Mo 28. September – So 4. Oktober“ (#1307): Montag bis Sonntag (Wien) - die Woche endet formal Montag 08:00."""
     from services.achievement_visibility import VIENNA
+    from services.date_text import format_range
 
     first = start.astimezone(VIENNA)
     last = (end - timedelta(days=1)).astimezone(VIENNA)
-    return f"{first:%d.%m.} – {last:%d.%m.%Y}"
+    return format_range(first, last)
 
 
 def _material_label(row: dict) -> str:

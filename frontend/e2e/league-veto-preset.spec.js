@@ -2,6 +2,11 @@ const fs = require("fs");
 const path = require("path");
 const { test, expect } = require("@playwright/test");
 
+// Feste Uhr (#1307): die Datums-Texte lassen das laufende Jahr weg und sagen „heute“/„morgen“ - Samstag, 28.11.2026.
+test.beforeEach(async ({ page }) => {
+  await page.clock.install({ time: new Date("2026-11-28T10:00:00Z") });
+});
+
 // Veto-Schrittart „Vorgabe der Woche“ (#2326, docs/LIGA.md D.3) bei 390 und 1440 px mit nachgestellter API: im Kasten „Veto“ der Season
 // die Map je Spielwoche (fehlende Wochen, „Rotiert automatisch durch den Pool“, Speichern) und auf der Matchseite das Veto mit Vorgabe
 // (fest im Brett, nicht antippbar, an ihrer Position in der Spielreihenfolge) sowie der Satz, solange die Vorgabe fehlt. Kein seitlicher
@@ -181,7 +186,7 @@ test.describe("Liga: Veto mit Vorgabe der Woche", () => {
       const box = page.getByTestId("season-veto-rules").getByTestId("veto-presets-box");
       await expect(box).toBeVisible();
       await expect(page.getByTestId("veto-presets-weeks").locator("> li")).toHaveCount(7);
-      await expect(page.getByTestId("veto-preset-week-1")).toContainText("10.11.–16.11.");
+      await expect(page.getByTestId("veto-preset-week-1")).toContainText("Di 10. – Mo 16. November");
       await expect(page.getByTestId("veto-preset-1-ctl")).toHaveValue("kai");
       await expect(page.getByTestId("veto-presets-missing")).toHaveText("Es fehlen noch: Spielwoche 2, 3, 4, 5, 6 und 7.");
       await expect(page.getByTestId("veto-preset-week-2")).toHaveAttribute("data-missing", "true");

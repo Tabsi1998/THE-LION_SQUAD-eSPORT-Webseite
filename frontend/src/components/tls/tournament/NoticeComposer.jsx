@@ -17,7 +17,7 @@ import {
   pauseUntilIso,
   remainingText,
 } from "@/lib/tournamentNotices";
-import { viennaTime } from "@/lib/vienna";
+import { formatClock } from "@/lib/datetime";
 
 // Reiter „Hinweis“ der Turnierleitung (#1166): ein Satz an alle im Turnier oder im ganzen Event - als Benachrichtigung,
 // als Banner oben auf der Seite und auf Wunsch am TV. Darunter, was schon hinausging: wer, wann, an wen, wie viele.
@@ -92,7 +92,7 @@ export function NoticeComposer({ slug, tournament, stations = [] }) {
     try {
       if (tournament.status === "paused") await api.put(`/tournaments/${id}/pause`, { paused_until: until });
       else await api.post(`/tournaments/${id}/status`, { status: "paused", paused_until: until });
-      toast.success(`Turnier pausiert bis ${viennaTime(until, { hour: "2-digit", minute: "2-digit" })} – der TV zeigt den Pause-Bildschirm.`);
+      toast.success(`Turnier pausiert bis ${formatClock(until)} – der TV zeigt den Pause-Bildschirm.`);
     } catch (err) {
       toast.error(formatApiError(err.response?.data?.detail) || "„Pause bis“ konnte nicht gesetzt werden.");
     }

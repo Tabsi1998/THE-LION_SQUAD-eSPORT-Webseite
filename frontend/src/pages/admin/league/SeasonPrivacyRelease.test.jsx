@@ -1,4 +1,8 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { runAtTestClock } from "@/testClock";
+
+// Feste Uhr (#1307): die Datums-Texte lassen das laufende Jahr weg und sagen „heute“/„morgen“.
+runAtTestClock();
 
 // Datenschutzhinweis für Gäste (#1665, Nr. 1): bis zur Freigabe durch den Superadmin sehen Gäste den Platzhalter.
 const apiMock = { put: vi.fn() };
@@ -41,7 +45,7 @@ test("andere sehen den Stand, aber keinen Knopf", () => {
   auth.user = { id: "u2", role: "user" };
   render(<SeasonPrivacyRelease season={{ application_privacy_text: TEXT, application_privacy_release: { text: TEXT, at: "2026-11-27T10:00:00Z" } }}
     seasonId="s1" formText={TEXT} />);
-  expect(screen.getByTestId("season-privacy-release")).toHaveTextContent("Für Gäste freigegeben am 27.11.2026");
+  expect(screen.getByTestId("season-privacy-release")).toHaveTextContent("Für Gäste freigegeben am Fr 27. November");
   expect(screen.queryByTestId("season-privacy-release-toggle")).toBeNull();
 });
 

@@ -15,8 +15,8 @@ import { NewsFilterRow } from "@/components/tls/NewsFilterRow";
 import { NewsTextCard } from "@/components/tls/NewsTextCard";
 import { NewsLead } from "@/components/tls/NewsLead";
 import { withoutRepeatedBanners } from "@/lib/newsCards";
-import { formatAgo } from "@/lib/datetime";
 import { newsCategoryColor } from "@/lib/categoryColors";
+import { When } from "@/components/tls/When";
 
 const VIS_ICON = { members: Crown, internal: Lock, community: null, public: null };
 
@@ -152,7 +152,7 @@ function NewsCard({ n }) {
           <span style={{ color: c }}>{newsCategoryLabel(n.category)}</span>
           {n.pinned && <Pin className="w-3 h-3 text-white" aria-label="Angepinnt" />}
           {VIcon && <VIcon className="w-3 h-3 text-honor" />}
-          <span className="text-white/45 ml-auto normal-case tracking-normal">{formatAgo(n.published_at || n.created_at)}</span>
+          <span className="text-white/45 ml-auto normal-case tracking-normal"><When value={n.published_at || n.created_at} ago /></span>
         </div>
         <h3 className="tls-wrap mt-2 tls-type-card leading-tight tls-card__title">
           {n.title}

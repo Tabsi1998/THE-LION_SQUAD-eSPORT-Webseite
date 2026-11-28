@@ -22,6 +22,7 @@ from zoneinfo import ZoneInfo
 
 from models import now_utc
 from services.svg_logo import raster_url
+from services.date_text import format_moment
 
 SETTINGS_ID = "discord_design"
 VIENNA = ZoneInfo("Europe/Vienna")
@@ -670,4 +671,4 @@ async def common_values(db, now: datetime | None = None) -> dict:
     branding = await db.settings.find_one({"id": "branding"}, {"_id": 0, "club_name": 1}) or {}
     current = (now or now_utc()).astimezone(VIENNA)
     return {"site": origin, "club": branding.get("club_name") or "THE LION SQUAD", "logo": f"{origin}/assets/brand/tls-favicon.png",
-            "now": current.strftime("%d.%m.%Y, %H:%M Uhr")}
+            "now": format_moment(current, now=current)}

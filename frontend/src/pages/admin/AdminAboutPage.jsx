@@ -9,7 +9,7 @@ import { SkeletonDetailHeader, SkeletonLines } from "@/components/tls/Skeleton";
 import { toast } from "sonner";
 import { ArrowDown, ArrowUp, ExternalLink, Plus, Trash2 } from "lucide-react";
 import { DEFAULT_SHOWN, NUMBER_KEYS, NUMBER_LABELS, moveShown, toggleShown } from "@/lib/clubNumbers";
-import { viennaDate } from "@/lib/vienna";
+import { formatWhen } from "@/lib/datetime";
 
 // Über uns pflegen (#406): die Leitbild-Texte der Seite „Über den Verein“ - Hero, Werte, Spiele,
 // Offline, Aufruf - als eigene Seite im Rahmen der Admin-Formulare. Was die Seite sonst zeigt
@@ -100,7 +100,7 @@ function ClubPhotoField({ value, onChange }) {
 /** Ein Gründungstag zum Lesen: „1. März 2019“. */
 export function foundedLabel(day) {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(String(day || ""))) return "";
-  return viennaDate(`${day}T12:00:00`, { day: "numeric", month: "long", year: "numeric" });
+  return formatWhen(`${day}T12:00:00`, { time: false });
 }
 
 export function numberValueText(key, numbers) {

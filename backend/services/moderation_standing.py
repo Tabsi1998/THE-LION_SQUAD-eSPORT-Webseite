@@ -59,7 +59,18 @@ def _parse(value) -> datetime | None:
 
 def _fmt(value) -> str:
     moment = _parse(value)
-    return moment.astimezone(timezone.utc).strftime("%d.%m.%Y, %H:%M") + " UTC" if moment else ""
+    from services.date_text import format_moment
+
+    # Wiener Zeit wie überall (#1307) - früher stand hier UTC.
+    return format_moment(moment) if moment else ""
+
+
+def _csv_moment(value) -> str:
+    """In der CSV für den Vorstand amtlich: „14.03.2026 18:05“ in Wiener Zeit, sortierbar und mit Jahr (#1307)."""
+    moment = _parse(value)
+    from services.date_text import format_official_moment
+
+    return format_official_moment(moment) if moment else ""
 
 
 def normalize_settings(raw: dict | None) -> dict:
@@ -431,8 +442,8 @@ def export_csv(rows: list[dict]) -> str:
         active = row.get("active") or {}
         writer.writerow([
             row["user"].get("username") or "", row["user"].get("display_name") or "", row.get("strikes", 0), row.get("active_strikes", 0), row.get("sanctions", 0),
-            active.get("label") or "", _fmt(active.get("chat_blocked_until")) if active.get("chat_blocked_until") else ("bis zur Entscheidung" if active.get("open_until_decision") else ""),
-            "ja" if row.get("open_appeal") else "nein", _fmt(row.get("last_event_at")),
+            active.get("label") or "", _csv_moment(active.get("chat_blocked_until")) if active.get("chat_blocked_until") else ("bis zur Entscheidung" if active.get("open_until_decision") else ""),
+            "ja" if row.get("open_appeal") else "nein", _csv_moment(row.get("last_event_at")),
         ])
     return buffer.getvalue()
 

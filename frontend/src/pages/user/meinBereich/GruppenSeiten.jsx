@@ -3,7 +3,7 @@ import { Link, useOutletContext, useSearchParams } from "react-router-dom";
 import { Crown, Download, ShieldCheck, Trash2 } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { lazyPage } from "@/lib/chunkReload";
-import { viennaDate } from "@/lib/vienna";
+import { formatWhen } from "@/lib/datetime";
 import { SkeletonList } from "@/components/tls/Skeleton";
 import { BEREICH, VEREIN_SEITEN, gruppe, vereinPfad } from "@/lib/meinBereich";
 import { RECHNUNGEN_REITER } from "@/lib/meinBereichSeiten";
@@ -50,7 +50,7 @@ export function KontoSeite() {
 function Einwilligungen() {
   const { user } = useAuth();
   const { mitglied } = useOutletContext() || {};
-  const since = user?.consent_updated_at ? viennaDate(user.consent_updated_at) : "";
+  const since = user?.consent_updated_at ? formatWhen(user.consent_updated_at, { time: false, relative: false }) : "";
   return (
     <>
       <div className="border border-white/10 rounded-sm bg-[#121212] p-5" data-testid="consents-site">

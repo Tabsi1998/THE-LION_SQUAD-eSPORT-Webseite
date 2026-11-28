@@ -1,7 +1,7 @@
 // Vorfälle im Spiel auf der Matchseite (D.5, #1619; docs/LIGA.md „D.5/E.2-Vertrag“ → „Vorfälle“; Regelwerk § 9, Anlage C):
 // Sätze, Auswahl und Prüfung im Klartext, damit Captains ohne Vorwissen melden und antworten können. Stand, Fristen, Rechte und
 // Kontingent kommen vom Server (Block `league`: `map_state`, `incidents`, `incident_info`) - hier wird nur formuliert.
-import { viennaTime } from "@/lib/vienna";
+import { formatClock } from "@/lib/datetime";
 
 export const STATE_LABELS = {
   proposed: "Wartet auf Antwort",
@@ -42,7 +42,7 @@ export const OUTCOME_HELP = {
 
 /** „20:14“ in Wiener Zeit. */
 export function clock(value) {
-  return value ? viennaTime(value, { hour: "2-digit", minute: "2-digit" }) : "";
+  return value ? formatClock(value) : "";
 }
 
 /** Wie viel die Uhr des Geräts von der des Servers abweicht (ms) - der Countdown rechnet mit der Serverzeit. */

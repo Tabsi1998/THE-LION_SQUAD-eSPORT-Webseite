@@ -19,11 +19,10 @@ import {
   rulesMediaProps, variableGroups, variableValueText,
 } from "@/lib/leagueRules";
 import { changedPlaces, seasonAnchorUrl } from "@/lib/seasonTabs";
-import { viennaDate } from "@/lib/vienna";
+import { formatWhen } from "@/lib/datetime";
 import { ShortCaps } from "@/components/tls/ShortCaps";
 
 import { ROLE_COLORS } from "@/lib/categoryColors";
-const LONG_DAY = { day: "2-digit", month: "2-digit", year: "numeric" };
 const QUIET = "tls-btn tls-btn--quiet inline-flex items-center gap-1.5 rounded-sm px-3 py-1.5 tls-type-label disabled:opacity-50";
 const PRIMARY = "tls-btn tls-btn--primary inline-flex items-center gap-1.5 rounded-sm px-4 py-2 tls-type-label disabled:opacity-50";
 const REASON_MIN = 5;
@@ -233,7 +232,7 @@ function Versions({ view }) {
             <div className="flex flex-wrap items-center justify-between gap-2">
               <span className="font-semibold text-white">
                 {row.label}{row.is_current ? " · gilt" : ""}
-                <span className="ml-2 font-normal text-white/60">gültig ab {dayLabel(row.valid_from)} · veröffentlicht {viennaDate(row.published_at, LONG_DAY)}</span>
+                <span className="ml-2 font-normal text-white/60">gültig ab {dayLabel(row.valid_from)} · veröffentlicht {formatWhen(row.published_at, { time: false })}</span>
               </span>
               <span className="flex gap-2">
                 <a className={QUIET} href={`${view.public_url}?version=${row.id}`} target="_blank" rel="noopener noreferrer">Seite <ExternalLink className="h-3 w-3" aria-hidden="true" /></a>
@@ -257,7 +256,7 @@ function Consents({ consents }) {
             <li key={row.squad_id} className="flex flex-wrap items-center justify-between gap-2 py-2 tls-type-small" data-testid={`rules-consent-row-${row.squad_id}`}>
               <span className="min-w-0 break-words text-white">{row.team_name || row.squad_name}</span>
               <span className={row.agreed ? "text-white/70" : "font-semibold text-warn"}>
-                {row.agreed ? `zugestimmt am ${viennaDate(row.agreed_at, LONG_DAY)}${row.agreed_by ? ` von ${row.agreed_by}` : ""}` : "offen"}
+                {row.agreed ? `zugestimmt am ${formatWhen(row.agreed_at, { time: false, relative: false })}${row.agreed_by ? ` von ${row.agreed_by}` : ""}` : "offen"}
               </span>
             </li>
           ))}

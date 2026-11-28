@@ -1,5 +1,9 @@
 import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
+import { runAtTestClock } from "@/testClock";
+
+// Feste Uhr (#1307): die Datums-Texte lassen das laufende Jahr weg und sagen „heute“/„morgen“.
+runAtTestClock();
 
 // Ostereiersuche pflegen (#646, #757): Vorschlag für das Jahr, prüfen, speichern; Preise und Freigabe; Verstecke
 // fest nach dem ersten Fund; Auswertung erst nach Ostermontag und nur nach Rückfrage.
@@ -102,7 +106,7 @@ test("Schalter oben auf der Seite: Ostereiersuche ist aus, mit dem Zeitraum", as
     : { data: BASE }));
   renderPage();
   expect(await screen.findByTestId("season-switch-title")).toHaveTextContent("Ostereiersuche ist aus");
-  expect(screen.getByTestId("season-switch-window")).toHaveTextContent("Eingeschaltet zu sehen von 26. März 2027");
+  expect(screen.getByTestId("season-switch-window")).toHaveTextContent("Eingeschaltet zu sehen von Fr 26. März 2027 · 00:00");
   expect(screen.queryByRole("link", { name: "Auftritt → Jahreszeiten" })).toBeNull();
 });
 

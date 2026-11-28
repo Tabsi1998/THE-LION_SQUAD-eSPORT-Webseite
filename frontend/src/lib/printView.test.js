@@ -5,6 +5,10 @@ import {
   CHECKIN, PRINT_DEFAULTS, STANDINGS, bracketBlocks, bracketPages, cardHeight, checkinPages, columnHeight, dayPlanPages, eventCheckinSections, listCapacity,
   TITLE_MAX, paginate, parseParts, partLabel, printParts, scheduleRowHeight, standingsPages, standingsSections, tableMode, schedulePages, sheetBody, splitBands, stampText, titleTier, tournamentCheckinSections, treeColumnCapacity, treeColumns,
 } from "@/lib/printView";
+import { runAtTestClock } from "@/testClock";
+
+// Feste Uhr (#1307): die Datums-Texte lassen das laufende Jahr weg und sagen „heute“/„morgen“.
+runAtTestClock();
 
 let next = 0;
 const reg = (name) => ({ id: `r-${name}`, display_name: name });
@@ -82,7 +86,7 @@ describe("Blatt", () => {
   });
 
   test("Druckzeit mit Datum und Uhrzeit in Wiener Zeit", () => {
-    expect(stampText(Date.parse("2026-10-30T18:05:00Z"))).toBe("Stand 30.10. 19:05");
+    expect(stampText(Date.parse("2026-10-30T18:05:00Z"))).toBe("Stand Fr 30. Oktober · 19:05");
   });
 });
 
@@ -323,7 +327,7 @@ describe("Listen", () => {
     expect(rows.length).toBe(7);
     expect(rows[0].time).toBe("10:00");
     expect(scheduleRowHeight(rows[0])).toBeGreaterThan(scheduleRowHeight({ heat: false, sides: [{}, {}] }));
-    expect(pages[0].sections[0].title).toBe("Samstag, 31. Oktober");
+    expect(pages[0].sections[0].title).toBe("Sa 31. Oktober");
   });
 
   test("Spielplan nach Station: je Station ein Abschnitt", () => {

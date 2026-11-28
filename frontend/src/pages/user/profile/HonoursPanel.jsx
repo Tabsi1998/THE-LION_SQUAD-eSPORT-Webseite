@@ -3,13 +3,14 @@ import { Award } from "lucide-react";
 import { toast } from "sonner";
 import { api, formatApiError } from "@/lib/api";
 import { SwitchRow } from "@/pages/user/profile/SwitchRow";
+import { formatWhen } from "@/lib/datetime";
 
 // Ehrungen aus der Mitgliederakte (#848): alle eigenen Ehrungen mit dem Hinweis, welche der Verein veröffentlichen
 // lässt; aufs öffentliche Profil kommen sie nur mit dem eigenen Schalter. Dieselbe Karte zeigt das öffentliche Profil.
 // Darunter die eigenen Teilnahmen (#906) - nur für die Person selbst, nie öffentlich.
 
 export function honourDay(day) {
-  return day ? day.split("-").reverse().join(".") : "";
+  return day ? formatWhen(String(day).slice(0, 10), { time: false }) : "";
 }
 
 /** „14.03.2026 · Wettbewerb · 2,5 Std. · von der Website gemeldet“ */

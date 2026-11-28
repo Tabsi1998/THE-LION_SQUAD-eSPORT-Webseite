@@ -686,7 +686,9 @@ def _day_text(value) -> str:
         moment = seasons.to_vienna(datetime.fromisoformat(str(value).replace("Z", "+00:00")))
     except ValueError:
         return ""
-    return f"{moment.day}.{moment.month}.{moment.year}"
+    from services.date_text import format_moment
+
+    return format_moment(moment, time=False)
 
 
 async def editor_options(db) -> dict:

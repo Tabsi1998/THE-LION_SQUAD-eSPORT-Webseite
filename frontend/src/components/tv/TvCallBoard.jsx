@@ -3,7 +3,7 @@ import { countdown, ringShare, stationFit } from "@/lib/tvCalls";
 import { matchName } from "@/lib/tvLive";
 import { matchRoundLabel } from "@/lib/tournamentLabels";
 import { forecastText } from "@/lib/tvForecast";
-import { viennaTime } from "@/lib/vienna";
+import { formatClock } from "@/lib/datetime";
 import { TvFace } from "./TvParts";
 import { useTv } from "./TvScreen";
 import { useServerTick } from "./TvTreeNode";
@@ -96,7 +96,7 @@ function CallRow({ call, matches, nameOf, tournamentOf }) {
 /** „ca. 16:40“ - mit Prognose (lib/tvForecast, #1564) die voraussichtliche Zeit, sonst die geplante. */
 function plannedTime(entry) {
   if (entry.eta !== undefined) return forecastText({ ...entry, station: "" });
-  return entry.at ? `ca. ${viennaTime(entry.at, { hour: "2-digit", minute: "2-digit" })}` : "";
+  return entry.at ? `ca. ${formatClock(entry.at)}` : "";
 }
 
 /** „Danach an PC 5“ - klein unter den Aufrufen (oder als Liste, wenn gerade niemand aufgerufen ist). */

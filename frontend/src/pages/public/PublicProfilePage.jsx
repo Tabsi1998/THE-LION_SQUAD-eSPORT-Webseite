@@ -36,7 +36,8 @@ import {
   Monitor, Keyboard, BadgeCheck, Heart, Users, Sparkles, Copy, Award, Settings, Target,
 } from "lucide-react";
 import { toast } from "sonner";
-import { asInstant, viennaDate } from "@/lib/vienna";
+import { formatMonth, formatWhen } from "@/lib/datetime";
+import { asInstant } from "@/lib/vienna";
 import { showLapTime } from "@/lib/laptime";
 import { CountUp } from "@/components/tls/motion/CountUp";
 import { StaggerIn } from "@/components/tls/motion/StaggerIn";
@@ -108,7 +109,7 @@ function formatPublicDate(value) {
   const raw = String(value).trim();
   const date = asInstant(raw);
   if (Number.isNaN(date.getTime())) return "";
-  return viennaDate(date, { day: "2-digit", month: "long", year: "numeric" });
+  return formatWhen(date, { time: false });
 }
 
 const MEMBERSHIP_TYPE_LABELS = {
@@ -630,7 +631,7 @@ export default function PublicProfilePage() {
                   </span>
                 )}
                 {profile.country && <span className="inline-flex items-center gap-1"><MapPin className="w-3.5 h-3.5" />{countryName(profile.country)}</span>}
-                {joinedDate && <span className="inline-flex items-center gap-1"><Calendar className="w-3.5 h-3.5" />Dabei seit {viennaDate(joinedDate, { month: "long", year: "numeric" })}</span>}
+                {joinedDate && <span className="inline-flex items-center gap-1"><Calendar className="w-3.5 h-3.5" />Dabei seit {formatMonth(joinedDate)}</span>}
               </div>
             </div>
             <div className="pointer-events-auto flex flex-wrap gap-2 md:pb-1 md:basis-full xl:basis-auto xl:justify-end shrink-0" data-testid="profile-actions">
@@ -1203,7 +1204,7 @@ function AboutCard({ profile, joinedDate }) {
     ? labelValue(profile.membership.membership_type, MEMBERSHIP_TYPE_LABELS)
     : (profile.is_club_member ? "Vereinsmitglied" : "");
   const rows = [
-    { label: "Dabei seit", value: joinedDate ? viennaDate(joinedDate, { month: "long", year: "numeric" }) : "", icon: Calendar, tone: "green" },
+    { label: "Dabei seit", value: joinedDate ? formatMonth(joinedDate) : "", icon: Calendar, tone: "green" },
     { label: "Geburtstag", value: birthday, icon: Cake, tone: "gold" },
     { label: "Ort", value: location, icon: MapPin, tone: "blue" },
     { label: "Mitgliedschaft", value: membership, icon: Crown, tone: "gold" },
@@ -1376,7 +1377,7 @@ function TournamentRow({ t, expanded = false }) {
         <div className="mt-1 tls-type-card truncate">{t.title}</div>
         <div className="tls-type-small text-white/50 mt-0.5 flex items-center gap-2 flex-wrap">
           {t.game && <span>{gameLabel(t.game)}</span>}
-          {date && <span>· {viennaDate(date)}</span>}
+          {date && <span>· {formatWhen(date, { time: false })}</span>}
           {expanded && t.final_position && <span>· Endplatz: <span className="text-white">{t.final_position}</span></span>}
         </div>
       </div>

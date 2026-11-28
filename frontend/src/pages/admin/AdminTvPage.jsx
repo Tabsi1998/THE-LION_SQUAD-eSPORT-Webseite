@@ -8,7 +8,7 @@ import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { api, formatRequestError } from "@/lib/api";
 import { PLAYLIST_SECONDS, PLAYLIST_SLIDES, SLIDE_LABELS, playlistLabel } from "@/lib/tvPlaylist";
 import { TV_DEFAULTS, TV_FIELDS, TV_GROUPS, TV_VIEWS, buildTvLink, fieldsForView, linkOverrides, parseTvPath, resolveTvSettings, sameTvValue, takesTvKey, tvValueLabel } from "@/lib/tvSettings";
-import { viennaDateTime } from "@/lib/vienna";
+import { formatWhen } from "@/lib/datetime";
 import { ShortCaps } from "@/components/tls/ShortCaps";
 
 // TV & Beamer (#1110): eine Stelle für alle Bildschirme. Oben die Grundwerte - sie gelten auf jedem TV und kommen
@@ -551,7 +551,7 @@ function TvKeyList() {
           <div key={row.id} className="flex flex-wrap items-center justify-between gap-3 border border-white/10 bg-[#0F0F0F] rounded-sm px-4 py-3" data-testid={`tv-key-${row.id}`}>
             <div className="min-w-0">
               <div className="tls-type-small font-bold text-white/90">{row.label}</div>
-              <div className="tls-type-small text-white/50">{row.target_type === "event" ? `Event ${row.target_title}` : row.target_title || row.tournament_title} · erstellt {row.created_at ? viennaDateTime(row.created_at, { dateStyle: "short", timeStyle: "short" }) : "–"} · {row.last_used_at ? `zuletzt da ${viennaDateTime(row.last_used_at, { dateStyle: "short", timeStyle: "short" })}` : "noch nie geöffnet"} · <span data-testid={`tv-key-until-${row.id}`} className={row.expired ? "text-quiet" : undefined}>{row.expired ? `abgelaufen (eine Woche nach dem ${row.target_type === "event" ? "Event" : "Turnier"})` : row.expires_at ? `gilt bis ${viennaDateTime(row.expires_at, { dateStyle: "short" })}` : "gilt bis zum Widerruf"}</span></div>
+              <div className="tls-type-small text-white/50">{row.target_type === "event" ? `Event ${row.target_title}` : row.target_title || row.tournament_title} · erstellt {row.created_at ? formatWhen(row.created_at) : "–"} · {row.last_used_at ? `zuletzt da ${formatWhen(row.last_used_at)}` : "noch nie geöffnet"} · <span data-testid={`tv-key-until-${row.id}`} className={row.expired ? "text-quiet" : undefined}>{row.expired ? `abgelaufen (eine Woche nach dem ${row.target_type === "event" ? "Event" : "Turnier"})` : row.expires_at ? `gilt bis ${formatWhen(row.expires_at, { time: false })}` : "gilt bis zum Widerruf"}</span></div>
             </div>
             <button type="button" onClick={() => revoke(row)} className="inline-flex items-center gap-2 px-3 py-2 border border-live/40 text-live rounded-sm tls-type-label hover:bg-live/10" data-testid={`tv-key-revoke-${row.id}`}>
               <Trash2 className="w-3.5 h-3.5" /> Widerrufen

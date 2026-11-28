@@ -19,7 +19,6 @@ from models import new_id, now_utc
 from services import checkin_rules
 from services.league_scope import is_league_staffel
 from services.matchday_schedule import (
-    LOCAL_TZ,
     MatchdayScheduleError,
     blocked_period_at,
     home_registration_id,
@@ -166,12 +165,11 @@ def _iso(value) -> str | None:
 
 
 def when_text(value) -> str:
-    """„Sa 14.11. 20:00“ in Wiener Zeit - für Meldungen und Nachrichten."""
+    """„Sa 14. November · 20:00“ in Wiener Zeit (#1307) - für Meldungen und Nachrichten."""
+    from services.date_text import format_moment
+
     moment = _moment(value)
-    if not moment:
-        return "ohne Termin"
-    local = moment.astimezone(LOCAL_TZ)
-    return f"{WEEKDAYS[local.weekday()]} {local.strftime('%d.%m. %H:%M')}"
+    return format_moment(moment) if moment else "ohne Termin"
 
 
 def is_fixed(match: dict | None) -> bool:

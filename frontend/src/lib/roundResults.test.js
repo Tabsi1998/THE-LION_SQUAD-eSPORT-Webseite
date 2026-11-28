@@ -3,6 +3,10 @@ import {
   pickSession, posLabel, roundEyebrow, roundHeading, roundPath, roundSubline, rowBadges, sessionKey, summaryCards, timeText,
   visibleColumns,
 } from "./roundResults";
+import { runAtTestClock } from "@/testClock";
+
+// Feste Uhr (#1307): die Datums-Texte lassen das laufende Jahr weg und sagen „heute“/„morgen“.
+runAtTestClock();
 
 // Ergebnistabelle je Runde (#1950): Reiter in der Adresse, Spalten ohne Leere, Abzeichen, Start → Ziel und eine
 // Zusammenfassung, die fremde Namen nicht außerhalb der Tabelle zeigt. Nur erfundene Namen.
@@ -140,16 +144,16 @@ describe("Kopf", () => {
     expect(roundHeading({ country_code: "AZ", venue: "Aserbaidschan" })).toEqual({ heading: "Aserbaidschan", sub: "" });
     expect(roundHeading({ title: "Probe-GP", venue: "Probering" })).toEqual({ heading: "Probe-GP", sub: "Probering" });
     expect(roundHeading({ code: "R4" })).toEqual({ heading: "R4", sub: "" });
-    expect(roundEyebrow({ number: 1, total: 24, club_day: "2026-10-08" })).toBe("Runde 1 von 24 · Do., 08.10.2026");
+    expect(roundEyebrow({ number: 1, total: 24, club_day: "2026-10-08" })).toBe("Runde 1 von 24 · Do 8. Oktober");
     expect(neighbourLabel({ number: 2, code: "R2", country_code: "SG" })).toBe("R2 Singapur");
     expect(neighbourLabel(null)).toBe("");
-    expect(roundSubline({ code: "R1", club_day: "2026-10-08" }, "Baku City Circuit")).toBe("R1 · Do., 08.10.2026 · Baku City Circuit");
+    expect(roundSubline({ code: "R1", club_day: "2026-10-08" }, "Baku City Circuit")).toBe("R1 · Do 8. Oktober · Baku City Circuit");
     expect(roundSubline({ number: 4 })).toBe("R4");
   });
 
   it("sagt, wann ein Ergebnis kommt", () => {
-    expect(emptyText({ label: "Sprint", state: "planned", club_day: "2026-10-08", time: "20:30" })).toBe("Noch kein Ergebnis – Sprint am Do., 08.10.2026, 20:30 Uhr.");
-    expect(emptyText({ label: "Rennen", state: "missing", club_day: "2026-10-08" })).toBe("Ergebnis folgt – Rennen am Do., 08.10.2026.");
+    expect(emptyText({ label: "Sprint", state: "planned", club_day: "2026-10-08", time: "20:30" })).toBe("Noch kein Ergebnis – Sprint am Do 8. Oktober · 20:30.");
+    expect(emptyText({ label: "Rennen", state: "missing", club_day: "2026-10-08" })).toBe("Ergebnis folgt – Rennen am Do 8. Oktober.");
     expect(emptyText({ label: "Rennen", state: "cancelled" })).toBe("Rennen abgesagt.");
     expect(emptyText(null)).toBe("Für diese Runde gibt es noch keine Läufe.");
   });

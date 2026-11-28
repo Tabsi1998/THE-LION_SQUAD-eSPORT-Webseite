@@ -1,6 +1,11 @@
 const path = require("node:path");
 const { test, expect } = require("@playwright/test");
 
+// Feste Uhr (#1307): die Datums-Texte lassen das laufende Jahr weg und sagen „heute“/„morgen“ - Samstag, 28.11.2026.
+test.beforeEach(async ({ page }) => {
+  await page.clock.install({ time: new Date("2026-11-28T10:00:00Z") });
+});
+
 // Mehrere Staffeln je Liga (#1623, #1627, docs/LIGA.md „B.4 Los auf mehrere Staffeln“ und „F.2 … Platzprüfung“) im echten Browser, Server
 // nachgestellt: Staffeln auslosen mit Vorschau, Tausch mit Grund und Zuteilen; die Platzprüfung im Abschnitt und im Blatt „Neue Season
 // aus …“; neue Co-Teams im Eingang zuerst in der untersten Liga. Bei 390 und 1440 px ohne seitliches Scrollen. Mit E2E_SCREENS_DIR legt
@@ -177,7 +182,7 @@ test.describe("Liga: mehrere Staffeln je Liga", () => {
 
       await sheet.getByTestId("draw-apply").click();
       await expect(sheet).toHaveCount(0);
-      await expect(page.getByTestId("draw-state-1")).toContainText("Los Nr. 1 – übernommen am 20.01.2027, 19:05");
+      await expect(page.getByTestId("draw-state-1")).toContainText("Los Nr. 1 – übernommen am Mi 20. Jänner 2027 · 19:05");
       expect(sent).toEqual([
         ["create", {}],
         ["swap", { squad_id: "q5", other_squad_id: "q6", reason: "Terminwunsch beider Teams" }],

@@ -23,7 +23,7 @@ import { useNavigationGuard } from "@/lib/navigationGuard";
 import { accentStyle } from "@/lib/leagueLook";
 import { selectableModes } from "@/lib/gameMatchData";
 import { LeagueEmblem } from "@/components/tls/league/public/LeagueLook";
-import { viennaDate } from "@/lib/vienna";
+import { formatWhen } from "@/lib/datetime";
 import {
   VISIBILITY_SHORT, isCancelledSeason, longestSeries, modeOrderProblem, orderLengthNote, sameOrder, seasonToForm, settingsLine,
 } from "@/lib/league";
@@ -51,7 +51,6 @@ import { SeasonTabForm } from "./SeasonTabForm";
 import { toast } from "sonner";
 import { SOLO_SUCCESSOR_FOLLOWS, isSoloLeague, participantLabel } from "@/lib/leagueParticipants";
 
-const LONG_DAY = { day: "2-digit", month: "2-digit", year: "numeric" };
 const SAVE_LABELS = {
   ueberblick: "Überblick speichern", spielbetrieb: "Spielbetrieb speichern", termine: "Termine speichern", anmeldung: "Anmeldung und Kader speichern",
   tabelle: "Tabelle speichern", ligen: "Staffelgröße speichern",
@@ -430,7 +429,7 @@ export default function AdminLeagueSeasonPage() {
               <div className="min-w-0">
                 <h1 className="tls-type-title break-words">{data.league.name} · {season.name}</h1>
                 <p className="mt-1 tls-type-small text-white/60" data-testid="season-head">
-                  {data.game?.name || "Spiel fehlt"} · {participantLabel(data.league)} · ab {viennaDate(season.start_date, LONG_DAY)} · Sichtbarkeit: {VISIBILITY_SHORT[season.visibility]}
+                  {data.game?.name || "Spiel fehlt"} · {participantLabel(data.league)} · ab {formatWhen(season.start_date, { time: false })} · Sichtbarkeit: {VISIBILITY_SHORT[season.visibility]}
                 </p>
               </div>
             </div>

@@ -1,6 +1,10 @@
 import { render, screen } from "@testing-library/react";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { StatusBadge } from "@/components/tls/StatusBadge";
+import { runAtTestClock } from "@/testClock";
+
+// Feste Uhr (#1307): die Datums-Texte lassen das laufende Jahr weg und sagen „heute“/„morgen“.
+runAtTestClock();
 
 // Jahreswertung (#1222): mit laufender Saison die Weiterleitung; ohne laufende der letzte Endstand (auch archiviert)
 // mit den ersten zehn und dem Start der nächsten; gar keine Saison: ein Satz für alle - die Anleitung für die
@@ -58,7 +62,7 @@ test("keine laufende Saison: Endstand der letzten (auch archiviert), die ersten 
   answer({ featured: S2027, seasons: [S2027, S2024, S2025], standings: { "wertung-2025": ROWS } });
   renderPage();
   expect(await screen.findByTestId("season-current-title")).toHaveTextContent("Endstand 2025");
-  expect(screen.getByTestId("season-next")).toHaveTextContent("Die nächste Wertung beginnt am 10. Jänner 2027.");
+  expect(screen.getByTestId("season-next")).toHaveTextContent("Die nächste Wertung beginnt am So 10. Jänner 2027.");
   const rows = screen.getByTestId("season-final-rows").querySelectorAll("li");
   expect(rows).toHaveLength(10);
   expect(rows[0]).toHaveTextContent("#1Spieler1300 Punkte");

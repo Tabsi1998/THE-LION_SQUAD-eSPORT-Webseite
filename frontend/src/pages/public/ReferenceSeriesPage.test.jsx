@@ -1,5 +1,9 @@
 import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { MemoryRouter, Route, Routes, useLocation } from "react-router-dom";
+import { runAtTestClock } from "@/testClock";
+
+// Feste Uhr (#1307): die Datums-Texte lassen das laufende Jahr weg und sagen „heute“/„morgen“.
+runAtTestClock();
 
 // Serienseite (#1742, #1745): Kopf, Fortschritt, Gesamtwertung mit gestrichenen Ergebnissen und Finalgrenze, Filter
 // „Nur Vereinsspieler“, Finalrechner als Richtwert, Finale als eigene Runde, Termine; nicht indexiert; unbekannt oder
@@ -68,7 +72,7 @@ test("Kopf, Fortschritt, Regeln und Termine, nicht indexiert", async () => {
   expect(apiMock.get).toHaveBeenCalledWith("/reference-series/public/probe-cup/2026-division-1");
   expect(screen.getByText("1vs1 · Probe Liga · Probespiel")).toBeInTheDocument();
   expect(screen.getByTestId("series-progress")).toHaveTextContent("2 von 3 Runden gewertet · 1 abgesagt");
-  expect(screen.getByTestId("series-next")).toHaveTextContent("Nächstes Turnier: Q3 · Do., 12.11.2026 · 20:30");
+  expect(screen.getByTestId("series-next")).toHaveTextContent("Nächstes Turnier: Q3 · Do 12. November · 20:30");
   const rules = screen.getByTestId("series-rules");
   expect(rules).toHaveTextContent("Platz 1 bis 4: 10 · 8 · 6 · 4");
   expect(rules).toHaveTextContent("Ein Streichergebnis");
@@ -76,7 +80,7 @@ test("Kopf, Fortschritt, Regeln und Termine, nicht indexiert", async () => {
   expect(rules).toHaveTextContent("Die besten 2 der Gesamtwertung");
   const calendar = screen.getAllByTestId("series-page-round");
   expect(calendar.map((item) => item.dataset.state)).toEqual(["scored", "scored", "cancelled", "planned", "planned"]);
-  expect(calendar[4]).toHaveTextContent("ursprünglich Do., 19.11.2026");
+  expect(calendar[4]).toHaveTextContent("ursprünglich Do 19. November");
   expect(useDocumentTitle).toHaveBeenLastCalledWith("Probe Cup 2026 · Division 1", undefined, { robots: "noindex, follow" });
 });
 

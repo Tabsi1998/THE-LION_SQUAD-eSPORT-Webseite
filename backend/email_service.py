@@ -269,7 +269,7 @@ def tpl_registration_rejected(tournament_title: str, reason: str = "", url: str 
 def tpl_checkin_closes_soon(tournament_title: str, when: str, url: str) -> tuple[str, str]:
     return f"Check-in endet bald: {tournament_title}", _wrap(
         "Check-in endet bald",
-        f"<p>Du bist für <strong>{tournament_title}</strong> noch nicht eingecheckt. Der Check-in endet um <strong>{when}</strong>.</p>"
+        f"<p>Du bist für <strong>{tournament_title}</strong> noch nicht eingecheckt. Der Check-in endet am <strong>{when}</strong>.</p>"
         "<p>Bitte checke jetzt ein, wenn du wirklich mitspielst.</p>",
         "Jetzt einchecken", url,
     )

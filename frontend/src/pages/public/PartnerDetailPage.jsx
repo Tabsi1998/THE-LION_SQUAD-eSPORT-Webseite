@@ -14,7 +14,8 @@ import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 import { useCanonicalSlugRedirect } from "@/hooks/useCanonicalSlugRedirect";
 import { seoTextPreview } from "@/lib/textPreview";
-import { asInstant, viennaDate } from "@/lib/vienna";
+import { formatWhen } from "@/lib/datetime";
+import { asInstant } from "@/lib/vienna";
 import { PublicLoadingState } from "@/components/tls/PublicLoadingState";
 import { PartnerSeries } from "@/components/tls/PartnerSeries";
 import { ShortCaps } from "@/components/tls/ShortCaps";
@@ -34,7 +35,7 @@ function formatDate(value) {
   if (!value) return "";
   const date = asInstant(value);
   if (Number.isNaN(date.getTime())) return "";
-  return viennaDate(date, { day: "2-digit", month: "long", year: "numeric" });
+  return formatWhen(date, { time: false });
 }
 
 export function channelDetail(channel, twitch, discord) {

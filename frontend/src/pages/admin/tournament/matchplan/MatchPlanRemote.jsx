@@ -2,15 +2,15 @@ import { useState } from "react";
 import { countOf } from "@/lib/schedulePlanText";
 import { finderFor, sourceLabel } from "@/lib/slotSource";
 import { formatScheduleGroupLabel } from "@/lib/tournamentLabels";
-import { viennaDateTime, viennaTime } from "@/lib/vienna";
+import { formatClock, formatWhen } from "@/lib/datetime";
 import "./matchplan.css";
 
 // Online und Liga (#1557): keine Stationen, keine Zeitleiste je Station. Online zählen Fristen je Spiel, in der Liga
 // Spielwochen mit Frist. Die Fristen rechnet der Server (GET …/schedule/deadlines, …/matchdays) - hier wird nur gezeigt.
 
-const hm = (value) => viennaTime(value, { hour: "2-digit", minute: "2-digit" }) || "–";
-const dayTime = (value) => viennaDateTime(value, { weekday: "short", day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" }) || "–";
-const day = (value) => viennaDateTime(value, { day: "2-digit", month: "2-digit" }) || "–";
+const hm = (value) => formatClock(value) || "–";
+const dayTime = (value) => formatWhen(value) || "–";
+const day = (value) => formatWhen(value, { time: false }) || "–";
 const DONE = new Set(["completed", "forfeit", "archived", "bye", "no_show"]);
 const RUNNING = new Set(["in_progress", "running", "waiting_result"]);
 

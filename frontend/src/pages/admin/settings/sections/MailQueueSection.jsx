@@ -6,7 +6,7 @@
 import { useState } from "react";
 import { CheckCircle2, ChevronDown, Clock, Eye, EyeOff, RefreshCw, Search, Send, SkipForward, Trash2, XCircle } from "lucide-react";
 import { QUEUE_STATES, STATUS_LABELS, mailErrorKnown, mailTemplateLabel, queueActions, queueDetail } from "../shared";
-import { viennaDateTime } from "@/lib/vienna";
+import { formatWhen } from "@/lib/datetime";
 
 import { ROLE_COLORS } from "@/lib/categoryColors";
 const STATE_STYLE = {
@@ -18,10 +18,9 @@ const STATE_STYLE = {
 };
 
 // Tag und Uhrzeit ohne Sekunden - „8.10.2026, 09:30“.
-const WHEN = { day: "numeric", month: "numeric", year: "numeric", hour: "2-digit", minute: "2-digit" };
 
 function when(value) {
-  return viennaDateTime(value, WHEN);
+  return formatWhen(value);
 }
 
 function StateBadge({ job, testId }) {

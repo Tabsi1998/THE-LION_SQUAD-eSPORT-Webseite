@@ -1,5 +1,9 @@
 import { fireEvent, render, screen, within } from "@testing-library/react";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
+import { runAtTestClock } from "@/testClock";
+
+// Feste Uhr (#1307): die Datums-Texte lassen das laufende Jahr weg und sagen „heute“/„morgen“.
+runAtTestClock();
 
 // Runde mit Läufen (#1930) auf der Seite einer Rennliga: eine Runde mit Lauf-Chips im Kalender, ein Kopf je Runde über
 // Sprint und Rennen im Raster, Fortschritt in Runden, der nächste Lauf, Punkte je Lauf und im Fahrer-Detail Poles, Ø Start
@@ -90,7 +94,7 @@ test("Kalender: je Runde eine Zeile mit Flagge, Ort und den Lauf-Chips samt Uhrz
   const chips = within(weekends[0]).getAllByTestId("session-chip");
   // Am zweiten Tag mit Wochentag - die Chips sagen Lauf, Zeit und Status.
   expect(chips.map((chip) => chip.textContent.split(":")[0])).toEqual(["Quali20", "Sprint20", "HauptrennenSo 20"]);
-  expect(chips[0]).toHaveAttribute("title", "Qualifying, Sa., 07.03.2026 · 20:00, Gewertet");
+  expect(chips[0]).toHaveAttribute("title", "Qualifying, Sa 7. März · 20:00, Gewertet");
   // Sieger je Lauf, wenn die Runde mehrere zählende Läufe hat - ein Qualifying hat keine Zeile.
   const winners = within(weekends[0]).getAllByTestId("racing-round-winner");
   expect(winners.map((line) => line.textContent)).toEqual([
@@ -102,7 +106,7 @@ test("Kalender: je Runde eine Zeile mit Flagge, Ort und den Lauf-Chips samt Uhrz
 test("Fortschritt in Runden, der nächste Lauf und die Punkte je Lauf", async () => {
   renderPage();
   expect(await screen.findByTestId("series-progress")).toHaveTextContent("1 von 2 Rennen gewertet");
-  expect(screen.getByTestId("series-next")).toHaveTextContent("Nächstes Rennen: R2 · Qualifying · Sa., 14.03.2026 · 20:00");
+  expect(screen.getByTestId("series-next")).toHaveTextContent("Nächstes Rennen: R2 · Qualifying · Sa 14. März · 20:00");
   expect(screen.getByTestId("racing-session-points")).toHaveTextContent("Punkte je Lauf Sprint: 12 · 9 · 7 · 6 · 5 · 4 · 3 · 2 · 1");
 });
 

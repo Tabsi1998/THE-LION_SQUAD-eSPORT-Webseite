@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Link2, Search } from "lucide-react";
 import { api, formatRequestError } from "@/lib/api";
-import { viennaDateTime } from "@/lib/vienna";
+import { formatWhen } from "@/lib/datetime";
 import { techniqueList } from "@/lib/shopTechniques";
 
 // Produktsuche im Printful-Katalog (#2069) für Schritt 1: Die Produktnummer steht im Printful-Dashboard nirgends. Gesucht
@@ -72,7 +72,7 @@ export default function ProductSearch({ disabled, current, onPick }) {
         <div className="space-y-2" aria-live="polite">
           <p className="tls-type-small text-white/50" data-testid="shop-search-meta">
             {answer.link ? answer.link.detail : `${answer.total} Treffer${answer.total > answer.results.length ? `, die ersten ${answer.results.length}` : ""}`}
-            {` · Katalog vom ${viennaDateTime(answer.fetched_at)}`}{answer.stale ? " (Printful gerade nicht erreichbar – letzter Stand)" : ""}
+            {` · Katalog vom ${formatWhen(answer.fetched_at, { relative: false })}`}{answer.stale ? " (Printful gerade nicht erreichbar – letzter Stand)" : ""}
           </p>
           <ul className="divide-y divide-white/10 border border-white/10 rounded-sm" data-testid="shop-search-results">
             {answer.results.map((row) => (

@@ -28,7 +28,6 @@ import { AwardBanner } from "@/components/tls/AwardBanner";
 import { RewardChip } from "@/components/tls/rewards/RewardChip";
 import { EmblemRow, TrophyCabinet } from "@/components/tls/rewards/TrophyCabinet";
 import { TeamRankBanners } from "@/components/tls/league/RankBannerCopy";
-import { viennaDateTime } from "@/lib/vienna";
 import { departureWarning } from "@/lib/squadShortage";
 import { teamLogoUpload } from "@/lib/svgLogo";
 import { TeamsPanel } from "@/pages/user/profile/TeamsPanel";
@@ -52,6 +51,7 @@ import { LeagueOverallStanding } from "@/components/tls/league/LeagueOverallStan
 import { LeagueSeasonLine } from "@/components/tls/league/LeagueSeasonLine";
 import { LeagueMomentHint } from "@/components/tls/league/LeagueMomentHint";
 import { ShortCaps } from "@/components/tls/ShortCaps";
+import { When } from "@/components/tls/When";
 
 const TEAM_TAB_ALIASES = { awards: "trophies", trophies: "trophies", trophaeen: "trophies", overview: "overview" };
 
@@ -680,7 +680,7 @@ function TeamChat({ team, user }) {
                 <div className={`max-w-[85%] border rounded-sm px-3 py-2 ${mine ? "border-[#29B6E8]/40 bg-[#29B6E8]/10" : "border-white/10 bg-[#0A0A0A]"}`}>
                   <div className="flex items-center gap-2 tls-type-small text-quiet">
                     <span className={mine ? "text-[#29B6E8]" : "text-white/55"}>{message.author?.display_name || message.author?.username || "Benutzer"}</span>
-                    {message.created_at && <span>{viennaDateTime(message.created_at, { dateStyle: "short", timeStyle: "short" })}</span>}
+                    {message.created_at && <span><When value={message.created_at} /></span>}
                   </div>
                   {message.message && <div className="mt-1 whitespace-pre-wrap break-words tls-type-small text-white/85"><MentionText text={message.message} /></div>}
                   <ChatMessageAttachments attachments={message.attachments} />

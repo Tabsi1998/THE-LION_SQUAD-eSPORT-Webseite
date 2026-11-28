@@ -1,14 +1,13 @@
 // Los auf mehrere Staffeln einer Liga N (#1623, docs/LIGA.md „B.4 Los auf mehrere Staffeln“): Wörter für Panel und Vorschau.
 // Gelost, geprüft und gezählt wird auf dem Server - hier steht nur, wie es heißt.
-import { viennaDateTime } from "@/lib/vienna";
+import { formatWhen } from "@/lib/datetime";
 
-const WHEN = { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" };
 const STEP_TEXT = { create: "Ausgelost", redraw: "Neu ausgelost", swap: "Getauscht", apply: "Übernommen" };
 
 export const DRAW_REASON_MIN = 5;
 
 export function drawWhen(value) {
-  return value ? viennaDateTime(value, WHEN) : "";
+  return value ? formatWhen(value) : "";
 }
 
 /** „3 Co-Teams warten auf eine Staffel“. */

@@ -4,6 +4,10 @@ import {
   SEASON_TABS, TAB_FIELDS, TAB_PAYLOAD_KEYS, changedPlaces, dirtyTabs, nicknameRepeatsLevel, orderPoolHints, readinessAnchor, rebaseForm, rulesNotice,
   seasonAnchorUrl, seasonPhases, seasonTarget, applicationEnd, staffelNeeds, staffelStand, tabPayload,
 } from "./seasonTabs";
+import { runAtTestClock } from "@/testClock";
+
+// Feste Uhr (#1307): die Datums-Texte lassen das laufende Jahr weg und sagen „heute“/„morgen“.
+runAtTestClock();
 
 // Season-Seite mit Reitern (#2267): Adresse ↔ Reiter, Felder je Reiter, Speichern je Reiter, Ablaufleiste, Hinweise.
 
@@ -150,7 +154,7 @@ describe("Liga-Stand einer Staffel (#2453)", () => {
 
   it("eine Staffel im Entwurf zeigt den Stand der Season, je Phase wie die Ablaufleiste", () => {
     expect(stand({}, "2026-10-20T10:00:00Z")).toMatchObject({ key: "vorbereitung", label: "Vorbereitung", filter: "league:vorbereitung" });
-    expect(stand({}, "2026-11-02T10:00:00Z")).toMatchObject({ key: "anmeldung", label: "Anmeldung offen bis 06.11., 23:59" });
+    expect(stand({}, "2026-11-02T10:00:00Z")).toMatchObject({ key: "anmeldung", label: "Anmeldung offen bis Fr 6. November · 23:59" });
     expect(stand({}, "2026-11-08T10:00:00Z")).toMatchObject({ key: "einteilung", label: "Einteilung" });
     expect(stand({ status: "live" }, "2026-11-12T10:00:00Z", { ...OPEN, status: "active" })).toMatchObject({ key: "spielbetrieb", label: "Spielbetrieb", live: true });
     expect(stand({ status: "paused" }, "2026-11-12T10:00:00Z", { ...OPEN, status: "active" })).toMatchObject({ label: "Spielbetrieb · pausiert", live: false });
@@ -206,15 +210,15 @@ describe("Liga-Stand einer Staffel (#2453)", () => {
     // Fenster bis 30.11., Start 10.11., Frist 2 Tage: wirksam bis 11.11. 23:00 UTC = 12.11. 00:00 Wien.
     const late = { ...OPEN, application_closes_at: "2026-11-29T23:00:00+00:00", late_registration_days: 2 };
     expect(applicationEnd(late)).toBe(new Date("2026-11-11T23:00:00Z").getTime());
-    expect(stand({}, "2026-11-11T10:00:00Z", late)).toMatchObject({ key: "anmeldung", label: "Anmeldung offen bis 12.11., 00:00" });
+    expect(stand({}, "2026-11-11T10:00:00Z", late)).toMatchObject({ key: "anmeldung", label: "Anmeldung offen bis Do 12. November · 00:00" });
     // Nach dem wirksamen Ende, vor dem Fensterende: nicht mehr Anmeldung.
     expect(stand({}, "2026-11-20T10:00:00Z", late).key).toBe("einteilung");
     const bar = seasonPhases({ season: late, divisions: [], now: new Date("2026-11-20T10:00:00Z") });
     expect(bar.find((step) => step.state === "current").key).toBe("einteilung");
-    expect(bar.find((step) => step.key === "anmeldung").when).toMatch(/– 12\.11\., 00:00$/);
+    expect(bar.find((step) => step.key === "anmeldung").when).toMatch(/– Do 12\. November · 00:00$/);
     // Vom Server geliefert geht vor.
     const served = { ...late, application_effective_closes_at: "2026-11-15T11:00:00+00:00" };
-    expect(stand({}, "2026-11-14T10:00:00Z", served).label).toBe("Anmeldung offen bis 15.11., 12:00");
+    expect(stand({}, "2026-11-14T10:00:00Z", served).label).toBe("Anmeldung offen bis So 15. November · 12:00");
     // Endet das Fenster vor dem Start, gilt es selbst.
     expect(applicationEnd(OPEN)).toBe(new Date(OPEN.application_closes_at).getTime());
   });
@@ -235,7 +239,7 @@ describe("Liga-Stand einer Staffel (#2453)", () => {
   it("verborgene Season mit offenem Fenster: kein grünes „Anmeldung offen“, dafür „Sichtbarkeit einschalten“ (Review #2453, 5c)", () => {
     for (const visibility of ["off", "admins"]) {
       const hidden = { ...OPEN, visibility };
-      expect(stand({}, "2026-11-02T10:00:00Z", hidden)).toMatchObject({ key: "anmeldung", hidden: true, label: "Anmeldung offen bis 06.11., 23:59 · Season verborgen" });
+      expect(stand({}, "2026-11-02T10:00:00Z", hidden)).toMatchObject({ key: "anmeldung", hidden: true, label: "Anmeldung offen bis Fr 6. November · 23:59 · Season verborgen" });
       const needs = staffelNeeds(STAFFEL, { season: hidden, now: new Date("2026-11-02T10:00:00Z") });
       expect(needs[0]).toEqual({ code: "visibility", text: "Sichtbarkeit einschalten – Teams sehen die Anmeldung nicht", to: "/admin/leagues/seasons/s1" });
     }

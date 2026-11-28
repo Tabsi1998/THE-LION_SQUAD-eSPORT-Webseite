@@ -1,4 +1,5 @@
-import { formatDateTime } from "@/lib/datetime";
+import { formatClock, formatWhen } from "@/lib/datetime";
+import { viennaDay } from "@/lib/vienna";
 
 // Die wirksamen Check-in-Zeiten (#1938): was für Spieler wirklich galt. Der Server zieht „Check-in öffnet“ und „Check-in
 // endet“ beim Check-in von Hand nach; ältere Turniere (oder ein Ende, das von Hand vor die Öffnung gesetzt wurde) zeigen
@@ -30,7 +31,10 @@ export function effectiveCheckIn(tournament, now = Date.now()) {
 /** Die Zeile „ab … bis …“ für „Dein Stand“ - ohne glaubwürdige Öffnung nur „bis …“. */
 export function checkInLine(tournament, now = Date.now()) {
   const { from, until } = effectiveCheckIn(tournament, now);
-  return [from ? `ab ${formatDateTime(from)}` : "", until ? `bis ${formatDateTime(until)}` : ""].filter(Boolean).join(" ");
+  // Am selben Wiener Tag steht der Tag nur einmal: „ab heute 10:45 bis 10:55“.
+  const sameDay = Boolean(from && until) && viennaDay(from) === viennaDay(until);
+  const untilText = sameDay ? formatClock(until) : formatWhen(until, { now });
+  return [from ? `ab ${formatWhen(from, { now })}` : "", until ? `bis ${untilText}` : ""].filter(Boolean).join(" ");
 }
 
 /**

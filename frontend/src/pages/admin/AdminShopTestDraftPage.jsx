@@ -5,7 +5,7 @@ import { AdminLayout } from "@/components/tls/AdminLayout";
 import { StepBar } from "@/components/tls/StepBar";
 import { api, formatRequestError } from "@/lib/api";
 import { techniqueLabel } from "@/lib/shopTechniques";
-import { viennaDateTime } from "@/lib/vienna";
+import { formatWhen } from "@/lib/datetime";
 import ShopTabs from "./ShopTabs";
 import { ShortCaps } from "@/components/tls/ShortCaps";
 
@@ -289,7 +289,7 @@ function Result({ draft, onDeleted, testId }) {
       <dl className="grid gap-x-6 gap-y-2 tls-type-small sm:grid-cols-3">
         <div><dt className="text-white/50 tls-type-small">Printful-Auftrag</dt><dd className="tabular-nums font-bold" data-testid={`${testId}-order-id`}>{draft.printful_order_id ?? "–"}</dd></div>
         <div><dt className="text-white/50 tls-type-small">Stand</dt><dd>{draft.state_label}{draft.printful_status ? ` (Printful: ${draft.printful_status_label || draft.printful_status})` : ""}</dd></div>
-        <div><dt className="text-white/50 tls-type-small">Gesendet</dt><dd>{draft.sent_at ? viennaDateTime(draft.sent_at) : "–"}</dd></div>
+        <div><dt className="text-white/50 tls-type-small">Gesendet</dt><dd>{draft.sent_at ? formatWhen(draft.sent_at) : "–"}</dd></div>
       </dl>
       {draft.dashboard_url && (
         <a href={draft.dashboard_url} target="_blank" rel="noreferrer noopener" data-testid={`${testId}-dashboard`}
@@ -533,7 +533,7 @@ export default function AdminShopTestDraftPage() {
                 <div><dt className="text-white/50 tls-type-small">Position</dt><dd>1 × {preview.product_title} - {preview.variant_display || preview.variant_label} (Printful-Variante {preview.printful_variant_id})</dd></div>
                 <div className="min-w-0"><dt className="text-white/50 tls-type-small">Externe Kennung</dt><dd className="font-mono tls-type-small break-all">{preview.external_id}</dd></div>
                 <div><dt className="text-white/50 tls-type-small">Anschrift</dt><dd>{preview.recipient.name}, {preview.recipient.street}{preview.recipient.street2 ? `, ${preview.recipient.street2}` : ""}, {preview.recipient.zip} {preview.recipient.city}, {preview.recipient.country}</dd></div>
-                <div><dt className="text-white/50 tls-type-small">Gültig bis</dt><dd>{viennaDateTime(preview.expires_at)}</dd></div>
+                <div><dt className="text-white/50 tls-type-small">Gültig bis</dt><dd>{formatWhen(preview.expires_at)}</dd></div>
                 {preview.product_options?.length > 0 && (
                   <div data-testid="shop-test-draft-options"><dt className="text-white/50 tls-type-small">Produktoptionen (an Printful)</dt>
                     <dd>{preview.product_options.map((row) => `${row.label}: ${row.value_label}`).join(" · ")}</dd></div>
@@ -572,7 +572,7 @@ export default function AdminShopTestDraftPage() {
                 {others.map((item) => (
                   <li key={item.id} className="border border-white/10 rounded-sm p-3 space-y-2 min-w-0" data-testid={`shop-test-draft-item-${item.id}`}>
                     <p className="tls-type-small font-bold">{item.product_title} - {item.variant_display || item.variant_label}</p>
-                    <p className="tls-type-small text-white/55">{viennaDateTime(item.created_at)}</p>
+                    <p className="tls-type-small text-white/55">{formatWhen(item.created_at)}</p>
                     <Result draft={item} onDeleted={deleted} testId={`shop-test-draft-item-${item.id}-result`} />
                   </li>
                 ))}

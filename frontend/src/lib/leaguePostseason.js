@@ -1,5 +1,6 @@
 // Playoffs und Relegation (#2404, docs/LIGA.md „F.6 Playoffs und Relegation“): Texte und kleine Rechnungen für das Cockpit im Reiter
 // „Abschluss“ und für die Ligaseite. Was gilt und was geht, sagt der Server - hier steht nur, wie es heißt.
+import { formatRange, formatWhen } from "@/lib/datetime";
 
 export const REASON_MIN = 5;
 export const KIND_LABELS = { playoff: "Playoffs", relegation: "Relegation" };
@@ -17,22 +18,20 @@ export function partState(part) {
   return STATES[part?.state] || STATES.waiting;
 }
 
-/** „31.03.“ aus „2031-03-31“ - ein Kalendertag ohne Uhrzeit, darum ohne Zeitzone gerechnet. */
+/** „Mo 31. März“ aus „2031-03-31“ - ein Kalendertag ohne Uhrzeit (#1307). */
 export function shortDay(value) {
-  const [year, month, day] = String(value || "").slice(0, 10).split("-");
-  return year && month && day ? `${day}.${month}.` : "";
+  return value ? formatWhen(String(value).slice(0, 10), { time: false }) : "";
 }
 
-/** „31.03.2031“ aus „2031-03-31“. */
+/** Derselbe Tag; das Jahr steht dabei, wenn es nicht das laufende ist. */
 export function fullDay(value) {
-  const [year, month, day] = String(value || "").slice(0, 10).split("-");
-  return year && month && day ? `${day}.${month}.${year}` : "";
+  return shortDay(value);
 }
 
-/** „31.03.–06.04.2031“ - die Woche einer Runde. */
+/** „Mo 31. März – So 6. April“ - die Woche einer Runde. */
 export function weekRange(start, end) {
   if (!start || !end) return fullDay(start || end);
-  return `${shortDay(start)}–${fullDay(end)}`;
+  return formatRange(String(start).slice(0, 10), String(end).slice(0, 10));
 }
 
 /** „Staffel A · Platz 2“ - woher ein Team in der Setzliste kommt. */

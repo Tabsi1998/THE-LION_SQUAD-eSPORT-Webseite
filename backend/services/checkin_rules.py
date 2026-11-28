@@ -78,12 +78,11 @@ def iso(value) -> str | None:
 
 
 def when_text(value) -> str:
-    """„Sa 14.11. 20:00“ in Wiener Zeit - für Meldungen und Nachrichten (wie ``league_schedule.when_text``)."""
+    """„Sa 14. November · 20:00“ in Wiener Zeit (#1307) - für Meldungen und Nachrichten (wie ``league_schedule.when_text``)."""
+    from services.date_text import format_moment
+
     parsed = moment(value)
-    if not parsed:
-        return "ohne Termin"
-    local = parsed.astimezone(LOCAL_TZ)
-    return f"{WEEKDAYS[local.weekday()]} {local.strftime('%d.%m. %H:%M')}"
+    return format_moment(parsed) if parsed else "ohne Termin"
 
 
 def clock_text(value) -> str:

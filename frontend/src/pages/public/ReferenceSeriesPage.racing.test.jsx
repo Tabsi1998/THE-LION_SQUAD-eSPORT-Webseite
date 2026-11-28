@@ -1,5 +1,9 @@
 import { fireEvent, render, screen, within } from "@testing-library/react";
 import { MemoryRouter, Route, Routes, useLocation } from "react-router-dom";
+import { runAtTestClock } from "@/testClock";
+
+// Feste Uhr (#1307): die Datums-Texte lassen das laufende Jahr weg und sagen „heute“/„morgen“.
+runAtTestClock();
 
 // Seite Rennliga (#1746): Umschalter zwischen den Saisons der Spur, Rennraster mit Podium, schnellster Runde, Ausfall,
 // Abstand und Abweichung zum offiziellen Wert, Teamwertung mit Balken, Vereins-Garage mit Teamduell, Fahrer-Detail nur
@@ -112,7 +116,7 @@ test("Rennliga: Umschalter zwischen den Saisons, Fortschritt in Rennen, Regeln m
   expect(links[0]).toHaveAttribute("aria-current", "page");
   expect(links[2]).toHaveAttribute("href", "/references/series/probe-racing/2025-f1");
   expect(screen.getByTestId("series-progress")).toHaveTextContent("2 von 3 Rennen gewertet · 1 abgesagt");
-  expect(screen.getByTestId("series-next")).toHaveTextContent("Nächstes Rennen: R4 · So., 29.11.2026 · 20:30");
+  expect(screen.getByTestId("series-next")).toHaveTextContent("Nächstes Rennen: R4 · morgen 20:30");
   expect(screen.getByTestId("racing-bonus")).toHaveTextContent("+1 Punkt für die schnellste Runde (bis Platz 10)");
 });
 
@@ -179,7 +183,7 @@ test("Fahrer-Anpassung fürs Team (#2000): „−5 (Fahrer)“ bei der Teamsumme
   const rows = within(within(section).getByTestId("series-table")).getAllByTestId("series-row");
   const lions = within(rows[1]).getByTestId("racing-driver-adjustment");
   expect(lions).toHaveTextContent("−5 (Probe Lion Eins)");
-  expect(lions).toHaveAttribute("title", "Anpassung −5 · Video fehlt · R2 · 08.11.2026 – Probe Lion Eins, zählt auch fürs Team");
+  expect(lions).toHaveAttribute("title", "Anpassung −5 · Video fehlt · R2 · So 8. November – Probe Lion Eins, zählt auch fürs Team");
   expect(within(rows[0]).getByTestId("racing-driver-adjustment")).toHaveTextContent("+2 (Name ausgeblendet)");
   expect(within(rows[2]).queryByTestId("racing-driver-adjustment")).toBeNull();
   const detail = screen.getByTestId("racing-driver");

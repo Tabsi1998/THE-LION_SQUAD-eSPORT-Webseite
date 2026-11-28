@@ -31,6 +31,7 @@ from models import new_id, now_utc
 from services import season_raffles as raffles
 from services import seasons
 from services.achievement_visibility import ranked_users_query
+from services.date_text import format_moment, format_range
 from services.private_fields import private_projection
 from services.season_collections import PROGRESS  # noqa: F401 - umgezogen (#1420)
 
@@ -406,10 +407,10 @@ def terms(hunt: dict) -> list[str]:
     """Die Spielregeln in einfachen Sätzen - Web und App zeigen denselben Text."""
     start, end = window(int(hunt["year"]))
     lines = [
-        f"Die Suche läuft von Karfreitag, {start.day}.{start.month}., bis Ostermontag, {end.day}.{end.month}.{end.year}, 23:59 Uhr.",
+        f"Die Suche läuft von Karfreitag bis Ostermontag ({format_range(start, end)}), am letzten Tag bis 23:59 Uhr.",
         f"Versteckt sind {int(hunt.get('egg_count') or 0)} Eier auf der Website und in der App. Mitzählen kann, wer angemeldet ist.",
         "Jedes Ei zählt einmal. Wer zu schnell klickt oder Programme sucht lässt, sammelt nichts.",
-        f"Ab {hints_open_at(hunt).day}.{hints_open_at(hunt).month}. gibt es zu jedem fehlenden Ei einen Hinweis.",
+        f"Ab {format_moment(hints_open_at(hunt), time=False)} gibt es zu jedem fehlenden Ei einen Hinweis.",
     ]
     kinds = {prize.get("kind") for prize in hunt.get("prizes") or []}
     if "raffle_all" in kinds:

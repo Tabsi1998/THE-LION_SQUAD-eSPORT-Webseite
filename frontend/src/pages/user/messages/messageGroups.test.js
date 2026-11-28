@@ -1,4 +1,8 @@
 import { buildTimeline, dayLabel, mergeMessages } from "./messageGroups";
+import { runAtTestClock } from "@/testClock";
+
+// Feste Uhr (#1307): die Datums-Texte lassen das laufende Jahr weg und sagen „heute“/„morgen“.
+runAtTestClock();
 
 // Die Unterhaltung als Chat (#254): Tages-Trenner, zusammengefasste Koepfe,
 // Nachladen ohne Doppelte und der Zaehler fuer neue Nachrichten.
@@ -12,7 +16,7 @@ function msg(id, sender, at, text = "") {
 test("Tages-Trenner heissen Heute, Gestern oder tragen das Datum", () => {
   expect(dayLabel("2026-09-16T08:00:00+02:00", NOW)).toBe("Heute");
   expect(dayLabel("2026-09-15T23:59:00+02:00", NOW)).toBe("Gestern");
-  expect(dayLabel("2026-09-12T12:00:00+02:00", NOW)).toBe("12.09.2026");
+  expect(dayLabel("2026-09-12T12:00:00+02:00", NOW)).toBe("Sa 12. September");
   expect(dayLabel("kaputt", NOW)).toBe("");
 });
 

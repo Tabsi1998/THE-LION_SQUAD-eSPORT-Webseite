@@ -11,7 +11,7 @@ import { OpsOverview } from "./ops/OpsOverview";
 import { AppLogsTab } from "./ops/AppLogsTab";
 import { useLiveRefresh } from "@/hooks/useLiveRefresh";
 import { RATING_LABELS, STATUS_LABELS, TONE_COLORS, describeRun, formatVital, ratingTone } from "@/lib/ops";
-import { viennaDateTime } from "@/lib/vienna";
+import { formatWhen } from "@/lib/datetime";
 import { ShortCaps } from "@/components/tls/ShortCaps";
 
 // Betrieb (#233, #265): Server-Fehler als Gruppen mit Zähler, die langsamsten
@@ -68,7 +68,7 @@ function ReachabilityStrip({ reachability }) {
 function formatTime(value) {
   if (!value) return "-";
   try {
-    return viennaDateTime(value);
+    return formatWhen(value);
   } catch {
     return value;
   }

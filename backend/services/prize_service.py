@@ -5,7 +5,7 @@ Status flow: pending  → ready → picked_up
                               → expired (after deadline reached)
 """
 import logging
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Optional
 
 from pymongo.errors import DuplicateKeyError
@@ -386,7 +386,10 @@ async def _sync_f1_prizes(challenge_id: str, *, review_stale: bool) -> dict:
 
 def _deadline_text(value) -> str:
     try:
-        return datetime.fromisoformat(value).strftime("%d.%m.%Y")
+        from services.date_text import format_moment
+
+        moment = datetime.fromisoformat(value)
+        return format_moment(moment if moment.tzinfo else moment.replace(tzinfo=timezone.utc), time=False)
     except (TypeError, ValueError):
         return ""  # keine oder unlesbare Abholfrist: dann nennt die Meldung keine
 

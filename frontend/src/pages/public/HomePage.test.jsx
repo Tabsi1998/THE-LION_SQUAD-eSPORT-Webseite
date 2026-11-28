@@ -1,5 +1,9 @@
 import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
+import { runAtTestClock } from "@/testClock";
+
+// Feste Uhr (#1307): die Datums-Texte lassen das laufende Jahr weg und sagen „heute“/„morgen“.
+runAtTestClock();
 
 // Startseite lebendiger (#224): Countdown zum nächsten Termin, Live-Zahlen in der Karte, und
 // nach einer Änderung über den Strom leuchtet die Karte kurz mit „Neu“ - beim ersten Laden nicht.
@@ -287,7 +291,7 @@ test("#2324: offene Liga-Anmeldung als Hinweis und in „Nächste Termine“, na
 
   const promo = await screen.findByTestId("home-league-promo-tirol-season-1");
   expect(promo).toHaveTextContent("Tiroler Liga · Season 1");
-  expect(screen.getByTestId("home-league-promo-deadline-tirol-season-1")).toHaveTextContent(/30\.09\.2026, 23:59 Uhr/);
+  expect(screen.getByTestId("home-league-promo-deadline-tirol-season-1")).toHaveTextContent("Mi 30. September · 23:59");
   expect(screen.getByTestId("home-league-promo-seats-tirol-season-1")).toHaveTextContent("3 von 16 Startplätzen frei");
   expect(screen.getByTestId("home-league-promo-apply-tirol-season-1")).toHaveAttribute("href", "/liga/tirol/season-1/anmelden");
   expect(screen.getByTestId("home-league-promo-page-tirol-season-1")).toHaveAttribute("href", "/liga/tirol/season-1");
@@ -299,7 +303,7 @@ test("#2324: offene Liga-Anmeldung als Hinweis und in „Nächste Termine“, na
   // Zustands-Schild (#1306): der Countdown steht neben dem Schild, nicht darin.
   expect(row).toHaveTextContent("Anmeldung offen, endet");
   expect(row).toHaveTextContent("3 von 16 Startplätzen frei");
-  expect(screen.getByTestId("home-next-period-tirol-season-1")).toHaveTextContent("05.10.2026 – 13.12.2026");
+  expect(screen.getByTestId("home-next-period-tirol-season-1")).toHaveTextContent("Mo 5. Oktober – So 13. Dezember");
   expect(screen.getByTestId("home-next-league-tirol-season-2")).toHaveTextContent("Angekündigt, startet");
   // Turnier am 25.09., Anmeldeschluss am 30.09., Season 2 im November - der große Countdown bleibt beim Turnier.
   const order = screen.getAllByTestId(/^home-next-(tournament|league)-/).map((node) => node.dataset.testid);

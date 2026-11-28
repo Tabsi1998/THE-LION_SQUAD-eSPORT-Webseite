@@ -1,4 +1,8 @@
 import { closeState, decisionLine, finalNote, historyLine, methodOptions, reopenProblem, seasonSummary, staffelLabel, untilText } from "./leagueFinal";
+import { runAtTestClock } from "@/testClock";
+
+// Feste Uhr (#1307): die Datums-Texte lassen das laufende Jahr weg und sagen „heute“/„morgen“.
+runAtTestClock();
 
 test("Stand einer Staffel: abgeschlossen, bereit oder mit der Zahl der offenen Punkte", () => {
   expect(closeState({ closed: true, blockers: [] })).toEqual({ key: "closed", label: "Abgeschlossen" });
@@ -18,9 +22,9 @@ test("die Season ist erst beendet, wenn alle Staffeln abgeschlossen sind", () =>
 test("Name der Staffel, Frist und Endstand-Zeile in Wiener Zeit", () => {
   expect(staffelLabel({ division_label: "Liga 1", staffel: "A" })).toBe("Liga 1 · Staffel A");
   expect(staffelLabel({ title: "Probe-Staffel" })).toBe("Probe-Staffel");
-  expect(untilText({ until: "2026-11-14T17:00:00+00:00" })).toBe("bis 14.11.2026, 18:00");
+  expect(untilText({ until: "2026-11-14T17:00:00+00:00" })).toBe("bis Sa 14. November · 18:00");
   expect(untilText({})).toBe("");
-  expect(finalNote({ closed_at: "2026-11-12T23:30:00+00:00" })).toBe("Endstand · abgeschlossen am 13.11.2026");
+  expect(finalNote({ closed_at: "2026-11-12T23:30:00+00:00" })).toBe("Endstand · abgeschlossen am Fr 13. November");
   expect(finalNote(null)).toBe("");
 });
 
@@ -28,7 +32,7 @@ test("Entscheid und Verlauf als ein Satz", () => {
   expect(decisionLine({ names: ["Probe 2", "Probe 3"], method_label: "Entscheidungsspiel", reason: "2:1 gewonnen" }))
     .toBe("Probe 2 vor Probe 3 – Entscheidungsspiel: 2:1 gewonnen");
   expect(decisionLine({ names: ["A", "B"], reason: "Los vor Zeugen" })).toBe("A vor B – Los vor Zeugen");
-  expect(historyLine({ version: 2, closed_at: "2026-11-12T17:00:00+00:00", closed_by_name: "Erste Leitung" })).toBe("Fassung 2 · 12.11.2026, 18:00 · Erste Leitung");
+  expect(historyLine({ version: 2, closed_at: "2026-11-12T17:00:00+00:00", closed_by_name: "Erste Leitung" })).toBe("Fassung 2 · Do 12. November · 18:00 · Erste Leitung");
   expect(methodOptions({ playoff: "Entscheidungsspiel", lot: "Los" })).toEqual([["playoff", "Entscheidungsspiel"], ["lot", "Los"]]);
 });
 
