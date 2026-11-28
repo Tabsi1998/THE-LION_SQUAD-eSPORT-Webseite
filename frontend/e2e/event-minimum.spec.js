@@ -10,7 +10,8 @@ const { test, expect } = require("@playwright/test");
  */
 
 const WIDTHS = [["handy", 390, 844], ["pc", 1440, 900]];
-test.use({ timezoneId: "Europe/Vienna", locale: "de-AT" });
+// Das Datumsfeld (datetime-local) zeichnet Chromium in der Sprache des Browsers, nicht nach `locale` - darum auch `--lang`.
+test.use({ timezoneId: "Europe/Vienna", locale: "de-AT", launchOptions: { args: ["--lang=de-AT"] } });
 
 const json = (body, status = 200) => ({ status, contentType: "application/json", body: JSON.stringify(body) });
 const DEADLINE = "2026-12-18T17:00:00+00:00";
