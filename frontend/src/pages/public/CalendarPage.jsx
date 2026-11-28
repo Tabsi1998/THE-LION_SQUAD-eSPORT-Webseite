@@ -14,6 +14,9 @@ import {
 import { MY_CALENDAR_PATH, agendaBuckets, ownBadge } from "@/lib/myCalendar";
 import { CalendarDays, ChevronLeft, ChevronRight, ExternalLink, LogIn } from "lucide-react";
 import { viennaDay } from "@/lib/vienna";
+import { StatusChip } from "@/components/tls/StatusChip";
+import { phaseDayInfo } from "@/components/tls/PhaseBadge";
+import { isKnownStatus } from "@/lib/statusKinds";
 
 // Kalender (#402): dieselbe Monatsansicht wie in der App (#216) - Punkte je Tag in der Farbe der
 // Art, Ecken-Klammern um Tage mit eigener Anmeldung (#1305: Cyan heißt „du“, #1316), darunter die Termine des gewählten Tags.
@@ -383,6 +386,15 @@ function kindLabel(item) {
   return KIND_LABELS[item.kind];
 }
 
+// Die Phase als Zustands-Schild (#1306) - dasselbe wie auf Karten und Turnierseite. Eigene Zustände des Vereinskalenders
+// (Schicht, Versammlung) kennt die Tabelle nicht, sie bleiben Text.
+function PhaseText({ item }) {
+  if (!isKnownStatus(item.phase?.state)) return <span>{item.phase?.label}</span>;
+  // Mehrtägige Events (#884): „Tag 2/3“ steht neben dem Schild, wie bei PhaseBadge.
+  const day = phaseDayInfo(item.phase);
+  return <StatusChip status={item.phase.state} testId={`calendar-phase-${item.kind}-${item.id}`} meta={day} metaTestId={`calendar-phase-day-${item.kind}-${item.id}`} />;
+}
+
 function ItemRow({ item, withDate = false }) {
   const when = withDate ? spanLabel(item) : item.all_day ? "ganztägig" : timeLabel(item.start);
   // „Mein Kalender“ (#1788): der eigene Stand vom Server als Plakette; im Vereinskalender bleibt „Angemeldet“.
@@ -402,13 +414,15 @@ function ItemRow({ item, withDate = false }) {
         <span className="tls-wrap block tls-type-small font-bold">{item.title}</span>
         {badge ? (
           <span className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 tls-type-small text-white/50">
-            <span className="tls-own-badge" data-tone={badge.tone} data-testid={`calendar-badge-${item.kind}-${item.id}`}>{badge.label}</span>
-            {item.phase?.label && item.kind !== "club" ? <span>{item.phase.label}</span> : null}
+            {/* Der eigene Stand als Zustands-Schild (#1306), das Team daneben. */}
+            <StatusChip kind={badge.kind} label={badge.word} dataTone={badge.tone} testId={`calendar-badge-${item.kind}-${item.id}`} meta={badge.team ? `mit ${badge.team}` : null} metaTestId={`calendar-badge-team-${item.kind}-${item.id}`} />
+            {item.phase?.label && item.kind !== "club" ? <PhaseText item={item} /> : null}
           </span>
         ) : (item.phase?.label || item.mine) && (
           <span className="flex flex-wrap items-center gap-x-2 gap-y-1 tls-type-small text-white/50">
             {you ? <span className="tls-you-tag" data-testid={`calendar-you-${item.kind}-${item.id}`}>Du</span> : null}
-            <span>{item.phase?.label}{item.phase?.label && item.mine ? " · " : ""}{item.mine ? <span className="text-brand">Angemeldet</span> : null}</span>
+            {item.phase?.label ? <PhaseText item={item} /> : null}
+            {item.mine ? <span className="text-brand">Angemeldet</span> : null}
           </span>
         )}
       </span>

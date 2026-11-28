@@ -4,11 +4,13 @@
 // als „Belegt“, sondern als „Aufgerufen“.
 import { isLiveMatch } from "@/lib/tvLive";
 
+// Als Zustands-Schild (#1306, Fabians Entscheidung vom 27.11.): dieselben Arten wie an Station und Leitung - belegt
+// heißt „Läuft“ (rot), frei ist die Art „Frei“ (grüner Rahmen), aufgerufen „Bald“, defekt „Problem“.
 export const STATION_STATES = Object.freeze({
-  free: { label: "Frei", tone: "green" },
-  busy: { label: "Belegt", tone: "accent" },
-  called: { label: "Aufgerufen", tone: "gold" },
-  broken: { label: "Defekt", tone: "red" },
+  free: { label: "Frei", kind: "free" },
+  busy: { label: "Läuft", kind: "live" },
+  called: { label: "Aufgerufen", kind: "soon" },
+  broken: { label: "Defekt", kind: "problem" },
 });
 const STATE_ORDER = ["busy", "called", "free", "broken"];
 

@@ -5,6 +5,8 @@ import { eventTypeLabel } from "@/lib/eventTypes";
 import { PublicLayout } from "@/components/tls/PublicLayout";
 import { Reveal } from "@/components/tls/Reveal";
 import { PhaseBadge } from "@/components/tls/PhaseBadge";
+import { StatusChip } from "@/components/tls/StatusChip";
+import { ownBadgeKind } from "@/lib/statusKinds";
 import { PublicEmptyState } from "@/components/tls/PublicEmptyState";
 import { PublicLoadingState } from "@/components/tls/PublicLoadingState";
 import { LazyImg } from "@/components/tls/LazyImg";
@@ -210,10 +212,19 @@ export default function EventsPage() {
   );
 }
 
+// Der eigene Stand als Zustands-Schild (#1306): Art aus lib/statusKinds.js (ownBadgeKind), Wort vom Server, das Team
+// steht neben dem Schild - so bricht kein langer Teamname das Schild um.
 function MineChip({ state, testId }) {
   if (!state) return null;
-  const text = [state.label || "Dabei", state.team_name].filter(Boolean).join(" · ");
-  return <span data-testid={testId} className="tls-wrap inline-block max-w-full rounded-sm border border-brand/50 bg-brand/10 px-1.5 py-0.5 tls-type-small font-bold text-brand">{text}</span>;
+  return (
+    <StatusChip
+      kind={ownBadgeKind(state.state)}
+      label={state.label || "Du bist dabei"}
+      testId={testId}
+      meta={state.team_name ? `mit ${state.team_name}` : null}
+      metaTestId={testId ? `${testId}-team` : undefined}
+    />
+  );
 }
 
 // Ein Datumsformat (#1307): „Sa 23. Mai · 18:00“, „heute 18:00“.

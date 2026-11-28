@@ -45,7 +45,8 @@ test("das Dashboard zeigt einen kommenden Termin, keinen vergangenen, Aktionen u
 
   const dates = page.getByTestId("dashboard-timeline");
   await expect(dates.getByText("Autumn Cup", { exact: true })).toBeVisible();
-  await expect(dates.getByText("Angemeldet", { exact: true })).toBeVisible();
+  // Der eigene Stand als Zustands-Schild (#1306): „Du bist dabei“.
+  await expect(dates.getByText("Du bist dabei", { exact: true })).toBeVisible();
   await expect(dates.getByText("Summer Cup", { exact: true })).toHaveCount(0);
   await expect(dates.getByText("Summer Opening", { exact: true })).toHaveCount(0);
   await expect(page.getByTestId("dashboard-timeline-t-next")).toHaveAttribute("href", "/tournaments/autumn-cup");

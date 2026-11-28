@@ -3,7 +3,8 @@ import { Check, ChevronDown, ChevronUp } from "lucide-react";
 import { METALS } from "@/components/tls/TrophyShelf";
 import { StandingsTable } from "@/components/tls/tournament/StandingsTable";
 import { formatNumber } from "@/lib/standingsTable";
-import { PUBLIC_STATE_LABELS, STATE_TONES, dayLabel, opponentText, roundLabel, roundWhen, sideLabel } from "@/lib/referenceCalendar";
+import { PUBLIC_STATE_LABELS, ROUND_STATE_KINDS, dayLabel, opponentText, roundLabel, roundWhen, sideLabel } from "@/lib/referenceCalendar";
+import { StatusChip } from "@/components/tls/StatusChip";
 import { nameOf } from "@/lib/referenceSeriesTable";
 import {
   OUTCOMES, PICK_LABELS, appearanceText, banText, cellState, mapShare, matchPointsLabel, matchdayProgress,
@@ -357,9 +358,9 @@ function MatchdayCard({ day, index, showTeam, originals }) {
         </div>
         {single && match ? <Score match={match} /> : null}
         {!matches.length && (
-          <span className={`inline-flex items-center px-2 py-0.5 border rounded-sm tls-type-label whitespace-nowrap ${STATE_TONES[round.state] || STATE_TONES.planned}`}>
-            {PUBLIC_STATE_LABELS[round.state] || round.state}
-          </span>
+          // Der Status des Spieltags als Zustands-Schild (#1306).
+          <StatusChip kind={ROUND_STATE_KINDS[round.state] || "soon"} label={PUBLIC_STATE_LABELS[round.state] || PUBLIC_STATE_LABELS.planned} />
+
         )}
       </div>
       {matches.length ? matches.map((item, position) => (

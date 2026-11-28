@@ -25,6 +25,17 @@ export const STATE_TONES = {
   scored: "border-ok/40 text-ok",
 };
 
+// Der Status einer Runde als Zustands-Schild (#1306): geplant und heute kommen bald, ein fehlendes Ergebnis und eine
+// verschobene Runde warten, gewertet ist vorbei, abgesagt ist abgesagt. Die Lauf-Chips (SessionChips) behalten ihre Töne.
+export const ROUND_STATE_KINDS = {
+  planned: "soon",
+  today: "soon",
+  missing: "waiting",
+  postponed: "waiting",
+  scored: "done",
+  cancelled: "cancelled",
+};
+
 export const ROUND_KIND_OPTIONS = [["regular", "Regulär"], ["final", "Finale"]];
 
 const DAY_MS = 24 * 60 * 60 * 1000;

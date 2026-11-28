@@ -79,7 +79,8 @@ for (const [width, height] of WIDTHS) {
       await expect(page.getByTestId("home-league-promo-zweite-liga")).toHaveCount(0);
 
       const row = page.getByTestId("home-next-league-probe-liga");
-      await expect(row).toContainText("Anmeldung offen · endet");
+      // Zustands-Schild (#1306): der Countdown steht neben dem Schild, für Vorleseprogramme mit Komma getrennt.
+      await expect(row).toContainText("Anmeldung offen, endet");
       await expect(row).toHaveAttribute("href", "/liga/probe-liga/season-1");
       await expect(page.getByTestId("home-next-league-zweite-liga")).toContainText("Angekündigt");
       await noSideScroll(page);

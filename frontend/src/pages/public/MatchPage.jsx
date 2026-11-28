@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { ModerationStateBadge } from "@/components/tls/ModerationStateBadge";
+import { StatusChip } from "@/components/tls/StatusChip";
 import { Link, useParams } from "react-router-dom";
 import { CalendarClock, ChevronDown, Flag, MessageSquare, RefreshCw, Send, ShieldCheck, Trophy } from "lucide-react";
 import { toast } from "sonner";
@@ -484,7 +485,8 @@ function MatchPageView() {
           {finished ? (
             <div className="border border-white/10 bg-[#121212] rounded-sm px-4 py-3 w-full sm:w-auto sm:min-w-[16rem] sm:max-w-sm" data-testid="match-finished">
               <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
-                <span className="rounded-sm border border-white/20 bg-white/10 px-2 py-0.5 tls-type-label text-white/80">Beendet</span>
+                {/* Zustands-Schild (#1306): dasselbe „Beendet“ wie überall. */}
+                <StatusChip status="completed" testId="match-finished-state" />
                 {match.scheduled_at && <span className="tls-type-small text-white/65" data-testid="match-when">{formatWhen(match.scheduled_at)}</span>}
               </div>
               <div className="mt-2 font-black text-white" data-testid="match-outcome">{finishedMatchText(participants, match)}</div>

@@ -9,7 +9,8 @@ import { api, formatApiError } from "@/lib/api";
 import { useConfirm } from "@/components/tls/ConfirmDialog";
 import { HelpLink } from "@/components/tls/HelpLink";
 import { useOptionalAuth } from "@/context/AuthContext";
-import { APPLICATION_STATES, STATE_CLASS, afterStartLine, canStartApplication, canStartPersonApplication, isSoloApplication, seatsLine, teamStateLabel,
+import { StatusChip } from "@/components/tls/StatusChip";
+import { APPLICATION_STATES, afterStartLine, canStartApplication, canStartPersonApplication, isSoloApplication, seatsLine, teamStateLabel,
   windowLine } from "@/lib/leagueApplications";
 import { carryLine } from "@/lib/leagueSuccessor";
 import { rightLine, teamBadge, teamBadgeTone } from "@/lib/leagueStartRights";
@@ -17,11 +18,19 @@ import { StartRightBlock } from "./StartRightBlock";
 
 // ``label``: eigener Text bei gleicher Farbe - das eigene Team liest „Angemeldet“ statt „Angenommen“ (#2348, ``teamStateLabel``).
 // ``tone`` (#1627, F.2a): eigene Farbe bei eigenem Text - ein Startrecht mit offener Zusage ist noch nicht „grün“.
+// Zustands-Schild (#1306): die Anmeldung zur Liga in denselben Arten wie überall - offen ist gefüllt grün, eingereicht,
+// in Prüfung und Warteliste warten, angenommen heißt „dabei“, abgelehnt und zurückgezogen sind vorbei. Eine eigene
+// Farbe (`tone`) wird zur Art: ok dabei, warn Problem (Zusage nötig), sonst wartet es.
+const APPLICATION_KINDS = {
+  none: "waiting", open: "registration", submitted: "waiting", in_review: "waiting", accepted: "joined",
+  rejected: "cancelled", waitlist: "waiting", withdrawn: "cancelled",
+};
+const TONE_KINDS = { ok: "joined", warn: "problem", info: "waiting", quiet: "waiting" };
+
 export function ApplicationStateBadge({ state, testId, label, tone }) {
   const info = APPLICATION_STATES[state] || APPLICATION_STATES.none;
-  return (
-    <span data-testid={testId} className={`inline-flex shrink-0 rounded-sm border px-2 py-0.5 tls-type-label ${STATE_CLASS[tone] || STATE_CLASS[info.tone]}`}>{label || info.label}</span>
-  );
+  const kind = (tone && TONE_KINDS[tone]) || APPLICATION_KINDS[state] || "waiting";
+  return <StatusChip kind={kind} label={label || info.label} testId={testId} dataTone={tone || info.tone} />;
 }
 
 function OwnSquadRow({ row, onWithdraw, onChanged }) {

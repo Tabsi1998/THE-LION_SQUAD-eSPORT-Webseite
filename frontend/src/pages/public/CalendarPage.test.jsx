@@ -224,8 +224,12 @@ test("Mein Kalender: Heute, Diese Woche, Später - mit Stand je Termin, Vergange
   expect(within(screen.getByTestId("calendar-bucket-later")).getByTestId("calendar-item-tournament-t-cup")).toBeInTheDocument();
   expect(within(list).queryByTestId("calendar-item-fastlap-f-old")).toBeNull();
 
-  expect(screen.getByTestId("calendar-badge-tournament-t-cup")).toHaveTextContent("Du bist dabei · mit Lions Rocket");
+  // Zustands-Schild (#1306): das Wort im Schild, das Team daneben.
+  expect(screen.getByTestId("calendar-badge-tournament-t-cup")).toHaveTextContent(/^Du bist dabei$/);
+  expect(screen.getByTestId("calendar-badge-tournament-t-cup")).toHaveAttribute("data-kind", "joined");
+  expect(screen.getByTestId("calendar-badge-team-tournament-t-cup")).toHaveTextContent("mit Lions Rocket");
   expect(screen.getByTestId("calendar-badge-event-e-lan")).toHaveAttribute("data-tone", "wait");
+  expect(screen.getByTestId("calendar-badge-event-e-lan")).toHaveAttribute("data-kind", "waiting");
   expect(screen.getByTestId("calendar-badge-club-shift-5-52")).toHaveAttribute("data-tone", "club");
   expect(screen.getByTestId("calendar-item-tournament-t-cup")).toHaveAttribute("href", "/tournaments/autumn-cup");
 

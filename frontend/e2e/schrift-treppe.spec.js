@@ -220,14 +220,15 @@ test.describe("Schrift-Treppe", () => {
     });
   }
 
-  // Teilnehmerliste eines Turniers bei 320 px: Das Schild „ANGENOMMEN“ ist ein Etikett (12 px). Kein Name wird
+  // Teilnehmerliste eines Turniers bei 320 px: Das Schild „Bestätigt“ ist ein Zustands-Schild (12,5 px, normal
+  // geschrieben, #1306). Kein Name wird
   // abgeschnitten und keiner endet mit „…“ (#1314): Namen wie „NeonFalke“ stehen in einer Zeile, längere brechen
   // zwischen Wörtern um („🦁“ / „Löwenherz“) - nie mitten in einem Wort, das allein in die Spalte passt.
   const TOURNAMENT = { id: "t-cup", slug: "herbst-cup", title: "Herbst-Cup 2026", status: "registration_open", start_date: "2026-12-05T13:00:00+00:00", max_participants: 16, participant_count: 8, public_phase: { state: "registration_open", label: "Anmeldung offen" } };
   const PLAYERS = ["NeonFalke", "Der unglaublich schnelle Kartfahrer", "LuckyLion", "🦁 Löwenherz", "DriftDaniel", "BoostBernd", "TurboTom", "SchnellSchnecke"];
   const REGISTRATIONS = PLAYERS.map((name, index) => ({ id: `r${index + 1}`, display_name: name, status: "approved", seed: index + 1 }));
 
-  test("Teilnehmerliste bei 320 px: Schilder als Etikett, kein Name abgeschnitten", async ({ page }) => {
+  test("Teilnehmerliste bei 320 px: Zustands-Schilder ab 12 px, kein Name abgeschnitten", async ({ page }) => {
     await page.setViewportSize({ width: 320, height: 740 });
     await mockLongApi(page);
     await page.route(`**/api/tournaments/${TOURNAMENT.slug}`, (route) => route.fulfill(json(TOURNAMENT)));
@@ -237,7 +238,8 @@ test.describe("Schrift-Treppe", () => {
     const first = page.getByTestId("tournament-participant-r1");
     await expect(first).toBeVisible();
     const badge = first.getByTestId("status-approved");
-    expect(await badge.evaluate((node) => getComputedStyle(node).fontSize)).toBe("12px");
+    expect(await badge.evaluate((node) => getComputedStyle(node).fontSize)).toBe("12.5px");
+    expect(await badge.evaluate((node) => getComputedStyle(node).textTransform)).toBe("none");
     await page.evaluate(() => document.fonts.ready);
     for (const [index, player] of PLAYERS.entries()) {
       const facts = await page.getByTestId(`tournament-participant-r${index + 1}`).evaluate((row, { name, subpixel }) => {

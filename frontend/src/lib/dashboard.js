@@ -1,4 +1,5 @@
 import { asInstant, viennaDateTime, viennaDay } from "@/lib/vienna";
+import { statusWord } from "@/lib/statusKinds";
 // Was das Dashboard aus den eigenen Terminen macht (#256) - dieselben Regeln
 // wie die App-Startseite (mobile/src/lib/dashboard.ts) und das Backend
 // (_still_relevant in mobile_routes.py): offen ist, was nicht beendet oder
@@ -28,20 +29,14 @@ export function isLiveOrToday(item, now = new Date()) {
   return Boolean(day) && day === viennaDay(now);
 }
 
-const REGISTRATION_LABELS = {
-  approved: "Angemeldet",
-  registered: "Angemeldet",
-  checked_in: "Eingecheckt",
-  pending: "Wartet auf Freigabe",
-  waitlist: "Warteliste",
-  waitlisted: "Warteliste",
-  declined: "Abgelehnt",
-  cancelled: "Abgemeldet",
-};
+// Der eigene Stand als Schild (#1306): welche Stände das Dashboard zeigt, steht hier - Art und Wort kommen aus
+// lib/statusKinds.js (Du-Form: „Du bist dabei“, „Wartet auf Freigabe“).
+const SHOWN_REGISTRATION_STATES = new Set(["approved", "registered", "checked_in", "pending", "waitlist", "waitlisted", "declined", "cancelled"]);
 
+/** Der eigene Anmeldestand, wenn das Dashboard ihn zeigt - sonst "". */
 export function registrationLabel(status) {
   const key = String(status || "").toLowerCase();
-  return REGISTRATION_LABELS[key] || "";
+  return SHOWN_REGISTRATION_STATES.has(key) ? statusWord(key, { own: true }) : "";
 }
 
 // Turniere und Events der Antwort von /api/mobile/dashboard als eine Liste.

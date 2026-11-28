@@ -120,6 +120,9 @@ test("geteilte Station, an der ein anderes Turnier spielt (#1162): kein Aufrufen
   const handlers = tile(shared);
   expect(stationTone(shared)).toBe("other");
   expect(screen.getByTestId("live-chip-sx")).toHaveTextContent("Anderes Turnier");
+  // Ruhig grau ohne Puls (Fabian Nr. 304): kein rotes „Läuft“ für ein fremdes Turnier.
+  expect(screen.getByTestId("live-chip-sx")).toHaveAttribute("data-kind", "waiting");
+  expect(screen.getByTestId("live-chip-sx").querySelector(".tls-live-dot")).toBeNull();
   expect(screen.getByTestId("live-other-hint-sx")).toHaveTextContent("Mario Kart Cup");
   expect(screen.queryByTestId("live-call-sx")).toBeNull();
   expect(screen.getByTestId("live-release-sx")).toBeDisabled();

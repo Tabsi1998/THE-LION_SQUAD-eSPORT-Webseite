@@ -193,7 +193,7 @@ export function TvTreeNode({ match, regMap, podiumMap, findMatch }) {
           {meta ? <span className="tv-node__meta">{meta}</span> : null}
         </span>
         {live ? (
-          <span className="tv-node__live tv-t-meta"><span className="tv-live-dot-tv" aria-hidden="true" />Live</span>
+          <span className="tv-node__live tv-t-meta"><span className="tv-live-dot-tv" aria-hidden="true" />Läuft</span>
         ) : status ? (
           <span className="tv-node__status tv-t-meta">
             {status}

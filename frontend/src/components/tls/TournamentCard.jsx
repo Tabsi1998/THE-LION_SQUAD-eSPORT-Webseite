@@ -3,6 +3,7 @@ import { PhaseBadge } from "./PhaseBadge";
 import { ArrowRight, Calendar, Users, Trophy } from "lucide-react";
 import { formatWhen, getRegistrationState } from "@/lib/datetime";
 import { formatTournamentDisplay } from "@/lib/tournamentLabels";
+import { statusKind } from "@/lib/statusKinds";
 import { LazyImg } from "@/components/tls/LazyImg";
 
 // Nach dem Ende sagt die Plakette oben, wie es ausging - „Anmeldung geschlossen“ wäre dort nur Lärm (#833).
@@ -15,6 +16,24 @@ export function cardAction(tournament, registration) {
   return "Ansehen";
 }
 
+// Arten, deren Schild schon sagt, dass die Anmeldung vorbei ist (Check-in, läuft, wartet, vorbei, abgesagt).
+const PAST_REGISTRATION = new Set(["checkin", "live", "waiting", "done", "cancelled"]);
+
+/**
+ * Die ruhige Zeile zur Anmeldung unter dem Titel (#1306): nur, was das Zustands-Schild oben nicht schon sagt - kein
+ * zweites „ANMELDUNG OFFEN“ unter „Anmeldung offen“, keine geschlossene Anmeldung unter „Check-in offen“. Eine Frist
+ * bleibt als Satz („Anmeldung bis …“), ebenso „öffnet am …“ oder „nur mit Einladung“. Sonst null.
+ */
+export function registrationLine(registration, chipKind) {
+  if (!registration?.label) return null;
+  if (registration.state === "open") {
+    if (registration.label.includes(" offen bis ")) return registration.label.replace(" offen bis ", " bis ");
+    return chipKind === "registration" ? null : registration.label;
+  }
+  if (registration.state === "closed" && PAST_REGISTRATION.has(chipKind)) return null;
+  return registration.label;
+}
+
 /** Spiel-Kürzel und Plattform - der Trennpunkt nur, wenn es beides gibt (#833). */
 export function gameLine(tournament) {
   return [tournament?.game?.short_name, tournament?.platform].map((part) => String(part || "").trim()).filter(Boolean);
@@ -24,6 +43,7 @@ export function TournamentCard({ tournament, index = 0 }) {
   const t = tournament;
   const registration = getRegistrationState(t, "Anmeldung");
   const finished = FINISHED.has(t.status);
+  const regLine = finished ? null : registrationLine(registration, statusKind(t.public_phase?.state || t.status).kind);
   // Liga-Staffel (docs/LIGA.md): die Karte sagt „Liga · Staffel A“ statt des Formats.
   const formatLabel = t.league_label || formatTournamentDisplay(t);
   const line = gameLine(t);
@@ -49,7 +69,8 @@ export function TournamentCard({ tournament, index = 0 }) {
         <div className="absolute inset-x-0 top-0 h-16 bg-gradient-to-b from-black/60 to-transparent" />
         <div className="absolute inset-x-0 bottom-0 h-1/4 bg-gradient-to-t from-[#18181B]/90 to-transparent" />
         <div className="absolute top-3 inset-x-3 flex flex-col items-start gap-1.5 sm:flex-row sm:items-start sm:justify-between">
-          <PhaseBadge phase={t.public_phase} status={t.status} className="max-w-full sm:max-w-[68%]" />
+          {/* Zustands-Schild (#1306): bricht nie um; auf der Grafik mit dunkler Unterlage, der Countdown daneben. */}
+          <PhaseBadge phase={t.public_phase} status={t.status} onMedia className="sm:max-w-[68%]" />
           {formatLabel && formatLabel !== "—" ? (
             <span className="max-w-full sm:max-w-[48%] tls-type-label text-[#29B6E8] bg-black/55 border border-[#29B6E8]/40 px-2 py-1 rounded-sm leading-tight break-words" data-testid="tournament-card-format">
               {formatLabel}
@@ -90,13 +111,11 @@ export function TournamentCard({ tournament, index = 0 }) {
             </span>
           )}
         </div>
-        {finished ? null : (
-          <div className={`mt-3 tls-type-label ${
-            registration.canRegister ? "text-ok" : registration.state === "scheduled" ? "text-[#29B6E8]" : "text-quiet"
-          }`} data-testid="tournament-card-registration">
-            {registration.label}
+        {regLine ? (
+          <div className="mt-3 tls-type-small text-muted-text" data-testid="tournament-card-registration">
+            {regLine}
           </div>
-        )}
+        ) : null}
         {/* Ein Knopf statt „Turnierdetails … Ansehen“ (#833). */}
         <div className="mt-4 flex items-center justify-end gap-3 border-t border-white/10 pt-3">
           <span className="inline-flex items-center gap-1.5 tls-type-label text-[#29B6E8]" data-testid="tournament-card-action">

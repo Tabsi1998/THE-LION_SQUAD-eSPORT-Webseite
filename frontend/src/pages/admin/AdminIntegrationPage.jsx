@@ -3,7 +3,7 @@ import { Link, Navigate, useParams } from "react-router-dom";
 import { toast } from "sonner";
 import { ArrowLeft, ArrowRight } from "lucide-react";
 import { AdminLayout } from "@/components/tls/AdminLayout";
-import { SetupGuide, StatusChip } from "@/components/tls/SetupGuide";
+import { SetupGuide, SetupStatusChip } from "@/components/tls/SetupGuide";
 import { PlatformAppCard } from "@/pages/admin/settings/PlatformLinkSettings";
 import { DiscordSettings } from "@/pages/admin/settings/DiscordSettings";
 import { TwitchSettings } from "@/pages/admin/settings/TwitchSettings";
@@ -97,7 +97,7 @@ export default function AdminIntegrationPage() {
         <div>
           <span className="tls-type-label text-[#29B6E8]">Verbindungen</span>
           <h1 className="tls-type-title mt-1 flex flex-wrap items-center gap-3" data-testid="integration-title">
-            {integration.label} <StatusChip status={status} />
+            {integration.label} <SetupStatusChip status={status} />
           </h1>
           <p className="tls-type-body text-white/55 mt-2 max-w-3xl">
             Alles zu {integration.label} an einer Stelle: Stand, Zugangsdaten, Rückrufadresse, Prüfung und die Anleitung Schritt für Schritt.
