@@ -21,16 +21,28 @@ import { leagueAnchorId } from "@/lib/staffelTabs";
 import { AccentField, BannerField, EmblemField } from "./LeagueLookFields";
 import { toast } from "sonner";
 import { ShortCaps } from "@/components/tls/ShortCaps";
+import { KIND_FIXED_HINT, PARTICIPANT_OPTIONS, SOLO, TEAM, gameAllowsSolo, isSoloLeague, participantKind, participantLabel } from "@/lib/leagueParticipants";
 
 const STATUS_TEXT = Object.fromEntries(SEASON_STATUS_OPTIONS);
 const ICON_BUTTON = "p-1.5 text-white/50 hover:text-[#29B6E8] focus-visible:outline focus-visible:outline-1 focus-visible:outline-[#29B6E8] rounded-sm";
 const ICON_DANGER = ICON_BUTTON.replace("hover:text-[#29B6E8]", "hover:text-live");
 const STEPS = [
-  "Liga je Spiel anlegen",
+  "Liga je Spiel anlegen – mit Co-Teams oder Spielern",
   "Season mit Beginn anlegen, dann Vorgaben, Sperrzeiten, Map-Pool, Regeltext und Sichtbarkeit festlegen",
   "Liga 1 anlegen",
-  "Staffel anlegen und auf der Staffel-Seite die Co-Teams zuteilen",
+  "Staffel anlegen und auf der Staffel-Seite die Co-Teams bzw. Spieler zuteilen",
 ];
+
+/** Ein Wert, der feststeht - gleiche Beschriftung wie ein Feld, ohne Eingabe. */
+function FixedField({ label, value, hint, testId }) {
+  return (
+    <div className="min-w-0" data-testid={testId}>
+      <div className="tls-type-label text-white/60 mb-1.5">{label}</div>
+      <div className="w-full rounded-sm border border-white/10 bg-white/[0.03] px-3 py-2 text-white/80">{value}</div>
+      {hint ? <div className="mt-1 tls-type-small text-white/45">{hint}</div> : null}
+    </div>
+  );
+}
 
 // Anlegen oder bearbeiten (#2106): Name, Beschreibung und Stand immer; das Spiel nur, solange keine Season eine Staffel
 // hat, die Adresse nur vor der ersten Veröffentlichung - beides sagt der Server (`game_locked`, `slug_locked`).
@@ -38,11 +50,15 @@ function LeagueSheet({ league, games, onClose, onSaved }) {
   const editing = Boolean(league);
   const [form, setForm] = useState(() => ({
     name: league?.name || "", game_id: league?.game_id || selectableGames(games)[0]?.id || "", description: league?.description || "",
-    slug: league?.slug || "", status: league?.status || "active",
+    slug: league?.slug || "", status: league?.status || "active", participant_kind: participantKind(league),
     ...leagueLookToForm(league),
   }));
   const [saving, setSaving] = useState(false);
   const set = (key, value) => setForm((current) => ({ ...current, [key]: value }));
+  // Teilnehmerart (#1629): „Spieler“ nur bei Spielen mit Einzelspielern - wechselt das Spiel auf eines ohne, gilt wieder Co-Teams.
+  const chosenGame = games.find((game) => game.id === form.game_id);
+  const soloPossible = gameAllowsSolo(chosenGame);
+  const kind = soloPossible ? form.participant_kind : TEAM;
   const submit = async (event) => {
     event.preventDefault();
     const problem = accentProblem(form.accent_color);
@@ -61,7 +77,9 @@ function LeagueSheet({ league, games, onClose, onSaved }) {
         const { data } = await api.patch(`/admin/leagues/${league.id}`, body);
         toast.success(data.changed?.length ? "Liga gespeichert." : "Keine Änderung.");
       } else {
-        await api.post("/admin/leagues", { name: form.name, game_id: form.game_id, description: form.description || null, ...leagueLookChanges(form, {}) });
+        // Teilnehmerart (#1629) nur bei „Spieler“ mitschicken - ohne Feld legt der Server wie bisher eine Team-Liga an.
+        await api.post("/admin/leagues", { name: form.name, game_id: form.game_id, ...(kind === SOLO ? { participant_kind: SOLO } : {}),
+          description: form.description || null, ...leagueLookChanges(form, {}) });
         toast.success("Liga angelegt.");
       }
       onSaved();
@@ -74,11 +92,23 @@ function LeagueSheet({ league, games, onClose, onSaved }) {
     <AdminSheet title={editing ? "Liga bearbeiten" : "Liga anlegen"} eyebrow={editing ? league.name : undefined} onClose={onClose} onSubmit={submit} saving={saving}
       submitLabel={editing ? "Speichern" : "Anlegen"} submitTestId={editing ? "league-edit-save" : "league-create-save"} testId={editing ? "league-edit-sheet" : "league-create-sheet"}>
       <TextField label="Name" required maxLength={80} value={form.name} onChange={(value) => set("name", value)} placeholder="z. B. CoD-Liga" testId="league-name" />
-      <SelectField label="Spiel" required value={form.game_id} onChange={(value) => set("game_id", value)} disabled={editing && league.game_locked}
-        options={selectableGames(games, league?.game_id).map((game) => [game.id, `${game.name}${isArchivedGame(game) ? " – archiviert" : ""}`])} testId="league-game"
-        hint={editing
-          ? (league.game_locked ? "Bleibt: eine Season hat schon eine Staffel. Für ein anderes Spiel eine neue Liga anlegen." : "Änderbar, solange keine Season eine Staffel hat. Die Modus-Reihenfolge der Seasons wird dabei geleert.")
-          : "Die Adresse der Liga folgt dem Spiel, etwa /liga/call-of-duty."} />
+      {/* Spiel und Teilnehmer gehören zusammen (#1629): „Spieler“ gibt es nur bei Spielen mit Einzelspielern. */}
+      <FormGrid>
+        <SelectField label="Spiel" required value={form.game_id} onChange={(value) => set("game_id", value)} disabled={editing && league.game_locked}
+          options={selectableGames(games, league?.game_id).filter((game) => !(editing && isSoloLeague(league)) || game.id === league.game_id || gameAllowsSolo(game))
+            .map((game) => [game.id, `${game.name}${isArchivedGame(game) ? " – archiviert" : ""}`])} testId="league-game"
+          hint={editing
+            ? (league.game_locked ? "Bleibt: eine Season hat schon eine Staffel. Für ein anderes Spiel eine neue Liga anlegen." : "Änderbar, solange keine Season eine Staffel hat. Die Modus-Reihenfolge der Seasons wird dabei geleert.")
+            : "Die Adresse der Liga folgt dem Spiel, etwa /liga/call-of-duty."} />
+        {editing ? (
+          <FixedField label="Teilnehmer" value={participantLabel(league)} hint={KIND_FIXED_HINT} testId="league-kind-fixed" />
+        ) : soloPossible ? (
+          <SelectField label="Teilnehmer" value={kind} onChange={(value) => set("participant_kind", value)} options={PARTICIPANT_OPTIONS} testId="league-kind"
+            hint={kind === SOLO ? "Jede Person spielt für sich, 1 gegen 1. Steht ab dem Anlegen fest." : "Co-Teams eines Vereinsteams spielen gegeneinander. Steht ab dem Anlegen fest."} />
+        ) : (
+          <FixedField label="Teilnehmer" value="Co-Teams" hint="Dieses Spiel ist nicht für Einzelspieler eingestellt." testId="league-kind-team-only" />
+        )}
+      </FormGrid>
       {editing ? (
         <FormGrid>
           <TextField label="Adresse" maxLength={80} value={form.slug} onChange={(value) => set("slug", value)} disabled={league.slug_locked} testId="league-slug"
@@ -122,6 +152,8 @@ function SeasonSheet({ league, defaults, onClose, onSaved }) {
     }
   };
   const legs = Number(defaults.round_robin_legs) === 2 ? "Hin- und Rückrunde" : "nur Hinrunde";
+  // Solo-Liga (#1629, S11): 1 gegen 1, der Kader ist die Person - Kaderregeln und „ein Team je Season“ gibt es dort nicht.
+  const solo = isSoloLeague(league);
   return (
     <AdminSheet title="Season anlegen" eyebrow={league.name} onClose={onClose} onSubmit={submit} saving={saving} submitLabel="Anlegen"
       submitTestId="season-create-save" testId="season-create-sheet">
@@ -133,9 +165,15 @@ function SeasonSheet({ league, defaults, onClose, onSaved }) {
       <p className="tls-type-small leading-relaxed text-white/60" data-testid="season-defaults">
         Startet mit den Vorgaben: {defaults.weeks_total} Wochen, Spielwoche {defaults.matchday_days} Tage,
         Standardtermin {weekdayName(defaults.default_match_weekday)} {defaults.default_match_time}, {legs}, Best of {defaults.best_of},
-        {" "}{defaults.team_size} gegen {defaults.team_size}, bis {defaults.max_staffel_size} Teams je Staffel. Kader {defaults.min_squad_size} bis {defaults.max_squad_size} Spieler,
-        Mindestalter {defaults.min_age}, Wartezeit neuer Spieler {defaults.new_player_wait_days} Tage, ein Team je Season. Sichtbar ist sie erst,
-        wenn du es auf der Season-Seite einstellst.
+        {solo ? (
+          <>{" "}1 gegen 1, bis {defaults.max_staffel_size} Spieler je Staffel, Mindestalter {defaults.min_age}, Check-in mit der Person selbst.</>
+        ) : (
+          <>
+            {" "}{defaults.team_size} gegen {defaults.team_size}, bis {defaults.max_staffel_size} Teams je Staffel. Kader {defaults.min_squad_size} bis {defaults.max_squad_size} Spieler,
+            Mindestalter {defaults.min_age}, Wartezeit neuer Spieler {defaults.new_player_wait_days} Tage, ein Team je Season.
+          </>
+        )}
+        {" "}Sichtbar ist sie erst, wenn du es auf der Season-Seite einstellst.
       </p>
     </AdminSheet>
   );
@@ -229,7 +267,9 @@ export default function AdminLeaguesPage() {
               <LeagueEmblem src={league.emblem_url} size={40} testId={`league-emblem-${league.slug}`} />
               <div className="min-w-0 flex-1">
                 <h2 className="tls-type-section break-words">{league.name}</h2>
-                <p className="tls-type-small text-white/55">{league.game_name || "Spiel fehlt"} · /liga/{league.slug}{league.status === "archived" ? " · archiviert" : ""}</p>
+                <p className="tls-type-small text-white/55" data-testid={`league-head-${league.slug}`}>
+                  {league.game_name || "Spiel fehlt"} · {participantLabel(league)} · /liga/{league.slug}{league.status === "archived" ? " · archiviert" : ""}
+                </p>
                 {league.description ? <p className="mt-1 tls-type-small text-white/60 break-words">{league.description}</p> : null}
               </div>
               <div className="flex flex-wrap items-center gap-1">
@@ -300,7 +340,7 @@ export default function AdminLeaguesPage() {
       ) : null}
       {sheet?.kind === "staff" ? <LeagueStaffSheet league={sheet.league} onClose={() => setSheet(null)} /> : null}
       {sheet?.kind === "season" ? (
-        <SeasonSheet league={sheet.league} defaults={data?.season_defaults || {}} onClose={() => setSheet(null)}
+        <SeasonSheet league={sheet.league} defaults={(isSoloLeague(sheet.league) && data?.season_defaults_solo) || data?.season_defaults || {}} onClose={() => setSheet(null)}
           onSaved={(season) => { setSheet(null); navigate(`/admin/leagues/seasons/${season.id}`); }} />
       ) : null}
     </AdminLayout>

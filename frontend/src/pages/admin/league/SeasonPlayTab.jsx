@@ -13,6 +13,7 @@ import { PoolMapLock } from "@/pages/admin/maps/PoolMapLock";
 import { PoolVersionCompare } from "@/pages/admin/maps/PoolVersionCompare";
 import { BEST_OF_OPTIONS, CLARIFICATION_MODE_OPTIONS, MAP_REPEAT_OPTIONS, modeOrderProblem } from "@/lib/league";
 import { orderPoolHints } from "@/lib/seasonTabs";
+import { SOLO_ONLY_ONE } from "@/lib/leagueParticipants";
 import { SeasonPoolMinimum } from "./SeasonReadinessPanel";
 import { SeasonResultRulesPanel } from "./SeasonResultRulesPanel";
 import { SeasonTabForm } from "./SeasonTabForm";
@@ -81,7 +82,7 @@ function ModeNeed({ row }) {
 }
 
 export function SeasonPlayTab({ seasonId, data, form, set, canSeason, readiness, formProps, modes, longest, orderNote, seasonModes, onSeasonModes,
-  onPoolDirty, onSavePool, onClearPool, onPendingSync, reload }) {
+  onPoolDirty, onSavePool, onClearPool, onPendingSync, reload, solo = false }) {
   const pool = data.map_pool;
   const requirements = readiness.result?.requirements || [];
   const needOf = (mode) => requirements.find((row) => (row.mode ?? null) === (mode ?? null));
@@ -128,11 +129,13 @@ export function SeasonPlayTab({ seasonId, data, form, set, canSeason, readiness,
       {canSeason ? (
         <SeasonTabForm {...formProps}>
           <FormSection title="Serie" id="serie" className="scroll-mt-24" testId="season-series"
-            hint="Wie ein Spiel abläuft. Liga N kann Best of und Teamgröße abweichend festlegen (Reiter Ligen und Staffeln).">
+            hint={solo ? "Wie ein Spiel abläuft. Liga N kann Best of abweichend festlegen (Reiter Ligen und Staffeln)."
+              : "Wie ein Spiel abläuft. Liga N kann Best of und Teamgröße abweichend festlegen (Reiter Ligen und Staffeln)."}>
             <FormGrid cols={3}>
               <SelectField label="Best of" value={form.best_of} onChange={(value) => set("best_of", value)} options={BEST_OF_OPTIONS} testId="season-form-best-of" />
+              {/* Solo-Liga (#1629): immer 1 gegen 1 - das Feld bleibt sichtbar, damit klar ist, was gilt. */}
               <TextField label="Teamgröße (je Map)" type="number" min={1} max={20} value={form.team_size} onChange={(value) => set("team_size", value)}
-                hint="Spieler je Seite; Kadergrößen unter Anmeldung und Kader" testId="season-form-team-size" />
+                disabled={solo} hint={solo ? SOLO_ONLY_ONE : "Spieler je Seite; Kadergrößen unter Anmeldung und Kader"} testId="season-form-team-size" />
               <SelectField label="Map-Wiederholung in einer Serie" value={form.map_repeat} onChange={(value) => set("map_repeat", value)} options={MAP_REPEAT_OPTIONS}
                 hint="Die Meldung prüft es." testId="season-form-map-repeat" />
             </FormGrid>

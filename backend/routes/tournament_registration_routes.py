@@ -9,9 +9,9 @@ from datetime import datetime, timezone
 from pydantic import BaseModel, Field
 from pymongo.errors import DuplicateKeyError
 from database import get_db
-from services import billing_orders, league_applications, squad_registration
+from services import billing_orders, league_applications, league_participants, squad_registration
 from services.league_scope import is_league_staffel
-from services.staffel_guard import SQUAD_UNREGISTER_REFUSED, STAFFEL_REGISTRATION_REFUSED
+from services.staffel_guard import PERSON_UNREGISTER_REFUSED, SQUAD_UNREGISTER_REFUSED, registration_refused
 from services.station_runtime import free_stations_of_deleted_matches
 from services.permissions import is_confirmed_tournament_lead
 from auth import get_current_user, get_optional_user
@@ -72,6 +72,8 @@ from routes.tournament_router import router
 
 
 REGISTRATION_CHECKIN_STATUSES = {"approved", "checked_in", "no_show"}
+# Solo-Staffel (#1629): Status, die es erst mit dem Spielbetrieb für Spieler gibt (P3).
+SOLO_OPERATING_REGISTRATION_STATUSES = frozenset({"checked_in", "no_show"})
 logger = logging.getLogger("tls.tournament_registration")
 
 
@@ -93,8 +95,8 @@ async def _season_squad_lock(db, tournament: dict | None):
 
 async def _sync_squad_key(db, registration: dict | None, new_status: str | None, tournament: dict | None) -> None:
     """Jeder Statuswechsel einer Co-Team-Anmeldung zieht ``league_squad_key`` nach (``squad_registration``) - vor dem
-    Schreiben des Status aufrufen. Anmeldungen ohne Co-Team: nichts."""
-    if not (registration or {}).get("squad_id"):
+    Schreiben des Status aufrufen. In einer Solo-Staffel (#1629) ebenso für die Person. Alle anderen Anmeldungen: nichts."""
+    if not squad_registration.season_entry(registration, tournament):
         return
     try:
         async with _season_squad_lock(db, tournament):
@@ -824,7 +826,7 @@ async def self_register(db, t: dict, body: RegistrationCreate, me: dict, registe
         raise HTTPException(status_code=423, detail=TOURNAMENT_MUTATION_LOCKED_DETAIL)
     # Liga-Staffel (#2109): nur Co-Teams über „Co-Team zuteilen“ - eine Selbstanmeldung gibt es dort auf keinem Weg.
     if is_league_staffel(t):
-        raise HTTPException(status_code=400, detail=STAFFEL_REGISTRATION_REFUSED)
+        raise HTTPException(status_code=400, detail=registration_refused(t))
     if not body.accept_rules or not body.accept_privacy:
         raise HTTPException(status_code=400, detail="Regeln und Datenschutz müssen akzeptiert werden.")
     registration_error = _registration_error(t)
@@ -997,7 +999,7 @@ async def admin_create_registration(tid: str, body: RegistrationAdminCreate,
     if is_league_staffel(tournament):
         # Liga-Staffel (#2109): nur Co-Teams über „Co-Team zuteilen“ (mit Kader- und Season-Prüfung) - kein ganzes
         # Hauptteam und kein Ersatz an diesen Prüfungen vorbei. Diese Route kennt kein ``squad_id``.
-        raise HTTPException(status_code=400, detail=STAFFEL_REGISTRATION_REFUSED)
+        raise HTTPException(status_code=400, detail=registration_refused(tournament))
 
     payload = body.model_dump()
     user = None
@@ -1148,6 +1150,9 @@ async def update_registration(tid: str, reg_id: str, body: RegistrationUpdate,
     # Setzplatz (#2111, TA15): leer heißt „kein Setzplatz“ - deshalb darf er ausdrücklich null sein.
     if "seed" in requested:
         updates["seed"] = requested["seed"]
+    if updates.get("status") in SOLO_OPERATING_REGISTRATION_STATUSES and league_participants.is_solo_staffel(tournament_doc):
+        # Solo-Staffel (#1629, P1): Check-in und „nicht erschienen“ gehören zum Spielbetrieb für Spieler (P3) - auch über den Status.
+        raise HTTPException(status_code=409, detail=league_participants.OPERATIONS_FOLLOW)
     if updates.get("status") in REMOVAL_KINDS:
         # Austritt und Disqualifikation (#1553) bauen den Baum um - das geht nur über den Umbauplan mit Bestätigung.
         raise HTTPException(
@@ -1253,6 +1258,9 @@ async def staff_set_registration_checkin(tid: str, reg_id: str, body: dict,
     tid = await _resolve_tid(tid)
     tournament_doc = await _ensure_tournament_unlocked(db, tid)
     await require_tournament_staff_permission(me, tid, CHECKIN_STAFF_ROLES, capability="matches")
+    # Solo-Staffel (#1629, P1): Check-in und „nicht erschienen“ gehören zum Spielbetrieb für Spieler (P3).
+    if league_participants.is_solo_staffel(tournament_doc):
+        raise HTTPException(status_code=409, detail=league_participants.OPERATIONS_FOLLOW)
     status = body.get("status")
     if status not in REGISTRATION_CHECKIN_STATUSES:
         raise HTTPException(status_code=400, detail="Ungültiger Check-in-Status")
@@ -1347,6 +1355,9 @@ async def _delete_registration_locked(db, tid: str, reg_id: str, me: dict) -> di
         team = await db.teams.find_one({"id": reg["team_id"]}, {"_id": 0})
         is_team_manager = bool(team and _can_register_team(team, me))
     is_staff = await has_tournament_staff_permission(me, tid, PARTICIPANT_STAFF_ROLES, capability="applications")
+    # Solo-Staffel (#1629): Die Leitung teilt die Person zu und nimmt sie heraus - eine Selbst-Abmeldung gibt es dort nicht (wie beim Co-Team).
+    if not is_staff and league_participants.is_solo_staffel(await db.tournaments.find_one({"id": tid}, {"_id": 0, "league_context": 1, "team_mode": 1})):
+        raise HTTPException(status_code=403, detail=PERSON_UNREGISTER_REFUSED)
     if not is_own_registration and not is_team_manager and not is_staff:
         # Co-Team (#2109): eine deutsche Begründung statt eines nackten 403.
         raise HTTPException(status_code=403, detail=SQUAD_UNREGISTER_REFUSED if reg.get("squad_id") else None)
@@ -1408,6 +1419,9 @@ async def checkin_self(tid: str, me: dict = Depends(get_current_user)):
     # Eine Prüfung für alle Stellen (#1135): Knopf, Startseite, Erinnerungen, Mail und Discord fragen dieselbe Regel.
     if not self_checkin_allowed(tournament):
         raise HTTPException(status_code=403, detail="Bei Vor-Ort-Turnieren macht die Turnierleitung den Check-in.")
+    # Solo-Staffel (#1629, P1): Check-in gehört zum Spielbetrieb für Spieler (P3). Team-Staffeln bleiben, wie sie sind.
+    if league_participants.is_solo_staffel(tournament):
+        raise HTTPException(status_code=409, detail=league_participants.OPERATIONS_FOLLOW)
     try:
         async with mutation_lock(db, tournament_write_resource(tid)):
             reg = await _find_self_registration(db, tid, me["id"])
@@ -1442,22 +1456,34 @@ async def checkin_self(tid: str, me: dict = Depends(get_current_user)):
         raise HTTPException(status_code=409, detail="Eine Turnieraktion wird bereits verarbeitet. Bitte erneut versuchen.")
 
 
-# --- Liga: Co-Team zuteilen (docs/LIGA.md, Abschnitte 2, 4 und 5; #1649) ---
+# --- Liga: Co-Team zuteilen (docs/LIGA.md, Abschnitte 2, 4 und 5; #1649) - in einer Solo-Staffel die Person (#1629, P1) ---
 class SquadAssignBody(BaseModel):
-    team_id: str = Field(min_length=1, max_length=64)
-    squad_id: str = Field(min_length=1, max_length=64)
+    # Team-Staffel: Hauptteam und Co-Team. Solo-Staffel (#1629): nur ``user_id``. Welche Art gilt, sagt die Staffel.
+    team_id: str | None = Field(default=None, min_length=1, max_length=64)
+    squad_id: str | None = Field(default=None, min_length=1, max_length=64)
+    user_id: str | None = Field(default=None, min_length=1, max_length=64)
     # Nur für die Notausnahme des Superadmins, wenn das Zuteilen den Antrag des eigenen Teams annimmt (#2245).
     conflict_reason: str | None = Field(default=None, max_length=500)
 
 
+SQUAD_ENTRY_MISSING = "Bitte ein Team und eines seiner Co-Teams wählen."
+PERSON_ENTRY_MISSING = "Bitte eine Person wählen."
+
+
 @router.get("/{tid}/squad-candidates")
-async def list_squad_candidates(tid: str, me: dict = Depends(require_lead_of("applications"))):
-    """Für den Dialog „Co-Team zuteilen“: Hauptteams mit ihren Co-Teams und was gegen eine Zuteilung spricht."""
+async def list_squad_candidates(tid: str, q: str | None = None, me: dict = Depends(require_lead_of("applications"))):
+    """Für den Dialog „Co-Team zuteilen“: Hauptteams mit ihren Co-Teams und was gegen eine Zuteilung spricht. In einer Solo-Staffel
+    (#1629) für „Spieler zuteilen“: Konten zur Suche ``q`` mit ihren Gründen (``kind: "solo"``)."""
     db = get_db()
     tid = await _resolve_tid(tid)
     tournament = await db.tournaments.find_one({"id": tid}, {"_id": 0})
     if not tournament:
         raise HTTPException(status_code=404, detail="Turnier nicht gefunden")
+    if league_participants.is_solo_staffel(tournament):
+        try:
+            return await squad_registration.person_candidates(db, tournament, q, me)
+        except squad_registration.SquadAssignError as refusal:
+            raise HTTPException(status_code=refusal.status_code, detail=refusal.detail)
     if not squad_registration.is_league_tournament(tournament):
         raise HTTPException(status_code=400, detail="Co-Teams teilt die Turnierleitung nur Team-Turnieren im Format Liga zu.")
     return await squad_registration.candidates(db, tournament)
@@ -1466,6 +1492,7 @@ async def list_squad_candidates(tid: str, me: dict = Depends(require_lead_of("ap
 SQUAD_SEASON_TAKEN = "Dieses Co-Team spielt in dieser Season schon in einer anderen Staffel."
 SQUAD_TEAM_TAKEN = ("Dieses Team hat schon ein Co-Team in dieser Staffel – zwei Co-Teams desselben Teams spielen nie "
                     "in derselben Staffel.")
+PERSON_STAFFEL_TAKEN = "Diese Person steht schon in dieser Staffel."
 
 
 async def _insert_squad_registration(db, tournament: dict, body: "SquadAssignBody", me: dict) -> dict:
@@ -1483,13 +1510,44 @@ async def _insert_squad_registration(db, tournament: dict, body: "SquadAssignBod
     return reg
 
 
+async def _insert_person_registration(db, tournament: dict, user_id: str, me: dict) -> dict:
+    """Die Einzel-Anmeldung einer Person in der Solo-Staffel (#1629) - dieselben eindeutigen Indizes wie beim Co-Team."""
+    try:
+        reg = await squad_registration.build_person_registration(db, tournament, user_id, me)
+    except squad_registration.SquadAssignError as refusal:
+        raise HTTPException(status_code=refusal.status_code, detail=refusal.detail)
+    try:
+        await db.tournament_registrations.insert_one(reg)
+    except DuplicateKeyError:
+        season_taken = await db.tournament_registrations.find_one({"league_squad_key": reg.get("league_squad_key")}, {"_id": 0, "id": 1})
+        raise HTTPException(status_code=409, detail=squad_registration.PERSON_SEASON_TAKEN if season_taken else PERSON_STAFFEL_TAKEN)
+    return reg
+
+
+def _entry_problem(tournament: dict, body: "SquadAssignBody") -> str | None:
+    """Passt die Auswahl zur Staffel? Solo-Staffel: eine Person, Team-Staffel: Team und Co-Team (#1629)."""
+    if league_participants.is_solo_staffel(tournament):
+        if body.team_id or body.squad_id:
+            return league_participants.WRONG_ENTRY_SOLO
+        return None if body.user_id else PERSON_ENTRY_MISSING
+    if body.user_id:
+        return league_participants.WRONG_ENTRY_TEAM
+    return None if body.team_id and body.squad_id else SQUAD_ENTRY_MISSING
+
+
 @router.post("/{tid}/squad-registrations")
 async def assign_squad(tid: str, body: SquadAssignBody, me: dict = Depends(require_lead_of("applications")),
                        _mutation_tid: str = Depends(_serialized_tournament_write)):
-    """Die Turnierleitung teilt ein Co-Team der Staffel zu - als freigegebene Team-Anmeldung mit ``squad_id``."""
+    """Die Turnierleitung teilt ein Co-Team der Staffel zu - als freigegebene Team-Anmeldung mit ``squad_id``. In einer Solo-Staffel
+    (#1629) die Person - als freigegebene Einzel-Anmeldung mit ``user_id``."""
     db = get_db()
     tid = await _resolve_tid(tid)
     tournament = await _ensure_tournament_unlocked(db, tid)
+    problem = _entry_problem(tournament, body)
+    if problem:
+        raise HTTPException(status_code=400, detail=problem)
+    if league_participants.is_solo_staffel(tournament):
+        return await _assign_person(db, tournament, body.user_id, me, body.conflict_reason)
     # Staffeln derselben Season teilen dasselbe Co-Team nie gleichzeitig zu: Sperre je Season (die Turnier-Sperre
     # hält nur diese Staffel), dazu der eindeutige Index auf ``league_squad_key``.
     season_resource = squad_registration.season_lock_resource(tournament)
@@ -1517,23 +1575,64 @@ async def assign_squad(tid: str, body: SquadAssignBody, me: dict = Depends(requi
     return {"registration": reg, "auto_bracket_update": auto_bracket_update, "ids_missing": sorted(missing)}
 
 
+async def _assign_person(db, tournament: dict, user_id: str, me: dict, conflict_reason: str | None = None) -> dict:
+    """Eine Person in die Solo-Staffel (#1629, P1): dieselbe Season-Sperre, dieselben Folgen wie beim Co-Team - Vorschau neu mischen,
+    Nachricht an die Person, Spiel-ID für die Season festhalten. Anträge gibt es für Personen noch nicht (P2). Sich selbst teilt die
+    Leitung nicht zu - wie bei der eigenen Anmeldung (#2245) nur der Superadmin als Notausnahme mit Grund."""
+    from services.league_permissions import CONFLICT_INVOLVED, override_reason, record_override
+    from services.permissions import is_superadmin
+
+    tid = tournament["id"]
+    override = None
+    if user_id == me.get("id"):
+        override = override_reason({"kind": CONFLICT_INVOLVED, "override": is_superadmin(me)}, conflict_reason,
+                                   detail=squad_registration.SELF_ASSIGN_DETAIL, superadmin_detail=squad_registration.SELF_ASSIGN_SUPERADMIN)
+    season_resource = squad_registration.season_lock_resource(tournament)
+    try:
+        async with (mutation_lock(db, season_resource) if season_resource else contextlib.nullcontext()):
+            reg = await _insert_person_registration(db, tournament, user_id, me)
+    except MutationLockBusy:
+        raise HTTPException(status_code=409, detail=TOURNAMENT_BUSY_DETAIL)
+    reg.pop("_id", None)
+    reg.pop("identity_key", None)
+    await _audit_tournament_action(db, "league.player.assign", me.get("id"), tid, {
+        "registration_id": reg["id"], "user_id": reg["user_id"], "display_name": reg.get("display_name"),
+    })
+    if override:
+        await record_override(db, me, action="league.player.assign", target_id=tid, reason=override, registration_id=reg["id"],
+                              season_id=(tournament.get("league_context") or {}).get("season_id"))
+    auto_bracket_update = await _refresh_tournament_previews_after_registration(db, tournament, me.get("id"))
+    await _notify_registration(db, tid, reg, reg["status"], actor_id=me.get("id"))
+    # Liga-Kader (#2108): Die Person ist ihr eigener Kader - ihre Spiel-ID gilt ab jetzt für die Season.
+    ids = await league_roster.after_assign(db, tournament, reg, {"id": None, "member_ids": [reg["user_id"]]}, me.get("id"))
+    missing = [row["name"] for row in league_roster.waiting_for_id(ids.values())]
+    return {"registration": reg, "auto_bracket_update": auto_bracket_update, "ids_missing": sorted(missing)}
+
+
 @router.delete("/{tid}/squad-registrations/{reg_id}")
 async def remove_squad(tid: str, reg_id: str, me: dict = Depends(require_lead_of("applications")),
                        _mutation_tid: str = Depends(_serialized_tournament_write)):
-    """Zuteilung zurücknehmen - nur solange das Co-Team in keinem festen Spiel steht."""
+    """Zuteilung zurücknehmen - nur solange das Co-Team (in einer Solo-Staffel die Person, #1629) in keinem festen Spiel steht."""
     db = get_db()
     tid = await _resolve_tid(tid)
     tournament = await _ensure_tournament_unlocked(db, tid)
     reg = await db.tournament_registrations.find_one({"id": reg_id, "tournament_id": tid}, {"_id": 0})
-    if not reg or not reg.get("squad_id"):
+    person = bool(reg and not reg.get("squad_id") and reg.get("user_id") and league_participants.is_solo_staffel(tournament))
+    if not reg or not (reg.get("squad_id") or person):
         raise HTTPException(status_code=404, detail="Zuteilung nicht gefunden")
     if await tournament_guard.fixed_match_count(db, tid, reg_id):
-        raise HTTPException(status_code=409, detail="Der Spielplan steht schon – das Co-Team bitte über „Austritt "
+        who = "die Person" if person else "das Co-Team"
+        raise HTTPException(status_code=409, detail=f"Der Spielplan steht schon – {who} bitte über „Austritt "
                                                     "eintragen“ in der Teilnehmerliste herausnehmen.")
     await db.tournament_registrations.delete_one({"id": reg_id, "tournament_id": tid})
     await league_applications.clear_assignment(db, reg_id, me.get("id"))
-    await _audit_tournament_action(db, "league.squad.remove", me.get("id"), tid, {
-        "registration_id": reg_id, "team_id": reg.get("team_id"), "squad_id": reg.get("squad_id"), "squad_name": reg.get("squad_name"),
-    })
+    if person:
+        await _audit_tournament_action(db, "league.player.remove", me.get("id"), tid, {
+            "registration_id": reg_id, "user_id": reg.get("user_id"), "display_name": reg.get("display_name"),
+        })
+    else:
+        await _audit_tournament_action(db, "league.squad.remove", me.get("id"), tid, {
+            "registration_id": reg_id, "team_id": reg.get("team_id"), "squad_id": reg.get("squad_id"), "squad_name": reg.get("squad_name"),
+        })
     auto_bracket_update = await _refresh_tournament_previews_after_registration(db, tournament, me.get("id"))
     return {"ok": True, "auto_bracket_update": auto_bracket_update}

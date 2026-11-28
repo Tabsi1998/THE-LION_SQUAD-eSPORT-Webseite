@@ -27,7 +27,7 @@ from datetime import datetime
 from pymongo.errors import DuplicateKeyError
 
 from models import now_utc
-from services import league_start_right_rules
+from services import league_participants, league_start_right_rules
 from services.league_permissions import (
     CAPABILITY_LABELS,
     CONFLICT_DETAIL,
@@ -416,7 +416,7 @@ async def open_count(db, season: dict, me: dict) -> int:
 LOG_PAGE_SIZE = 25
 LOG_GROUPS = {
     "league.application": "Anmeldung", "league.sanction": "Strafe", "league.rules": "Regelwerk", "league.season": "Season",
-    "league.roster": "Kader", "league.transfer": "Transfer", "league.squad": "Co-Team", "league.staffel": "Staffel",
+    "league.roster": "Kader", "league.transfer": "Transfer", "league.squad": "Co-Team", "league.player": "Spieler", "league.staffel": "Staffel",
     "league.table": "Tabelle", "league.conflict": "Notausnahme bei Befangenheit", "league.broadcast": "Rundnachricht",
     "league.division": "Liga N", "league.guest_team": "Gastteam", "match.procedure": "Verfahren", "match.reschedule": "Verschiebung", "match.incident": "Vorfall",
     "match.result": "Ergebnis", "match.lineup": "Teilnehmerliste", "match.no_show": "Nicht erschienen", "match.checkin": "Check-in",
@@ -432,7 +432,7 @@ LOG_VERBS = {
     "publish": "veröffentlicht", "draft": "Entwurf gespeichert", "submit": "eingereicht", "overdue": "Frist abgelaufen",
     "override": "Notausnahme", "send": "verschickt", "issue": "verhängt", "waitlist": "auf die Warteliste gesetzt",
     "review": "in Prüfung", "amend": "nachgetragen", "status": "Stand geändert", "sync": "Vorgaben übertragen",
-    "double": "beide nicht erschienen",
+    "double": "beide nicht erschienen", "remove": "entfernt",
 }
 
 # Staffel-Aktionen auf dem Turnierweg (#2262, Entwurf 1.4 Nr. 5): Liga starten und jeder weitere Stand, Darstellung, Sperren,
@@ -465,13 +465,15 @@ def _status_label(data: dict) -> str:
     return STAFFEL_STATUS_LABELS.get(status, STAFFEL_LOG_ACTIONS["tournament.status.change"])
 
 
-def log_label(action: str, data: dict | None = None) -> str:
+def log_label(action: str, data: dict | None = None, *, solo: bool = False) -> str:
     """„Strafe · bestätigt“ aus ``league.sanction.confirm`` - nie ein Text aus den Daten. Bei einem Statuswechsel der Staffel nennt
-    der neue Stand (ein fester Wert, kein freier Text) das Wort: „Staffel · Liga gestartet“, „Staffel · beendet“."""
+    der neue Stand (ein fester Wert, kein freier Text) das Wort: „Staffel · Liga gestartet“, „Staffel · beendet“. ``solo``: In einer
+    Solo-Liga (#1629) heißt der Teilnehmer „Spieler“ statt „Co-Team“."""
     if action == "tournament.status.change":
         return _status_label(data if isinstance(data, dict) else {})
     if action in STAFFEL_LOG_ACTIONS:
-        return STAFFEL_LOG_ACTIONS[action]
+        label = STAFFEL_LOG_ACTIONS[action]
+        return label.replace("Co-Team · ", "Spieler · ", 1) if solo else label
     parts = str(action or "").split(".")
     group = LOG_GROUPS.get(".".join(parts[:2]), "Liga")
     verb = LOG_VERBS.get(parts[-1]) if len(parts) > 2 else None
@@ -551,8 +553,10 @@ async def season_log(db, season: dict, page: int = 1, *, me: dict | None = None,
     actor_ids = sorted({row["actor_id"] for row in rows if row.get("actor_id")})
     names = {row["id"]: row.get("display_name") or row.get("username") or "Mitglied" for row in await db.users.find(
         {"id": {"$in": actor_ids}}, {"_id": 0, "id": 1, "display_name": 1, "username": 1}).to_list(len(actor_ids) + 1)} if actor_ids else {}
+    league = await db.leagues.find_one({"id": season.get("league_id")}, {"_id": 0, "participant_kind": 1})
+    solo = league_participants.is_solo(league)
     return {
-        "items": [{"id": row.get("id"), "action": row.get("action"), "label": log_label(row.get("action"), row.get("data")), "at": row.get("created_at"),
+        "items": [{"id": row.get("id"), "action": row.get("action"), "label": log_label(row.get("action"), row.get("data"), solo=solo), "at": row.get("created_at"),
                    "actor": names.get(row.get("actor_id") or "") if row.get("actor_id") else "Automatik",
                    **_log_detail(row, staffeln)} for row in rows],
         "page": page, "pages": pages, "total": total, "page_size": LOG_PAGE_SIZE,

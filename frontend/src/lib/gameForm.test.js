@@ -33,10 +33,17 @@ test("Allgemein schickt nur Name, Art, Bilder und Discord - keine IDs, keine Mod
   const body = generalPayload({ ...generalToForm(EDITION), name: "  Black Ops 7  " });
   expect(body).toEqual({
     name: "Black Ops 7", slug: "black-ops-7", kind: "edition", parent_game_id: "g1", short_name: "BO7", logo_url: "/l.png",
-    cover_url: "", discord_guild_id: "9", discord_role_name: null,
+    cover_url: "", discord_guild_id: "9", discord_role_name: null, supports_solo: true,
   });
   expect(body).not.toHaveProperty("match_modes");
   expect(body).not.toHaveProperty("player_id_fields");
+});
+
+// Schalter „Einzelspieler erlaubt“ (#1629, Nr. 296): Vorgabe an - ein Altspiel ohne Feld gilt als erlaubt, aus bleibt aus.
+test("Allgemein: Einzelspieler erlaubt ist ohne Feld an und geht als Wahrheitswert mit", () => {
+  expect(generalToForm(EDITION).supports_solo).toBe(true);
+  expect(generalToForm({ ...EDITION, supports_solo: false }).supports_solo).toBe(false);
+  expect(generalPayload({ ...generalToForm(EDITION), supports_solo: false }).supports_solo).toBe(false);
 });
 
 test("Allgemein: keine Spielversion mehr - Hauptspiel und ID-Quelle fallen weg, Discord-Rolle gilt, leer heißt Vorgabe", () => {

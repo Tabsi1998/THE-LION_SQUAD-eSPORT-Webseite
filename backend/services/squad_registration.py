@@ -17,7 +17,7 @@ from __future__ import annotations
 from pymongo.errors import DuplicateKeyError
 
 from models import REGISTRATION_LIMIT, new_id, now_utc
-from services import league_eligibility, league_roster
+from services import league_eligibility, league_participants, league_roster
 from services.discord_roles import load_games, top_game
 from services.league_roster import active_league_registrations, min_squad_size
 from services.mutation_lock import league_season_resource
@@ -44,12 +44,24 @@ def league_squad_key(tournament: dict, squad_id: str) -> str | None:
     return f"{season_id}:{squad_id}" if season_id and squad_id and not context.get("kind") else None
 
 
+def season_entry(registration: dict | None, tournament: dict | None) -> str | None:
+    """Wer in der Season antritt (#1629): das Co-Team (``squad_id``) - in einer Solo-Staffel die Person (``user:<id>``). Damit hält derselbe
+    Season-Schlüssel ``league_squad_key`` auch „eine Person je Season nur in einer Staffel“. Alle anderen Anmeldungen: ``None``."""
+    registration = registration or {}
+    if registration.get("squad_id"):
+        return registration["squad_id"]
+    if league_participants.is_solo_staffel(tournament):
+        return league_participants.person_entry(registration.get("user_id"))
+    return None
+
+
 def season_lock_resource(tournament: dict) -> str | None:
     season_id = (tournament.get("league_context") or {}).get("season_id")
     return league_season_resource(season_id) if season_id else None
 
 
 SEASON_TAKEN = "Dieses Co-Team spielt in dieser Season schon in einer anderen Staffel."
+PERSON_SEASON_TAKEN = "Diese Person spielt in dieser Season schon in einer anderen Staffel."
 POSTSEASON_ASSIGN = ("In Playoffs und Relegation kommen die Teams aus dem Endstand. Zuteilen geht hier nicht - im Reiter „Abschluss“ der "
                      "Season steht die Setzliste, dort lässt sie sich vor dem ersten Spiel neu berechnen.")
 
@@ -59,23 +71,25 @@ async def sync_season_key(db, registration: dict | None, new_status: str | None,
     ausgetreten …) → Schlüssel weg, das Co-Team ist in der Season wieder frei; wieder aktiv → Schlüssel neu setzen,
     außer das Co-Team spielt inzwischen in einer anderen Staffel (``SquadAssignError`` 409 - deshalb vor dem
     Statuswechsel aufrufen). Anmeldungen ohne Co-Team oder ohne Liga-Rahmen bleiben unberührt. Aufrufer halten die
-    Season-Sperre (``season_lock_resource``)."""
-    if not registration or not registration.get("squad_id") or not registration.get("id"):
+    Season-Sperre (``season_lock_resource``). In einer Solo-Staffel (#1629) gilt dasselbe für die Person."""
+    entry = season_entry(registration, tournament)
+    if not entry or not registration.get("id"):
         return
-    key = league_squad_key(tournament or {}, registration["squad_id"])
+    key = league_squad_key(tournament or {}, entry)
     if not key:
         return
     if new_status not in ACTIVE_REGISTRATION_STATUSES:
         await db.tournament_registrations.update_one({"id": registration["id"]}, {"$unset": {"league_squad_key": ""}})
         return
+    taken = PERSON_SEASON_TAKEN if entry.startswith("user:") else SEASON_TAKEN
     if await db.tournament_registrations.find_one(
         {"league_squad_key": key, "id": {"$ne": registration["id"]}}, {"_id": 0, "id": 1}
     ):
-        raise SquadAssignError(409, SEASON_TAKEN)
+        raise SquadAssignError(409, taken)
     try:
         await db.tournament_registrations.update_one({"id": registration["id"]}, {"$set": {"league_squad_key": key}})
     except DuplicateKeyError:
-        raise SquadAssignError(409, SEASON_TAKEN)
+        raise SquadAssignError(409, taken)
 
 
 class SquadAssignError(Exception):
@@ -469,6 +483,176 @@ async def build_registration(db, tournament: dict, team_id: str, squad_id: str, 
         "identity_key": f"{tid}:team:{team_id}:squad:{squad_id}" if siblings else f"{tid}:team:{team_id}",
         **({"league_squad_key": key} if (key := league_squad_key(tournament, squad_id)) else {}),
         **({"application_id": application_id} if application_id else {}),
+        "created_by": actor.get("id"),
+        "created_at": now_iso,
+        "updated_at": now_iso,
+    }
+
+
+# ---------------------------------------------------------------- Person zuteilen (Solo-Liga, #1629 P1)
+#
+# In einer Solo-Staffel ist der Teilnehmer die Person selbst. Die Leitung teilt sie über denselben Weg zu wie ein Co-Team
+# (``POST …/squad-registrations`` mit ``user_id``); daraus entsteht eine gewöhnliche Einzel-Anmeldung: ``user_id``, kein Team,
+# ``registration_type="solo"``, ``identity_key "<tid>:user:<id>"`` wie bei jeder Einzel-Anmeldung und als Season-Schlüssel
+# ``league_squad_key "<season>:user:<id>"`` - so spielt eine Person je Season nur in einer Staffel. Kein zweites System.
+
+# Sich selbst zuteilen (#1629, wie #2245): Über die eigene Teilnahme entscheidet eine andere Person, der Superadmin nur mit Grund.
+SELF_ASSIGN_DETAIL = "Dich selbst teilt eine andere Person aus der Leitung zu."
+SELF_ASSIGN_SUPERADMIN = ("Dich selbst teilt eine andere Person aus der Leitung zu. Als Superadmin geht es nur als Notausnahme, mit einem Grund "
+                          "von mindestens fünf Zeichen.")
+PERSON_FIELDS = {"_id": 0, "id": 1, "username": 1, "display_name": 1, "avatar_url": 1, "is_banned": 1, "is_active": 1}
+PERSON_SEARCH_LIMIT = 30
+
+
+# Im Dialog vorab (#1629): Die eigene Zeile ist gesperrt - die Notausnahme läuft wie beim Team-Weg nur über die API mit Grund.
+SELF_ASSIGN_ROW = "Dich selbst teilt nur der Superadmin mit Grund zu – über den Weg für Notausnahmen."
+
+
+def person_name(person: dict | None) -> str:
+    return str((person or {}).get("display_name") or (person or {}).get("username") or "Diese Person").strip()
+
+
+def _seat_limit_problem(tournament: dict, seats_taken: int) -> tuple[int, str] | None:
+    limit = _positive_int(tournament.get("max_participants"))
+    if limit and seats_taken >= limit:
+        return 409, f"Die Staffel ist voll ({seats_taken} von {limit} Plätzen)."
+    return None
+
+
+def person_problems(person: dict, tournament: dict, *, taken: dict[str, str | None], seats_taken: int,
+                    other_staffel: set[str]) -> list[tuple[int, str]]:
+    """Alle Gründe, warum diese Person nicht in die Staffel kann - leer heißt: zuteilbar. Reihenfolge = Reihenfolge der Meldung.
+    ``taken``: Personen dieser Staffel mit Status (jede Anmeldung belegt den ``identity_key``, auch eine ausgetretene),
+    ``other_staffel``: Personen mit Season-Schlüssel in einer anderen Staffel derselben Season."""
+    name = person_name(person)
+    problems: list[tuple[int, str]] = []
+    if person.get("is_banned") or person.get("is_active") is False:
+        problems.append((400, f"{name} ist gesperrt – ein gesperrtes Konto spielt nicht in der Liga."))
+    if person.get("id") in taken:
+        status = taken[person["id"]]
+        if status in ACTIVE_REGISTRATION_STATUSES:
+            problems.append((409, f"{name} steht schon in dieser Staffel."))
+        else:
+            problems.append((409, f"{name} stand schon in dieser Staffel ({STATUS_LABELS.get(status, status or 'ohne Status')}) – "
+                                  "eine Person tritt je Staffel nur einmal an."))
+    if person.get("id") in other_staffel:
+        problems.append((409, f"{name} spielt in dieser Season schon in einer anderen Staffel."))
+    seat = _seat_limit_problem(tournament, seats_taken)
+    if seat:
+        problems.append(seat)
+    return problems
+
+
+async def _person_state(db, tournament: dict, user_ids: list[str]) -> tuple[dict[str, str | None], int, set[str]]:
+    """Wer schon in dieser Staffel steht (mit Status), wie viele Plätze belegt sind und wer von ``user_ids`` in einer anderen Staffel
+    derselben Season spielt (Season-Schlüssel ``<season>:user:<id>``)."""
+    regs = await db.tournament_registrations.find(
+        {"tournament_id": tournament["id"]}, {"_id": 0, "user_id": 1, "status": 1}).to_list(REGISTRATION_LIMIT)
+    taken: dict[str, str | None] = {}
+    for reg in regs:
+        uid = reg.get("user_id")
+        if uid and taken.get(uid) not in ACTIVE_REGISTRATION_STATUSES:
+            taken[uid] = reg.get("status")
+    seats = len([reg for reg in regs if reg.get("status") in SEAT_STATUSES])
+    keys = {league_squad_key(tournament, league_participants.person_entry(uid)): uid for uid in user_ids if uid}
+    keys.pop(None, None)
+    other: set[str] = set()
+    if keys:
+        rows = await db.tournament_registrations.find(
+            {"league_squad_key": {"$in": sorted(keys)}, "tournament_id": {"$ne": tournament["id"]}},
+            {"_id": 0, "league_squad_key": 1}).to_list(len(keys) + 5)
+        other = {keys[row["league_squad_key"]] for row in rows if row.get("league_squad_key") in keys}
+    return taken, seats, other
+
+
+def _check_solo_staffel(tournament: dict) -> None:
+    if not league_participants.is_solo_staffel(tournament):
+        raise SquadAssignError(400, league_participants.WRONG_ENTRY_TEAM)
+    if (tournament.get("league_context") or {}).get("kind"):
+        raise SquadAssignError(409, POSTSEASON_ASSIGN)
+
+
+async def person_candidates(db, tournament: dict, query: str | None, actor: dict | None = None) -> dict:
+    """Für den Dialog „Spieler zuteilen“: Konten nach Name (ohne E-Mail), je Person die Gründe, warum sie (noch) nicht geht, dazu
+    Alter, Plattform und Spiel-ID als Hinweis - wie beim Co-Team, nur für eine Person. Ohne Suchtext keine Liste."""
+    from services.query_filters import safe_regex
+
+    _check_solo_staffel(tournament)
+    needle = str(query or "").strip()
+    people: list[dict] = []
+    if len(needle) >= 2:
+        pattern = safe_regex(needle)
+        # Wie die Personensuche (``mention-search``): gesperrte und deaktivierte Konten erscheinen nicht - die Leitung sieht so keinen
+        # fremden Sperrstatus. Das direkte Zuteilen sagt weiter „gesperrt“ (``person_problems``).
+        people = await db.users.find(
+            {"is_active": True, "is_banned": {"$ne": True},
+             "$or": [{"username": {"$regex": pattern, "$options": "i"}}, {"display_name": {"$regex": pattern, "$options": "i"}}]},
+            PERSON_FIELDS).sort("display_name", 1).to_list(PERSON_SEARCH_LIMIT)
+    ids = [row["id"] for row in people if row.get("id")]
+    taken, seats, other = await _person_state(db, tournament, ids)
+    roster_ctx = await league_roster.context_for_tournament(db, tournament, ids) if ids else None
+    eligibility = await league_eligibility.context_for_tournament(db, tournament, ids) if ids else None
+    rows = []
+    for person in people:
+        problems = person_problems(person, tournament, taken=taken, seats_taken=seats, other_staffel=other)
+        if actor and person.get("id") == actor.get("id"):
+            problems.append((403, SELF_ASSIGN_ROW))
+        alone = {"id": None, "name": person_name(person), "member_ids": [person["id"]]}
+        rows.append({
+            "id": person["id"], "username": person.get("username"), "display_name": person_name(person), "avatar_url": person.get("avatar_url"),
+            "problems": [text for _code, text in problems],
+            # Alter und Plattform (#2270, #2313) und die Spiel-ID (#2108): Hinweis, das Zuteilen geht trotzdem - wie beim Co-Team.
+            "notes": league_eligibility.assign_notes(eligibility, alone),
+            "players": _id_players(alone, league_roster.statuses(roster_ctx, [person["id"]])) if roster_ctx and roster_ctx.fields else [],
+        })
+    return {
+        "kind": league_participants.SOLO,
+        "max_participants": _positive_int(tournament.get("max_participants")),
+        "seats_taken": seats,
+        "people": rows,
+        "id_label": league_roster.labels(roster_ctx.fields) if roster_ctx and roster_ctx.fields else None,
+    }
+
+
+async def build_person_registration(db, tournament: dict, user_id: str, actor: dict) -> dict:
+    """Prüft die Person und baut ihre Einzel-Anmeldung für die Solo-Staffel - ohne zu schreiben. Wirft ``SquadAssignError``."""
+    _check_solo_staffel(tournament)
+    if tournament.get("status") in FINISHED_TOURNAMENT_STATUSES:
+        raise SquadAssignError(409, "Diese Staffel ist schon beendet.")
+    person = await db.users.find_one({"id": user_id}, PERSON_FIELDS)
+    if not person:
+        raise SquadAssignError(404, "Dieses Konto gibt es nicht.")
+    taken, seats, other = await _person_state(db, tournament, [user_id])
+    problems = person_problems(person, tournament, taken=taken, seats_taken=seats, other_staffel=other)
+    if problems:
+        code, text = problems[0]
+        raise SquadAssignError(code, text)
+    tid = tournament["id"]
+    now_iso = now_utc().isoformat()
+    name = person_name(person)
+    late = await _late_mark(db, tournament)
+    key = league_squad_key(tournament, league_participants.person_entry(user_id))
+    return {
+        **({"late_entry": late} if late else {}),
+        "id": new_id(),
+        "tournament_id": tid,
+        "user_id": user_id,
+        "team_id": None,
+        "status": "approved",
+        "display_name": name,
+        "ingame_name": name,
+        "player_ids": {},
+        # Wie beim Co-Team (D-7, #1646): Das Zuteilen ist keine Zustimmung - Regeln stehen in league_rule_consents.
+        "accepted_rules": False,
+        "accepted_privacy": False,
+        "seed": None,
+        "registration_type": "solo",
+        "registered_via": "league_assign",
+        "registered_by": actor.get("id"),
+        "source": "staff_add",
+        "is_guest": False,
+        "identity_key": f"{tid}:user:{user_id}",
+        **({"league_squad_key": key} if key else {}),
         "created_by": actor.get("id"),
         "created_at": now_iso,
         "updated_at": now_iso,

@@ -161,6 +161,59 @@ test("Gestaltung: vorhandenes Emblem und Banner stehen in der Vorschau, Entferne
   expect(apiMock.patch.mock.calls[0][1]).not.toHaveProperty("emblem_url");
 });
 
+// Solo-Liga (#1629, P1): Die Teilnehmerart wird beim Anlegen gewählt - nur bei Spielen mit Einzelspielern - und steht danach fest.
+const SOLO_BODY = {
+  ...BODY,
+  games: [{ id: "g1", name: "Probe Shooter", slug: "probe-shooter", supports_solo: true }, { id: "g2", name: "Nur Teams", slug: "nur-teams", supports_solo: false }],
+  season_defaults_solo: { ...DEFAULTS, team_size: 1, min_squad_size: 1, max_squad_size: 1 },
+  leagues: [...BODY.leagues, { id: "l2", name: "Duell-Liga", slug: "duell", game_id: "g1", game_name: "Probe Shooter", status: "active", participant_kind: "solo", seasons: [] }],
+};
+
+test("Solo-Liga anlegen: Teilnehmer wählen, nur bei Spielen mit Einzelspielern", async () => {
+  apiMock.get.mockResolvedValue({ data: SOLO_BODY });
+  renderPage();
+  fireEvent.click(await screen.findByTestId("league-add"));
+  fireEvent.change(screen.getByTestId("league-name"), { target: { value: "Duell Zwei" } });
+  fireEvent.change(screen.getByTestId("league-kind"), { target: { value: "solo" } });
+  fireEvent.click(screen.getByTestId("league-create-save"));
+  await waitFor(() => expect(apiMock.post).toHaveBeenCalledWith("/admin/leagues", { name: "Duell Zwei", game_id: "g1", participant_kind: "solo", description: null }));
+});
+
+test("ein Spiel ohne Einzelspieler bietet keine Solo-Liga an", async () => {
+  apiMock.get.mockResolvedValue({ data: SOLO_BODY });
+  renderPage();
+  fireEvent.click(await screen.findByTestId("league-add"));
+  fireEvent.change(screen.getByTestId("league-kind"), { target: { value: "solo" } });
+  fireEvent.change(screen.getByTestId("league-game"), { target: { value: "g2" } });
+  expect(screen.queryByTestId("league-kind")).toBeNull();
+  expect(screen.getByTestId("league-kind-team-only")).toHaveTextContent("Co-Teams");
+  fireEvent.change(screen.getByTestId("league-name"), { target: { value: "Team Zwei" } });
+  fireEvent.click(screen.getByTestId("league-create-save"));
+  await waitFor(() => expect(apiMock.post).toHaveBeenCalledWith("/admin/leagues", { name: "Team Zwei", game_id: "g2", description: null }));
+});
+
+test("die Art steht in der Übersicht, beim Bearbeiten fest und in den Vorgaben einer neuen Season", async () => {
+  apiMock.get.mockResolvedValue({ data: SOLO_BODY });
+  renderPage();
+  expect(await screen.findByTestId("league-head-duell")).toHaveTextContent("Probe Shooter · Spieler (1 gegen 1) · /liga/duell");
+  expect(screen.getByTestId("league-head-probe-shooter")).toHaveTextContent("Probe Shooter · Co-Teams · /liga/probe-shooter");
+
+  fireEvent.click(screen.getByTestId("league-edit-duell"));
+  expect(screen.getByTestId("league-kind-fixed")).toHaveTextContent("Spieler (1 gegen 1)");
+  expect(screen.getByTestId("league-kind-fixed")).toHaveTextContent("Steht seit dem Anlegen fest.");
+  expect(screen.queryByTestId("league-kind")).toBeNull();
+  // Eine Solo-Liga wechselt nur auf Spiele mit Einzelspielern.
+  expect([...screen.getByTestId("league-game").querySelectorAll("option")].map((row) => row.value)).toEqual(["g1"]);
+});
+
+test("die Vorgaben einer neuen Season in der Solo-Liga: 1 gegen 1, ohne Kaderregeln", async () => {
+  apiMock.get.mockResolvedValue({ data: SOLO_BODY });
+  renderPage();
+  fireEvent.click(await screen.findByTestId("season-add-duell"));
+  expect(screen.getByTestId("season-defaults")).toHaveTextContent("1 gegen 1, bis 8 Spieler je Staffel");
+  expect(screen.getByTestId("season-defaults")).not.toHaveTextContent("Kader");
+});
+
 test("Zuständige (#2203): kein Anlegen und Löschen, nur die Knöpfe der eigenen Zuständigkeit", async () => {
   const [league] = BODY.leagues;
   apiMock.get.mockResolvedValue({ data: { ...BODY, can_create: false, leagues: [{ ...league, capabilities: ["roster"] }] } });

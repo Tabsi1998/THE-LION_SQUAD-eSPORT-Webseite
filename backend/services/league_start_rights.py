@@ -20,7 +20,7 @@ from services.league_start_right_rules import (
     PAUSES, REASON_MIN, StartRightProblem, accept_until, candidates, day_text, defaults, may_pass, needs_accept, normalize, offer,
     open_pause, overdue, pauses, remind_at, resting, restored_right, right_of, start_reached, state, stored, waits_for_lead,
 )
-from services import league_calendar
+from services import league_calendar, league_participants
 from services.log_safe import log_safe
 
 logger = logging.getLogger("tls.league_start_rights")
@@ -825,6 +825,10 @@ async def announce(db, season_id: str | None) -> dict:
 async def save_settings(db, season: dict, body: dict, actor: dict) -> dict | None:
     """Speichert die Einstellung (``active: false`` nimmt sie weg). Braucht nach dem Speichern niemand mehr eine Zusage (Modus
     ``auto`` oder ausgeschaltet), gelten offene Startrechte als zugesagt - niemand verliert seinen Platz durch das Umschalten."""
+    league = await db.leagues.find_one({"id": season.get("league_id")}, {"_id": 0, "participant_kind": 1})
+    if league_participants.is_solo(league):
+        # Solo-Liga (#1629): Startrechte je Person (``user:<id>``) kommen mit der Folge-Season (P4).
+        raise StartRightProblem(league_participants.SUCCESSOR_FOLLOWS, 409)
     before = stored(season)
     fields = {key: value for key, value in body.items() if key in DEFAULTS and value is not None}
     rules = normalize({**(before or {}), **fields}) if body.get("active", True) else None

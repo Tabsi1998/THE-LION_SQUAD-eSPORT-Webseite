@@ -38,6 +38,7 @@ from services import game_maps
 from services import league_applications
 from services import league_late
 from services import league_look
+from services import league_participants
 from services import league_platform
 from services import league_pool_check
 from services import league_readiness
@@ -111,7 +112,10 @@ async def admin_list_leagues(me: dict = Depends(require_any_league)):
     only = {} if area else {"id": {"$in": sorted(await staffed_league_ids(db, me))}}
     rows = await db.leagues.find(only, {"_id": 0}).sort("name", 1).to_list(200)
     seasons = await db.league_seasons.find({} if area else {"league_id": only["id"]}, {"_id": 0}).sort("number", -1).to_list(2000)
-    games = await db.games.find({}, {"_id": 0, "id": 1, "name": 1, "slug": 1, "status": 1}).sort("name", 1).to_list(500)
+    games = await db.games.find({}, {"_id": 0, "id": 1, "name": 1, "slug": 1, "status": 1, "supports_solo": 1}).sort("name", 1).to_list(500)
+    for game in games:
+        # Teilnehmerart (#1629): Die Wahl „Spieler“ gibt es nur bei Spielen mit Einzelspielern - ohne Feld wie im Spiel-Modell ja.
+        game["supports_solo"] = league_participants.game_allows(game, league_participants.SOLO)
     names = {game["id"]: game.get("name") for game in games}
     return {
         "can_create": area,
@@ -124,6 +128,9 @@ async def admin_list_leagues(me: dict = Depends(require_any_league)):
         "games": games,
         "season_defaults": {key: value for key, value in leagues.new_season_settings({}).items()
                             if key not in ("scoring_rules",)},
+        # Dieselben Vorgaben für eine Season einer Solo-Liga (#1629, S11): 1 gegen 1, der Kader ist die Person.
+        "season_defaults_solo": {key: value for key, value in leagues.new_season_settings(league_participants.SOLO_SEASON_DEFAULTS).items()
+                                 if key not in ("scoring_rules",)},
     }
 
 
