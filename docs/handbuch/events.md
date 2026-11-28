@@ -449,7 +449,8 @@ Website selbst – die Abstimmungen der Generalversammlung kommen weiter aus der
 
 - **Frage** (3 bis 200 Zeichen) und **Antworten** (2 bis 12, je bis 80 Zeichen, keine doppelt).
 - **Frist (optional):** Bis dahin wird abgestimmt; genau zur Frist ist die Abstimmung zu. Ohne Frist bleibt sie offen, bis ihr
-  **Jetzt beenden** tippt. Eine Frist in der Vergangenheit nimmt das Formular nicht.
+  **Jetzt beenden** tippt. Eine Frist in der Vergangenheit nimmt das Formular nicht – auch nicht beim Ändern einer laufenden
+  Abstimmung, denn dann fielen schon abgegebene Stimmen still heraus. Zum sofortigen Schließen gibt es **Jetzt beenden**.
 - **Ergebnis zeigen:** **Sofort** (der Stand läuft mit) oder **Erst nach der Frist bzw. dem Ende**.
 - **Mehrere Antworten erlauben** mit **bis zu** (2 bis Zahl der Antworten); sonst gilt eine Antwort.
 - **Angemeldete informieren:** Alle, die abstimmen dürfen, bekommen einmal die Nachricht „Neue Abstimmung“ – über die Nachricht zum
@@ -468,9 +469,11 @@ nicht mit (folgt mit #2615).
 bleibt es eine Stimme. Kommt eine Stimme im selben Moment wie **Jetzt beenden**, zählt sie entweder im Ergebnis, oder die Person liest
 „Die Abstimmung ist beendet“ – nie dazwischen.
 
-**Ende und Ergebnis:** Zu ist eine Abstimmung mit der Frist, mit **Jetzt beenden** oder wenn das Event **Beendet**, **Archiviert** oder
-**Abgesagt** ist. Ab dann steht das Ergebnis fest: Spätere Abmeldungen und gelöschte Konten ändern es nicht mehr (gelöschte Konten
-nehmen ihre Stimme trotzdem mit – das Ergebnis enthält nur Zahlen).
+**Ende und Ergebnis:** Die Abstimmung endet mit der Frist oder mit **Jetzt beenden**. Ab dann steht das Ergebnis fest: Spätere
+Abmeldungen und gelöschte Konten ändern es nicht mehr (gelöschte Konten nehmen ihre Stimme trotzdem mit – das Ergebnis enthält nur
+Zahlen). Steht das Event auf **Beendet**, **Archiviert** oder **Abgesagt**, zeigt die Seite die Abstimmung als beendet und nimmt keine
+Stimme an; das Ergebnis bleibt so sichtbar oder verdeckt wie eingestellt und wird nicht festgeschrieben. Wird eine Absage
+zurückgenommen, läuft die Abstimmung normal weiter.
 
 **Geheim:** Wer wie gestimmt hat, steht nirgends. Jede Person sieht ihre eigene Stimme, ihr seht in der Verwaltung nur Zahlen:
 „3 von 12 abgestimmt“ und je Antwort die Zahl – auch vor der Frist, wenn das Ergebnis für alle noch verdeckt ist. Das Protokoll hält
