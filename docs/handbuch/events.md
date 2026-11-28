@@ -169,7 +169,15 @@ PLZ, Stadt, Land).
 - Schalten zwei aus der Leitung gleichzeitig um, zählt das erste. Auf denselben Plan geht keine zweite Nachricht hinaus; auf einen anderen
   bekommt der zweite „Inzwischen ist Plan B aktiv – bitte die Seite neu laden“.
 - Ändert ihr beim Speichern den Plan, der gerade gilt (zum Beispiel seine Adresse), fragt das Formular wie beim Verschieben, ob die
-  Angemeldeten es erfahren sollen. Ein Plan, der gerade gilt, lässt sich nicht entfernen – erst umschalten.
+  Angemeldeten es erfahren sollen. Ein Plan, der gerade gilt, lässt sich nicht einzeln entfernen – erst umschalten.
+- Hat jemand anderer umgeschaltet, während ihr die Maske offen hattet, speichert sie nicht über den neuen Plan drüber: Beim Ort steht
+  **Inzwischen wurde umgeschaltet – bitte neu laden**, mit **Neu laden**. Eure Änderungen am Ort sind dann nicht gespeichert.
+- **Ausweichorte entfernen** (oben im Kasten, mit Rückfrage): Danach gibt es nur noch einen Ort – den Plan, der gerade gilt. Er steht wieder
+  in den normalen Ortsfeldern; wirksam mit **Speichern**.
+- Ein entfernter Plan kommt nicht als neuer Plan mit derselben Kennung zurück. Eine Abstimmung über die Pläne kann so nie auf einen Ort
+  zeigen, über den gar nicht abgestimmt wurde.
+- Ändert jemand nur die Ortsfelder (über die Schnittstelle oder den Inhalte-Helfer), ändert sich der Plan, der gerade gilt, mit. Ort und
+  aktiver Plan stehen nie auseinander.
 
 ### 3.4 Event als Klammer: Turniere und Fast Laps
 
@@ -445,23 +453,34 @@ Website selbst – die Abstimmungen der Generalversammlung kommen weiter aus der
 - **Ergebnis zeigen:** **Sofort** (der Stand läuft mit) oder **Erst nach der Frist bzw. dem Ende**.
 - **Mehrere Antworten erlauben** mit **bis zu** (2 bis Zahl der Antworten); sonst gilt eine Antwort.
 - **Angemeldete informieren:** Alle, die abstimmen dürfen, bekommen einmal die Nachricht „Neue Abstimmung“ – über die Nachricht zum
-  Event (Postfach, Push und Mail nach den Einstellungen der Person). Nicht bei Entwurf, Archiviert und Abgesagt.
-- **Über die Ort-Pläne abstimmen** (nur mit Plan A, B, C): legt je Plan eine Antwort an. Ist die Abstimmung entschieden, steht
-  **Als Ort übernehmen** daneben – ein Klick schaltet auf den Gewinner um, mit der Frage **Angemeldete informieren?**.
+  Event (Postfach, Push und Mail nach den Einstellungen der Person). Sie ist eine normale Info: Ruhezeit und Sammel-Mail gelten, anders
+  als bei einer Absage. Nicht bei Entwurf, Archiviert und Abgesagt.
+- **Über die Ort-Pläne abstimmen** (nur mit Plan A, B, C): legt je Plan eine Antwort an („Plan A: Name“, lange Namen werden auf 80
+  Zeichen gekürzt). Ist die Abstimmung entschieden, steht **Als Ort übernehmen** daneben – ein Klick schaltet auf den Gewinner um, mit
+  der Frage **Angemeldete informieren?**.
 
-**Wer abstimmt:** nur, wer angemeldet oder eingecheckt ist. Die **Warteliste** und Abgemeldete stimmen nicht ab: Die Abstimmung
-entscheidet über den Ablauf für die, die fix dabei sind, und eine Warteliste soll keine Stimmen sammeln. Wer nachrückt, stimmt ab dann
-mit. Sagt jemand ab, zählt seine Stimme nicht mehr. Begleitpersonen stimmen noch nicht mit (folgt mit #2615).
+**Wer abstimmt:** nur, wer angemeldet oder eingecheckt ist. Die **Warteliste**, Abgemeldete und als „nicht erschienen“ Eingetragene stimmen
+nicht ab: Die Abstimmung entscheidet über den Ablauf für die, die fix dabei sind, und eine Warteliste soll keine Stimmen sammeln. Wer
+nachrückt, stimmt ab dann mit. Sagt jemand ab, solange die Abstimmung läuft, zählt seine Stimme nicht mehr. Begleitpersonen stimmen noch
+nicht mit (folgt mit #2615).
 
 **Eine Stimme je Person:** Ändern geht bis zur Frist, danach nicht mehr. Tippt jemand zweimal oder auf zwei Geräten gleichzeitig,
-bleibt es eine Stimme.
+bleibt es eine Stimme. Kommt eine Stimme im selben Moment wie **Jetzt beenden**, zählt sie entweder im Ergebnis, oder die Person liest
+„Die Abstimmung ist beendet“ – nie dazwischen.
+
+**Ende und Ergebnis:** Zu ist eine Abstimmung mit der Frist, mit **Jetzt beenden** oder wenn das Event **Beendet**, **Archiviert** oder
+**Abgesagt** ist. Ab dann steht das Ergebnis fest: Spätere Abmeldungen und gelöschte Konten ändern es nicht mehr (gelöschte Konten
+nehmen ihre Stimme trotzdem mit – das Ergebnis enthält nur Zahlen).
 
 **Geheim:** Wer wie gestimmt hat, steht nirgends. Jede Person sieht ihre eigene Stimme, ihr seht in der Verwaltung nur Zahlen:
 „3 von 12 abgestimmt“ und je Antwort die Zahl – auch vor der Frist, wenn das Ergebnis für alle noch verdeckt ist. Das Protokoll hält
 Anlegen, Ändern, Beenden und Löschen fest, nie eine Stimme.
 
 **Ändern:** **Bearbeiten** ändert Frage, Antworten, Frist und Einstellungen. Eine Antwort, für die es schon Stimmen gibt, lässt sich
-nicht entfernen – nur ihre Beschriftung ändern. **Löschen** nimmt die Abstimmung samt Stimmen weg (mit Rückfrage).
+nicht entfernen – nur ihre Beschriftung ändern. Hat schon jemand mehrere Antworten gewählt, lässt sich die Zahl der erlaubten Antworten
+nicht mehr senken. Die Frist verlängern geht, solange die Abstimmung läuft; eine beendete oder abgelaufene Abstimmung öffnet keine neue
+Frist wieder – dann lassen sich nur noch Frage und Beschriftungen berichtigen. **Löschen** nimmt die Abstimmung samt Stimmen weg
+(mit Rückfrage).
 
 **Auf der Event-Seite** steht nach „Dein Event“ der Abschnitt **Abstimmungen**: je Abstimmung Frage, Frist, Regel und das Schild
 **Offen**, **Abgestimmt** oder **Beendet**. Angemeldete wählen und tippen **Abstimmen** bzw. **Stimme ändern**; alle anderen lesen, warum
@@ -511,6 +530,10 @@ In der App folgt der Abschnitt; die Daten liefert die Event-Seite schon mit (`po
 | **Ausweichort hinterlegen** fehlt | Das Event hat mehrere Standorte oder ist online | Standorte entfernen; online gibt es keinen Ort |
 | Person kann nicht abstimmen | Sie steht auf der Warteliste, ist abgemeldet oder nicht angemeldet | Gewollt; nach dem Nachrücken geht es |
 | „Die Frist ist vorbei – die Abstimmung ist zu“ | Die Frist ist erreicht oder die Abstimmung beendet | Gewollt; Frist unter **Bearbeiten** verlängern, solange sie noch läuft |
+| „Eine neue Frist öffnet sie nicht wieder“ | Die Abstimmung ist schon beendet oder abgelaufen | Gewollt; bei Bedarf eine neue Abstimmung anlegen |
+| „Weniger erlauben geht nicht mehr“ | Jemand hat schon mehrere Antworten gewählt | Die Zahl so lassen, oder eine neue Abstimmung anlegen |
+| „Inzwischen wurde umgeschaltet – bitte neu laden“ | Jemand anderer hat den Ort-Plan umgeschaltet, während die Maske offen war | **Neu laden**, Änderungen am Ort noch einmal eintragen |
+| Ausweichorte lassen sich nicht einzeln bis auf einen entfernen | Pläne brauchen mindestens zwei Orte | **Ausweichorte entfernen** tippen – der Plan, der gilt, bleibt als Ort |
 | Antwort lässt sich nicht entfernen | Für sie gibt es schon Stimmen | Nur die Beschriftung ändern, oder die Abstimmung löschen und neu anlegen |
 
 ---
