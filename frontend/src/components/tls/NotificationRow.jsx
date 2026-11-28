@@ -5,7 +5,7 @@ import { toast } from "sonner";
 import { api, formatApiError } from "@/lib/api";
 import { Badge } from "@/components/achievements/Badge";
 import { isExternalUrl, previewText } from "@/lib/notifications";
-import { viennaDateTime } from "@/lib/vienna";
+import { formatAgo } from "@/lib/datetime";
 
 // Eine Benachrichtigung (oder ein Bündel) als anklickbare Zeile (#255):
 // Titel, eine Zeile Vorschau, Zeit. Der Klick führt ans Ziel und meldet
@@ -14,7 +14,7 @@ import { viennaDateTime } from "@/lib/vienna";
 export function notificationDate(value) {
   if (!value) return "";
   try {
-    return viennaDateTime(value, { dateStyle: "short", timeStyle: "short" });
+    return formatAgo(value);
   } catch {
     return "";
   }
