@@ -21,6 +21,11 @@ test("heute ohne Mittelpunkt, reiner Tag mit dem Tag als dateTime", () => {
   expect(day.container.querySelector("time")).toHaveTextContent(/^Do 31\. Dezember$/);
 });
 
+test("nur die Uhrzeit, wo der Tag schon darübersteht", () => {
+  const { container } = render(<When value="2026-05-19T10:10:00Z" now={NOW} clock />);
+  expect(container.querySelector("time")).toHaveTextContent(/^12:10$/);
+});
+
 test("vergangen in Listen, ohne Wert der Platzhalter als Text", () => {
   const ago = render(<When value="2026-05-20T09:48:00Z" now={NOW} ago />);
   expect(ago.container.querySelector("time")).toHaveTextContent("vor 12 Min.");

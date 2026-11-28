@@ -57,7 +57,7 @@ function ConfirmResultButton({ bundle, onDone, testId }) {
 
 // `pending` (#987): „gelesen“ ist unterwegs - die Zeile ist kenntlich, bis der Server es bestätigt oder ablehnt.
 // `leading` (#1205): ein Symbol für das Thema vor dem Titel - Glocke und Postfach geben es mit.
-export function NotificationRow({ bundle, onOpen, onDelete, compact = false, testIdPrefix = "notification-row", pending = false, leading = null }) {
+export function NotificationRow({ bundle, onOpen, onDelete, compact = false, testIdPrefix = "notification-row", pending = false, leading = null, day = null }) {
   const badge = notificationBadge(bundle);
   const content = (
     <div className="flex items-start gap-2 min-w-0">
@@ -70,7 +70,8 @@ export function NotificationRow({ bundle, onOpen, onDelete, compact = false, tes
           <div className="mt-0.5 tls-type-small text-white/55 truncate" data-testid={`${testIdPrefix}-preview-${bundle.id}`}>{previewText(bundle.body)}</div>
         ) : null}
         <div className="mt-1 tls-type-label text-quiet">
-          <When value={bundle.created_at} ago />
+          {/* Unter „Gestern“ steht der Tag schon im Kopf - dort nur die Uhrzeit, sonst „vor 12 Min.“ bzw. der Tag (#1307). */}
+          <When value={bundle.created_at} ago={day !== "yesterday"} clock={day === "yesterday"} />
           {bundle.count > 1 ? ` · ${bundle.count} gebündelt` : ""}
         </div>
       </div>
