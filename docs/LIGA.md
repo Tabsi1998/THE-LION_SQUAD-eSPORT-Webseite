@@ -5525,7 +5525,7 @@ Kader-Übersicht).
 **Gleichzeitigkeit:** Einreichen, Entscheiden und Zurückziehen unter der Season-Sperre (Zuteilen zuerst Turnier-, dann Season-Sperre),
 dazu die eindeutigen Indizes `active_key` und `league_squad_key`. Geprüft: zwei Anträge derselben Person, drei Personen auf den letzten
 Platz mit „automatisch annehmen“, Annehmen und Zuteilen durch die Leitung auf den letzten Platz einer Staffel, dieselbe Person
-gleichzeitig in zwei Staffeln (`test_league_solo_application_flow.py`, auch auf echtem MongoDB).
+gleichzeitig in zwei Staffeln (`test_league_solo_application_flow.py`).
 
 **Kontolöschung:** Der Antrag einer Person bleibt als Nachweis, ohne `user_id` und mit `display_name` „Gelöschter User“. Läuft er noch
 ohne Zuteilung (eingereicht, in Prüfung, Warteliste, angenommen), gilt er als zurückgezogen (Verlauf „Konto gelöscht“), der Platz ist
