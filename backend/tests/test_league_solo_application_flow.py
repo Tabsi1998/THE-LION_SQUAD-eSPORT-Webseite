@@ -459,6 +459,35 @@ async def test_an_application_and_a_lead_assignment_race_for_the_last_staffel_se
 
 
 @pytest.mark.asyncio
+async def test_accepting_and_assigning_the_same_person_into_two_staffeln_gives_one_seat(flow):
+    w = await solo_application_world(flow, staffeln=2)
+    player = w["players"][0]
+    application = await submitted_person(flow, w, player)
+    flow.act_as(w["lead"])
+
+    answers = await asyncio.gather(flow.post(f"{inbox_url(w)}/{application['id']}/accept", json={"tournament_id": w["tids"][0]}),
+                                   assign_person(flow, {"id": w["tids"][1]}, player))
+
+    assert all(answer.status_code in (200, 409) for answer in answers), [answer.text for answer in answers]
+    assert await flow.db.tournament_registrations.count_documents({"user_id": player["id"]}) == 1
+    stored = await flow.db.league_applications.find_one({"id": application["id"]}, {"_id": 0})
+    reg = await flow.db.tournament_registrations.find_one({"user_id": player["id"]}, {"_id": 0})
+    assert stored["status"] == "accepted" and stored["assignment"]["registration_id"] == reg["id"]
+
+
+@pytest.mark.asyncio
+async def test_the_desk_lists_a_waiting_person(flow):
+    w = await solo_application_world(flow)
+    await submitted_person(flow, w, w["players"][0])
+    flow.act_as(w["lead"])
+
+    desk = ok(await flow.get(f"{season_url(w)}/desk"))
+
+    titles = [item.get("title") for item in desk.get("tasks", desk.get("items", [])) if isinstance(item, dict)]
+    assert "Duellant A" in str(desk), titles
+
+
+@pytest.mark.asyncio
 async def test_seats_of_the_season_count_assigned_persons(flow):
     w = await solo_application_world(flow, application_slots=1)
     flow.act_as(w["lead"])
