@@ -35,6 +35,7 @@ from pymongo.errors import DuplicateKeyError
 from models import new_id, now_utc
 from services.league_scope import context_label
 from services.log_safe import log_safe
+from services.date_text import format_moment
 
 logger = logging.getLogger("tls.league_roster")
 
@@ -780,7 +781,7 @@ async def tell_waiting(db, ctx: RosterContext, tournament: dict, registration: d
         until = wait_until(ctx, user_id, squad_id)
         if not until:
             continue
-        when = until.astimezone(LOCAL_TZ).strftime("%d.%m.%Y, %H:%M")
+        when = format_moment(until.astimezone(LOCAL_TZ))
         person = person_name(ctx.people.get(user_id))
         await create_user_notification(
             user_id, "Wartezeit in der Liga",

@@ -15,6 +15,7 @@ from fastapi import HTTPException
 
 from models import new_id, now_utc
 from services import seasons
+from services.date_text import format_moment
 from services.private_fields import private_projection
 from services.prize_service import DEFAULT_PICKUP_WINDOW_DAYS
 
@@ -162,7 +163,7 @@ def phase(raffle: dict, now: datetime) -> str:
 def terms(raffle: dict) -> list[str]:
     """Die Teilnahmebedingungen in einfachen Sätzen - für Web und App derselbe Text."""
     closes = _moment(raffle.get("closes_at"))
-    until = f"{closes.day}.{closes.month}.{closes.year}, {closes.hour:02d}:{closes.minute:02d} Uhr" if closes else "zum Ende des Kalenders"
+    until = format_moment(closes) if closes else "zum Ende des Kalenders"
     who = "Mitmachen können Vereinsmitglieder mit Konto." if raffle.get("audience") == "members" else "Mitmachen kann, wer ein Konto hat."
     winners = int(raffle.get("winners") or 1)
     return [
@@ -276,7 +277,7 @@ async def draw(db, raffle: dict, actor: dict, now: datetime | None = None, close
         _fail("Diese Verlosung ist schon gezogen.", 409)
     if state == "open" and not close_early:
         closes = _moment(raffle.get("closes_at"))
-        _fail(f"Die Teilnahme läuft noch bis {closes.day}.{closes.month}. um {closes.hour:02d}:{closes.minute:02d} Uhr. Früher ziehen geht nur mit „Teilnahme jetzt beenden“.", 409)
+        _fail(f"Die Teilnahme läuft noch bis {format_moment(closes)}. Früher ziehen geht nur mit „Teilnahme jetzt beenden“.", 409)
     # Nur eine Ziehung zugleich: wer zuerst kommt, sperrt - ein zweiter Klick findet nichts mehr zu ziehen.
     locked = await db[RAFFLES].update_one({"id": raffle["id"], "status": "open"}, {"$set": {"status": "drawing"}})
     if not locked.modified_count:

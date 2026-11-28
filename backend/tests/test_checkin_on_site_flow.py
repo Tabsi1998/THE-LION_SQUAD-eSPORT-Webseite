@@ -42,11 +42,11 @@ def test_reminder_texts_name_the_staff_on_site():
     local = {"title": "LAN-Cup", "event_mode": "local", "check_in_until": CHECK_IN_UNTIL.isoformat()}
     online = {**local, "event_mode": "online"}
     title, body = checkin_reminder_text(local, "open_now", CHECK_IN_FROM)
-    assert (title, body) == ("Check-in ist offen", "LAN-Cup: Check-in ist offen. Bitte bis 14.11.2026, 18:45 Uhr vor Ort bei der Turnierleitung melden.")
+    assert (title, body) == ("Check-in ist offen", "LAN-Cup: Check-in ist offen. Bitte bis Sa 14. November · 18:45 vor Ort bei der Turnierleitung melden.")
     assert "einchecken" not in checkin_reminder_text(local, "closes_10m", CHECK_IN_UNTIL)[1]
-    assert checkin_reminder_text(local, "closes_10m", CHECK_IN_UNTIL)[1] == "LAN-Cup: Bitte bis 14.11.2026, 18:45 Uhr vor Ort bei der Turnierleitung melden."
-    assert "vor Ort bei der Turnierleitung ab 14.11.2026, 18:00 Uhr" in checkin_reminder_text(local, "opens_10m", CHECK_IN_FROM)[1]
-    assert checkin_reminder_text(online, "open_now", CHECK_IN_FROM)[1] == "LAN-Cup: Check-in ist jetzt offen. Bitte bis 14.11.2026, 18:45 Uhr einchecken."
+    assert checkin_reminder_text(local, "closes_10m", CHECK_IN_UNTIL)[1] == "LAN-Cup: Bitte bis Sa 14. November · 18:45 vor Ort bei der Turnierleitung melden."
+    assert "vor Ort bei der Turnierleitung ab Sa 14. November · 18:00" in checkin_reminder_text(local, "opens_10m", CHECK_IN_FROM)[1]
+    assert checkin_reminder_text(online, "open_now", CHECK_IN_FROM)[1] == "LAN-Cup: Check-in ist jetzt offen. Bitte bis Sa 14. November · 18:45 einchecken."
 
 
 def test_discord_says_on_site_without_check_in_button():

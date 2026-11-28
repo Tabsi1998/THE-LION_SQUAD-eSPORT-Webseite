@@ -240,16 +240,18 @@ def star(cx: float, cy: float, outer: float, inner: float, points: int = 5) -> l
 
 
 def date_label(value, *, vienna: bool = False) -> str:
-    """„17.10.2026“ - mit ``vienna`` der Tag in Wien (Turniere am späten Abend bleiben am richtigen Tag)."""
+    """„Sa 17. Oktober“ (#1307) - mit ``vienna`` der Tag in Wien (Turniere am späten Abend bleiben am richtigen Tag)."""
+    from services.date_text import format_moment
+
     try:
         when = value if isinstance(value, datetime) else datetime.fromisoformat(str(value).replace("Z", "+00:00"))
     except (TypeError, ValueError):
         return ""
     if when.tzinfo is None:
         when = when.replace(tzinfo=timezone.utc)
-    if vienna:
-        when = when.astimezone(VIENNA)
-    return when.strftime("%d.%m.%Y")
+    # Ohne ``vienna`` zählt der Tag, wie er dasteht (ein reiner Tag ohne Uhrzeit), sonst der Wiener Tag.
+    day = when.astimezone(VIENNA).date() if vienna else when.date()
+    return format_moment(day)
 
 
 def canvas(size: tuple[int, int], accent: tuple) -> Image.Image:

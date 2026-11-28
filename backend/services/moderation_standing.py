@@ -59,7 +59,10 @@ def _parse(value) -> datetime | None:
 
 def _fmt(value) -> str:
     moment = _parse(value)
-    return moment.astimezone(timezone.utc).strftime("%d.%m.%Y, %H:%M") + " UTC" if moment else ""
+    from services.date_text import format_moment
+
+    # Wiener Zeit wie überall (#1307) - früher stand hier UTC.
+    return format_moment(moment) if moment else ""
 
 
 def normalize_settings(raw: dict | None) -> dict:

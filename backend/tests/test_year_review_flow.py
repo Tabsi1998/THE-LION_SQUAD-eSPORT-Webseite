@@ -136,7 +136,7 @@ async def test_review_sums_up_the_year_like_profile_references_and_ranking(flow,
     # 12 Spieler im Jahr; einer spielte auch im Team mit (gleich viele), zehn haben weniger: „mehr als 8 von 10“.
     assert t["more_than_of_ten"] == 8
     assert data["favorite_game"] == {"name": "EA SPORTS FC 26", "tournaments": 1, "games": 2}
-    assert data["events"] == {"count": 1, "items": [{"name": "LAN-Wochenende Herbst", "date": "03.10.2026"}]}
+    assert data["events"] == {"count": 1, "items": [{"name": "LAN-Wochenende Herbst", "date": "Sa 3. Oktober"}]}
     assert data["fastlap"]["count"] == 1
     assert data["fastlap"]["best"] == {"time": "2:01,300", "track": "Spa", "title": "Spa Challenge", "rank": 1, "participant_count": 2}
     # Negatives und Erfolge aus dem Vorjahr zählen nicht.

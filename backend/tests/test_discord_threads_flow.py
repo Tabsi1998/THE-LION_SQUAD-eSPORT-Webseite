@@ -139,7 +139,7 @@ async def test_one_thread_per_tournament_from_every_status_source_with_the_final
     response = await flow.post("/api/tournaments/t1/status", json={"status": "check_in"})
     assert response.status_code == 200, response.text
     checkin = discord.messages[thread][-1]["embed"]
-    assert checkin["title"] == "🏆 Sommer-Cup · Check-in offen" and checkin["description"].startswith("Jetzt einchecken – bis 12.06.2027, 17:45 Uhr")
+    assert checkin["title"] == "🏆 Sommer-Cup · Check-in offen" and checkin["description"].startswith("Jetzt einchecken – bis Sa 12. Juni 2027 · 17:45")
     assert "fields" not in checkin and "image" not in checkin
 
     # Station oder Gruppen schreiben den Status direkt: live, ebenfalls im Thread.

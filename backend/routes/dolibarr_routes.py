@@ -29,7 +29,7 @@ from services.dolibarr_client import (
     write_capable,
 )
 from services.dolibarr_links import OPEN_STATUSES, LinkConflict, close_link, link_for_user, note_candidate, verify_link
-from services.dolibarr_policy import CLUB_TZ, DERIVABLE_AREAS, areas_from_functions, clean_policy_map, policy_active
+from services.dolibarr_policy import DERIVABLE_AREAS, areas_from_functions, clean_policy_map, policy_active
 from services import dolibarr_identity, dolibarr_participations, vereine_webhooks
 from services.dolibarr_sync import DEFAULT_FIELD_MAP, FIELD_MAP_COLUMNS, STATE_ID, apply_summary, migration_preview, queue_member, run_sync, sync_state
 from services.log_safe import log_safe
@@ -62,7 +62,9 @@ def _vienna_moment(value) -> str:
         moment = datetime.fromisoformat(str(value).replace("Z", "+00:00"))
     except ValueError:
         return str(value)
-    return (moment if moment.tzinfo else moment.replace(tzinfo=timezone.utc)).astimezone(CLUB_TZ).strftime("%d.%m.%Y %H:%M")
+    from services.date_text import format_moment
+
+    return format_moment(moment if moment.tzinfo else moment.replace(tzinfo=timezone.utc))
 
 
 # ---------------------------------------------------------------- Stand (Vereinsverwaltung und System)

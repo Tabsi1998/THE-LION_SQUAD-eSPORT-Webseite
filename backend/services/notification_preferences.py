@@ -7,7 +7,6 @@ from __future__ import annotations
 
 from typing import Any
 from datetime import datetime, timezone
-from zoneinfo import ZoneInfo
 
 
 OPTIONAL_EMAIL_PREFERENCES = {
@@ -631,7 +630,9 @@ def _format_de_datetime(value: Any) -> str:
         dt = value if isinstance(value, datetime) else datetime.fromisoformat(str(value).replace("Z", "+00:00"))
         if dt.tzinfo is None:
             dt = dt.replace(tzinfo=timezone.utc)
-        return dt.astimezone(ZoneInfo("Europe/Vienna")).strftime("%d.%m.%Y, %H:%M Uhr")
+        from services.date_text import format_moment
+
+        return format_moment(dt)
     except Exception:
         return ""
 

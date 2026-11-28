@@ -4,7 +4,6 @@ Idempotent via dedupe_key on the mail_jobs collection.
 """
 import logging
 from datetime import datetime, timedelta, timezone
-from zoneinfo import ZoneInfo
 
 from database import get_db
 from models import now_utc
@@ -12,6 +11,7 @@ from services.competition_read import load_scheduled_matches
 from services.match_audience import match_player_users, playing_ids, registrations_for_match, teams_by_id, users_for
 from services.tournament_rules import uses_actual_start_notifications
 from services.user_notifications import build_public_url, create_user_notification
+from services.date_text import format_moment
 
 logger = logging.getLogger("tls.match_reminders")
 
@@ -117,7 +117,7 @@ async def schedule_match_reminders() -> dict:
             continue
         url = f"/matches/{m.get('id')}"
         mail_url = await build_public_url(url)
-        when_str = scheduled.astimezone(ZoneInfo("Europe/Vienna")).strftime("%d.%m. %H:%M Uhr")
+        when_str = format_moment(scheduled)
         station = await _station_label(m)
 
         participants = await _recipients_with_opponents(db, m)
@@ -143,7 +143,7 @@ async def schedule_match_reminders() -> dict:
                         await create_user_notification(
                             p.get("id"),
                             "Match startet in 10 Minuten",
-                            f"{t.get('title', 'Turnier')} gegen {opp_name} um {when_str}{station_part}.",
+                            f"{t.get('title', 'Turnier')} gegen {opp_name} am {when_str}{station_part}.",
                             url=url,
                             kind="match_reminder",
                             meta={

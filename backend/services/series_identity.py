@@ -129,12 +129,14 @@ def name_keys(value) -> tuple[str, ...]:
 
 
 def vienna_date(value) -> str:
-    """Wiener Tag eines gespeicherten Zeitpunkts als TT.MM.JJJJ (leer, wenn er fehlt)."""
+    """Wiener Tag eines gespeicherten Zeitpunkts als „Fr 20. November“ (#1307; leer, wenn er fehlt)."""
+    from services.date_text import format_moment
+
     try:
         moment = datetime.fromisoformat(str(value))
     except ValueError:
         return ""
-    return moment.astimezone(VIENNA).strftime("%d.%m.%Y")
+    return format_moment(moment.astimezone(VIENNA), time=False)
 
 
 def counts_for_club(participant: dict) -> bool:

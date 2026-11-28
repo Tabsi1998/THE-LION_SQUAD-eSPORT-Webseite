@@ -13,7 +13,6 @@ from __future__ import annotations
 
 import logging
 from datetime import datetime, timezone
-from zoneinfo import ZoneInfo
 
 from services.event_notifications import kept_invoice_line
 from services.match_audience import player_user_ids, responsible_user_ids, users_for
@@ -41,7 +40,9 @@ def _when(value) -> str:
         return ""
     if moment.tzinfo is None:
         moment = moment.replace(tzinfo=timezone.utc)
-    return moment.astimezone(ZoneInfo("Europe/Vienna")).strftime("%d.%m.%Y, %H:%M Uhr")
+    from services.date_text import format_moment
+
+    return format_moment(moment)
 
 
 def _checkin_line(tournament: dict) -> str:

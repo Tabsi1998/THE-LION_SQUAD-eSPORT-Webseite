@@ -167,7 +167,7 @@ async def remind_upcoming(db, tournament: dict, match: dict, rules: dict, kind: 
         other = next(row for row in registrations if row.get("id") != reg.get("id"))
         team = teams.get(reg.get("team_id") or "")
         people = players[reg["id"]] | responsible_ids(reg, team)
-        body = f"{tournament.get('title') or 'Liga'}: gegen {_name(other)} am {when_text(start)} Uhr."
+        body = f"{tournament.get('title') or 'Liga'}: gegen {_name(other)} am {when_text(start)}."
         sent += await _send(db, people, title, body, match, rules, kind, dedupe, notification_kind="match_reminder")
     return sent
 
@@ -182,7 +182,7 @@ async def remind_unscheduled(db, tournament: dict, match: dict, rules: dict, win
         return 0
     regs_by_id = {reg["id"]: reg for reg in registrations}
     default = match.get("scheduled_at")
-    tail = (f"ohne Einigung gilt der Standardtermin {when_text(default)} Uhr." if default
+    tail = (f"ohne Einigung gilt der Standardtermin {when_text(default)}." if default
             else "ohne Einigung entscheidet die Liga-Leitung.")
     body = (f"{tournament.get('title') or 'Liga'} · {match_title(match, regs_by_id)}: Noch kein Termin vereinbart. Bitte auf der "
             f"Matchseite einen Termin vorschlagen oder annehmen – {tail}")

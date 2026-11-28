@@ -529,13 +529,10 @@ def _refuse_blocked_moment(tournament: dict | None, moment) -> None:
         return
     first, last = blocked.get("start_date"), blocked.get("end_date")
 
-    def day(value):
-        try:
-            year, month, date_ = str(value).split("-")
-            return f"{int(date_)}.{int(month)}.{year}"
-        except ValueError:
-            return str(value)
-    span = day(first) if first == last else f"{day(first)} bis {day(last)}"
+    from services.date_text import format_moment, format_range
+
+    # „Do 24. – Sa 26. Dezember“ (#1307) - ein Tag allein ohne Spanne.
+    span = format_moment(str(first)[:10], fallback=str(first)) if first == last else format_range(str(first)[:10], str(last)[:10], fallback=f"{first} bis {last}")
     raise HTTPException(status_code=409, detail=f"In dieser Zeit wird nicht gespielt ({blocked.get('label') or 'Sperrzeit'}, "
                                                 f"{span}) – bitte einen anderen Termin vorschlagen.")
 

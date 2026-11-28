@@ -2,6 +2,7 @@
 keiner gespeichert, genau eine Nachricht an die Gegenseite. Annehmen schließt die übrigen der Gruppe - in der Liga wie ohne
 Liga-Regeln. 72-h-Regel und ``after_agreement`` bleiben, wie sie sind. Erfundene Namen."""
 import os
+import re
 import pathlib
 import sys
 from datetime import datetime, timedelta
@@ -108,7 +109,7 @@ async def test_three_times_make_one_group_and_one_message(flow, rules):
     sent = await notes(flow, "schedule_proposed")
     assert [row["user_id"] for row in sent] == [world["users"]["Falke1"]["id"]], "genau eine Nachricht an die Gegenseite"
     assert sent[0]["title"] == "Neue Terminvorschläge"
-    assert "drei Termine" in sent[0]["body"] and sent[0]["body"].count(" Uhr") == 3
+    assert "drei Termine" in sent[0]["body"] and len(re.findall(r" · \d\d:\d\d", sent[0]["body"])) == 3
     assert "Abends geht immer" in sent[0]["body"]
     assert sent[0]["meta"]["dedupe_key"] == f"match-schedule-group:{answer['group_id']}:proposed"
 

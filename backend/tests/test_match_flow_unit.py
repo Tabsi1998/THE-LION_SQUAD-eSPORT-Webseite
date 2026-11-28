@@ -114,9 +114,9 @@ def test_missing_sides_ignore_checkins_of_sides_that_left():
 def test_side_refusal_names_the_window_in_vienna_time():
     t, rules = staffel(), DEFAULTS
     early = side_refusal(match(), t, rules, utc("2026-10-25T00:00:00"))
-    assert "öffnet erst um So 25.10. 02:30" in early and "15 Minuten" in early
+    assert "öffnet erst So 25. Oktober · 02:30" in early and "15 Minuten" in early
     late = side_refusal(match(), t, rules, utc("2026-10-25T01:00:00"))
-    assert "seit So 25.10. 02:00 geschlossen" in late and "Liga-Leitung" in late and "@leitung" in late
+    assert "seit So 25. Oktober · 02:00 geschlossen" in late and "Liga-Leitung" in late and "@leitung" in late
     assert side_refusal(match(), t, rules, utc("2026-10-25T00:45:00")) is None
     assert side_refusal(match(started_at=AT), t, rules, utc("2026-10-25T00:45:00")) == match_flow.STARTED_DETAIL
     assert side_refusal(match(reports=[{"registration_id": HOME}]), t, rules, utc("2026-10-25T00:45:00")) == match_flow.REPORTED_DETAIL

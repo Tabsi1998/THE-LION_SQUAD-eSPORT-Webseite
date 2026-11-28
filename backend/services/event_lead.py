@@ -284,7 +284,9 @@ VIENNA = ZoneInfo("Europe/Vienna")
 
 def _vienna_text(value) -> str:
     moment = parse_dt(value)
-    return moment.astimezone(VIENNA).strftime("%d.%m.%Y %H:%M") if moment else ""
+    from services.date_text import format_moment
+
+    return format_moment(moment) if moment else ""
 
 
 async def export_csv(db, event: dict, me: dict, *, filter_key: str = "all") -> str:

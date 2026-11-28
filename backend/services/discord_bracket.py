@@ -33,9 +33,10 @@ from models import REGISTRATION_LIMIT, now_utc
 from services.discord_bracket_state import FIELD, GUILD_FIELD, _dirty, _state_at, forget, pending, request_refresh, revising, version  # noqa: F401 - umgezogen (#1420)
 from services.log_safe import log_safe
 from services.bracket_common import (
-    CLARIFICATION, DONE, LIVE, TABLE_STAGE_TYPES, VIENNA, _dt, _safe_int, _score, clarification_count, in_clarification, late_entry_note, round_label,
+    CLARIFICATION, DONE, LIVE, TABLE_STAGE_TYPES, _dt, _safe_int, _score, clarification_count, in_clarification, late_entry_note, round_label,
     section_label,
 )
+from services.date_text import format_moment
 
 # Bewusster Wiederexport (#1420): diese Namen holen andere Module und Tests weiterhin von hier.
 __all__ = ["pending", "request_refresh"]
@@ -112,7 +113,7 @@ def _match_line(match: dict, names: dict[str, str]) -> str:
     when = _dt(match.get("scheduled_at"))
     if in_clarification(match):
         return f"{name_a} – {name_b}"
-    tail = " · live" if status in LIVE else (f" · {when.astimezone(VIENNA).strftime('%d.%m., %H:%M')} Uhr" if when else "")
+    tail = " · live" if status in LIVE else (f" · {format_moment(when)}" if when else "")
     return f"{name_a} – {name_b}{tail}"
 
 
@@ -208,10 +209,10 @@ def bracket_embed(tournament: dict, matches: list[dict], stages: list[dict], reg
         lines.append(f"\n{done} Partien gespielt. Alle Ergebnisse: {link}")
     else:
         lines = [f"{done} von {len(matches)} Partien gespielt – Bracket ansehen: {link}"] if matches else [f"Noch keine Partien – Bracket ansehen: {link}"]
-    stamp = (now or now_utc()).astimezone(VIENNA).strftime("%d.%m.%Y, %H:%M")
+    stamp = format_moment(now or now_utc())
     return {"title": title[:256], "description": "\n".join(lines)[:4000], "color": 0xFFD700 if final else 0x29B6E8, "url": link,
             "fields": bracket_fields(matches, stages, registrations, names, tournament=tournament), "image_url": None,
-            "footer": f"{'Endstand' if final else 'Stand'}: {stamp} Uhr"}
+            "footer": f"{'Endstand' if final else 'Stand'}: {stamp}"}
 
 
 def content_hash(embed: dict) -> str:

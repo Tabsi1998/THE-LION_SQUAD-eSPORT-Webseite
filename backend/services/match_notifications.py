@@ -345,17 +345,17 @@ _WEEKDAYS = ("Mo", "Di", "Mi", "Do", "Fr", "Sa", "So")
 
 
 def _when_text(value) -> str:
-    """„So 15.11. 20:00 Uhr“ in Wiener Zeit - wie der Termin auf der Matchseite."""
+    """„So 15. November · 20:00“ in Wiener Zeit (#1307) - wie der Termin auf der Matchseite."""
+    from services.date_text import format_moment
+
     from datetime import datetime, timezone
-    from zoneinfo import ZoneInfo
 
     try:
         moment = datetime.fromisoformat(str(value).replace("Z", "+00:00"))
     except (TypeError, ValueError):
         return "einen neuen Termin"
     moment = moment if moment.tzinfo else moment.replace(tzinfo=timezone.utc)
-    local = moment.astimezone(ZoneInfo("Europe/Vienna"))
-    return f"{_WEEKDAYS[local.weekday()]} {local.strftime('%d.%m. %H:%M')} Uhr"
+    return format_moment(moment)
 
 
 # Was die andere Seite liest - je Ereignis Titel und Satz. ``{who}`` handelt, ``{when}`` ist der vorgeschlagene Termin.

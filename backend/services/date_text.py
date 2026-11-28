@@ -8,6 +8,8 @@ Dieselbe Regel wie die Website (``frontend/src/lib/datetime.js``) und die App, g
   „heute“ und „morgen“ weg - für Sätze wie „Gesendet am Mi 20. Mai · 18:00“.
 - ``format_range``: Zeiträume nach Wiener Tagen, „Fr 19. – Sa 20. Juni“, „Mo 30. November – Mi 2. Dezember“.
 - ``format_ago``: Vergangenes in Listen, „gerade eben“, „vor 12 Min.“, „vor 3 Std.“, „gestern“, danach der Tag.
+- ``format_moment``: wie ``format_when``, aber ohne „heute“/„morgen“ - für alles, was später gelesen wird (Mail, Discord,
+  Bild, Kalender-Abo, gespeicherte Benachrichtigung). Der Server schreibt fast nur solche Texte.
 - ``format_clock``: nur die Uhrzeit, „18:00“.
 - ``format_official_date``: das amtliche „23.05.2026“ - allein für Rechnungen, Urkunden und PDF-Listen.
 
@@ -22,14 +24,18 @@ import re
 from datetime import date, datetime, timedelta, timezone
 from zoneinfo import ZoneInfo
 
-from models import now_utc
-
 VIENNA = ZoneInfo("Europe/Vienna")
 WEEKDAYS = ("Mo", "Di", "Mi", "Do", "Fr", "Sa", "So")
 MONTHS = ("Jänner", "Februar", "März", "April", "Mai", "Juni", "Juli", "August", "September", "Oktober", "November",
           "Dezember")
 _PURE_DAY = re.compile(r"^\d{4}-\d{2}-\d{2}$")
 _WALL_CLOCK = re.compile(r"^\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}(?::\d{2}(?:\.\d+)?)?$")
+
+
+def now_utc() -> datetime:
+    """Jetzt in UTC - eigene Uhr statt ``models.now_utc``: date_text ist ein Blatt-Modul ohne Importe aus der App
+    (sonst Import-Kreis über models → scoring_rules → series_identity)."""
+    return datetime.now(timezone.utc)
 
 
 def is_pure_day(value) -> bool:
@@ -109,6 +115,12 @@ def format_when(value, *, now=None, time: bool = True, relative: bool = True, fa
         return f"morgen {clock}" if with_clock else "morgen"
     text = _day_text(day, with_year=day.year != today.year)
     return f"{text} · {clock}" if with_clock else text
+
+
+def format_moment(value, *, time: bool = True, fallback: str = "") -> str:
+    """Für Texte, die später gelesen werden - Mail, Discord, Teilen-Bild, Kalender, Benachrichtigung: dieselbe Form wie
+    ``format_when``, aber nie „heute“ oder „morgen“ („Sa 23. Mai · 18:00“). Eine Mail von gestern sagt sonst „morgen“."""
+    return format_when(value, time=time, relative=False, fallback=fallback)
 
 
 def format_date(value, *, now=None, relative: bool = True, fallback: str = "") -> str:

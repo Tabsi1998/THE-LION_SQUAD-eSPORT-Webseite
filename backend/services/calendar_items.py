@@ -117,12 +117,11 @@ def fastlap_item(doc: dict, *, mine: bool = False) -> dict | None:
 
 
 def vienna(value, *, with_time: bool = True) -> str:
-    """Zeit so, wie sie im Verein gilt - mit „Uhr“."""
+    """Zeit so, wie sie im Verein gilt: „Sa 23. Mai · 18:00“ (#1307) - fest, das Kalender-Abo liest man später."""
+    from services.date_text import format_moment
+
     dt = _dt(value)
-    if not dt:
-        return ""
-    local = dt.astimezone(VIENNA)
-    return local.strftime("%d.%m.%Y, %H:%M Uhr") if with_time else local.strftime("%d.%m.%Y")
+    return format_moment(dt, time=with_time) if dt else ""
 
 
 def check_in_note(doc: dict) -> str | None:

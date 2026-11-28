@@ -84,7 +84,7 @@ async def test_only_people_with_activity_get_one_recap_and_opting_out_works(flow
     assert [entry[1] for entry in sent] == [paula["email"]]
     kwargs = sent[0][2]
     assert kwargs["xp_week"] == "55" and kwargs["unlocked"] == "Champion III (Gold)", "negative Erfolge nie im Rückblick"
-    assert kwargs["week"] == "05.10. – 11.10.2026"
+    assert kwargs["week"] == "Mo 5. – So 11. Oktober"
     assert kwargs["bonus_hint"].startswith("Vereinsmitglieder bekommen 10 %")
     assert kwargs["dedupe_key"] == "achievement_recap:2026-W42:" + paula["id"]
     assert notification_preferences.TEMPLATE_CATEGORY["achievement_recap"] == "achievement_recap"

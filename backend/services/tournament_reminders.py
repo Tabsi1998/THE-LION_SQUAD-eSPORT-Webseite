@@ -13,9 +13,9 @@ import logging
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from typing import Any
-from zoneinfo import ZoneInfo
 
 from database import get_db
+from services.date_text import format_clock
 from services.match_audience import responsible_user_ids, users_for
 from services.notification_preferences import _site_base_url, send_user_template
 from services.tournament_rules import self_checkin_allowed
@@ -58,7 +58,9 @@ def _format_de_time(value: Any) -> str:
     dt = _parse_dt(value)
     if not dt:
         return ""
-    return dt.astimezone(ZoneInfo("Europe/Vienna")).strftime("%d.%m.%Y, %H:%M Uhr")
+    from services.date_text import format_moment
+
+    return format_moment(dt)
 
 
 def due_checkin_reminders(tournament: dict, now: datetime) -> list[tuple[ReminderSpec, datetime]]:
@@ -87,7 +89,7 @@ def checkin_reminder_text(tournament: dict, label: str, target: datetime) -> tup
     if label == "opens_10m":
         if on_site:
             return "Check-in startet gleich", f"{title_text}: Check-in vor Ort bei der Turnierleitung ab {_format_de_time(target)}."
-        return "Check-in startet gleich", f"{title_text}: Check-in startet um {_format_de_time(target)}."
+        return "Check-in startet gleich", f"{title_text}: Check-in startet um {format_clock(target)} Uhr."
     if label == "open_now":
         if on_site:
             body = f"{title_text}: Check-in ist offen."
@@ -97,7 +99,7 @@ def checkin_reminder_text(tournament: dict, label: str, target: datetime) -> tup
         return "Check-in ist offen", body + (f" Bitte bis {until} einchecken." if until else "")
     if on_site:
         return "Check-in endet bald", f"{title_text}: Bitte bis {_format_de_time(target)} vor Ort bei der Turnierleitung melden."
-    return "Check-in endet bald", f"{title_text}: Check-in endet um {_format_de_time(target)}."
+    return "Check-in endet bald", f"{title_text}: Check-in endet um {format_clock(target)} Uhr."
 
 
 async def _unchecked_registration_users(tournament_id: str) -> list[dict]:

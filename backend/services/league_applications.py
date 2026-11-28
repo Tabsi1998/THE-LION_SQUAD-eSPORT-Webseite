@@ -259,14 +259,18 @@ async def public_block(db, season: dict, league: dict | None = None) -> dict | N
 def _day(value: str | None) -> str:
     from services.matchday_schedule import LOCAL_TZ
 
+    from services.date_text import format_moment
+
     moment = league_service._aware(value)
-    return moment.astimezone(LOCAL_TZ).strftime("%d.%m.%Y, %H:%M Uhr") if moment else ""
+    return format_moment(moment.astimezone(LOCAL_TZ)) if moment else ""
 
 
 def _when(value: str | None) -> str:
     from services.matchday_schedule import LOCAL_TZ
 
-    return _moment(value).astimezone(LOCAL_TZ).strftime("%d.%m.%Y, %H:%M") if value else ""
+    from services.date_text import format_moment
+
+    return format_moment(_moment(value).astimezone(LOCAL_TZ)) if value else ""
 
 
 async def season_problems(db, league: dict, season: dict, stats: dict | None = None) -> list[str]:
@@ -278,9 +282,9 @@ async def season_problems(db, league: dict, season: dict, stats: dict | None = N
     if (season.get("status") or "draft") in ("completed", "archived"):
         problems.append(FINISHED)
     if state == UPCOMING:
-        problems.append(f"Die Anmeldung öffnet am {_when(season.get('application_opens_at'))} Uhr.")
+        problems.append(f"Die Anmeldung öffnet am {_when(season.get('application_opens_at'))}.")
     if state == CLOSED:
-        problems.append(f"Die Anmeldung ist vorbei: Sie lief bis {_when(league_late.effective_closes_iso(season))} Uhr.")
+        problems.append(f"Die Anmeldung ist vorbei: Sie lief bis {_when(league_late.effective_closes_iso(season))}.")
     if not await league_rules.current_version(db, league, season):
         problems.append(NO_RULES)
     stats = stats or await seat_stats(db, season)

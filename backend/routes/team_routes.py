@@ -1263,7 +1263,6 @@ async def _tell_squad_edited(db, team: dict, before: dict, after: dict, me: dict
     """Griff von außen in ein Co-Team einer Staffel (#2204): Leitung und Co-Leitung des Hauptteams erfahren wer, was, wann. Der Kader
     ist schon gespeichert - eine klemmende Nachricht hält das nicht auf."""
     from services.league_mail import send_league_mail
-    from services.matchday_schedule import LOCAL_TZ
 
     added = [uid for uid in after.get("member_ids") or [] if uid not in (before.get("member_ids") or [])]
     removed = [uid for uid in before.get("member_ids") or [] if uid not in (after.get("member_ids") or [])]
@@ -1285,7 +1284,9 @@ async def _tell_squad_edited(db, team: dict, before: dict, after: dict, me: dict
     if not parts:
         parts.append("Angaben geändert (" + ", ".join(sorted(fields)) + ")")
     moment = now_utc()
-    when = moment.astimezone(LOCAL_TZ).strftime("%d.%m.%Y, %H:%M")
+    from services.date_text import format_moment
+
+    when = format_moment(moment)
     name = after.get("name") or before.get("name") or "Co-Team"
     for user_id in sorted({team.get("leader_id"), *(team.get("co_leader_ids") or [])} - {me["id"], None}):
         try:

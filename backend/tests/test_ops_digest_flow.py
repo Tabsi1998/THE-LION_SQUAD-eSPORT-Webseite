@@ -72,7 +72,7 @@ async def test_the_summary_goes_once_a_day_after_the_hour(flow, discord_recorder
     assert again == {"sent": False, "reason": "already"}
     sent = digests(discord_recorder)
     assert len(sent) == 1
-    assert sent[0]["title"] == "Betrieb: Tageszusammenfassung 24.11.2026"
+    assert sent[0]["title"] == "Betrieb: Tageszusammenfassung Di 24. November"
     text = sent[0]["description"]
     assert "2 Fehlergruppen aktiv" in text and "1 neu" in text
     assert "TypeError auf /teams/:slug (Server)" in text and "40×" in text

@@ -92,7 +92,7 @@ async def test_twenty_four_hours_and_one_hour_before_the_match_once_each_with_op
     falke = next(row for row in early if row["user_id"] == world["users"]["Falke1"]["id"])
     assert captain["title"] == "Liga-Spiel in 24 Stunden" and captain["kind"] == "match_reminder"
     other_side = world["reg_h"].get("display_name") or world["reg_h"].get("team_name")
-    assert captain["body"] == f"{world['tournament']['title']}: gegen {other_side} am {when} Uhr."
+    assert captain["body"] == f"{world['tournament']['title']}: gegen {other_side} am {when}."
     assert "Rudel A am" in falke["body"], "die Gegenseite liest den Namen der anderen"
     assert captain["url"] == f"/matches/{world['match']['id']}" and captain["meta"]["category"] == "match_reminders"
     assert captain["meta"]["no_discord"] is True, "Discord nur, wenn die Season es einschaltet"
@@ -195,7 +195,7 @@ async def test_first_match_after_a_break_gets_its_reminder_although_the_reminder
     at = datetime(2026, 12, 26, 19, 0, tzinfo=timezone.utc)
     assert (await run(flow, world, at))["upcoming_early"] == 1
     captain = next(row for row in await notes(flow, "upcoming_early") if row["user_id"] == world["users"]["Kapitaen"]["id"])
-    assert captain["body"].endswith("am So 27.12. 20:00 Uhr."), "Winterzeit: 19:00 UTC ist 20:00 in Wien"
+    assert captain["body"].endswith("am So 27. Dezember · 20:00."), "Winterzeit: 19:00 UTC ist 20:00 in Wien"
     # Gegenprobe: liegt das Spiel selbst in der Sperrzeit, kommt nichts.
     await flow.db.matches_v2.update_one({"id": mid}, {"$set": {"scheduled_at": "2026-12-26T19:00:00+00:00"}})
     assert (await run(flow, world, at - timedelta(hours=24)))["upcoming_early"] == 0
@@ -290,7 +290,7 @@ async def test_vienna_time_around_the_switch_to_summer_time(flow):
     world = await reminder_world(flow)
     mid = world["match"]["id"]
     captain = world["users"]["Kapitaen"]["id"]
-    for stored, text in (("2026-03-28T19:00:00+00:00", "am Sa 28.03. 20:00 Uhr."), ("2026-03-29T18:00:00+00:00", "am So 29.03. 20:00 Uhr.")):
+    for stored, text in (("2026-03-28T19:00:00+00:00", "am Sa 28. März · 20:00."), ("2026-03-29T18:00:00+00:00", "am So 29. März · 20:00.")):
         await flow.db.matches_v2.update_one({"id": mid}, {"$set": {"scheduled_at": stored}})
         start = datetime.fromisoformat(stored)
         assert (await run(flow, world, start - timedelta(hours=24)))["upcoming_early"] == 1
@@ -386,7 +386,7 @@ async def test_open_date_reminds_both_captains_at_mid_week_once(flow):
     rows = await notes(flow, "unscheduled")
     assert names(world, rows) == {"Kapitaen", "Falke1"}, "nur die Captains"
     assert rows[0]["title"] == "Termin noch offen" and rows[0]["kind"] == "match_schedule"
-    assert f"gilt der Standardtermin {league_schedule.when_text(world['start'])} Uhr" in rows[0]["body"]
+    assert f"gilt der Standardtermin {league_schedule.when_text(world['start'])}." in rows[0]["body"]
     assert (await run(flow, world, middle + timedelta(hours=5)))["unscheduled"] == 0, "einmal je Spielwoche"
     assert len(await notes(flow, "unscheduled")) == 2
 

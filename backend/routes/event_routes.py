@@ -312,7 +312,9 @@ async def _build_event_recap_payload(db, event: dict) -> dict:
     event_date = ""
     parsed_start = _parse_dt(event.get("start_date"))
     if parsed_start:
-        event_date = parsed_start.strftime("%d.%m.%Y")
+        from services.date_text import format_moment
+
+        event_date = format_moment(parsed_start, time=False)
     lines = [
         f"## Rückblick {event.get('name') or 'Event'}",
         "",

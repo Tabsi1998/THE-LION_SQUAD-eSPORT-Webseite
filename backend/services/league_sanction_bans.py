@@ -68,9 +68,10 @@ def appeal_refusal(doc: dict, now: datetime | None = None) -> str | None:
 
 
 def _local(moment: datetime) -> str:
+    from services.date_text import format_moment
     from services.matchday_schedule import LOCAL_TZ
 
-    return moment.astimezone(LOCAL_TZ).strftime("%d.%m.%Y, %H:%M")
+    return format_moment(moment.astimezone(LOCAL_TZ))
 
 
 # ---------------------------------------------------------------- Sperren und Spielberechtigung

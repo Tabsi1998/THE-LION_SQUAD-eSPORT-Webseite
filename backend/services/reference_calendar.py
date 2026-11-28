@@ -34,6 +34,7 @@ from services import series_kinds
 from services.round_countries import detect_country
 from services.series_standings import ordered_rounds
 from services.team_league_calendar import MAX_OPPONENT, take_opponent, take_window, window_end
+from services.date_text import format_moment
 
 STATES = ("planned", "today", "missing", "cancelled", "postponed", "scored")
 MAX_LINES = 200
@@ -70,7 +71,7 @@ def vienna_start(day: str | None, clock: str | None) -> str | None:
 def clock_gap_message(day: str, clock: str) -> str:
     """Die Meldung für eine Uhrzeit, die es nicht gibt - aus den Eingaben gebaut, nie aus einer Ausnahme."""
     try:
-        shown = date.fromisoformat(day).strftime("%d.%m.%Y")
+        shown = format_moment(date.fromisoformat(day))
     except ValueError:
         shown = "diesem Tag"
     return f"{clock} Uhr gibt es am {shown} in Wien nicht (Umstellung auf Sommerzeit)."

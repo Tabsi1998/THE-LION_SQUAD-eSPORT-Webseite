@@ -24,7 +24,9 @@ def first_day(event: dict) -> date | None:
 
 
 def _day_text(day: date) -> str:
-    return day.strftime("%d.%m.%Y")
+    from services.date_text import format_moment
+
+    return format_moment(day)
 
 
 def window_text(event: dict) -> str:

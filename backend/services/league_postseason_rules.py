@@ -14,6 +14,7 @@ from __future__ import annotations
 from datetime import date, datetime, time, timedelta, timezone
 
 from services.league_calendar import VIENNA, local_day, week_days
+from services.date_text import format_moment
 
 FIELD = "postseason"
 END_FIELD = "postseason_end"
@@ -87,7 +88,7 @@ def _day(value, season: dict | None) -> str | None:
         raise PostseasonProblem(DATE_WRONG) from None
     earliest = regular_end_day(season or {})
     if earliest and day <= earliest:
-        raise PostseasonProblem(DATE_EARLY.format(day=(earliest + timedelta(days=1)).strftime("%d.%m.%Y")))
+        raise PostseasonProblem(DATE_EARLY.format(day=format_moment(earliest + timedelta(days=1))))
     return day.isoformat()
 
 

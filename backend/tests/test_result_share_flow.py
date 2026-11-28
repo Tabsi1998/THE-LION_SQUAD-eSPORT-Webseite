@@ -92,7 +92,7 @@ async def test_solo_result_has_both_images_page_data_and_link_preview(flow):
     assert data["share_text"] == "Ich habe Platz 2 im FC 26 Herbst-Cup geholt – bei THE LION SQUAD."
     assert data["chips"] == ["Halbfinale 2:1", "Finale 1:2"]
     assert [step["outcome"] for step in data["steps"]] == ["win", "loss"]
-    assert data["event_name"] == "LAN-Wochenende Herbst" and data["date"] == "20.09.2026"
+    assert data["event_name"] == "LAN-Wochenende Herbst" and data["date"] == "So 20. September"
     assert data["participant_count"] == 4 and data["participant_word"] == "Spieler" and data["team_name"] is None
     assert data["path"] == f"/tournaments/{cup['slug']}/ergebnis/neonfalke"
     # Gegner stehen nicht drauf - auch kein privates Profil über einen Umweg.

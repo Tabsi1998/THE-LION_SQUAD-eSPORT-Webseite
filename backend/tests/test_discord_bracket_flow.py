@@ -96,7 +96,7 @@ def test_bracket_embed_is_a_pure_function():
     assert names == ["Winner Bracket · Runde 1", "Winner Bracket · Runde 2", "Winner Bracket · Runde 3"]
     assert embed["fields"][0]["value"] == "2 von 2 Partien gespielt", "frühere Runden zusammengefasst"
     assert embed["fields"][1]["value"] == "Paula – Kai · live"
-    assert embed["fields"][2]["value"] == "offen – offen · 03.10., 21:00 Uhr"
+    assert embed["fields"][2]["value"] == "offen – offen · Sa 3. Oktober · 21:00"
     assert embed["footer"].startswith("Stand: ")
 
     # Vor dem Start: Runde 1 vollständig mit Ergebniszeilen, sobald sie die aktuelle ist.

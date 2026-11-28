@@ -272,14 +272,14 @@ async def test_event_announcement_names_time_in_vienna_place_and_deadline(flow, 
     assert message["title"] == "📅 LAN-Party" and message["url"].endswith("/events/lan") and message["image"].endswith("/uploads/public/lan.webp")
     fields = {field["name"]: field["value"] for field in message["fields"]}
     assert fields["Wo"] == "Vereinsheim, Telfs" and fields["Plätze"] == "40"
-    assert fields["Wann"].endswith("Uhr – " + discord_announcements.vienna(start + timedelta(days=1), with_time=False)) or "Uhr" in fields["Wann"]
-    assert "Uhr" in fields["Anmeldung bis"]
+    assert fields["Wann"] == f"{discord_announcements.vienna(start)} – {discord_announcements.vienna(start + timedelta(days=1), with_time=False)}" or "·" in fields["Wann"]
+    assert " · " in fields["Anmeldung bis"], "Tag und Uhrzeit"
     assert (await flow.db.events.find_one({"id": "e3"})).get("discord_checked_at") is None
 
 
 def test_times_are_vienna_time():
-    assert discord_announcements.vienna("2026-07-01T16:00:00+00:00") == "01.07.2026, 18:00 Uhr"
-    assert discord_announcements.vienna("2026-12-01T16:00:00+00:00") == "01.12.2026, 17:00 Uhr"
+    assert discord_announcements.vienna("2026-07-01T16:00:00+00:00") == "Mi 1. Juli · 18:00"
+    assert discord_announcements.vienna("2026-12-01T16:00:00+00:00") == "Di 1. Dezember · 17:00"
     assert discord_announcements.plain_text("<p>Hallo **Welt**</p>\n\n# Titel") == "Hallo Welt Titel"
 
 

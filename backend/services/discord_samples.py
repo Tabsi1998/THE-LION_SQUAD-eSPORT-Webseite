@@ -18,6 +18,7 @@ from datetime import date, timedelta
 
 from database import get_db
 from models import new_id, now_utc
+from services.date_text import format_moment
 
 GROUPS = (
     {"key": "public", "label": "Öffentliche Kanäle"},
@@ -162,7 +163,7 @@ async def sample_catalog(db=None, guild_id: str | None = None) -> list[dict]:
     title, text = club_birthday.discord_message({"data": {"years": next_years}, "texts": texts}, branding.get("club_name") or "THE LION SQUAD")
     await add("club.birthday", EVENTS["club.birthday"]["label"], "public", {"title": title, "description": text, "color": 0xFFD700, "event_key": "club.birthday"},
               target="community", source="latest" if founded_on else "example",
-              source_text=f"mit dem Gründungsdatum {born.strftime('%d.%m.%Y')}" if founded_on else SOURCE_EXAMPLE)
+              source_text=f"mit dem Gründungsdatum {format_moment(born)}" if founded_on else SOURCE_EXAMPLE)
 
     # Nur für Mitglieder (#605): in den Mitgliederkanal - die letzte Mitglieder-News, das nächste Mitglieder-Event.
     members_post = await db.news_posts.find_one({"published": True, "visibility": "members"}, {"_id": 0}, sort=[("published_at", -1)])
@@ -187,7 +188,7 @@ async def sample_catalog(db=None, guild_id: str | None = None) -> list[dict]:
 
     # Betrieb: roter Auto-Check und Serverfehler, wie Betrieb → Alarme sie schickt.
     check = check_red_message({"key": "mail_queue", "label": "Mail-Queue", "value": "3 Mails hängen", "detail": "Seit 20 Minuten kein Versand."},
-                              {"at": now_utc().strftime("%d.%m.%Y %H:%M UTC")})
+                              {"at": format_moment(now_utc())})
     await add("ops.check_red", "Auto-Check rot", "ops", {**check, "event_key": "ops_check", "color": RED, "url": "/admin/ops"}, target="ops", source_text=SOURCE_EXAMPLE)
     error = error_group_message({"error_type": "TimeoutError", "method": "GET", "route": "/api/tournaments/{id}/bracket", "message": "Die Datenbank hat nicht geantwortet.",
                                  "status_code": 500, "count": 4})

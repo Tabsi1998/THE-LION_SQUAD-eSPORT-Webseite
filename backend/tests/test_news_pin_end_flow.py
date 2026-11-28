@@ -15,6 +15,7 @@ sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
 from flow_harness import make_flow  # noqa: E402
 from models import now_utc  # noqa: E402
 from services import migrations, news_publish  # noqa: E402
+from services.date_text import format_moment  # noqa: E402
 from services.news_publish import PIN_RULE_SINCE, default_pinned_until, pin_active, pin_end, vienna_today  # noqa: E402
 
 
@@ -155,7 +156,7 @@ async def test_a_post_planned_in_three_weeks_counts_from_its_publish_day(flow):
     too_early = await flow.post("/api/news", json={"title": "Zu früh", "content": "Text", "published": True,
                                                    "published_at": later.isoformat(), "pinned": True, "pinned_until": day(5)})
     assert too_early.status_code == 400, too_early.text
-    assert publish_day.strftime("%d.%m.%Y") in too_early.json()["detail"]
+    assert format_moment(publish_day) in too_early.json()["detail"]
     moved = await flow.patch(f"/api/news/{created.json()['id']}", json={"pinned_until": day(3)})
     assert moved.status_code == 400, "auch beim Ändern nie vor dem Erscheinen"
 

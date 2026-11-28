@@ -122,7 +122,7 @@ async def test_single_ics_has_reminder_and_check_in_and_hides_private_items(flow
 
     cup = (await flow.get("/api/calendar/tournaments/autumn-cup.ics")).text
     assert "SUMMARY:Autumn Cup" in cup and "DTSTART:20261010T170000Z" in cup
-    assert "Check-in ab 10.10.2026\\, 17:45 Uhr bis 18:55 Uhr" in cup.replace("\r\n ", ""), "Wiener Zeit, Check-in im Text"
+    assert "Check-in ab Sa 10. Oktober · 17:45 bis 18:55 Uhr" in cup.replace("\r\n ", ""), "Wiener Zeit, Check-in im Text"
     assert (await flow.get("/api/calendar/tournaments/t-cup.ics")).status_code == 200, "auch über die Kennung"
 
     for path in ("/api/calendar/events/vorstandssitzung.ics", "/api/calendar/events/lan.ics", "/api/calendar/events/entwurf.ics",

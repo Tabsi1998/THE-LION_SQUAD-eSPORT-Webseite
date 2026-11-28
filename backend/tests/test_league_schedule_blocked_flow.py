@@ -47,7 +47,7 @@ async def test_a_proposal_in_a_blocked_period_is_refused(flow):
 
     refused = await flow.post(url, json={"scheduled_at": "2026-12-27T19:00:00+00:00"})
     assert refused.status_code == 409
-    assert "Weihnachtspause" in refused.json()["detail"] and "21.12.2026 bis 3.1.2027" in refused.json()["detail"]
+    assert "Weihnachtspause" in refused.json()["detail"] and "Mo 21. Dezember 2026 – So 3. Jänner 2027" in refused.json()["detail"]
 
     accepted = await flow.post(url, json={"scheduled_at": "2027-01-10T19:00:00+00:00"})
     assert accepted.status_code == 200, accepted.text

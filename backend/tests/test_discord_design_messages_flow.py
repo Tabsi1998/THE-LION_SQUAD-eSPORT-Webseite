@@ -75,7 +75,7 @@ async def test_the_standard_looks_like_before_plus_author_footer_and_time(flow):
              "end_date": "2026-10-11T20:00:00+00:00", "location": "Vereinsheim", "city": "Telfs", "has_registration": True,
              "registration_closes_at": "2026-10-08T21:59:00+00:00", "max_participants": 24, "visibility": "public"}
     fields = {field["name"]: field["value"] for field in (await discord_announcements.designed_event(flow.db, event))["embed"]["fields"]}
-    assert fields == {"Wann": "10.10.2026, 18:00 Uhr – 11.10.2026", "Wo": "Vereinsheim, Telfs", "Anmeldung bis": "08.10.2026, 23:59 Uhr", "Plätze": "24"}
+    assert fields == {"Wann": "Sa 10. Oktober · 18:00 – So 11. Oktober", "Wo": "Vereinsheim, Telfs", "Anmeldung bis": "Do 8. Oktober · 23:59", "Plätze": "24"}
     without = (await discord_announcements.designed_event(flow.db, {**event, "has_registration": False}))["embed"]["fields"]
     assert [field["name"] for field in without] == ["Wann", "Wo"], "ohne Anmeldung keine leeren Felder"
 
@@ -128,7 +128,7 @@ async def test_tournament_templates_reach_channel_and_thread(flow, posted):
     await discord_threads.status_changed(flow.db, {**tournament, "status": "registration_open"}, "registration_open", "check_in")
     assert posted[0]["channel_id"] == EVENTS and posted[0]["embed"]["title"] == "🏆 Sommer-Cup · Anmeldung offen", "die Ankündigung im Standard"
     assert posted[1]["channel_id"] == "th-m1" and posted[1]["embed"]["title"] == "Sommer-Cup: Check-in offen" and posted[1]["embed"]["color"] == 0x123456
-    assert posted[1]["embed"]["description"].startswith("Jetzt einchecken – bis 12.06.2027, 17:45 Uhr")
+    assert posted[1]["embed"]["description"].startswith("Jetzt einchecken – bis Sa 12. Juni 2027 · 17:45")
 
 
 @pytest.mark.asyncio

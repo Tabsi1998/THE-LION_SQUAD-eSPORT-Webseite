@@ -116,6 +116,27 @@ def season_clock(monkeypatch):
     yield fixed
 
 
+# Der feste Tag der Datums-Texte (#1307): Samstag, 28. November 2026, 11:00 in Wien - wie im Web (src/testClock.js).
+DATE_TEXT_TEST_NOW = "2026-11-28T10:00:00+00:00"
+
+
+@pytest.fixture(autouse=True)
+def date_text_today(monkeypatch):
+    """Das laufende Jahr der Datums-Texte steht in jedem Test fest (``services/date_text.py``).
+
+    „Sa 23. Mai · 18:00“ lässt das Jahr weg, solange es das laufende ist. Ohne feste Uhr kippte jeder Test mit einem
+    Datum aus 2026 zum Jahreswechsel und in der Zeitreise-Probe. Wer ein anderes „heute“ braucht, gibt ``now`` mit.
+    """
+    try:
+        from services import date_text
+    except ImportError:  # Live-Tests gegen einen laufenden Server laden die Dienste nicht
+        yield None
+        return
+    fixed = datetime.fromisoformat(DATE_TEXT_TEST_NOW)
+    monkeypatch.setattr(date_text, "now_utc", lambda: fixed)
+    yield fixed
+
+
 @pytest.fixture(autouse=True)
 def printful_rate_window():
     """Das Rate-Limit des Printful-Adapters (#1709) gilt prozessweit je Schlüssel. Jeder Test beginnt mit leerem

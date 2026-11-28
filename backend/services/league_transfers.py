@@ -14,9 +14,8 @@ from database import get_db
 from models import new_id, now_utc
 from services import league_eligibility, league_roster
 from services.league_mail import send_league_mail
-from services.matchday_schedule import LOCAL_TZ
-from services.matchday_schedule import LOCAL_TZ
 from services.dolibarr_policy import club_today
+from services.date_text import format_moment
 
 PENDING, APPROVED, REJECTED, WITHDRAWN = "pending", "approved", "rejected", "withdrawn"
 NO_WINDOWS = "In dieser Season gibt es keine Transfers: Es ist kein Transferfenster eingetragen."
@@ -156,7 +155,7 @@ async def approve(db, season: dict, transfer_id: str, reason: str | None, actor:
     await _audit(db, "league.transfer.approve", row, actor.get("id"), **({"reason": row["reason"]} if row["reason"] else {}))
     url = f"/teams/{team['id']}"
     leads = {*await _team_leads(db, team["id"]), *await _team_leads(db, (source or {}).get("team_id"))}
-    waits = f" Die Person darf ab {until.astimezone(LOCAL_TZ).strftime('%d.%m.%Y, %H:%M')} spielen." if until else ""
+    waits = f" Die Person darf ab {format_moment(until)} spielen." if until else ""
     await _tell({user_id, *leads}, title="Transfer genehmigt", body=f"Die Liga-Leitung hat den Wechsel ins Co-Team {target.get('name') or ''} genehmigt.{waits}",
                 url=url, reason="league_transfer_approved", row=row, status=APPROVED)
     if source:

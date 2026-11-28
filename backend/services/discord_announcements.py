@@ -57,12 +57,11 @@ def _parse(value) -> datetime | None:
 
 
 def vienna(value, *, with_time: bool = True) -> str:
-    """Zeit so, wie sie im Verein gilt - mit „Uhr“, damit im Discord niemand rechnet."""
+    """Zeit so, wie sie im Verein gilt: „Sa 23. Mai · 18:00“ (#1307) - fest, die Meldung bleibt im Discord stehen."""
+    from services.date_text import format_moment
+
     parsed = _parse(value)
-    if not parsed:
-        return ""
-    local = parsed.astimezone(VIENNA)
-    return local.strftime("%d.%m.%Y, %H:%M Uhr") if with_time else local.strftime("%d.%m.%Y")
+    return format_moment(parsed, time=with_time) if parsed else ""
 
 
 def audience(item: dict) -> str:

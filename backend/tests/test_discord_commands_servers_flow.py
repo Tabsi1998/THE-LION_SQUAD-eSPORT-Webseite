@@ -185,7 +185,7 @@ async def test_status_names_the_server_its_games_and_channels(flow):
     main = await discord_commands.server_status_lines(db, MAIN)
     assert main[0] == "Dieser Server: LION (Hauptserver)" and main[1] == "Spiele: alle ohne eigenen Server"
     assert main[2] == "Kanäle: Events und Turniere <#100000000000000003>, Vorstand <#100000000000000005>"
-    assert main[3] == "Einbettungen zuletzt aktualisiert: 05.10.2026, 12:00 Uhr"
+    assert main[3] == "Einbettungen zuletzt aktualisiert: Mo 5. Oktober · 12:00"
     assert (await discord_commands.server_status_lines(db, "900000000000000000"))[0].startswith("Dieser Server: nicht im Server-Verzeichnis")
 
 

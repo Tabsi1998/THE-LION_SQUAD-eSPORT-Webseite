@@ -27,6 +27,7 @@ from services import discord_design
 from services.discord_embed_queue import KINDS, _dirty, pending, request_refresh  # noqa: F401 - umgezogen (#1420)
 from services.log_safe import log_safe
 from services.usernames import profile_path
+from services.date_text import format_moment
 
 # Bewusster Wiederexport (#1420): diese Namen holen andere Module und Tests weiterhin von hier.
 __all__ = ["pending", "request_refresh"]
@@ -65,24 +66,21 @@ def _dt(value) -> datetime | None:
 
 
 def stand_footer(now: datetime | None = None) -> str:
-    return f"Stand: {(now or now_utc()).astimezone(VIENNA).strftime('%d.%m.%Y, %H:%M')} Uhr"
+    return f"Stand: {format_moment(now or now_utc())}"
 
 
 def vienna(value) -> str:
     parsed = _dt(value)
-    return parsed.astimezone(VIENNA).strftime("%d.%m.%Y, %H:%M Uhr") if parsed else ""
+    return format_moment(parsed) if parsed else ""
 
 
 WEEKDAYS = ("Mo", "Di", "Mi", "Do", "Fr", "Sa", "So")
 
 
 def vienna_day(value) -> str:
-    """„Sa, 03.10.2026 · 18:00 Uhr“ - für die Feldnamen der Termine."""
+    """„Sa 3. Oktober · 18:00“ (#1307) - für die Feldnamen der Termine."""
     parsed = _dt(value)
-    if not parsed:
-        return ""
-    local = parsed.astimezone(VIENNA)
-    return f"{WEEKDAYS[local.weekday()]}, {local.strftime('%d.%m.%Y · %H:%M')} Uhr"
+    return format_moment(parsed) if parsed else ""
 
 
 def _points(value) -> str:
@@ -154,7 +152,7 @@ def achievement_week_context(doc: dict | None, origin: str) -> tuple[dict, list[
 
 def _common(origin: str, now: datetime | None) -> dict:
     return {"site": origin, "club": "THE LION SQUAD", "logo": f"{origin}/assets/brand/tls-favicon.png",
-            "now": (now or now_utc()).astimezone(VIENNA).strftime("%d.%m.%Y, %H:%M Uhr")}
+            "now": format_moment(now or now_utc())}
 
 
 def _standard(kind: str, context: tuple[dict, list[dict]], origin: str, now: datetime | None) -> dict:
