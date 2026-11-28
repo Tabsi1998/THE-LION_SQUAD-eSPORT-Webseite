@@ -81,6 +81,15 @@ test("Raster mit Punkten, Tag antippen zeigt seine Termine, Abo-Adresse und Logi
   expect(within(screen.getByTestId("calendar-upcoming")).getAllByRole("link")).toHaveLength(3);
 });
 
+// Plan A/B/C (#2613): der Termin nennt den Ort-Plan, der gerade gilt.
+test("ein Event mit Ausweichort sagt „Plan B aktiv“", async () => {
+  respond([{ ...ITEMS[0], location: "Rodelbahn Gaisalm, Telfs", place_plan: "Plan B" }]);
+  await renderPage("Oktober 2099");
+  await userEvent.click(screen.getByTestId("calendar-day-2099-10-05"));
+  expect(within(screen.getByTestId("calendar-day-items")).getByTestId("calendar-place-plan-e-fest")).toHaveTextContent("· Plan B aktiv");
+  expect(within(screen.getByTestId("calendar-day-items")).getByTestId("calendar-item-event-e-fest")).toHaveTextContent("Rodelbahn Gaisalm, Telfs");
+});
+
 test("Arten lassen sich ausblenden, die letzte bleibt; mit Login kein Hinweis", async () => {
   respond(ITEMS, true);
   await renderPage("Oktober 2099");

@@ -16,6 +16,8 @@ import { AuthFormAlert } from "@/components/tls/AuthFormFields";
 import { FactsBox } from "@/components/tls/FactsBox";
 import { EventRecap } from "@/components/tls/EventRecap";
 import { FriendsAtEvent } from "@/components/tls/FriendsAtEvent";
+import { EventPolls } from "@/components/tls/EventPolls";
+import { PlacePlanList, PlacePlanNotice } from "@/components/tls/EventPlacePlans";
 import { offerFriendsHint } from "@/lib/friendsHint";
 import { offerWebPush, registrationKey, rememberWebPushRegistration } from "@/lib/webPush";
 import { WebPushOffHint } from "@/components/notifications/WebPushOffHint";
@@ -352,7 +354,7 @@ function EventFactsBox({ e, user, over, onRegister }) {
   const calendarItem = {
     id: e.id, slug: e.slug, kind: "event", title: e.name, start: e.start_date, end: e.end_date,
     location: [e.location, fullAddress(e)].filter(Boolean).join(", ") || null,
-    detail: eventKindLabel(e.event_type), url: typeof window !== "undefined" && e.slug ? `${window.location.origin}/events/${e.slug}` : null,
+    detail: [eventKindLabel(e.event_type), e.place_plan?.total > 1 ? `${e.place_plan.label} aktiv` : ""].filter(Boolean).join(" · "), url: typeof window !== "undefined" && e.slug ? `${window.location.origin}/events/${e.slug}` : null,
   };
   return (
     <FactsBox rows={eventFacts(e, { over })} testId="event-facts">
@@ -404,6 +406,9 @@ function EventOverview({ e, user, over, accessToken, hasConsent, onChanged, regi
         </div>
       )}
 
+      {/* Plan A/B/C (#2613): gilt ein Ausweichort, steht er oben - mit Hinweis. */}
+      {!cancelled && <PlacePlanNotice plan={e.place_plan} />}
+
       {/* Nach dem Ende (#1221): kein Kalender, kein „Live verfolgen“, kein „Display“. Der Rückblick (#1187) steht oben;
           solange seine Daten fehlen, der Satz, wo die Ergebnisse stehen. */}
       {recap && (
@@ -430,6 +435,9 @@ function EventOverview({ e, user, over, accessToken, hasConsent, onChanged, regi
           <EventRegistrationPanel event={e} user={user} accessToken={accessToken} onChanged={onChanged} open={registerOpen} onRegistered={onRegistered} />
         </section>
       )}
+
+      {/* Abstimmungen (#2612): Angemeldete stimmen ab, alle sehen Frage, Frist und - wie eingestellt - den Stand. */}
+      {!cancelled && <EventPolls event={e} accessToken={accessToken} />}
 
       {/* Freunde beim Event (#1188): nur mit Konto, nur bestätigte Freunde, die es erlauben. */}
       <FriendsAtEvent event={e} user={user} over={over} accessToken={accessToken} />
@@ -550,6 +558,8 @@ function EventOverview({ e, user, over, accessToken, hasConsent, onChanged, regi
             </div>
           </div>
         )}
+        {/* Plan A/B/C (#2613): alle Pläne, der aktive markiert. */}
+        <PlacePlanList plans={e.place_plans} />
         {singleMap && hasConsent("external_media") && (
           <div className="border border-white/10 bg-[#121212] rounded-sm overflow-hidden">
             <iframe title={`Karte ${e.name}`} src={mapEmbedUrl(e)} className="w-full h-72 border-0" loading="lazy" referrerPolicy="no-referrer-when-downgrade" />

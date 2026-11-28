@@ -797,6 +797,17 @@ class EventLocation(BaseModel):
     note: Optional[str] = Field(default=None, max_length=500)
 
 
+class EventPlacePlan(BaseModel):
+    """Ein Ort-Plan (#2613, Plan A/B/C): eine Alternative für den Ort - geprüft in services/event_place_plans."""
+    key: Optional[str] = Field(default=None, max_length=40)
+    name: Optional[str] = Field(default=None, max_length=120)
+    address: Optional[str] = Field(default=None, max_length=120)
+    postal_code: Optional[str] = Field(default=None, max_length=20)
+    city: Optional[str] = Field(default=None, max_length=120)
+    country: Optional[str] = Field(default=None, max_length=120)
+    note: Optional[str] = Field(default=None, max_length=300)
+
+
 class EventDay(BaseModel):
     """Ein Tag eines mehrtägigen Events (#884): Datum und Uhrzeiten in Wiener Zeit; geprüft in services/event_days."""
     date: str = Field(max_length=10)
@@ -876,6 +887,8 @@ class EventCreate(BaseModel):
     billing: Optional[BillingConfig] = None
     # Mehrere Standorte (#203); leer = ein Standort aus den Feldern oben.
     locations: Optional[List[EventLocation]] = None
+    # Plan A/B/C beim Ort (#2613); leer = nur der Ort oben. Der aktive Plan wird umgeschaltet, nicht hier gesetzt.
+    place_plans: Optional[List[EventPlacePlan]] = Field(default=None, max_length=20)
     # Mehrere Tage mit eigenen Zeiten (#884); leer = ein Tag aus start_date und end_date.
     days: Optional[List[EventDay]] = None
     # Fakten-Kasten (#1346): „Mitbringen“ (eine Zeile je Punkt) und Highlights als Kacheln über dem Text.
@@ -932,6 +945,8 @@ class EventUpdate(BaseModel):
     status: Optional[EventStatus] = None
     billing: Optional[BillingConfig] = None
     locations: Optional[List[EventLocation]] = None
+    # Plan A/B/C beim Ort (#2613); leere Liste entfernt die Pläne, der Ort bleibt, wie er gerade ist.
+    place_plans: Optional[List[EventPlacePlan]] = Field(default=None, max_length=20)
     # Mehrere Tage mit eigenen Zeiten (#884); leer = ein Tag aus start_date und end_date.
     days: Optional[List[EventDay]] = None
     # Fakten-Kasten (#1346): „Mitbringen“ (eine Zeile je Punkt) und Highlights als Kacheln über dem Text.

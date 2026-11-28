@@ -160,6 +160,18 @@
     "link": { "to": "/faq/events-und-kalender#anmeldung-aendern", "label": "Zur Anleitung" }
   },
   {
+    "id": "event-abstimmung",
+    "frage": "Wie stimme ich bei einem Event ab?",
+    "antwort": "Öffne das Event, wähle unter Abstimmungen deine Antwort und tippe auf Abstimmen, ändern geht bis zur Frist. Abstimmen kann, wer angemeldet ist, nicht die Warteliste. Wie du gestimmt hast, sieht niemand.",
+    "bereich": "events-kalender", "rollen": ["spieler", "mitglied"], "sichtbar_fuer": "alle"
+  },
+  {
+    "id": "event-plan-b",
+    "frage": "Was heißt Plan B aktiv bei einem Event?",
+    "antwort": "Manche Events haben Ausweichorte, etwa je nach Schnee. Plan B aktiv heißt: Es gilt der zweite Ort, er steht oben auf der Event-Seite und im Kalender. Wechselt der Plan, bekommst du meist eine Nachricht.",
+    "bereich": "events-kalender", "rollen": ["spieler", "mitglied"], "sichtbar_fuer": "alle"
+  },
+  {
     "id": "event-mindestanzahl",
     "frage": "Was heißt „Findet ab 8 Anmeldungen statt“?",
     "antwort": "Das Event findet nur statt, wenn bis zur Frist genug dabei sind. Darunter steht, wie viele noch fehlen und bis wann. Sagt der Verein ab, bekommst du eine Nachricht mit dem Grund.",

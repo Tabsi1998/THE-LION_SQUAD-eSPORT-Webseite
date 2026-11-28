@@ -62,6 +62,8 @@ PURGED = (
     "league_rule_consents",
     # Seit #1662: gesammelte Mails und die Läufe der Sammel-Mail.
     "mail_digest_items", "mail_digest_runs",
+    # Seit #2612: die eigenen Stimmen bei Abstimmungen am Event - das Ergebnis zählt danach ohne sie.
+    "event_poll_votes",
 )
 # Angaben zur Person, die in den Daten des Adminprotokolls stehen können (#1029). Der Vorgang bleibt, die Angaben nicht.
 AUDIT_PERSONAL_KEYS = ("display_name", "username", "real_name", "first_name", "last_name", "nickname", "email", "phone", "address",

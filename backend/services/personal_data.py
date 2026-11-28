@@ -218,6 +218,8 @@ PERSONAL: dict[str, Entry] = {
                                  "mit Konto: Name, Adresse und Notizen beim Löschen überschrieben, die Zählung bleibt. An der Tür "
                                  "Eingetragene ohne Konto (#2127): kein Konto, also keine Auskunft und Löschung darüber - beides "
                                  "über die Turnierleitung; nach der Frist des Adminprotokolls bleibt nur die Zählung (Job ops_retention)"),
+    # Abstimmung im Event (#2612): die eigene Stimme (gewählte Antworten) je Abstimmung - mit dem Konto gelöscht.
+    "event_poll_votes": Entry(DELETED, ("event_poll_votes",)),
     "f1_lap_times": Entry(OVERWRITTEN, ("f1_lap_times",)),
     # Fast Lap vor Ort (#1585): Gäste ohne Konto und die Liste „Am Start / Als Nächstes“.
     "f1_guests": Entry(EXPIRES, note="Anzeigename eines Gastes ohne Konto - kein Konto, also weder Auskunft noch Löschung "
@@ -253,6 +255,8 @@ CLUB_CONTENT = frozenset({
     "member_benefits", "references", "seasons", "settings", "site_banners", "stations", "sticker_packs", "stickers",
     "team_invite_links", "tournament_awards", "tournament_groups", "tournament_onsite_access", "tournament_stages",
     "tournaments",
+    # Abstimmungen am Event (#2612): Frage, Antworten, Frist - die Stimmen stehen bei den Daten zur Person.
+    "event_polls",
     # Externe Serien (#1741): Spur, Serie, Termine, Ergebnisblätter samt Revisionen (nur die Kennung, wer geändert hat)
     # und Stände. Teilnehmer und Aliase stehen bei den Daten zur Person.
     "reference_lineages", "reference_round_result_revisions", "reference_round_results", "reference_rounds",

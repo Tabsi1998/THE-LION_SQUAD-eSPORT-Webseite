@@ -25,6 +25,8 @@ import { appendEmbedToken } from "@/components/tls/RichContent";
 import { normalizeDateTimeFields, toDateTimeLocalInput } from "@/lib/datetime";
 import { buildDirtyPayload, hasPayloadChanges } from "@/lib/dirtyPayload";
 import { EventProgramPanel, useEventProgram } from "@/pages/admin/event/EventProgramPanel";
+import { EventPlacePlansSection, activePlanEdited, emptyPlan, formToPlans, planFromPlace, plansFormError, plansToForm } from "@/pages/admin/event/EventPlacePlansSection";
+import { EventPollsPanel } from "@/pages/admin/event/EventPollsPanel";
 import { useConfirm } from "@/components/tls/ConfirmDialog";
 import { affectedRegistrations, cancelConfirmText, eventStatusOptions, outsideText, savedEventMessage, touchesScheduleOrPlace } from "@/lib/eventAdmin";
 import { formToMinimum, minimumFormError, minimumToForm } from "@/lib/eventMinimum";
@@ -127,6 +129,17 @@ function EventForm({ event, meta, partners = [], onDone }) {
   const [locationsForm, setLocationsForm] = useState(() => locationsToForm(event?.locations));
   const locationsDirty = JSON.stringify(locationsForm) !== JSON.stringify(locationsToForm(event?.locations));
   const usesLocationList = locationsForm.length > 0;
+  // Plan A/B/C beim Ort (#2613): Pläne gehen mit dem Speichern, umgeschaltet wird sofort per Knopf. Mit Plänen sind die
+  // Ortsfelder ausgeblendet - der Server schreibt den aktiven Plan hinein. Standorte und Pläne schließen sich aus.
+  const [plansForm, setPlansForm] = useState(() => plansToForm(event?.place_plans));
+  const [placeState, setPlaceState] = useState(() => ({
+    saved: plansToForm(event?.place_plans), active: event?.place_plan?.key || event?.active_place_plan || null, history: event?.place_plan_history || [],
+  }));
+  const [switching, setSwitching] = useState("");
+  // Hat inzwischen jemand umgeschaltet, lehnt der Server das Speichern ab (409) - der Hinweis steht dann beim Ort.
+  const [placeConflict, setPlaceConflict] = useState("");
+  const plansDirty = JSON.stringify(plansForm) !== JSON.stringify(placeState.saved);
+  const usesPlans = plansForm.length > 0;
   // Mehrtägig (#884): die Tage ersetzen Start, Ende und Einlass; die Liste geht nur mit, wenn sie sich geändert hat.
   const [daysForm, setDaysForm] = useState(() => daysToForm(event?.days));
   const daysDirty = JSON.stringify(daysForm) !== JSON.stringify(daysToForm(event?.days));
@@ -218,6 +231,56 @@ function EventForm({ event, meta, partners = [], onDone }) {
     setForm((f) => ({ ...f, program: appendEmbedToken(f.program, kind, item) }));
   };
 
+  // Umschalten (#2613): ein Klick, dazu die vorhandene Frage „Angemeldete informieren?“. Der Server schaltet nur, wenn noch
+  // der Plan aktiv ist, den diese Seite zeigt (expected) - sonst sagt er, wer schneller war.
+  const reloadPlace = async () => {
+    try {
+      const { data } = await api.get(`/admin/events/${encodeURIComponent(event.id)}`);
+      setPlaceState({ saved: plansToForm(data?.place_plans), active: data?.place_plan?.key || data?.active_place_plan || null, history: data?.place_plan_history || [] });
+    } catch {
+      // still: die Seite zeigt weiter den letzten Stand
+    }
+  };
+  // Ausweichorte entfernen (Review #2613-4): der Plan, der gerade gilt, bleibt als normaler Ort - wirksam mit „Speichern“.
+  const removeAllPlans = async () => {
+    const active = placeState.saved.find((plan) => plan.key === placeState.active) || plansForm[0];
+    const ok = await confirm({
+      title: "Ausweichorte entfernen?",
+      description: `Danach gibt es nur noch einen Ort: ${active?.name || active?.address || "der Plan, der gerade gilt"}. Die anderen Pläne sind weg. Wirksam wird es mit „Speichern“.`,
+      confirmLabel: "Entfernen",
+      cancelLabel: "Zurück",
+    });
+    if (!ok) return;
+    setPlansForm([]);
+    if (active) {
+      setForm((f) => ({ ...f, location: active.name || "", address: active.address || "", postal_code: active.postal_code || "",
+        city: active.city || "", country: active.country || f.country }));
+    }
+  };
+  const switchPlan = async (key, label) => {
+    const affected = affectedRegistrations(event);
+    let notify = false;
+    if (affected && !["draft", "archived", "cancelled"].includes(event.status)) {
+      notify = await confirm({
+        title: "Angemeldete informieren?",
+        description: `Der Ort wechselt auf ${label}. Sollen ${affected === 1 ? "die 1 angemeldete Person" : `die ${affected} Angemeldeten`} (samt Warteliste) eine Nachricht bekommen?`,
+        confirmLabel: "Informieren",
+        cancelLabel: "Ohne Nachricht umschalten",
+        tone: "info",
+      });
+    }
+    setSwitching(key);
+    try {
+      const { data } = await api.post(`/admin/events/${event.id}/place-plan`, { key, notify, expected: placeState.active });
+      const told = data?.notice?.notified;
+      toast.success(data?.changed === false ? `${label} gilt schon.` : told ? `${label} gilt jetzt. ${told === 1 ? "1 Person" : `${told} Personen`} informiert.` : `${label} gilt jetzt.`);
+    } catch (err) {
+      toast.error(formatRequestError(err, "Umschalten hat nicht geklappt."));
+    }
+    await reloadPlace();
+    setSwitching("");
+  };
+
   const normalizeEventPayload = (source) => {
     const payload = { ...source };
     Object.keys(payload).forEach((k) => { if (payload[k] === "") payload[k] = null; });
@@ -242,7 +305,7 @@ function EventForm({ event, meta, partners = [], onDone }) {
     setCancelSheet(null);
     onDone();
   };
-  const otherChanges = !isNew && (billingDirty || locationsDirty || daysDirty || highlightsDirty || minimumDirty || clearOwnSponsors
+  const otherChanges = !isNew && (billingDirty || locationsDirty || plansDirty || daysDirty || highlightsDirty || minimumDirty || clearOwnSponsors
     || hasPayloadChanges(buildDirtyPayload(normalizeEventPayload(form), originalEventPayload())));
 
   const submit = async (ev) => {
@@ -262,6 +325,11 @@ function EventForm({ event, meta, partners = [], onDone }) {
       toast.error(daysProblem);
       return;
     }
+    const plansProblem = plansDirty ? plansFormError(plansForm) : "";
+    if (plansProblem) {
+      toast.error(plansProblem);
+      return;
+    }
     const minimumProblem = minimumDirty ? minimumFormError(minimumForm, { startDate: formStart(), maxParticipants: form.max_participants }) : "";
     if (minimumProblem) {
       toast.error(minimumProblem);
@@ -278,6 +346,7 @@ function EventForm({ event, meta, partners = [], onDone }) {
       if (canFinance && billingDirty) payload.billing = formToBilling(billingForm);
       if (locationsDirty) payload.locations = formToLocations(locationsForm);
       if (daysDirty) payload.days = formToDays(daysForm);
+      if (plansDirty) payload.place_plans = formToPlans(plansForm);
       if (isNew) {
         if (minimumForm.enabled) payload.min_registrations = formToMinimum(minimumForm);
         await api.post("/events", payload);
@@ -288,6 +357,7 @@ function EventForm({ event, meta, partners = [], onDone }) {
         if (canFinance && billingDirty) patch.billing = formToBilling(billingForm);
         if (locationsDirty) patch.locations = formToLocations(locationsForm);
         if (daysDirty) patch.days = formToDays(daysForm);
+        if (plansDirty) patch.place_plans = formToPlans(plansForm);
         if (clearOwnSponsors) patch.sponsor_ids = [];
         if (minimumDirty) patch.min_registrations = formToMinimum(minimumForm);
         if (!hasPayloadChanges(patch)) {
@@ -314,7 +384,9 @@ function EventForm({ event, meta, partners = [], onDone }) {
           setSaving(false);
           return;
         }
-        if (!cancelling && affected && touchesScheduleOrPlace(patch) && !["draft", "archived", "cancelled"].includes(patch.status || event.status)) {
+        // Ändert sich der Ort-Plan, der gerade gilt (#2613), ist das wie ein neuer Ort.
+        const placeEdited = plansDirty && activePlanEdited(placeState.saved, plansForm, placeState.active);
+        if (!cancelling && affected && (touchesScheduleOrPlace(patch) || placeEdited) && !["draft", "archived", "cancelled"].includes(patch.status || event.status)) {
           patch.notify_registrants = await confirm({
             title: "Angemeldete informieren?",
             description: `Termin oder Ort ändern sich. Sollen ${affected === 1 ? "die 1 angemeldete Person" : `die ${affected} Angemeldeten`} (samt Warteliste) eine Nachricht bekommen?`,
@@ -333,7 +405,10 @@ function EventForm({ event, meta, partners = [], onDone }) {
       toast.success("Gespeichert.");
       onDone();
     } catch (err) {
-      toast.error(formatRequestError(err, "Event konnte nicht gespeichert werden.", { slug: form.slug, name: form.name }));
+      const message = formatRequestError(err, "Event konnte nicht gespeichert werden.", { slug: form.slug, name: form.name });
+      const detail = err?.response?.data?.detail;
+      if (err?.response?.status === 409 && typeof detail === "string" && /umgeschaltet/i.test(detail)) setPlaceConflict(detail);
+      toast.error(message);
     }
     setSaving(false);
   };
@@ -411,15 +486,30 @@ function EventForm({ event, meta, partners = [], onDone }) {
       <FormSection title={eventMode === "online" ? "Veranstalter" : "Ort und Veranstalter"} accent={ACCENT}>
         {/* Online braucht es weder Ort noch Adresse noch Karte (#2111, W3). */}
         {eventMode === "online" && <p className="tls-type-small text-white/45" data-testid="event-online-no-place">Online-Event – Ort, Adresse und Karte entfallen.</p>}
-        {eventMode !== "online" && <EventLocationsSection value={locationsForm} onChange={setLocationsForm} />}
+        {eventMode !== "online" && !usesPlans && <EventLocationsSection value={locationsForm} onChange={setLocationsForm} />}
+        {/* Plan A/B/C (#2613): beim Ort, nicht unten angehängt. Mit Plänen ersetzen sie die Ortsfelder. */}
+        {eventMode !== "online" && usesPlans && (
+          <EventPlacePlansSection value={plansForm} onChange={setPlansForm} saved={placeState.saved} activeKey={placeState.active}
+            onSwitch={switchPlan} switching={switching} dirty={plansDirty} history={placeState.history} canSwitch={!isNew}
+            onRemoveAll={removeAllPlans} conflict={placeConflict} />
+        )}
+        {eventMode !== "online" && !usesPlans && !usesLocationList && (
+          <div className="flex flex-wrap items-center gap-3">
+            <button type="button" onClick={() => setPlansForm([planFromPlace(form), emptyPlan()])}
+              className="tls-btn tls-btn--quiet inline-flex min-h-11 items-center gap-2 px-3 py-2 rounded-sm tls-type-label" data-testid="event-place-plans-start">
+              Ausweichort hinterlegen (Plan B)
+            </button>
+            <span className="tls-type-small text-quiet">Für Wetter und Schnee: Plan A ist der Ort unten, Plan B, C kommen dazu.</span>
+          </div>
+        )}
         {/* „Ort“ hieß bisher zweideutig; es ist der Name des Veranstaltungsorts. Die Karte sucht die Adresse (#204). */}
-        {eventMode !== "online" && !usesLocationList && (
+        {eventMode !== "online" && !usesLocationList && !usesPlans && (
           <FormGrid>
             <TextField label="Veranstaltungsort (Name, optional)" value={form.location} onChange={(v) => set("location", v)} placeholder="Vereinsheim, Gemeindesaal Telfs" testId="event-location-name" />
             <TextField label="Adresse" value={form.address} onChange={(v) => set("address", v)} placeholder="Maria-Theresien-Str. 1" />
           </FormGrid>
         )}
-        {eventMode !== "online" && !usesLocationList && (
+        {eventMode !== "online" && !usesLocationList && !usesPlans && (
           <FormGrid cols={3}>
             <TextField label="PLZ" value={form.postal_code} onChange={(v) => set("postal_code", v)} placeholder="6020" />
             <TextField label="Stadt" value={form.city} onChange={(v) => set("city", v)} placeholder="Innsbruck" />
@@ -482,6 +572,16 @@ function EventForm({ event, meta, partners = [], onDone }) {
           <EventBillingSection value={billingForm} onChange={setBillingForm} canEdit={canFinance} dolibarrConnected={Boolean(meta?.dolibarr_connected)} />
         )}
       </FormSection>
+
+      {/* Abstimmungen (#2612): eigener Abschnitt; was hier passiert, wirkt sofort - nicht erst mit „Speichern“. */}
+      {!isNew && event?.id ? (
+        <FormSection title="Abstimmungen" accent={ACCENT} testId="event-section-polls"
+          hint="Zum Beispiel Rodelbahn A, B oder C. Frist, eine oder mehrere Antworten und wann das Ergebnis zu sehen ist, stellst du je Abstimmung ein.">
+          <EventPollsPanel eventId={event.id} plans={(event.place_plans || []).filter((plan) => placeState.saved.some((saved) => saved.key === plan.key))}
+            activePlan={placeState.active} onTakeOver={(key, label) => switchPlan(key, label || "den Plan")}
+            canNotify={!["draft", "archived", "cancelled"].includes(event.status)} />
+        </FormSection>
+      ) : null}
 
       <FormSection title="Programm" accent={ACCENT}>
         <FieldLabel label="Programm / Tagesablauf">
