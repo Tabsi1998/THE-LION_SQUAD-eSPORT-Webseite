@@ -15,6 +15,7 @@ import { MY_CALENDAR_PATH, agendaBuckets, ownBadge } from "@/lib/myCalendar";
 import { CalendarDays, ChevronLeft, ChevronRight, ExternalLink, LogIn } from "lucide-react";
 import { viennaDay } from "@/lib/vienna";
 import { StatusChip } from "@/components/tls/StatusChip";
+import { phaseDayInfo } from "@/components/tls/PhaseBadge";
 import { isKnownStatus } from "@/lib/statusKinds";
 
 // Kalender (#402): dieselbe Monatsansicht wie in der App (#216) - Punkte je Tag in der Farbe der
@@ -389,7 +390,9 @@ function kindLabel(item) {
 // (Schicht, Versammlung) kennt die Tabelle nicht, sie bleiben Text.
 function PhaseText({ item }) {
   if (!isKnownStatus(item.phase?.state)) return <span>{item.phase?.label}</span>;
-  return <StatusChip status={item.phase.state} testId={`calendar-phase-${item.kind}-${item.id}`} />;
+  // Mehrtägige Events (#884): „Tag 2/3“ steht neben dem Schild, wie bei PhaseBadge.
+  const day = phaseDayInfo(item.phase);
+  return <StatusChip status={item.phase.state} testId={`calendar-phase-${item.kind}-${item.id}`} meta={day} metaTestId={`calendar-phase-day-${item.kind}-${item.id}`} />;
 }
 
 function ItemRow({ item, withDate = false }) {

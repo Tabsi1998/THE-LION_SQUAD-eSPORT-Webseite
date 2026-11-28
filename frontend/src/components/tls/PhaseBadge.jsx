@@ -21,6 +21,13 @@ const COUNTDOWN_VERB = {
 // Mehrtägig (#884): „Tag 2/3 läuft“ bzw. „Tag 2/3“ vom Server - die Tagesangabe wandert neben das Schild.
 const DAY_INFO = /^Tag \d+\/\d+/;
 
+/** „Tag 2/3“ aus der Phase eines mehrtägigen Events (läuft oder Pause zwischen zwei Tagen), sonst null - auch für Stellen
+ *  ohne Countdown (Kalender). */
+export function phaseDayInfo(phase) {
+  const state = phase?.state;
+  return state === "live" || state === "day_break" ? DAY_INFO.exec(phase?.label || "")?.[0] || null : null;
+}
+
 function fallbackState(status) {
   if (status === "scheduled") return "announced";
   if (status === "checkin_open") return "check_in";
@@ -54,7 +61,7 @@ export function PhaseBadge({ phase, status, size = "sm", className = "", onMedia
 
   const when = targetMs && targetMs > now ? whenText(targetMs, { now, days }) : null;
   const remaining = when ? whenPhrase(COUNTDOWN_VERB[phase?.countdown_kind] || "", when) : "";
-  const dayInfo = (state === "live" || state === "day_break") ? DAY_INFO.exec(phase?.label || "")?.[0] : null;
+  const dayInfo = phaseDayInfo({ state, label: phase?.label });
   const meta = [dayInfo, remaining].filter(Boolean).join(" · ");
   // Ein Zustand, den die Tabelle nicht kennt, behält das Wort des Servers - nie den Rohwert.
   const label = isKnownStatus(state) ? undefined : phase?.label || undefined;

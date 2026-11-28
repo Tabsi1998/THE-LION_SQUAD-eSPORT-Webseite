@@ -1,5 +1,5 @@
 import { render, screen } from "@testing-library/react";
-import { PhaseBadge } from "./PhaseBadge";
+import { PhaseBadge, phaseDayInfo } from "./PhaseBadge";
 
 // Die öffentliche Phase als Zustands-Schild (#1076, #1306): überall dasselbe Schild für denselben Zustand. Bei „Läuft“
 // steht das Schild ruhig, nur der Punkt pulsiert. Der Countdown steht als kleiner Text neben dem Schild, nie darin.
@@ -43,6 +43,14 @@ test("mehrtägig: die Tagesangabe des Servers steht neben dem Schild", () => {
   render(<PhaseBadge phase={{ state: "day_break", label: "Tag 1/3" }} />);
   expect(chip()).toHaveTextContent(/^Pause$/);
   expect(meta()).toHaveTextContent("Tag 1/3");
+});
+
+test("phaseDayInfo: die Tagesangabe für Kalender und andere Stellen ohne Countdown", () => {
+  expect(phaseDayInfo({ state: "live", label: "Tag 2/3 läuft" })).toBe("Tag 2/3");
+  expect(phaseDayInfo({ state: "day_break", label: "Tag 1/3" })).toBe("Tag 1/3");
+  expect(phaseDayInfo({ state: "live", label: "Läuft" })).toBeNull();
+  expect(phaseDayInfo({ state: "registration_open", label: "Tag 2/3" })).toBeNull();
+  expect(phaseDayInfo(null)).toBeNull();
 });
 
 test("ein unbekannter Zustand behält das Wort des Servers, nie den Rohwert", () => {
