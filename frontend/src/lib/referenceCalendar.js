@@ -1,7 +1,8 @@
 // Kalender externer Serien (#1742): Beschriftungen und kleine Rechnungen für die Termine einer Saison. Der Status
 // („heute“, „Ergebnis fehlt“ …) und „heute“ selbst kommen vom Server (Wiener Tag über club_today()) - hier wird
 // nur beschriftet und ein Vorschlag für den nächsten Termin gerechnet, in Kalendertagen, nie mit der Uhr des Geräts.
-import { dayNoon, viennaDate } from "@/lib/vienna";
+import { formatRange, formatWhen } from "@/lib/datetime";
+import { dayNoon } from "@/lib/vienna";
 
 export const STATE_LABELS = {
   planned: "Geplant",
@@ -40,6 +41,7 @@ export const ROUND_KIND_OPTIONS = [["regular", "Regulär"], ["final", "Finale"]]
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 const DAY_RE = /^\d{4}-\d{2}-\d{2}$/;
+const CLOCK_RE = /^\d{2}:\d{2}$/;
 
 /** Tag „JJJJ-MM-TT“ plus n Kalendertage. */
 export function addDays(day, count) {
@@ -67,15 +69,15 @@ export function suggestNextDay(rounds, weekday, today) {
   return addDays(last, ((Number(weekday) - weekdayOf(last) + 6) % 7) + 1);
 }
 
-/** „Do., 05.11.2026“ - leer ohne Tag. */
+/** „Do 5. November“ (#1307) - leer ohne Tag. */
 export function dayLabel(day) {
   if (!DAY_RE.test(day || "")) return "";
-  return viennaDate(dayNoon(day), { weekday: "short", day: "2-digit", month: "2-digit", year: "numeric" });
+  return formatWhen(day, { time: false });
 }
 
 /**
- * Tag und Uhrzeit eines Termins: „Do., 05.11.2026 · 20:30“, ohne Uhrzeit nur der Tag, ohne Tag „Termin offen“. Ein
- * Spieltag mit Zeitraum (Team-Liga, #1931) zeigt beide Tage ohne Uhrzeit: „Mi., 13.05. – So., 17.05.2026“.
+ * Tag und Uhrzeit eines Termins: „Do 5. November · 20:30“, ohne Uhrzeit nur der Tag, ohne Tag „Termin offen“. Ein
+ * Spieltag mit Zeitraum (Team-Liga, #1931) zeigt beide Tage ohne Uhrzeit: „Mi 13. – So 17. Mai“.
  */
 export function roundWhen(round, { open = "Termin offen" } = {}) {
   const day = dayLabel(round?.club_day);
@@ -84,11 +86,9 @@ export function roundWhen(round, { open = "Termin offen" } = {}) {
   if (!day) return round?.time ? `${open} · ${round.time}` : open;
   const end = round.club_day_end && round.club_day_end !== round.club_day ? dayLabel(round.club_day_end) : "";
   if (end) {
-    const sameYear = round.club_day.slice(0, 4) === round.club_day_end.slice(0, 4);
-    const start = sameYear ? viennaDate(dayNoon(round.club_day), { weekday: "short", day: "2-digit", month: "2-digit" }) : day;
-    return `${start} – ${end}`;
+    return formatRange(round.club_day, round.club_day_end);
   }
-  return round.time ? `${day} · ${round.time}` : day;
+  return round.time && CLOCK_RE.test(round.time) ? formatWhen(`${round.club_day}T${round.time}`) : day;
 }
 
 /** Gegner eines Spieltags (#1931): „vs Team“ daheim, „@ Team“ auswärts, sonst „gegen Team“ - leer ohne Gegner. */

@@ -1,6 +1,10 @@
 import { act, render, screen } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { WHATS_NEW_SEEN_KEY } from "@/lib/whatsNew";
+import { runAtTestClock } from "@/testClock";
+
+// Feste Uhr (#1307): die Datums-Texte lassen das laufende Jahr weg und sagen „heute“/„morgen“.
+runAtTestClock();
 
 // „Neu auf der Website“ (#1240): /neu zeigt die Einträge, neueste oben; der Link in der Fußzeile trägt einen Punkt,
 // solange seit dem letzten Besuch etwas dazugekommen ist - das Öffnen der Seite löscht ihn.
@@ -21,7 +25,7 @@ beforeEach(() => window.localStorage.clear());
 test("/neu: neueste oben, mit Datum und Link", () => {
   render(<MemoryRouter><WhatsNewPage data={DATA} /></MemoryRouter>);
   expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent("Neu auf der Website");
-  expect(screen.getByTestId("whatsnew-item-0")).toHaveTextContent("20.10.2026");
+  expect(screen.getByTestId("whatsnew-item-0")).toHaveTextContent("Di 20. Oktober");
   expect(screen.getByTestId("whatsnew-item-0")).toHaveTextContent("Neueste Neuerung.");
   expect(screen.getByRole("link", { name: /Ansehen/ })).toHaveAttribute("href", "/fastlap");
   expect(screen.getByTestId("whatsnew-item-1")).toHaveTextContent("Ältere Neuerung.");

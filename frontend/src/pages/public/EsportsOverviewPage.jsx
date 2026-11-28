@@ -13,7 +13,6 @@ import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 import { formatWhen } from "@/lib/datetime";
 import { compareByNearestDate, sortByNearestDate } from "@/lib/contentSort";
 import { ArrowRight, CalendarDays, Flag, Medal, Radio, Shield, Trophy, Users } from "lucide-react";
-import { viennaDate } from "@/lib/vienna";
 import { ShortCaps } from "@/components/tls/ShortCaps";
 
 const ACTIVE_PHASES = new Set(["registration", "check_in", "live", "upcoming"]);
@@ -189,7 +188,7 @@ export function leagueTile(leagues, now = Date.now()) {
     .filter((season) => season.status !== "completed" && season.start_date)
     .sort((a, b) => new Date(a.start_date) - new Date(b.start_date))
     .find((season) => new Date(season.start_date).getTime() >= now - 24 * 3600 * 1000);
-  if (upcoming) return { badge: `Start am ${viennaDate(upcoming.start_date, { day: "numeric", month: "numeric", year: "numeric" })}` };
+  if (upcoming) return { badge: `Start am ${formatWhen(upcoming.start_date, { time: false, relative: false })}` };
   return { badge: seasons.some((season) => season.status !== "completed") ? "Startet bald" : "" };
 }
 

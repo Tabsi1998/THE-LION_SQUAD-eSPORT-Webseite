@@ -13,7 +13,7 @@ import { countOf } from "@/lib/schedulePlanText";
 import { useConfirm, usePrompt } from "@/components/tls/ConfirmDialog";
 import { matchRights } from "@/lib/tournamentRights";
 import { planViewMode } from "@/lib/matchPlanMode";
-import { viennaTime } from "@/lib/vienna";
+import { formatClock } from "@/lib/datetime";
 import { StationTimeline } from "./StationTimeline";
 import { FlowGraph } from "./FlowGraph";
 import { DelayBanner, MatchEditor, OrderList, PlanNotice, PlanPreview, PlanSettings, PlanWarnings, StationAgenda } from "./MatchPlanParts";
@@ -333,7 +333,7 @@ export function MatchPlanPanel({ tournament, matches = [], stages = [], stations
     note = background.reason;
   }
   const summary = timeline.items.length
-    ? `Ende ca. ${viennaTime(Math.max(...timeline.items.map((item) => item.end)), { hour: "2-digit", minute: "2-digit" })}`
+    ? `Ende ca. ${formatClock(Math.max(...timeline.items.map((item) => item.end)))}`
     : "";
 
   return (

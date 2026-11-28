@@ -1,4 +1,8 @@
 import { blockedLines, dayRange, defaultSlot, matchWhen, openWeek, pointsLine, progressLine, scoreLine, seasonPeriod, weekHeading, weekSpan, winnerSide } from "./leaguePage";
+import { runAtTestClock } from "@/testClock";
+
+// Feste Uhr (#1307): die Datums-Texte lassen das laufende Jahr weg und sagen „heute“/„morgen“.
+runAtTestClock();
 
 // Ligaseite (docs/LIGA.md, P5, #1625): Kopf, Spielwochen und Ergebnisse in Worten - Season 1 als Beispiel.
 
@@ -9,22 +13,22 @@ const SEASON = {
 };
 
 test("Kopf der Season in Worten", () => {
-  expect(seasonPeriod(SEASON)).toBe("10.11.2026 – 18.1.2027");
+  expect(seasonPeriod(SEASON)).toBe("Di 10. November 2026 – Mo 18. Jänner 2027");
   expect(weekSpan(SEASON)).toBe("Spielwoche Di–Mo");
   expect(weekSpan({ ...SEASON, matchday_days: 3 })).toBe("Spielwoche 3 Tage");
   expect(defaultSlot(SEASON)).toBe("Sonntag, 20:00 Uhr");
   expect(pointsLine(SEASON)).toBe("3 / 1 / 0");
-  expect(blockedLines(SEASON)).toEqual([{ key: "2026-12-21-2027-01-03", label: "Weihnachtspause", range: "21.12.–3.1." }]);
-  expect(dayRange("2026-12-24", "2026-12-24")).toBe("24.12.");
+  expect(blockedLines(SEASON)).toEqual([{ key: "2026-12-21-2027-01-03", label: "Weihnachtspause", range: "Mo 21. Dezember 2026 – So 3. Jänner 2027" }]);
+  expect(dayRange("2026-12-24", "2026-12-24")).toBe("Do 24. Dezember");
 });
 
 test("Spielwochen und Spiele", () => {
-  expect(weekHeading({ week: 9, first_day: "2027-01-05", last_day: "2027-01-11" })).toBe("Woche 9 · 5.1.–11.1.");
+  expect(weekHeading({ week: 9, first_day: "2027-01-05", last_day: "2027-01-11" })).toBe("Woche 9 · Di 5. – Mo 11. Jänner 2027");
   const done = { done: true, home: { registration_id: "a", score: 2 }, away: { registration_id: "b", score: 1 }, winner_registration_id: "a" };
   expect(scoreLine(done)).toBe("2 : 1");
   expect(winnerSide(done)).toBe("home");
   expect(scoreLine({ done: false, home: {}, away: {} })).toBe("");
-  expect(matchWhen({ scheduled_at: "2027-01-10T19:00:00+00:00" })).toMatch(/10\.1\..*20:00/);
+  expect(matchWhen({ scheduled_at: "2027-01-10T19:00:00+00:00" })).toBe("So 10. Jänner 2027 · 20:00");
   expect(matchWhen({})).toBe("Termin offen");
   expect(progressLine({ matches: [done, { done: false }] })).toBe("1 von 2 gespielt");
   expect(progressLine({ matches: [done] })).toBe("alle gespielt");

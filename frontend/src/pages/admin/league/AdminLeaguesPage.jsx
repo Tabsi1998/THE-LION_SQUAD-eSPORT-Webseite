@@ -11,7 +11,8 @@ import { FormGrid } from "@/components/tls/AdminForm";
 import { SelectField, TextAreaField, TextField } from "@/components/tls/FormFields";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { isArchivedGame, selectableGames } from "@/lib/gameLabels";
-import { fromViennaInput, viennaDate } from "@/lib/vienna";
+import { formatWhen } from "@/lib/datetime";
+import { fromViennaInput } from "@/lib/vienna";
 import { ACTIVE_STATUS_OPTIONS, SEASON_STATUS_OPTIONS, VISIBILITY_SHORT, leagueLookChanges, leagueLookToForm, weekdayName } from "@/lib/league";
 import { accentProblem, accentStyle } from "@/lib/leagueLook";
 import { LeagueEmblem } from "@/components/tls/league/public/LeagueLook";
@@ -314,7 +315,7 @@ export default function AdminLeaguesPage() {
                       <span className="min-w-0 flex-1">
                         <span className="block font-semibold text-white">{season.name}</span>
                         <span className="block tls-type-small text-white/55">
-                          ab {viennaDate(season.start_date, { day: "2-digit", month: "2-digit", year: "numeric" })} · {season.weeks_total} Wochen · {STATUS_TEXT[season.status] || season.status}
+                          ab {formatWhen(season.start_date, { time: false })} · {season.weeks_total} Wochen · {STATUS_TEXT[season.status] || season.status}
                         </span>
                       </span>
                       <span className={`shrink-0 rounded-sm px-2 py-0.5 tls-type-label ${season.visibility === "off" ? "bg-white/5 text-white/55" : "bg-[#29B6E8]/15 text-[#29B6E8]"}`}>

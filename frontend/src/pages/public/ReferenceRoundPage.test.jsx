@@ -1,5 +1,9 @@
 import { act, fireEvent, render, screen, within } from "@testing-library/react";
 import { MemoryRouter, Route, Routes, useLocation } from "react-router-dom";
+import { runAtTestClock } from "@/testClock";
+
+// Feste Uhr (#1307): die Datums-Texte lassen das laufende Jahr weg und sagen „heute“/„morgen“.
+runAtTestClock();
 
 // Ergebnisseite einer Runde (#1950): Hauptrennen als Vorgabe, Reiter in der Adresse, Tabelle wie beim Veranstalter mit
 // Abzeichen, Teamfarben und hervorgehobenen Vereinsfahrern, ein Lauf ohne Zeiten ohne leere Spalten, fremde Namen nicht
@@ -85,7 +89,7 @@ test("zeigt das Hauptrennen wie beim Veranstalter - Kopf, Abzeichen, Teamfarbe, 
   renderAt("/references/series/probe-rennliga/2026/runde/1");
   expect(await screen.findByTestId("round-head")).toHaveTextContent("Aserbaidschan");
   expect(apiMock.get).toHaveBeenCalledWith("/reference-series/public/probe-rennliga/2026/rounds/1");
-  expect(screen.getByTestId("round-eyebrow")).toHaveTextContent("Runde 1 von 3 · Do., 08.10.2026");
+  expect(screen.getByTestId("round-eyebrow")).toHaveTextContent("Runde 1 von 3 · Do 8. Oktober");
   expect(screen.getByTestId("round-head")).toHaveTextContent("Baku City Circuit");
   expect(screen.getByTestId("round-next")).toHaveAttribute("href", "/references/series/probe-rennliga/2026/runde/2");
   expect(screen.getByTestId("round-prev")).toHaveAttribute("aria-disabled", "true");
@@ -182,7 +186,7 @@ test("eine Runde, die es nicht gibt, ist 404", async () => {
 test("ein Lauf ohne Ergebnis sagt, wann es kommt", async () => {
   const planned = { ...RACE, state: "planned", has_result: false, rows: [], columns: [], club_day: "2026-10-22", time: "20:30" };
   renderAt("/references/series/probe-rennliga/2026/runde/1", { ...PAGE, sessions: [QUALI, planned], summary: {} });
-  expect(await screen.findByTestId("round-empty")).toHaveTextContent("Noch kein Ergebnis – Rennen am Do., 22.10.2026, 20:30 Uhr.");
+  expect(await screen.findByTestId("round-empty")).toHaveTextContent("Noch kein Ergebnis – Rennen am Do 22. Oktober · 20:30.");
 });
 
 test("Original-Bilder des Laufs (#1933): „Original ansehen“ öffnet das Vollbild, je Reiter die eigenen", async () => {

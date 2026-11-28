@@ -2,7 +2,8 @@ import axios from "axios";
 import { emitApiInvalidation } from "./apiInvalidation";
 import { noteFresh, noteRequestFailed } from "./network";
 import { isWritePauseError, noteWritePause, retryAfterSeconds } from "./writePause";
-import { asInstant, viennaDate } from "@/lib/vienna";
+import { formatMonth, formatWhen } from "@/lib/datetime";
+import { asInstant } from "@/lib/vienna";
 import { CHANNEL_HEADER } from "./newsChannels";
 
 const configuredBackendUrl = (import.meta.env.VITE_BACKEND_URL || "").trim().replace(/\/+$/, "");
@@ -288,7 +289,7 @@ export function formatMemberSince(value, precision = "day") {
   if (Number.isNaN(date.getTime())) return String(value);
   if (precision === "year") return String(date.getFullYear());
   if (precision === "month") {
-    return viennaDate(date, { month: "long", year: "numeric" });
+    return formatMonth(date);
   }
-  return viennaDate(date, { dateStyle: "long" });
+  return formatWhen(date, { time: false });
 }

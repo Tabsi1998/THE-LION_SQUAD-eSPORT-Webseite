@@ -1,5 +1,9 @@
 import { fireEvent, render, screen, within } from "@testing-library/react";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
+import { runAtTestClock } from "@/testClock";
+
+// Feste Uhr (#1307): die Datums-Texte lassen das laufende Jahr weg und sagen „heute“/„morgen“.
+runAtTestClock();
 
 // Vereinsplatzierungen im Mitgliederprofil (#859, neu im Referenzen-Design #1944): Kopf nur mit Werten über null, der
 // Liga-Weg der Person, die Chronik je Jahr als aufklappbare Liste mit der Platzierung dieser Person. Nur erfundene Namen.
@@ -136,7 +140,7 @@ test("Chronik je Jahr: Zeile mit eigenem Platz, kurzem Titel (langer im Tooltip)
   expect(team).toHaveTextContent("Rocket League");
   expect(team).toHaveTextContent("LION B");
   expect(team).toHaveTextContent("von 12 Teams");
-  expect(team).toHaveTextContent("15.11.2025");
+  expect(team).toHaveTextContent("Sa 15. November 2025");
 
   const solo = screen.getByTestId("member-reference-row-r2");
   expect(within(solo).getByTestId("placement-badge")).toHaveAttribute("data-medal", "bronze");

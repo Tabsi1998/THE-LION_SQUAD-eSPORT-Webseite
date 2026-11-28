@@ -2,8 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { AlertTriangle, CheckCircle2, ChevronDown, ChevronRight, Download, EyeOff, Plus, Search, ShieldCheck, Upload } from "lucide-react";
 import { api } from "@/lib/api";
-import { fromDateTimeLocal, toDateTimeLocalInput } from "@/lib/datetime";
-import { viennaDateTime } from "@/lib/vienna";
+import { formatWhen, fromDateTimeLocal, toDateTimeLocalInput } from "@/lib/datetime";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { AdminSheet } from "@/components/tls/AdminSheet";
 import { FormGrid, FormSection } from "@/components/tls/AdminForm";
@@ -69,7 +68,7 @@ export function retiredState(doc, now = Date.now()) {
 function RetiredChip({ doc, testId }) {
   const state = retiredState(doc);
   if (!state.active && !state.upcoming) return null;
-  const label = state.active ? "nicht mehr erreichbar" : `erreichbar bis ${viennaDateTime(state.until, { day: "2-digit", month: "2-digit", year: "numeric" })}`;
+  const label = state.active ? "nicht mehr erreichbar" : `erreichbar bis ${formatWhen(state.until, { time: false })}`;
   const reasonId = doc?.retired_reason && testId ? `${testId}-reason` : undefined;
   return (
     <>

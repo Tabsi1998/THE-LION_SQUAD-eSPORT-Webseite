@@ -12,7 +12,7 @@ import { LeagueEmblem } from "@/components/tls/league/public/LeagueLook";
 import { accentStyle, bannerFocus } from "@/lib/leagueLook";
 import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 import { seasonPath } from "@/lib/leaguePage";
-import { viennaDate } from "@/lib/vienna";
+import { formatWhen } from "@/lib/datetime";
 import "@/components/tls/league/public/league.css";
 import { ShortCaps } from "@/components/tls/ShortCaps";
 
@@ -71,7 +71,7 @@ export default function LeagueIndexPage() {
                       <span className="relative min-w-0 flex-1">
                         <span className="block tls-type-card">{season.name}</span>
                         <span className="block tls-type-small text-white/55">
-                          {STATUS[season.status] || ""}{season.start_date ? ` · ab ${viennaDate(season.start_date, { day: "numeric", month: "numeric", year: "numeric" })}` : ""}
+                          {STATUS[season.status] || ""}{season.start_date ? ` · ab ${formatWhen(season.start_date, { time: false })}` : ""}
                         </span>
                       </span>
                       <ChevronRight className="tls-card__arrow relative h-4 w-4 shrink-0 text-white/35" aria-hidden="true" />

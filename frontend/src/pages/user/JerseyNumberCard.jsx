@@ -2,12 +2,12 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { Shirt, Check, X, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { api, formatApiError } from "@/lib/api";
-import { viennaDate } from "@/lib/vienna";
+import { formatWhen } from "@/lib/datetime";
 import { useConfirm } from "@/components/tls/ConfirmDialog";
 import { checkState, jerseyRequestLine, parseJerseyInput } from "@/lib/jerseyNumber";
 
 const CHECK_DELAY_MS = 350;
-const day = (iso) => (iso ? viennaDate(iso, { day: "2-digit", month: "2-digit", year: "numeric" }) : "");
+const day = (iso) => (iso ? formatWhen(iso, { time: false, relative: false }) : "");
 const TONE = {
   ok: "text-ok border-ok/40 bg-ok/10",
   bad: "text-warn border-warn/40 bg-warn/10",

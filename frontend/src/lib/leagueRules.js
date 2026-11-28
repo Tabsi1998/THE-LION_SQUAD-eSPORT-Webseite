@@ -1,10 +1,10 @@
 // Regelwerk der Liga (docs/LIGA.md, #1646): Adressen, Inhaltsverzeichnis, Suche in der Seite und Helfer der Pflege. Abschnitte, Anker und
 // Vergleich rechnet der Server - Web und PDF zeigen dieselben.
 import { renderMarkdownLite } from "@/lib/markdownLite";
-import { dayNoon, viennaDate } from "@/lib/vienna";
+import { formatWhen } from "@/lib/datetime";
+import { dayNoon } from "@/lib/vienna";
 import { mediaPropsFor } from "@/lib/mediaAccess";
 
-const LONG_DAY = { day: "2-digit", month: "2-digit", year: "numeric" };
 const SEARCH_MIN = 2;
 const HIT = "tls-rules-hit";
 const ACTIVE_HIT = "tls-rules-hit-active";
@@ -24,7 +24,7 @@ export function rulesPagePath(league, season) {
 }
 
 export function dayLabel(day) {
-  return day ? viennaDate(dayNoon(day), LONG_DAY) : "";
+  return day ? formatWhen(dayNoon(day), { time: false }) : "";
 }
 
 /** Das Inhaltsverzeichnis: Überschriften bis Ebene 2, Anlagen als eigener Block. */

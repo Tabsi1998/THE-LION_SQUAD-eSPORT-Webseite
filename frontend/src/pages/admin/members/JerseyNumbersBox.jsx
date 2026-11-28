@@ -2,14 +2,14 @@ import { useCallback, useEffect, useState } from "react";
 import { History, RefreshCw } from "lucide-react";
 import { toast } from "sonner";
 import { api, formatRequestError } from "@/lib/api";
-import { viennaDate } from "@/lib/vienna";
+import { formatWhen } from "@/lib/datetime";
 import { useConfirm } from "@/components/tls/ConfirmDialog";
 import { jerseyRequestLine, parseJerseyInput } from "@/lib/jerseyNumber";
 
 // Nummern der Mitglieder (#2034): vergebene Nummern mit Stand in Dolibarr, offene Anträge, Nummern nur in Dolibarr und
 // die Regeln (Bereich, reservierte Nummern, Feldname in Dolibarr). Nur für den Vorstand (Bereich „club“).
 
-const day = (iso) => (iso ? viennaDate(iso, { day: "2-digit", month: "2-digit", year: "numeric" }) : "");
+const day = (iso) => (iso ? formatWhen(iso, { time: false }) : "");
 // Offen - auch „in Entscheidung“: bricht eine Entscheidung ab, entscheidet der Vorstand einfach noch einmal.
 const OPEN_STATES = new Set(["received", "deciding"]);
 const SET_BY = { member: "selbst gewählt", board: "vom Vorstand", dolibarr: "aus Dolibarr" };

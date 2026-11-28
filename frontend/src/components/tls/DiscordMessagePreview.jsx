@@ -1,6 +1,7 @@
 import { Fragment } from "react";
 import { ExternalLink } from "lucide-react";
-import { asInstant, viennaDate, viennaDay, viennaTime } from "@/lib/vienna";
+import { formatClock, formatOfficialDate } from "@/lib/datetime";
+import { asInstant, viennaDay } from "@/lib/vienna";
 
 // Discord-Nachbildung (#583, #866): so sieht eine Nachricht des Bots ungefähr im Discord aus - Bot-Name mit
 // APP-Plakette, Text über dem Kasten, Kasten mit Farbleiste, Autorzeile mit Bild, Titel, Text, Felder, Bild rechts,
@@ -72,12 +73,15 @@ export function renderDiscordText(text, options = {}) {
   });
 }
 
-/** „Heute um 19:15 Uhr“ oder „03.10.2026 19:15“ - wie Discord die Zeit in der Fußzeile zeigt. */
+/**
+ * „Heute um 19:15 Uhr“ oder „03.10.2026 19:15“ - wie Discord selbst die Zeit in der Fußzeile zeigt. Die Vorschau ahmt
+ * Discord nach, darum hier bewusst Discords Form statt „Sa 3. Oktober · 19:15“ (#1307).
+ */
 export function discordTime(value, now = new Date()) {
   const date = asInstant(value);
   if (Number.isNaN(date.getTime())) return "";
-  const time = viennaTime(date, { hour: "2-digit", minute: "2-digit" });
-  return viennaDay(date) === viennaDay(now) ? `Heute um ${time} Uhr` : `${viennaDate(date, { day: "2-digit", month: "2-digit", year: "numeric" })} ${time}`;
+  const time = formatClock(date);
+  return viennaDay(date) === viennaDay(now) ? `Heute um ${time} Uhr` : `${formatOfficialDate(date)} ${time}`;
 }
 
 const ACTION_STYLES = { primary: "bg-[#5865F2]", success: "bg-[#248046]", danger: "bg-[#DA373C]", secondary: "bg-[#4E5058]" };

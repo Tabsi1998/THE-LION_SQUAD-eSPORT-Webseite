@@ -1,5 +1,9 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
+import { runAtTestClock } from "@/testClock";
+
+// Feste Uhr (#1307): die Datums-Texte lassen das laufende Jahr weg und sagen „heute“/„morgen“.
+runAtTestClock();
 
 // Eingang der Leitung (docs/LIGA.md, B.4, #2205): prüfen, annehmen, ablehnen mit Pflichtgrund, Warteliste, Zuteilung. Nur erfundene Namen.
 const apiMock = { get: vi.fn(), post: vi.fn(), put: vi.fn() };
@@ -231,7 +235,7 @@ test("eine automatisch angenommene Anmeldung geht nur mit Grund auf die Wartelis
   renderPanel();
 
   const row = await screen.findByTestId("application-a1");
-  expect(screen.getByTestId("application-auto-a1")).toHaveTextContent("Automatisch angenommen 02.11.2026");
+  expect(screen.getByTestId("application-auto-a1")).toHaveTextContent("Automatisch angenommen Mo 2. November · 19:00");
   expect(row).toHaveTextContent("Angenommen, automatisch");
   expect(screen.queryByTestId("application-waitlist-a1")).toBeNull();
   fireEvent.click(screen.getByTestId("application-waitlist-open-a1"));
@@ -291,7 +295,7 @@ test("übernommen aus der Vorgänger-Season (F.2, #1627): Herkunft, Frist und nu
     ...BODY.divisions, { id: "d2", label: "Liga 2", staffeln: [{ tournament_id: "t2", staffel: "A", participant_count: 0, max_participants: 8 }] }] } });
   renderPanel();
   const row = await screen.findByTestId("application-a2");
-  expect(screen.getByTestId("application-carry-a2")).toHaveTextContent("Übernommen aus Season 1: Liga 1 (Aufstieg aus Liga 2). Abmelden bis zum Start am 05.01.2027, 00:00 Uhr.");
+  expect(screen.getByTestId("application-carry-a2")).toHaveTextContent("Übernommen aus Season 1: Liga 1 (Aufstieg aus Liga 2). Abmelden bis zum Start am Di 5. Jänner 2027 · 00:00.");
   expect(row).toHaveTextContent("Zustimmung zum Regelwerk folgt vor dem ersten Spiel");
   const select = screen.getByTestId("application-staffel-a2");
   const labels = Array.from(select.querySelectorAll("option")).map((option) => option.textContent);

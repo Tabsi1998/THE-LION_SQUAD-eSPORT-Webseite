@@ -1,4 +1,4 @@
-import { viennaDateTime } from "@/lib/vienna";
+import { formatWhen } from "@/lib/datetime";
 
 // Spielplaner (#1552): der Text im Dialog „Spielplan übernehmen?“. Reine Funktionen, damit Einzahl, Wiener Zeit
 // und die Kürzung langer Listen geprüft sind, bevor der Dialog sie zeigt.
@@ -18,7 +18,7 @@ function shortLabel(value) {
 }
 
 function when(value) {
-  return viennaDateTime(value, { weekday: "short", day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" }) || "ohne Zeit";
+  return formatWhen(value) || "ohne Zeit";
 }
 
 function describeAssignment(item) {

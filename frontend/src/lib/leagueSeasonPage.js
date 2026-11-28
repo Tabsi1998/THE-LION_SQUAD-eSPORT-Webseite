@@ -4,7 +4,7 @@
 import { ruleHint } from "@/components/tls/league/leagueResultRules";
 import { defaultSlot, dayRange } from "@/lib/leaguePage";
 import { pointsSummary, tiebreakOrder } from "@/lib/leagueTable";
-import { viennaDate } from "@/lib/vienna";
+import { formatWhen } from "@/lib/datetime";
 
 /** Die Unterseiten einer Season in der Reihenfolge der Navigation. `key` ist der letzte Teil der Adresse. */
 export const SEASON_SECTIONS = [
@@ -105,7 +105,7 @@ export function weeksText(season) {
   return weeks ? `${weeks} ${weeks === 1 ? "Spielwoche" : "Spielwochen"}` : "";
 }
 
-const day = (value) => (value ? viennaDate(value, { day: "numeric", month: "numeric", year: "numeric" }) : "");
+const day = (value) => (value ? formatWhen(value, { time: false, relative: false }) : "");
 
 /**
  * Was vor der Einteilung als Nächstes passiert - für den freundlichen Platzhalter: Anmeldung (falls ein Fenster da ist),

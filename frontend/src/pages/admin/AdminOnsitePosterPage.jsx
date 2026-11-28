@@ -5,14 +5,13 @@ import { api, formatRequestError } from "@/lib/api";
 import { BrandedQRCode } from "@/components/tls/BrandedQRCode";
 import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 import { gameLabel } from "@/lib/gameLabels";
-import { viennaDateTime } from "@/lib/vienna";
+import { formatWhen } from "@/lib/datetime";
 import { windowText } from "@/pages/admin/tournament/OnsiteAccessPanel";
 
 // Aushang zum Vor-Ort-Zugang (#1592): ein A4-Blatt für Tisch oder Wand in der Halle - hell, damit der Drucker es gut
 // schafft, und aus zwei bis drei Metern lesbar: Turnier, Termin, Spiel, ein großer QR-Code und was danach passiert.
 // Der Code steht nur im QR-Code. Eigene Seite ohne Admin-Rahmen, damit der Druck nur das Blatt zeigt.
 
-const START = { weekday: "short", day: "numeric", month: "long", hour: "2-digit", minute: "2-digit" };
 
 export default function AdminOnsitePosterPage() {
   const { id } = useParams();
@@ -35,7 +34,7 @@ export default function AdminOnsitePosterPage() {
 
   const url = access?.path ? `${window.location.origin}${access.path}` : "";
   const meta = tournament
-    ? [tournament.start_date ? viennaDateTime(tournament.start_date, START) : null, tournament.game ? gameLabel(tournament.game) : null, tournament.location || null].filter(Boolean)
+    ? [tournament.start_date ? formatWhen(tournament.start_date, { relative: false }) : null, tournament.game ? gameLabel(tournament.game) : null, tournament.location || null].filter(Boolean)
     : [];
 
   return (

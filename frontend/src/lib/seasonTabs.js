@@ -4,7 +4,8 @@
 // seine Felder an PATCH /api/admin/leagues/seasons/{id}, der Server nimmt Teil-Anfragen an.
 import { seasonPayload } from "@/lib/league";
 import { effectiveCloses } from "@/lib/leagueApplications";
-import { dayNoon, viennaDate, viennaDateTime, viennaDay } from "@/lib/vienna";
+import { formatRange, formatWhen } from "@/lib/datetime";
+import { viennaDay } from "@/lib/vienna";
 import { staffelNeedsUrl } from "@/lib/staffelTabs";
 
 export const SEASON_TABS = [
@@ -174,8 +175,6 @@ export function rebaseForm(form, oldSaved, newSaved, reset = []) {
 
 const STARTED = new Set(["live", "paused", "completed", "results_published"]);
 const FINISHED = new Set(["completed", "results_published", "archived", "cancelled"]);
-const SHORT = { day: "2-digit", month: "2-digit" };
-const WITH_TIME = { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" };
 const at = (value) => (value ? new Date(value).getTime() : null);
 
 /**
@@ -234,14 +233,14 @@ export function seasonPhases({ season = {}, calendar = null, divisions = [], now
     const week = weeks.find((row) => row.start_day <= today && today <= row.end_day);
     if (week) weekNote = week.blocked ? `Spielpause (Woche ${week.number} gesperrt)` : `Spielwoche ${week.number} von ${weeks.length}`;
   }
-  const startText = start ? viennaDate(season.start_date, SHORT) : "";
+  const startText = start ? formatWhen(season.start_date, { time: false }) : "";
   const steps = [
-    { key: "vorbereitung", label: "Vorbereitung", when: hasWindow ? `bis ${viennaDate(season.application_opens_at, SHORT)}` : startText ? `bis ${startText}` : "",
+    { key: "vorbereitung", label: "Vorbereitung", when: hasWindow ? `bis ${formatWhen(season.application_opens_at, { time: false })}` : startText ? `bis ${startText}` : "",
       note: "Einstellungen, Regelwerk, Prüfung" },
-    { key: "anmeldung", label: "Anmeldung", when: hasWindow ? `${viennaDateTime(season.application_opens_at, WITH_TIME)} – ${viennaDateTime(endInstant(season), WITH_TIME)}` : "ohne Selbstanmeldung",
+    { key: "anmeldung", label: "Anmeldung", when: hasWindow ? `${formatWhen(season.application_opens_at)} – ${formatWhen(endInstant(season))}` : "ohne Selbstanmeldung",
       note: hasWindow ? "Co-Teams melden sich auf der Ligaseite an" : "Co-Teams teilst du in der Staffel zu" },
     { key: "einteilung", label: "Einteilung", when: startText ? `bis ${startText}` : "", note: "Staffeln anlegen, Co-Teams zuteilen, Staffel starten" },
-    { key: "spielbetrieb", label: "Spielbetrieb", when: startText ? `${startText}${lastDay ? ` – ${viennaDate(dayNoon(lastDay), SHORT)}` : ""}` : "",
+    { key: "spielbetrieb", label: "Spielbetrieb", when: startText ? (lastDay ? formatRange(season.start_date, lastDay) : startText) : "",
       note: weekNote || "Termine, Check-in je Spiel, Ergebnisse" },
     { key: "abschluss", label: "Abschluss", when: season.status === "archived" ? "archiviert" : season.status === "completed" ? "beendet" : "",
       note: "Endstand je Staffel im Reiter „Abschluss“ festhalten" },
@@ -283,7 +282,7 @@ export function staffelStand(staffel, { season = staffel?.league_season, now = n
   let label = waiting ? `${STAND_LABEL.einteilung} · Start fehlt` : STAND_LABEL[key];
   // Offen, aber nicht veröffentlicht: Teams sehen die Ligaseite nicht und können sich nicht anmelden.
   const hidden = key === "anmeldung" && !PUBLISHED_VISIBILITY.has(season.visibility);
-  if (key === "anmeldung") label = `${label} bis ${viennaDateTime(endInstant(season), WITH_TIME)}`;
+  if (key === "anmeldung") label = `${label} bis ${formatWhen(endInstant(season))}`;
   if (hidden) label = `${label} · Season verborgen`;
   if (key === "spielbetrieb" && status === "paused") label = `${label} · pausiert`;
   const note = hidden ? "Die Season ist nicht veröffentlicht – Teams sehen die Anmeldung nicht." : waiting ? STEP_NOTE_WAITING : step.note;

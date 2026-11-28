@@ -19,7 +19,7 @@ function matchList(keys) {
 
 function drawnAt(matches, group) {
   const match = (matches || []).find((row) => row?.settings?.draw_group === group && row?.draw?.drawn_at);
-  return match ? formatDateTime(match.draw.drawn_at) : "";
+  return match ? formatDateTime(match.draw.drawn_at, { relative: false }) : "";
 }
 
 /** Der Satz hinter dem Rundennamen - je Modus und Stand. */

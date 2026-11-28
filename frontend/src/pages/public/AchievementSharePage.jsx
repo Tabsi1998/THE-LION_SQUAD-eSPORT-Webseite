@@ -9,7 +9,7 @@ import { Badge } from "@/components/achievements/Badge";
 import { formatPercent } from "@/components/tls/AchievementGroups";
 import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 import { shareAchievement } from "@/lib/shareAchievement";
-import { viennaDate } from "@/lib/vienna";
+import { formatWhen } from "@/lib/datetime";
 
 import { ROLE_COLORS } from "@/lib/categoryColors";
 // Die Teilen-Seite eines Erfolgs (#619): /achievements/a/<award_id>. Zeigt die serverseitig gezeichnete
@@ -97,7 +97,7 @@ export default function AchievementSharePage() {
                     <span className="w-7 h-7 rounded-sm border border-white/15 bg-white/5 flex items-center justify-center font-bold text-white/60 tls-type-small">{person.trim().charAt(0).toUpperCase()}</span>
                   )}
                   <span className="font-semibold">{person}</span>
-                  {card.earned_at && <span className="text-quiet tls-type-small">{viennaDate(card.earned_at)}</span>}
+                  {card.earned_at && <span className="text-quiet tls-type-small">{formatWhen(card.earned_at, { time: false })}</span>}
                 </Link>
               </div>
               <div className="flex md:flex-col gap-2 shrink-0">

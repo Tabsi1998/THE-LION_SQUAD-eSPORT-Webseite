@@ -5,7 +5,7 @@ import { api, formatRequestError } from "@/lib/api";
 import { useModalBehavior } from "@/hooks/useModalBehavior";
 import { useSubmissionGuard } from "@/hooks/useSubmissionGuard";
 import { feedbackTagPrompt, parseFeedbackTarget, STAR_LABELS } from "@/lib/feedback";
-import { viennaDate } from "@/lib/vienna";
+import { formatWhen } from "@/lib/datetime";
 
 // Rückmeldung (#1196): „Wie war der FC 26 Cup?“ - ein bis fünf Sterne, auf Wunsch Stichworte und ein Satz. Das sieht
 // nur der Verein, ohne Namen. „Lieber nicht“ beendet die Frage für dieses Turnier bzw. Event.
@@ -66,7 +66,7 @@ export function FeedbackDialog({ target, onClose, onDone }) {
         className="w-full sm:max-w-md bg-[#121212] border border-white/10 rounded-t-md sm:rounded-sm shadow-2xl focus:outline-none max-h-[92vh] overflow-y-auto">
         <div className="flex items-start justify-between gap-3 p-5 border-b border-white/10">
           <div className="min-w-0">
-            {prompt ? <div className="tls-type-small text-white/45">{viennaDate(prompt.day, { weekday: "short", day: "2-digit", month: "2-digit" })}</div> : null}
+            {prompt ? <div className="tls-type-small text-white/45">{formatWhen(prompt.day, { time: false })}</div> : null}
             <h2 id="feedback-title" className="tls-type-section leading-tight">{prompt?.question || (missing ? "Schon erledigt" : "Kurz bewerten")}</h2>
             <p className="mt-1 tls-type-small text-white/55">Das sieht nur der Verein – ohne deinen Namen. Es hilft beim nächsten Mal.</p>
           </div>

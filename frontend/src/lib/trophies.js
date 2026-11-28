@@ -1,13 +1,14 @@
 // Reiter „Trophäen“ (#2425, Nr. 59) an Profil und Team: Turnier-Pokale und Liga-Belohnungen in einer Vitrine, mit Filtern nach Art,
 // Spiel, Season bzw. Jahr und Platz. Dazu die bis zu drei Embleme neben dem Namen (Nr. 34c). Reine Logik - Tests und App lesen dieselbe.
-import { asInstant, viennaDate } from "@/lib/vienna";
+import { formatWhen } from "@/lib/datetime";
+import { asInstant } from "@/lib/vienna";
 
 /** Nur der Tag im Vereins-Kalender – die Uhrzeit des Turnierstarts gehört nicht aufs Banner (auch ``AwardBanner``). */
 export function awardDay(value) {
   if (!value) return "";
   const date = asInstant(value);
   if (Number.isNaN(date.getTime())) return "";
-  return viennaDate(date, { day: "numeric", month: "numeric", year: "numeric", timeZone: "Europe/Vienna" });
+  return formatWhen(date, { time: false });
 }
 
 export const TROPHY_KINDS = [

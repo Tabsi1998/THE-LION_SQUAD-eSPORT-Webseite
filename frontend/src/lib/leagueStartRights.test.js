@@ -3,6 +3,10 @@ import { describe, expect, it } from "vitest";
 import {
   countsLine, declineText, openRightsQuestion, outlookLine, placeLine, rightLine, settingsForm, settingsPayload, stateLabel, teamBadge, teamBadgeTone,
 } from "./leagueStartRights";
+import { runAtTestClock } from "@/testClock";
+
+// Feste Uhr (#1307): die Datums-Texte lassen das laufende Jahr weg und sagen „heute“/„morgen“.
+runAtTestClock();
 
 const UNTIL = "2026-12-15T17:00:00+00:00";
 
@@ -33,12 +37,12 @@ describe("Das eigene Team", () => {
 
   it("sagt bei offener Zusage, bis wann und was sonst geschieht", () => {
     const line = rightLine({ ...carry, start_right: { state: "offered", accept_until: UNTIL } });
-    expect(line).toBe("Startrecht für Liga 1: bitte bis 15.12.2026, 18:00 Uhr zusagen. Ohne Zusage verfällt es.");
+    expect(line).toBe("Startrecht für Liga 1: bitte bis Di 15. Dezember · 18:00 zusagen. Ohne Zusage verfällt es.");
   });
 
   it("sagt dem Nachrücker, dass er ablehnen kann und wohin er zurückfällt - ohne den Namen des anderen Teams", () => {
     const line = rightLine({ ...carry, start_right: { state: "offered", accept_until: UNTIL, fills: { from_label: "Liga 2" } } });
-    expect(line).toBe("Nachgerückt: In Liga 1 ist ein Platz frei geworden. Bitte bis 15.12.2026, 18:00 Uhr zusagen oder ablehnen – ohne Antwort bleibt ihr in Liga 2.");
+    expect(line).toBe("Nachgerückt: In Liga 1 ist ein Platz frei geworden. Bitte bis Di 15. Dezember · 18:00 zusagen oder ablehnen – ohne Antwort bleibt ihr in Liga 2.");
     expect(rightLine({ ...carry, start_right: { state: "confirmed", fills: { from_label: "Liga 2" } } }))
       .toBe("Nachgerückt in Liga 1. Wer lieber in Liga 2 bleibt, lehnt bis zum Start ab.");
   });
@@ -46,12 +50,12 @@ describe("Das eigene Team", () => {
   it("sagt dem Nachrücker mit offener eigener Zusage, was Ablehnen und Schweigen bedeuten", () => {
     // Entscheidung 26.11.: Die eigene Frist ruht, Ablehnen gilt als Zusage für die eigene Liga, Schweigen lässt die Restfrist.
     const line = rightLine({ ...carry, start_right: { state: "offered", accept_until: UNTIL, fills: { from_label: "Liga 2", own_open: true, rest_days: 3 } } });
-    expect(line).toBe("Nachgerückt: In Liga 1 ist ein Platz frei geworden. Bitte bis 15.12.2026, 18:00 Uhr zusagen oder ablehnen. Eure Frist für Liga 2 ruht so lange. Ablehnen gilt als Zusage für Liga 2. Ohne Antwort bleibt ihr in Liga 2 und habt dort noch die restliche Frist, mindestens 3 Tage.");
+    expect(line).toBe("Nachgerückt: In Liga 1 ist ein Platz frei geworden. Bitte bis Di 15. Dezember · 18:00 zusagen oder ablehnen. Eure Frist für Liga 2 ruht so lange. Ablehnen gilt als Zusage für Liga 2. Ohne Antwort bleibt ihr in Liga 2 und habt dort noch die restliche Frist, mindestens 3 Tage.");
     expect(rightLine({ ...carry, start_right: { state: "offered", accept_until: UNTIL, fills: { from_label: "Liga 2", own_open: true, rest_days: 1 } } }))
       .toContain("mindestens 1 Tag.");
     // Hat das Team für die eigene Liga schon zugesagt, bleibt der kurze Satz.
     expect(rightLine({ ...carry, start_right: { state: "offered", accept_until: UNTIL, fills: { from_label: "Liga 2", own_open: false, rest_days: 3 } } }))
-      .toBe("Nachgerückt: In Liga 1 ist ein Platz frei geworden. Bitte bis 15.12.2026, 18:00 Uhr zusagen oder ablehnen – ohne Antwort bleibt ihr in Liga 2.");
+      .toBe("Nachgerückt: In Liga 1 ist ein Platz frei geworden. Bitte bis Di 15. Dezember · 18:00 zusagen oder ablehnen – ohne Antwort bleibt ihr in Liga 2.");
     expect(declineText({ ...carry, start_right: { state: "offered", fills: { from_label: "Liga 2", own_open: true } } }))
       .toBe("Ihr bleibt in Liga 2 – das gilt zugleich als eure Zusage für Liga 2. Der Platz in Liga 1 geht an das nächste Team, zurück geht das nicht.");
     expect(declineText({ ...carry, start_right: { state: "offered", fills: { from_label: "Liga 2", own_open: false } } }))

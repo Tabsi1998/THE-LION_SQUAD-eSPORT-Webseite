@@ -1,4 +1,5 @@
-import { asInstant, viennaDateTime, viennaDay } from "@/lib/vienna";
+import { formatWhen } from "@/lib/datetime";
+import { asInstant, viennaDay } from "@/lib/vienna";
 import { statusWord } from "@/lib/statusKinds";
 // Was das Dashboard aus den eigenen Terminen macht (#256) - dieselben Regeln
 // wie die App-Startseite (mobile/src/lib/dashboard.ts) und das Backend
@@ -93,9 +94,7 @@ export function formatVienna(value, { withTime = true } = {}) {
   if (!value) return "";
   const date = asInstant(value);
   if (Number.isNaN(date.getTime())) return "";
-  const options = { weekday: "short", day: "2-digit", month: "2-digit", timeZone: VIENNA };
-  if (withTime) Object.assign(options, { hour: "2-digit", minute: "2-digit" });
-  return viennaDateTime(date, options);
+  return formatWhen(date, { time: withTime });
 }
 
 // Eine Zeile zur Jahreswertung: die eigene Platzierung, sonst die Spitze.

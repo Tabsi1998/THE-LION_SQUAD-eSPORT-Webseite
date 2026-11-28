@@ -2,6 +2,10 @@ import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router-dom";
 import { csvFilename } from "@/lib/billing";
+import { runAtTestClock } from "@/testClock";
+
+// Feste Uhr (#1307): die Datums-Texte lassen das laufende Jahr weg und sagen „heute“/„morgen“.
+runAtTestClock();
 
 // Finanzübersicht (#322, #370, #321): offene Aufträge zeigen den Rechnungstext und nehmen einen
 // Zusatz an; angelegte Belege zeigen den Zahlungsstand; Prüffälle werden mit Grund erledigt;
@@ -161,7 +165,7 @@ test("Prüffälle: Umschalter zeigt die erledigten mit Grund, wer und wann (#213
   await user.click(screen.getByTestId("finance-cases-resolved"));
   const row = await screen.findByTestId("finance-resolved-c9");
   expect(row).toHaveTextContent("von Kim Kassa: 20 € überwiesen");
-  expect(row).toHaveTextContent("24.09.");
+  expect(row).toHaveTextContent("Do 24. September · 12:00");
   expect(screen.queryByTestId("finance-case-c1")).toBeNull();
 });
 
@@ -178,7 +182,7 @@ test("der Verlauf zeigt Wiener Uhr, ein reiner Tag bleibt ohne Uhrzeit, der Anme
   expect(detail).toHaveTextContent("Anmeldung storniert");
   const times = within(detail).getAllByTestId("finance-timeline-at").map((node) => node.textContent);
   expect(times[0]).toMatch(/12:00/);   // 10:00 UTC im September
-  expect(times[1]).toMatch(/23\.0?9\.2026/);
+  expect(times[1]).toBe("Mi 23. September");
   expect(times[1]).not.toMatch(/:/);
 });
 

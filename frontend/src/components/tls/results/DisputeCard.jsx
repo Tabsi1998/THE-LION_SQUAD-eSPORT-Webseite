@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { AlertTriangle, Clock, FileArchive, Gavel, MessageSquareText, Scale, UserCheck } from "lucide-react";
 import { chatAttachmentSrc } from "@/lib/chatAttachments";
-import { viennaDateTime } from "@/lib/vienna";
+import { formatClock, formatWhen } from "@/lib/datetime";
 import { api, formatApiError } from "@/lib/api";
 import { AGAINST_LABELS, MOSS_STATE_LABELS, PROCEDURE_STATE_LABELS, claimedText, deadlineTone, decisionText, remainingText } from "@/lib/leagueProcedures";
 import { ProofList, proofAudienceText, proofHintText } from "@/components/tls/results/ProofList";
@@ -13,7 +13,7 @@ import { ProofList, proofAudienceText, proofHintText } from "@/components/tls/re
 function clock(value) {
   if (!value) return "";
   try {
-    return viennaDateTime(value, { hour: "2-digit", minute: "2-digit" });
+    return formatClock(value);
   } catch {
     return "";
   }
@@ -96,7 +96,8 @@ const SMALL_BUTTON = "tls-btn tls-btn--secondary min-h-[44px] px-3 py-2 rounded-
 function when(value) {
   if (!value) return "";
   try {
-    return viennaDateTime(value, { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" });
+    // Steht hinter „am“ („Entschieden am …“) - darum ohne „heute“ (#1307).
+  return formatWhen(value, { relative: false });
   } catch {
     return "";
   }

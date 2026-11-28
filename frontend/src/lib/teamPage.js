@@ -1,4 +1,4 @@
-import { viennaDateTime } from "@/lib/vienna";
+import { formatWhen } from "@/lib/datetime";
 
 // Team-Seite (#1191): reine Helfer für Termine, letzte Spiele und den Einladungs-Link - ohne React, mit Tests.
 
@@ -29,11 +29,11 @@ export function recentLine(row) {
   return [row.score, against].filter(Boolean).join(" ");
 }
 
-/** Unter dem Titel eines kommenden Turniers: „Herbst-LAN · Sa., 17.10. · 16:00“. */
+/** Unter dem Titel eines kommenden Turniers: „Herbst-LAN · Sa 17. Oktober · 16:00“. */
 export function upcomingLine(row) {
   const t = row?.tournament || {};
-  const when = t.start_date ? viennaDateTime(t.start_date, { weekday: "short", day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" }) : "";
-  return [t.event_name, when ? when.replace(", ", " · ") : "", !t.event_name ? t.game_name : ""].filter(Boolean).join(" · ");
+  const when = t.start_date ? formatWhen(t.start_date) : "";
+  return [t.event_name, when, !t.event_name ? t.game_name : ""].filter(Boolean).join(" · ");
 }
 
 /** Der Schlüssel aus der Adresse - oder leer. */

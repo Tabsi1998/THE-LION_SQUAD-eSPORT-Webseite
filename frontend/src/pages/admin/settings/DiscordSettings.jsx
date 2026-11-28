@@ -16,7 +16,7 @@ import { DiscordSamplesPanel } from "./DiscordSamplesPanel";
 import { DiscordStatsPanel } from "./DiscordStatsPanel";
 import { DiscordTargets } from "./DiscordTargets";
 import { DiscordWelcomePanel } from "./DiscordWelcomePanel";
-import { viennaDateTime } from "@/lib/vienna";
+import { formatWhen } from "@/lib/datetime";
 
 // Discord: Meldungen über den Bot (Kanal je Zweck, Schalter je Ereignis), Bot und Aktivitätszähler.
 // Seit #566 gibt es keine Webhook-Adressen mehr - der Bot schickt alles; ist er aus, wird nichts
@@ -152,7 +152,7 @@ export function DiscordSettings({ initialTab = "messages" }) {
         {discord.last_status && (
           <div className={`border rounded-sm p-3 tls-type-small ${discord.last_status === "sent" ? "border-ok/25 bg-ok/5 text-white/60" : "border-warn/25 bg-warn/5 text-white/60"}`} data-testid="discord-last-status">
             <div className="font-bold uppercase tracking-widest mb-1">Letzte Meldung: {discord.last_status}</div>
-            <div>{discord.last_checked_at ? viennaDateTime(discord.last_checked_at) : ""}{discord.last_event_key ? ` - ${discord.last_event_key}` : ""}</div>
+            <div>{discord.last_checked_at ? formatWhen(discord.last_checked_at) : ""}{discord.last_event_key ? ` - ${discord.last_event_key}` : ""}</div>
             {discord.last_error && <div className="mt-1 text-warn break-words">{discord.last_error}</div>}
           </div>
         )}

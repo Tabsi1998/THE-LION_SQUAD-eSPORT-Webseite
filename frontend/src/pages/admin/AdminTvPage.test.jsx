@@ -1,5 +1,9 @@
 import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { runAtTestClock } from "@/testClock";
+
+// Feste Uhr (#1307): die Datums-Texte lassen das laufende Jahr weg und sagen „heute“/„morgen“.
+runAtTestClock();
 
 // TV & Beamer (#1110): Grundwerte speichern nur, was sich geändert hat; der Baukasten baut Links mit den gewählten
 // Abweichungen, beim Turnierbaum mit Anzeige-Schlüssel; Schlüssel lassen sich widerrufen. Meilenstein 59: „Ton beim
@@ -159,7 +163,7 @@ test("Schlüssel-Liste: wie lange er gilt - eine Woche nach dem Turnier, sonst b
     { ...keys[0], id: "k3", label: "Foyer", expires_at: null, expired: false },
   ];
   render(<AdminTvPage />);
-  expect(await screen.findByTestId("tv-key-until-k1")).toHaveTextContent("gilt bis 17.10.26");
+  expect(await screen.findByTestId("tv-key-until-k1")).toHaveTextContent("gilt bis Sa 17. Oktober");
   expect(screen.getByTestId("tv-key-until-k2")).toHaveTextContent("abgelaufen");
   expect(screen.getByTestId("tv-key-until-k3")).toHaveTextContent("gilt bis zum Widerruf");
 });

@@ -1,35 +1,33 @@
 // Öffentliche Ligaseite (docs/LIGA.md, P5, #1625): reine Helfer für Kopf, Spielwochen und Ergebnisse - ohne React,
 // mit Tests. Alle Tage über die Wien-Helfer (lib/vienna.js).
-import { dayNoon, viennaDate, viennaDateTime } from "@/lib/vienna";
+import { formatRange, formatWhen } from "@/lib/datetime";
+import { dayNoon, viennaDay } from "@/lib/vienna";
 
 const WEEKDAY_SHORT = ["Mo", "Di", "Mi", "Do", "Fr", "Sa", "So"];
 const WEEKDAY_LONG = ["Montag", "Dienstag", "Mittwoch", "Donnerstag", "Freitag", "Samstag", "Sonntag"];
 
-/** Ein Kalendertag kurz: „21.12.“. */
+/** Ein Kalendertag kurz: „Mo 21. Dezember“ (#1307). */
 export function shortDay(day) {
-  return day ? viennaDate(dayNoon(day), { day: "numeric", month: "numeric" }) : "";
+  return day ? formatWhen(String(day).slice(0, 10), { time: false }) : "";
 }
 
-/** Zwei Kalendertage als Spanne: „21.12.–3.1.“. */
+/** Zwei Kalendertage als Spanne: „Mo 21. Dezember – So 3. Jänner 2027“ (#1307). */
 export function dayRange(first, last) {
   if (!first) return "";
-  return first === last || !last ? shortDay(first) : `${shortDay(first)}–${shortDay(last)}`;
+  return formatRange(String(first).slice(0, 10), last ? String(last).slice(0, 10) : null);
 }
 
-/** Zeitraum der Season: „10.11.2026 – 18.1.2027“. */
+/** Zeitraum der Season: „Di 10. November – Mo 18. Jänner 2027“ (#1307). */
 export function seasonPeriod(season) {
-  const options = { day: "numeric", month: "numeric", year: "numeric" };
-  const start = season?.start_date ? viennaDate(season.start_date, options) : "";
-  const end = season?.end_date ? viennaDate(season.end_date, options) : "";
-  return [start, end].filter(Boolean).join(" – ");
+  if (!season?.start_date) return season?.end_date ? formatWhen(season.end_date, { time: false }) : "";
+  return formatRange(season.start_date, season.end_date || null);
 }
 
 /** Wochentag (0 = Montag) des Starts in Wien. */
 function startWeekday(season) {
   if (!season?.start_date) return null;
-  const name = viennaDate(season.start_date, { weekday: "short" }) || "";
-  const index = WEEKDAY_SHORT.findIndex((short) => name.toLowerCase().startsWith(short.toLowerCase()));
-  return index >= 0 ? index : null;
+  const day = viennaDay(season.start_date);
+  return day ? (dayNoon(day).getUTCDay() + 6) % 7 : null;
 }
 
 /** Wie eine Spielwoche läuft: „Spielwoche Di–Mo“ (7 Tage) bzw. „Spielwoche 3 Tage“. */
@@ -66,11 +64,10 @@ export function weekHeading(week) {
   return `Woche ${week.week} · ${dayRange(week.first_day, week.last_day)}`;
 }
 
-/** Wann ein Spiel ist: „So 10.1. · 20:00“, „Standard“ wenn noch niemand einen Termin vereinbart hat. */
+/** Wann ein Spiel ist: „So 10. Jänner · 20:00“, „heute 20:00“ - ohne Termin „Termin offen“. */
 export function matchWhen(match) {
   if (!match?.scheduled_at) return "Termin offen";
-  const text = viennaDateTime(match.scheduled_at, { weekday: "short", day: "numeric", month: "numeric", hour: "2-digit", minute: "2-digit" }) || "";
-  return text.replace(", ", " · ").replace(/\.,/, ".");
+  return formatWhen(match.scheduled_at, { fallback: "Termin offen" });
 }
 
 export const SOURCE_LABELS = { accepted: "vereinbart", home: "Heimteam", default: "Standardtermin", manual: "Turnierleitung" };

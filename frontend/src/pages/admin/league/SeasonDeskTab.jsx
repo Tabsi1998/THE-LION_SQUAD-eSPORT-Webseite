@@ -17,14 +17,13 @@ import { api, formatApiError } from "@/lib/api";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { CountUp, Glow, StaggerIn } from "@/components/tls/motion";
 import { DESK_FILTERS, deskResponsible, deskWhen, filterGroups, scopeOptions, staffelGroups } from "@/lib/leagueDesk";
-import { viennaDateTime } from "@/lib/vienna";
+import { formatWhen } from "@/lib/datetime";
 import { incidentReviewText, rulesPendingText } from "@/pages/admin/duty/DutyAttention";
 import { SeasonBroadcastSheet } from "./SeasonBroadcastSheet";
 import { GuestBadge } from "@/components/tls/league/GuestBadge";
 
 // Stand einer Rundnachricht im Protokoll (M-1): „hängt“ heißt, im Dialog der Rundnachricht lässt sie sich fortsetzen.
 const BROADCAST_STATE = { sent: "verschickt", sending: "wird verschickt", interrupted: "Versand hängt", failed: "abgebrochen" };
-const WHEN = { day: "2-digit", month: "2-digit", year: "2-digit", hour: "2-digit", minute: "2-digit" };
 // Gruppen, deren Aufgaben nie zu einer Staffel gehören - mit Staffel-Filter blendet der Leitstand sie ganz aus.
 const SEASON_GROUPS = new Set(["applications", "rules"]);
 const ACTION = "tls-btn tls-btn--secondary inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-sm px-4 py-2 tls-type-label sm:w-auto";
@@ -140,7 +139,7 @@ export function SeasonLog({ seasonId, staffelId = "", version = 0, title = "Prot
         <ol className="divide-y divide-white/5 rounded-sm border border-white/10 bg-[#121212]" data-testid="desk-log-list">
           {state.items.map((row) => (
             <li key={row.id} className="flex flex-col gap-0.5 px-4 py-2.5 tls-type-small sm:flex-row sm:items-baseline sm:gap-4" data-testid={`desk-log-${row.id}`}>
-              <span className="shrink-0 tls-type-small tabular-nums text-white/60 sm:w-32">{row.at ? viennaDateTime(row.at, WHEN) : ""}</span>
+              <span className="shrink-0 tls-type-small tabular-nums text-white/60 sm:w-32">{row.at ? formatWhen(row.at) : ""}</span>
               <span className="min-w-0 flex-1 [overflow-wrap:anywhere]">
                 <span className="font-semibold text-white">{row.label}</span>
                 {row.broadcast ? (

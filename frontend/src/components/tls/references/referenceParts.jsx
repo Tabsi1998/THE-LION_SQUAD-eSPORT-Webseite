@@ -3,7 +3,8 @@ import { ExternalLink, Trophy, User, Users } from "lucide-react";
 import { resolveMediaUrl } from "@/lib/api";
 import { gameLabel } from "@/lib/gameLabels";
 import { gameCode } from "@/components/tls/GamesShelf";
-import { asInstant, viennaDate } from "@/lib/vienna";
+import { formatWhen } from "@/lib/datetime";
+import { asInstant } from "@/lib/vienna";
 
 // Bausteine der Referenzen (#409, #859): Platz-Abzeichen, Spiel-Zeichen, Einträge mit Aufstellung, Titel und Datum -
 // gemeinsam für die Referenzen-Seiten. Die Vereinsplatzierungen im Mitgliederprofil (#1944) zeigen dieselbe Chronik
@@ -21,7 +22,7 @@ export function formatDate(value) {
   if (!value) return "";
   const date = asInstant(value);
   if (Number.isNaN(date.getTime())) return "";
-  return viennaDate(date, { dateStyle: "medium" });
+  return formatWhen(date, { time: false });
 }
 
 export function referenceGameName(item) {

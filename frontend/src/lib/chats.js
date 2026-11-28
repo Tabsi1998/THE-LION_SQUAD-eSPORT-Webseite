@@ -1,5 +1,6 @@
 import { api } from "@/lib/api";
-import { asInstant, dayBefore, viennaDate, viennaDay, viennaTime } from "@/lib/vienna";
+import { formatClock, formatWhen } from "@/lib/datetime";
+import { asInstant, dayBefore, viennaDay } from "@/lib/vienna";
 
 // Alle Chats an einem Ort (#1148): Direktnachrichten, Team-, Turnier- und Match-Chats aus `/api/chats`, das Neueste oben,
 // mit der Zahl der Ungelesenen. Der Server merkt sich je Unterhaltung „gelesen bis“; Web und App setzen die Marke beim
@@ -58,9 +59,9 @@ export function chatTime(value, now = new Date()) {
   const date = asInstant(value);
   if (Number.isNaN(date.getTime())) return "";
   const today = viennaDay(now);
-  if (viennaDay(date) === today) return viennaTime(date, { hour: "2-digit", minute: "2-digit" });
+  if (viennaDay(date) === today) return formatClock(date);
   if (viennaDay(date) === dayBefore(today)) return "gestern";
-  return viennaDate(date, { day: "2-digit", month: "2-digit" });
+  return formatWhen(date, { time: false });
 }
 
 /** Die Vorschauzeile eines Eintrags: Art, bei Gruppen der Name, dann der Text. */

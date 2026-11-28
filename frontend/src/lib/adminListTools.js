@@ -1,4 +1,5 @@
-import { asInstant, viennaDate } from "@/lib/vienna";
+import { formatWhen } from "@/lib/datetime";
+import { asInstant } from "@/lib/vienna";
 export function normalizeSearch(value) {
   return String(value || "")
     .toLowerCase()
@@ -31,5 +32,5 @@ export function formatAdminDate(value) {
   if (!value) return "";
   const date = asInstant(value);
   if (Number.isNaN(date.getTime())) return "";
-  return viennaDate(date);
+  return formatWhen(date, { time: false });
 }

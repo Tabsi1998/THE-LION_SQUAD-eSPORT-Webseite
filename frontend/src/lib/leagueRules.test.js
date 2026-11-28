@@ -2,6 +2,10 @@ import {
   addAnnex, annexLabel, changeRows, clearHits, dayLabel, findRanges, insertBlock, moveAnnex, paintHits, removeAnnex, renderRulesMarkdown,
   renderRulesSection, rulesApiPath, rulesMediaProps, rulesPagePath, tocOf,
 } from "./leagueRules";
+import { runAtTestClock } from "@/testClock";
+
+// Feste Uhr (#1307): die Datums-Texte lassen das laufende Jahr weg und sagen „heute“/„morgen“.
+runAtTestClock();
 
 const SECTIONS = [
   { anchor: "einleitung", title: null, level: 0, kind: "main", body_md: "Vorwort" },
@@ -25,7 +29,7 @@ test("Inhaltsverzeichnis: Überschriften bis Ebene 2, Anlagen getrennt, kein Ein
 });
 
 test("Tag in Wiener Schreibweise, Unbekanntes bleibt leer", () => {
-  expect(dayLabel("2030-03-05")).toBe("05.03.2030");
+  expect(dayLabel("2030-03-05")).toBe("Di 5. März 2030");
   expect(dayLabel(null)).toBe("");
 });
 

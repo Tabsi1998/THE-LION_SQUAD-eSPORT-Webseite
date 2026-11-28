@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
 import { countOf, describeSchedulePlan } from "./schedulePlanText";
+import { runAtTestClock } from "@/testClock";
+
+// Feste Uhr (#1307): die Datums-Texte lassen das laufende Jahr weg und sagen „heute“/„morgen“.
+runAtTestClock();
 
 // Spielplaner (#1552): der Text im Dialog „Spielplan übernehmen?“ - Zahlen mit richtiger Einzahl, Wiener Zeit,
 // lange Listen gekürzt, Konflikte vor Hinweisen.
@@ -26,8 +30,8 @@ describe("describeSchedulePlan", () => {
     ];
     const text = describeSchedulePlan(plan, changed, warnings);
     expect(text).toContain("2 Spiele bekommen Zeit und Station, 1 Konflikt, 1 Hinweis.");
-    expect(text).toContain("A1: Sa., 31.10., 11:00 · Station 1");
-    expect(text).toContain("F: Sa., 31.10., 11:35 · Station 1 (voraussichtlich)");
+    expect(text).toContain("A1: Sa 31. Oktober · 11:00 · Station 1");
+    expect(text).toContain("F: Sa 31. Oktober · 11:35 · Station 1 (voraussichtlich)");
     expect(text).toContain("Konflikt: B1 ist fest um 10:00 UTC");
     expect(text).toContain("Hinweis: Keine freie Station.");
     expect(text.indexOf("Konflikt:")).toBeLessThan(text.indexOf("Hinweis:"));
@@ -45,11 +49,11 @@ describe("describeSchedulePlan", () => {
   it("sagt „ohne Station“, wenn der Plan nur Zeiten schreibt (Spielwochen)", () => {
     const text = describeSchedulePlan({ mode: "matchdays" }, [assignment({ station_name: null, schedule_source: "default" })], []);
     expect(text).toContain("1 Spiel bekommt Zeit, 0 Konflikte, 0 Hinweise.");
-    expect(text).toContain("A1: Sa., 31.10., 11:00 · ohne Station");
+    expect(text).toContain("A1: Sa 31. Oktober · 11:00 · ohne Station");
   });
 
   it("ein Spiel, das auf die Auslosung wartet (#1590), sagt das statt „voraussichtlich“", () => {
     const text = describeSchedulePlan({ mode: "stations" }, [assignment({ forecast: true, waiting_for_draw: true })], []);
-    expect(text).toContain("A1: Sa., 31.10., 11:00 · Station 1 (wartet auf Auslosung)");
+    expect(text).toContain("A1: Sa 31. Oktober · 11:00 · Station 1 (wartet auf Auslosung)");
   });
 });

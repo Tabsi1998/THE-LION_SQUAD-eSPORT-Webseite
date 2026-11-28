@@ -4,7 +4,8 @@ import { animate } from "framer-motion";
 import { Link, useInRouterContext } from "react-router-dom";
 import { resolveMediaUrl } from "@/lib/api";
 import { formatMatchStatus, stationText } from "@/lib/tournamentLabels";
-import { asInstant, viennaDateTime } from "@/lib/vienna";
+import { formatWhen } from "@/lib/datetime";
+import { asInstant } from "@/lib/vienna";
 import { initials } from "@/lib/slotSource";
 import { InlineMatchClock } from "@/components/tls/live/MatchClock";
 import { MOTION, motionAllowed } from "@/lib/motion";
@@ -42,7 +43,7 @@ export function formatNodeDateTime(value) {
   if (!value) return "";
   const date = asInstant(value);
   if (Number.isNaN(date.getTime())) return "";
-  return viennaDateTime(date, { dateStyle: "short", timeStyle: "short" });
+  return formatWhen(date);
 }
 
 /** Die Station im Klartext (#1941): „Station 5 · Switch 2“ wie überall - nie das Gerätekürzel, nie eine Kennung. */

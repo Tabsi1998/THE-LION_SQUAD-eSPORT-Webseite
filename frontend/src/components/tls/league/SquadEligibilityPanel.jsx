@@ -4,7 +4,7 @@ import { toast } from "sonner";
 import { api, formatApiError } from "@/lib/api";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { ELIGIBILITY_LABELS, TRANSFER_LABELS, ageLabel, rulesLines } from "@/lib/leagueEligibility";
-import { viennaDateTime } from "@/lib/vienna";
+import { formatWhen } from "@/lib/datetime";
 import { LeagueRulesNote, rulesConsentState } from "./LeagueRulesNote";
 
 // Spielberechtigung im Co-Team (#2204): was die Season verlangt, wer spielen darf und wer nicht, und der Weg zum Transfer. Für Teamleitung,
@@ -12,7 +12,7 @@ import { LeagueRulesNote, rulesConsentState } from "./LeagueRulesNote";
 
 function untilText(value) {
   try {
-    return value ? viennaDateTime(value, { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" }) : "";
+    return value ? formatWhen(value) : "";
   } catch {
     return "";
   }

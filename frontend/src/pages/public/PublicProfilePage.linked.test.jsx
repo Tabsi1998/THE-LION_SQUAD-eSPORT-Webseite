@@ -1,5 +1,9 @@
 import { render, screen } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
+import { runAtTestClock } from "@/testClock";
+
+// Feste Uhr (#1307): die Datums-Texte lassen das laufende Jahr weg und sagen „heute“/„morgen“.
+runAtTestClock();
 
 // Konten einmal sauber (#527): ein Kasten, zwei Gruppen (Socials, Spielkonten), jedes Konto genau einmal.
 // Ein bestätigtes Konto ersetzt den getippten Namen derselben Plattform; Haken, Farbe und Link je Zeile.
@@ -28,13 +32,13 @@ test("accountGroups: verknüpft schlägt getippt, Socials und Spielkonten getren
   const groups = accountGroups(PROFILE);
   // Mastodon ist seit Welle 3 (#547) eine bekannte Plattform; Einträge außerhalb der Profilfelder gibt es nicht mehr (#2113).
   expect(groups.socials.map((e) => e.key)).toEqual(["discord", "youtube", "mastodon", "website"]);
-  expect(groups.socials[0]).toMatchObject({ title: "Paula B.", detail: "Discord · paula · seit 22.09.2026", verified: true, url: "https://discord.com/users/123" });
+  expect(groups.socials[0]).toMatchObject({ title: "Paula B.", detail: "Discord · paula · seit Di 22. September", verified: true, url: "https://discord.com/users/123" });
   expect(groups.socials[1]).toMatchObject({ title: "paula", detail: "YouTube", verified: false, url: "https://www.youtube.com/@paula" });
   expect(groups.socials[2]).toMatchObject({ label: "Mastodon", url: "https://mastodon.example/@paula" });
   expect(groups.socials[3]).toMatchObject({ title: "paula.example", url: "https://paula.example/" });
   expect(accountGroups({ socials: [{ platform: "kick", value: "alt" }] }).socials).toEqual([]);
   expect(groups.games.map((e) => e.key)).toEqual(["steam", "psn", "nintendo"]);
-  expect(groups.games[0]).toMatchObject({ title: "Steam-Profil", detail: "Steam · 76561198000000001 · seit 23.09.2026", verified: true });
+  expect(groups.games[0]).toMatchObject({ title: "Steam-Profil", detail: "Steam · 76561198000000001 · seit Mi 23. September", verified: true });
   // #891: getippt, aber verlinkt; Nintendo hat keine Profilseite im Netz und bleibt zum Kopieren.
   expect(groups.games[1]).toMatchObject({ title: "paula_psn", label: "PlayStation", url: "https://profile.playstation.com/paula_psn", verified: false });
   expect(groups.games[2]).toMatchObject({ key: "nintendo", url: "", verified: false });
@@ -51,7 +55,7 @@ test("Konten-Kasten: eine Zeile je Konto mit Farbe, Haken, Link oder Kopieren", 
   const discord = screen.getByTestId("profile-account-discord");
   expect(discord).toHaveAttribute("href", "https://discord.com/users/123");
   expect(discord).toHaveTextContent("Paula B.");
-  expect(discord).toHaveTextContent("Discord · paula · seit 22.09.2026");
+  expect(discord).toHaveTextContent("Discord · paula · seit Di 22. September");
   expect(discord.style.getPropertyValue("--social-color")).toBe("#5865F2");
   expect(screen.getByTestId("profile-account-discord-verified")).toBeInTheDocument();
   expect(box).not.toHaveTextContent("paula#0001"); // der getippte Discord-Name weicht dem bestätigten Konto

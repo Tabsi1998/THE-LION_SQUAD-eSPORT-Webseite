@@ -10,7 +10,7 @@ import { Link } from "react-router-dom";
 import { ArrowDown, ArrowUp, Map as MapIcon, Trash2 } from "lucide-react";
 import { LazyImg } from "@/components/tls/LazyImg";
 import { ModeIcon } from "@/components/tls/ModeIcon";
-import { viennaDate } from "@/lib/vienna";
+import { formatWhen } from "@/lib/datetime";
 import { modeStatusOf, selectableModes } from "@/lib/gameMatchData";
 import { gamePageUrl } from "@/lib/gameForm";
 import {
@@ -205,7 +205,7 @@ export function MapPoolEditor({ title, hint = "", game, library = [], entry = nu
 
   let status = "Noch kein Pool";
   if (entry) {
-    status = `Version ${entry.version}${entry.saved_at ? ` · gespeichert am ${viennaDate(entry.saved_at, { day: "2-digit", month: "2-digit", year: "numeric" })}` : ""}`;
+    status = `Version ${entry.version}${entry.saved_at ? ` · gespeichert am ${formatWhen(entry.saved_at, { time: false, relative: false })}` : ""}`;
   }
 
   return (

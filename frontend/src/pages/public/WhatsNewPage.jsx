@@ -4,7 +4,8 @@ import { ArrowRight } from "lucide-react";
 import { PublicLayout } from "@/components/tls/PublicLayout";
 import { Breadcrumbs } from "@/components/tls/Breadcrumbs";
 import { useDocumentTitle } from "@/hooks/useDocumentTitle";
-import { dayNoon, viennaDate } from "@/lib/vienna";
+import { formatWhen } from "@/lib/datetime";
+import { dayNoon } from "@/lib/vienna";
 import { markWhatsNewSeen, whatsNewItems } from "@/lib/whatsNew";
 import whatsNew from "@/whatsnew.json";
 import { ShortCaps } from "@/components/tls/ShortCaps";
@@ -32,7 +33,7 @@ export default function WhatsNewPage({ data = whatsNew }) {
             {items.map((item, index) => (
               <li key={`${item.date}-${index}`} data-testid={`whatsnew-item-${index}`} className="grid gap-1 sm:grid-cols-[9rem_minmax(0,1fr)] sm:gap-6 py-4 border-b border-white/10">
                 <time dateTime={item.date} className="tls-type-label text-white/45 tabular-nums sm:pt-0.5">
-                  {viennaDate(dayNoon(item.date), { day: "2-digit", month: "2-digit", year: "numeric" })}
+                  {formatWhen(dayNoon(item.date), { time: false })}
                 </time>
                 <p className="text-white/85 leading-relaxed">
                   {item.text}

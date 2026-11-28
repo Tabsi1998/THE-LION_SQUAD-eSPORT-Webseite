@@ -1,6 +1,10 @@
 import { fireEvent, render, screen, within } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { EmblemRow, TrophyCabinet } from "./TrophyCabinet";
+import { runAtTestClock } from "@/testClock";
+
+// Feste Uhr (#1307): die Datums-Texte lassen das laufende Jahr weg und sagen „heute“/„morgen“.
+runAtTestClock();
 
 // Reiter „Trophäen“ (#2425): Karten mit Bild, Name, Wettbewerb, Platz, Datum und Link, Filter, leerer Zustand, Embleme (höchstens drei).
 // Erfundene Daten - auch die schlimmsten Fälle: ein Name ohne Leerzeichen, ein Zeichen, Emoji.
@@ -31,7 +35,7 @@ test("Karten: Bild, Name, Wettbewerb, Platz, Datum und Link - Pokal und Belohnun
   expect(cup).toHaveTextContent("Frühjahrs-Cup");
   expect(cup).toHaveTextContent("Rennspiel · 12 Teilnehmer");
   expect(cup).toHaveTextContent("2. Platz");
-  expect(cup).toHaveTextContent("3.5.2025");
+  expect(cup).toHaveTextContent("Sa 3. Mai 2025");
   expect(within(cup).getByRole("link")).toHaveAttribute("href", "/tournaments/fruehjahrs-cup");
   expect(within(cup).getByTestId("trophy-art-cup")).toHaveAttribute("data-medal", "silver");
   expect(screen.getByTestId("trophy-name-gold")).toHaveTextContent(LONG);

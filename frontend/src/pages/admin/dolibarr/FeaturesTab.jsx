@@ -5,7 +5,7 @@ import { toast } from "sonner";
 import { api } from "@/lib/api";
 import { useDolibarrSource } from "@/components/tls/DolibarrSourceBlock";
 import { Empty, Panel } from "./parts";
-import { viennaDateTime } from "@/lib/vienna";
+import { formatWhen } from "@/lib/datetime";
 
 // Reiter Funktionen (#510): jede „aus Dolibarr“-Funktion als Zeile mit echtem Schalter, Zustand, Voraussetzung und
 // der Auswahl, die dazugehört. Die Werte liegen weiter dort, wo sie immer lagen (Branding, Sponsorenquelle,
@@ -13,8 +13,8 @@ import { viennaDateTime } from "@/lib/vienna";
 
 const FIELD_COLUMNS = [["gamertag", "Gamertag"], ["bio", "Kurztext"], ["games", "Spiele"], ["platforms", "Plattformen"]];
 
-const germanDay = (day) => (day ? day.split("-").reverse().join(".") : "");
-const shortMoment = (iso) => (iso ? viennaDateTime(iso, { dateStyle: "short", timeStyle: "short" }) : "");
+const germanDay = (day) => (day ? formatWhen(String(day).slice(0, 10), { time: false }) : "");
+const shortMoment = (iso) => (iso ? formatWhen(iso) : "");
 
 // Teilnahmen in die Mitgliederakte (#847): letzter Abgleich, laufender Nachzug, Abgelehntes mit Grund, Knopf für zwölf Monate.
 function ParticipationsDetails({ info, busy, onBackfill }) {
@@ -152,7 +152,7 @@ export function FeaturesTab({ status, busy, run, consentTexts = [], consentError
                   </div>
                   {feature.enabled && (
                     <div className="flex flex-wrap items-center gap-3 tls-type-small" data-testid="dolibarr-source-state">
-                      {source.fetched_at ? <span className="text-white/60">Stand {viennaDateTime(source.fetched_at, { dateStyle: "short", timeStyle: "short" })}: <span className="text-white">{source.counts?.sponsors ?? 0} Sponsoren, {source.counts?.partners ?? 0} Partner</span></span>
+                      {source.fetched_at ? <span className="text-white/60">Stand {formatWhen(source.fetched_at)}: <span className="text-white">{source.counts?.sponsors ?? 0} Sponsoren, {source.counts?.partners ?? 0} Partner</span></span>
                         : <span className="text-warn">Noch nichts aus Dolibarr gelesen.</span>}
                       {source.error && <span className="text-warn">Letzter Abgleich fehlgeschlagen ({source.error_text || source.error}) – alter Stand bleibt.</span>}
                       <button type="button" onClick={refreshSponsors} disabled={!!busy} data-testid="dolibarr-source-refresh" className="px-3 py-1 border border-white/20 text-white/80 rounded-sm tls-type-label inline-flex items-center gap-1 disabled:opacity-40">

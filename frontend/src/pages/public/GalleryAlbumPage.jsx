@@ -25,7 +25,7 @@ import {
   providerLabel,
 } from "@/lib/galleryMedia";
 import { ArrowLeft, X, ChevronLeft, ChevronRight, Calendar, Play, Film, ExternalLink, Layers, Download } from "lucide-react";
-import { viennaDate } from "@/lib/vienna";
+import { formatWhen } from "@/lib/datetime";
 import { ShareButton } from "@/components/tls/ShareButton";
 import { PhotoSubmitPanel } from "@/components/tls/PhotoSubmitPanel";
 import { photoCredit } from "@/lib/photoSubmission";
@@ -164,7 +164,7 @@ export default function GalleryAlbumPage() {
         </div>
         <h1 className="mt-6 tls-type-title">{a.title}</h1>
         <div className="mt-3 flex flex-wrap items-center gap-4 tls-type-small text-white/60">
-          {a.taken_at && <span className="inline-flex items-center gap-1.5"><Calendar className="w-3.5 h-3.5" /> {viennaDate(a.taken_at, { dateStyle: "long" })}</span>}
+          {a.taken_at && <span className="inline-flex items-center gap-1.5"><Calendar className="w-3.5 h-3.5" /> {formatWhen(a.taken_at, { time: false })}</span>}
           {/* Fotos gehören zum Event (#1185): das Album nennt sein Event und führt zurück. */}
           {a.event && <Link to={`/events/${a.event.slug || a.event.id}`} className="text-[#9F7AEA] hover:underline" data-testid="album-event-link">Vom Event: {a.event.name} →</Link>}
           {items.length > 0 && <span>{items.length} Medien</span>}

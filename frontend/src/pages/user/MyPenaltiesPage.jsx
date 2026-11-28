@@ -10,7 +10,7 @@ import { LoadState } from "@/components/tls/LoadState";
 import { useLoad } from "@/hooks/useLoad";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { AlertTriangle, Clock, Flag, MessageCircleQuestion, ShieldAlert, ArrowRight } from "lucide-react";
-import { viennaDateTime } from "@/lib/vienna";
+import { formatWhen } from "@/lib/datetime";
 import { showLapTime } from "@/lib/laptime";
 import { LeagueSanctionCard } from "./LeagueSanctionCard";
 
@@ -69,9 +69,7 @@ export default function MyPenaltiesPage() {
 function PenaltyCard({ p }) {
   const meta = KIND_META[p.kind] || KIND_META.incident;
   const Icon = meta.icon;
-  const date = p.issued_at ? viennaDateTime(p.issued_at, {
-    dateStyle: "medium", timeStyle: "short",
-  }) : "—";
+  const date = p.issued_at ? formatWhen(p.issued_at) : "—";
   return (
     <div
       data-testid={`penalty-card-${p.ref_id}`}

@@ -2,7 +2,7 @@
 // Der Server liefert je Eintrag `badge: {level, nickname, champion}` (services/league_current.badge). Die Stufe zeigt sich über die
 // Form: Liga 1 mit Krone und zartem Glanz, Liga 2 mit doppeltem Rand, ab Liga 3 schlicht. Cyan ist die Markenfarbe, Gold gibt es nur
 // für den Season-Meister.
-import { viennaDateTime } from "@/lib/vienna";
+import { formatWhen } from "@/lib/datetime";
 import { EXIT_TEXTS, exitText } from "@/lib/leagueTable";
 
 /** "top" (Liga 1), "mid" (Liga 2), "base" (ab Liga 3) - ohne gültige Liga N `null`. */
@@ -40,7 +40,7 @@ export function currentPlace(row) {
 export function nextMatchText(match) {
   if (!match) return "";
   const when = match.scheduled_at
-    ? viennaDateTime(match.scheduled_at, { weekday: "short", day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" })
+    ? formatWhen(match.scheduled_at)
     : match.matchday ? `Spieltag ${match.matchday}` : "";
   return [match.opponent ? `gegen ${match.opponent}` : "", when].filter(Boolean).join(" · ");
 }

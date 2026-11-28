@@ -1,4 +1,8 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { runAtTestClock } from "@/testClock";
+
+// Feste Uhr (#1307): die Datums-Texte lassen das laufende Jahr weg und sagen „heute“/„morgen“.
+runAtTestClock();
 
 // Nachmeldungen (docs/LIGA.md, B.4, #2422): Vorschau mit Vorschlag, was entfällt, und Anlegen per Bestätigung. Nur erfundene Namen.
 const apiMock = { get: vi.fn(), post: vi.fn() };
@@ -48,7 +52,7 @@ test("die Vorschau zeigt den Vorschlag und was entfällt, die Bestätigung schic
 
   expect(await screen.findByTestId("late-entry-pairings")).toHaveTextContent("Woche 3Rudel Neu · Eins gegen Rudel Zwei");
   expect(screen.getByTestId("late-entry-pairing-3")).toHaveTextContent("Freilos des Gegners – Rudel Zwei hat in dieser Woche spielfrei.");
-  expect(screen.getByTestId("late-entry-pairing-3")).toHaveTextContent("29.11., 20:00 Uhr");
+  expect(screen.getByTestId("late-entry-pairing-3")).toHaveTextContent("morgen 20:00");
   expect(screen.getByTestId("late-entry-pairing-4")).toHaveTextContent("Termin festlegen");
   expect(screen.getByTestId("late-entry-missing")).toHaveTextContent("Gegen Rudel Eins kein Spiel mehr möglich.");
   expect(screen.getByTestId("late-entry-intro")).toHaveTextContent("Nachgemeldet ab Woche 3.");

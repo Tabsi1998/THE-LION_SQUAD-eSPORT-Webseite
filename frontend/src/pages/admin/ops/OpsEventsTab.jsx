@@ -5,7 +5,8 @@ import { toast } from "sonner";
 import { api, formatApiError } from "@/lib/api";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { useConfirm } from "@/components/tls/ConfirmDialog";
-import { asInstant, viennaDateTime } from "@/lib/vienna";
+import { formatWhen } from "@/lib/datetime";
+import { asInstant } from "@/lib/vienna";
 
 // Ereignisse (#517 Teil 2): alle Quellen in einer Liste - Serverfehler, Auto-Checks, Alarme, App-Logs,
 // E-Mail-Versand, Mail-Queue, Adminaktionen, Uploads, Dolibarr-Abgleich, Discord-Bot. Gefiltert wird
@@ -22,7 +23,7 @@ export function formatEventTime(value) {
   if (!value) return "-";
   const date = asInstant(value);
   if (Number.isNaN(date.getTime())) return String(value);
-  return viennaDateTime(date);
+  return formatWhen(date);
 }
 
 function severityClass(severity) {

@@ -4,11 +4,11 @@
 // wenn sie es für Spieler wirklich ist (Status „Anmeldung offen“, eingeschaltet, im Zeitraum), der Check-in nach Status
 // oder Zeitraum. Die Uhr läuft mit -
 // der TV wechselt von selbst, auch ohne neue Daten.
-import { getRegistrationState } from "@/lib/datetime";
+import { formatClock, formatWhen, getRegistrationState } from "@/lib/datetime";
 import { formatBracketSection, matchRoundLabel } from "@/lib/tournamentLabels";
 import { isMatchDone } from "@/lib/slotSource";
 import { isLiveMatch, matchName, stationName } from "@/lib/tvLive";
-import { asInstant, viennaDate, viennaDay, viennaTime } from "@/lib/vienna";
+import { asInstant } from "@/lib/vienna";
 
 const TERMINAL = new Set(["completed", "results_published", "archived", "cancelled"]);
 
@@ -61,7 +61,7 @@ export function tvScreenFor(tournament, { now = Date.now(), seats = null, regist
 }
 
 function clock(value) {
-  return viennaTime(value, { hour: "2-digit", minute: "2-digit" });
+  return formatClock(value);
 }
 
 /** „Winner Bracket, Runde 2 · Durchgang E an PC 3“ - was nach der Pause als Erstes dran ist. */
@@ -118,12 +118,11 @@ export function checkInView(tournament, registrations = []) {
   };
 }
 
-/** „Samstag, 18. Oktober · 14:00“ - am selben Tag „Heute · 14:00“. */
+/** „Sa 18. Oktober · 14:00“ - am selben Tag „heute 14:00“, am nächsten „morgen 14:00“ (#1307). */
 export function dayAndTime(value, now = Date.now()) {
   const time = timeOf(value);
   if (time === null) return "";
-  if (viennaDay(time) === viennaDay(now)) return `Heute · ${clock(time)}`;
-  return `${viennaDate(time, { weekday: "long", day: "numeric", month: "long" })} · ${clock(time)}`;
+  return formatWhen(time, { now: new Date(now) });
 }
 
 /** Die Anmeldung: freie Plätze („Noch 6 von 16 Plätzen frei“), Beginn, bis wann. */
@@ -142,6 +141,6 @@ export function registrationView(tournament, seats = null, registrations = [], n
     free,
     seatsText,
     startText: dayAndTime(tournament?.start_date, now),
-    untilText: until === null ? "" : `Anmeldung bis ${dayAndTime(until, now).replace(/^Heute · /, "")}`,
+    untilText: until === null ? "" : `Anmeldung bis ${dayAndTime(until, now)}`,
   };
 }

@@ -1,5 +1,9 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
+import { runAtTestClock } from "@/testClock";
+
+// Feste Uhr (#1307): die Datums-Texte lassen das laufende Jahr weg und sagen „heute“/„morgen“.
+runAtTestClock();
 
 // Über uns pflegen (#406): die Texte kommen ins Formular, Speichern schickt Texte, Listen (eine je
 // Zeile) und die Vereins-Rückfallfelder; kommen die Vereinsdaten aus Dolibarr, sind Gründung und
@@ -109,7 +113,7 @@ test("Gründungsdatum (#644): leer löscht, ein Tag geht mit, das Jahr folgt dar
   expect(formToPayload(form).founded_on).toBe("");
   expect(formToPayload({ ...form, founded_on: "2019-03-01" }).founded_on).toBe("2019-03-01");
   expect(formToPayload({ ...form, founded_on: "1.3.2019" }).founded_on).toBe("");
-  expect(foundedLabel("2019-03-01")).toBe("1. März 2019");
+  expect(foundedLabel("2019-03-01")).toBe("Fr 1. März 2019");
   expect(foundedLabel("")).toBe("");
 
   mockApi({ source: "manual" }, { ...TEXTS, founded_on: "2019-03-01" });

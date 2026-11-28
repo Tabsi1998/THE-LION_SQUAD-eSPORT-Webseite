@@ -5,7 +5,8 @@
 // Das Bild der Karte liegt zusätzlich im Cache des Service Workers - die installierte Website zeigt es ohne Netz auf der
 // Seite „Keine Verbindung“ (public/service-worker.js).
 
-import { asInstant, viennaDateTime } from "@/lib/vienna";
+import { formatWhen } from "@/lib/datetime";
+import { asInstant } from "@/lib/vienna";
 
 export const STORAGE_KEY = "tls-member-card-v1";
 export const CARD_CACHE = "tls-member-card";
@@ -105,7 +106,7 @@ export function cardChanged(previous, card) {
 export function standLine(snapshot) {
   if (!snapshot?.saved_at || Number.isNaN(asInstant(snapshot.saved_at).getTime())) return "";
   // Wiener Uhr über die gemeinsame Hilfe (vienna.test.js wacht darüber).
-  return `Stand: ${viennaDateTime(snapshot.saved_at, { day: "numeric", month: "numeric", year: "numeric", hour: "2-digit", minute: "2-digit" })}`;
+  return `Stand: ${formatWhen(snapshot.saved_at)}`;
 }
 
 /** Als Bild speichern: am Handy das Teilen-Menü (Fotos), sonst ein Download. */

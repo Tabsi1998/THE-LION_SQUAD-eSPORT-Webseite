@@ -16,6 +16,10 @@ import {
   yearOf,
 } from "./referencesOverview";
 import { RACING_PROFILE, SERIES_PROFILE } from "./seriesKinds.fixture";
+import { runAtTestClock } from "@/testClock";
+
+// Feste Uhr (#1307): die Datums-Texte lassen das laufende Jahr weg und sagen „heute“/„morgen“.
+runAtTestClock();
 
 // Referenzen-Übersicht (#1878): Gruppierung, Filter und die Auswahl der Hauptkarte. Nur erfundene Namen.
 
@@ -311,16 +315,16 @@ test("Läuft gerade: Fortschritt, Termin und Platz in der Sprache der Art", () =
   expect(nextTitle("series", { state: "postponed" })).toBe("Nächstes Turnier");
   expect(nextTitle("series", null)).toBe("Nächster Termin");
   expect(nextValue({ state: "today", code: "R7", time: "20:30", club_day: "2026-11-09" })).toBe("R7 · 20:30");
-  expect(nextValue({ state: "planned", code: "ST4", time: "20:00", club_day: "2026-10-22" })).toBe("Do 22.10. · 20:00 · ST4");
-  expect(nextValue({ state: "planned", title: "Finale", time: null, club_day: "2026-10-24" })).toBe("Sa 24.10. · Finale");
+  expect(nextValue({ state: "planned", code: "ST4", time: "20:00", club_day: "2026-10-22" })).toBe("Do 22. Oktober · 20:00 · ST4");
+  expect(nextValue({ state: "planned", title: "Finale", time: null, club_day: "2026-10-24" })).toBe("Sa 24. Oktober · Finale");
   // #2024: „Noch kein Termin“ - „Termin offen“ heißt ein Termin ohne Datum.
   expect(nextValue(null)).toBe("Noch kein Termin");
   // Runde mit Läufen (#1930): der nächste Lauf.
   expect(nextValue({ state: "today", code: "R3", session: "Qualifying", time: "20:00", club_day: "2026-11-09" })).toBe("R3 · Qualifying · 20:00");
   // Team-Liga (#1931): der Gegner mit Seite, ein Spieltag mit Zeitraum ohne Uhrzeit.
-  expect(nextValue({ state: "planned", code: "ST4", time: "20:00", club_day: "2026-10-22", opponent: "Probe Falken", at_home: true })).toBe("Do 22.10. · 20:00 · ST4 · vs Probe Falken");
+  expect(nextValue({ state: "planned", code: "ST4", time: "20:00", club_day: "2026-10-22", opponent: "Probe Falken", at_home: true })).toBe("Do 22. Oktober · 20:00 · ST4 · vs Probe Falken");
   expect(nextValue({ state: "today", code: "ST4", time: "20:00", club_day: "2026-10-22", opponent: "Probe Falken", at_home: false })).toBe("ST4 · 20:00 · @ Probe Falken");
-  expect(nextValue({ state: "planned", code: "ST5", time: "20:00", club_day: "2026-10-26", club_day_end: "2026-10-30", opponent: "Probe Adler" })).toBe("Mo 26.10.–Fr 30.10. · ST5 · gegen Probe Adler");
+  expect(nextValue({ state: "planned", code: "ST5", time: "20:00", club_day: "2026-10-26", club_day_end: "2026-10-30", opponent: "Probe Adler" })).toBe("Mo 26. – Fr 30. Oktober · ST5 · gegen Probe Adler");
   expect(placeTitle("racing")).toBe("Bester Fahrer");
   expect(placeTitle("team_league")).toBe("Tabelle");
   expect(placeTitle("series")).toBe("Gesamtwertung");

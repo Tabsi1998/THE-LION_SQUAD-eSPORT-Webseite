@@ -5,7 +5,7 @@ import { toast } from "sonner";
 import { Link, useNavigate } from "react-router-dom";
 import { Download, AlertTriangle, ShieldOff, Users } from "lucide-react";
 import { usePrompt } from "@/components/tls/ConfirmDialog";
-import { viennaDate } from "@/lib/vienna";
+import { formatWhen } from "@/lib/datetime";
 import { useLoad } from "@/hooks/useLoad";
 import { roleLabel } from "@/lib/permissions";
 
@@ -181,7 +181,7 @@ export function KontoAngaben() {
         <dt className="text-white/45">Benutzername</dt><dd className="tls-wrap">{user?.username}</dd>
         <dt className="text-white/45">E-Mail</dt><dd className="tls-wrap">{user?.email}</dd>
         <dt className="text-white/45">Rolle</dt><dd className="text-[#29B6E8]" data-testid="privacy-account-role">{roleLabel(user?.role || "player")}</dd>
-        <dt className="text-white/45">Registriert</dt><dd>{user?.created_at && viennaDate(user.created_at)}</dd>
+        <dt className="text-white/45">Registriert</dt><dd>{user?.created_at && formatWhen(user.created_at, { time: false })}</dd>
       </dl>
     </div>
   );

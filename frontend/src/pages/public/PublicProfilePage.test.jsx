@@ -1,5 +1,9 @@
 import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
+import { runAtTestClock } from "@/testClock";
+
+// Feste Uhr (#1307): die Datums-Texte lassen das laufende Jahr weg und sagen „heute“/„morgen“.
+runAtTestClock();
 
 // Profilseite (Umbau 24.09.): Banner mit Avatar, Pillen und verknüpften Konten im Kopf, fünf Reiter,
 // Podestplätze als Highlights, eine Konten-Karte; der Twitch-Player steht nur bei laufendem Stream.
@@ -300,7 +304,7 @@ test("Ehrungen: Reiter nur mit freigegebenen Ehrungen (#1268) - ohne Mitgliedsch
   const tab = await screen.findByTestId("profile-tab-honours");
   expect(tab).toHaveTextContent("Ehrungen (1)");
   fireEvent.click(tab);
-  expect(screen.getByTestId("public-profile-honours")).toHaveTextContent("EhrenmitgliedschaftEhrenmitgliedAufbau der JugendarbeitVerliehen am 01.05.2026");
+  expect(screen.getByTestId("public-profile-honours")).toHaveTextContent("EhrenmitgliedschaftEhrenmitgliedAufbau der JugendarbeitVerliehen am Fr 1. Mai");
   expect(screen.getByTestId("public-profile-honours")).not.toHaveTextContent("Darf aufs Profil");
 });
 

@@ -13,7 +13,7 @@ import { AREA_HINTS, AREA_LABELS, GRANTABLE_AREAS, ROLE_AREAS, roleLabel } from 
 import { USERNAME_RULE_HINT, usernameProblem } from "@/lib/username";
 import { listLimitHint } from "@/lib/membershipMail";
 import { banState, effectiveAreas, invitationText, rightsChange, rightsHistoryLine } from "@/lib/userRights";
-import { viennaDate } from "@/lib/vienna";
+import { formatWhen } from "@/lib/datetime";
 import { AlertTriangle, ChevronDown, Pencil, Plus, X } from "lucide-react";
 import { ShortCaps } from "@/components/tls/ShortCaps";
 
@@ -34,7 +34,7 @@ const BAN_REASON_MIN = 5;
 
 function day(value) {
   try {
-    return viennaDate(value);
+    return formatWhen(value, { time: false, relative: false });
   } catch {
     return "";
   }

@@ -16,6 +16,10 @@ import {
   waitingLine,
   windowLine,
 } from "./leagueApplications";
+import { runAtTestClock } from "@/testClock";
+
+// Feste Uhr (#1307): die Datums-Texte lassen das laufende Jahr weg und sagen „heute“/„morgen“.
+runAtTestClock();
 
 // Selbstanmeldung (docs/LIGA.md, B.4, #2205): Texte aus der Antwort des Servers, Formular der Season. Wiener Zeit, unabhängig vom Rechner.
 
@@ -23,7 +27,7 @@ describe("Fenster und Plätze", () => {
   const block = { opens_at: "2026-11-01T17:00:00+00:00", closes_at: "2026-11-20T19:00:00+00:00" };
 
   test("Nachmeldung (Nr. 180): endet die Anmeldung nach dem Season-Start, sagt es ein Satz - sonst nichts", () => {
-    expect(afterStartLine(block.closes_at, "2026-11-17T00:00:00")).toBe("Anmeldung läuft nach Season-Start weiter (bis 20.11.2026, 20:00 Uhr).");
+    expect(afterStartLine(block.closes_at, "2026-11-17T00:00:00")).toBe("Anmeldung läuft nach Season-Start weiter (bis Fr 20. November · 20:00).");
     expect(afterStartLine(block.closes_at, "2026-11-24T00:00:00")).toBe("");
     expect(afterStartLine(block.closes_at, "2026-11-20T20:00:00")).toBe("");
     expect(afterStartLine(null, "2026-11-17T00:00:00")).toBe("");
@@ -31,9 +35,9 @@ describe("Fenster und Plätze", () => {
   });
 
   test("das Fenster nennt die Wiener Uhrzeit je Stand", () => {
-    expect(windowLine({ ...block, state: "open" })).toBe("Offen bis 20.11.2026, 20:00 Uhr");
-    expect(windowLine({ ...block, state: "upcoming" })).toBe("Öffnet am 01.11.2026, 18:00 Uhr");
-    expect(windowLine({ ...block, state: "closed" })).toBe("Vorbei seit 20.11.2026, 20:00 Uhr");
+    expect(windowLine({ ...block, state: "open" })).toBe("Offen bis Fr 20. November · 20:00");
+    expect(windowLine({ ...block, state: "upcoming" })).toBe("Öffnet am So 1. November · 18:00");
+    expect(windowLine({ ...block, state: "closed" })).toBe("Vorbei seit Fr 20. November · 20:00");
   });
 
   test("freie Plätze, volle Plätze mit und ohne Warteliste, keine Grenze", () => {
@@ -149,7 +153,7 @@ describe("Nachmeldefrist (#2422, Nr. 184)", () => {
     expect(effectiveCloses("2026-11-25T00:00:00+00:00", start, "", "2026-12-10T00:00:00+00:00").toISOString()).toBe("2026-11-25T00:00:00.000Z");
   });
   test("der Hinweis nur, wenn die Frist früher schließt", () => {
-    expect(lateCapLine("2026-12-31T00:00:00+00:00", start, "", null)).toBe("Die Anmeldung schließt am 15.11.2026, 01:00 Uhr, auch wenn das Fenster länger eingestellt ist.");
+    expect(lateCapLine("2026-12-31T00:00:00+00:00", start, "", null)).toBe("Die Anmeldung schließt am So 15. November · 01:00, auch wenn das Fenster länger eingestellt ist.");
     expect(lateCapLine("2026-11-05T00:00:00+00:00", start, "", null)).toBe("");
   });
   test("das Formular trägt die Frist, leer heißt null", () => {

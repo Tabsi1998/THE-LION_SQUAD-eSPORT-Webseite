@@ -3,7 +3,7 @@ import { Bell, ChevronDown, Mail, MessageSquare, Smartphone } from "lucide-react
 import { toast } from "sonner";
 import { api, formatRequestError } from "@/lib/api";
 import { useConfirm } from "@/components/tls/ConfirmDialog";
-import { viennaDateTime } from "@/lib/vienna";
+import { formatWhen } from "@/lib/datetime";
 
 // Verteilen (#1359): im News- und Event-Editor steht, was mit dem Beitrag hinausgeht - der Newsletter mit der Zahl der
 // Empfänger und „Jetzt senden“ bzw. „gesendet am … an …“, die Meldung an Mitglieder oder Vorstand und die Discord-Vorschau
@@ -38,7 +38,7 @@ export function appPushLine({ appOnly = false, visibility = "", appPush = null, 
   if (!appOnly || !APP_PUSH_VISIBILITIES.has(visibility || "")) return "";
   if (appPush?.skipped === "channel_changed") return "Kein App-Push – der Beitrag war schon öffentlich, als er auf „Nur App“ gestellt wurde.";
   if (appPush?.skipped === "too_old") return "Kein App-Push – der Beitrag war beim Veröffentlichen schon älter als 24 Stunden.";
-  if (appPush?.sent_at) return `App-Push gesendet am ${viennaDateTime(appPush.sent_at)} an ${people(appPush.count)}.`;
+  if (appPush?.sent_at) return `App-Push gesendet am ${formatWhen(appPush.sent_at, { relative: false })} an ${people(appPush.count)}.`;
   if (alreadyPublic && wasMembersOnly) return "Kein App-Push – der Beitrag ist schon veröffentlicht. Wird er jetzt auf „Nur App“ gestellt, geht beim Speichern kein Push hinaus.";
   if (alreadyPublic) return "Kein App-Push – der Beitrag ist schon öffentlich. Wird er auf „Nur App“ gestellt, geht beim Speichern kein Push hinaus.";
   const line = "Beim Veröffentlichen geht ein App-Push an alle App-Nutzer mit Zustimmung für „News & Events“.";
@@ -47,7 +47,7 @@ export function appPushLine({ appOnly = false, visibility = "", appPush = null, 
 
 export function newsletterLine(box) {
   if (!box) return "";
-  if (box.state === "sent") return `Gesendet am ${viennaDateTime(box.sent_at)} an ${people(box.sent_count)}.`;
+  if (box.state === "sent") return `Gesendet am ${formatWhen(box.sent_at, { relative: false })} an ${people(box.sent_count)}.`;
   if (box.state === "internal") return "Kein Newsletter – „Nur intern“ geht nicht per Mail hinaus.";
   if (box.state === "draft") return `Geht beim Veröffentlichen von selbst an ${people(box.recipients)} mit Newsletter-Zustimmung.`;
   return `Noch nicht verschickt – geht an ${people(box.recipients)} mit Newsletter-Zustimmung.`;
@@ -202,7 +202,7 @@ export function DistributeBox({ kind, itemId, title = "", visibility = "", appOn
               <Bell className="w-4 h-4 mt-0.5 text-white/50 shrink-0" />
               <div className="min-w-0 flex-1">
                 <div className="tls-type-label text-white/70">Meldung</div>
-                <p className="mt-1 tls-type-small text-white/65">{box.announcement}{box.announced_at && box.announced_count ? ` Gemeldet am ${viennaDateTime(box.announced_at)} an ${people(box.announced_count)}.` : ""}</p>
+                <p className="mt-1 tls-type-small text-white/65">{box.announcement}{box.announced_at && box.announced_count ? ` Gemeldet am ${formatWhen(box.announced_at, { relative: false })} an ${people(box.announced_count)}.` : ""}</p>
               </div>
             </div>
           )}

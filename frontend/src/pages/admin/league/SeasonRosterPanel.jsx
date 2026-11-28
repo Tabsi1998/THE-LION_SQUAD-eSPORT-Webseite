@@ -7,7 +7,7 @@ import { TextField } from "@/components/tls/FormFields";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { ID_STATE_LABELS } from "@/lib/leagueIds";
 import { ELIGIBILITY_LABELS, TRANSFER_LABELS, ageLabel, hasSeasonRules, rulesLines } from "@/lib/leagueEligibility";
-import { viennaDateTime } from "@/lib/vienna";
+import { formatWhen } from "@/lib/datetime";
 import { SquadKaderSheet } from "./SquadKaderSheet";
 
 // Kader und Spiel-IDs einer Season (docs/LIGA.md, #2108): je Co-Team die Spieler mit der ID, die in der Season gilt.
@@ -26,7 +26,7 @@ const STATE_CLASS = {
 
 function when(value) {
   try {
-    return value ? viennaDateTime(value, { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" }) : "";
+    return value ? formatWhen(value) : "";
   } catch {
     return "";
   }

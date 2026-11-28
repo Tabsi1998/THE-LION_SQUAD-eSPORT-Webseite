@@ -6,7 +6,7 @@ import { ArrowRight } from "lucide-react";
 import { FormGrid, FormSection } from "@/components/tls/AdminForm";
 import { StatusBadge } from "@/components/tls/StatusBadge";
 import { staffelNeeds, staffelStand } from "@/lib/seasonTabs";
-import { viennaDateTime } from "@/lib/vienna";
+import { formatWhen } from "@/lib/datetime";
 import { gameOptionLabel } from "@/lib/gameLabels";
 import { VISIBILITY_OPTIONS, WEEKDAY_OPTIONS } from "./shared";
 
@@ -94,7 +94,7 @@ function ReadOnlyValue({ label, value, testId, wide = false }) {
 }
 
 const optionLabel = (options, value) => options.find(([key]) => String(key) === String(value))?.[1] || value;
-const when = (value) => (value ? viennaDateTime(value, { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" }) : "");
+const when = (value) => (value ? formatWhen(value) : "");
 
 /** Die Werte, die die Season der Staffel gibt - nur lesend (S3–S9, S13). Die Seitenleiste des Formulars. */
 export function StaffelSeasonValues({ tournament, games = [] }) {

@@ -16,7 +16,7 @@ import { useSeason } from "@/seasons/SeasonContext";
 import { StickerClaim } from "@/seasons/birthday/StickerClaim";
 import { DiscordServerList } from "@/components/tls/DiscordServerTile";
 import { DiscordVoice } from "@/components/tls/DiscordNow";
-import { viennaDate } from "@/lib/vienna";
+import { formatWhen } from "@/lib/datetime";
 import { gemeinsamLaden } from "@/lib/gemeinsamLaden";
 import { vereinPfad } from "@/lib/meinBereich";
 
@@ -241,7 +241,7 @@ export default function MemberAreaPage() {
                       {internalNews.map((post) => (
                         <Link key={post.id} to={`/news/${post.slug}`} className="group block border-l-2 border-white/15 pl-3 hover:border-[#29B6E8] transition">
                           <div className="tls-type-label text-white/45">
-                            {viennaDate(post.published_at || post.created_at)}
+                            {formatWhen(post.published_at || post.created_at, { time: false })}
                             {isRecent(post.published_at || post.created_at) ? <span className="ml-2 font-bold text-[#29B6E8]" data-testid={`member-area-news-new-${post.id}`}>neu</span> : null}
                           </div>
                           <div className="font-bold text-white mt-0.5 break-words group-hover:text-[#29B6E8] transition">{post.title}</div>

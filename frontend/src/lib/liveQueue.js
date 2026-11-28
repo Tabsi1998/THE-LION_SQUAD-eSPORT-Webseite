@@ -1,11 +1,11 @@
 // Live vor Ort (#1556): Verzug und die Zeile „Du bist als Nächstes an Station 2“. Die Daten
 // kommen fertig vom Server (GET /tournaments/<id>/live-queue, services/live_queue.py) - hier steht nur, wie sie
 // aussehen. Die Spielzeit-Uhr (#1167) rechnet lib/matchClock.
-import { viennaTime } from "@/lib/vienna";
+import { formatClock } from "@/lib/datetime";
 
 // Ab so viel Verschiebung heißt es „Verzug“ - darunter ist es Rauschen (wie am TV, #1564).
 export const DELAY_SHOWN_FROM = 5;
-const clock = (value) => viennaTime(value, { hour: "2-digit", minute: "2-digit" });
+const clock = (value) => formatClock(value);
 
 /** „+11 Min.“ - erst ab 5 Minuten; früher als geplant „12 Min. früher“. */
 export function delayText(minutes) {

@@ -12,7 +12,8 @@ import { Link } from "react-router-dom";
 import { toast } from "sonner";
 import { BarChart3, Calculator, Flag, Info, ListChecks, Pencil, Plus, Search, Trash2 } from "lucide-react";
 import { PersonPicker } from "@/components/tls/PersonPicker";
-import { asInstant, viennaDate } from "@/lib/vienna";
+import { formatWhen } from "@/lib/datetime";
+import { asInstant } from "@/lib/vienna";
 import { ShortCaps } from "@/components/tls/ShortCaps";
 
 const DEFAULT_POINTS = "25,18,15,12,10,8,6,4,2,1";
@@ -147,7 +148,7 @@ function formatDate(value) {
   if (!value) return null;
   const d = asInstant(value);
   if (Number.isNaN(d.getTime())) return String(value).slice(0, 10);
-  return viennaDate(d, { day: "2-digit", month: "2-digit", year: "2-digit" });
+  return formatWhen(d, { time: false });
 }
 
 function formatDateRange(start, end) {

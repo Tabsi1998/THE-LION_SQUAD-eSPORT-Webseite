@@ -4,13 +4,12 @@ import { useEffect, useState } from "react";
 import { GitCompare } from "lucide-react";
 import { api, formatApiError } from "@/lib/api";
 import { SelectField } from "@/components/tls/FormFields";
-import { viennaDate } from "@/lib/vienna";
+import { formatWhen } from "@/lib/datetime";
 import { compareRows } from "@/lib/seasonPools";
 
-const DAY = { day: "2-digit", month: "2-digit", year: "numeric" };
 
 function versionLabel(row) {
-  const day = row.saved_at ? ` · ${viennaDate(row.saved_at, DAY)}` : "";
+  const day = row.saved_at ? ` · ${formatWhen(row.saved_at, { time: false })}` : "";
   return `Version ${row.version}${day}${row.cleared ? " · entfernt" : ` · ${row.maps} Maps`}`;
 }
 

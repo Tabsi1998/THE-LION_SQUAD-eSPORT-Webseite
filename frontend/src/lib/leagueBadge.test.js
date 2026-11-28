@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
 import { badgeAria, badgeLabel, badgeMetal, badgeTier, currentPlace, exitLabel, ladderValue, lineRuns, nextMatchText, seasonLabelLines, seasonLine } from "./leagueBadge";
+import { runAtTestClock } from "@/testClock";
+
+// Feste Uhr (#1307): die Datums-Texte lassen das laufende Jahr weg und sagen „heute“/„morgen“.
+runAtTestClock();
 
 describe("Liga-Abzeichen (#1638)", () => {
   it("zeigt die Stufe über die Form: Liga 1 oben, Liga 2 mittel, ab Liga 3 schlicht", () => {
@@ -38,7 +42,7 @@ describe("Aktuelle Ligen (#1630)", () => {
 
   it("beschreibt das nächste Spiel mit Gegner, Termin oder Spieltag", () => {
     expect(nextMatchText({ opponent: "Probe B", scheduled_at: "2026-11-25T19:00:00Z", matchday: 3 }))
-      .toBe("gegen Probe B · Mi., 25.11., 20:00");
+      .toBe("gegen Probe B · Mi 25. November · 20:00");
     expect(nextMatchText({ opponent: null, scheduled_at: null, matchday: 4 })).toBe("Spieltag 4");
     expect(nextMatchText(null)).toBe("");
   });

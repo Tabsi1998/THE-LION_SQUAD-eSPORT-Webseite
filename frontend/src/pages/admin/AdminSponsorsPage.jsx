@@ -16,6 +16,7 @@ import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { toast } from "sonner";
 import { Archive, ArchiveRestore, Plus, Trash2, Pencil } from "lucide-react";
 import { ShortCaps } from "@/components/tls/ShortCaps";
+import { formatWhen } from "@/lib/datetime";
 
 import { ROLE_COLORS } from "@/lib/categoryColors";
 const TIERS = ["main", "platinum", "gold", "silver", "bronze"];
@@ -59,8 +60,7 @@ function effectiveSponsorStatus(sponsor) {
 }
 
 function formatDate(value) {
-  if (!value) return "";
-  return String(value).slice(0, 10).split("-").reverse().join(".");
+  return value ? formatWhen(String(value).slice(0, 10), { time: false }) : "";
 }
 
 export default function AdminSponsorsPage() {

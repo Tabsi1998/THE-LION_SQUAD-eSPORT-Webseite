@@ -21,7 +21,8 @@ import {
   SeasonRulesCard,
 } from "@/components/tls/league/public/SeasonParts";
 import { renderMarkdownLite } from "@/lib/markdownLite";
-import { dayNoon, viennaDate } from "@/lib/vienna";
+import { formatWhen } from "@/lib/datetime";
+import { dayNoon } from "@/lib/vienna";
 import { mapOrder } from "@/lib/leagueSeasonPage";
 
 function Head({ data }) {
@@ -31,7 +32,7 @@ function Head({ data }) {
       {/* Mit Selbstanmeldung (#2205) steht das Fenster unten - jede Angabe nur an einer Stelle. */}
       {season.registration_deadline && !data.application ? (
         <p className="mt-3 tls-type-small text-white/60" data-testid="league-subline">
-          Meldeschluss {viennaDate(dayNoon(season.registration_deadline), { day: "numeric", month: "numeric", year: "numeric" })}
+          Meldeschluss {formatWhen(dayNoon(season.registration_deadline), { time: false })}
         </p>
       ) : null}
       <SeasonHeadFacts season={season} />

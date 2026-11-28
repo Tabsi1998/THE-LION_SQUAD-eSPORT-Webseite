@@ -15,10 +15,9 @@ import { RulesChanges, RulesComparison, RulesDocument } from "@/components/tls/l
 import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 import { accentStyle } from "@/lib/leagueLook";
 import { clearHits, dayLabel, findRanges, paintHits, renderRulesMarkdown, rulesApiPath, rulesPagePath, tocOf } from "@/lib/leagueRules";
-import { viennaDate } from "@/lib/vienna";
+import { formatWhen } from "@/lib/datetime";
 import { ShortCaps } from "@/components/tls/ShortCaps";
 
-const LONG_DAY = { day: "2-digit", month: "2-digit", year: "numeric" };
 const QUIET_BUTTON = "tls-btn tls-btn--quiet rounded-sm px-3 py-2 tls-type-label";
 
 function Toc({ sections, active }) {
@@ -146,7 +145,7 @@ function ConsentHint({ consent, seasonId, onDone }) {
         <ul className={`tls-type-small text-white/70 ${open.length ? "mt-3" : ""}`}>
           {done.map((row) => (
             <li key={row.squad_id} data-testid={`rules-consent-done-${row.squad_id}`}>
-              {row.squad_name} hat zugestimmt am {viennaDate(row.agreed_at, LONG_DAY)}.
+              {row.squad_name} hat zugestimmt am {formatWhen(row.agreed_at, { time: false, relative: false })}.
             </li>
           ))}
         </ul>
@@ -284,7 +283,7 @@ export default function LeagueRulesPage() {
           {version ? (
             <p className="mt-3 tls-type-small text-white/75" data-testid="rules-meta">
               {version.label} · gültig ab {dayLabel(version.valid_from)}
-              {version.published_at ? ` · Stand ${viennaDate(version.published_at, LONG_DAY)}` : ""}
+              {version.published_at ? ` · Stand ${formatWhen(version.published_at, { time: false })}` : ""}
             </p>
           ) : null}
           {version?.change_reason ? <p className="mt-1 tls-type-small text-white/60">Änderungsgrund: {version.change_reason}</p> : null}

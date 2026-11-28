@@ -1,5 +1,9 @@
 import { fireEvent, render, screen, within } from "@testing-library/react";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
+import { runAtTestClock } from "@/testClock";
+
+// Feste Uhr (#1307): die Datums-Texte lassen das laufende Jahr weg und sagen „heute“/„morgen“.
+runAtTestClock();
 
 // Gesamtwertung über Seasons (F.5, #2215) auf der Ligaseite: Liga N als Auswahl, Co-Teams und Spieler, Punkte je Season mit
 // Streichergebnis und Staffelsieg, Aufsteiger, Aufklappen am Handy, privates Profil ohne Link. Nur erfundene Namen.
@@ -54,7 +58,7 @@ test("Co-Teams mit Punkten je Season, Streichergebnis, Gesamtsieger und Aufsteig
   const table = await screen.findByTestId("overall-1-teams-table");
   expect(screen.getByTestId("season-nav-gesamtwertung")).toHaveAttribute("aria-current", "page");
   expect(screen.getByTestId("overall-1-winner")).toHaveTextContent("Gesamtsieger Nordlicht");
-  expect(screen.getByTestId("overall-1-state")).toHaveTextContent("Endstand seit 12.01.2027");
+  expect(screen.getByTestId("overall-1-state")).toHaveTextContent("Endstand seit Di 12. Jänner 2027");
   const first = within(table).getByTestId("overall-1-teams-table-row-0");
   expect(first).toHaveAttribute("data-climbed", "true");
   expect(within(first).getByRole("link", { name: "Nordlicht" })).toHaveAttribute("href", "/teams/team-1");

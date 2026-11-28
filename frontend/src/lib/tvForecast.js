@@ -7,7 +7,8 @@ import { bracketEdges } from "@/lib/bracketGraph";
 import { effectiveMatchDuration } from "@/lib/matchDuration";
 import { isMatchDone } from "@/lib/slotSource";
 import { isLiveMatch, stationName } from "@/lib/tvLive";
-import { asInstant, viennaTime } from "@/lib/vienna";
+import { formatClock } from "@/lib/datetime";
+import { asInstant } from "@/lib/vienna";
 
 const MINUTE = 60000;
 // Ab so viel Verschiebung sagt der TV „Verzug“ - darunter ist es Rauschen.
@@ -196,7 +197,7 @@ export function forecastOf(match, { matches = [], stations = [], now = Date.now(
 /** „ca. 16:40 · Switch 2“ - ohne Uhrzeit nur die Station. Planung ist nie auf die Minute genau, deshalb immer „ca.“. */
 export function forecastText(entry) {
   if (!entry) return "";
-  const time = entry.eta === null || entry.eta === undefined ? "" : `ca. ${viennaTime(entry.eta, { hour: "2-digit", minute: "2-digit" })}`;
+  const time = entry.eta === null || entry.eta === undefined ? "" : `ca. ${formatClock(entry.eta)}`;
   return [time, entry.station].filter(Boolean).join(" · ");
 }
 

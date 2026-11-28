@@ -4,7 +4,7 @@ import { api } from "@/lib/api";
 import { feedUrls } from "@/lib/calendar";
 import { motionAllowed } from "@/lib/motion";
 import { SUBSCRIBE_ANCHOR, SUBSCRIBE_GUIDE, googleSubscribeUrl, subscriptionLine } from "@/lib/myCalendar";
-import { viennaDateTime } from "@/lib/vienna";
+import { formatWhen } from "@/lib/datetime";
 
 // Mein Kalender-Abo (#1189, #1788): der persönliche Link - nur die eigenen Termine, für die Kalender-App. Ein Baustein
 // für /calendar, „Mein Kalender“ und die Einstellungen. Gespeichert ist nur ein Hash: die Adresse steht nur direkt nach
@@ -132,7 +132,7 @@ export function PersonalFeedCard({ origin = typeof window !== "undefined" ? wind
         </>
       ) : status.active ? (
         <p className="mt-3 tls-type-small text-white/55" data-testid={`${testId}-active`}>
-          {subscriptionLine(status, viennaDateTime)} Die Adresse zeigen wir nur beim Erzeugen – brauchst du sie wieder, erzeug eine neue.
+          {subscriptionLine(status, formatWhen)} Die Adresse zeigen wir nur beim Erzeugen – brauchst du sie wieder, erzeug eine neue.
         </p>
       ) : null}
       {problem && <p className="mt-3 tls-type-small text-warn" role="alert">{problem}</p>}

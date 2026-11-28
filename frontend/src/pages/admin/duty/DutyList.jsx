@@ -5,7 +5,7 @@ import { Link } from "react-router-dom";
 import { ArrowRight, Flag, MessageCircleWarning, Trophy } from "lucide-react";
 import { STAFF_ROLE_LABELS } from "@/lib/tournamentLabels";
 import { staffRolesSentence } from "@/lib/staffRoles";
-import { viennaDate, viennaTime } from "@/lib/vienna";
+import { formatClock, formatWhen } from "@/lib/datetime";
 
 import { ROLE_COLORS } from "@/lib/categoryColors";
 const KIND = {
@@ -15,9 +15,9 @@ const KIND = {
 
 export function dutyWhen(row) {
   if (!row.starts_at) return row.today ? "Heute" : "Ohne Termin";
-  const time = viennaTime(row.starts_at, { hour: "2-digit", minute: "2-digit" });
+  const time = formatClock(row.starts_at);
   if (row.today) return `Heute · ${time}`;
-  return `${viennaDate(row.starts_at, { weekday: "short", day: "2-digit", month: "2-digit" })} · ${time}`;
+  return `${formatWhen(row.starts_at, { time: false })} · ${time}`;
 }
 
 export function dutyRoles(row) {

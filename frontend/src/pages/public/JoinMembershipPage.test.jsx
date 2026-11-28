@@ -1,5 +1,9 @@
 import { render, screen, waitFor, within } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
+import { runAtTestClock } from "@/testClock";
+
+// Feste Uhr (#1307): die Datums-Texte lassen das laufende Jahr weg und sagen „heute“/„morgen“.
+runAtTestClock();
 
 // Mitglied werden (#1251, #1335): die Karte als Muster, vier Vorteils-Kacheln, der goldene Knopf „Antrag stellen“ und der
 // Beitrag offen - mit Daten als Liste und Tabelle, mit altem Stand samt Datum, ohne Stand ein Satz.
@@ -60,7 +64,7 @@ test("Bühne mit Karte (Muster), goldener Antrag-Knopf, vier Vorteile und der Be
 
 test("alter Stand: die Beträge mit Datum; ohne Stand der Satz statt Beträgen", () => {
   const { rerender } = render(<FeeSection fees={{ ...FEES, stale: true }} />);
-  expect(screen.getByTestId("join-fees-stand")).toHaveTextContent("Stand 7.10.2026 – die Mitgliederverwaltung antwortet gerade nicht.");
+  expect(screen.getByTestId("join-fees-stand")).toHaveTextContent("Stand Mi 7. Oktober – die Mitgliederverwaltung antwortet gerade nicht.");
   rerender(<FeeSection fees={{ available: false, fees: [] }} purpose="" />);
   expect(screen.getByTestId("join-fees-none")).toHaveTextContent("Die Beiträge nennen wir dir im Antrag.");
   expect(screen.queryByTestId("join-fees-table")).toBeNull();

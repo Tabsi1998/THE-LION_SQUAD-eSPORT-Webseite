@@ -1,4 +1,5 @@
-import { asInstant, viennaDate } from "@/lib/vienna";
+import { formatWhen } from "@/lib/datetime";
+import { asInstant } from "@/lib/vienna";
 // Plattform-Konten verknüpfen (#260): welches Profilfeld zu welcher Plattform gehört, und was
 // ein Fehlercode aus dem Rückruf (?link_error=) in Worten heißt.
 
@@ -76,7 +77,7 @@ export function linkErrorText(code, detail = "") {
 export function formatLinkedAt(value) {
   if (!value) return "";
   const date = asInstant(value);
-  return Number.isNaN(date.getTime()) ? "" : viennaDate(date, { dateStyle: "medium" });
+  return Number.isNaN(date.getTime()) ? "" : formatWhen(date, { time: false });
 }
 
 export function linkedText(platform) {

@@ -10,8 +10,8 @@ import { safeResourceUrl, serverResourceLabels } from "@/lib/serverResources";
 import { ruleFacts, serverTags } from "@/lib/serverFacts";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { useDocumentTitle } from "@/hooks/useDocumentTitle";
-import { asInstant, viennaDateTime } from "@/lib/vienna";
-import { formatDuration } from "@/lib/datetime";
+import { asInstant } from "@/lib/vienna";
+import { formatDuration, formatWhen } from "@/lib/datetime";
 import { ShortCaps } from "@/components/tls/ShortCaps";
 
 const statusLabels = { online: "Online", offline: "Offline", maintenance: "Wartung", planned: "Geplant" };
@@ -46,7 +46,7 @@ function formatDateTime(value) {
   if (!value) return "";
   const date = asInstant(value);
   if (Number.isNaN(date.getTime())) return String(value);
-  return viennaDateTime(date, { dateStyle: "medium", timeStyle: "short" });
+  return formatWhen(date);
 }
 
 function formatRemainingTime(target, now) {

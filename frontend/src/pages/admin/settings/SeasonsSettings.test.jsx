@@ -1,6 +1,10 @@
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router-dom";
+import { runAtTestClock } from "@/testClock";
+
+// Feste Uhr (#1307): die Datums-Texte lassen das laufende Jahr weg und sagen „heute“/„morgen“.
+runAtTestClock();
 
 // Jahreszeiten (#633): Hauptschalter und Saison-Schalter speichern sofort, Texte mit eigenem Knopf,
 // die Vorschau merkt sich das Token nur in dieser Sitzung, der Stand steht in Worten.
@@ -44,18 +48,18 @@ beforeEach(() => {
 });
 
 test("Stand in Worten", () => {
-  expect(stateText(season())).toBe("Nächstes Mal 25.10.2026 bis 01.11.2026.");
+  expect(stateText(season())).toBe("Nächstes Mal So 25. Oktober bis So 1. November.");
   expect(stateText(season({ active_now: true, phase: "deko" }))).toBe("Läuft gerade (deko).");
   expect(stateText(season({ active_now: true, forced: true }))).toBe("Läuft gerade – erzwungen.");
   expect(stateText(season({ enabled: false }))).toBe("Ausgeschaltet.");
-  expect(stateText(season({ mode: "force_off", until: "2026-12-05T00:00:00+01:00" }))).toMatch(/^Aus bis 05\.12\.2026/);
+  expect(stateText(season({ mode: "force_off", until: "2026-12-05T00:00:00+01:00" }))).toMatch(/^Aus bis Sa 5\. Dezember · 00:00/);
   expect(stateText(season({ needs_founded_on: true }))).toContain("Gründungsdatum");
 });
 
 test("Hauptschalter und Saison-Schalter speichern sofort, Texte mit eigenem Knopf", async () => {
   const user = userEvent.setup();
   render(<SeasonsSettings />);
-  expect(await screen.findByTestId("season-halloween-state")).toHaveTextContent("Nächstes Mal 25.10.2026 bis 01.11.2026.");
+  expect(await screen.findByTestId("season-halloween-state")).toHaveTextContent("Nächstes Mal So 25. Oktober bis So 1. November.");
   expect(screen.getByTestId("season-club_birthday-state")).toHaveTextContent("Gründungsdatum");
   await user.click(screen.getByTestId("seasons-enabled"));
   await waitFor(() => expect(apiMock.put).toHaveBeenCalledWith("/settings/seasons", { enabled: false }));

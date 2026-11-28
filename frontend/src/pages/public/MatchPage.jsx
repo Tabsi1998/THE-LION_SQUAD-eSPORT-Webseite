@@ -19,7 +19,6 @@ import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 import { useSubmissionGuard } from "@/hooks/useSubmissionGuard";
 import { CommendButton } from "@/components/tls/CommendButton";
 import { HelpLink } from "@/components/tls/HelpLink";
-import { viennaDateTime } from "@/lib/vienna";
 import { formatWhen } from "@/lib/datetime";
 import { showLapTime } from "@/lib/laptime";
 import { finishedMatchText, formatMatchKind, formatMatchStatus, isByeSlot, isMatchFinished, matchHeadline, slotName, stationText } from "@/lib/tournamentLabels";
@@ -88,7 +87,7 @@ const scheduleModeLabels = {
 
 function formatDateTime(value) {
   if (!value) return "Noch kein Termin";
-  return viennaDateTime(value, { dateStyle: "medium", timeStyle: "short" });
+  return formatWhen(value);
 }
 
 // Ein laufendes Spiel nennt im Kopf seinen Zustand statt des Termins.

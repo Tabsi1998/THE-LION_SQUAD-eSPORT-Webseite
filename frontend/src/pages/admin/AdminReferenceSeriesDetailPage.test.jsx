@@ -1,5 +1,9 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
+import { runAtTestClock } from "@/testClock";
+
+// Feste Uhr (#1307): die Datums-Texte lassen das laufende Jahr weg und sagen „heute“/„morgen“.
+runAtTestClock();
 
 // Seite einer Saison (#1741): Kopf mit Spur, Saison und Regeln, Bearbeiten im Seitenblatt, Archivieren. Kalender,
 // Teilnehmer, Ergebnisse und Captains hängen die nächsten Pakete als eigene Abschnitte an.
@@ -149,7 +153,7 @@ test("Bearbeiten öffnet das Seitenblatt der Saison, Archivieren archiviert", as
 test("Captain: Hinweis mit Ablauf und Entwurf, keine Knöpfe des Vorstands", async () => {
   apiMock.get.mockResolvedValue({ data: { ...SERIES, access: { role: "captain", can_publish: false, valid_until: "2026-12-31" } } });
   renderAt();
-  expect(await screen.findByTestId("series-detail-captain")).toHaveTextContent("Du bist Captain dieser Saison bis 31.12.2026 · Einträge sind Entwürfe, der Vorstand gibt frei.");
+  expect(await screen.findByTestId("series-detail-captain")).toHaveTextContent("Du bist Captain dieser Saison bis Do 31. Dezember · Einträge sind Entwürfe, der Vorstand gibt frei.");
   expect(screen.queryByTestId("series-detail-edit")).toBeNull();
   expect(screen.queryByTestId("series-detail-archive")).toBeNull();
   expect(screen.queryByTestId("series-staff")).toBeNull();

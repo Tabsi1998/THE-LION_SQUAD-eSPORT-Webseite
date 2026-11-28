@@ -1,5 +1,5 @@
 import { useSyncExternalStore } from "react";
-import { viennaTime } from "@/lib/vienna";
+import { formatClock } from "@/lib/datetime";
 
 // Netz der Website (#1152, wie mobile/src/lib/network.ts): Der Browser meldet „offline“ und „online“; der API-Client
 // meldet jede echte Antwort (dann ist das Netz da, und die Uhrzeit ist der Stand der gezeigten Daten) und jeden Abruf,
@@ -51,7 +51,7 @@ export function useNetwork() {
 /** „Offline · Stand 14:05“ - ohne bekannten Stand nur „Offline“. */
 export function offlineLabel(stand) {
   if (!stand) return "Offline";
-  return `Offline · Stand ${viennaTime(stand, { hour: "2-digit", minute: "2-digit" })}`;
+  return `Offline · Stand ${formatClock(stand)}`;
 }
 
 /** Hört auf den Browser: `offline` und `online`. Einmal beim Start (main.jsx / Layout). */

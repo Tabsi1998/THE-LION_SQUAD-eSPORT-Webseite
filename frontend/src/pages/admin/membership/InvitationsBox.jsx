@@ -2,7 +2,8 @@ import { useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
 import { Send, X as XIcon } from "lucide-react";
 import { api, formatApiError } from "@/lib/api";
-import { asInstant, viennaDate } from "@/lib/vienna";
+import { formatWhen } from "@/lib/datetime";
+import { asInstant } from "@/lib/vienna";
 
 // Einladungen zum Mitgliedsantrag (#507): wen der Vorstand eingeladen hat, seit wann, ob der Antrag schon
 // gestellt ist; offene Einladungen lassen sich zurückziehen. Eingeladen wird seit #1356 oben auf dieser Seite
@@ -11,7 +12,7 @@ const STATUS_LABEL = { open: "offen", applied: "Antrag gestellt", withdrawn: "zu
 
 function formatDay(value) {
   const date = asInstant(value);
-  return Number.isNaN(date.getTime()) ? "" : viennaDate(date);
+  return Number.isNaN(date.getTime()) ? "" : formatWhen(date, { time: false, relative: false });
 }
 
 export function InvitationsBox({ reloadKey = 0 }) {

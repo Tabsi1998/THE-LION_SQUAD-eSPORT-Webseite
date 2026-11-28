@@ -1,5 +1,10 @@
 import { render, screen, waitFor } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
+import { runAtTestClock } from "@/testClock";
+import { formatWhen } from "@/lib/datetime";
+
+// Feste Uhr (#1307): die Datums-Texte lassen das laufende Jahr weg und sagen „heute“/„morgen“.
+runAtTestClock();
 
 // eSports-Übersicht (#2122 NW10): die Liga hat eine eigene Kachel und einen Knopf oben - sobald eine Season sichtbar ist.
 
@@ -27,7 +32,7 @@ test("mit sichtbarer Season: Kachel „Liga“ mit Starttermin und Knopf oben", 
   const iso = `${start.getFullYear()}-${String(start.getMonth() + 1).padStart(2, "0")}-${String(start.getDate()).padStart(2, "0")}`;
   // Die Seite schreibt Tag und Monat ohne führende Null („4.1.2027“) - mit fester Null wurde der Test an jedem Tag rot, an dem der
   // Start auf einen Tag oder Monat unter 10 fällt.
-  const shown = `${start.getDate()}.${start.getMonth() + 1}.${start.getFullYear()}`;
+  const shown = formatWhen(iso, { time: false });
   state.leagues = [{ id: "l1", slug: "cod-liga", name: "CoD-Liga", seasons: [{ ...SEASON, start_date: iso }] }];
   render(<MemoryRouter><EsportsOverviewPage /></MemoryRouter>);
   const tile = await screen.findByTestId("esports-hub-league");
@@ -49,7 +54,7 @@ test("leagueTile: läuft vor Starttermin, sonst „Startet bald“", () => {
   const now = Date.parse("2026-10-28T12:00:00Z");
   expect(leagueTile([], now)).toBeNull();
   expect(leagueTile([{ name: "L", seasons: [{ ...SEASON, status: "active" }] }], now).badge).toBe("Läuft: Season 1");
-  expect(leagueTile([{ name: "L", seasons: [SEASON] }], now).badge).toBe("Start am 10.11.2026");
+  expect(leagueTile([{ name: "L", seasons: [SEASON] }], now).badge).toBe("Start am Di 10. November");
   expect(leagueTile([{ name: "L", seasons: [{ ...SEASON, start_date: null }] }], now).badge).toBe("Startet bald");
   expect(leagueTile([{ name: "L", seasons: [{ ...SEASON, status: "completed" }] }], now).badge).toBe("");
 });

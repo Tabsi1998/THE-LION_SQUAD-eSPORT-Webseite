@@ -4,7 +4,7 @@ import { SetupGuide } from "@/components/tls/SetupGuide";
 import { Send, RefreshCw } from "lucide-react";
 import { INDEXNOW_DEFAULT_PATHS } from "../shared";
 import { SeoStatusCard } from "./parts";
-import { viennaDateTime } from "@/lib/vienna";
+import { formatWhen } from "@/lib/datetime";
 
 export function SeoSection({ brand, savingBrand, submittingIndexNow, indexNowResult, imageUploadBusy, setBrandField, saveBrand, submitIndexNow, indexNowKeyUrl }) {
   return (
@@ -55,7 +55,7 @@ export function SeoSection({ brand, savingBrand, submittingIndexNow, indexNowRes
             {indexNowResult && (
               <div className={`mt-3 rounded-sm border px-3 py-2 ${indexNowResult.ok ? "border-ok/25 text-ok" : "border-warn/25 text-warn"}`}>
                 {indexNowResult.ok ? `${indexNowResult.submitted || 0} URLs gesendet` : indexNowResult.error}
-                {indexNowResult.submitted_at && <span className="text-white/35"> - {viennaDateTime(indexNowResult.submitted_at)}</span>}
+                {indexNowResult.submitted_at && <span className="text-white/35"> - {formatWhen(indexNowResult.submitted_at)}</span>}
               </div>
             )}
           </div>

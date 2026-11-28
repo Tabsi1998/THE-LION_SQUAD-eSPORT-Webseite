@@ -10,6 +10,7 @@ import { CountryFlag, VenueWithFlag } from "@/components/tls/CountryFlag";
 import { noScoreOptions } from "@/lib/seriesSpecialRules";
 import { kindShows, kindWord } from "@/lib/seriesKinds";
 import { toast } from "sonner";
+import { formatWhen } from "@/lib/datetime";
 
 // Seitenblätter des Kalenders (#1742): Termin anlegen/bearbeiten, verschieben und eine Terminliste einfügen.
 // Gerechnet und geprüft wird im Server - auch die eingefügte Liste: die Vorschau kommt vom Server, übernommen wird nur
@@ -258,7 +259,7 @@ export function PasteSheet({ series, lineage, version, onClose, onSaved, onStale
                           {(row.sessions || []).map((item, index) => (
                             <li key={index} className="whitespace-nowrap">
                               <span className="font-semibold">{item.session || "Rennen"}</span>
-                              <span className="text-white/55 tabular-nums">{` ${item.day && item.day !== row.day ? `${dayLabel(item.day)} ` : ""}${item.time || ""}`}</span>
+                              <span className="text-white/55 tabular-nums">{` ${item.day && item.day !== row.day ? (item.time ? formatWhen(`${item.day}T${item.time}`) : dayLabel(item.day)) : item.time || ""}`}</span>
                               {item.counts === false && <span className="tls-type-small text-white/45"> · zählt nicht</span>}
                             </li>
                           ))}

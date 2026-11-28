@@ -1,4 +1,8 @@
 import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { runAtTestClock } from "@/testClock";
+
+// Feste Uhr (#1307): die Datums-Texte lassen das laufende Jahr weg und sagen „heute“/„morgen“.
+runAtTestClock();
 
 // Kalender der Saison (#1742): Liste mit Status vom Server, Hinweis auf Lücken, Termin anlegen mit Vorgaben der Saison,
 // Liste einfügen mit Vorschau vom Server, Absagen, Verschieben und Reihenfolge. Nur erfundene Orte.
@@ -45,8 +49,8 @@ test("Termine in Reihenfolge mit Status, Ursprungstag, Hinweis und Zählern", as
   const items = await screen.findAllByTestId("calendar-round");
   expect(items.map((item) => item.dataset.state)).toEqual(["missing", "scored", "postponed", "cancelled"]);
   expect(within(items[0]).getByTestId("round-state")).toHaveTextContent("Ergebnis fehlt");
-  expect(items[0]).toHaveTextContent("Do., 22.10.2026 · 20:30");
-  expect(items[2]).toHaveTextContent("ursprünglich Do., 05.11.2026");
+  expect(items[0]).toHaveTextContent("Do 22. Oktober · 20:30");
+  expect(items[2]).toHaveTextContent("ursprünglich Do 5. November");
   expect(items[3]).toHaveTextContent("Finale");
   expect(items[3]).toHaveTextContent("zählt nicht zur Wertung");
   // Gewertet: weder verschieben noch absagen noch archivieren; abgesagt: wieder ansetzen.
@@ -119,7 +123,7 @@ test("Liste einfügen: erst die Vorschau vom Server, dann übernehmen", async ()
   fireEvent.click(screen.getByTestId("paste-submit"));
   await waitFor(() => expect(apiMock.post).toHaveBeenCalledWith("/reference-series/admin/series/serie-1/rounds/paste", { text }));
   const preview = await screen.findByTestId("paste-preview");
-  expect(preview).toHaveTextContent("Do., 26.11.2026");
+  expect(preview).toHaveTextContent("Do 26. November");
   expect(preview).toHaveTextContent("aus dem Wochentag");
   expect(screen.getByTestId("paste-submit")).toHaveTextContent("2 Termine übernehmen");
   apiMock.post.mockResolvedValueOnce({ data: { created: 2, ...CALENDAR } });
@@ -145,7 +149,7 @@ test("Absagen, Verschieben und Reihenfolge rufen den Server", async () => {
   await waitFor(() => expect(apiMock.post).toHaveBeenCalledWith("/reference-series/admin/series/serie-1/rounds/r1/cancel", { expected_version: 7 }));
 
   fireEvent.click(within(items[2]).getByTestId("round-postpone"));
-  expect(screen.getByTestId("postpone-original")).toHaveTextContent("Do., 05.11.2026");
+  expect(screen.getByTestId("postpone-original")).toHaveTextContent("Do 5. November");
   fireEvent.change(screen.getByTestId("postpone-day"), { target: { value: "2026-11-14" } });
   fireEvent.click(screen.getByTestId("postpone-save"));
   await waitFor(() => expect(apiMock.post).toHaveBeenCalledWith("/reference-series/admin/series/serie-1/rounds/r3/postpone", { day: "2026-11-14", time: "19:00", note: null, expected_version: 7 }));
@@ -190,7 +194,7 @@ test("Team-Liga (#1931): Gegner mit Seite und Zeitraum in Liste und Vorschau, He
   apiMock.get.mockResolvedValue({ data: { ...CALENDAR, rounds, hints: [] } });
   render(<SeriesCalendarSection series={league} onChanged={() => {}} />);
   const [item] = await screen.findAllByTestId("calendar-round");
-  expect(item).toHaveTextContent("Mi., 13.05. – So., 17.05.2026 · @ Probe Wölfe");
+  expect(item).toHaveTextContent("Mi 13. – So 17. Mai · @ Probe Wölfe");
 
   fireEvent.click(within(item).getByTestId("round-edit"));
   expect(screen.getByTestId("round-side")).toHaveValue("away");
@@ -207,7 +211,7 @@ test("Team-Liga (#1931): Gegner mit Seite und Zeitraum in Liste und Vorschau, He
   fireEvent.change(screen.getByTestId("paste-text"), { target: { value: "ST2 · 20.05.–24.05. · vs Probe Falken" } });
   fireEvent.click(screen.getByTestId("paste-submit"));
   expect(await screen.findByTestId("paste-opponent")).toHaveTextContent("vs Probe Falken");
-  expect(screen.getByTestId("paste-day-end")).toHaveTextContent("bis So., 24.05.2026");
+  expect(screen.getByTestId("paste-day-end")).toHaveTextContent("bis So 24. Mai");
 });
 
 test("ein Captain sieht den Kalender seiner Saison nur zum Lesen", async () => {

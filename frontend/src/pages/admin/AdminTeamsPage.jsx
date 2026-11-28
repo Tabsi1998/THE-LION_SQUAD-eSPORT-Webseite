@@ -12,7 +12,7 @@ import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { useLoad } from "@/hooks/useLoad";
 import { useSubmissionGuard } from "@/hooks/useSubmissionGuard";
 import { DissolvedTeamRow } from "@/pages/public/team/DissolvedTeams";
-import { viennaDate } from "@/lib/vienna";
+import { formatWhen } from "@/lib/datetime";
 import { ShortCaps } from "@/components/tls/ShortCaps";
 
 // Teamverwaltung (#2128, TM7): alle Teams mit Suche - auch private; ein Team ohne aktive Teamleitung fällt auf. Verwaltet
@@ -46,7 +46,7 @@ function TeamRow({ team }) {
           <span className="inline-flex items-center gap-1"><Users className="w-3.5 h-3.5" aria-hidden="true" /> {team.member_count}</span>
           <span>{team.squad_count} {team.squad_count === 1 ? "Co-Team" : "Co-Teams"}</span>
           {team.is_public === false ? <span className="inline-flex items-center gap-1 text-white/80 font-bold" data-testid={`admin-team-private-${team.id}`}><Lock className="w-3 h-3" aria-hidden="true" /> Privat</span> : null}
-          {team.created_at ? <span>seit {viennaDate(team.created_at)}</span> : null}
+          {team.created_at ? <span>seit {formatWhen(team.created_at, { time: false })}</span> : null}
         </div>
       </div>
     </>

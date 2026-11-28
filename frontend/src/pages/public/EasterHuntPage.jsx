@@ -8,7 +8,8 @@ import { useReducedMotion } from "@/hooks/useLiveChanges";
 import { EggShape } from "@/seasons/easterHunt/EggShape";
 import { fetchHuntPage, onHuntProgress } from "@/seasons/easterHunt/api";
 import "@/seasons/easterHunt/easter-hunt.css";
-import { asInstant, viennaDate, viennaDateTime } from "@/lib/vienna";
+import { formatWhen } from "@/lib/datetime";
+import { asInstant } from "@/lib/vienna";
 import { ShortCaps } from "@/components/tls/ShortCaps";
 
 // Die Seite der Ostereiersuche (#646, Korb #758): der eigene Korb mit den gefundenen Eiern in ihrem echten Muster,
@@ -20,13 +21,14 @@ const SERIF = { fontFamily: 'Georgia, "Noto Serif", "Times New Roman", serif' };
 function dayLabel(iso) {
   const day = asInstant(iso || "");
   if (Number.isNaN(day.getTime())) return "";
-  return viennaDate(day, { weekday: "long", day: "numeric", month: "long", timeZone: "Europe/Vienna" });
+  // Steht in Sätzen mit „am“ - darum ohne „heute“ (#1307).
+  return formatWhen(day, { time: false, relative: false });
 }
 
 function timeLabel(iso) {
   const day = asInstant(iso || "");
   if (Number.isNaN(day.getTime())) return "";
-  return viennaDateTime(day, { day: "numeric", month: "numeric", hour: "2-digit", minute: "2-digit", timeZone: "Europe/Vienna" });
+  return formatWhen(day);
 }
 
 /** „1 Std. 12 Min.“ - die Zeit bis zum vollen Korb, gezählt ab Karfreitag 0 Uhr. */

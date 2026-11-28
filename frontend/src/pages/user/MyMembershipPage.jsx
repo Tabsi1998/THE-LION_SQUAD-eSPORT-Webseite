@@ -14,7 +14,7 @@ import JerseyNumberCard from "@/pages/user/JerseyNumberCard";
 import { useConfirm } from "@/components/tls/ConfirmDialog";
 import { toast } from "sonner";
 import { Crown, Calendar, Hash, FileText, Eye, EyeOff, History, Wallet, Users, ShieldCheck } from "lucide-react";
-import { viennaDate, viennaDateTime } from "@/lib/vienna";
+import { formatOfficialDate, formatWhen } from "@/lib/datetime";
 import { LoadState, LoadStaleNotice } from "@/components/tls/LoadState";
 import { useLoad } from "@/hooks/useLoad";
 import { BEREICH, vereinPfad } from "@/lib/meinBereich";
@@ -155,7 +155,7 @@ export default function MyMembershipPage() {
                         <span className="text-white/40"> (vorher: {STATUS_LABELS[h.from_status] || h.from_status})</span>
                       )}
                     </div>
-                    <div className="tls-type-small text-quiet mt-0.5">{viennaDateTime(h.at)}</div>
+                    <div className="tls-type-small text-quiet mt-0.5">{formatWhen(h.at)}</div>
                     {h.source === "dolibarr" && <div className="tls-type-small text-white/45 mt-1">aus der Mitgliederverwaltung übernommen</div>}
                   </div>
                 </div>
@@ -233,7 +233,7 @@ function SimpleExitCard({ exitRequest, onChanged }) {
       <h2 className="tls-type-section">Austritt</h2>
       {exitRequest ? (
         <div className="mt-2 space-y-3">
-          <p className="tls-type-body text-white/70" data-testid="membership-exit-declared">{exitLine(exitRequest, viennaDate)} Der Vorstand beendet deine Mitgliedschaft und meldet sich, wenn Fragen offen sind.</p>
+          <p className="tls-type-body text-white/70" data-testid="membership-exit-declared">{exitLine(exitRequest, formatDate)} Der Vorstand beendet deine Mitgliedschaft und meldet sich, wenn Fragen offen sind.</p>
           <button type="button" onClick={() => run(() => api.delete("/membership/me/exit"), "Du hast die Erklärung zurückgenommen.")} disabled={busy} data-testid="membership-exit-withdraw" className="tls-btn tls-btn--secondary px-4 py-2 rounded-sm tls-type-label disabled:opacity-50">Erklärung zurücknehmen</button>
         </div>
       ) : (
@@ -485,7 +485,7 @@ function SelfServiceCard() {
     <div className="mt-6 border border-white/10 rounded-sm bg-[#121212] p-5" data-testid="membership-self-card">
       <h2 className="tls-type-section inline-flex items-center gap-2"><Users className="w-4 h-4 text-honor" /> Meine Daten</h2>
       <p className="mt-2 tls-type-small text-white/70" data-testid="membership-self-identity">
-        {profile.firstname} {profile.lastname} · {profile.member_type}{profile.ref ? ` · Nr. ${profile.ref}` : ""}{profile.birth ? ` · geboren ${formatDate(profile.birth)}` : ""}
+        {profile.firstname} {profile.lastname} · {profile.member_type}{profile.ref ? ` · Nr. ${profile.ref}` : ""}{profile.birth ? ` · geboren ${formatOfficialDate(profile.birth)}` : ""}
       </p>
       {/* Einmalige Freigabe (#329, Vereine 1.8.0): der Vorstand gibt das Mitglied in Dolibarr für eine direkte Änderung frei. */}
       {profile.direct_once ? (
@@ -551,7 +551,7 @@ const CONSENTS_HIDDEN = new Set(["not_connected", "not_linked"]);
 // Der Text einer früheren Fassung kommt nicht vom Modul; die Website kennt ihn nur, wenn sie ihn selbst einmal gelesen hat
 // (Codex-Prüfung #1547). Fehlt er, steht das ehrlich da - mit der aktuellen Fassung darunter.
 function missingGivenText(row) {
-  const which = row.moment ? `vom ${viennaDate(row.moment, { day: "2-digit", month: "2-digit", year: "numeric" })}` : row.version;
+  const which = row.moment ? `vom ${formatWhen(row.moment, { time: false, relative: false })}` : row.version;
   return `Den Text der Fassung ${which}, der du zugestimmt hast, haben wir nicht. Aktuelle Fassung:`;
 }
 

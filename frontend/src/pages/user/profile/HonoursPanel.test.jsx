@@ -1,4 +1,8 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { runAtTestClock } from "@/testClock";
+
+// Feste Uhr (#1307): die Datums-Texte lassen das laufende Jahr weg und sagen „heute“/„morgen“.
+runAtTestClock();
 
 // Ehrungen im eigenen Profil (#848): alle eigenen mit dem Hinweis, welche der Verein freigibt; der Schalter bringt sie
 // aufs öffentliche Profil; ohne Verbindung oder Fähigkeit steht der Grund da.
@@ -18,9 +22,9 @@ beforeEach(() => {
 });
 
 test("Tag und Karte in Worten", () => {
-  expect(honourDay("2026-05-01")).toBe("01.05.2026");
+  expect(honourDay("2026-05-01")).toBe("Fr 1. Mai");
   render(<ul><HonourCard honour={{ ...HONORARY, kind: "jubilee", kind_label: "Jubiläum", title: "10 Jahre Mitgliedschaft", years: 10, label: "" }} /></ul>);
-  expect(screen.getByTestId("honour-card")).toHaveTextContent("Jubiläum10 Jahre MitgliedschaftVerliehen am 01.05.2026 · 10 Jahre im Verein");
+  expect(screen.getByTestId("honour-card")).toHaveTextContent("Jubiläum10 Jahre MitgliedschaftVerliehen am Fr 1. Mai · 10 Jahre im Verein");
 });
 
 test("alle eigenen mit Hinweis; der Schalter bringt sie aufs Profil", async () => {
@@ -57,8 +61,8 @@ const SHIFT = { kind: "shift", kind_label: "Helferdienst", title: "Sommerfest �
 const XMAS = { kind: "event", kind_label: "Veranstaltung", title: "Weihnachtsfeier", day: "2025-12-19", hours: 2.5, source: "dolibarr", source_label: "vom Verein eingetragen" };
 
 test("Teilnahme in einer Zeile, Gruppen je Jahr", () => {
-  expect(participationLine(SHIFT)).toBe("04.07.2026 · Helferdienst · 3,5 Std. · Helferdienst");
-  expect(participationLine(CUP)).toBe("12.07.2026 · Wettbewerb · von der Website gemeldet");
+  expect(participationLine(SHIFT)).toBe("Sa 4. Juli · Helferdienst · 3,5 Std. · Helferdienst");
+  expect(participationLine(CUP)).toBe("So 12. Juli · Wettbewerb · von der Website gemeldet");
   expect(participationsByYear([CUP, SHIFT, XMAS]).map((group) => [group.year, group.rows.length])).toEqual([["2026", 2], ["2025", 1]]);
   expect(participationsByYear(undefined)).toEqual([]);
 });
@@ -67,7 +71,7 @@ test("Meine Teilnahmen unter den Ehrungen; scheitert nur dieser Teil, steht der 
   apiMock.get.mockResolvedValue({ data: { available: true, public: false, honours: [HONORARY], participations: [CUP, SHIFT, XMAS], participations_text: "" } });
   const { unmount } = render(<HonoursPanel />);
   expect(await screen.findByTestId("participations-2026")).toHaveTextContent("2026 · 2 Teilnahmen");
-  expect(screen.getByTestId("participations-2025")).toHaveTextContent("2025 · 1 TeilnahmeWeihnachtsfeier19.12.2025 · Veranstaltung · 2,5 Std. · vom Verein eingetragen");
+  expect(screen.getByTestId("participations-2025")).toHaveTextContent("2025 · 1 TeilnahmeWeihnachtsfeierFr 19. Dezember 2025 · Veranstaltung · 2,5 Std. · vom Verein eingetragen");
   expect(screen.getAllByTestId("participation-row")).toHaveLength(3);
   expect(screen.getByTestId("honours-panel")).toHaveTextContent("Ehrenmitglied");
   unmount();

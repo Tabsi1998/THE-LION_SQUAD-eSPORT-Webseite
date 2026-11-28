@@ -9,7 +9,7 @@ import { PartnerTicker } from "@/components/tls/PartnerTicker";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 import { memberNews, tileNote } from "@/lib/memberArea";
-import { viennaDate } from "@/lib/vienna";
+import { formatWhen } from "@/lib/datetime";
 import { referenceHref } from "@/lib/seasonClose";
 import { ShortCaps } from "@/components/tls/ShortCaps";
 
@@ -36,7 +36,7 @@ export const JOIN_REASONS = [
 
 function newsDate(post) {
   const value = post.published_at || post.created_at;
-  return value ? viennaDate(value, { day: "2-digit", month: "2-digit", year: "numeric" }) : "";
+  return value ? formatWhen(value, { time: false }) : "";
 }
 
 function SectionHead({ icon: Icon, title, to, label = "Alle", testId }) {

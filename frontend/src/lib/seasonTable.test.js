@@ -4,6 +4,10 @@ import {
   lastTableRound, mergeDecisions, organizerDecisions, prefilledTableNames, proposalDecisions, rememberCandidates, roundOption, tableText,
   targetText, totalText, totalsSummary, unclearCells, undoTableNames,
 } from "@/lib/seasonTable";
+import { runAtTestClock } from "@/testClock";
+
+// Feste Uhr (#1307): die Datums-Texte lassen das laufende Jahr weg und sagen „heute“/„morgen“.
+runAtTestClock();
 
 // Saisontabelle einlesen (#1928): Anfrage aus der eingefügten Tabelle, Auswahl, gelbe Zellen und Texte der Vorschau.
 // Nur erfundene Namen.
@@ -130,7 +134,7 @@ test("das Bild hängt an der letzten Runde der Tabelle - im Kalender die spätes
 });
 
 test("Texte: Termin, Ziel, Abgleich und Rückmeldung", () => {
-  expect(roundOption({ code: "R2", session: "Sprint", venue: "Probe Ring", club_day: "2026-03-08" })).toBe("R2 · Sprint · Probe Ring · So., 08.03.2026");
+  expect(roundOption({ code: "R2", session: "Sprint", venue: "Probe Ring", club_day: "2026-03-08" })).toBe("R2 · Sprint · Probe Ring · So 8. März");
   expect(targetText(COLUMNS[1])).toBe("Entwurf neben dem veröffentlichten Ergebnis – du gibst ihn frei");
   expect(targetText(COLUMNS[3])).toBe("Spalte wird nicht übernommen");
   expect(targetText({ ...COLUMNS[0], state: "same" })).toBe("Ergebnis stimmt mit der Tabelle überein");

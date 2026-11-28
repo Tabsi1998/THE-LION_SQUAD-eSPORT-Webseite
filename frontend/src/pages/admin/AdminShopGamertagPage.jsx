@@ -3,7 +3,7 @@ import { toast } from "sonner";
 import { AlertTriangle, Copy, FileImage, Plus, Ruler, ShoppingBag, Trash2, Type } from "lucide-react";
 import { AdminLayout } from "@/components/tls/AdminLayout";
 import { api, formatRequestError, resolveMediaUrl } from "@/lib/api";
-import { viennaDateTime } from "@/lib/vienna";
+import { formatWhen } from "@/lib/datetime";
 import ShopTabs from "./ShopTabs";
 import { ShortCaps } from "@/components/tls/ShortCaps";
 
@@ -355,7 +355,7 @@ export default function AdminShopGamertagPage() {
                     <code className="font-mono" title={file.sha256}>{file.sha256_short}…</code>
                     <span className="tabular-nums">{file.measures.text_height} · {file.width_px} × {file.height_px} px · {file.dpi} DPI</span>
                     {file.scaled && <span className="text-warn">verkleinert</span>}
-                    <span>{viennaDateTime(file.last_used_at)}</span>
+                    <span>{formatWhen(file.last_used_at)}</span>
                     <button type="button" onClick={() => copy(fullUrl(file))} className="tls-btn tls-btn--quiet min-h-8 px-2 tls-type-label rounded-sm inline-flex items-center gap-1.5" data-testid={`shop-gamertag-file-${file.sha256_short}-copy`}>
                       <Copy className="w-3.5 h-3.5" aria-hidden="true" /> Adresse für Printful
                     </button>

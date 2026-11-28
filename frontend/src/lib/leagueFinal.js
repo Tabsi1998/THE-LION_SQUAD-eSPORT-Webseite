@@ -1,9 +1,6 @@
 // Saisonabschluss (F.1, #1645, docs/LIGA.md „F.1 Saisonabschluss“): Texte und kleine Rechnungen für das Cockpit der Season und den
 // Endstand auf der Ligaseite. Was abgeschlossen werden darf, entscheidet der Server - hier steht nur, wie es heißt.
-import { viennaDate, viennaDateTime } from "@/lib/vienna";
-
-const DAY = { day: "2-digit", month: "2-digit", year: "numeric" };
-const MOMENT = { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" };
+import { formatWhen } from "@/lib/datetime";
 
 export const REASON_MIN = 5;
 
@@ -15,8 +12,9 @@ function safe(format, value, options) {
   }
 }
 
-export const finalDay = (value) => safe(viennaDate, value, DAY);
-export const finalMoment = (value) => safe(viennaDateTime, value, MOMENT);
+// Steht in Sätzen wie „abgeschlossen am …“ - darum ohne „heute“ (#1307).
+export const finalDay = (value) => safe(formatWhen, value, { time: false, relative: false });
+export const finalMoment = (value) => safe(formatWhen, value, { relative: false });
 
 /** „Liga 1 · Staffel A“ - der Name einer Staffel im Cockpit. */
 export function staffelLabel(row) {

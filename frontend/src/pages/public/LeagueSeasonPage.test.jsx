@@ -1,5 +1,9 @@
 import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
+import { runAtTestClock } from "@/testClock";
+
+// Feste Uhr (#1307): die Datums-Texte lassen das laufende Jahr weg und sagen „heute“/„morgen“.
+runAtTestClock();
 
 // Ligaseite (docs/LIGA.md, P5, #1625): Kopf mit Pausen, Liga N mit Staffel-Reitern, Tabelle, Spielwochen mit Pause,
 // Ergebnis mit Maps, Teams mit Teamseite, Regeln aufklappbar. Nur erfundene Namen.
@@ -69,7 +73,7 @@ function renderPage(path = "/liga/probe-liga/season-1") {
 test("Kopf mit Zeitraum, Spielwochen und Pausen - Best of, Standardtermin und Punkte nur an ihrer einen Stelle (#2268)", async () => {
   renderPage();
   expect(await screen.findByRole("heading", { level: 1 })).toHaveTextContent("Probe-Liga Season 1");
-  expect(screen.getByTestId("league-fact-period")).toHaveTextContent("10.11.2026 – 18.1.2027");
+  expect(screen.getByTestId("league-fact-period")).toHaveTextContent("Di 10. November 2026 – Mo 18. Jänner 2027");
   expect(screen.getByTestId("league-fact-week")).toHaveTextContent("10 Spielwochen");
   expect(screen.getByTestId("league-fact-week")).toHaveTextContent("Spielwoche Di–Mo");
   // Jede Angabe an einer Stelle: nicht im Kopf, sondern in „Was gespielt wird“ bzw. „Ablauf“.
@@ -78,7 +82,7 @@ test("Kopf mit Zeitraum, Spielwochen und Pausen - Best of, Standardtermin und Pu
   expect(screen.getByTestId("league-facts")).not.toHaveTextContent("20:00");
   expect(screen.getByTestId("season-points")).toHaveTextContent("3 / 1 / 0");
   expect(screen.getByTestId("season-flow-default")).toHaveTextContent("Sonntag, 20:00 Uhr");
-  expect(screen.getByTestId("league-fact-breaks")).toHaveTextContent("Weihnachtspause 21.12.–3.1.");
+  expect(screen.getByTestId("league-fact-breaks")).toHaveTextContent("Weihnachtspause Mo 21. Dezember 2026 – So 3. Jänner 2027");
   expect(screen.getByTestId("league-rules")).toHaveTextContent("Kein Cheaten");
   expect(screen.getByTestId("league-map-pool")).toHaveTextContent("Hafenkante");
 });
@@ -91,7 +95,7 @@ test("Regelwerk (#1646): Link mit Version und Stand plus PDF statt des Aufklappb
   renderPage();
   const link = await screen.findByTestId("league-rules-link");
   expect(within(link).getByRole("link", { name: "Regelwerk" })).toHaveAttribute("href", "/liga/probe-liga/season-1/regeln");
-  expect(screen.getByTestId("league-rules-version")).toHaveTextContent("Version 2 · gültig ab 03.11.2026");
+  expect(screen.getByTestId("league-rules-version")).toHaveTextContent("Version 2 · gültig ab Di 3. November");
   expect(screen.getByTestId("league-rules-pdf")).toHaveAttribute("href", "/api/league-rules/seasons/probe-liga/season-1/versions/v2/pdf");
   expect(screen.getByTestId("league-rules-consent")).toHaveTextContent("noch nicht zugestimmt");
   expect(screen.queryByTestId("league-rules")).toBeNull();
@@ -306,9 +310,9 @@ test("Vor der Einteilung (#2268): freundlicher Platzhalter mit dem, was als Näc
   const placeholder = await screen.findByTestId("league-no-divisions");
   expect(placeholder).toHaveTextContent("Die Ligen werden eingeteilt");
   expect(within(placeholder).getByTestId("season-step-apply")).toHaveAttribute("data-state", "now");
-  expect(within(placeholder).getByTestId("season-step-apply")).toHaveTextContent("Offen bis 6.11.2026");
+  expect(within(placeholder).getByTestId("season-step-apply")).toHaveTextContent("Offen bis Fr 6. November");
   expect(within(placeholder).getByTestId("season-step-split")).toHaveAttribute("data-state", "next");
-  expect(within(placeholder).getByTestId("season-step-start")).toHaveTextContent("Erster Spieltag ab 10.11.2026");
+  expect(within(placeholder).getByTestId("season-step-start")).toHaveTextContent("Erster Spieltag ab Di 10. November");
 });
 
 test("Gold nur für den Meister (#2268): beendete Staffel der obersten Liga, Platz 1 allein", async () => {

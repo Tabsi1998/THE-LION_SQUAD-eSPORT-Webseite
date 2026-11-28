@@ -1,13 +1,11 @@
 // Liga-Termine auf der Matchseite (#2194, docs/LIGA.md D.1): Grenzen, Regeln und Historie im Klartext, damit Captains
 // ohne Vorwissen sehen, was geht - „Noch 1 Verschiebung möglich, bis Sa 14.11. 20:00“. Die Zahlen kommen vom Server
 // (`schedule_block`), hier wird nur formuliert.
-import { viennaDate, viennaTime } from "@/lib/vienna";
+import { formatWhen } from "@/lib/datetime";
 
-/** „Sa 14.11. 20:00“ in Wiener Zeit. */
+/** „Sa 14. November · 20:00“, „heute 20:00“ in Wiener Zeit (#1307). */
 export function shortWhen(value) {
-  if (!value) return "";
-  const day = viennaDate(value, { weekday: "short", day: "2-digit", month: "2-digit" }).replace(/\.,/, "").replace(",", "");
-  return `${day} ${viennaTime(value, { hour: "2-digit", minute: "2-digit" })}`;
+  return value ? formatWhen(value) : "";
 }
 
 /** Die Spielwoche: „Di 10.11. 00:00 bis Mo 16.11. 23:59“ (Ende ausschließlich, darum eine Minute davor). */

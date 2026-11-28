@@ -1,4 +1,8 @@
 import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { runAtTestClock } from "@/testClock";
+
+// Feste Uhr (#1307): die Datums-Texte lassen das laufende Jahr weg und sagen „heute“/„morgen“.
+runAtTestClock();
 
 // Anpassungen der Saison (#1960): Liste mit „−5“, Teilnehmer bzw. Team, Grund, Termin und Tag; anlegen (Grund und Tag
 // Pflicht, echtes Minus geht), bearbeiten und entfernen - alles über den Server. Nur erfundene Namen.
@@ -30,8 +34,8 @@ test("Liste: Punkte als Zeichen, für wen, Grund, Termin und Tag", async () => {
   render(<SeriesAdjustmentsSection series={SERIES} onChanged={vi.fn()} />);
   await waitFor(() => expect(screen.getAllByTestId("adjustment-row")[0]).toHaveTextContent("Probe Lion Eins"));
   const [first, second] = screen.getAllByTestId("adjustment-row");
-  expect(first).toHaveTextContent("−5Probe Lion EinsFahrerNichtteilnahme nach Anmeldung · R2 · 02.11.2026");
-  expect(second).toHaveTextContent("+2Probe LöwenTeamKorrektur laut Veranstalter · 03.11.2026");
+  expect(first).toHaveTextContent("−5Probe Lion EinsFahrerNichtteilnahme nach Anmeldung · R2 · Mo 2. November");
+  expect(second).toHaveTextContent("+2Probe LöwenTeamKorrektur laut Veranstalter · Di 3. November");
 });
 
 test("Anlegen: Pflichtfelder, echtes Minus, Termin - dann rechnet der Server neu", async () => {

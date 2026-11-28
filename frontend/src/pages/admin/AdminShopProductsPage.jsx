@@ -7,7 +7,7 @@ import {
 import { AdminLayout } from "@/components/tls/AdminLayout";
 import { api, formatRequestError } from "@/lib/api";
 import { formatCents, parseEuro } from "@/lib/billing";
-import { viennaDateTime } from "@/lib/vienna";
+import { formatWhen } from "@/lib/datetime";
 import { defaultTechnique, techniqueHint, techniqueLabel, techniqueList } from "@/lib/shopTechniques";
 import ShopTabs from "./ShopTabs";
 import LayoutStep, { layoutKey } from "./ShopLayoutStep";
@@ -329,7 +329,7 @@ function PrintfulStep({ view, busy, run }) {
       {printful && (
         <dl className="grid gap-x-6 gap-y-2 tls-type-small sm:grid-cols-2 border-t border-white/10 pt-3" data-testid="shop-printful-loaded">
           <div><dt className="text-white/50 tls-type-small">Produkt</dt><dd className="font-bold">{printful.name} <span className="text-white/50 font-normal tabular-nums">Nr. {printful.product_id}</span></dd></div>
-          <div><dt className="text-white/50 tls-type-small">Geladen</dt><dd>{viennaDateTime(printful.loaded_at)}{printful.is_discontinued ? <span className="text-warn"> · bei Printful eingestellt</span> : ""}</dd></div>
+          <div><dt className="text-white/50 tls-type-small">Geladen</dt><dd>{formatWhen(printful.loaded_at)}{printful.is_discontinued ? <span className="text-warn"> · bei Printful eingestellt</span> : ""}</dd></div>
           <div><dt className="text-white/50 tls-type-small">Farben · Größen · Varianten</dt><dd className="tabular-nums">{printful.colors.length} · {printful.sizes.length} · {printful.variants.length}</dd></div>
           <div><dt className="text-white/50 tls-type-small">Techniken</dt><dd data-testid="shop-printful-techniques">{techniqueList(printful.techniques) || "–"}</dd></div>
           <div className="sm:col-span-2"><dt className="text-white/50 tls-type-small">Druckflächen</dt>
@@ -544,7 +544,7 @@ function PricesStep({ view, busy, run }) {
         <div className="border border-warn/40 bg-warn/10 rounded-sm p-3 tls-type-small" role="alert" data-testid="shop-price-warnings">
           <div className="font-bold inline-flex items-center gap-2"><AlertTriangle className="w-4 h-4 text-warn" aria-hidden="true" /> Printful hat Preise geändert</div>
           <ul className="mt-1 tls-type-small space-y-0.5">
-            {warnings.map((row) => <li key={row.id}>{row.display_label || row.label}: {money(row.price_warning.before_cents)} → {row.price_warning.stale ? "Schätzung veraltet – neu schätzen" : money(row.price_warning.after_cents)} (seit {viennaDateTime(row.price_warning.at)})</li>)}
+            {warnings.map((row) => <li key={row.id}>{row.display_label || row.label}: {money(row.price_warning.before_cents)} → {row.price_warning.stale ? "Schätzung veraltet – neu schätzen" : money(row.price_warning.after_cents)} (seit {formatWhen(row.price_warning.at)})</li>)}
           </ul>
           <p className="tls-type-small text-white/60 mt-1">Bestehende Bestellungen bleiben unverändert. Neue Preise gelten erst nach „Preise übernehmen“.</p>
         </div>
@@ -656,8 +656,8 @@ function SyncLine({ view, busy, run }) {
     <div className="flex flex-wrap items-center gap-3 tls-type-small" data-testid="shop-sync">
       <span className={sync && !sync.ok ? "text-warn" : sync?.warning ? "text-warn" : "text-white/60"} data-state={sync?.warning ? "warn" : undefined}>
         {!sync ? "Noch nicht abgeglichen."
-          : sync.ok ? `Abgleich ${viennaDateTime(sync.at)}: ${sync.detail}`
-            : `Abgleich gescheitert (${viennaDateTime(sync.at)}): ${sync.detail} Stand vom ${sync.last_ok_at ? viennaDateTime(sync.last_ok_at) : "–"}.`}
+          : sync.ok ? `Abgleich ${formatWhen(sync.at)}: ${sync.detail}`
+            : `Abgleich gescheitert (${formatWhen(sync.at)}): ${sync.detail} Stand vom ${sync.last_ok_at ? formatWhen(sync.last_ok_at, { relative: false }) : "–"}.`}
       </span>
       <button type="button" disabled={busy === "sync"} onClick={() => run("sync", () => api.post(`${BASE}/${view.product.id}/sync`, {}), (next) => (next.result?.ok ? "Mit Printful abgeglichen." : "Printful nicht erreichbar – letzter Stand bleibt."))}
         className="tls-btn tls-btn--secondary min-h-9 px-3 tls-type-label rounded-sm inline-flex items-center gap-1.5 disabled:opacity-40" data-testid="shop-sync-run">

@@ -11,10 +11,9 @@ import { SeasonShell } from "@/components/tls/league/public/SeasonShell";
 import { StaffelRewards } from "@/components/tls/rewards/StaffelRewards";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { cellText, pointsWord, rulesLine, seasonColumns, stateLine, tiebreakLine } from "@/lib/leagueOverall";
-import { viennaDate } from "@/lib/vienna";
+import { formatWhen } from "@/lib/datetime";
 import "@/components/tls/league/public/overall.css";
 
-const LONG_DAY = { day: "2-digit", month: "2-digit", year: "numeric" };
 
 function Cell({ cell }) {
   if (!cell.played) return <span aria-hidden="true">–</span>;
@@ -131,7 +130,7 @@ function Level({ block, data, leagueSlug, seasonSlug }) {
           <h2 id={`${testId}-head`} className="tls-type-section [overflow-wrap:anywhere] hyphens-auto">{block.label}</h2>
           <p className="mt-1 flex items-center gap-1.5 tls-type-small text-white/60" data-testid={`${testId}-state`}>
             {block.closed ? <Lock className="h-3.5 w-3.5 shrink-0" aria-hidden="true" /> : null}
-            {stateLine(block, (value) => viennaDate(value, LONG_DAY))}
+            {stateLine(block, (value) => formatWhen(value, { time: false }))}
           </p>
         </div>
         <div className="tls-overall-tabs" role="group" aria-label="Wertung">

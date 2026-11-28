@@ -1,8 +1,8 @@
-import { formatWhen } from "@/lib/datetime";
+import { formatClock, formatWhen } from "@/lib/datetime";
 import { gameLabel } from "@/lib/gameLabels";
 import { offerSummary } from "@/lib/pricing";
 import { formatTournamentDisplay } from "@/lib/tournamentLabels";
-import { viennaDay, viennaTime } from "@/lib/vienna";
+import { viennaDay } from "@/lib/vienna";
 
 // Die Event-Seite als Startpunkt (#1183), Kopf mit Bild (#1273) und Fakten-Kasten (#1346) - die Rechnung ohne React.
 // Dieselbe Reihenfolge und dieselben Wörter stehen für die App in mobile/src/lib/eventPage.ts.
@@ -53,7 +53,7 @@ function addressLine(event) {
 
 function endClock(start, end) {
   if (!start || !end) return "";
-  return viennaDay(start) === viennaDay(end) ? viennaTime(end, { hour: "2-digit", minute: "2-digit" }) : formatWhen(end);
+  return viennaDay(start) === viennaDay(end) ? formatClock(end) : formatWhen(end);
 }
 
 /**
@@ -98,7 +98,7 @@ export function eventFacts(event, { now = new Date() } = {}) {
 }
 
 export function clock(value) {
-  return value ? viennaTime(value, { hour: "2-digit", minute: "2-digit" }) : "";
+  return value ? formatClock(value) : "";
 }
 
 export function weekdayClock(value) {

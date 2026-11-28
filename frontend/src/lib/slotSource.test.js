@@ -1,6 +1,10 @@
 // Klartext statt Platzhalter (#1113): Sieger, Verlierer, Platz, Setzplatz, Freilos - und die Kürzel.
 import { absoluteRank, describeSlot, finderFor, initials, normalizeSource, plannedText, sourceLabel, stationLabel } from "./slotSource";
 import sharedCases from "./slotSource.cases.json";
+import { runAtTestClock } from "@/testClock";
+
+// Feste Uhr (#1307): die Datums-Texte lassen das laufende Jahr weg und sagen „heute“/„morgen“.
+runAtTestClock();
 
 const duel = (key, extra = {}) => ({ id: key, match_key: key, stage_id: "s1", slots: [{}, {}], settings: { match_size: 2, qualifiers_per_match: 1 }, ...extra });
 const heat = (key, size = 4, qualifiers = 2) => ({ id: key, match_key: key, stage_id: "s1", slots: Array.from({ length: size }, () => ({})), settings: { match_size: size, qualifiers_per_match: qualifiers } });

@@ -12,12 +12,11 @@ import { ApplicationStateBadge } from "@/components/tls/league/application/Leagu
 import { stateLabel, untilText } from "@/lib/leagueStartRights";
 import { carryLine } from "@/lib/leagueSuccessor";
 import { APPLICATION_STATES, statsLine } from "@/lib/leagueApplications";
-import { viennaDateTime } from "@/lib/vienna";
+import { formatWhen } from "@/lib/datetime";
 import { staffelAdminUrl } from "@/lib/staffelTabs";
 import { GuestBadge } from "@/components/tls/league/GuestBadge";
 import { GuestTeamControl } from "./GuestTeamControl";
 
-const WHEN = { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" };
 const BUTTON = "inline-flex min-h-[40px] items-center rounded-sm px-3 py-1.5 tls-type-label disabled:opacity-50";
 const REASON_MIN = 5;
 const OWN_TEAM = "Über dein eigenes Team entscheidet eine andere Person.";
@@ -31,7 +30,7 @@ const OPEN_GROUPS = [
 ];
 
 function when(value) {
-  return value ? viennaDateTime(value, WHEN) : "";
+  return value ? formatWhen(value) : "";
 }
 
 const OTHER_DIVISION = " – andere Liga, nur mit Grund";

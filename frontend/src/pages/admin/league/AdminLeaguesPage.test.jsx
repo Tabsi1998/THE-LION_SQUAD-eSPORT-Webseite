@@ -1,5 +1,9 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
+import { runAtTestClock } from "@/testClock";
+
+// Feste Uhr (#1307): die Datums-Texte lassen das laufende Jahr weg und sagen „heute“/„morgen“.
+runAtTestClock();
 
 // Liga verwalten (docs/LIGA.md, #1622): Einstieg mit den Schritten, Liga je Spiel anlegen, Season mit Beginn anlegen und
 // gleich auf ihre Seite springen. Nur erfundene Namen.
@@ -46,7 +50,7 @@ test("zeigt die Schritte, die Ligen und ihre Seasons mit Sichtbarkeit", async ()
   expect(screen.getByTestId("league-steps").querySelectorAll("li")).toHaveLength(4);
   const link = screen.getByTestId("season-link-season-1");
   expect(link).toHaveAttribute("href", "/admin/leagues/seasons/s1");
-  expect(link).toHaveTextContent("10.11.2026");
+  expect(link).toHaveTextContent("Di 10. November");
   expect(link).toHaveTextContent("Aus");
 });
 

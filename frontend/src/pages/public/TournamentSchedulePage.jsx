@@ -24,9 +24,8 @@ import { useChangedKeys } from "@/hooks/useLiveChanges";
 import { useCanonicalSlugRedirect } from "@/hooks/useCanonicalSlugRedirect";
 import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 import { matchScheduleStatusText } from "@/lib/tournamentLabels";
-import { formatWhen } from "@/lib/datetime";
+import { formatRange, formatWhen } from "@/lib/datetime";
 import { seoTextPreview } from "@/lib/textPreview";
-import { viennaDate } from "@/lib/vienna";
 import { groupByRound, groupByStation, hasStations, onlyMine, scheduleEntries } from "@/lib/scheduleView";
 import { ShortCaps } from "@/components/tls/ShortCaps";
 
@@ -39,10 +38,7 @@ import { ShortCaps } from "@/components/tls/ShortCaps";
 // nur die Nummer - "Spieltag 3" allein sagt niemandem, wann gespielt wird.
 function formatWeekRange(startsAt, endsAt) {
   if (!startsAt || !endsAt) return "";
-  const day = { day: "2-digit", month: "2-digit" };
-  const start = viennaDate(startsAt, day);
-  const end = viennaDate(endsAt, { ...day, year: "numeric" });
-  return `${start} – ${end}`;
+  return formatRange(startsAt, endsAt);
 }
 
 // Warum dieser Termin gilt. Ohne das steht da eine Uhrzeit, bei der unklar

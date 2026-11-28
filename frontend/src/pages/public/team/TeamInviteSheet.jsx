@@ -9,7 +9,7 @@ import { useConfirm } from "@/components/tls/ConfirmDialog";
 import { useSubmissionGuard } from "@/hooks/useSubmissionGuard";
 import { useLoad } from "@/hooks/useLoad";
 import { LoadNotice } from "@/components/tls/LoadState";
-import { viennaDate } from "@/lib/vienna";
+import { formatWhen } from "@/lib/datetime";
 
 // „Einladen“ auf der Team-Seite (#1191): Link mit QR-Code - wer ihn öffnet, landet im Team und tippt nur noch
 // „Beitreten“. Neu erzeugen macht den alten Link ungültig. Darunter der Beitrittscode als Rückfall und die Suche nach
@@ -258,7 +258,7 @@ export function PendingInvites({ team, load, onWithdrawn }) {
             <div className="font-bold tls-type-small truncate">{invite.user?.display_name || invite.user?.username || "Unbekannt"}</div>
             <div className="tls-type-small text-quiet truncate">
               {invite.inviter ? `eingeladen von ${invite.inviter.display_name || invite.inviter.username}` : "wartet auf Antwort"}
-              {invite.created_at ? ` · ${viennaDate(invite.created_at)}` : ""}
+              {invite.created_at ? ` · ${formatWhen(invite.created_at, { time: false })}` : ""}
             </div>
           </div>
           <button

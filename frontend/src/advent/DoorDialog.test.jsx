@@ -1,6 +1,10 @@
 import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import appSource from "@/App.jsx?raw";
+import { runAtTestClock } from "@/testClock";
+
+// Feste Uhr (#1307): die Datums-Texte lassen das laufende Jahr weg und sagen „heute“/„morgen“.
+runAtTestClock();
 
 // Der Inhalt eines Türchens (#641): jede Art zeigt, was sie hat; Videos und Clips erst nach Zustimmung; das Quiz
 // löst nach der Antwort auf; bei der Verlosung ist Mitmachen ein eigener Klick.
@@ -95,7 +99,7 @@ test("Karten: News, Event und Mitglied der Woche führen auf ihre Seite", () => 
   first.unmount();
   const second = show({ kind: "event", card: { title: "Weihnachtsfeier", image_url: null, url: "/events/weihnachtsfeier", date: "2026-12-19T18:00:00+01:00", location: "Vereinsheim" } });
   card = screen.getByTestId("advent-card");
-  expect(card).toHaveTextContent("EventWeihnachtsfeier19. Dezember 2026 · Vereinsheim");
+  expect(card).toHaveTextContent("EventWeihnachtsfeierSa 19. Dezember · Vereinsheim");
   expect(card.className).toContain("tls-adv-card--plain");
   second.unmount();
   const third = show({ kind: "member_spotlight", card: { name: "Pauli", role: "Kapitänin", image_url: null, url: "/members/paula" } });

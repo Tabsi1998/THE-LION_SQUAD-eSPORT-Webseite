@@ -1,5 +1,9 @@
 import { fireEvent, render, screen, within } from "@testing-library/react";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
+import { runAtTestClock } from "@/testClock";
+
+// Feste Uhr (#1307): die Datums-Texte lassen das laufende Jahr weg und sagen „heute“/„morgen“.
+runAtTestClock();
 
 // Referenzen-Übersicht (#409, neu gestaltet #1878): Ehrentafel, Läuft gerade, Vitrine mit Hauptkarte, Serien & Ligen
 // mit Liga-Weg, Chronik je Jahr mit Spiel-Chips und „Nur Podest“, Mitmachen-Band. Nur erfundene Namen.
@@ -95,7 +99,7 @@ test("Läuft gerade: heute zuerst mit goldenem Chip, Fortschritt in Segmenten, T
 
   const league = cards[1];
   expect(within(league).getByTestId("running-progress-text")).toHaveTextContent("0 von 8 Spieltagen gespielt");
-  expect(within(league).getByTestId("running-next")).toHaveTextContent("Mo 23.11. · ST1");
+  expect(within(league).getByTestId("running-next")).toHaveTextContent("Mo 23. November · ST1");
   expect(within(league).getByTestId("running-place")).toHaveTextContent("Noch offen");
   expect(within(league).queryByTestId("running-today-badge")).toBeNull();
   // Reihenfolge: Bereich steht vor der Vitrine; die Sprungmarke „Im Einsatz“ pulsiert, weil heute etwas ansteht.
@@ -231,7 +235,7 @@ test("Chronik: Zeilen je Jahr mit Platz-Ring, Titel, Veranstalter, Marken und St
   expect(row).toHaveTextContent("Call of Duty");
   expect(row).toHaveTextContent("HC");
   expect(within(row).getByTestId("reference-row-starters")).toHaveTextContent(/^Anni, Benny$/);
-  expect(row).toHaveTextContent("01.02.2026");
+  expect(row).toHaveTextContent("So 1. Februar");
   const team = within(screen.getByTestId("references-timeline-2025")).getByTestId("reference-card-r2");
   expect(within(team).getByTestId("placement-badge")).toHaveAttribute("data-medal", "none");
   expect(within(team).getByTestId("reference-row-starters")).toHaveTextContent(/^LION A$/);
@@ -397,7 +401,7 @@ test("Detailseite eines Tagesturniers: nur ausgefüllte Felder, ein Tag steht ei
   } });
   render(<MemoryRouter initialEntries={["/references/r9"]}><Routes><Route path="/references/:id" element={<ReferenceDetailPage />} /></Routes></MemoryRouter>);
   const meta = await screen.findByTestId("reference-detail-meta");
-  expect(meta).toHaveTextContent("12.10.2026");
+  expect(meta).toHaveTextContent("Mo 12. Oktober");
   expect(meta).not.toHaveTextContent("–");
   expect(meta).not.toHaveTextContent("Veranstalter");
   expect(screen.queryByTestId("reference-detail-organizer")).toBeNull();
@@ -408,7 +412,7 @@ test("Detailseite eines Tagesturniers: nur ausgefüllte Felder, ein Tag steht ei
 test("Detailseite: mehrere Tage als Spanne, Veranstalter-Zeile und Links nur mit Inhalt", async () => {
   apiMock.get.mockResolvedValue({ data: { ...ITEMS[0], start_date: "2026-10-10", end_date: "2026-10-12", external_url: "https://example.org/cup" } });
   render(<MemoryRouter initialEntries={["/references/r1"]}><Routes><Route path="/references/:id" element={<ReferenceDetailPage />} /></Routes></MemoryRouter>);
-  expect(await screen.findByTestId("reference-detail-meta")).toHaveTextContent("10.10.2026 – 12.10.2026");
+  expect(await screen.findByTestId("reference-detail-meta")).toHaveTextContent("Sa 10. Oktober – Mo 12. Oktober");
   expect(screen.getByTestId("reference-detail-organizer")).toHaveTextContent("ESL · Liga X · Season 3");
   expect(within(screen.getByTestId("reference-detail-links")).getByRole("link")).toHaveAttribute("href", "https://example.org/cup");
 });

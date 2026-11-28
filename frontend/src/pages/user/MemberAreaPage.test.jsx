@@ -1,5 +1,9 @@
 import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
+import { runAtTestClock } from "@/testClock";
+
+// Feste Uhr (#1307): die Datums-Texte lassen das laufende Jahr weg und sagen „heute“/„morgen“.
+runAtTestClock();
 
 // Mitgliederbereich: oben die eigene Karte mit Gruß, „Mitglied seit“ und Beitragsstand (#1336), darunter die Sprungleiste
 // mit dem, was offen ist (#1257) - Zahl nur, wenn etwas offen ist; die Zusage zur Versammlung geht direkt in der Karte.
@@ -108,7 +112,7 @@ test("Zusage in der Karte: ohne Seitenwechsel, die Zahl in der Leiste geht weg",
   const card = await screen.findByTestId("member-area-meeting-7");
   expect(card).toHaveTextContent("Generalversammlung 2026");
   expect(card).toHaveTextContent("Okt");
-  expect(card).toHaveTextContent("24.10.2026");
+  expect(card).toHaveTextContent("Sa 24. Oktober");
   expect(screen.getByTestId("member-area-answer")).toHaveTextContent("Deine Antwort: noch keine Antwort");
   fireEvent.click(screen.getByTestId("member-area-answer-yes"));
   await waitFor(() => expect(screen.getByTestId("member-area-answer")).toHaveTextContent("Deine Antwort: zugesagt"));

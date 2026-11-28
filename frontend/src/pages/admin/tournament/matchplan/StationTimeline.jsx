@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { AlertTriangle, Pin } from "lucide-react";
 import { dropConflicts, NO_STATION, snapMinutes, timeScale, timeTicks } from "@/lib/matchTimeline";
-import { viennaTime } from "@/lib/vienna";
+import { formatClock } from "@/lib/datetime";
 import "./matchplan.css";
 
 // Zeitleiste je Station (#1557): Balken je Spiel, Länge = Dauer, Farbe = Abschnitt, Zustand über Rollen (läuft Rot,
@@ -17,7 +17,7 @@ export const LANE_HEIGHT = 64;
 const MINUTE = 60_000;
 const DRAG_THRESHOLD = 4;
 
-const hm = (ms) => viennaTime(ms, { hour: "2-digit", minute: "2-digit" }) || "–";
+const hm = (ms) => formatClock(ms) || "–";
 
 function barLabel(item, laneName) {
   const parts = [`${item.key}, ${hm(item.start)} bis ${hm(item.end)}`, laneName];

@@ -8,6 +8,7 @@ import { formatRaceTime } from "@/lib/raceTime";
 import { countryName } from "@/lib/countryFlags";
 import { dayLabel } from "@/lib/referenceCalendar";
 import { nameOf } from "@/lib/referenceSeriesTable";
+import { formatWhen } from "@/lib/datetime";
 
 export const SESSION_PARAM = "lauf";
 const UMLAUTS = { ä: "ae", ö: "oe", ü: "ue", ß: "ss" };
@@ -227,7 +228,11 @@ export function neighbourLabel(item) {
 export function emptyText(session) {
   if (!session) return "Für diese Runde gibt es noch keine Läufe.";
   if (session.state === "cancelled") return `${session.label} abgesagt.`;
-  const when = [dayLabel(session.club_day), session.time ? `${session.time} Uhr` : ""].filter(Boolean).join(", ");
+  // „am Do 8. Oktober · 20:30“ - ohne „heute“, weil „am“ davorsteht (#1307).
+  const clock = /^\d{2}:\d{2}$/.test(session.time || "");
+  const when = session.club_day
+    ? formatWhen(clock ? `${session.club_day}T${session.time}` : session.club_day, { time: clock, relative: false })
+    : session.time ? `${session.time} Uhr` : "";
   if (session.state === "missing") return `Ergebnis folgt – ${session.label}${when ? ` am ${when}` : ""}.`;
   return `Noch kein Ergebnis – ${session.label}${when ? ` am ${when}` : ""}.`;
 }

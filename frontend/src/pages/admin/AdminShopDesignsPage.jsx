@@ -3,7 +3,7 @@ import { toast } from "sonner";
 import { AlertTriangle, ArrowLeftRight, CheckCircle2, Copy, ExternalLink, FileImage, Palette, Plus, Ruler, ShoppingBag, Trash2, Upload, XOctagon } from "lucide-react";
 import { AdminLayout } from "@/components/tls/AdminLayout";
 import { api, formatRequestError, resolveMediaUrl, uploadApi } from "@/lib/api";
-import { viennaDateTime } from "@/lib/vienna";
+import { formatWhen } from "@/lib/datetime";
 import { ReasonedButton } from "./AdminShopPage";
 import ShopTabs from "./ShopTabs";
 import { ShortCaps } from "@/components/tls/ShortCaps";
@@ -776,7 +776,7 @@ function MotifCard({ design, busy, maxExceptions, onColors, onExceptions, onNewF
         <div className="min-w-0 space-y-2">
           {latest ? (
             <dl className="grid gap-x-6 gap-y-1 tls-type-small sm:grid-cols-2" data-testid={`shop-design-${key}-latest`}>
-              <div><dt className="text-white/50 tls-type-small">Hauptdatei</dt><dd>v{latest.version} · {viennaDateTime(latest.created_at)}{latest.created_by ? ` · ${latest.created_by}` : ""}</dd></div>
+              <div><dt className="text-white/50 tls-type-small">Hauptdatei</dt><dd>v{latest.version} · {formatWhen(latest.created_at)}{latest.created_by ? ` · ${latest.created_by}` : ""}</dd></div>
               <div><dt className="text-white/50 tls-type-small">Format</dt><dd data-testid={`shop-motif-${key}-format`}>
                 {latest.is_vector
                   ? <span className="inline-flex items-center gap-1 text-ok"><CheckCircle2 className="w-3.5 h-3.5" aria-hidden="true" /> echtes Vektor-SVG</span>
@@ -852,7 +852,7 @@ function MotifCard({ design, busy, maxExceptions, onColors, onExceptions, onNewF
                 <b className="text-white">v{version.version}</b>
                 <span>{VARIANT_LABELS[version.variant] || VARIANT_LABELS.dark}</span>
                 <span className="text-white/50">{ORIGIN_LABELS[version.origin] || version.origin}{version.derived_from ? ` aus v${version.derived_from}` : ""}{version.is_vector ? " · SVG" : ""}</span>
-                <span>{viennaDateTime(version.created_at)}</span>
+                <span>{formatWhen(version.created_at)}</span>
                 {version.created_by && <span>{version.created_by}</span>}
                 <code className="font-mono" title={version.sha256}>{version.sha256_short}…</code>
                 <span className="tabular-nums">{version.print_size || "–"}</span>

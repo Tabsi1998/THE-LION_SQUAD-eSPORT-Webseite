@@ -16,7 +16,8 @@ import { AlertTriangle } from "lucide-react";
 import { toast } from "sonner";
 import { Archive, ArchiveRestore, ExternalLink, Flag, History, Medal, Pencil, Plus, Save, Search, Trash2, User, Users } from "lucide-react";
 import { filterReferences, pageOf, REFERENCE_STATUS_FILTERS, referenceFilterOptions } from "@/lib/referenceAdminList";
-import { viennaDate, viennaDay } from "@/lib/vienna";
+import { formatWhen } from "@/lib/datetime";
+import { viennaDay } from "@/lib/vienna";
 import { podiumItems, yearOf } from "@/lib/referencesOverview";
 import { bestPlacement } from "@/components/tls/references/referenceParts";
 import { seasonOf, seasonOptions } from "@/lib/seasonClose";
@@ -195,7 +196,7 @@ function buildReferenceSuggestions(items, helpers) {
 
 function formatDate(value) {
   if (!value) return "—";
-  return viennaDate(value, { dateStyle: "medium" });
+  return formatWhen(value, { time: false });
 }
 
 function entryPeople(entry) {

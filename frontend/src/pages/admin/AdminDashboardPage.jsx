@@ -13,7 +13,7 @@ import { DutyAttention, hasDutyAttention } from "@/pages/admin/duty/DutyAttentio
 import { useLiveRefresh } from "@/hooks/useLiveRefresh";
 import { ResponsiveContainer, ComposedChart, Area, Line, XAxis, YAxis, Tooltip, CartesianGrid } from "recharts";
 import { Trophy, Users as UsersIcon, Flag, CalendarDays, Radio, AlertTriangle, ShieldCheck, GamepadIcon, Sparkles, ImageIcon, Activity, BellRing, Bug, Inbox, Award, Mail, Search, Settings as SettingsIcon, LogIn, Palette, MessageSquare, Database, Server, RefreshCw, Share2, TrendingUp, ClipboardCheck, MessageCircleWarning, Clock, Wallet, Star } from "lucide-react";
-import { viennaDate, viennaDateTime, viennaTime } from "@/lib/vienna";
+import { formatClock, formatWhen } from "@/lib/datetime";
 import { seasonAnchorUrl } from "@/lib/seasonTabs";
 import { ShortCaps } from "@/components/tls/ShortCaps";
 
@@ -358,7 +358,7 @@ export default function AdminDashboardPage() {
           title="Live-Zahlen aktualisieren"
         >
           <RefreshCw className="w-3.5 h-3.5 text-[#29B6E8]" />
-          {refreshedAt ? viennaTime(refreshedAt, { hour: "2-digit", minute: "2-digit" }) : "Aktualisieren"}
+          {refreshedAt ? formatClock(refreshedAt) : "Aktualisieren"}
         </button>
       </div>
 
@@ -428,7 +428,7 @@ export default function AdminDashboardPage() {
               Offene Aufgaben{activeTaskItems.length > 0 ? ` · ${activeTaskItems.length}` : ""}
             </h2>
           </div>
-          <span className="tls-type-small text-quiet">{viennaDate(new Date())}</span>
+          <span className="tls-type-small text-quiet">{formatWhen(new Date(), { time: false, relative: false })}</span>
         </div>
         {activeTaskItems.length > 0 ? (
           <div className="grid md:grid-cols-2 xl:grid-cols-4 gap-3">
@@ -458,7 +458,7 @@ export default function AdminDashboardPage() {
             <ul className="divide-y divide-white/5">
               {today.map((item, index) => (
                 <li key={`${item.kind}-${item.url}-${index}`} className="py-2 flex items-center gap-3 tls-type-small">
-                  <span className="w-12 shrink-0 font-mono text-white/60 tabular-nums">{item.at ? viennaTime(item.at, { timeStyle: "short" }) : "–"}</span>
+                  <span className="w-12 shrink-0 font-mono text-white/60 tabular-nums">{item.at ? formatClock(item.at) : "–"}</span>
                   <span className="shrink-0 tls-type-label" style={{ color: item.kind === "event" ? "#9F7AEA" : item.kind === "check_in" ? ROLE_COLORS.ok : "#29B6E8" }}>
                     {item.kind === "event" ? "Event" : item.kind === "check_in" ? "Check-in" : "Match"}
                   </span>
@@ -640,7 +640,7 @@ export default function AdminDashboardPage() {
           {(data?.recent_audit_logs || []).slice(0, 8).map((l, i) => (
             <div key={i} className="flex items-center justify-between gap-3 border-b border-white/5 pb-2">
               <span className="text-white/80 tls-wrap">{l.action}</span>
-              <span className="text-quiet tls-type-small shrink-0">{l.created_at && viennaDateTime(l.created_at)}</span>
+              <span className="text-quiet tls-type-small shrink-0">{l.created_at && formatWhen(l.created_at)}</span>
             </div>
           ))}
           {data.recent_audit_logs.length === 0 && <div className="text-white/40">Keine Einträge.</div>}

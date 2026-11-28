@@ -1,5 +1,9 @@
 import { render, screen, waitFor } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
+import { runAtTestClock } from "@/testClock";
+
+// Feste Uhr (#1307): die Datums-Texte lassen das laufende Jahr weg und sagen „heute“/„morgen“.
+runAtTestClock();
 
 // Die Seite der Ostereiersuche (#646, #758): Zeitraum, Korb mit echten Mustern und leeren Mulden, Hinweise erst ab
 // Tag zwei, Gäste werden eingeladen, Preise, die Schnellsten, Regeln - und ohne Suche der nächste Start.
@@ -40,7 +44,7 @@ test("Zeiten in Worten", () => {
 test("ohne Suche: nur der nächste Start", async () => {
   pageMock.mockResolvedValue({ phase: "none", next_start: "2027-03-26T00:00:00+01:00" });
   renderPage();
-  await waitFor(() => expect(screen.getByTestId("easter-phase")).toHaveTextContent("Die nächste Eiersuche beginnt am Freitag, 26. März."));
+  await waitFor(() => expect(screen.getByTestId("easter-phase")).toHaveTextContent("Die nächste Eiersuche beginnt am Fr 26. März 2027."));
   expect(screen.queryByTestId("easter-prizes")).toBeNull();
 });
 
@@ -63,7 +67,7 @@ test("angemeldet: Korb mit echten Mustern und leeren Mulden; Hinweise erst ab Ta
   await waitFor(() => expect(screen.getByTestId("easter-basket-count")).toHaveTextContent("1 von 4"));
   expect(screen.getByTestId("easter-basket-egg-3").querySelector("svg")).toHaveAttribute("data-pattern", "lion");
   expect(screen.getAllByTestId("easter-basket-hole")).toHaveLength(3);
-  expect(screen.getByTestId("easter-hints")).toHaveTextContent("Ab Samstag, 27. März gibt es zu jedem fehlenden Ei einen Hinweis.");
+  expect(screen.getByTestId("easter-hints")).toHaveTextContent("Ab Sa 27. März 2027 gibt es zu jedem fehlenden Ei einen Hinweis.");
   expect(screen.queryByTestId("easter-guest")).toBeNull();
 });
 

@@ -11,7 +11,7 @@ import { useAuth } from "@/context/AuthContext";
 import { useModalBehavior } from "@/hooks/useModalBehavior";
 import { useLiveRefresh } from "@/hooks/useLiveRefresh";
 import { useDocumentTitle } from "@/hooks/useDocumentTitle";
-import { viennaDateTime } from "@/lib/vienna";
+import { formatWhen } from "@/lib/datetime";
 import {
   LEAD_FILTERS, MESSAGE_MAX, MESSAGE_TEMPLATES, STATUS_LABELS,
   changeText, companionsText, counterText, filterRows, leadCounts, messagePreview, normalizeName, seatsText, statusQuestion, waitlistHint,
@@ -187,7 +187,7 @@ export default function EventLeadPage() {
           <div className="min-w-0">
             <div className="tls-type-label text-[#29B6E8]">Anmeldungen & Einlass</div>
             <h1 className="mt-1 tls-type-title [overflow-wrap:anywhere]">{event.name || "…"}</h1>
-            {event.start_date ? <div className="mt-1 tls-type-small text-white/50">{viennaDateTime(event.start_date, { weekday: "short", day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" })}</div> : null}
+            {event.start_date ? <div className="mt-1 tls-type-small text-white/50">{formatWhen(event.start_date)}</div> : null}
           </div>
           <div className="flex flex-wrap gap-2">
             {data?.can_add_walk_in ? (
@@ -412,7 +412,7 @@ function Details({ row, event, busy, onChange, onStatus, onRename, onDelete, onC
           {STATUS_ORDER.map((status) => <option key={status} value={status}>{STATUS_LABELS[status]}</option>)}
         </select>
       </label>
-      {row.created_at ? <div className="mt-3 tls-type-small text-quiet">Angemeldet am {viennaDateTime(row.created_at, { dateStyle: "medium", timeStyle: "short" })}</div> : null}
+      {row.created_at ? <div className="mt-3 tls-type-small text-quiet">Angemeldet am {formatWhen(row.created_at, { relative: false })}</div> : null}
     </div>
   );
 }
@@ -572,7 +572,7 @@ function MessageLog({ messages }) {
       <ul className="mt-2 space-y-2">
         {messages.map((message) => (
           <li key={message.id} className="rounded-sm border border-white/10 bg-[#121212] p-3">
-            <div className="tls-type-small text-white/45">{viennaDateTime(message.created_at, { dateStyle: "short", timeStyle: "short" })} · {message.actor_name || "Turnierleitung"} · an {message.recipient_count}</div>
+            <div className="tls-type-small text-white/45">{formatWhen(message.created_at)} · {message.actor_name || "Turnierleitung"} · an {message.recipient_count}</div>
             <div className="mt-1 whitespace-pre-line tls-type-small text-white/80 [overflow-wrap:anywhere]">{message.text}</div>
           </li>
         ))}

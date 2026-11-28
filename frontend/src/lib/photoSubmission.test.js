@@ -1,4 +1,8 @@
 import { photoCredit, pickSubmissionFiles, submissionDoneText, submissionHint } from "./photoSubmission";
+import { runAtTestClock } from "@/testClock";
+
+// Feste Uhr (#1307): die Datums-Texte lassen das laufende Jahr weg und sagen „heute“/„morgen“.
+runAtTestClock();
 
 // Fotos vom Event einsenden (#1186): was die Seite vor dem Senden sagt.
 
@@ -20,9 +24,9 @@ test("nur Bilder, nicht zu groß, höchstens so viele, wie noch frei sind", () =
 });
 
 test("der Hinweis nennt Frist, Rest und Wartende", () => {
-  expect(submissionHint({ open: true, until: "2026-10-22", remaining: 18, pending: 2, max: 20 })).toBe("Bis Do., 22. Oktober · noch 18 Fotos · 2 warten auf Freigabe");
-  expect(submissionHint({ open: true, until: "2026-10-22", remaining: 0, pending: 1, max: 20 })).toBe("Bis Do., 22. Oktober · alle 20 Fotos geschickt · 1 wartet auf Freigabe");
-  expect(submissionHint({ open: false, until: "2026-10-22" })).toBe("Einsenden war bis Do., 22. Oktober möglich.");
+  expect(submissionHint({ open: true, until: "2026-10-22", remaining: 18, pending: 2, max: 20 })).toBe("Bis Do 22. Oktober · noch 18 Fotos · 2 warten auf Freigabe");
+  expect(submissionHint({ open: true, until: "2026-10-22", remaining: 0, pending: 1, max: 20 })).toBe("Bis Do 22. Oktober · alle 20 Fotos geschickt · 1 wartet auf Freigabe");
+  expect(submissionHint({ open: false, until: "2026-10-22" })).toBe("Einsenden war bis Do 22. Oktober möglich.");
   expect(submissionHint(null)).toBe("");
 });
 

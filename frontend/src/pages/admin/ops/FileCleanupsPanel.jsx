@@ -2,7 +2,8 @@ import { useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
 import { RotateCcw } from "lucide-react";
 import { api, formatApiError } from "@/lib/api";
-import { asInstant, viennaDateTime } from "@/lib/vienna";
+import { formatWhen } from "@/lib/datetime";
+import { asInstant } from "@/lib/vienna";
 
 // Datei-Nacharbeit (#1046): Dateien, deren Löschung scheiterte (Kontolöschung, Mediathek). Der Aufräum-Job
 // versucht es stündlich mit wachsendem Abstand und gibt nach der Grenze auf. Hier stehen die Einträge ohne
@@ -13,7 +14,7 @@ const SOURCE_LABELS = { account_erasure: "Kontolöschung", media_library: "Media
 function formatTime(value) {
   if (!value) return "–";
   const date = asInstant(value);
-  return Number.isNaN(date.getTime()) ? String(value) : viennaDateTime(date);
+  return Number.isNaN(date.getTime()) ? String(value) : formatWhen(date);
 }
 
 export function FileCleanupsPanel({ onChanged }) {

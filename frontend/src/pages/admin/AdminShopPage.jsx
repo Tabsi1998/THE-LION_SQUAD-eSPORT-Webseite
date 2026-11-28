@@ -4,7 +4,7 @@ import { KeyRound, Lock, Power, ShoppingBag, Truck, Users } from "lucide-react";
 import { AdminLayout } from "@/components/tls/AdminLayout";
 import { api, formatRequestError } from "@/lib/api";
 import { formatCents, parseEuro } from "@/lib/billing";
-import { viennaDateTime } from "@/lib/vienna";
+import { formatWhen } from "@/lib/datetime";
 import ShopTabs from "./ShopTabs";
 import { ShortCaps } from "@/components/tls/ShortCaps";
 
@@ -209,7 +209,7 @@ export default function AdminShopPage() {
         <Section title="Steuer geklärt (#1701)" icon={Lock} testId="shop-tax">
           <p className="tls-type-small text-white/65" data-testid="shop-tax-state">
             {config.tax_cleared
-              ? <>Freigegeben von {config.tax_cleared.by} am {viennaDateTime(config.tax_cleared.at)}{config.tax_cleared.reason ? ` – „${config.tax_cleared.reason}“` : ""}.</>
+              ? <>Freigegeben von {config.tax_cleared.by} am {formatWhen(config.tax_cleared.at, { relative: false })}{config.tax_cleared.reason ? ` – „${config.tax_cleared.reason}“` : ""}.</>
               : "Noch nicht freigegeben. Solange bleibt „Öffentlich“ gesperrt."}
           </p>
           {rights.can_set_tax
@@ -275,7 +275,7 @@ export default function AdminShopPage() {
 
         <Section title="Printful-Zugang" icon={KeyRound} testId="shop-access">
           <p className="tls-type-small text-white/65" data-testid="shop-key-state">
-            {key.state === "ok" && <>Schlüssel hinterlegt seit {viennaDateTime(key.saved_at)}{key.saved_by ? ` von ${key.saved_by}` : ""}. Er wird nie wieder angezeigt.</>}
+            {key.state === "ok" && <>Schlüssel hinterlegt seit {formatWhen(key.saved_at)}{key.saved_by ? ` von ${key.saved_by}` : ""}. Er wird nie wieder angezeigt.</>}
             {key.state === "missing" && "Kein Schlüssel hinterlegt."}
             {key.state === "unreadable" && <span className="text-warn">Schlüssel {key.detail}</span>}
           </p>
@@ -287,7 +287,7 @@ export default function AdminShopPage() {
             </button>
             {lastTest && (
               <span className={`tls-type-small ${lastTest.ok ? "text-ok" : "text-warn"}`} data-testid="shop-key-last-test">
-                {viennaDateTime(lastTest.at)}: {lastTest.detail}
+                {formatWhen(lastTest.at)}: {lastTest.detail}
               </span>
             )}
           </div>

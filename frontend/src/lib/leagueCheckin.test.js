@@ -1,4 +1,8 @@
 import { countdownLabel, countdownTarget, remainingText, ringShare, rulesSentences, selectionText, sideStatusText, stateText } from "./leagueCheckin";
+import { runAtTestClock } from "@/testClock";
+
+// Feste Uhr (#1307): die Datums-Texte lassen das laufende Jahr weg und sagen „heute“/„morgen“.
+runAtTestClock();
 
 // Liga-Check-in (#1652): Sätze, Countdown und Ring aus dem Block des Servers - Wiener Zeit, nie negativ.
 
@@ -12,8 +16,8 @@ function block(state, extra = {}) {
 }
 
 test("der Satz sagt je Stand, was jetzt gilt - mit Wiener Zeit", () => {
-  expect(stateText(block("waiting"))).toBe("Der Check-in öffnet um Sa 14.11. 19:45 (15 Minuten vor dem Termin) und schließt um Sa 14.11. 20:15.");
-  expect(stateText(block("open"))).toBe("Hakt an, wer da ist (mindestens 3), und tippt auf „Einchecken“ – bis Sa 14.11. 20:15.");
+  expect(stateText(block("waiting"))).toBe("Der Check-in öffnet Sa 14. November · 19:45 (15 Minuten vor dem Termin) und schließt Sa 14. November · 20:15.");
+  expect(stateText(block("open"))).toBe("Hakt an, wer da ist (mindestens 3), und tippt auf „Einchecken“ – bis Sa 14. November · 20:15.");
   expect(stateText(block("open", { sides: [{ ...OWN, checked_in: true }, OTHER] }))).toContain("jetzt fehlt noch Falken · Horst");
   expect(stateText(block("closed"))).toContain("gewertet wird nichts von selbst");
   expect(stateText(block("ready"))).toContain("Spiel starten");

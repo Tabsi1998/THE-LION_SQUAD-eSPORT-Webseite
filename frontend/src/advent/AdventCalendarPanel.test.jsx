@@ -1,5 +1,9 @@
 import { act, fireEvent, render, screen } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
+import { runAtTestClock } from "@/testClock";
+
+// Feste Uhr (#1307): die Datums-Texte lassen das laufende Jahr weg und sagen „heute“/„morgen“.
+runAtTestClock();
 
 // Das Innere des Kalender-Fensters (#641, seit #963 kein Seiteninhalt mehr): zu, offen, Gast oder angemeldet; ein Klick
 // öffnet, der Flügel schwingt auf, danach erscheint der Inhalt; verschlossene Türchen sagen, wann sie aufgehen. In der
@@ -62,7 +66,7 @@ test("Vorschau (#963): der Hinweis nennt den simulierten Tag, Platzhalter und da
   show();
   expect(screen.getByTestId("advent-page")).toHaveAttribute("data-preview", "1");
   const note = screen.getByTestId("advent-preview-note");
-  expect(note).toHaveTextContent("so sieht der Kalender am 12. Dezember aus");
+  expect(note).toHaveTextContent("so sieht der Kalender am Sa 12. Dezember aus");
   expect(note).toHaveTextContent("Öffnen zählt nicht");
   expect(note).toHaveTextContent("Platzhalter");
   expect(screen.queryByTestId("advent-guest")).toBeNull();

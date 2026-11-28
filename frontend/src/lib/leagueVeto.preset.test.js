@@ -4,6 +4,10 @@ import {
   presetChangeLine, presetModes, presetStale, presetValue, presetsPayload, presetsToForm, readyText, staleWeeks, stepLabel, stepSentence,
   templateProblems, vetoHeadline, vetoRulesPayload, vetoText, weekDates, weekList, weekLocked, withPreset,
 } from "./leagueVeto";
+import { runAtTestClock } from "@/testClock";
+
+// Feste Uhr (#1307): die Datums-Texte lassen das laufende Jahr weg und sagen „heute“/„morgen“.
+runAtTestClock();
 
 // Veto-Schrittart „Vorgabe der Woche“ (#2326): Vorlage prüfen wie der Server, die Vorgaben je Spielwoche als Formular und die Sätze der
 // Matchseite. Erfundene Modi und Maps.
@@ -95,7 +99,7 @@ describe("Vorgaben je Spielwoche", () => {
   });
 
   it("beschriftet Wochen und Historie", () => {
-    expect(weekDates(weeks[0])).toBe("10.11.–16.11.");
+    expect(weekDates(weeks[0])).toBe("Di 10. – Mo 16. November");
     expect(weekDates(weeks[2])).toBe("");
     expect(weekList([3])).toBe("3");
     expect(weekList([3, 4, 5])).toBe("3, 4 und 5");

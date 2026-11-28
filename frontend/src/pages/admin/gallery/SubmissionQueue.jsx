@@ -5,7 +5,7 @@ import { api, formatApiError } from "@/lib/api";
 import { chatAttachmentSrc } from "@/lib/chatAttachments";
 import { usePrompt } from "@/components/tls/ConfirmDialog";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
-import { viennaDateTime } from "@/lib/vienna";
+import { formatWhen } from "@/lib/datetime";
 
 // Eingesandte Fotos (#1186): was Mitglieder ins Album eines Events geschickt haben, wartet hier auf Freigabe - der
 // einzige Ort dafür. Freigeben und ablehnen dürfen Redaktion und Vereinsverwaltung (der Vorstand hat sie von selbst).
@@ -105,7 +105,7 @@ export function SubmissionQueue() {
                       )}
                     </div>
                     <div className="space-y-2 p-3 tls-type-small">
-                      <div className="text-white/80">{item.owner_name} · {viennaDateTime(item.created_at, { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}</div>
+                      <div className="text-white/80">{item.owner_name} · {formatWhen(item.created_at)}</div>
                       <div className="text-white/50">{item.credit ? `Zeigt „Foto: ${item.owner_name}“` : "Ohne Namen"}</div>
                       <div className="flex gap-2">
                         <button type="button" disabled={busy || !isReady} onClick={() => decide([item.id], "approve")} className="tls-btn tls-btn--secondary inline-flex flex-1 items-center justify-center gap-1 rounded-sm px-2 py-1.5 font-bold uppercase" data-testid={`submission-approve-${item.id}`}>

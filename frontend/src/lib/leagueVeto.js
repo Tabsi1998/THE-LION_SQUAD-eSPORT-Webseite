@@ -3,6 +3,7 @@
 // Sätze des Veto-Blocks auf der Matchseite. Der Server bleibt maßgeblich; hier geht es darum, dass man nichts Falsches eingibt.
 // Live-Oberfläche (D.4, #1651): Takt des Nachfragens, Countdown nach der Serverzeit, Zeitleiste, Karten und was davon aufleuchtet.
 import { serverOffset } from "@/seasons/clock";
+import { formatRange, formatWhen } from "@/lib/datetime";
 
 // Kurz, damit die Art in der Zeile je Schritt nicht abgeschnitten wird; was Decider und Vorgabe sind, erklärt der Kasten darüber.
 // „Vorgabe“ ist die Vorgabe der Woche (#2326): Die Map legt die Liga-Leitung je Spielwoche fest, das System setzt sie.
@@ -212,16 +213,11 @@ export function weekList(weeks) {
   return names.length <= 1 ? names.join("") : `${names.slice(0, -1).join(", ")} und ${names[names.length - 1]}`;
 }
 
-const dayMonth = (day) => {
-  const [, month, date] = String(day || "").split("-");
-  return month && date ? `${date}.${month}.` : "";
-};
+const dayMonth = (day) => (day ? formatWhen(String(day).slice(0, 10), { time: false }) : "");
 
-/** „10.11.–16.11.“ aus den Wiener Kalendertagen einer Spielwoche - leer, wenn der Kalender der Season nicht so weit reicht. */
+/** „Di 10. – Mo 16. November“ aus den Wiener Kalendertagen einer Spielwoche (#1307) - leer, wenn der Kalender der Season nicht so weit reicht. */
 export function weekDates(row) {
-  const from = dayMonth(row?.start_day);
-  const to = dayMonth(row?.end_day);
-  return from && to ? `${from}–${to}` : "";
+  return dayMonth(row?.start_day) && dayMonth(row?.end_day) ? formatRange(String(row.start_day).slice(0, 10), String(row.end_day).slice(0, 10)) : "";
 }
 
 /** Wochen, die der Vorschlag nie anfasst: Die Woche ist vorbei, oder in ihr hat schon ein Veto begonnen. */

@@ -5,7 +5,7 @@ import { api, formatRequestError } from "@/lib/api";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { useSubmissionGuard } from "@/hooks/useSubmissionGuard";
 import { lineupLabel, presenceLine, starterLabel } from "@/lib/teamDay";
-import { viennaDateTime, viennaTime } from "@/lib/vienna";
+import { formatClock, formatWhen } from "@/lib/datetime";
 
 // Team am Spieltag (#1192) in „Dein Stand“ - nur bei Team-Turnieren. Teamleitung oder Co-Leitung wählt, wer spielt
 // (genau so viele wie Spieler je Team; die übrigen sind Ersatz, wenn erlaubt), bis zum Ende des Check-ins. Am
@@ -105,7 +105,7 @@ export function TeamDayPanel({ tournament }) {
           <div className="mt-2 flex flex-wrap items-center gap-2">
             <button type="button" onClick={save} disabled={!dirty || !valid || submitting} data-testid="team-lineup-save" className="tls-btn tls-btn--primary px-4 py-2 rounded-sm tls-type-label disabled:opacity-45">Aufstellung speichern</button>
             {data.lineup_set ? <button type="button" onClick={reset} disabled={submitting} data-testid="team-lineup-reset" className="tls-btn tls-btn--quiet px-4 py-2 rounded-sm tls-type-label disabled:opacity-45">Zurücknehmen</button> : null}
-            {data.editable_until ? <span className="tls-type-small text-white/45">änderbar bis {viennaDateTime(data.editable_until, { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" })}</span> : null}
+            {data.editable_until ? <span className="tls-type-small text-white/45">änderbar bis {formatWhen(data.editable_until)}</span> : null}
           </div>
         ) : null}
       </section>
@@ -124,7 +124,7 @@ export function TeamDayPanel({ tournament }) {
               <li key={member.id} className="flex items-center justify-between gap-3 tls-type-small" data-testid={`team-presence-${member.id}`}>
                 <span className="truncate">{member.display_name}</span>
                 <span className={`tls-type-label ${present[member.id] ? "text-[#29B6E8]" : "text-quiet"}`}>
-                  {present[member.id] ? `da · ${viennaTime(present[member.id], { hour: "2-digit", minute: "2-digit" })}` : "fehlt"}
+                  {present[member.id] ? `da · ${formatClock(present[member.id])}` : "fehlt"}
                 </span>
               </li>
             ))}
@@ -137,7 +137,7 @@ export function TeamDayPanel({ tournament }) {
             )}
             {data.can_nudge ? (
               <button type="button" onClick={nudge} disabled={submitting || Boolean(data.nudge_available_at) || pres.count >= pres.total} data-testid="team-presence-nudge" className="tls-btn tls-btn--secondary inline-flex items-center gap-2 px-4 py-2 rounded-sm tls-type-label disabled:opacity-45">
-                <BellRing className="w-3.5 h-3.5" /> {data.nudge_available_at ? `Wieder ab ${viennaTime(data.nudge_available_at, { hour: "2-digit", minute: "2-digit" })}` : "Fehlende anstupsen"}
+                <BellRing className="w-3.5 h-3.5" /> {data.nudge_available_at ? `Wieder ab ${formatClock(data.nudge_available_at)}` : "Fehlende anstupsen"}
               </button>
             ) : null}
           </div>

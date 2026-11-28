@@ -1,5 +1,9 @@
 import { render, screen } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
+import { runAtTestClock } from "@/testClock";
+
+// Feste Uhr (#1307): die Datums-Texte lassen das laufende Jahr weg und sagen „heute“/„morgen“.
+runAtTestClock();
 
 // Regelwerk auf Team-Seite und Matchseite (#2269): gültige Fassung mit Weg zu Text und PDF, dazu der Stand der eigenen Zustimmung -
 // „Neue Fassung, bitte zustimmen“ nur, wenn sie verlangt wird und fehlt.
@@ -19,7 +23,7 @@ test("Fassung, Link und PDF - ohne Forderung kein Zustimmungssatz", () => {
   show(RULES);
   expect(screen.getByTestId("note")).toHaveAttribute("data-consent", "none");
   expect(screen.getByTestId("note-link")).toHaveAttribute("href", "/liga/probe/s1/regeln");
-  expect(screen.getByTestId("note-version")).toHaveTextContent("Version 2 · gültig ab 05.03.2030");
+  expect(screen.getByTestId("note-version")).toHaveTextContent("Version 2 · gültig ab Di 5. März 2030");
   expect(screen.getByTestId("note-pdf")).toHaveAttribute("href", "/api/league-rules/seasons/probe/s1/versions/v2/pdf");
   expect(screen.queryByTestId("note-consent")).toBeNull();
 });
@@ -35,7 +39,7 @@ test("Neue Fassung, bitte zustimmen - mit Weg zur Regelseite; zugestimmt mit Dat
   const agreed = { ...RULES, consent: { required: true, agreed: true, agreed_at: "2030-03-06T10:00:00+00:00", demanded_label: "Version 2" } };
   expect(rulesConsentState(agreed)).toBe("agreed");
   show(agreed);
-  expect(screen.getByTestId("note-consent")).toHaveTextContent("Dein Co-Team hat zugestimmt (06.03.2030)");
+  expect(screen.getByTestId("note-consent")).toHaveTextContent("Dein Co-Team hat zugestimmt (Mi 6. März 2030)");
 });
 
 test("ohne Regelwerk nichts", () => {

@@ -10,7 +10,7 @@ import { FormGrid, FormSection } from "@/components/tls/AdminForm";
 import { SelectField, TextField } from "@/components/tls/FormFields";
 import { api, formatApiError } from "@/lib/api";
 import { PROCEDURE_STATE_LABELS, deadlineTone, remainingText } from "@/lib/leagueProcedures";
-import { viennaDateTime } from "@/lib/vienna";
+import { formatWhen } from "@/lib/datetime";
 
 const NUMBER_FIELDS = [
   ["protest_hours", "Protestfrist (Stunden)", "ab der Bestätigung des Ergebnisses"],
@@ -26,7 +26,6 @@ const MODE_OPTIONS = [
   ["excluded", "Zählt bis zur Entscheidung nicht"],
 ];
 const TONE = { none: "text-white/55", calm: "text-white/70", soon: "text-warn", over: "text-warn font-bold" };
-const WHEN = { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" };
 
 /** Die Eingabe als Werte für den Server: ganze Zahlen, Gründe ohne leere Zeilen. */
 export function protestSettingsPayload(form) {
@@ -89,7 +88,7 @@ function ProceduresInbox({ seasonId }) {
                   ) : (
                     <div className="mt-2 flex flex-wrap items-center justify-between gap-x-4 gap-y-1 tls-type-small">
                       <span className="text-white/60">
-                        {item.state === "open" ? (item.assignee ? `Übernommen von ${item.assignee.name}` : "Noch nicht übernommen") : `Entschieden ${item.resolved_at ? viennaDateTime(item.resolved_at, WHEN) : ""}`}
+                        {item.state === "open" ? (item.assignee ? `Übernommen von ${item.assignee.name}` : "Noch nicht übernommen") : `Entschieden ${item.resolved_at ? formatWhen(item.resolved_at) : ""}`}
                         {item.state === "open" && deadline ? <span className={`ml-2 tabular-nums ${TONE[deadlineTone(deadline, now)]}`}>· {item.target_at ? "Zielfrist" : "Stellungnahme"} {remainingText(deadline, now)}</span> : null}
                       </span>
                       <Link to={`/matches/${item.match_id}#verfahren-${item.id}`} className="inline-flex min-h-11 items-center font-bold uppercase tracking-wider text-[#29B6E8] hover:underline" data-testid={`season-procedure-open-${item.id}`}>Zum Spiel</Link>

@@ -1,5 +1,9 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
+import { runAtTestClock } from "@/testClock";
+
+// Feste Uhr (#1307): die Datums-Texte lassen das laufende Jahr weg und sagen „heute“/„morgen“.
+runAtTestClock();
 
 // News-Liste (#2122 NW4): Sichtbarkeit und Kategorie mit Namen statt Rohwert - in der Tabelle, den Filtern und der CSV.
 
@@ -93,8 +97,8 @@ test("die Liste nennt das Ende der Anheftung", async () => {
     return { data: [] };
   });
   render(<MemoryRouter><AdminNewsPage /></MemoryRouter>);
-  expect(await screen.findByTestId("news-pin-n1")).toHaveTextContent("Angepinnt bis 21.10.2099");
-  expect(screen.getByTestId("news-pin-n2")).toHaveTextContent("Anpinnen abgelaufen (bis 05.01.2020)");
+  expect(await screen.findByTestId("news-pin-n1")).toHaveTextContent("Angepinnt bis Mi 21. Oktober 2099");
+  expect(screen.getByTestId("news-pin-n2")).toHaveTextContent("Anpinnen abgelaufen (bis So 5. Jänner 2020)");
   expect(screen.queryByTestId("news-pin-n3")).toBeNull();
 });
 

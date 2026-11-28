@@ -1,5 +1,9 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { applicationToForm } from "@/lib/leagueApplications";
+import { runAtTestClock } from "@/testClock";
+
+// Feste Uhr (#1307): die Datums-Texte lassen das laufende Jahr weg und sagen „heute“/„morgen“.
+runAtTestClock();
 
 const apiMock = { post: vi.fn() };
 vi.mock("@/lib/api", () => ({ api: apiMock, formatApiError: (detail) => String(detail || "Fehler") }));
@@ -42,7 +46,7 @@ test("ohne offene Anmeldungen steht kein Hinweis da", () => {
 test("Nachmeldung (Nr. 180): endet die Anmeldung nach dem Season-Start, steht ein Hinweis da - davor nicht", () => {
   const season = { application_opens_at: "2026-11-01T17:00:00+00:00", application_closes_at: "2026-11-20T19:00:00+00:00" };
   renderSection(season, 0, { start_day: "2026-11-17" });
-  expect(screen.getByTestId("season-form-application-after-start")).toHaveTextContent("Anmeldung läuft nach Season-Start weiter (bis 20.11.2026, 20:00 Uhr).");
+  expect(screen.getByTestId("season-form-application-after-start")).toHaveTextContent("Anmeldung läuft nach Season-Start weiter (bis Fr 20. November · 20:00).");
 });
 
 test("ohne Nachmeldung kein Hinweis", () => {
@@ -59,15 +63,15 @@ test("Nachmeldefrist: leer heißt 14 Tage, der Hinweis nennt das wirksame Ende",
   const field = screen.getByTestId("season-form-late-days");
   expect(field).toHaveValue(null);
   expect(field).toHaveAttribute("placeholder", "14");
-  expect(screen.getByTestId("season-form-application-after-start")).toHaveTextContent("Anmeldung läuft nach Season-Start weiter (bis 01.12.2026, 00:00 Uhr).");
-  expect(screen.getByTestId("season-form-late-cap")).toHaveTextContent("Die Anmeldung schließt am 01.12.2026, 00:00 Uhr, auch wenn das Fenster länger eingestellt ist.");
+  expect(screen.getByTestId("season-form-application-after-start")).toHaveTextContent("Anmeldung läuft nach Season-Start weiter (bis Di 1. Dezember · 00:00).");
+  expect(screen.getByTestId("season-form-late-cap")).toHaveTextContent("Die Anmeldung schließt am Di 1. Dezember · 00:00, auch wenn das Fenster länger eingestellt ist.");
   fireEvent.change(field, { target: { value: "30" } });
   expect(set).toHaveBeenCalledWith("late_registration_days", "30");
 });
 
 test("Nachmeldefrist: mit eigener Frist und ohne Kappung kein Hinweis zur Frist", () => {
   renderSection(LONG, 0, { start_day: "2026-11-17", late_registration_days: "60" });
-  expect(screen.getByTestId("season-form-application-after-start")).toHaveTextContent("(bis 31.12.2026, 20:00 Uhr)");
+  expect(screen.getByTestId("season-form-application-after-start")).toHaveTextContent("(bis Do 31. Dezember · 20:00)");
   expect(screen.queryByTestId("season-form-late-cap")).toBeNull();
 });
 
@@ -91,8 +95,8 @@ test("eine Verlängerung steht mit Grund da und verschiebt das Ende", () => {
   const form = { ...applicationToForm(LONG), start_day: "2026-11-17" };
   render(<SeasonApplicationSection form={form} set={vi.fn()} seasonId="s1"
     late={{ days: 14, extension: { until: "2026-12-10T17:00:00+00:00", reason: "Nachrücker aus Liga 2" } }} />);
-  expect(screen.getByTestId("season-late-extension-current")).toHaveTextContent("Verlängert bis 10.12.2026, 18:00 Uhr. Grund: Nachrücker aus Liga 2");
-  expect(screen.getByTestId("season-form-late-cap")).toHaveTextContent("Verlängert bis 10.12.2026, 18:00 Uhr.");
+  expect(screen.getByTestId("season-late-extension-current")).toHaveTextContent("Verlängert bis Do 10. Dezember · 18:00. Grund: Nachrücker aus Liga 2");
+  expect(screen.getByTestId("season-form-late-cap")).toHaveTextContent("Verlängert bis Do 10. Dezember · 18:00.");
 });
 
 test("ohne Fenster über den Start gibt es nichts zu verlängern", () => {

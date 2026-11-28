@@ -7,7 +7,7 @@ import { toast } from "sonner";
 import { Download, Plus, Trash2, Upload } from "lucide-react";
 import { formatMoment } from "@/components/tls/ModerationStandingCard";
 import ImageScanTab from "@/pages/admin/moderation/ImageScanTab";
-import { viennaDateTime } from "@/lib/vienna";
+import { formatWhen } from "@/lib/datetime";
 import { ShortCaps } from "@/components/tls/ShortCaps";
 
 // Moderation (#417): drei Reiter - die Meldungen der Community, die Funde des Wortfilters
@@ -384,7 +384,7 @@ function ReportCard({ report, onSaved }) {
         <blockquote className="mt-2 border-l-2 border-white/20 pl-3 tls-type-small text-white/60 whitespace-pre-wrap break-words" data-testid={`report-message-${report.id}`}>{report.message_excerpt}</blockquote>
       )}
       {report.resolution_note && <div className="mt-2 tls-type-small text-white/70" data-testid={`report-note-${report.id}`}><span className="text-white/45">Grund:</span> {report.resolution_note}</div>}
-      <div className="mt-2 tls-type-small text-quiet">Gemeldet von {personName(report.reporter, "einem gelöschten Konto")}{report.created_at ? ` · ${viennaDateTime(report.created_at)}` : ""}</div>
+      <div className="mt-2 tls-type-small text-quiet">Gemeldet von {personName(report.reporter, "einem gelöschten Konto")}{report.created_at ? ` · ${formatWhen(report.created_at)}` : ""}</div>
       <div className="mt-3 flex flex-wrap gap-2">
         {REPORT_STEPS[reportStatusOf(report.status)].map((next) => (
           <button key={next} type="button" disabled={busy} aria-pressed={step === next} onClick={() => open(next)} data-testid={`report-step-${next}-${report.id}`} className={`min-h-10 px-3 py-2 border rounded-sm tls-type-label disabled:opacity-40 ${step === next ? "border-[#29B6E8] text-[#29B6E8]" : next === "justified" ? "border-warn/50 text-warn" : "border-white/15 text-white/70 hover:text-white"}`}>
@@ -457,7 +457,7 @@ function ItemsTab() {
                 <div className="tls-type-label text-warn">{item.kind_label || item.kind} · {ITEM_STATE_LABEL[item.state] || item.state} · {item.action === "hold" ? "zurückgehalten" : "markiert"}</div>
                 <div className="mt-1 tls-type-small text-white/80 whitespace-pre-wrap break-words">{item.excerpt}</div>
                 <div className="mt-2 tls-type-small text-quiet">
-                  {item.user?.display_name || item.user?.username || item.user_id}{item.user?.username ? ` (@${item.user.username})` : ""} · Treffer: {(item.matched || []).join(", ")} · {item.created_at && viennaDateTime(item.created_at)}
+                  {item.user?.display_name || item.user?.username || item.user_id}{item.user?.username ? ` (@${item.user.username})` : ""} · Treffer: {(item.matched || []).join(", ")} · {item.created_at && formatWhen(item.created_at)}
                   {item.note ? ` · Notiz: ${item.note}` : ""}
                 </div>
               </div>

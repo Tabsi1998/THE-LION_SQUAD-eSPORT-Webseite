@@ -1,5 +1,9 @@
 import { describe, expect, test } from "vitest";
 import { drawLogLine, drawStatusLine, drawVisible, staffelnLine, swapPartners, waitingLine } from "./leagueDraw";
+import { runAtTestClock } from "@/testClock";
+
+// Feste Uhr (#1307): die Datums-Texte lassen das laufende Jahr weg und sagen „heute“/„morgen“.
+runAtTestClock();
 
 const division = (extra = {}) => ({
   id: "d1", label: "Liga 1", waiting: [], suggestion: { teams: 0, fits: true, text: "" }, problem: null, can_draw: false, draw: null,
@@ -34,19 +38,19 @@ describe("Los auf mehrere Staffeln", () => {
   test("der Stand eines Loses in einem Satz", () => {
     expect(drawStatusLine({ status: "draft", number: 1, stale: false })).toBe("Los Nr. 1 – Vorschau, noch nicht übernommen");
     expect(drawStatusLine({ status: "draft", number: 2, stale: true })).toBe("Los Nr. 2 – veraltet: Seitdem hat sich etwas geändert");
-    expect(drawStatusLine({ status: "applied", number: 2, applied_at: "2026-11-23T13:05:00+00:00" })).toBe("Los Nr. 2 – übernommen am 23.11.2026, 14:05");
+    expect(drawStatusLine({ status: "applied", number: 2, applied_at: "2026-11-23T13:05:00+00:00" })).toBe("Los Nr. 2 – übernommen am Mo 23. November · 14:05");
   });
 
   test("das Protokoll nennt Schritt, Person und Grund", () => {
     const at = "2026-11-23T13:05:00+00:00";
-    expect(drawLogLine({ action: "create", number: 1, by_name: "Probe Leitung", at })).toBe("23.11.2026, 14:05: Ausgelost (Los Nr. 1), Probe Leitung");
+    expect(drawLogLine({ action: "create", number: 1, by_name: "Probe Leitung", at })).toBe("Mo 23. November · 14:05: Ausgelost (Los Nr. 1), Probe Leitung");
     expect(drawLogLine({ action: "redraw", number: 2, by_name: "Probe Leitung", at, reason: "Falsche Staffelzahl" }))
-      .toBe("23.11.2026, 14:05: Neu ausgelost (Los Nr. 2), Probe Leitung, Grund: Falsche Staffelzahl");
+      .toBe("Mo 23. November · 14:05: Neu ausgelost (Los Nr. 2), Probe Leitung, Grund: Falsche Staffelzahl");
     expect(drawLogLine({ action: "redraw", number: 2, by_name: "Probe Leitung", at, stale: true }))
-      .toBe("23.11.2026, 14:05: Neu ausgelost (Los Nr. 2), Probe Leitung, weil sich die Eingabe geändert hatte");
-    expect(drawLogLine({ action: "swap", by_name: "Probe Leitung", at, reason: "Terminwunsch" })).toBe("23.11.2026, 14:05: Getauscht, Probe Leitung, Grund: Terminwunsch");
+      .toBe("Mo 23. November · 14:05: Neu ausgelost (Los Nr. 2), Probe Leitung, weil sich die Eingabe geändert hatte");
+    expect(drawLogLine({ action: "swap", by_name: "Probe Leitung", at, reason: "Terminwunsch" })).toBe("Mo 23. November · 14:05: Getauscht, Probe Leitung, Grund: Terminwunsch");
     expect(drawLogLine({ action: "apply", by_name: "Probe Chef", at, conflict_reason: "Niemand sonst da" }))
-      .toBe("23.11.2026, 14:05: Übernommen, Probe Chef (Notausnahme: Niemand sonst da)");
+      .toBe("Mo 23. November · 14:05: Übernommen, Probe Chef (Notausnahme: Niemand sonst da)");
   });
 
   test("getauscht wird nur mit Co-Teams aus anderen Staffeln", () => {

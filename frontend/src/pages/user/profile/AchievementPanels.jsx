@@ -9,7 +9,7 @@ import { AchievementIcon } from "@/components/tls/AchievementIcon";
 import { Badge } from "@/components/achievements/Badge";
 import { CATEGORY_META, STATUS_FILTERS, categoryProgressSummary, formatPercent } from "@/components/tls/AchievementGroups";
 import { AccountLevelProgress } from "@/components/tls/AccountLevel";
-import { viennaDateTime } from "@/lib/vienna";
+import { formatWhen } from "@/lib/datetime";
 
 import { ROLE_COLORS } from "@/lib/categoryColors";
 // Der Reiter „Achievements“ im Profil (#619): Kopf mit Level, Titel, Prestige und XP-Leiste; „Als Nächstes“
@@ -135,13 +135,13 @@ export function PrestigePanel({ level, onLevelChange }) {
     });
     if (ok) await run("/users/me/prestige/undo", "Prestige zurückgenommen.");
   };
-  const untilText = viennaDateTime(undoUntil, { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" });
+  const untilText = formatWhen(undoUntil);
   return (
     <div className="mt-4 border border-honor/30 bg-honor/5 rounded-sm px-4 py-3 flex items-center gap-3 flex-wrap" data-testid="achievement-prestige-panel">
       <Star className="w-4 h-4 text-honor fill-current shrink-0" aria-hidden="true" />
       <p className="flex-1 min-w-[12rem] tls-type-small text-white/70">
         {undoUntil
-          ? `${stars}. Prestige-Stern – bis ${untilText} Uhr kannst du ihn zurücknehmen.`
+          ? `${stars}. Prestige-Stern – bis ${untilText} kannst du ihn zurücknehmen.`
           : "Level 60 erreicht. Mit Prestige startest du bei Level 1 neu und bekommst einen Stern – alle Erfolge bleiben."}
       </p>
       {undoUntil ? (

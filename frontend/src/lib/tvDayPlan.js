@@ -4,7 +4,8 @@
 // Mitternacht beginnt, gehört dann noch zum Samstag. Der freie Programm-Text hat keine Uhrzeiten und bleibt draußen.
 // Darunter: was jetzt läuft und was als Nächstes kommt, mit Uhrzeit und Hinweis („Check-in ab 14:00 bei der
 // Turnierleitung“). Alles reine Rechnung - die Uhr gibt die Seite herein, die „jetzt“-Linie rückt jede Minute weiter.
-import { asInstant, viennaDate, viennaDay, viennaTime } from "@/lib/vienna";
+import { formatClock, formatWeekday, formatWhen } from "@/lib/datetime";
+import { asInstant, viennaDay } from "@/lib/vienna";
 
 const HOUR = 3600000;
 const LIVE_TOURNAMENT = new Set(["live", "paused", "check_in", "checkin_open"]);
@@ -20,11 +21,11 @@ function timeOf(value) {
 }
 
 export function clockText(time) {
-  return viennaTime(time, { hour: "2-digit", minute: "2-digit" });
+  return formatClock(time);
 }
 
 function weekday(time) {
-  return viennaDate(time, { weekday: "long" });
+  return formatWeekday(time, { long: true });
 }
 
 /** Die Tage des Events: bei mehreren Tagen aus den Event-Tagen, sonst ein Tag aus Beginn und Ende. */
@@ -165,7 +166,7 @@ export function dayPlan(event, now = Date.now()) {
     day,
     state,
     multi,
-    title: multi ? `Tag ${day.index + 1} von ${day.count} · ${weekday(day.startAt)}` : `${weekday(day.startAt)}, ${viennaDate(day.startAt, { day: "numeric", month: "long" })}`,
+    title: multi ? `Tag ${day.index + 1} von ${day.count} · ${weekday(day.startAt)}` : formatWhen(day.startAt, { time: false, relative: false }),
     weekday: weekday(day.startAt),
     from,
     to,

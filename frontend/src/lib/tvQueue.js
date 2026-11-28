@@ -5,9 +5,9 @@
 import { delayText } from "@/lib/liveQueue";
 import { matchName } from "@/lib/tvLive";
 import { matchRoundLabel } from "@/lib/tournamentLabels";
-import { viennaTime } from "@/lib/vienna";
+import { formatClock } from "@/lib/datetime";
 
-const clock = (value) => (value ? viennaTime(value, { hour: "2-digit", minute: "2-digit" }) : "");
+const clock = (value) => (value ? formatClock(value) : "");
 
 /**
  * Die Bahnen je Station in der Reihenfolge des Servers: `{ id, name, status, now, next, waiting }` - `now` das laufende

@@ -1,5 +1,9 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
+import { runAtTestClock } from "@/testClock";
+
+// Feste Uhr (#1307): die Datums-Texte lassen das laufende Jahr weg und sagen „heute“/„morgen“.
+runAtTestClock();
 
 // Beitrag als eigene Seite (#434): Anlegen unter /admin/news/new, Bearbeiten unter /admin/news/:id
 // mit den Daten aus der Admin-Liste; Speichern führt zurück zur Liste.
@@ -228,7 +232,7 @@ test("Verteilen: nicht gesendet – „Jetzt senden“ mit Rückfrage, danach �
   fireEvent.click(screen.getByTestId("distribute-send"));
   await waitFor(() => expect(apiMock.post).toHaveBeenCalledWith("/settings/newsletter/send", { kind: "news", id: "n1", force: false }));
   expect(confirmMock).toHaveBeenCalledWith(expect.objectContaining({ title: "Newsletter jetzt senden?", description: expect.stringContaining("214 Personen") }));
-  expect(await screen.findByTestId("distribute-newsletter-line")).toHaveTextContent("Gesendet am 12.10.2026");
+  expect(await screen.findByTestId("distribute-newsletter-line")).toHaveTextContent("Gesendet am Mo 12. Oktober · 18:00");
   expect(screen.getByTestId("distribute-newsletter-line")).toHaveTextContent("an 214 Personen.");
   expect(screen.getByTestId("distribute-resend")).toBeInTheDocument();
 });
@@ -252,7 +256,7 @@ test("Autor und Verlauf: zuletzt geändert, Verlauf mit Feldern, neuer Autor geh
   });
   apiMock.patch.mockResolvedValue({ data: post });
   renderAt("/admin/news/n1");
-  expect(await screen.findByTestId("news-last-change")).toHaveTextContent("Zuletzt geändert von Moritz Muster am 27.10.2026, 09:15.");
+  expect(await screen.findByTestId("news-last-change")).toHaveTextContent("Zuletzt geändert von Moritz Muster am Di 27. Oktober · 09:15.");
   expect(screen.getByTestId("news-history")).toHaveTextContent("Geändert von Moritz Muster");
   expect(screen.getByTestId("news-history")).toHaveTextContent("Titel, Kurzbeschreibung");
   expect(screen.getByTestId("news-author-selected")).toHaveTextContent("Rita Redaktion");
@@ -272,7 +276,7 @@ test("zurückgezogen: Hinweis und Wiederherstellen als Entwurf", async () => {
   });
   apiMock.post.mockResolvedValue({ data: {} });
   renderAt("/admin/news/n1");
-  expect(await screen.findByTestId("news-withdrawn")).toHaveTextContent("Zurückgezogen am 20.10.2026, 12:00 von Rita Redaktion.");
+  expect(await screen.findByTestId("news-withdrawn")).toHaveTextContent("Zurückgezogen am Di 20. Oktober · 12:00 von Rita Redaktion.");
   fireEvent.click(screen.getByTestId("news-restore"));
   await waitFor(() => expect(apiMock.post).toHaveBeenCalledWith("/news/n1/restore"));
 });
@@ -351,7 +355,7 @@ test("geplanter Beitrag: Anpinnen schlägt 14 Tage ab dem Termin vor, ein Ende d
   expect(screen.getByTestId("news-pinned-until")).toHaveValue(shiftDay("2099-03-10", 14));
   expect(screen.getByTestId("news-pinned-until")).toHaveAttribute("min", "2099-03-10");
   fireEvent.change(screen.getByTestId("news-pinned-until"), { target: { value: "2099-03-01" } });
-  expect(screen.getByTestId("news-pinned-until-early")).toHaveTextContent("10.03.2099");
+  expect(screen.getByTestId("news-pinned-until-early")).toHaveTextContent("Di 10. März 2099");
 });
 
 test("Altbestand ohne eigenes Ende: das errechnete Ende steht im Feld, Speichern geht ohne Änderung daran", async () => {

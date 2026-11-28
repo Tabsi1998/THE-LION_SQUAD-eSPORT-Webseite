@@ -14,7 +14,8 @@ import { ApplicationStateBadge } from "@/components/tls/league/application/Leagu
 import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 import { isSelectable, submittedToast, teamStateLabel } from "@/lib/leagueApplications";
 import { platformLines, platformShort } from "@/lib/leaguePlatform";
-import { dayNoon, viennaDate } from "@/lib/vienna";
+import { formatWhen } from "@/lib/datetime";
+import { dayNoon } from "@/lib/vienna";
 import "@/components/tls/league/public/league.css";
 import { ShortCaps } from "@/components/tls/ShortCaps";
 
@@ -32,7 +33,6 @@ const SOLO_STEPS = [
   { key: "consent", label: "Zustimmen", title: "Regeln und Datenschutz", help: "als-spieler-anmelden" },
   { key: "summary", label: "Einreichen", title: "Alles richtig?", help: "als-spieler-anmelden" },
 ];
-const DAY = { day: "2-digit", month: "2-digit", year: "numeric" };
 const QUIET = "tls-btn tls-btn--quiet inline-flex min-h-[44px] items-center justify-center gap-1.5 rounded-sm px-4 py-2.5 tls-type-label";
 const PRIMARY = "tls-btn tls-btn--primary inline-flex min-h-[44px] items-center justify-center rounded-sm px-5 py-2.5 tls-type-label disabled:opacity-50";
 
@@ -153,7 +153,7 @@ function ConsentStep({ rules, privacy, acceptRules, acceptPrivacy, onRules, onPr
     <div className="space-y-5">
       <div className="rounded-sm border border-white/10 bg-[#0A0A0A] p-3">
         <p className="font-semibold text-white [overflow-wrap:anywhere]">{rules.title}</p>
-        <p className="tls-type-small text-white/65" data-testid="apply-rules-version">{rules.label} · gültig ab {viennaDate(dayNoon(rules.valid_from), DAY)}</p>
+        <p className="tls-type-small text-white/65" data-testid="apply-rules-version">{rules.label} · gültig ab {formatWhen(dayNoon(rules.valid_from), { time: false })}</p>
         <div className="mt-2 flex flex-wrap gap-2">
           <a href={rules.url} target="_blank" rel="noopener noreferrer" data-testid="apply-rules-link" className={QUIET}><ExternalLink className="h-4 w-4" aria-hidden="true" /> Regeln lesen</a>
           <a href={`${API}${rules.pdf_url.replace(/^\/api/, "")}`} target="_blank" rel="noopener noreferrer" className={QUIET}><FileText className="h-4 w-4" aria-hidden="true" /> PDF</a>

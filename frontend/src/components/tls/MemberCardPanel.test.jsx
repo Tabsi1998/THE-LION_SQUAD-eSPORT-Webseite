@@ -1,5 +1,9 @@
 import { act, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { runAtTestClock } from "@/testClock";
+
+// Feste Uhr (#1307): die Datums-Texte lassen das laufende Jahr weg und sagen „heute“/„morgen“.
+runAtTestClock();
 
 // Mitgliedskarte im Web (#346, #1335, #1256): die Karte wie auf „Mitglied werden“, daneben der QR-Code mit dem Prüflink,
 // der sich vor Ablauf erneuert; „Als Bild speichern“ nimmt die Karte ohne Code; ohne Netz die zuletzt geladene Karte mit
@@ -67,7 +71,7 @@ test("ohne Netz: die zuletzt geladene Karte mit Stand und „Prüfcode braucht N
   saveOfflineCard("u-paula", card(60 * 1000), new Date("2026-10-07T16:05:00Z"));
   apiMock.get.mockRejectedValue(new Error("Network Error"));
   render(<MemberCardPanel />);
-  expect(await screen.findByTestId("member-card-offline")).toHaveTextContent("Stand: 7.10.2026, 18:05");
+  expect(await screen.findByTestId("member-card-offline")).toHaveTextContent("Stand: Mi 7. Oktober · 18:05");
   expect(screen.getByTestId("member-card-art-offline")).toHaveTextContent("Prüfcode braucht Netz");
   expect(screen.queryByTestId("qr")).toBeNull();
 });

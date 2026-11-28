@@ -1,5 +1,6 @@
 // Spielberechtigung in der Liga (docs/LIGA.md, B.3, #2204): nur die Darstellung, geprüft wird im Server
 // (services/league_eligibility.py). Ein Geburtsdatum kommt hier nie an, nur „erfüllt“ oder „fehlt“.
+import { formatRange, formatWhen } from "@/lib/datetime";
 import { platformLines } from "@/lib/leaguePlatform";
 
 export const ELIGIBILITY_LABELS = {
@@ -36,13 +37,12 @@ export function ageLabel(age) {
 }
 
 function dayText(day) {
-  const [year, month, date] = String(day || "").split("-");
-  return year && month && date ? `${Number(date)}.${Number(month)}.${year}` : "";
+  return day ? formatWhen(String(day).slice(0, 10), { time: false }) : "";
 }
 
-/** Ein Transferfenster in Worten - „1.4.2027 bis 7.4.2027“. */
+/** Ein Transferfenster in Worten - „Do 1. – Mi 7. April 2027“ (#1307). */
 export function windowText(window) {
-  const text = `${dayText(window?.start_date)} bis ${dayText(window?.end_date)}`;
+  const text = window?.start_date && window?.end_date ? formatRange(String(window.start_date).slice(0, 10), String(window.end_date).slice(0, 10)) : dayText(window?.start_date || window?.end_date);
   return window?.label ? `${window.label}: ${text}` : text;
 }
 

@@ -1,6 +1,10 @@
 import { act, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router-dom";
+import { runAtTestClock } from "@/testClock";
+
+// Feste Uhr (#1307): die Datums-Texte lassen das laufende Jahr weg und sagen „heute“/„morgen“.
+runAtTestClock();
 
 // „Meine Mitgliedschaft“ (#295): Beitragskarte aus der Mitgliederverwaltung – und
 // für ein Konto ohne Zuordnung der Weg, sie beim Vorstand anzufragen.
@@ -41,7 +45,7 @@ test("mit bestätigter Zuordnung steht der Beitragsstand samt Stand-Datum da", a
   renderPage();
   const card = await screen.findByTestId("membership-fee-card");
   expect(card).toHaveTextContent("fällig");
-  expect(card).toHaveTextContent("Nächster Beitrag seit 1.1.2026 offen");
+  expect(card).toHaveTextContent("Nächster Beitrag seit Do 1. Jänner offen");
   expect(card).toHaveTextContent("Funktion im Verein: Kassier:in");
   expect(card).toHaveTextContent("Stand aus der Mitgliederverwaltung vom");
   expect(screen.queryByTestId("membership-link-card")).toBeNull();
@@ -153,7 +157,7 @@ test("Einwilligungen (#1537): der Text der zugestimmten Fassung bleibt lesbar, b
 
   // Die alte Fassung kennt die Website nicht: das steht da, und die aktuelle.
   await user.click(screen.getByTestId("consent-open-spiel"));
-  expect(screen.getByTestId("consent-given-missing-spiel")).toHaveTextContent(/^Den Text der Fassung vom 10\.01\.2026, der du zugestimmt hast, haben wir nicht\. Aktuelle Fassung:$/);
+  expect(screen.getByTestId("consent-given-missing-spiel")).toHaveTextContent(/^Den Text der Fassung vom Sa 10\. Jänner, der du zugestimmt hast, haben wir nicht\. Aktuelle Fassung:$/);
   expect(screen.getByTestId("consent-current-text-spiel")).toHaveTextContent("Spielberichte, Fassung 2.");
 });
 
@@ -330,7 +334,7 @@ test("Austritt (#329): nach der Rückfrage geht die Erklärung raus, der letzte 
   await screen.findByTestId("membership-self-exit");
   await user.click(screen.getByTestId("membership-self-exit-button"));
   await waitFor(() => expect(apiMock.post).toHaveBeenCalledWith("/membership/me/self-service/exit", {}));
-  await waitFor(() => expect(toastMock.success).toHaveBeenCalledWith(expect.stringContaining("31.12.2026")));
+  await waitFor(() => expect(toastMock.success).toHaveBeenCalledWith(expect.stringContaining("Do 31. Dezember")));
   expect(toastMock.success).toHaveBeenCalledWith(expect.stringContaining("Wunschdatum lag vor der Kündigungsfrist"));
 });
 
@@ -351,7 +355,7 @@ test("Meine Daten (#329): mit der einmaligen Freigabe gilt die nächste Änderun
 test("Austritt geplant: nur noch der Stand, kein Knopf", async () => {
   mockSelf({ ...SELF, profile: { ...SELF.profile, exit: { status: "planned", reason: "", notice_day: "2026-09-24", last_day: "2026-12-31" } } });
   renderPage();
-  expect(await screen.findByTestId("membership-self-exit-planned")).toHaveTextContent("Austritt geplant: letzter Tag der Mitgliedschaft 31.12.2026");
+  expect(await screen.findByTestId("membership-self-exit-planned")).toHaveTextContent("Austritt geplant: letzter Tag der Mitgliedschaft Do 31. Dezember");
   expect(screen.queryByTestId("membership-self-exit-button")).not.toBeInTheDocument();
 });
 

@@ -1,5 +1,9 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
+import { runAtTestClock } from "@/testClock";
+
+// Feste Uhr (#1307): die Datums-Texte lassen das laufende Jahr weg und sagen „heute“/„morgen“.
+runAtTestClock();
 
 // News-Detail am PC breit: Artikel links, Seitenleiste rechts mit Angaben, Teilen, Verknüpftem und
 // weiteren News (ohne den eigenen Beitrag); eine Überschrift, die den Titel wiederholt, fällt weg.
@@ -131,8 +135,8 @@ test("ohne Vorschau-Kennzeichen kein Band", async () => {
 });
 
 test("previewText: geplant mit Termin, zurückgezogen mit Datum", () => {
-  expect(previewText({ state: "scheduled", published_at: "2026-11-10T17:00:00Z" })).toMatch(/^Geplant – erscheint am 10\.11\.2026, 18:00 von selbst\./);
-  expect(previewText({ state: "withdrawn", since: "2026-10-28T09:00:00Z" })).toBe("Zurückgezogen am 28.10.2026. Besucher sehen statt des Beitrags nur einen Hinweis.");
+  expect(previewText({ state: "scheduled", published_at: "2026-11-10T17:00:00Z" })).toMatch(/^Geplant – erscheint am Di 10\. November · 18:00 von selbst\./);
+  expect(previewText({ state: "withdrawn", since: "2026-10-28T09:00:00Z" })).toBe("Zurückgezogen am Mi 28. Oktober. Besucher sehen statt des Beitrags nur einen Hinweis.");
 });
 
 test("zurückgezogener Beitrag: freundlicher Hinweis statt „nicht gefunden“", async () => {

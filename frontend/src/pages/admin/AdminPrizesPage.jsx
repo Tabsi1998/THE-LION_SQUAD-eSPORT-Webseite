@@ -7,7 +7,8 @@ import { SkeletonLines } from "@/components/tls/Skeleton";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { toast } from "sonner";
 import { Award, CheckCircle2, Clock, XCircle, Gift, RefreshCw, AlertCircle, Search, Users, User, CalendarDays, Plus } from "lucide-react";
-import { asInstant, viennaDate } from "@/lib/vienna";
+import { formatWhen } from "@/lib/datetime";
+import { asInstant } from "@/lib/vienna";
 import { PrizeFormSheet } from "./prizes/PrizeFormSheet";
 import { ShortCaps } from "@/components/tls/ShortCaps";
 
@@ -36,7 +37,7 @@ function formatDate(value) {
   if (!value) return "—";
   const date = asInstant(value);
   if (Number.isNaN(date.getTime())) return "—";
-  return viennaDate(date);
+  return formatWhen(date, { time: false });
 }
 
 function daysUntil(value) {

@@ -4,7 +4,8 @@ import { Clock, Save, Tv } from "lucide-react";
 import { toast } from "sonner";
 import { api, formatRequestError } from "@/lib/api";
 import { displayRoundLabels, sectionRoundLabel } from "@/lib/bracketNames";
-import { asInstant, viennaDay, viennaTime } from "@/lib/vienna";
+import { formatClock } from "@/lib/datetime";
+import { asInstant, viennaDay } from "@/lib/vienna";
 
 // Was nur ein Turnier am Bildschirm betrifft (Meilenstein 60) - beim Turnier, nicht unter TV & Beamer:
 // - „Pause bis“ (#1123): beim Status „Pausiert“ eine Uhrzeit; der TV zählt bis „Weiter um 14:30“ herunter. Ohne Uhrzeit
@@ -24,7 +25,7 @@ export function pauseUntilFromClock(clock, now = Date.now()) {
 
 /** „Pause bis“ für die Turnierleitung - nur beim Status „Pausiert“. */
 export function PauseUntilControl({ tournament, onSaved }) {
-  const current = tournament?.paused_until ? viennaTime(tournament.paused_until, { hour: "2-digit", minute: "2-digit" }) : "";
+  const current = tournament?.paused_until ? formatClock(tournament.paused_until) : "";
   const [clock, setClock] = useState(current);
   const [busy, setBusy] = useState(false);
   useEffect(() => setClock(current), [current]);
@@ -33,7 +34,7 @@ export function PauseUntilControl({ tournament, onSaved }) {
     setBusy(true);
     try {
       await api.put(`/tournaments/${tournament.id}/pause`, { paused_until: value });
-      toast.success(value ? `Pause bis ${viennaTime(value, { hour: "2-digit", minute: "2-digit" })} – der TV zählt herunter.` : "Kurze Pause ohne Uhrzeit.");
+      toast.success(value ? `Pause bis ${formatClock(value)} – der TV zählt herunter.` : "Kurze Pause ohne Uhrzeit.");
       onSaved?.();
     } catch (error) {
       toast.error(formatRequestError(error, "„Pause bis“ konnte nicht gespeichert werden."));

@@ -50,6 +50,15 @@ export function formatClock(value) {
   return viennaTime(date, { hour: "2-digit", minute: "2-digit", hourCycle: "h23" });
 }
 
+/** Nur der Wochentag in Wien: „Sa“, mit `long: true` „Samstag“ - für Spaltenköpfe und Lauf-Chips. */
+export function formatWeekday(value, { long = false } = {}) {
+  if (value == null || value === "") return "";
+  const day = viennaDay(isPureDay(value) ? dayNoon(value.trim()) : value);
+  if (!day) return "";
+  const noon = dayNoon(day);
+  return long ? viennaDate(noon, { weekday: "long" }) : WEEKDAYS[noon.getUTCDay()];
+}
+
 /** Ein Monat als Überschrift oder „Dabei seit“: „Februar 2026“, ohne Jahr `year: false` („Februar“). */
 export function formatMonth(value, { year = true } = {}) {
   if (value == null || value === "") return "";
@@ -199,7 +208,7 @@ export function getRegistrationState(item, noun = "Anmeldung", now = Date.now())
     return { state: "closed", canRegister: false, label: `${noun} geschlossen` };
   }
   if (openFromMs && now < openFromMs) {
-    return { state: "scheduled", canRegister: false, label: `${noun} öffnet am ${formatDateTime(item.registration_open_from)}` };
+    return { state: "scheduled", canRegister: false, label: `${noun} öffnet am ${formatDateTime(item.registration_open_from, { relative: false })}` };
   }
   if (openUntilMs && now > openUntilMs) {
     return { state: "closed", canRegister: false, label: `${noun} seit ${formatDateTime(item.registration_open_until)} geschlossen` };

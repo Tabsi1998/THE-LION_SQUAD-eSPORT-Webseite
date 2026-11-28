@@ -13,7 +13,7 @@ import { DashboardNotifications } from "./DashboardNotifications";
 import { dashboardActions, formatVienna, registrationLabel, seasonLine, splitHomeTimeline, timelineItems } from "@/lib/dashboard";
 import { useLiveRefresh } from "@/hooks/useLiveRefresh";
 import { Trophy, Crown, Gift, AlertTriangle, UserCheck, CalendarClock, CalendarDays, ClipboardCheck, Shield, ChevronRight, Award, Swords, ListChecks, ScrollText, Star, Users } from "lucide-react";
-import { viennaDateTime } from "@/lib/vienna";
+import { formatWhen } from "@/lib/datetime";
 import { stationText } from "@/lib/tournamentLabels";
 import { FeedbackDialog } from "@/components/tls/FeedbackDialog";
 import { YearReviewBanner } from "@/components/tls/YearReviewBanner";
@@ -95,7 +95,7 @@ function TimelineRow({ item, live = false }) {
       <div className="min-w-0 flex-1 basis-32">
         <div className="font-bold tls-type-small text-white break-words">{item.title}</div>
         <div className="tls-type-small text-white/50 break-words">
-          {[item.date ? `${formatVienna(item.date)} Uhr` : "", item.detail].filter(Boolean).join(" · ")}
+          {[item.date ? formatVienna(item.date) : "", item.detail].filter(Boolean).join(" · ")}
         </div>
       </div>
       {/* Zustands-Schilder (#1306): dieselben Arten wie auf Startseite und Turnierseite - „Läuft“ ist rot, nicht Cyan. */}
@@ -394,7 +394,7 @@ function DashboardMatchCard({ match, staff = false, testId }) {
         <StatusBadge status={match.status} />
       </div>
       {details.length > 0 && <div className="tls-type-small text-white/50 mt-1">{details.join(" · ")}</div>}
-      {match.scheduled_at && <div className="tls-type-small text-white/45 mt-1">{viennaDateTime(match.scheduled_at)}</div>}
+      {match.scheduled_at && <div className="tls-type-small text-white/45 mt-1">{formatWhen(match.scheduled_at)}</div>}
       <div className={`mt-2 tls-type-label ${disputed ? "text-warn" : attention ? "text-brand" : "text-white/70"}`}>{action}</div>
     </Link>
   );

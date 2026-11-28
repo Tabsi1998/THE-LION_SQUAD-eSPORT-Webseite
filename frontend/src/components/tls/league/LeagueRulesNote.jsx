@@ -4,9 +4,8 @@ import { Link } from "react-router-dom";
 import { AlertTriangle, Check, FileText, ScrollText } from "lucide-react";
 import { API } from "@/lib/api";
 import { dayLabel } from "@/lib/leagueRules";
-import { viennaDate } from "@/lib/vienna";
+import { formatWhen } from "@/lib/datetime";
 
-const LONG_DAY = { day: "2-digit", month: "2-digit", year: "numeric" };
 
 /** „open“: zustimmen; „agreed“: schon zugestimmt; null: nichts gefordert oder nicht das eigene Co-Team. */
 export function rulesConsentState(rules) {
@@ -44,7 +43,7 @@ export function LeagueRulesNote({ rules, testId = "league-rules-note", className
       ) : null}
       {state === "agreed" ? (
         <p className="mt-1.5 flex items-center gap-1.5 tls-type-small text-white/60" data-testid={`${testId}-consent`}>
-          <Check className="h-3.5 w-3.5 text-ok" aria-hidden="true" /> Dein Co-Team hat zugestimmt{rules.consent?.agreed_at ? ` (${viennaDate(rules.consent.agreed_at, LONG_DAY)})` : ""}.
+          <Check className="h-3.5 w-3.5 text-ok" aria-hidden="true" /> Dein Co-Team hat zugestimmt{rules.consent?.agreed_at ? ` (${formatWhen(rules.consent.agreed_at, { time: false })})` : ""}.
         </p>
       ) : null}
     </div>

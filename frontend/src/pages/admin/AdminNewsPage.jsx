@@ -10,7 +10,7 @@ import { useConfirm } from "@/components/tls/ConfirmDialog";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { toast } from "sonner";
 import { Download, Globe, Plus, Pin, RotateCcw, Smartphone, Trash2, Search, Newspaper, Undo2 } from "lucide-react";
-import { viennaDate } from "@/lib/vienna";
+import { formatWhen } from "@/lib/datetime";
 import { pinState } from "@/lib/newsPin";
 import { ShortCaps } from "@/components/tls/ShortCaps";
 
@@ -174,7 +174,7 @@ export default function AdminNewsPage() {
                 return {
                   ...item,
                   status_label: state.label,
-                  date_label: viennaDate(item.published_at || item.created_at),
+                  date_label: formatWhen(item.published_at || item.created_at, { time: false }),
                 };
               }))}
               disabled={filteredList.length === 0}
@@ -244,7 +244,7 @@ export default function AdminNewsPage() {
                       <span className={`${state.className} font-bold uppercase`}>{state.label}</span>
                       {state.detail && <div className="mt-0.5 tls-type-small text-white/45">{state.detail}</div>}
                     </td>
-                    <td className="px-4 py-3 tls-type-small text-white/55">{viennaDate(n.published_at || n.created_at)}</td>
+                    <td className="px-4 py-3 tls-type-small text-white/55">{formatWhen(n.published_at || n.created_at, { time: false })}</td>
                     <td className="px-4 py-3 text-center space-x-2 whitespace-nowrap">
                       <Link to={`/admin/news/${n.id}`} data-testid={`news-edit-${n.id}`} className="inline-flex tls-type-label px-3 py-1 rounded-sm border border-[#29B6E8]/40 text-[#29B6E8] hover:bg-[#29B6E8]/10">Bearbeiten</Link>
                       {n.slug && (

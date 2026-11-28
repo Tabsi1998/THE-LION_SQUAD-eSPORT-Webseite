@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import { RefreshCw, Send } from "lucide-react";
 import { toast } from "sonner";
 import { api, formatApiError } from "@/lib/api";
-import { viennaDateTime } from "@/lib/vienna";
+import { formatWhen } from "@/lib/datetime";
 
 // Kanal je Zweck und Schalter je Ereignis (#300, #566): der Bot schickt alles. Öffentliche Ziele
 // fallen ohne eigenen Kanal auf „Community“ zurück; Vorstand und Betrieb sind privat und fallen nie
@@ -37,7 +37,7 @@ export function deliveryText(target, status) {
 
 export function lastAttemptText(last) {
   if (!last) return "";
-  const when = viennaDateTime(last.created_at);
+  const when = formatWhen(last.created_at);
   if (last.status === "sent") return `zuletzt gesendet · ${when}`;
   return `zuletzt fehlgeschlagen · ${when}${last.error ? ` – ${last.error}` : ""}`;
 }

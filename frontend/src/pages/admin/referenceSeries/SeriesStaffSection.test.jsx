@@ -1,4 +1,8 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { runAtTestClock } from "@/testClock";
+
+// Feste Uhr (#1307): die Datums-Texte lassen das laufende Jahr weg und sagen „heute“/„morgen“.
+runAtTestClock();
 
 // Captains der Saison (#1749): der Vorstand sieht Ablauf, Veröffentlichen-Recht und fehlende Zwei-Faktor-Anmeldung,
 // fügt per Personensuche mit Pflicht-Ablauf hinzu, schaltet das Recht um und entfernt - alles über den Server.
@@ -42,8 +46,8 @@ beforeEach(() => {
 
 test("Liste: Ablauf, Entwurf oder direkt, fehlende Zwei-Faktor-Anmeldung und Mitgliedschaft", async () => {
   render(<SeriesStaffSection series={SERIES} />);
-  expect(await screen.findByTestId("series-staff-validity-st-1")).toHaveTextContent("gilt bis 31.12.2026 · Einträge sind Entwürfe, der Vorstand gibt frei");
-  expect(screen.getByTestId("series-staff-validity-st-2")).toHaveTextContent("abgelaufen am 31.01.2026 · veröffentlicht direkt");
+  expect(await screen.findByTestId("series-staff-validity-st-1")).toHaveTextContent("gilt bis Do 31. Dezember · Einträge sind Entwürfe, der Vorstand gibt frei");
+  expect(screen.getByTestId("series-staff-validity-st-2")).toHaveTextContent("abgelaufen am Sa 31. Jänner · veröffentlicht direkt");
   expect(screen.getByTestId("series-staff-mfa-st-2")).toHaveTextContent("Zwei-Faktor fehlt");
   expect(screen.queryByTestId("series-staff-mfa-st-1")).toBeNull();
   expect(screen.getByTestId("series-staff-member-st-2")).toHaveTextContent("Kein aktives Vereinsmitglied mehr");

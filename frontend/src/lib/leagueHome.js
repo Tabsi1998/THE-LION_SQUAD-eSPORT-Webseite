@@ -2,10 +2,8 @@
 // Hinweis, solange die Anmeldung offen ist. Wer was sieht und welche Plakette gilt, entscheidet der Server
 // (backend/services/league_home.py); hier steht nur, wie es auf der Seite steht.
 import { seatsLine } from "@/lib/leagueApplications";
-import { viennaDate, viennaDateTime } from "@/lib/vienna";
+import { formatRange, formatWhen } from "@/lib/datetime";
 
-const SHORT = { day: "2-digit", month: "2-digit", year: "numeric" };
-const DEADLINE = { weekday: "short", day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" };
 
 /** Eine Season als Zeile der Startseiten-Liste - im Format der Events und Turniere (``label``, ``url``, ``public_phase``). */
 export function leagueTimelineItem(row) {
@@ -18,11 +16,10 @@ export function leagueSortTime(item) {
   return Number.isFinite(ms) ? ms : Number.MAX_SAFE_INTEGER;
 }
 
-/** Der Zeitraum der Season: „16.11.2026 – 24.01.2027“. */
+/** Der Zeitraum der Season: „Mo 16. November – So 24. Jänner 2027“ (#1307). */
 export function periodLine(item) {
-  const start = item?.start_date ? viennaDate(item.start_date, SHORT) : "";
-  const end = item?.end_date ? viennaDate(item.end_date, SHORT) : "";
-  return [start, end].filter(Boolean).join(" – ");
+  if (!item?.start_date) return item?.end_date ? formatWhen(item.end_date, { time: false }) : "";
+  return formatRange(item.start_date, item.end_date || null);
 }
 
 /** Freie Startplätze nur, solange angemeldet werden kann oder bald kann - danach zählt die Spielwoche. */
@@ -31,9 +28,9 @@ export function leagueSeatsLine(item) {
   return state === "open" || state === "upcoming" ? seatsLine(item.application) : "";
 }
 
-/** Der Anmeldeschluss für den Hinweis: „Sa., 21.11.2026, 23:59 Uhr“. */
+/** Der Anmeldeschluss für den Hinweis: „Sa 21. November · 23:59“. */
 export function deadlineText(value) {
-  return value ? `${viennaDateTime(value, DEADLINE)} Uhr` : "";
+  return value ? formatWhen(value) : "";
 }
 
 /** Die Seasons, für die gerade angemeldet werden kann - nach Anmeldeschluss fällt eine von selbst heraus. */

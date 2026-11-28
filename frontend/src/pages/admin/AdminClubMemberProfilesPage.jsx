@@ -14,7 +14,7 @@ import { buildDirtyPayload, hasPayloadChanges } from "@/lib/dirtyPayload";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { GermanDateField } from "@/components/tls/GermanDateField";
 import { SkeletonList } from "@/components/tls/Skeleton";
-import { viennaDate, viennaDateTime } from "@/lib/vienna";
+import { formatWhen } from "@/lib/datetime";
 
 import { ROLE_COLORS } from "@/lib/categoryColors";
 const emptyForm = {
@@ -163,7 +163,7 @@ export function ClubMemberProfilesAdminContent() {
                     {/* Verzeichnis per Opt-in (#410): vom Mitglied selbst angelegt, ggf. gesperrt */}
                     {profile.source === "member" && <p className="mt-1 tls-type-label text-[#29B6E8]" data-testid={`club-member-self-${profile.id}`}>vom Mitglied eingetragen</p>}
                     {/* Mitgliederverzeichnis aus der Einwilligung (#410 Nachtrag): vom Abgleich angelegt, Widerruf nimmt offline */}
-                    {profile.source === "dolibarr" && <p className="mt-1 tls-type-label text-[#29B6E8]" data-testid={`club-member-dolibarr-${profile.id}`}>aus der Dolibarr-Einwilligung{profile.consent?.moment ? ` (${viennaDate(profile.consent.moment)})` : ""}</p>}
+                    {profile.source === "dolibarr" && <p className="mt-1 tls-type-label text-[#29B6E8]" data-testid={`club-member-dolibarr-${profile.id}`}>aus der Dolibarr-Einwilligung{profile.consent?.moment ? ` (${formatWhen(profile.consent.moment, { time: false })})` : ""}</p>}
                     {/* Mitgliedsnummer aus Dolibarr (#504): darüber findet der Abgleich die Karte wieder - ohne Konto heißt: Konto noch nicht verknüpft */}
                     {profile.dolibarr_member_id && <p className="tls-type-small text-quiet" data-testid={`club-member-number-${profile.id}`}>Mitglied Nr. {profile.dolibarr_member_id}{!profile.user_id ? " · ohne Konto" : ""}</p>}
                     {profile.deactivated_reason === "consent_withdrawn" && <p className="tls-type-small font-bold text-warn" data-testid={`club-member-withdrawn-${profile.id}`}>Einwilligung widerrufen – offline</p>}
@@ -276,7 +276,7 @@ function ProfileModal({ entry, profiles = [], onClose, onSaved }) {
         {/* Profil aus Dolibarr (#496): was dort gepflegt ist, setzt der Abgleich hier wieder - der Vorstand soll das sehen, bevor er tippt. */}
         {entry.profile?.dolibarr_profile_at && (
           <div className="border border-[#29B6E8]/30 bg-[#29B6E8]/5 px-3 py-2 tls-type-small text-white/60 rounded-sm" data-testid="club-member-dolibarr-hint">
-            Die zugeordneten Felder des Website-Profils (Dolibarr → Verbindung → Feldzuordnung) und das Foto kommen aus Dolibarr (Mitgliedskarte → Verein → Website-Profil; Stand {viennaDateTime(entry.profile.dolibarr_profile_at)}).
+            Die zugeordneten Felder des Website-Profils (Dolibarr → Verbindung → Feldzuordnung) und das Foto kommen aus Dolibarr (Mitgliedskarte → Verein → Website-Profil; Stand {formatWhen(entry.profile.dolibarr_profile_at)}).
             Was dort gepflegt ist, setzt der nächste Abgleich hier wieder; leere Felder in Dolibarr lassen deine Eingaben stehen. Vor- und Nachname sowie Realname bleiben deine Sache.
           </div>
         )}

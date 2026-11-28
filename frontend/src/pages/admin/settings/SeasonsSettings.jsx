@@ -6,7 +6,8 @@ import { api, formatApiError } from "@/lib/api";
 import { useLiveRefresh } from "@/hooks/useLiveRefresh";
 import { useSeason } from "@/seasons/SeasonContext";
 import { SeasonsWeatherCard } from "./SeasonsWeatherCard";
-import { asInstant, viennaDate, viennaDateTime } from "@/lib/vienna";
+import { formatWhen } from "@/lib/datetime";
+import { asInstant } from "@/lib/vienna";
 
 // Jahreszeiten (#632/#633): Halloween, Advent, Weihnachten, Silvester, Fasching, Geburtstag, Ostern - alles
 // an einem Ort. Ein Hauptschalter, je Saison Ein/Aus, automatisch nach Datum oder erzwungen (bis wann),
@@ -26,8 +27,8 @@ export function dateText(value, { withTime = true } = {}) {
   const date = asInstant(value);
   if (Number.isNaN(date.getTime())) return String(value);
   return withTime
-    ? viennaDateTime(date, { timeZone: "Europe/Vienna", day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" })
-    : viennaDate(date, { timeZone: "Europe/Vienna", day: "2-digit", month: "2-digit", year: "numeric" });
+    ? formatWhen(date)
+    : formatWhen(date, { time: false });
 }
 
 // Ein Satz je Saison: läuft gerade, erzwungen, nächstes Fenster, oder was fehlt.

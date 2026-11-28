@@ -1,4 +1,8 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { runAtTestClock } from "@/testClock";
+
+// Feste Uhr (#1307): die Datums-Texte lassen das laufende Jahr weg und sagen „heute“/„morgen“.
+runAtTestClock();
 
 // Vorgabe der Woche in der Verwaltung der Season (#2326): im Kasten „Veto“, je Spielwoche eine Map, fehlende Wochen sichtbar, „Rotiert
 // automatisch durch den Pool“ als Vorschlag, eigenes Speichern mit Historie. Erfundene Modi und Maps.
@@ -56,7 +60,7 @@ test("ohne Schritt „Vorgabe“ gibt es den Block nicht - mit ihm stehen die Wo
   expect(screen.queryByTestId("veto-step-1-team")).toBeNull();
   expect(screen.getByTestId("veto-presets-weeks").children).toHaveLength(3);
   expect(screen.getByTestId("veto-preset-week-1")).toHaveTextContent("Spielwoche 1");
-  expect(screen.getByTestId("veto-preset-week-1")).toHaveTextContent("10.11.–16.11.");
+  expect(screen.getByTestId("veto-preset-week-1")).toHaveTextContent("Di 10. – Mo 16. November");
   expect(screen.getByTestId("veto-preset-1-ctl")).toHaveValue("kai");
   expect(screen.getByTestId("veto-preset-week-1")).toHaveAttribute("data-missing", "false");
   expect(screen.getByTestId("veto-preset-week-2")).toHaveAttribute("data-missing", "true");

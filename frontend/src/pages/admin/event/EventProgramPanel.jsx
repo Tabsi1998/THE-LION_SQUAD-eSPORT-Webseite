@@ -4,7 +4,7 @@ import { Flag, Plus, Trophy, Unlink } from "lucide-react";
 import { toast } from "sonner";
 import { api, formatRequestError } from "@/lib/api";
 import { useConfirm } from "@/components/tls/ConfirmDialog";
-import { viennaDate } from "@/lib/vienna";
+import { formatWhen } from "@/lib/datetime";
 
 // Event als Klammer in der Verwaltung (#1371): Turniere und Fast Laps gehören zum Event, wenn sie hier angelegt oder
 // hinzugefügt werden - das Turnier- und das Fast-Lap-Formular verbinden nicht mehr. Neu Angelegtes übernimmt Ort, Tag,
@@ -102,7 +102,7 @@ export function EventProgramPanel({ eventId, program, failed, reload, onEmbed })
                 <Icon className="w-4 h-4 text-[#9F7AEA] shrink-0" aria-hidden="true" />
                 <div className="min-w-0 flex-1">
                   <Link to={KIND[kind].edit(item.id)} className="font-semibold tls-type-small hover:underline break-words">{item.title || "Ohne Titel"}</Link>
-                  <div className="tls-type-small text-white/45">{[KIND[kind].label, item.start_date ? viennaDate(item.start_date) : ""].filter(Boolean).join(" · ")}</div>
+                  <div className="tls-type-small text-white/45">{[KIND[kind].label, item.start_date ? formatWhen(item.start_date, { time: false }) : ""].filter(Boolean).join(" · ")}</div>
                   {/* Nach einer Verschiebung (#2127, EV4): der Termin bleibt, aber er passt nicht mehr zum Event. */}
                   {item.outside && (
                     <div className="mt-0.5 tls-type-small font-bold text-[#FF9F43]" data-testid={`event-program-outside-${item.id}`}>
@@ -145,7 +145,7 @@ export function EventProgramPanel({ eventId, program, failed, reload, onEmbed })
               <optgroup key={kind} label={KIND[kind].plural}>
                 {candidates[KIND[kind].list].map((item) => (
                   <option key={item.id} value={`${kind}:${item.id}`}>
-                    {[item.title || "Ohne Titel", item.start_date ? viennaDate(item.start_date) : ""].filter(Boolean).join(" · ")}
+                    {[item.title || "Ohne Titel", item.start_date ? formatWhen(item.start_date, { time: false }) : ""].filter(Boolean).join(" · ")}
                   </option>
                 ))}
               </optgroup>

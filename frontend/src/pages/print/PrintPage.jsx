@@ -4,7 +4,7 @@ import { ArrowLeft, Printer } from "lucide-react";
 import { api, formatRequestError } from "@/lib/api";
 import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 import { gameLabel } from "@/lib/gameLabels";
-import { viennaDateTime } from "@/lib/vienna";
+import { formatWhen } from "@/lib/datetime";
 import {
   PAPER, PRINT_DEFAULTS, PRINT_PARTS, bracketPages, checkinPages, dayPlanPages, eventCheckinSections, parseParts, partLabel, printParts,
   schedulePages, stampText, standingsPages, tableMode, tournamentCheckinSections,
@@ -21,7 +21,6 @@ import { CheckinBody, DayPlanBody, PrintSheet, ScheduleBody, StandingsBody, Tree
 // Seit #2121 die Tabelle (beim K.-o. „Rangliste“): Liga, Jeder gegen jeden, Schweizer System und Gruppen drucken sie
 // statt ihrer Spieltage als Baumspalten; „Zurück“ führt dorthin, wo der Druck-Knopf war, sonst zur Turnierseite.
 
-const START = { weekday: "short", day: "numeric", month: "long", hour: "2-digit", minute: "2-digit" };
 const ORIENTATION = { quer: "landscape", hoch: "portrait" };
 const ORIENTATION_PARAM = { landscape: "quer", portrait: "hoch" };
 const MM_TO_PX = 96 / 25.4;
@@ -151,7 +150,7 @@ function PrintView({ scope }) {
   const backQuery = accessToken ? `?access=${encodeURIComponent(accessToken)}` : "";
   const backTo = `${base}${scope === "event" ? "" : BACK[params.get("von")] || ""}${backQuery}`;
   const meta = subject
-    ? [subject.start_date ? viennaDateTime(subject.start_date, START) : null, subject.game ? gameLabel(subject.game) : null, subject.location || subject.venue_name || null].filter(Boolean).join(" · ")
+    ? [subject.start_date ? formatWhen(subject.start_date, { relative: false }) : null, subject.game ? gameLabel(subject.game) : null, subject.location || subject.venue_name || null].filter(Boolean).join(" · ")
     : "";
 
   const sheets = useMemo(() => {

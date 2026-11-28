@@ -9,7 +9,8 @@ import { useAuth } from "@/context/AuthContext";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { canUseArea, hasArea, mfaSetupPath } from "@/lib/permissions";
 import { ArrowRight, CalendarDays, Settings, Trophy } from "lucide-react";
-import { asInstant, viennaDate } from "@/lib/vienna";
+import { formatWhen } from "@/lib/datetime";
+import { asInstant, viennaDay } from "@/lib/vienna";
 
 // Jahreswertung (#1222): /seasons/current öffnet die laufende Saison. Läuft keine, steht hier der Endstand der zuletzt
 // beendeten Wertung (auch archiviert) mit den ersten zehn Plätzen - und darüber, wann die nächste beginnt, wenn sie
@@ -37,7 +38,7 @@ export function seasonOverview(seasons = [], now = new Date()) {
 /** „Endstand 2025“ - das Jahr aus dem Ende (sonst dem Beginn), ohne Datum der Name der Saison. */
 export function finalTitle(season) {
   const when = season?.end_date || season?.start_date;
-  return when ? `Endstand ${viennaDate(when, { year: "numeric" })}` : `Endstand ${season?.name || ""}`.trim();
+  return when ? `Endstand ${viennaDay(when).slice(0, 4)}` : `Endstand ${season?.name || ""}`.trim();
 }
 
 export default function CurrentSeasonRedirect() {
@@ -96,7 +97,7 @@ export default function CurrentSeasonRedirect() {
           <span className="tls-type-label text-[#29B6E8]">TLS Jahreswertung</span>
           <h1 className="mt-2 tls-type-title leading-tight" data-testid="season-current-title">{latest ? finalTitle(latest) : "Jahreswertung"}</h1>
           {next?.start_date && (
-            <p className="mt-4 text-white/75" data-testid="season-next">Die nächste Wertung beginnt am {viennaDate(next.start_date, { day: "numeric", month: "long", year: "numeric" })}.</p>
+            <p className="mt-4 text-white/75" data-testid="season-next">Die nächste Wertung beginnt am {formatWhen(next.start_date, { time: false, relative: false })}.</p>
           )}
           {!latest && !next && (
             <p className="mt-4 text-white/75 max-w-2xl" data-testid="season-none">Die Jahreswertung startet mit dem nächsten Turnier.</p>
@@ -191,8 +192,8 @@ function SeasonTile({ season }) {
         {(season.start_date || season.end_date) && (
           <div className="mt-2 inline-flex items-center gap-2 tls-type-small text-white/45">
             <CalendarDays className="w-3.5 h-3.5" />
-            {season.start_date ? viennaDate(season.start_date) : "Start offen"}
-            {season.end_date ? ` - ${viennaDate(season.end_date)}` : ""}
+            {season.start_date ? formatWhen(season.start_date, { time: false }) : "Start offen"}
+            {season.end_date ? ` - ${formatWhen(season.end_date, { time: false })}` : ""}
           </div>
         )}
       </div>

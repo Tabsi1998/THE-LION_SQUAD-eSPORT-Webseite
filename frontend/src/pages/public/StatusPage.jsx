@@ -4,7 +4,7 @@ import { PublicLayout } from "@/components/tls/PublicLayout";
 import { LionArt } from "@/components/tls/LionArt";
 import { LION_ART_SIZE } from "@/components/tls/PublicEmptyState";
 import { useDocumentTitle } from "@/hooks/useDocumentTitle";
-import { viennaDateTime } from "@/lib/vienna";
+import { formatWhen } from "@/lib/datetime";
 
 // Statusseite (#1657, Entscheidung 15.10.2026): zwei Zustände, die die Überwachung selbst umstellt - „Alles läuft“ und
 // „Störung, wir sind dran“. Keine Einzelheiten (welcher Teil, warum), nur Deutsch. Antwortet der Server gar nicht, ist das
@@ -70,7 +70,7 @@ export default function StatusPage() {
               <h1 className="mt-3 tls-type-title">{view.title}</h1>
               <p className="mt-3 tls-type-body text-white/60">{view.text}</p>
               {status.checkedAt ? (
-                <p className="mt-4 tls-type-small text-quiet">Zuletzt geprüft: {viennaDateTime(status.checkedAt)}</p>
+                <p className="mt-4 tls-type-small text-quiet">Zuletzt geprüft: {formatWhen(status.checkedAt)}</p>
               ) : null}
             </>
           ) : (

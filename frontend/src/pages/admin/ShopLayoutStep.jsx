@@ -2,7 +2,7 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } fr
 import * as DialogPrimitive from "@radix-ui/react-dialog";
 import { AlertTriangle, AlignCenterHorizontal, CheckCircle2, ExternalLink, FlipHorizontal2, Image as ImageIcon, LayoutTemplate, Maximize2, Minus, Move, Plus, RefreshCw, RotateCcw, Scan, Trash2, Upload, Wand2, X, ZoomIn, ZoomOut } from "lucide-react";
 import { api, formatRequestError, resolveMediaUrl, uploadApi } from "@/lib/api";
-import { viennaDateTime } from "@/lib/vienna";
+import { formatWhen } from "@/lib/datetime";
 import { cmText, gapCm, gapOffsetCm, layerAbove, layersFromSet, maxWidthCm, resolveLayers, textBoundsCm } from "@/lib/shopLayout";
 import {
   alignToLayer, areaSizeCm, BIG_STEP_CM, centerOnArea, clampOffsets, DEFAULT_GRID_CM, DRAG_START_PX, followersOf, formatCm, frameCm, GRID_CHOICES_CM, MAX_OFFSET_CM, mirrorOnArea,
@@ -1181,7 +1181,7 @@ export function TemplateStatus({ view, busy, run }) {
   return (
     <div className="flex flex-wrap items-center gap-3 tls-type-small" data-testid="shop-template-status">
       <span className={!template?.loaded || template?.last_error ? "text-warn" : "text-white/60"}>
-        {!template?.loaded ? "Noch keine Druckvorlage von Printful." : `Druckvorlage von Printful, abgeglichen ${viennaDateTime(template.checked_at)}.`}
+        {!template?.loaded ? "Noch keine Druckvorlage von Printful." : `Druckvorlage von Printful, abgeglichen ${formatWhen(template.checked_at)}.`}
         {template?.last_error ? ` Letzter Versuch gescheitert: ${template.last_error.detail}` : ""}
       </span>
       <button type="button" disabled={busy === "templates"} onClick={() => run("templates", () => api.post(`${BASE}/${view.product.id}/print-templates/refresh`, { reason: "" }),
@@ -1195,7 +1195,7 @@ export function TemplateStatus({ view, busy, run }) {
       )}
       {template?.changes?.length > 0 && template?.changed_at && (
         <div className="basis-full border border-warn/40 bg-warn/10 rounded-sm p-2" role="status" data-testid="shop-template-changes">
-          <div className="font-bold">Printful hat die Vorlage geändert ({viennaDateTime(template.changed_at)})</div>
+          <div className="font-bold">Printful hat die Vorlage geändert ({formatWhen(template.changed_at)})</div>
           <ul className="mt-1 space-y-0.5">{template.changes.map((change) => <li key={change}>{change}</li>)}</ul>
           <p className="mt-1 text-white/60">Betroffene Druckdateien sind „veraltet“ - bitte neu erzeugen.</p>
         </div>

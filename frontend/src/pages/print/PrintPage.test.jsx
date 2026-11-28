@@ -1,6 +1,10 @@
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { Link, MemoryRouter, Route, Routes } from "react-router-dom";
+import { runAtTestClock } from "@/testClock";
+
+// Feste Uhr (#1307): die Datums-Texte lassen das laufende Jahr weg und sagen „heute“/„morgen“.
+runAtTestClock();
 
 // Druckansicht (#1283): Blätter je Teil mit Druckzeit und QR-Code, kein Druck beim Laden (erst der Knopf), und die
 // Check-in-Liste nur mit Turnier-Recht - ohne Recht fragt die Seite den Server gar nicht erst.
@@ -49,7 +53,7 @@ test("Baum und Spielplan: je Blatt Druckzeit und QR-Code zur Live-Seite; gedruck
   renderAt("/print/tournaments/herbst-cup");
   expect(await screen.findByTestId("print-sheet-baum")).toBeInTheDocument();
   expect(screen.getByTestId("print-sheet-spielplan")).toBeInTheDocument();
-  expect(screen.getAllByTestId("print-stamp").every((node) => /^Stand \d\d\.\d\d\. \d\d:\d\d$/.test(node.textContent))).toBe(true);
+  expect(screen.getAllByTestId("print-stamp").every((node) => /^Stand (?:Mo|Di|Mi|Do|Fr|Sa|So) \d{1,2}\. \S+(?: \d{4})? · \d\d:\d\d$/.test(node.textContent))).toBe(true);
   const qr = screen.getAllByTestId("branded-qr-code").map((node) => node.dataset.value);
   expect(qr).toEqual([`${window.location.origin}/tournaments/herbst-cup/bracket`, `${window.location.origin}/tournaments/herbst-cup/matches`]);
   expect(screen.getAllByTestId("print-round-title").map((node) => node.textContent)).toEqual(["Halbfinale", "Finale"]);

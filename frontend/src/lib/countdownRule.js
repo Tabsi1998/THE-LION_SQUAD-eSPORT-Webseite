@@ -1,4 +1,5 @@
-import { dayNoon, viennaDate, viennaDay, viennaTime } from "./vienna";
+import { formatClock, formatMonth, formatWeekday } from "@/lib/datetime";
+import { dayNoon, viennaDay } from "./vienna";
 
 // Countdown nur, wenn es bald so weit ist (#1264) - eine Regel für alle Termin-Angaben der Website (Startseite,
 // Zustands-Schild, Zeitleiste der Turnierseite):
@@ -35,10 +36,10 @@ export function calendarDaysBetween(fromMs, toMs_) {
   return Math.round((dayNoon(viennaDay(toMs_)).getTime() - dayNoon(viennaDay(fromMs)).getTime()) / DAY_MS);
 }
 
-const clock = (ms) => viennaTime(ms, { hour: "2-digit", minute: "2-digit", hourCycle: "h23" });
-const weekday = (ms) => viennaDate(ms, { weekday: "short" }).replace(/\.$/, "");
+const clock = (ms) => formatClock(ms);
+const weekday = (ms) => formatWeekday(ms);
 const dayNumber = (ms) => Number(viennaDay(ms).slice(8, 10));
-const monthName = (ms) => viennaDate(ms, { month: "long" });
+const monthName = (ms) => formatMonth(ms, { year: false });
 const yearOf = (ms) => viennaDay(ms).slice(0, 4);
 
 /** „Sa 14. November“ bzw. mehrtägig „Do 11. – So 14. März“ / „Fr 30. Oktober – So 1. November“. */

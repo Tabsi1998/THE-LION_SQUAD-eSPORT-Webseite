@@ -4,7 +4,8 @@ import { CheckCircle2, Crown, ExternalLink, Link2, RefreshCw, Send, Server, XCir
 import { toast } from "sonner";
 import { api, formatApiError } from "@/lib/api";
 import { useConfirm } from "@/components/tls/ConfirmDialog";
-import { asInstant, viennaDateTime } from "@/lib/vienna";
+import { formatWhen } from "@/lib/datetime";
+import { asInstant } from "@/lib/vienna";
 import { gamePageUrl } from "@/lib/gameForm";
 
 // Server-Verzeichnis (#624, Discord VI): ein Bot, mehrere Server. Der Hauptserver bekommt alle Meldungen wie bisher;
@@ -80,7 +81,7 @@ function GuildGames({ guild }) {
 
 function when(value) {
   const date = value ? asInstant(value) : null;
-  return date && !Number.isNaN(date.getTime()) ? viennaDateTime(date) : "";
+  return date && !Number.isNaN(date.getTime()) ? formatWhen(date) : "";
 }
 
 /** Rollen je Server (#629): letzter Abgleich in Worten - Änderungen, was fehlt, was angelegt wurde. */
