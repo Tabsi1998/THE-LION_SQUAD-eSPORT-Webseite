@@ -2428,7 +2428,7 @@ die Wertung unter **Gesamtwertung** (mit PDF), Profil und Teamseite den Platz.
 | „Die Teilnehmerart steht ab dem Anlegen fest …“ | Eine Liga soll von Co-Teams auf Spieler wechseln (oder umgekehrt) | Neue Liga anlegen (2.5d) |
 | „… ist nicht für Einzelspieler eingestellt – eine Solo-Liga geht nur mit einem Spiel, das Einzelspieler erlaubt.“ | Solo-Liga für ein Spiel nur mit Teams | Anderes Spiel wählen oder eine Team-Liga anlegen |
 | „In einer Solo-Liga spielt jede Person für sich – die Teamgröße ist dort immer 1.“ (ebenso der Mindestkader) | Teamgröße in einer Solo-Liga geändert | Teamgröße 1 lassen; für 2 gegen 2 eine Team-Liga anlegen |
-| „Die Selbstanmeldung als Spieler folgt in einem späteren Ausbau …“ | Anmeldefenster in einer Solo-Liga | Spieler auf der Staffel-Seite zuteilen (2.5d) |
+| „In einer Solo-Staffel meldest du dich auf der Ligaseite als Spieler an …“ | Anmeldung direkt an der Solo-Staffel vorbei (Turnier-Anmeldung) | Auf der Ligaseite **Als Spieler anmelden**, oder die Leitung teilt über **Spieler zuteilen** zu (2.5d) |
 | „Der Spielbetrieb einer Solo-Liga … folgt in einem späteren Ausbau …“ | **Liga starten** in einer Solo-Staffel | Die Staffel bleibt vor dem Start, bis der Spielbetrieb für Spieler kommt |
 | „In dieser Staffel spielen Spieler, keine Co-Teams – bitte eine Person zuteilen.“ | Co-Team in eine Solo-Staffel | **Spieler zuteilen** |
 | „… spielt in dieser Season schon in einer anderen Staffel.“ bei einer Person | Eine Person spielt je Season nur eine Staffel | Andere Staffel wählen oder dort entfernen |
