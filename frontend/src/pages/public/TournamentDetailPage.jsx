@@ -25,7 +25,7 @@ import { MentionTextarea } from "@/components/tls/MentionTextarea";
 import { MentionText } from "@/components/tls/MentionText";
 import { ChatAttachButton, ChatAttachmentDrafts, ChatMessageAttachments, useChatAttachmentDrafts } from "@/components/tls/ChatAttachments";
 import { ChatMessageSticker, ChatStickerButton, ChatStickerPicker } from "@/components/tls/ChatStickers";
-import { formatWhen, getRegistrationState } from "@/lib/datetime";
+import { getRegistrationState } from "@/lib/datetime";
 import { checkInState } from "@/lib/checkInTimes";
 import { tournamentIsOver } from "@/lib/afterEnd";
 import { renderMarkdownLite } from "@/lib/markdownLite";
@@ -426,7 +426,7 @@ function TournamentDetailView() {
 
           <div className="mt-8 grid grid-cols-2 md:grid-cols-4 gap-3 max-w-3xl">
             {/* Datum ganz (#1220): „Sa 23. Mai · 21:00“, ohne Abschneiden. */}
-            <InfoTile icon={Calendar} label="Start" value={formatWhen(t.start_date, { fallback: "—" })} wrap testId="tournament-start-tile" />
+            <InfoTile icon={Calendar} label="Start" value={<When value={t.start_date} fallback="—" />} wrap testId="tournament-start-tile" />
             <InfoTile icon={Users} label={isTeamTournament ? "Teams" : "Teilnehmer"} value={`${t.participant_count}/${t.max_participants}`} />
             <InfoTile icon={Gamepad2} label="Plattform" value={t.platform || "—"} />
             {/* Format ganz (#401): kein Abschneiden, dazu der Tooltip mit Modus und Best-of */}
@@ -686,7 +686,7 @@ function TournamentChat({ tournament, user }) {
                     <div className={`max-w-[85%] border rounded-sm px-3 py-2 ${mine ? "border-[#29B6E8]/40 bg-[#29B6E8]/10" : "border-white/10 bg-[#0A0A0A]"}`}>
                       <div className="flex items-center gap-2 tls-type-small text-quiet">
                         <span className={mine ? "text-[#29B6E8]" : "text-white/55"}>{message.author?.display_name || message.author?.username || "Benutzer"}</span>
-                        {message.created_at && <span>{formatWhen(message.created_at)}</span>}
+                        {message.created_at && <span><When value={message.created_at} /></span>}
                       </div>
                       {message.message && <div className="mt-1 whitespace-pre-wrap break-words tls-type-small text-white/85"><MentionText text={message.message} /></div>}
                       <ChatMessageAttachments attachments={message.attachments} />

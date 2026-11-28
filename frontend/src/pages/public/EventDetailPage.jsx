@@ -495,7 +495,7 @@ function EventOverview({ e, user, over, accessToken, hasConsent, onChanged, regi
           <div className="grid sm:grid-cols-2 gap-4">
             {e.news.map((n) => (
               <Link key={n.id} to={`/news/${n.slug}`} className="tls-card border border-white/10 rounded-sm bg-[#121212] p-4">
-                <div className="tls-type-label text-quiet">{formatWhen(n.published_at || n.created_at, { time: false })}</div>
+                <div className="tls-type-label text-quiet"><When value={n.published_at || n.created_at} time={false} /></div>
                 <div className="font-bold mt-1">{n.title}</div>
                 {n.excerpt && <div className="tls-type-small text-white/60 mt-1 line-clamp-2">{n.excerpt}</div>}
               </Link>
@@ -781,8 +781,8 @@ function EventRegistrationPanel({ event, user, accessToken = "", onChanged, open
         </div>
       )}
       <div className="mt-4 space-y-1 tls-type-small text-white/65">
-        {event.registration_opens_at && <div>Öffnet: {formatWhen(event.registration_opens_at)}</div>}
-        {event.registration_closes_at && <div>Schließt: {formatWhen(event.registration_closes_at)}</div>}
+        {event.registration_opens_at && <div>Öffnet: <When value={event.registration_opens_at} /></div>}
+        {event.registration_closes_at && <div>Schließt: <When value={event.registration_closes_at} /></div>}
         {!event.registration_url && summary.spots_left != null && <div>Freie Plätze: {summary.spots_left}</div>}
       </div>
       {event.registration_url ? (

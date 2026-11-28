@@ -13,7 +13,6 @@ import { DashboardNotifications } from "./DashboardNotifications";
 import { dashboardActions, formatVienna, registrationLabel, seasonLine, splitHomeTimeline, timelineItems } from "@/lib/dashboard";
 import { useLiveRefresh } from "@/hooks/useLiveRefresh";
 import { Trophy, Crown, Gift, AlertTriangle, UserCheck, CalendarClock, CalendarDays, ClipboardCheck, Shield, ChevronRight, Award, Swords, ListChecks, ScrollText, Star, Users } from "lucide-react";
-import { formatWhen } from "@/lib/datetime";
 import { stationText } from "@/lib/tournamentLabels";
 import { FeedbackDialog } from "@/components/tls/FeedbackDialog";
 import { YearReviewBanner } from "@/components/tls/YearReviewBanner";
@@ -22,6 +21,7 @@ import { noteOwnMatches } from "@/lib/liveQueue";
 import { BEREICH, gruppenFuer } from "@/lib/meinBereich";
 import { isAnyAdmin } from "@/lib/permissions";
 import { BereichListe } from "./meinBereich/BereichNav";
+import { When } from "@/components/tls/When";
 
 // Das Dashboard ist die persönliche Startseite, wie die App-Startseite seit
 // #237 (#256): Kopf, offene Aktionen, nächste Termine, Jahreswertung,
@@ -394,7 +394,7 @@ function DashboardMatchCard({ match, staff = false, testId }) {
         <StatusBadge status={match.status} />
       </div>
       {details.length > 0 && <div className="tls-type-small text-white/50 mt-1">{details.join(" · ")}</div>}
-      {match.scheduled_at && <div className="tls-type-small text-white/45 mt-1">{formatWhen(match.scheduled_at)}</div>}
+      {match.scheduled_at && <div className="tls-type-small text-white/45 mt-1"><When value={match.scheduled_at} /></div>}
       <div className={`mt-2 tls-type-label ${disputed ? "text-warn" : attention ? "text-brand" : "text-white/70"}`}>{action}</div>
     </Link>
   );
