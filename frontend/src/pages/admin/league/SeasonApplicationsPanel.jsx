@@ -21,6 +21,9 @@ const WHEN = { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit
 const BUTTON = "inline-flex min-h-[40px] items-center rounded-sm px-3 py-1.5 tls-type-label disabled:opacity-50";
 const REASON_MIN = 5;
 const OWN_TEAM = "Über dein eigenes Team entscheidet eine andere Person.";
+// Solo-Liga (#1629, P2): Anmeldungen von Spielern (``kind: "solo"``) - dieselben Knöpfe, die Sätze sprechen vom Spieler.
+const OWN_ENTRY = "Über deine eigene Anmeldung entscheidet eine andere Person.";
+const isPerson = (row) => row?.kind === "solo";
 const OPEN_GROUPS = [
   { key: "open", title: "Neu und in Prüfung", statuses: ["submitted", "in_review"] },
   { key: "waitlist", title: "Warteliste", statuses: ["waitlist"] },
@@ -63,7 +66,7 @@ function Notes({ row }) {
           </p>
           {row.shortfall ? <p className="mt-1 tls-type-small text-white/85 [overflow-wrap:anywhere]">{row.shortfall}</p> : null}
           {row.warnings?.length ? <ul className="mt-1 space-y-0.5 tls-type-small text-white/65">{row.warnings.map((text) => <li key={text} className="[overflow-wrap:anywhere]">{text}</li>)}</ul> : null}
-          <p className="mt-1 tls-type-small text-white/50">Zulassen geht trotzdem. Wer etwas offen hat, kann nicht einchecken und nicht aufgestellt werden; das Team wird erinnert.</p>
+          <p className="mt-1 tls-type-small text-white/50">{isPerson(row) ? "Zulassen geht trotzdem. Solange etwas offen ist, kann der Spieler nicht einchecken; er wird erinnert." : "Zulassen geht trotzdem. Wer etwas offen hat, kann nicht einchecken und nicht aufgestellt werden; das Team wird erinnert."}</p>
         </div>
       ) : null}
       {row.shared_with?.length ? <p className="mt-2 tls-type-small text-white/60 [overflow-wrap:anywhere]">Gleiche Spieler stehen auch im Antrag von: {row.shared_with.join(", ")}.</p> : null}
@@ -73,7 +76,7 @@ function Notes({ row }) {
 
 // Befangenheit (#2245, Entscheidung Nr. 73): Über das eigene Team entscheidet eine zweite Person. Der Server prüft dieselbe Regel, hier nur die Anzeige.
 function OwnTeamNote({ row }) {
-  return <p className="tls-type-small font-semibold text-white/80" data-testid={`application-own-team-${row.id}`}>{OWN_TEAM}</p>;
+  return <p className="tls-type-small font-semibold text-white/80" data-testid={`application-own-team-${row.id}`}>{isPerson(row) ? OWN_ENTRY : OWN_TEAM}</p>;
 }
 
 // Offene Anmeldungen (Entscheidung B, #1665): Nur hier steht das Kennzeichen „Gast“ - abgelehnt oder zurückgezogen gibt kein Recht daran.
@@ -116,7 +119,7 @@ function RowActions({ row, options, busy, act, superadmin, conflictReason = "", 
         </div>
       ) : null}
       {autoSeated ? (
-        <p className="tls-type-small text-white/55" data-testid={`application-auto-seat-${row.id}`}>Ablehnen oder Warteliste nehmen das Co-Team wieder aus der Staffel, solange der Spielplan nicht steht.</p>
+        <p className="tls-type-small text-white/55" data-testid={`application-auto-seat-${row.id}`}>Ablehnen oder Warteliste nehmen {isPerson(row) ? "den Spieler" : "das Co-Team"} wieder aus der Staffel, solange der Spielplan nicht steht.</p>
       ) : options.length ? (
         <SelectField label={unassigned ? "Staffel" : "Staffel (geht auch später)"} value={staffel} onChange={setStaffel} testId={`application-staffel-${row.id}`} className="max-w-md"
           options={[["", "Staffel wählen …"], ...options.map(([value, text]) => [value, text])]} />
@@ -124,7 +127,8 @@ function RowActions({ row, options, busy, act, superadmin, conflictReason = "", 
       {otherDivision ? (
         <TextField label="Grund für die andere Liga" required value={deviation} onChange={setDeviation} maxLength={500} className="max-w-md"
           hint={row.carry_over ? "Das Co-Team ist in eine andere Liga übernommen. Der Grund steht im Verlauf und im Protokoll."
-            : "Neue Co-Teams starten in der untersten Liga. Der Grund steht im Verlauf und im Protokoll."} testId={`application-deviation-${row.id}`} />
+            : isPerson(row) ? "Neue Spieler starten in der untersten Liga. Der Grund steht im Verlauf und im Protokoll."
+              : "Neue Co-Teams starten in der untersten Liga. Der Grund steht im Verlauf und im Protokoll."} testId={`application-deviation-${row.id}`} />
       ) : null}
       <div className="flex flex-wrap gap-2">
         {deciding ? (
@@ -145,7 +149,7 @@ function RowActions({ row, options, busy, act, superadmin, conflictReason = "", 
       </div>
       {mode ? (
         <div className="max-w-xl space-y-2">
-          <TextAreaField label="Grund (Pflicht, das Team liest ihn)" rows={2} value={reason} onChange={setReason} testId={`application-reason-${row.id}`} />
+          <TextAreaField label={isPerson(row) ? "Grund (Pflicht, der Spieler liest ihn)" : "Grund (Pflicht, das Team liest ihn)"} rows={2} value={reason} onChange={setReason} testId={`application-reason-${row.id}`} />
           {mode === "reject" ? (
             <button type="button" disabled={blocked || reason.trim().length < REASON_MIN} onClick={() => send("reject", { reason: reason.trim() })} className={`tls-btn tls-btn--danger ${BUTTON}`} data-testid={`application-reject-send-${row.id}`}>Ablehnung senden</button>
           ) : (
@@ -166,7 +170,7 @@ function ApplicationRow({ row, options, busy, act, superadmin, seasonId = null, 
   const [conflictReason, setConflictReason] = useState("");
   // Beendete oder archivierte Season: kein Recht mehr am Kennzeichen (Entscheidung B) - der Kasten fällt weg, statt mit 403 zu antworten.
   // Auch der Bereich Ligen setzt es dann über eine laufende Season des Teams.
-  const guestControl = Boolean(seasonId) && !seasonClosed && OPEN_STATUSES.includes(row.status);
+  const guestControl = Boolean(seasonId) && !seasonClosed && OPEN_STATUSES.includes(row.status) && !isPerson(row);
   return (
     <li className="rounded-sm border border-white/10 bg-[#0A0A0A] p-3" data-testid={`application-${row.id}`}>
       <div className="flex flex-wrap items-center gap-2">
@@ -190,7 +194,8 @@ function ApplicationRow({ row, options, busy, act, superadmin, seasonId = null, 
         </p>
       ) : null}
       <p className="mt-1 tls-type-small text-white/60 [overflow-wrap:anywhere]">
-        {row.carry_over ? "Übernommen" : "Eingereicht"} {when(row.submitted_at)} {row.carry_over ? "" : `von ${row.applied_by_name} `}· {row.member_count} Spieler · Captain {row.captain_name || "fehlt"}{row.vice_name ? ` · Vertreter ${row.vice_name}` : ""}
+        {isPerson(row) ? `Eingereicht ${when(row.submitted_at)} · meldet sich selbst als Spieler an`
+          : <>{row.carry_over ? "Übernommen" : "Eingereicht"} {when(row.submitted_at)} {row.carry_over ? "" : `von ${row.applied_by_name} `}· {row.member_count} Spieler · Captain {row.captain_name || "fehlt"}{row.vice_name ? ` · Vertreter ${row.vice_name}` : ""}</>}
       </p>
       <p className="tls-type-small text-white/60">
         {row.carry_over && !row.rules_version ? "Zustimmung zum Regelwerk folgt vor dem ersten Spiel (Captain im Regelwerk)"
@@ -263,7 +268,7 @@ export function SeasonApplicationsPanel({ seasonId, version, seasonStatus = null
     setBusy(true);
     try {
       await api.post(`${url}/${row.id}/${action}`, body);
-      toast.success("Gespeichert. Das Team bekommt eine Nachricht.");
+      toast.success(isPerson(row) ? "Gespeichert. Der Spieler bekommt eine Nachricht." : "Gespeichert. Das Team bekommt eine Nachricht.");
     } catch (err) {
       toast.error(formatApiError(err.response?.data?.detail));
     }
@@ -277,7 +282,9 @@ export function SeasonApplicationsPanel({ seasonId, version, seasonStatus = null
   const closed = items.filter((row) => ["rejected", "withdrawn"].includes(row.status));
   return (
     <div id="anmeldungen" className="scroll-mt-24">
-      <FormSection title="Anmeldungen" testId="season-applications" hint="Was Captains und Vertreter eingereicht haben. Annehmen und Zuteilen prüfen den Kader noch einmal. Wird ein Platz frei, entscheidest du, wer nachrückt.">
+      <FormSection title="Anmeldungen" testId="season-applications" hint={data.kind === "solo"
+        ? "Was Spieler eingereicht haben. Annehmen und Zuteilen prüfen sie noch einmal. Wird ein Platz frei, entscheidest du, wer nachrückt."
+        : "Was Captains und Vertreter eingereicht haben. Annehmen und Zuteilen prüfen den Kader noch einmal. Wird ein Platz frei, entscheidest du, wer nachrückt."}>
         <p className="tls-type-small text-white/80" data-testid="season-applications-stats">{statsLine(data.stats)}</p>
         {!items.length ? <p className="tls-type-small text-white/55">Noch keine Anmeldung.</p> : null}
         {OPEN_GROUPS.map((group) => {

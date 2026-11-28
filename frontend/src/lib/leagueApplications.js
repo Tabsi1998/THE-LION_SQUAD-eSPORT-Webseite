@@ -28,11 +28,26 @@ export function teamStateLabel(state, application) {
   return (APPLICATION_STATES[state] || APPLICATION_STATES.none).label;
 }
 
-/** Nach dem Einreichen: was jetzt gilt - mit „automatisch annehmen“ entscheidet die Season gleich (#2348). */
-export function submittedToast(status) {
-  if (status === "accepted") return "Angemeldet. Ihr habt einen Startplatz.";
-  if (status === "waitlist") return "Eingereicht. Ihr steht auf der Warteliste.";
+/** Nach dem Einreichen: was jetzt gilt - mit „automatisch annehmen“ entscheidet die Season gleich (#2348). ``solo``: als Spieler (#1629, P2). */
+export function submittedToast(status, solo = false) {
+  if (status === "accepted") return solo ? "Angemeldet. Du hast einen Startplatz." : "Angemeldet. Ihr habt einen Startplatz.";
+  if (status === "waitlist") return solo ? "Eingereicht. Du stehst auf der Warteliste." : "Eingereicht. Ihr steht auf der Warteliste.";
   return "Anmeldung eingereicht. Die Liga-Leitung prüft sie jetzt.";
+}
+
+/**
+ * Solo-Liga (#1629, P2): Die Person meldet sich selbst an. Der Server sagt es mit ``kind: "solo"`` (eigene Sicht) bzw.
+ * ``participant_kind: "solo"`` (öffentlicher Block) - Team-Ligen tragen keines der Felder.
+ */
+export function isSoloApplication(view, block) {
+  return view?.kind === "solo" || block?.participant_kind === "solo";
+}
+
+/** Darf die Person sich jetzt als Spieler anmelden? Dann steht der Knopf „Als Spieler anmelden“ auf der Ligaseite - sonst sagen die
+ * Gründe der Prüfung, warum nicht (``player.problems``). */
+export function canStartPersonApplication(view) {
+  if (view?.kind !== "solo" || view?.application?.state !== "open" || view?.season_problems?.length) return false;
+  return Boolean(view.player?.can_submit) && !RUNNING.has(view.player.state);
 }
 
 /** Hinweis in der Verwaltung bei „automatisch annehmen“: Offene Anmeldungen bleiben bei der Leitung und halten ihren Platz (wer zuerst kommt, wird zuerst bedient). */
@@ -42,6 +57,8 @@ export function waitingLine(count) {
 }
 
 export const ENTRY_POLICY_OPTIONS = [["all", "Alle Konten, auch externe Teams"], ["members", "Nur Vereinsmitglieder"]];
+// Solo-Liga (#1629, P2): Es melden sich Personen an, keine Teams.
+export const ENTRY_POLICY_OPTIONS_SOLO = [["all", "Alle Konten"], ["members", "Nur Vereinsmitglieder"]];
 
 function when(value) {
   return `${viennaDateTime(value, LONG)} Uhr`;

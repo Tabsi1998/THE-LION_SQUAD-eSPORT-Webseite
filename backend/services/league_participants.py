@@ -28,9 +28,11 @@ KIND_LOCKED = ("Die Teilnehmerart steht ab dem Anlegen fest – für Spieler sta
                "anlegen.")
 TEAM_SIZE_SOLO = "In einer Solo-Liga spielt jede Person für sich – die Teamgröße ist dort immer 1."
 SQUAD_SIZE_SOLO = "In einer Solo-Liga ist der Kader die Person selbst – der Mindestkader ist dort immer 1."
-# Wege, die es für Spieler erst in einem späteren Paket gibt (#1629, P2 bis P4): gesperrt mit klarem Satz statt halb gebaut.
-APPLICATIONS_FOLLOW = ("Die Selbstanmeldung als Spieler folgt in einem späteren Ausbau – bis dahin teilt die Leitung die Spieler "
-                       "auf der Staffel-Seite zu.")
+# Wege, die es für Spieler erst in einem späteren Paket gibt (#1629, P3 und P4): gesperrt mit klarem Satz statt halb gebaut. Die
+# Selbstanmeldung als Spieler gibt es seit P2.
+# Das Los rechnet mit Co-Teams und Hauptteams (Geschwister-Regel) - für Spieler teilt die Leitung im Eingang zu.
+DRAW_FOLLOWS = ("Das Auslosen auf mehrere Staffeln folgt für Solo-Ligen in einem späteren Ausbau – bis dahin teilst du die Spieler im "
+                "Eingang einer Staffel zu.")
 OPERATIONS_FOLLOW = ("Der Spielbetrieb einer Solo-Liga (Check-in, Veto, Ergebnis melden) folgt in einem späteren Ausbau – die Staffel "
                      "bleibt bis dahin im Entwurf.")
 SUCCESSOR_FOLLOWS = ("Die Folge-Season mit Auf- und Abstieg und Startrechten folgt für Solo-Ligen in einem späteren Ausbau – bis dahin "
@@ -83,17 +85,27 @@ def season_defaults(league: dict | None) -> dict:
 
 
 def season_problem(league: dict | None, settings: dict) -> str | None:
-    """Werte, die es in einer Solo-Liga nicht gibt (Season oder Liga N, schon zusammengelegt) - dazu das Anmeldefenster, solange es
-    die Selbstanmeldung als Spieler nicht gibt (P2). Team-Ligen: nie etwas."""
+    """Werte, die es in einer Solo-Liga nicht gibt (Season oder Liga N, schon zusammengelegt). Das Anmeldefenster gibt es seit P2 wie bei
+    Team-Ligen. Team-Ligen: nie etwas."""
     if not is_solo(league):
         return None
     if settings.get("team_size") is not None and int(settings["team_size"]) != 1:
         return TEAM_SIZE_SOLO
     if settings.get("min_squad_size") is not None and int(settings["min_squad_size"]) != 1:
         return SQUAD_SIZE_SOLO
-    if settings.get("application_opens_at") or settings.get("application_closes_at"):
-        return APPLICATIONS_FOLLOW
     return None
+
+
+def is_person_application(application: dict | None) -> bool:
+    """Ein Antrag einer Person (#1629, P2): derselbe Antrag wie beim Co-Team, nur mit ``user_id`` statt Co-Team. Bleibt auch nach einer
+    Kontolöschung (``user_id`` dann leer) ein Antrag einer Person - Team-Anträge tragen immer ein Co-Team."""
+    return bool(application) and not application.get("squad_id")
+
+
+def application_entry(application: dict | None) -> str | None:
+    """Wer sich mit dem Antrag anmeldet, in der Form des Season-Schlüssels: das Co-Team oder ``user:<id>``."""
+    application = application or {}
+    return application.get("squad_id") or person_entry(application.get("user_id"))
 
 
 def is_solo_staffel(tournament: dict | None) -> bool:

@@ -54,6 +54,13 @@ neuen Bestätigung nur „Gast“. Rechte und Abläufe sind dieselben wie für j
 
 **Zurückziehen** geht, bis die Liga-Leitung das Co-Team einer Staffel zugeteilt hat. Hat euch die Season automatisch zugeteilt, geht es bis zum Check-in, solange der Spielplan der Staffel noch nicht steht. Danach klärt ihr den Austritt mit der Liga-Leitung.
 
+**Solo-Liga (1 gegen 1): als Spieler anmelden.** In einer Solo-Liga spielt jede Person für sich, ein Co-Team brauchst du nicht. Auf der
+Ligaseite steht dann **Als Spieler anmelden**. Die Schritte sind dieselben, nur ohne Auswahl: **Passt alles?** prüft dich selbst, du
+stimmst dem Regelwerk und dem Datenschutz **selbst** zu und reichst ein. Was dich aufhält, steht im Klartext da, etwa „Du spielst in
+dieser Season schon in einer Staffel“ oder „Diese Season ist nur für Mitglieder“. Fehlende Angaben (Geburtsdatum, Spiel-ID, Plattform)
+halten nicht auf, trag sie bis zum ersten Spiel im Profil nach. Stand, Nachrichten und **Zurückziehen** wie oben, nur an dich. Den
+Spielbetrieb (Check-in, Veto, Ergebnis melden) gibt es für Solo-Ligen noch nicht, die Liga-Leitung sagt Bescheid, sobald es losgeht.
+
 ## Die Woche
 
 - Eine **Spielwoche** beginnt am Wochentag des Season-Starts, je Woche ein Spiel (Vorgabe 7 Tage, etwa Dienstag bis

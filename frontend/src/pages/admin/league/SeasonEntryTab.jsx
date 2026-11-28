@@ -15,24 +15,14 @@ import { SeasonPlatformSection } from "./SeasonPlatformSection";
 import { SeasonRosterPanel } from "./SeasonRosterPanel";
 import { SeasonStartRightsPanel } from "./SeasonStartRightsPanel";
 import { SeasonTabForm } from "./SeasonTabForm";
-import { SOLO_APPLICATIONS_FOLLOW } from "@/lib/leagueParticipants";
+import { SOLO_TEAM_PANELS_FOLLOW } from "@/lib/leagueParticipants";
 
 const JUMPS = [["selbstanmeldung", "Selbstanmeldung"], ["spielberechtigung", "Kader und Spielberechtigung"], ["plattform", "Plattform"], ["anmeldungen", "Eingang"],
   ["startrechte", "Startrechte"], ["auslosung", "Staffeln auslosen"], ["nachmeldungen", "Nachmeldungen"], ["kader", "Kaderübersicht"]];
 
-// Solo-Liga (#1629, P1): Selbstanmeldung als Spieler, Eingang, Startrechte, Los und Kader je Person folgen - bis dahin teilt die Leitung
-// die Spieler auf der Staffel-Seite zu. Der Reiter zeigt dann nur, was schon gilt.
-const SOLO_JUMPS = new Set(["selbstanmeldung", "spielberechtigung", "plattform"]);
-
-function SoloEntryNotice({ id, deadlineField }) {
-  return (
-    <FormSection title="Anmeldung" id={id} className="scroll-mt-24" testId="season-solo-entry"
-      hint="Solo-Liga: Teilnehmer sind Spieler, 1 gegen 1.">
-      <p className="tls-type-body text-white/75" data-testid="season-solo-entry-follows">{SOLO_APPLICATIONS_FOLLOW}</p>
-      {deadlineField}
-    </FormSection>
-  );
-}
+// Solo-Liga (#1629): Seit P2 melden sich Spieler selbst an - Selbstanmeldung und Eingang wie bei Co-Teams. Startrechte, Los, Nachmeldungen
+// und die Kaderübersicht rechnen mit Co-Teams und folgen (P3, P4); der Reiter sagt das in einem Satz unter dem Eingang.
+const SOLO_JUMPS = new Set(["selbstanmeldung", "spielberechtigung", "plattform", "anmeldungen"]);
 
 export function SeasonEntryTab({ seasonId, season, form, set, canSeason, canApplications, canRoster, formProps, onJump, applicationsWaiting = 0,
   lateRegistration = null, onReload = null, solo = false }) {
@@ -46,9 +36,8 @@ export function SeasonEntryTab({ seasonId, season, form, set, canSeason, canAppl
   ) : null;
   const jumps = JUMPS.filter(([key]) => (solo && !SOLO_JUMPS.has(key) ? false
     : key === "anmeldungen" || key === "auslosung" || key === "nachmeldungen" ? canApplications
-      : key === "kader" ? canRoster : key === "startrechte" ? canSeason || canApplications : canSeason))
-    .map(([key, label]) => (solo && key === "selbstanmeldung" ? [key, "Anmeldung"] : [key, label]));
-  // Eingang, Startrechte, Los, Nachmeldungen und Kaderübersicht rechnen mit Co-Teams - in der Solo-Liga folgen sie (P2, P4).
+      : key === "kader" ? canRoster : key === "startrechte" ? canSeason || canApplications : canSeason));
+  // Startrechte, Los, Nachmeldungen und Kaderübersicht rechnen mit Co-Teams - in der Solo-Liga folgen sie (P3, P4).
   const teamPanels = !solo;
   return (
     <div className="space-y-6">
@@ -61,16 +50,16 @@ export function SeasonEntryTab({ seasonId, season, form, set, canSeason, canAppl
       ) : null}
       {canSeason ? (
         <SeasonTabForm {...formProps}>
-          {solo ? <SoloEntryNotice id="selbstanmeldung" deadlineField={deadline} /> : (
-            <SeasonApplicationSection form={form} set={set} id="selbstanmeldung" deadlineField={deadline} waiting={applicationsWaiting}
-              late={lateRegistration} seasonId={seasonId} onReload={onReload} season={season} />
-          )}
+          <SeasonApplicationSection form={form} set={set} id="selbstanmeldung" deadlineField={deadline} waiting={applicationsWaiting}
+            late={lateRegistration} seasonId={seasonId} onReload={onReload} season={season} solo={solo} />
           <SeasonEligibilitySection form={form} set={set} id="spielberechtigung" solo={solo} />
           <SeasonPlatformSection seasonId={seasonId} form={form} set={set} id="plattform" version={season.updated_at} />
         </SeasonTabForm>
       ) : null}
-      {solo && !canSeason && (canApplications || canRoster) ? <SoloEntryNotice id="selbstanmeldung" deadlineField={null} /> : null}
-      {teamPanels && canApplications ? <SeasonApplicationsPanel seasonId={seasonId} version={season.updated_at} seasonStatus={season.status} /> : null}
+      {canApplications ? <SeasonApplicationsPanel seasonId={seasonId} version={season.updated_at} seasonStatus={season.status} /> : null}
+      {solo && (canApplications || canRoster) ? (
+        <p className="tls-type-small text-white/60" data-testid="season-solo-entry-follows">{SOLO_TEAM_PANELS_FOLLOW}</p>
+      ) : null}
       {teamPanels && (canSeason || canApplications) ? <SeasonStartRightsPanel seasonId={seasonId} canSeason={canSeason} canApplications={canApplications} version={season.updated_at} /> : null}
       {teamPanels && canApplications ? <SeasonDrawPanel seasonId={seasonId} version={season.updated_at} /> : null}
       {teamPanels && canApplications ? <SeasonLateEntriesPanel seasonId={seasonId} version={season.updated_at} /> : null}

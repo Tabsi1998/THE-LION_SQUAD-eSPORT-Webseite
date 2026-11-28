@@ -388,3 +388,36 @@ test("Gastteam: in einer beendeten oder archivierten Season steht der Kasten nic
   expect(await screen.findByTestId("application-guest-a1")).toBeInTheDocument();
 });
 
+
+
+// ---------------------------------------------------------------- Solo-Liga (#1629, P2): Anträge von Spielern
+
+const PERSON = {
+  ...ROW, id: "a2", kind: "solo", user_id: "u9", squad_id: null, team_id: null, display_name: "Duellant Neun", applied_by_name: "Duellant Neun", member_count: 1,
+  captain_name: null, vice_name: null, warnings: ["Duellant Neun: Geburtsdatum fehlt. Die Person trägt es im eigenen Profil ein."],
+};
+
+test("Solo-Liga: ein Spieler ohne Captain und Kader, annehmen mit Staffel, die Nachricht geht an den Spieler", async () => {
+  apiMock.get.mockResolvedValue({ data: { ...BODY, kind: "solo", items: [PERSON] } });
+  renderPanel();
+
+  const row = await screen.findByTestId("application-a2");
+  expect(row).toHaveTextContent("meldet sich selbst als Spieler an");
+  expect(row).not.toHaveTextContent("Captain");
+  expect(screen.getByTestId("season-applications")).toHaveTextContent("Was Spieler eingereicht haben.");
+  expect(screen.getByTestId("application-open-points-a2")).toHaveTextContent("der Spieler nicht einchecken");
+  expect(screen.queryByTestId("application-guest-a2")).toBeNull();
+  fireEvent.change(screen.getByTestId("application-staffel-a2"), { target: { value: "t1" } });
+  fireEvent.click(screen.getByTestId("application-accept-a2"));
+
+  await waitFor(() => expect(apiMock.post).toHaveBeenCalledWith("/admin/leagues/seasons/s1/applications/a2/accept", { tournament_id: "t1" }));
+  expect(toastMock.success).toHaveBeenCalledWith("Gespeichert. Der Spieler bekommt eine Nachricht.");
+});
+
+test("Solo-Liga: die eigene Anmeldung entscheidet eine andere Person", async () => {
+  apiMock.get.mockResolvedValue({ data: { ...BODY, kind: "solo", items: [{ ...PERSON, own_team: true }] } });
+  renderPanel();
+
+  expect(await screen.findByTestId("application-own-team-a2")).toHaveTextContent("Über deine eigene Anmeldung entscheidet eine andere Person.");
+  expect(screen.queryByTestId("application-accept-a2")).toBeNull();
+});

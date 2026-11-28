@@ -486,6 +486,31 @@ def registration_problems(ctx: EligibilityContext | None, squad: dict) -> list[t
     return problems
 
 
+def person_problems(ctx: EligibilityContext | None, user_id: str, name: str | None = None) -> list[tuple[int, str]]:
+    """Für die Anmeldung einer Person in der Solo-Liga (#1629, P2, S8): Die Person ist ihr eigener Kader - Höchstkader und „ein Co-Team je
+    Season“ gibt es dort nicht, und keine Transfers. Es bleibt die Sperre (E.3): Sie hält die Anmeldung auf wie die Teamsperre beim Co-Team.
+    ``name``: Satz für die Leitung („Name: Grund“); ohne Namen spricht der Satz die Person selbst an. Fehlende Angaben halten wie beim
+    Co-Team nichts auf (#2313) - sie stehen in ``person_warnings``."""
+    ban = league_sanction_bans.person_ban(ctx.sanctions if ctx else None, user_id)
+    if not ban:
+        return []
+    return [(403, f"{name}: {ban['reason']}" if name else ban["reason"])]
+
+
+def person_warnings(ctx: EligibilityContext | None, user_id: str, name: str | None = None) -> list[str]:
+    """Was der Person bis zum ersten Spiel fehlt (Alter, Spiel-ID, Plattform; #2313) - als Hinweis, wie beim Co-Team. Eine Sperre steht schon als
+    Grund in ``person_problems``. ``name``: für die Leitung, ohne Namen in der Ansprache an die Person (``self_reason``)."""
+    if not ctx:
+        return []
+    row = status(ctx, user_id, None)
+    if row["ok"] or row["state"] in NOT_OPEN_POINTS:
+        return []
+    texts = _reasons(row)
+    if name:
+        return [f"{name}: {text}" for text in texts]
+    return [self_reason(row["state"], texts[0]) or texts[0], *texts[1:]] if texts else []
+
+
 # Selbst im eigenen Profil behebbar (#2313): dahin führt die Erinnerung, dahin der Link auf der Matchseite.
 FIXABLE_STATES = frozenset({AGE_MISSING, league_platform.MISSING, league_platform.NOT_ALLOWED,
                             league_roster.MISSING, league_roster.FORMAT, league_roster.TAKEN})
