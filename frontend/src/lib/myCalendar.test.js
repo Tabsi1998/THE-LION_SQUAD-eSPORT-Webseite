@@ -56,11 +56,14 @@ test("die Tage eines Events sind eine Zeile", () => {
   expect(later.items[0].title).toBe("Herbst-LAN");
 });
 
-test("Plakette: Stand vom Server, mit Team; Warteliste wartet, Gefahrenes ist erledigt, Verein in Gold", () => {
-  expect(ownBadge({ kind: "tournament", own: { state: "approved", label: "Du bist dabei", team_name: "Lions Rocket" } })).toEqual({ label: "Du bist dabei · mit Lions Rocket", tone: "mine" });
-  expect(ownBadge({ kind: "event", own: { state: "waitlist", label: "Warteliste" } }).tone).toBe("wait");
-  expect(ownBadge({ kind: "fastlap", own: { state: "driven", label: "Du bist gefahren" } }).tone).toBe("done");
-  expect(ownBadge({ kind: "club", own: { state: "accepted", label: "Zugesagt" } }).tone).toBe("club");
+test("Plakette: Stand vom Server, mit Team; Warteliste wartet, Gefahrenes ist erledigt, Verein heißt dabei", () => {
+  expect(ownBadge({ kind: "tournament", own: { state: "approved", label: "Du bist dabei", team_name: "Lions Rocket" } })).toEqual({
+    label: "Du bist dabei · mit Lions Rocket", tone: "mine", kind: "joined", word: "Du bist dabei", team: "Lions Rocket",
+  });
+  // Zustands-Schild (#1306): Warteliste wartet, gefahren ist vorbei, zugesagt heißt „dabei“.
+  expect(ownBadge({ kind: "event", own: { state: "waitlist", label: "Warteliste" } })).toMatchObject({ tone: "wait", kind: "waiting" });
+  expect(ownBadge({ kind: "fastlap", own: { state: "driven", label: "Du bist gefahren" } })).toMatchObject({ tone: "done", kind: "done" });
+  expect(ownBadge({ kind: "club", own: { state: "accepted", label: "Zugesagt" } })).toMatchObject({ tone: "club", kind: "joined", team: null });
   expect(ownBadge({ kind: "event", mine: true })).toBeNull();
 });
 

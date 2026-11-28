@@ -127,7 +127,7 @@ test("unter 768 px: Karten mit Titel, Spiel, Format, Status, Teilnehmern, Regeln
   expect(within(league).getByTestId("admin-tr-rules-liga-cup")).toHaveTextContent(/Online/i);
   const cup = screen.getByTestId("admin-tr-eigenes");
   expect(cup).toHaveTextContent("Probe Racer");
-  expect(cup).toHaveTextContent("ENTWURF");
+  expect(cup).toHaveTextContent("Entwurf");
   expect(within(cup).getByRole("button", { name: /^Anmeldung öffnen:/ })).toBeInTheDocument();
   expect(within(cup).getByRole("button", { name: /^Löschen:/ })).toBeInTheDocument();
   expect(within(cup).getByRole("link", { name: /^Teilnehmer:/ })).toHaveAttribute("href", "/admin/tournaments/t-own?tab=participants");

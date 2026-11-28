@@ -2,7 +2,8 @@ import { useCallback, useEffect, useState } from "react";
 import { api, formatApiError } from "@/lib/api";
 import { useConfirm } from "@/components/tls/ConfirmDialog";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
-import { STATE_LABELS, STATE_TONES, dayLabel, moveIds, opponentText, roundLabel, roundWhen, suggestNextDay } from "@/lib/referenceCalendar";
+import { ROUND_STATE_KINDS, STATE_LABELS, dayLabel, moveIds, opponentText, roundLabel, roundWhen, suggestNextDay } from "@/lib/referenceCalendar";
+import { StatusChip } from "@/components/tls/StatusChip";
 import { groupWeekends, hasSessions, sessionLabel } from "@/lib/raceWeekend";
 import { PasteSheet, PostponeSheet, RoundSheet } from "./RoundSheets";
 import { DatesSheet, GuideSteps, guideSteps, undatedRounds } from "./CalendarGuide";
@@ -33,12 +34,11 @@ function RoundNotes({ round, profile = null }) {
   );
 }
 
+// Der Status je Termin als Zustands-Schild (#1306). In der Verwaltung ist ein fehlendes Ergebnis ein Problem („fehlt“),
+// öffentlich wartet es („folgt“).
 function StateBadge({ state }) {
-  return (
-    <span className={`inline-flex items-center px-2 py-0.5 border rounded-sm tls-type-label whitespace-nowrap ${STATE_TONES[state] || STATE_TONES.planned}`} data-testid="round-state">
-      {STATE_LABELS[state] || state}
-    </span>
-  );
+  const kind = state === "missing" ? "problem" : ROUND_STATE_KINDS[state] || "soon";
+  return <StatusChip kind={kind} label={STATE_LABELS[state] || STATE_LABELS.planned} testId="round-state" />;
 }
 
 // #2024: eigener Zustand „ohne Datum“ neben dem Status - ein offener Termin ist geplant, aber noch nicht festgelegt.

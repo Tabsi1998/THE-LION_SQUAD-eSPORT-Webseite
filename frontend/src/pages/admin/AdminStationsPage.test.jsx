@@ -195,7 +195,8 @@ test("Live-Knöpfe nur in der Turnierleitung: Link mit Reiter Stationen, hier nu
   render(<MemoryRouter><ConfirmDialogProvider><AdminStationsPage /></ConfirmDialogProvider></MemoryRouter>);
   const link = await screen.findByRole("link", { name: /Stationen live bedienen/ });
   expect(link).toHaveAttribute("href", "/tournaments/winter-cup/leitung?reiter=stationen");
-  await screen.findByText("Reserviert");
+  // Zustands-Schild (#1306) und Hinweis der Karte sagen beide „Reserviert“.
+  expect(await screen.findByTestId("status-reserved")).toHaveTextContent(/^Reserviert$/);
   expect(screen.queryByText("Freie Stationen starten")).toBeNull();
   expect(screen.queryByText("Spiel zuweisen")).toBeNull();
   expect(screen.queryByText("Freigeben")).toBeNull();

@@ -414,7 +414,9 @@ test("Was läuft: Zeilen mit Uhrzeit, Spielart und eigenem Stand - „Anmelden�
   expect(solo.querySelector("[data-testid='event-row-register']")).not.toBeNull();
   const team = screen.getByTestId("event-row-tournament-t2");
   expect(team).toHaveTextContent("Team");
-  expect(team.querySelector("[data-testid='event-row-mine']")).toHaveTextContent("Du bist dabei · Lions Rocket");
+  // Zustands-Schild (#1306): das Wort im Schild, das Team daneben.
+  expect(team.querySelector("[data-testid='event-row-mine']")).toHaveTextContent(/^Du bist dabei$/);
+  expect(team.querySelector("[data-testid='event-row-mine-team']")).toHaveTextContent("mit Lions Rocket");
   expect(team.querySelector("[data-testid='event-row-register']")).toBeNull();
   expect(screen.getByTestId("event-row-fastlap-f1")).toHaveTextContent("Bestzeit fahren");
   expect(team.querySelector("a")).toHaveAttribute("href", "/tournaments/rl");

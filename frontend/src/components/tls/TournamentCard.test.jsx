@@ -1,6 +1,6 @@
 import { render, screen } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
-import { TournamentCard, cardAction, gameLine } from "./TournamentCard";
+import { TournamentCard, cardAction, gameLine, registrationLine } from "./TournamentCard";
 
 // Turniere I (#833): kein leeres Format-Kästchen, kein loser Punkt, nach dem Ende der Stand statt
 // „Anmeldung geschlossen“, ein Knopf im Fuß.
@@ -20,9 +20,10 @@ test("Knopf und Spielzeile in Worten", () => {
   expect(gameLine({})).toEqual([]);
 });
 
-test("offen: Anmeldung, „Mitmachen“, Format sichtbar", () => {
+test("offen: das Schild sagt „Anmeldung offen“ - keine zweite Zeile dazu; „Mitmachen“, Format sichtbar", () => {
   card({ ...BASE, format: "single_elim", game: { short_name: "RL" }, platform: "PC" });
-  expect(screen.getByTestId("tournament-card-registration")).toHaveTextContent("Anmeldung offen");
+  expect(screen.queryByTestId("tournament-card-registration")).toBeNull();
+  expect(screen.getByTestId("phase-chip")).toHaveTextContent("Anmeldung offen");
   expect(screen.getByTestId("tournament-card-action")).toHaveTextContent("Mitmachen");
   expect(screen.getByTestId("tournament-card-format")).not.toHaveTextContent("—");
   expect(screen.getByTestId("tournament-card-game")).toHaveTextContent("RL·PC");
@@ -35,6 +36,27 @@ test("beendet ohne Format und ohne Spiel-Kürzel: kein Strich-Kästchen, kein lo
   expect(screen.queryByTestId("tournament-card-registration")).toBeNull();
   expect(screen.getByTestId("tournament-card-action")).toHaveTextContent("Ergebnisse");
   expect(screen.queryByText("Turnierdetails")).toBeNull();
+});
+
+// Die Zeile zur Anmeldung (#1306): ruhiger Text, nur was das Schild nicht schon sagt.
+test("registrationLine: Frist als Satz, nichts doppelt zum Schild", () => {
+  expect(registrationLine({ state: "open", label: "Anmeldung offen" }, "registration")).toBeNull();
+  expect(registrationLine({ state: "open", label: "Anmeldung offen bis Sa, 14.12., 18:00" }, "registration")).toBe("Anmeldung bis Sa, 14.12., 18:00");
+  expect(registrationLine({ state: "closed", label: "Anmeldung geschlossen" }, "checkin")).toBeNull();
+  expect(registrationLine({ state: "closed", label: "Anmeldung geschlossen" }, "soon")).toBe("Anmeldung geschlossen");
+  expect(registrationLine({ state: "scheduled", label: "Anmeldung öffnet am 1.12." }, "soon")).toBe("Anmeldung öffnet am 1.12.");
+  expect(registrationLine({ state: "disabled", label: "Anmeldung deaktiviert" }, "soon")).toBe("Anmeldung deaktiviert");
+});
+
+test("Check-in offen: keine Zeile „Anmeldung geschlossen“ darunter; sonst ruhiger kleiner Text", () => {
+  const { unmount } = card({ ...BASE, status: "check_in", public_phase: { state: "check_in", label: "Check-in offen" } });
+  expect(screen.queryByTestId("tournament-card-registration")).toBeNull();
+  unmount();
+  card({ ...BASE, status: "scheduled", public_phase: { state: "announced", label: "Angekündigt" } });
+  const line = screen.getByTestId("tournament-card-registration");
+  expect(line).toHaveTextContent("Anmeldung öffnet");
+  expect(line).toHaveClass("tls-type-small", "text-muted-text");
+  expect(line).not.toHaveClass("tls-type-label");
 });
 
 // Laufender Rahmen (#1076): nur die Karte, die gerade live ist, trägt ihn.

@@ -3,7 +3,8 @@ import { Star, Timer } from "lucide-react";
 import { METALS } from "@/components/tls/TrophyShelf";
 import { Points } from "@/components/tls/series/SeriesStandings";
 import { formatDiff, formatNumber } from "@/lib/standingsTable";
-import { PUBLIC_STATE_LABELS, STATE_TONES, dayLabel, roundLabel, roundWhen } from "@/lib/referenceCalendar";
+import { PUBLIC_STATE_LABELS, ROUND_STATE_KINDS, dayLabel, roundLabel, roundWhen } from "@/lib/referenceCalendar";
+import { StatusChip } from "@/components/tls/StatusChip";
 import { nameOf } from "@/lib/referenceSeriesTable";
 import { raceCell, raceCellLabel, raceSummary } from "@/lib/racingLeague";
 import { chipLabel, groupWeekends, roundKind } from "@/lib/raceWeekend";
@@ -155,12 +156,9 @@ function RoundSummary({ round, rows, publicKeys, onSelect, session = "" }) {
   );
 }
 
+// Der Status der Runde als Zustands-Schild (#1306).
 function StateBadge({ state }) {
-  return (
-    <span className={`inline-flex items-center px-2 py-0.5 border rounded-sm tls-type-label whitespace-nowrap ${STATE_TONES[state] || STATE_TONES.planned}`}>
-      {PUBLIC_STATE_LABELS[state] || state}
-    </span>
-  );
+  return <StatusChip kind={ROUND_STATE_KINDS[state] || "soon"} label={PUBLIC_STATE_LABELS[state] || PUBLIC_STATE_LABELS.planned} />;
 }
 
 /** Rennkalender: je Runde eine Zeile - Kürzel, Tag, Ort mit Flagge und, bei einer Runde mit Läufen (#1930), die

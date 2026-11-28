@@ -255,3 +255,185 @@ table tr.tls-you > :last-child { background-position: top right, top right, bott
   :where(p).tls-type-body { max-width: 70ch; }
   :where(.text-center) > :where(p).tls-type-body, :where(p).tls-type-body:where(.text-center) { margin-inline: auto; }
 }
+
+/* Zustands-Schilder (#1306, Fabians Variante C - gefüllt fürs Wichtige): ein Baustein für jeden Zustand
+   (components/tls/StatusChip.jsx). Zehn Arten mit fester Bedeutung, jede mit Symbol und Wort, normal geschrieben, Outfit
+   600 in 12,5 px (groß: 14 px), Symbol 13 px. Nur „Anmeldung offen“ und „Check-in offen“ sind gefüllt (Grün, dunkle
+   Schrift) - sie sollen auffallen; „Läuft“ ist das einzige rote Schild, sein Punkt pulsiert leise (.tls-live-dot) - bei
+   einer laufenden Saison steht er still (.tls-live-dot--still). Alles andere tritt zurück. Der Countdown steht nie im Schild, sondern als kleiner Text daneben (.tls-status__meta) - am
+   Handy darunter, wenn der Platz nicht reicht. Welcher Zustand zu welcher Art gehört, sagt lib/statusKinds.js; die
+   Werte hier hält lib/statusKinds.test.js gleich mit docs/status-kinds.json (die App liest sie später).
+
+   soon          Bald             Rahmen, Uhr
+   registration  Anmeldung offen  Grün gefüllt, dunkle Schrift
+   checkin       Check-in offen   Grün gefüllt, Haken im Kreis
+   free          Frei             grüner Rahmen ohne Füllung, Stecker (Station)
+   live          Läuft            rot getönt, roter Punkt
+   joined        Du bist dabei    Cyan-Rahmen, Haken
+   waiting       Wartet           gestrichelter Rahmen, Sanduhr
+   problem       Problem          Orange, Warn-Symbol
+   done          Beendet          graue Fläche, Fahne
+   cancelled     Abgesagt         grau, durchgestrichen
+
+   Kontrast (scripts/check-contrast.js): jede Schrift auf ihrem Schild über den Flächen 1 bis 3 mindestens 4,5 : 1. */
+:root {
+  --tls-chip-size: 0.78125rem;
+  --tls-on-ok: #04140D;
+  /* Unterlage auf Bildern: 94 % des Grunds - auch auf einem weißen Bild bleibt jede Schrift über 4,5 : 1 (vorher 82 %:
+     „Abgesagt“ hatte dort nur 3,3 : 1, jetzt 4,9 : 1). */
+  --tls-chip-underlay: color-mix(in srgb, var(--tls-surface-0) 94%, transparent);
+}
+
+@layer components {
+  /* Schild und Countdown: in einer Zeile, wenn Platz ist - sonst rutscht der Text unter das Schild, das Schild bricht nie. */
+  .tls-status {
+    display: inline-flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.25rem 0.5rem;
+    min-width: 0;
+    max-width: 100%;
+    vertical-align: middle;
+  }
+  .tls-status__meta {
+    min-width: 0;
+    color: var(--tls-text-muted);
+    font-variant-numeric: tabular-nums;
+  }
+  /* Auf Bildern bekommt auch der Countdown eine dunkle Unterlage - grauer Text auf einer Grafik wäre nicht lesbar. */
+  .tls-status--media .tls-status__meta {
+    padding: 0.0625rem 0.375rem;
+    border-radius: 3px;
+    background: var(--tls-chip-underlay);
+    color: rgb(255 255 255 / 0.88);
+  }
+
+  .tls-status-chip {
+    --tls-chip-text: rgb(255 255 255 / 0.88);
+    --tls-chip-fill: transparent;
+    --tls-chip-line: rgb(255 255 255 / 0.24);
+    display: inline-flex;
+    flex: none;
+    align-items: center;
+    gap: 0.375rem;
+    min-height: 1.625rem;
+    padding: 0.25rem 0.5625rem;
+    border: 1px solid var(--tls-chip-line);
+    border-radius: 3px;
+    background-color: var(--tls-chip-fill);
+    color: var(--tls-chip-text);
+    font-family: var(--tls-font-text);
+    font-size: var(--tls-chip-size);
+    font-weight: 600;
+    line-height: 1.2;
+    letter-spacing: 0.01em;
+    text-transform: none;
+    font-variant-numeric: normal;
+    white-space: nowrap;
+    vertical-align: middle;
+  }
+  .tls-status-chip--lg {
+    gap: 0.4375rem;
+    min-height: 1.875rem;
+    padding: 0.3125rem 0.6875rem;
+    font-size: var(--tls-type-small-size);
+  }
+  /* Auf Bildern (Karten mit Grafik): eine dunkle Unterlage, damit Schrift und Rahmen auf jedem Bild lesbar bleiben. */
+  .tls-status-chip--media {
+    background: linear-gradient(var(--tls-chip-fill), var(--tls-chip-fill)) var(--tls-chip-underlay);
+  }
+  .tls-status-chip__icon {
+    flex: none;
+    width: 1.04em;
+    height: 1.04em;
+    stroke-width: 2.25;
+  }
+
+  .tls-status-chip[data-kind="soon"] {
+    --tls-chip-text: rgb(255 255 255 / 0.88);
+    --tls-chip-fill: transparent;
+    --tls-chip-line: rgb(255 255 255 / 0.24);
+  }
+  .tls-status-chip[data-kind="registration"] {
+    --tls-chip-text: var(--tls-on-ok);
+    --tls-chip-fill: var(--tls-ok);
+    --tls-chip-line: var(--tls-ok);
+  }
+  .tls-status-chip[data-kind="checkin"] {
+    --tls-chip-text: var(--tls-on-ok);
+    --tls-chip-fill: var(--tls-ok);
+    --tls-chip-line: var(--tls-ok);
+  }
+  .tls-status-chip[data-kind="free"] {
+    --tls-chip-text: var(--tls-ok);
+    --tls-chip-fill: transparent;
+    --tls-chip-line: rgb(var(--tls-ok-rgb) / 0.6);
+  }
+  .tls-status-chip[data-kind="live"] {
+    --tls-chip-text: rgb(255 255 255);
+    --tls-chip-fill: rgb(var(--tls-live-rgb) / 0.16);
+    --tls-chip-line: rgb(var(--tls-live-rgb) / 0.6);
+  }
+  .tls-status-chip[data-kind="joined"] {
+    --tls-chip-text: var(--tls-brand);
+    --tls-chip-fill: rgb(var(--tls-brand-rgb) / 0.1);
+    --tls-chip-line: rgb(var(--tls-brand-rgb) / 0.55);
+  }
+  /* Ruhige Spielart (Fabian Nr. 303): eine fremde bestätigte Anmeldung - Haken in Grau, Cyan heißt „du“. */
+  .tls-status-chip[data-kind="joined"][data-variant="quiet"] {
+    --tls-chip-text: var(--tls-text-muted);
+    --tls-chip-fill: rgb(255 255 255 / 0.04);
+    --tls-chip-line: rgb(255 255 255 / 0.24);
+  }
+  .tls-status-chip[data-kind="waiting"] {
+    --tls-chip-text: var(--tls-text-muted);
+    --tls-chip-fill: transparent;
+    --tls-chip-line: rgb(255 255 255 / 0.3);
+    border-style: dashed;
+  }
+  .tls-status-chip[data-kind="problem"] {
+    --tls-chip-text: var(--tls-warn);
+    --tls-chip-fill: rgb(var(--tls-warn-rgb) / 0.1);
+    --tls-chip-line: rgb(var(--tls-warn-rgb) / 0.55);
+  }
+  .tls-status-chip[data-kind="done"] {
+    --tls-chip-text: var(--tls-text-muted);
+    --tls-chip-fill: rgb(255 255 255 / 0.06);
+    --tls-chip-line: transparent;
+  }
+  .tls-status-chip[data-kind="cancelled"] {
+    --tls-chip-text: var(--tls-quiet);
+    --tls-chip-fill: rgb(255 255 255 / 0.04);
+    --tls-chip-line: transparent;
+  }
+  .tls-status-chip[data-kind="cancelled"] .tls-status-chip__word {
+    text-decoration: line-through;
+    text-decoration-color: rgb(255 255 255 / 0.4);
+    text-decoration-thickness: 1px;
+  }
+}
+
+/* Der Punkt bei „Läuft“ (#1076): rot, etwas größer als im Fließtext, der Ring läuft kleiner und leiser aus (index.css,
+   tls-live-ping). Außerhalb der Ebene, weil .tls-live-dot in index.css ohne Ebene steht. Bei reduzierter Bewegung steht
+   er still - dann trägt ein ruhiger Hof das „live“. */
+.tls-status-chip .tls-live-dot {
+  --tls-live-ping-scale: 2.4;
+  --tls-live-ping-from: 0.55;
+  width: 0.4375rem;
+  height: 0.4375rem;
+  margin-inline: 0.0625rem;
+  color: var(--tls-live);
+}
+
+/* Still (#1306, laufende Saison): „Läuft“ ohne Puls - der Ring fällt weg, der ruhige Hof bleibt. */
+.tls-status-chip .tls-live-dot--still { box-shadow: 0 0 0 2px rgb(var(--tls-live-rgb) / 0.3); }
+.tls-status-chip .tls-live-dot--still::after { display: none; }
+
+@media (prefers-reduced-motion: reduce) {
+  .tls-status-chip .tls-live-dot { box-shadow: 0 0 0 2px rgb(var(--tls-live-rgb) / 0.3); }
+}
+
+/* Kontrast-Modus von Windows: Flächen fallen weg - der Rahmen in der Systemfarbe hält jedes Schild als Schild sichtbar. */
+@media (forced-colors: active) {
+  .tls-status-chip { border-color: CanvasText; }
+}

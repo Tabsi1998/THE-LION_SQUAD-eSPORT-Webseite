@@ -1,39 +1,13 @@
-import fs from "fs";
-import path from "path";
 import { PHASE_TONES, phaseTone } from "./phaseTone";
 
-// Phase → Ton wie PhaseBadge im Web (#1869): Rot nur „läuft“, Grün offen, Cyan angekündigt, Violett Pause zwischen
-// zwei Tagen, Grau vorbei. Der Test liest die Tabelle der Website (frontend/src/components/tls/PhaseBadge.jsx), damit
-// beide Seiten nicht auseinanderlaufen.
-const WEB = fs.readFileSync(path.join(__dirname, "../../../frontend/src/components/tls/PhaseBadge.jsx"), "utf8");
+// Phase → Ton (#1869): Rot nur „läuft“, Grün offen, Cyan angekündigt, Violett Pause zwischen zwei Tagen, Grau vorbei.
+// Bis #1306 las dieser Test die Farbtabelle aus PhaseBadge.jsx der Website. Seit den Zustands-Schildern (#1306) ist
+// PhaseBadge nur noch eine Hülle um StatusChip, die gemeinsame Quelle ist docs/status-kinds.json. Den Abgleich mit
+// dieser Datei bringt das App-Paket zu #1306 (die App bekommt dort dieselben zehn Arten). Bis dahin hält die feste
+// Tabelle unten den heutigen App-Stand fest.
 
-function webPhaseStyles(): Record<string, string> {
-  const block = WEB.slice(WEB.indexOf("const PHASE_STYLES"), WEB.indexOf("};", WEB.indexOf("const PHASE_STYLES")));
-  const rows: Record<string, string> = {};
-  for (const line of block.split("\n")) {
-    const match = /^\s*([a-z_]+):\s*"([^"]+)"/.exec(line);
-    if (match) rows[match[1]] = match[2];
-  }
-  return rows;
-}
-
-function toneOfWebClasses(classes: string) {
-  if (classes.includes("text-live")) return "danger";
-  if (classes.includes("bg-event")) return "event";
-  if (classes.includes("text-ok")) return "success";
-  if (classes.includes("text-brand")) return "cyan";
-  return "default";
-}
-
-const web = webPhaseStyles();
-
-test("die Tabelle der Website ist gelesen", () => {
-  expect(Object.keys(web).length).toBeGreaterThanOrEqual(13);
-  expect(Object.keys(PHASE_TONES).sort()).toEqual(Object.keys(web).sort());
-});
-
-test.each(Object.keys(web))("Phase %s hat denselben Ton wie im Web", (state) => {
-  expect(phaseTone(state)).toBe(toneOfWebClasses(web[state]));
+test("die App kennt alle Phasen", () => {
+  expect(Object.keys(PHASE_TONES).length).toBeGreaterThanOrEqual(13);
 });
 
 test.each([

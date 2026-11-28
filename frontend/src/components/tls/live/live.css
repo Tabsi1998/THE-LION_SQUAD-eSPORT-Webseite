@@ -124,7 +124,7 @@
   position: absolute;
   inset: -1px;
   border-radius: inherit;
-  border: 1px solid var(--tls-brand);
+  border: 1px solid currentColor;
   pointer-events: none;
   opacity: 0;
   animation: tls-live-pulse calc(var(--tls-motion-slow) * 2) var(--tls-ease) 2;

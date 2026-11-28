@@ -6,6 +6,7 @@ import { useAuth } from "@/context/AuthContext";
 import { PublicLayout } from "@/components/tls/PublicLayout";
 import { AdventHint } from "@/advent/AdventHint";
 import { StatusBadge } from "@/components/tls/StatusBadge";
+import { PhaseBadge } from "@/components/tls/PhaseBadge";
 import { ModerationStandingCard } from "@/components/tls/ModerationStandingCard";
 import { AchievementsTile } from "@/components/tls/AchievementsTile";
 import { DashboardNotifications } from "./DashboardNotifications";
@@ -97,9 +98,10 @@ function TimelineRow({ item, live = false }) {
           {[item.date ? `${formatVienna(item.date)} Uhr` : "", item.detail].filter(Boolean).join(" · ")}
         </div>
       </div>
+      {/* Zustands-Schilder (#1306): dieselben Arten wie auf Startseite und Turnierseite - „Läuft“ ist rot, nicht Cyan. */}
       <div className="flex flex-col items-end gap-1 shrink-0">
-        {live && item.phaseLabel ? <Pill tone="cyan">{item.phaseLabel}</Pill> : null}
-        {status ? <Pill tone={["pending", "waitlist", "waitlisted"].includes(item.registrationStatus) ? "grey" : "cyan"}>{status}</Pill> : null}
+        {live && item.phaseState ? <PhaseBadge phase={{ state: item.phaseState, label: item.phaseLabel }} /> : null}
+        {status ? <StatusBadge status={String(item.registrationStatus).toLowerCase()} own testId={`dashboard-timeline-reg-${item.id}`} /> : null}
       </div>
       <ChevronRight className="w-4 h-4 text-white/30 shrink-0" />
     </Link>

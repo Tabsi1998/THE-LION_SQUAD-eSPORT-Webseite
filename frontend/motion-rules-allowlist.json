@@ -185,12 +185,6 @@
         "grund": "Bestand vor dem Prüftor (#1660): Animation mit fester Dauer ohne eigenes Gegenstück für „Bewegung reduzieren“. Nachrüsten steht aus."
       }
     },
-    "src/components/tls/StatusBadge.jsx": {
-      "reduced-motion": {
-        "anzahl": 1,
-        "grund": "Bestand vor dem Prüftor (#1660): Animation mit fester Dauer ohne eigenes Gegenstück für „Bewegung reduzieren“. Nachrüsten steht aus."
-      }
-    },
     "src/components/tls/StreamEmbed.jsx": {
       "reduced-motion": {
         "anzahl": 1,

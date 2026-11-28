@@ -133,7 +133,7 @@ export function whatsOnRows(event) {
       timeLabel: multi ? weekdayClock(item.start_date) : clock(item.start_date),
       mode: kind === "fastlap" ? "Bestzeit fahren" : team ? "Team" : "Einzel",
       detail: kind === "tournament" ? [item.game ? gameLabel(item.game) : item.game_name, item.format ? formatTournamentDisplay(item) : ""].filter(Boolean).join(" · ") : "",
-      mine: mine ? { label: mine.label, team: mine.team_name || null } : null,
+      mine: mine ? { state: mine.state || null, label: mine.label, team: mine.team_name || null } : null,
       action: !mine && kind === "tournament" && OPEN_STATES.has(state) ? "register" : null,
       phase: item.public_phase || null,
       status: item.status,

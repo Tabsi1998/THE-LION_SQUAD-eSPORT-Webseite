@@ -468,10 +468,10 @@ function NextUp({ items }) {
                   )}
                 </div>
               </div>
-              {/* Einzeilig (#832): die Plakette brach in der schmalen Spalte um - jetzt so breit wie nötig. */}
+              {/* Einzeilig (#832, #1306): das Schild bricht nie um, der Countdown steht daneben oder darunter. */}
               <div className="w-full sm:w-auto sm:shrink-0 sm:min-w-[12rem] flex flex-col gap-2 sm:items-start">
                 {when && <div className="tls-type-small text-white/45" data-testid={league ? `home-next-period-${item.slug}` : undefined}>{when}</div>}
-                {(item.public_phase || item.status) && <PhaseBadge phase={item.public_phase} status={item.status} className="self-start max-w-full sm:whitespace-nowrap" />}
+                {(item.public_phase || item.status) && <PhaseBadge phase={item.public_phase} status={item.status} className="self-start" />}
               </div>
             </Link>
           );

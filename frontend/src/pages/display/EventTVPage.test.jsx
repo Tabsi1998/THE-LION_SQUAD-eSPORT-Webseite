@@ -230,12 +230,14 @@ test("#1888: die Statuspille oben folgt der öffentlichen Phase - ein stehen geb
   expect(pill).not.toHaveClass("tv-pill--live");
 });
 
-test("#1888: läuft das Event öffentlich, zeigt die Pille „Live“ mit Punkt - auch ohne Rohstatus „live“", async () => {
+test("#1888: läuft das Event öffentlich, zeigt die Pille „Läuft“ mit Punkt - auch ohne Rohstatus „live“", async () => {
   const hall = hallEvent({ now: Date.now(), stations: 4 });
   serve({ ...hall, event: { ...hall.event, status: "scheduled", public_phase: { state: "live", label: "Läuft" } } });
   renderAt("/display/event/event-1");
   const pill = await screen.findByTestId("tv-event-status");
-  expect(pill).toHaveTextContent("Live");
+  // Dieselbe Art wie auf der Website (#1306): rot, Punkt, das Wort „Läuft“.
+  expect(pill).toHaveTextContent(/^Läuft$/);
+  expect(pill).toHaveAttribute("data-kind", "live");
   expect(pill.querySelector(".tv-live-dot")).not.toBeNull();
 });
 

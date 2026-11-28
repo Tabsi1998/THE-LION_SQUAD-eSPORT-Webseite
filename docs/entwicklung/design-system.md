@@ -1,4 +1,4 @@
-# Design-System: Bewegung, Wischleisten, Puls
+# Design-System: Bewegung, Wischleisten, Puls, Zustands-Schilder
 
 Kurz für spätere Arbeiten an der Website (#1969). Farben stehen als Rollen in `frontend/src/styles/system.css`
 (Wächter: `lib/categoryColors.test.js`), Bewegung in `frontend/src/lib/motion.js` und `frontend/src/index.css`
@@ -98,3 +98,49 @@ die Klasse fehlt im CSS. Gemeinte Zwischenwerte stehen als `/[0.12]` da. Wächte
 
 Pole (`--tls-pole`, Pink) und schnellste Runde (`--tls-fastest`, Violett) stehen als Rollen in `styles/system.css` –
 nur für diese beiden Auszeichnungen.
+
+## Zustands-Schilder (#1306)
+
+Ein Baustein für jeden Zustand: `components/tls/StatusChip.jsx`. `StatusBadge` (Rohstatus) und `PhaseBadge`
+(öffentliche Phase mit Countdown) sind dünne Hüllen darum; neue Stellen nehmen eine der drei, nie ein eigenes Schild.
+
+- **Zehn Arten** (Fabians Variante C – gefüllt fürs Wichtige, „Frei“ seit 27.11.): `soon` Bald, `registration`
+  Anmeldung offen, `checkin` Check-in offen, `free` Frei (Station), `live` Läuft, `joined` Du bist dabei, `waiting`
+  Wartet, `problem` Problem, `done` Beendet, `cancelled` Abgesagt. Jede hat ein Symbol (Lucide) und ein Wort; die
+  Farbe ist nie die einzige Information.
+- **Gefüllt** sind nur Anmeldung offen und Check-in offen (Grün `ok`, Schrift `--tls-on-ok`); „Frei“ hat einen grünen
+  Rahmen ohne Füllung. **Rot** (`live`) ist nur „Läuft“ – der Punkt (`.tls-live-dot`) pulsiert leise, bei „Bewegung
+  reduzieren“ steht er still mit ruhigem Hof. Eine laufende Saison (`active`) steht immer still: `STILL_STATES` in
+  `lib/statusKinds.js` („still“ in der JSON-Datei), von Hand `pulse={false}`.
+- **Zuordnung** in `lib/statusKinds.js`: jeder bekannte Zustand → `[Art, Wort]` oder `[Art, Wort, Spielart]`, dazu die
+  Du-Form der eigenen Anmeldung (`own`: „Du bist dabei“, „Wartet auf Freigabe“). Unbekanntes zeigt das Wort der Stelle
+  oder „Unbekannt“, nie den Rohwert. Ein neuer Zustand bekommt hier eine Zeile – und in `docs/status-kinds.json`, die
+  die App liest.
+- **Cyan heißt „du“** (Fabian Nr. 303): fremde Anmeldungen (`approved`, `registered`, `checked_in` ohne `own`) nehmen
+  die ruhige Spielart `quiet` von `joined` – Haken in Grau (`data-variant="quiet"`, `STATUS_VARIANTS`, „variants“ in
+  der JSON-Datei). Nur die eigene Anmeldung ist Cyan. Eine Station, an der ein anderes Turnier spielt, ist `waiting`
+  („Anderes Turnier“, ohne Puls, Fabian Nr. 304).
+- **Eigener Stand** mit Wort vom Server („Mein Kalender“, Eventliste, Event-Programm): `ownBadgeKind(state)` gibt die
+  Art (Warteliste wartet, Gefahrenes ist vorbei, sonst „Du bist dabei“), das Team steht als `meta` daneben.
+- **Eigene Status-Listen** anderer Bereiche bilden ihre Werte auf die Arten ab, statt eigene Farben zu setzen: Runden
+  der Rennserien `ROUND_STATE_KINDS` (lib/referenceCalendar.js), Liga-Anmeldung `APPLICATION_KINDS`
+  (LeagueApplicationPanel), Stationen der Hallen-Tafel `STATION_STATES` (lib/tvStationGrid.js).
+- **Aussehen** in `styles/system.css` (`.tls-status-chip[data-kind]`): Outfit 600, 12,5 px (`--tls-chip-size`),
+  groß 14 px (`size="lg"`), Symbol 13 px, normal geschrieben, bricht nie um. Auf Bildern `onMedia`: Unterlage
+  `--tls-chip-underlay` (94 % des Grunds, „media“ in der JSON-Datei) unter Schild und Countdown – auch auf einem weißen
+  Bild über 4,5 : 1.
+- **Countdown** nie im Schild: `meta` setzt ihn als `tls-type-small` daneben (`.tls-status`, bricht am Handy darunter
+  um). `PhaseBadge` macht das selbst, mit `lib/countdownRule.js` (#1264) und der Tagesangabe mehrtägiger Events;
+  `phaseDayInfo(phase)` gibt „Tag 2/3“ auch Stellen ohne Countdown (Kalender).
+- **Keine zweite Zustandszeile:** Was das Schild sagt, steht nicht noch einmal darunter. Die Turnierkarte zeigt zur
+  Anmeldung nur ruhigen Text mit Zusatz (Frist, „öffnet am …“), siehe `registrationLine` in TournamentCard.jsx.
+- **Andere Modi** (TV-Station „Aufgerufen“, Tage eines Events) nehmen eine Art direkt: `<StatusChip kind="soon"
+  label="Aufgerufen" />`.
+- **TV:** `TvPill kind=…` bzw. `TvStatusPill status=…` (components/tv/TvParts.jsx) – dieselben Arten in Beamer-Größe
+  (`tv.css`, `.tv-pill--status`), mit Kontrast-Modus.
+
+Wächter: `lib/statusKinds.test.js` hält JS, JSON und CSS gleich und prüft, dass jeder Zustand aus StatusBadge,
+PhaseBadge, Server (`models.py`, `public_phase.py`) und Aufrufern eine Art und ein Wort hat. `scripts/check-contrast.js`
+rechnet jede Art und Spielart auf Grund und Fläche 1 bis 3 und auf einem weißen Bild nach (mindestens 4,5 : 1).
+Playwright: `e2e/zustands-schilder.spec.js` (alle zehn Arten auf Startseite, Dashboard, den Stationen der Turnierleitung
+und der öffentlichen Turnierseite).

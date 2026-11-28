@@ -101,5 +101,5 @@ test("Auswahl: die zuletzt beendete Wertung, die nächste angelegte, nichts aus 
 
 test("eine laufende Saison trägt das Schild „Läuft“", () => {
   render(<StatusBadge status="active" />);
-  expect(screen.getByTestId("status-active")).toHaveTextContent("LÄUFT");
+  expect(screen.getByTestId("status-active")).toHaveTextContent(/^Läuft$/);
 });

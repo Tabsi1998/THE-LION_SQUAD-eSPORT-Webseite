@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { Search } from "lucide-react";
 import { AdminLayout } from "@/components/tls/AdminLayout";
-import { SetupGuide, StatusChip } from "@/components/tls/SetupGuide";
+import { SetupGuide, SetupStatusChip } from "@/components/tls/SetupGuide";
 import { api } from "@/lib/api";
 import { SETUP_GUIDE_ORDER, guideStatus } from "@/lib/setupGuides";
 import { FAQ_TOPICS, filterFaq } from "@/lib/adminFaq";
@@ -77,7 +77,7 @@ export default function AdminSetupPage() {
                     <details key={question.key} open={open} className="border border-white/10 bg-[#0F0F0F] rounded-sm" data-testid={`setup-faq-${question.key}`}>
                       <summary className="cursor-pointer select-none px-4 py-3 flex flex-wrap items-center gap-2 tls-type-small font-bold text-white/85 hover:text-white">
                         {question.q}
-                        {status && <StatusChip status={status} />}
+                        {status && <SetupStatusChip status={status} />}
                       </summary>
                       <div className="px-4 pb-4 space-y-3">
                         <p className="tls-type-small text-white/70">{question.a}</p>

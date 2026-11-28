@@ -43,7 +43,7 @@ export function MyStandCard({ tournament: t, registration: myReg, team = null, i
     <section className="border border-brand/40 rounded-sm bg-brand/5 p-4" data-testid="tournament-my-stand">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="tls-type-label">Dein Stand</div>
-        <StatusBadge status={myReg.status} size="lg" />
+        <StatusBadge status={myReg.status} size="lg" own />
       </div>
       {step >= 0 ? <StepBar steps={steps} current={step} className="mt-3" testId="tournament-my-steps" /> : null}
       {/* Abgelehnt (#2113, L-C3): sagen, was das heißt und was jetzt geht - der Grund steht in der Nachricht. */}
