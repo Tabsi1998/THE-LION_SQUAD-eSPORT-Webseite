@@ -12,7 +12,7 @@ import { StatusBadge } from "@/components/tls/StatusBadge";
 import { LineupMark } from "@/components/tls/tournament/LineupMark";
 import { SquadAssignDialog, canAssignSquads } from "@/components/tls/league/SquadAssignDialog";
 import { PersonAssignDialog } from "@/components/tls/league/PersonAssignDialog";
-import { SOLO_APPLICATIONS_FOLLOW, entrantWords, isSoloStaffel } from "@/lib/leagueParticipants";
+import { SOLO_ASSIGN_HINT, entrantWords, isSoloStaffel } from "@/lib/leagueParticipants";
 import { ParticipantRemovalActions } from "@/pages/admin/tournament/ParticipantRemovalActions";
 import { fixedRegistrationIds, normalizeSearch } from "@/pages/admin/tournament/shared";
 import { SquadKaderSheet } from "../SquadKaderSheet";
@@ -125,16 +125,13 @@ export function StaffelParticipantsTab({ tournament, registrations, matches, lin
         </div>
       </div>
 
-      {solo ? (
-        <p className="tls-type-small text-white/60" data-testid="staffel-entry-hint">{SOLO_APPLICATIONS_FOLLOW}</p>
-      ) : (
-        <p className="flex flex-wrap items-center gap-x-2 gap-y-1 tls-type-small text-white/60" data-testid="staffel-entry-hint">
-          Anmeldungen und Warteliste stehen im Eingang der Season.
-          <Link to={seasonAnchorUrl(seasonId, "anmeldungen")} className="inline-flex min-h-[44px] items-center gap-1 font-bold text-[#29B6E8] hover:text-white" data-testid="staffel-entry-link">
-            Zum Eingang <ArrowRight className="h-3.5 w-3.5" aria-hidden="true" />
-          </Link>
-        </p>
-      )}
+      {/* Solo-Liga (#1629, P2): Spieler melden sich selbst an - derselbe Eingang, Zuteilen ist der zweite Weg. */}
+      <p className="flex flex-wrap items-center gap-x-2 gap-y-1 tls-type-small text-white/60" data-testid="staffel-entry-hint">
+        {solo ? SOLO_ASSIGN_HINT : "Anmeldungen und Warteliste stehen im Eingang der Season."}
+        <Link to={seasonAnchorUrl(seasonId, "anmeldungen")} className="inline-flex min-h-[44px] items-center gap-1 font-bold text-[#29B6E8] hover:text-white" data-testid="staffel-entry-link">
+          Zum Eingang <ArrowRight className="h-3.5 w-3.5" aria-hidden="true" />
+        </Link>
+      </p>
 
       {registrations.length > 6 ? (
         <label className="relative block">
