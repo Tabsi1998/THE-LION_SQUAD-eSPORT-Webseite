@@ -3,7 +3,8 @@ import path from "node:path";
 import { MATCH_STATUS_LABELS, REGISTRATION_STATUS_LABELS } from "./tournamentLabels";
 import { ROLE_COLORS } from "./categoryColors";
 import {
-  OWN_BADGE_KINDS, OWN_STATUS_STATES, STATUS_KIND_ORDER, STATUS_KINDS, STATUS_STATES, STILL_STATES, isKnownStatus, ownBadgeKind, statusKind,
+  OWN_BADGE_KINDS, OWN_STATUS_STATES, STATUS_KIND_ORDER, STATUS_KINDS, STATUS_STATES, STATUS_VARIANTS, STILL_STATES, isKnownStatus, ownBadgeKind,
+  statusKind,
   statusWord,
 } from "./statusKinds";
 
@@ -74,6 +75,43 @@ test.each(STATUS_KIND_ORDER)("Art %s: Schrift, Fläche und Rahmen in system.css 
   if (spec.borderStyle === "dashed") expect(css).toContain("border-style: dashed;");
   else expect(css).not.toContain("border-style");
   expect(shared.colors.onOk).toBe(/--tls-on-ok: (#[0-9A-Fa-f]{6});/.exec(system)?.[1]);
+});
+
+test("ruhige Spielart (Fabian Nr. 303): fremde Anmeldungen grau mit Haken, nur die eigene in Cyan", () => {
+  expect(Object.keys(shared.variants)).toEqual(Object.keys(STATUS_VARIANTS));
+  for (const [variant, kinds] of Object.entries(STATUS_VARIANTS)) {
+    const { _info: info, ...specs } = shared.variants[variant];
+    expect(info.length).toBeGreaterThan(10);
+    expect(Object.keys(specs)).toEqual(kinds);
+    for (const kind of kinds) {
+      const selector = `.tls-status-chip[data-kind="${kind}"][data-variant="${variant}"] {`;
+      const start = system.indexOf(selector);
+      expect(start, `${selector} fehlt in system.css`).toBeGreaterThanOrEqual(0);
+      const css = system.slice(start, system.indexOf("}", start));
+      expect(css).toContain(`--tls-chip-text: ${cssColor(specs[kind].text)};`);
+      expect(css).toContain(`--tls-chip-fill: ${cssColor(specs[kind].fill)};`);
+      expect(css).toContain(`--tls-chip-line: ${cssColor(specs[kind].border)};`);
+      expect(specs[kind].text, "ruhig heißt: nicht Cyan").not.toMatch(/^brand/);
+    }
+  }
+  // Jede Spielart an einem Zustand gibt es für dessen Art.
+  for (const [state, [kind, , variant]] of Object.entries(STATUS_STATES)) {
+    if (variant) expect(STATUS_VARIANTS[variant], state).toContain(kind);
+  }
+  expect(statusKind("approved")).toMatchObject({ kind: "joined", word: "Bestätigt", variant: "quiet" });
+  expect(statusKind("approved", { own: true })).toMatchObject({ kind: "joined", word: "Du bist dabei", variant: null });
+  expect(Object.values(OWN_STATUS_STATES).every((entry) => !entry[2])).toBe(true);
+});
+
+test("auf Bildern: Unterlage aus der JSON-Datei, an Schild und Countdown", () => {
+  const [name, alpha] = shared.media.underlay.split("/");
+  expect(name).toBe("surface0");
+  expect(shared.colors.surface0).toBe("#0A0A0A");
+  expect(system).toContain(`--tls-chip-underlay: color-mix(in srgb, var(--tls-surface-0) ${Math.round(Number(alpha) * 100)}%, transparent);`);
+  expect(Number(alpha)).toBeGreaterThanOrEqual(0.92);
+  expect(Number(alpha)).toBeLessThanOrEqual(0.95);
+  expect(system).not.toMatch(/var\(--tls-surface-0\) 82%/);
+  expect(system.match(/var\(--tls-chip-underlay\)/g)).toHaveLength(2);
 });
 
 test("gefüllt sind nur Anmeldung offen und Check-in offen; rot ist nur Läuft", () => {
@@ -159,13 +197,13 @@ test("kein Wort ist ein Rohwert oder GROSS geschrieben", () => {
 });
 
 test("statusKind: Schreibweise egal, eigene Anmeldung in der Du-Form, Unbekanntes ohne Rohwert", () => {
-  expect(statusKind("LIVE")).toEqual({ kind: "live", word: "Läuft", known: true, pulse: true });
-  expect(statusKind("checked_in", { own: true })).toEqual({ kind: "joined", word: "Eingecheckt", known: true, pulse: false });
+  expect(statusKind("LIVE")).toEqual({ kind: "live", word: "Läuft", known: true, pulse: true, variant: null });
+  expect(statusKind("checked_in", { own: true })).toEqual({ kind: "joined", word: "Eingecheckt", known: true, pulse: false, variant: null });
   expect(statusKind("approved", { own: true }).word).toBe("Du bist dabei");
   expect(statusKind("approved").word).toBe("Bestätigt");
   expect(statusKind("waitlist", { own: true }).word).toBe("Warteliste");
   expect(statusKind("cancelled", { own: true }).word).toBe("Abgemeldet");
-  expect(statusKind("gibt_es_nicht")).toEqual({ kind: "waiting", word: "Unbekannt", known: false, pulse: false });
+  expect(statusKind("gibt_es_nicht")).toEqual({ kind: "waiting", word: "Unbekannt", known: false, pulse: false, variant: null });
   expect(statusKind(null).known).toBe(false);
   // Die Beispiele aus dem Ticket.
   expect(statusKind("results_published")).toMatchObject({ kind: "done", word: "Ergebnisse da" });

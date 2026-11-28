@@ -1,6 +1,13 @@
 {
   "_info": "Zustands-Schilder (#1306, Fabians Variante C – gefüllt fürs Wichtige): eine Quelle für Website und App. Zehn Arten mit fester Bedeutung, jede mit Symbol und Wort – die Farbe ist nie die einzige Information. Nur „Anmeldung offen“ und „Check-in offen“ sind gefüllt (Grün, dunkle Schrift), „Frei“ (Station) hat einen grünen Rahmen ohne Füllung, „Läuft“ ist das einzige rote Schild. „states“ ordnet jedem bekannten Zustand eine Art und ein Wort zu, „own“ die Wörter für die eigene Anmeldung, „still“ die Zustände, deren Punkt bei „Läuft“ nicht pulsiert (eine Saison läuft Monate). Die Website hält frontend/src/lib/statusKinds.js und styles/system.css gleich (lib/statusKinds.test.js), die App liest dieselben Werte später für mobile/src/lib/statusKinds.ts. Farben: Rolle aus docs/category-colors.json (brand, live, warn, ok, muted, quiet), dazu white und onOk, mit Deckkraft als „rolle/0.xx“.",
-  "colors": { "white": "#FFFFFF", "onOk": "#04140D" },
+  "colors": { "white": "#FFFFFF", "onOk": "#04140D", "surface0": "#0A0A0A" },
+  "media": { "_info": "Auf Bildern (Turnierkarten): eine dunkle Unterlage unter jedem Schild und dem Countdown – auch auf einem weißen Bild bleibt jede Schrift über 4,5 : 1.", "underlay": "surface0/0.94" },
+  "variants": {
+    "quiet": {
+      "_info": "Ruhige Spielart (Fabian Nr. 303): eine fremde bestätigte Anmeldung – derselbe Haken, aber grau statt Cyan; Cyan heißt „du“. Ein Zustand mit drittem Wert „quiet“ nimmt sie.",
+      "joined": { "text": "muted", "fill": "white/0.04", "border": "white/0.24", "borderStyle": "solid" }
+    }
+  },
   "kinds": {
     "soon": { "label": "Bald", "icon": "clock", "text": "white/0.88", "fill": null, "border": "white/0.24", "borderStyle": "solid" },
     "registration": { "label": "Anmeldung offen", "icon": "user-plus", "text": "onOk", "fill": "ok", "border": "ok", "borderStyle": "solid", "filled": true },
@@ -40,9 +47,9 @@
     "disputed": ["problem", "Klärung"],
     "forfeit": ["done", "Wertung"],
     "bye": ["done", "Freilos"],
-    "approved": ["joined", "Bestätigt"],
-    "registered": ["joined", "Angemeldet"],
-    "checked_in": ["joined", "Eingecheckt"],
+    "approved": ["joined", "Bestätigt", "quiet"],
+    "registered": ["joined", "Angemeldet", "quiet"],
+    "checked_in": ["joined", "Eingecheckt", "quiet"],
     "waitlist": ["waiting", "Warteliste"],
     "waitlisted": ["waiting", "Warteliste"],
     "rejected": ["cancelled", "Abgelehnt"],

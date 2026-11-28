@@ -41,6 +41,19 @@ test.each(STATUS_KIND_ORDER)("Art %s: Symbol, Farbe und Wort", (kind) => {
   expect(chip.textContent).toBe(info.label);
 });
 
+test("fremde bestätigte Anmeldung ruhig grau mit Haken, die eigene in Cyan (Fabian Nr. 303)", () => {
+  const { rerender } = render(<StatusChip status="approved" testId="chip" />);
+  expect(screen.getByTestId("chip")).toHaveAttribute("data-kind", "joined");
+  expect(screen.getByTestId("chip")).toHaveAttribute("data-variant", "quiet");
+  expect(screen.getByTestId("chip")).toHaveTextContent(/^Bestätigt$/);
+  expect(screen.getByTestId("chip").querySelector("svg.lucide-check")).not.toBeNull();
+  rerender(<StatusChip status="approved" own testId="chip" />);
+  expect(screen.getByTestId("chip")).not.toHaveAttribute("data-variant");
+  expect(screen.getByTestId("chip")).toHaveTextContent(/^Du bist dabei$/);
+  rerender(<StatusChip kind="joined" label="Du bist dabei" testId="chip" />);
+  expect(screen.getByTestId("chip")).not.toHaveAttribute("data-variant");
+});
+
 test("laufende Saison: rotes „Läuft“, der Punkt steht still; pulse={false} geht auch von Hand", () => {
   const { rerender } = render(<StatusChip status="active" testId="chip" dotTestId="dot" />);
   expect(screen.getByTestId("chip")).toHaveAttribute("data-kind", "live");

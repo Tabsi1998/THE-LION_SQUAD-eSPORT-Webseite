@@ -109,15 +109,25 @@ function statusChips() {
     const [name, alpha] = spec.split("/");
     return blend(parseColor(named[name]), alpha ? Number(alpha) : 1, below);
   };
-  return Object.entries(kinds.kinds).flatMap(([kind, spec]) => grounds.map((ground) => {
+  // Alle Arten und Spielarten (ruhiges „Bestätigt“, Fabian Nr. 303).
+  const looks = [
+    ...Object.entries(kinds.kinds).map(([kind, spec]) => [`${spec.label} (${kind})`, spec]),
+    ...Object.entries(kinds.variants || {}).flatMap(([variant, specs]) => Object.entries(specs)
+      .filter(([kind]) => !kind.startsWith("_")).map(([kind, spec]) => [`${kind}.${variant}`, spec])),
+  ];
+  const onGround = looks.flatMap(([name, spec]) => grounds.map((ground) => {
     const background = layer(spec.fill, parseColor(ground));
-    return {
-      label: `Zustands-Schild ${spec.label} (${kind}) on ${ground}`,
-      foreground: layer(spec.text, background),
-      background,
-      min: 4.5,
-    };
+    return { label: `Zustands-Schild ${name} on ${ground}`, foreground: layer(spec.text, background), background, min: 4.5 };
   }));
+  // Auf Bildern (onMedia): die Unterlage über dem schlimmsten Bild - einem weißen. Auch der Countdown daneben (Weiß 88 %).
+  const white = parseColor("#FFFFFF");
+  const underlay = layer(kinds.media.underlay, white);
+  const onMedia = looks.map(([name, spec]) => {
+    const background = layer(spec.fill, underlay);
+    return { label: `Zustands-Schild ${name} auf weißem Bild (Unterlage ${kinds.media.underlay})`, foreground: layer(spec.text, background), background, min: 4.5 };
+  });
+  onMedia.push({ label: "Countdown neben dem Schild auf weißem Bild", foreground: layer("white/0.88", underlay), background: underlay, min: 4.5 });
+  return [...onGround, ...onMedia];
 }
 
 function opacityText(label, foreground, alpha, min) {

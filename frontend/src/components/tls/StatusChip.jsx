@@ -31,21 +31,25 @@ export function StatusKindIcon({ kind, testId, className = "tls-status-chip__ico
  * @param {string} status   Zustand (Phase, Status, Anmeldung, Spiel, Station)
  * @param {string} [kind]   Art direkt (TV-Modi, die kein gemeinsamer Zustand sind) - geht vor `status`
  * @param {string} [label]  eigenes Wort der Stelle (z. B. vom Server) - sonst das Wort aus der Tabelle
- * @param {boolean} [own]   die eigene Anmeldung: „Du bist dabei“ statt „Bestätigt“
+ * @param {boolean} [own]   die eigene Anmeldung: „Du bist dabei“ in Cyan statt „Bestätigt“ in ruhigem Grau
+ * @param {"quiet"} [variant] ruhige Spielart von Hand (sonst aus der Tabelle)
  * @param {boolean} [pulse] pulsiert der Punkt bei „Läuft“? Ohne Angabe sagt es die Tabelle (Saison: still)
  * @param {"sm"|"lg"} [size]
  * @param {boolean} [onMedia] auf einem Bild: mit dunkler Unterlage
  * @param {import("react").ReactNode} [meta] kleiner Text daneben (Countdown, Tag) - am Handy darunter
  */
-export function StatusChip({ status, kind: kindProp, label, own = false, pulse, size = "sm", onMedia = false, meta = null, className = "", testId, dotTestId, metaTestId, dataTone }) {
+export function StatusChip({ status, kind: kindProp, variant: variantProp, label, own = false, pulse, size = "sm", onMedia = false, meta = null, className = "", testId, dotTestId, metaTestId, dataTone }) {
   const resolved = statusKind(status, { own });
   const kind = kindProp && STATUS_KINDS[kindProp] ? kindProp : resolved.kind;
+  // Ruhige Spielart (Fabian Nr. 303): aus der Tabelle, solange die Stelle keine andere Art setzt - oder von Hand.
+  const variant = variantProp ?? (kind === resolved.kind ? resolved.variant : null);
   const word = label || (kindProp && !status ? STATUS_KINDS[kind].label : resolved.word);
   const pulsing = pulse ?? (status && resolved.known ? resolved.pulse : true);
   const chip = (
     <span
       className={`tls-status-chip${size === "lg" ? " tls-status-chip--lg" : ""}${onMedia ? " tls-status-chip--media" : ""}${meta ? "" : className ? ` ${className}` : ""}`}
       data-kind={kind}
+      data-variant={variant || undefined}
       data-status={status || undefined}
       data-tone={dataTone}
       data-testid={testId}
