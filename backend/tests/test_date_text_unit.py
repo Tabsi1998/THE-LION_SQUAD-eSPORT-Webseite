@@ -49,6 +49,33 @@ def test_official(row):
     assert date_text.format_official_date(row["value"]) == row["expected"]
 
 
+@pytest.mark.parametrize("row", CASES["edges"], ids=lambda row: row["note"])
+def test_edges_like_the_web(row):
+    """Randfälle (#1307, Review): Sommerzeit-Lücke, Tage, die es nicht gibt, reine Tage in format_ago, unlesbares now."""
+    if row["fn"] == "ago":
+        assert date_text.format_ago(row["value"], now=case_now(row)) == row["expected"]
+    elif row["fn"] == "when_bad_now":
+        assert date_text.format_when(row["value"], now="kein Datum") == row["expected"]
+        assert date_text.format_range(row["value"], None, now="kein Datum")
+        assert date_text.format_ago(row["value"], now="kein Datum")
+    else:
+        assert date_text.format_when(row["value"], now=case_now(row)) == row["expected"]
+
+
+def test_moment_takes_the_year_from_now():
+    """``now`` bestimmt das laufende Jahr - wie im Web (#1307, Review)."""
+    assert date_text.format_moment("2026-05-23T16:00:00Z", now="2027-01-05T10:00:00Z") == "Sa 23. Mai 2026 · 18:00"
+    assert date_text.format_moment("2026-05-23T16:00:00Z", now="2026-12-01T10:00:00Z") == "Sa 23. Mai · 18:00"
+
+
+def test_official_moment_for_csv():
+    """CSV-Ausfuhren: amtlich, sortierbar, mit Jahr - nie „heute“ (#1307, Review)."""
+    assert date_text.format_official_moment("2026-03-14T17:05:00Z") == "14.03.2026 18:05"
+    assert date_text.format_official_moment("2026-12-31T23:30:00Z") == "01.01.2027 00:30"
+    assert date_text.format_official_moment("2026-03-14") == "14.03.2026"
+    assert date_text.format_official_moment(None) == ""
+
+
 def test_values_as_the_database_delivers_them():
     now = datetime(2026, 5, 20, 10, tzinfo=timezone.utc)
     # Ein datetime ohne Zone kommt aus MongoDB und ist UTC; ein Text ohne Zone ist die Wiener Uhr.

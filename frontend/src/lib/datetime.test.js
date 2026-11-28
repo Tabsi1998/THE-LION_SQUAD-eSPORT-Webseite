@@ -214,6 +214,14 @@ describe("gemeinsame Datumsfälle (docs/date-cases.json)", () => {
   test.each(CASES.official)("amtliches Datum: $note", (row) => {
     expect(formatOfficialDate(row.value)).toBe(row.expected);
   });
+
+  // Randfälle (#1307, Review): Web und Server schreiben auch hier gleich.
+  test.each(CASES.edges)("Randfall ($fn): $note", (row) => {
+    const now = caseNow(row);
+    if (row.fn === "ago") expect(formatAgo(row.value, { now })).toBe(row.expected);
+    else if (row.fn === "when_bad_now") expect(formatWhen(row.value, { now: "kein Datum" })).toBe(row.expected);
+    else expect(formatWhen(row.value, { now })).toBe(row.expected);
+  });
 });
 
 // Die alten Namen schreiben dieselbe Form (#1307) - Seiten, die sie noch rufen, ändern sich ohne eigenes Zutun mit.

@@ -64,7 +64,10 @@ def as_vienna(value) -> datetime | None:
             day = date.fromisoformat(text)
             return datetime(day.year, day.month, day.day, 12, tzinfo=VIENNA)
         if _WALL_CLOCK.match(text):
-            return datetime.fromisoformat(text.replace(" ", "T")).replace(tzinfo=VIENNA)
+            # Über UTC und zurück: eine Uhrzeit, die es nicht gibt (29.03. 02:30), rückt um die fehlende Stunde vor
+            # (03:30); eine doppelte (25.10. 02:30) meint die erste - wie fromViennaInput im Web.
+            wall = datetime.fromisoformat(text.replace(" ", "T")).replace(tzinfo=VIENNA)
+            return wall.astimezone(timezone.utc).astimezone(VIENNA)
         parsed = datetime.fromisoformat(text.replace("Z", "+00:00"))
     except ValueError:
         return None
@@ -77,8 +80,13 @@ def vienna_day(value) -> date | None:
     return local.date() if local else None
 
 
+def _current(now) -> datetime:
+    """Der Bezugszeitpunkt in Wien - ohne oder mit unlesbarem ``now`` die echte Uhr."""
+    return (as_vienna(now) if now is not None else None) or as_vienna(now_utc())
+
+
 def _today(now) -> date:
-    return vienna_day(now if now is not None else now_utc())
+    return _current(now).date()
 
 
 def _day_text(day: date, *, with_month: bool = True, with_year: bool = False) -> str:
@@ -117,10 +125,11 @@ def format_when(value, *, now=None, time: bool = True, relative: bool = True, fa
     return f"{text} · {clock}" if with_clock else text
 
 
-def format_moment(value, *, time: bool = True, fallback: str = "") -> str:
+def format_moment(value, *, now=None, time: bool = True, fallback: str = "") -> str:
     """Für Texte, die später gelesen werden - Mail, Discord, Teilen-Bild, Kalender, Benachrichtigung: dieselbe Form wie
-    ``format_when``, aber nie „heute“ oder „morgen“ („Sa 23. Mai · 18:00“). Eine Mail von gestern sagt sonst „morgen“."""
-    return format_when(value, time=time, relative=False, fallback=fallback)
+    ``format_when``, aber nie „heute“ oder „morgen“ („Sa 23. Mai · 18:00“). Eine Mail von gestern sagt sonst „morgen“.
+    ``now`` bestimmt das laufende Jahr (Standard: jetzt)."""
+    return format_when(value, now=now, time=time, relative=False, fallback=fallback)
 
 
 def format_date(value, *, now=None, relative: bool = True, fallback: str = "") -> str:
@@ -154,10 +163,15 @@ def format_ago(value, *, now=None, fallback: str = "") -> str:
     moment = as_vienna(value)
     if not moment:
         return fallback
-    current = as_vienna(now if now is not None else now_utc())
+    current = _current(now)
+    if is_pure_day(value):
+        # Ein reiner Tag hat keine Uhrzeit, also auch kein „vor 3 Std.“: heute, gestern, sonst der Tag.
+        if moment.date() == current.date() - timedelta(days=1):
+            return "gestern"
+        return format_when(value, now=current, time=False)
     seconds = (current - moment).total_seconds()
     if seconds < -60:
-        return format_when(moment, now=current)
+        return format_when(value, now=current)
     if seconds < 60:
         return "gerade eben"
     if seconds < 3600:
@@ -166,10 +180,19 @@ def format_ago(value, *, now=None, fallback: str = "") -> str:
         return f"vor {int(seconds // 3600)} Std."
     if moment.date() == current.date() - timedelta(days=1):
         return "gestern"
-    return format_when(moment, now=current, time=False)
+    return format_when(value, now=current, time=False)
 
 
 def format_official_date(value) -> str:
     """Das amtliche Datum „23.05.2026“ in Wiener Zeit - nur für Rechnungen, Urkunden und PDF-Listen."""
     day = vienna_day(value)
     return f"{day.day:02d}.{day.month:02d}.{day.year}" if day else ""
+
+
+def format_official_moment(value) -> str:
+    """Amtlich mit Uhrzeit, „14.03.2026 18:05“ in Wiener Zeit - für CSV-Ausfuhren (sortierbar, mit Jahr). Ein reiner Tag
+    ohne Uhrzeit."""
+    day = format_official_date(value)
+    if not day or is_pure_day(value):
+        return day
+    return f"{day} {format_clock(value)}"

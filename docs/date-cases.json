@@ -1,5 +1,5 @@
 {
-  "_info": "Ein Datumsformat (#1307): dieselben Fälle für Website (frontend/src/lib/datetime.test.js), Server (backend/tests/test_date_text_unit.py) und App (mobile/src/lib/format.cases.test.ts). Gerechnet in Wiener Zeit; `now` ist der Bezugszeitpunkt, ein Fall kann ihn überschreiben. Die App liest bisher when, range und ago; when_fixed (ohne heute/morgen, für Sätze mit „am“), day (reine Kalendertage ohne Uhrzeit) und official (das amtliche Datum für Rechnung, Urkunde und PDF) übernimmt das App-Paket.",
+  "_info": "Ein Datumsformat (#1307): dieselben Fälle für Website (frontend/src/lib/datetime.test.js), Server (backend/tests/test_date_text_unit.py) und App (mobile/src/lib/format.cases.test.ts). Gerechnet in Wiener Zeit; `now` ist der Bezugszeitpunkt, ein Fall kann ihn überschreiben. Die App liest bisher when, range und ago; when_fixed (ohne heute/morgen, für Sätze mit „am“), day (reine Kalendertage ohne Uhrzeit) und official (das amtliche Datum für Rechnung, Urkunde und PDF) und edges (Sommerzeit-Lücke, Tage, die es nicht gibt, reine Tage in formatAgo, unlesbares now) übernimmt das App-Paket.",
   "now": "2026-05-20T10:00:00Z",
   "when": [
     { "note": "Wochentag kurz, Monat ausgeschrieben, ohne Jahr", "value": "2026-05-23T16:00:00Z", "expected": "Sa 23. Mai · 18:00" },
@@ -66,6 +66,18 @@
   "official": [
     { "note": "Rechnung, Urkunde, PDF: das amtliche Datum", "value": "2026-05-23T16:00:00Z", "expected": "23.05.2026" },
     { "note": "amtlich in Wiener Zeit: Silvester 23:30 UTC ist in Wien schon Neujahr", "value": "2026-12-31T23:30:00Z", "expected": "01.01.2027" },
-    { "note": "amtlich: ein reiner Kalendertag bleibt dieser Tag", "value": "2026-12-31", "expected": "31.12.2026" }
+    { "note": "amtlich: ein reiner Kalendertag bleibt dieser Tag", "value": "2026-12-31", "expected": "31.12.2026" },
+    { "note": "amtlich: einen Tag, den es nicht gibt, gibt es nicht", "value": "2026-02-30", "expected": "" }
+  ],
+  "edges": [
+    { "note": "Sommerzeit-Lücke: 02:30 gibt es am 29.03. nicht, die Uhr rückt auf 03:30 vor", "fn": "when", "value": "2026-03-29T02:30:00", "expected": "So 29. März · 03:30" },
+    { "note": "doppelte Stunde am 25.10.: 02:30 ohne Zone meint die erste", "fn": "when", "value": "2026-10-25T02:30:00", "expected": "So 25. Oktober · 02:30" },
+    { "note": "einen Tag, den es nicht gibt, gibt es nicht", "fn": "when", "value": "2026-02-30", "expected": "" },
+    { "note": "einen Tag mit Uhrzeit, den es nicht gibt, auch nicht", "fn": "when", "value": "2026-02-30T10:00:00", "expected": "" },
+    { "note": "reiner Tag in der Zukunft: der Tag, keine erfundene Uhrzeit", "fn": "ago", "value": "2026-12-31", "expected": "Do 31. Dezember" },
+    { "note": "reiner Tag heute: heute, kein „vor 10 Std.“", "fn": "ago", "value": "2026-05-20", "expected": "heute" },
+    { "note": "reiner Tag gestern", "fn": "ago", "value": "2026-05-19", "expected": "gestern" },
+    { "note": "reiner Tag früher: der Tag", "fn": "ago", "value": "2026-05-10", "expected": "So 10. Mai" },
+    { "note": "ein unlesbares now zählt wie keines: kein Absturz", "fn": "when_bad_now", "value": "2020-05-23T16:00:00Z", "expected": "Sa 23. Mai 2020 · 18:00" }
   ]
 }
