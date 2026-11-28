@@ -135,6 +135,19 @@ async def _inform(db, event: dict, users: list[dict], *, title: str, message: st
     return {"notified": notified, "mails": mails}
 
 
+async def inform_registrants(db, event: dict, *, title: str, message: str, dedupe: str,
+                             statuses: tuple[str, ...] = AFFECTED_STATUSES, starts_at: str | None = None) -> dict:
+    """Eine Nachricht zum Event an alle mit einer Anmeldung in ``statuses`` - je Person genau eine je ``dedupe``.
+    Für neue Abstimmungen (#2612, nur wer abstimmen darf) und den Wechsel auf einen anderen Ort-Plan (#2613, samt
+    Warteliste wie beim Verschieben). Dieselben Wege wie beim Verschieben: Postfach, Push, Mail „Nachricht zum Event“."""
+    registrations = await db.event_registrations.find(
+        {"event_id": event["id"], "status": {"$in": list(statuses)}}, {"_id": 0, "user_id": 1},
+    ).to_list(5000)
+    users = await _recipients(db, [registration.get("user_id") for registration in registrations])
+    sent = await _inform(db, event, users, title=title, message=message, dedupe=dedupe, starts_at=starts_at)
+    return {"recipients": len(users), "notified": sent["notified"], "mails": sent["mails"]}
+
+
 def _when_and_where(event: dict) -> str:
     from services.notification_preferences import _event_when
 

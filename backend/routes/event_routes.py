@@ -18,6 +18,7 @@ from services import news_channels, partner_pages
 from services.notification_preferences import enqueue_newsletter_for_item
 from services.slug_utils import apply_slug_history, find_by_slug_or_history, slug_source_for_update, unique_slug
 from services import billing_orders, event_changes, event_days, event_facts, event_locations, event_notifications, event_play_along, event_program, event_registration, event_rewards, pricing
+from services import event_polls
 from services.billing_amounts import public_payment_state
 from services.event_public import public_competition, public_event
 from services.event_registration import RegistrationError
@@ -692,6 +693,8 @@ async def get_event(slug_or_id: str, request: Request, include_draft: bool = Fal
     # Standorte (#203): immer als Liste, auch für Events, die nur die alten Felder haben.
     event["locations"] = [event_locations.with_map(place) for place in event_locations.event_locations(event)]
     event["map_query"] = event_locations.map_query(event_locations.primary_from_event(event) or (event["locations"][0] if event["locations"] else None))
+    # Abstimmungen (#2612): wie die Person sie sehen darf - eigene Stimme, Ergebnis nach Einstellung, nie fremde Stimmen.
+    event["polls"] = await event_polls.polls_for_event(db, event, user)
     # Preisangabe für die Anmeldung (#318); die Konfiguration mit Dolibarr-Nummern sieht nur Finanzen.
     offer = event.pop("billing", None)
     event["offer"] = pricing.public_offer(offer)
@@ -1252,5 +1255,7 @@ async def delete_event(event_id: str, me: dict = Depends(require_admin())):
     if blocked:
         raise HTTPException(409, blocked)
     result = await event_changes.delete_event(db, event, me)
+    # Abstimmungen (#2612) hängen nur am Event - sie gehen mit, samt Stimmen.
+    await event_polls.forget_event(db, event["id"])
     reset_scope_cache()  # Live-Meldungen (#1801): Turnier und Event neu nachschlagen
     return result

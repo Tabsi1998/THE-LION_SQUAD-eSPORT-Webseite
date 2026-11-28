@@ -82,6 +82,8 @@ from routes.event_display_routes import router as event_display_router
 from routes.match_routes import router as match_router
 from routes.f1_routes import router as f1_router
 from routes.event_program_routes import router as event_program_router
+# Abstimmungen am Event (#2612) und Ort-Pläne A/B/C (#2613).
+from routes.event_poll_routes import admin_router as event_poll_admin_router, router as event_poll_router
 from routes.station_routes import router as station_router
 from routes.news_routes import router as news_router
 from routes.reference_series_routes import router as reference_series_router
@@ -483,6 +485,8 @@ app.include_router(event_display_router)
 app.include_router(event_recap_router)
 app.include_router(tournament_router)
 app.include_router(event_program_router)
+app.include_router(event_poll_router)
+app.include_router(event_poll_admin_router)
 app.include_router(match_router)
 app.include_router(f1_router)
 app.include_router(station_router)
