@@ -47,6 +47,8 @@ NOT_COPIED = frozenset({
     league_postseason.KEPT,
     # Startrechte (#1627, F.2a): Die Einstellung ``start_rights`` geht mit - was die alte Season schon gemeldet hat, gehört zu ihr.
     league_start_right_rules.NOTICES, league_start_right_rules.NOTICES_OPEN, league_start_right_rules.PAUSES,
+    # Abgesagt (#2607): gehört nur der abgesagten Season (eine Folge-Season aus ihr gibt es ohnehin nicht).
+    "cancel_reason", "cancelled_by", "cancelled_predecessor_id", "status_before_cancel",
 })
 DATES_TO_SET = ("Beginn der ersten Spielwoche", "Sperrzeiten", "Anmeldefenster und Meldeschluss", "Transferfenster", "Stichtag des Kaders")
 COPIED_GROUPS = (
@@ -65,6 +67,8 @@ MOVEMENT_TEXT = {"up": "Aufstieg", "down": "Abstieg", "stay": "bleibt"}
 
 NOT_CLOSED = "Die Season ist noch nicht abgeschlossen. Erst alle Staffeln im Reiter „Abschluss“ abschließen."
 NO_STAFFELN = "Diese Season hat keine Staffel mit Endstand - aus ihr lässt sich keine neue Season anlegen."
+NO_SUCCESSOR_CANCELLED = ("Diese Season ist abgesagt - aus ihr lässt sich keine neue Season anlegen. Lege die neue Season aus der Vorgänger-Season "
+                          "an, dort gelten deren Startrechte weiter, oder lege eine neue Season in der Liga an.")
 BUSY = "Die neue Season wird gerade angelegt. Bitte gleich noch einmal."
 NO_DIVISION = "Die Season hat keine aktive Liga N."
 REPLAY_REOPENED = ("{name} ist angelegt, aber noch nicht fertig - und die Vorgänger-Season ist inzwischen nicht mehr abgeschlossen ({problem}) "
@@ -135,6 +139,9 @@ async def plan(db, season: dict) -> dict:
     staffeln = await league_final.season_staffeln(db, season["id"])
     counted = [row for row in staffeln if is_closed(row) or row.get("status") not in league_final.IGNORED_STAFFEL_STATUSES]
     problems: list[str] = []
+    if season.get("status") == leagues.CANCELLED:
+        # Abgesagt (#2607): Es gibt keinen Endstand. Die neue Season entsteht aus dem Vorgänger - dort gelten dessen Startrechte weiter.
+        problems.append(NO_SUCCESSOR_CANCELLED)
     league = await db.leagues.find_one({"id": season.get("league_id")}, {"_id": 0, "participant_kind": 1})
     if league_participants.is_solo(league):
         # Solo-Liga (#1629): Übernahme je Person und Startrechte mit ``user:<id>`` kommen erst mit P4 - als erster Grund genannt.

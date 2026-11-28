@@ -12,7 +12,7 @@ import { SelectField, TextAreaField, TextField } from "@/components/tls/FormFiel
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { isArchivedGame, selectableGames } from "@/lib/gameLabels";
 import { fromViennaInput, viennaDate } from "@/lib/vienna";
-import { ACTIVE_STATUS_OPTIONS, SEASON_STATUS_OPTIONS, VISIBILITY_SHORT, leagueLookChanges, leagueLookToForm, weekdayName } from "@/lib/league";
+import { ACTIVE_STATUS_OPTIONS, SEASON_STATUS_TEXT, VISIBILITY_SHORT, leagueLookChanges, leagueLookToForm, weekdayName } from "@/lib/league";
 import { accentProblem, accentStyle } from "@/lib/leagueLook";
 import { LeagueEmblem } from "@/components/tls/league/public/LeagueLook";
 import { LeagueDeleteSheet } from "./LeagueDeleteSheet";
@@ -23,7 +23,7 @@ import { toast } from "sonner";
 import { ShortCaps } from "@/components/tls/ShortCaps";
 import { KIND_FIXED_HINT, PARTICIPANT_OPTIONS, SOLO, TEAM, gameAllowsSolo, isSoloLeague, participantKind, participantLabel } from "@/lib/leagueParticipants";
 
-const STATUS_TEXT = Object.fromEntries(SEASON_STATUS_OPTIONS);
+const STATUS_TEXT = SEASON_STATUS_TEXT;
 const ICON_BUTTON = "p-1.5 text-white/50 hover:text-[#29B6E8] focus-visible:outline focus-visible:outline-1 focus-visible:outline-[#29B6E8] rounded-sm";
 const ICON_DANGER = ICON_BUTTON.replace("hover:text-[#29B6E8]", "hover:text-live");
 const STEPS = [

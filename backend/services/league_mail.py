@@ -10,9 +10,11 @@ from services.log_safe import log_safe
 logger = logging.getLogger("tls.league_mail")
 
 
-async def send_league_mail(db, user_id: str | None, title: str, text: str, path: str, dedupe_key: str, *, category: str | None = None) -> bool:
+async def send_league_mail(db, user_id: str | None, title: str, text: str, path: str, dedupe_key: str, *, category: str | None = None,
+                           never_collect: bool = False) -> bool:
     """``category``: das Thema der Einstellungen, wenn es nicht das der Vorlage ist (die Rundnachricht folgt „Turnier-Updates“ wie Glocke
-    und Push). ``True``: Die Mail ist neu eingereiht - nicht bei fehlender Adresse, abgeschalteter Einstellung oder schon eingereiht."""
+    und Push). ``never_collect``: zeitkritisch wie eine Absage (Nr. 261, 267) - nie in der Sammel-Mail. ``True``: Die Mail ist neu
+    eingereiht - nicht bei fehlender Adresse, abgeschalteter Einstellung oder schon eingereiht."""
     from services.match_audience import users_for
     from services.notification_preferences import send_user_template
     from services.user_notifications import build_public_url
@@ -23,7 +25,8 @@ async def send_league_mail(db, user_id: str | None, title: str, text: str, path:
             return False
         user = people[0]
         result = await send_user_template(user, "league_notice", category=category, title=title, text=text, url=await build_public_url(path),
-                                          dedupe_key=dedupe_key, mail_meta={"kind": "league_notice", "user_id": user_id})
+                                          dedupe_key=dedupe_key, mail_meta={"kind": "league_notice", "user_id": user_id},
+                                          **({"never_collect": True} if never_collect else {}))
         return bool(result.get("ok")) and not result.get("skipped") and not result.get("deduped")
     except Exception:  # noqa: BLE001 - siehe oben
         logger.warning("[liga] Mail nicht verschickt: %s", log_safe(dedupe_key), exc_info=True)

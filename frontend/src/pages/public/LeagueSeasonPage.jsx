@@ -58,7 +58,8 @@ function Overview({ data }) {
   const order = useMemo(() => mapOrder(season, league?.game, data.map_pool), [season, league, data.map_pool]);
   const divisions = data.divisions || [];
   // Läuft eine Staffel, sind die Tabellen das Wichtigste - sie rücken nach oben.
-  const running = divisions.some((division) => (division.staffeln || []).some((row) => row.status && row.status !== "draft"));
+  // Abgesagte und archivierte Staffeln laufen nicht (#2607): Bei einer abgesagten Season bleiben die Tabellen unten.
+  const running = divisions.some((division) => (division.staffeln || []).some((row) => row.status && !["draft", "cancelled", "archived"].includes(row.status)));
   return (
     <>
       {/* Ohne Anmeldefenster nur, wenn die Season aus dem Vorgänger übernommen ist (F.2): Dann sehen Captains ihr Co-Team und „Abmelden“. */}

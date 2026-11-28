@@ -16,7 +16,14 @@ import { viennaDate } from "@/lib/vienna";
 import "@/components/tls/league/public/league.css";
 import { ShortCaps } from "@/components/tls/ShortCaps";
 
-const STATUS = { draft: "Startet bald", active: "Läuft", completed: "Beendet" };
+const STATUS = { draft: "Startet bald", active: "Läuft", completed: "Beendet", cancelled: "Abgesagt" };
+const DAY = { day: "numeric", month: "numeric", year: "numeric" };
+
+/** Die Zeile unter dem Namen: Stand und Beginn - eine abgesagte Season (#2607) nennt statt des Beginns den Tag der Absage. */
+function seasonLine(season) {
+  if (season.status === "cancelled") return `${STATUS.cancelled}${season.cancelled_at ? ` am ${viennaDate(season.cancelled_at, DAY)}` : ""}`;
+  return `${STATUS[season.status] || ""}${season.start_date ? ` · ab ${viennaDate(season.start_date, DAY)}` : ""}`;
+}
 
 export default function LeagueIndexPage() {
   const [leagues, setLeagues] = useState(null);
@@ -70,8 +77,9 @@ export default function LeagueIndexPage() {
                       ) : null}
                       <span className="relative min-w-0 flex-1">
                         <span className="block tls-type-card">{season.name}</span>
-                        <span className="block tls-type-small text-white/55">
-                          {STATUS[season.status] || ""}{season.start_date ? ` · ab ${viennaDate(season.start_date, { day: "numeric", month: "numeric", year: "numeric" })}` : ""}
+                        <span className={`block tls-type-small ${season.status === "cancelled" ? "text-quiet" : "text-white/55"}`}
+                          data-testid={`league-index-season-state-${season.slug}`}>
+                          {seasonLine(season)}
                         </span>
                       </span>
                       <ChevronRight className="tls-card__arrow relative h-4 w-4 shrink-0 text-white/35" aria-hidden="true" />

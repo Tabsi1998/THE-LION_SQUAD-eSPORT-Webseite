@@ -69,7 +69,9 @@ Indizes: `id` eindeutig, `slug` eindeutig, `game_id`.
 | `rules_text` | str (Markdown) | nein | Regeltext der Season - Altbestand; seit #2267 ohne Eingabefeld, die Season-Seite zeigt ihn nur noch zum Lesen, solange es kein Regelwerk gibt |
 | `registration_deadline` | Kalendertag | nein | Meldeschluss, nur Anzeige (Season 1: 6.11.) |
 | `visibility` | `"off"` \| `"admins"` \| `"members"` \| `"public"` | ja | **`off`** |
-| `status` | `"draft"` \| `"active"` \| `"completed"` \| `"archived"` | ja | `draft` |
+| `status` | `"draft"` \| `"active"` \| `"completed"` \| `"archived"` \| `"cancelled"` | ja | `draft`. `cancelled` (#2607) setzt nur „Season absagen“, siehe „Season absagen“ in Abschnitt 12 |
+| `cancel_reason`, `cancelled_at`, `cancelled_by`, `status_before_cancel` | str, ISO, str, str | nein | Absage (#2607): Grund und Zeit stehen öffentlich da, wer abgesagt hat nicht. Fehlt = nie abgesagt |
+| `cancelled_predecessor_id` | str | nein | Absage einer Folge-Season (#2607): die frühere `predecessor_id`, damit der Vorgänger wieder eine Folge-Season bekommen kann (`predecessor` bleibt zur Anzeige) |
 | `emblem_url`, `banner_url`, `banner_focus` | str / dict | nein | überschreiben die der Liga (#2107, Abschnitt 11) |
 | `prizes` | `[{place, text, image_url}]` | nein | Gewinne der Season (#2107) - reine Anzeige |
 
@@ -235,7 +237,9 @@ Altbestand auf beiden Seiten durch, nur mit `match_id` und Anzahl, ohne Personen
 verlängert, mit Grund), `league.staffel.late_entry` (Spiele einer Nachmeldung angelegt; #2422) · `league.draw.create|redraw|swap|discard|apply`
 (Los auf mehrere Staffeln einer Liga N, #1623: Seed, Zählung, Grund; `apply` mit der ganzen Verteilung) ·
 `league.zone.decision`, `league.zone.decision.clear` (Gleichstand über Staffeln hinweg entschieden bzw. zurückgenommen, #1627: Art, Grund, wer gewählt ist) ·
-`league.season.start_rights`, `league.start_right.accept|expire|fill|pass|announce` (Startrechte für die nächste Season, #1627, F.2a).
+`league.season.start_rights`, `league.start_right.accept|expire|fill|pass|announce` (Startrechte für die nächste Season, #1627, F.2a) ·
+`league.season.cancel` (Season abgesagt, #2607: Grund, Anträge, Staffeln, Zahl der Nachrichten, Stand davor; dazu je Antrag
+`league.application.reject` und je Staffel `tournament.status.change` mit `via: "season_cancel"`).
 
 ## 3. Einstellbar statt fest
 
@@ -639,7 +643,7 @@ je Person läuft über den Index `user_id`, Löschen des Kontos und Auskunft (`p
 
 | Zuständigkeit | Schlüssel | Was dazugehört |
 | --- | --- | --- |
-| Liga verwalten | `manage` | Liga bearbeiten, Season anlegen und löschen, Status und Sperre einer Staffel, Staffel-Einstellungen, Helfer der Staffel |
+| Liga verwalten | `manage` | Liga bearbeiten, Season anlegen, löschen und absagen (#2607), Status und Sperre einer Staffel, Staffel-Einstellungen, Helfer der Staffel |
 | Season konfigurieren | `season` | Season ändern, Map-Pool, Liga N, Staffel anlegen und löschen, Übertragen, Spielplan und Phasen |
 | Teams freigeben | `applications` | Co-Team zuteilen und herausnehmen, Teilnehmerliste, Austritt |
 | Kader prüfen | `roster` | Kaderübersicht mit Spiel-IDs, neue ID freigeben, Stichtag |
@@ -691,6 +695,7 @@ Zugriff, außer „lesen“ steht in der Zeile. Prüfung: `backend/tests/test_le
 | `GET /api/admin/leagues/seasons/{id}` | jede Zuständigkeit der Liga | – | – |
 | `PATCH /api/admin/leagues/{id}`, `POST …/{id}/seasons` | `manage` | – | – |
 | `DELETE …/seasons/{id}`, `GET …/seasons/{id}/delete-plan` | `manage` | – | – |
+| `POST …/seasons/{id}/cancel`, `GET …/seasons/{id}/cancel-plan` (Season absagen, #2607) | `manage` | – | – |
 | `PATCH …/seasons/{id}` | `season`; `rules_text` braucht `rules` | – | – |
 | `PUT`, `DELETE …/seasons/{id}/map-pool`, `POST …/seasons/{id}/sync` | `season` | – | – |
 | `GET …/seasons/{id}/result-rules` (C.3) | jede Zuständigkeit der Liga | – | – |
@@ -3784,6 +3789,89 @@ trägt, steht in `frontend/src/lib/seasonTabs.js` (`TAB_FIELDS`, `TAB_PAYLOAD_KE
 - **Links:** Nachrichten zu neuen Anmeldungen zeigen weiter auf `#anmeldungen`, „Transfer beantragt“ auf `#kader`, „Zurück“ im
   Regelwerk auf `#regelwerk`. Unbekannte Marken öffnen den Überblick.
 - „Neue Season aus …“ (F.2, #1627) steht als Knopf neben „Season löschen“, siehe „F.2 Neue Season aus dem Vorgänger“.
+- „Season absagen“ (#2607) steht daneben, siehe „Season absagen“.
+
+### Season absagen (#2607, Entscheidung Nr. 302)
+
+Eine Season lässt sich mit **einem Knopf** absagen, etwa wenn sich zu wenige anmelden. Vorher ging das nur über Umwege: jede Anmeldung
+einzeln ablehnen, jede Staffel einzeln absagen, dann löschen (nur als Entwurf ohne Teams) oder archivieren - und das Archiv blendete die
+Season ohne Hinweis aus. **Keine Mindestzahl, nie automatisch:** Die Leitung entscheidet, der Server warnt nur (unten „Warnung“).
+Logik in `services/league_season_cancel.py`, Routen in `routes/league_routes.py`, Blatt `SeasonCancelSheet.jsx`, Folgen im Klartext
+`lib/seasonCancel.js`, Schild `SeasonCancelledNotice.jsx`.
+
+| Route | Wer | Zweck |
+| --- | --- | --- |
+| `GET /api/admin/leagues/seasons/{id}/cancel-plan` | `manage` | Was das Absagen täte: `can_cancel`, `cancelled`, `problems`, `kind`, `applications` mit `applications_by_status`, `staffeln`, `registrations`, `people` (Personen mit Nachricht), `teams` (Co-Teams bzw. Spieler), `carried` (übernommene Anträge), `predecessor`. Liest nur |
+| `POST /api/admin/leagues/seasons/{id}/cancel` `{reason}` | `manage` | Absagen. Grund mindestens fünf Zeichen (422). Antwort `{ok, already, season, rejected, staffeln, notified}` |
+
+- **Wann:** Season weder beendet noch archiviert, keine Staffel (auch Playoffs und Relegation) live, pausiert, beendet, mit Endstand oder
+  mit einem gewerteten Spiel (`completed`, `forfeit`, ohne Vorschau). Sonst 409 mit dem Grund je Staffel. Team- und Solo-Season gleich.
+- **In einem Schritt, unter Sperre:** erst die Turnier-Sperren aller Staffeln (sortiert), dann die Season-Sperre, zuletzt die Sperre des
+  Map-Pools - dieselbe Reihenfolge wie beim Zuteilen und beim Anlegen einer Staffel. Unter der Sperre liest es die Staffeln neu: Kam
+  inzwischen eine dazu oder ging eine weg, antwortet es 409 `CHANGED_MEANWHILE` (neu laden, noch einmal). Dann:
+  1. Season `status: "cancelled"` mit `cancel_reason`, `cancelled_at`, `cancelled_by`, `status_before_cancel`. Damit ist die Anmeldung zu
+     (`window_state` antwortet `closed`, das Fenster bleibt gespeichert).
+  2. Jeder offene Antrag (`submitted`, `in_review`, `waitlist`, `accepted`, auch zugeteilt) wird `rejected` mit dem Grund,
+     `season_cancelled: true`, ohne `active_key`; eine Zuteilung bleibt als Nachweis. Protokoll je Antrag `league.application.reject` mit
+     `data.via: "season_cancel"`.
+  3. Jede Staffel, die nicht schon abgesagt oder archiviert ist, wird `cancelled` (`cancelled_with_season: true`, Protokoll
+     `tournament.status.change` mit `via: "season_cancel"`) - **ohne** die Nachricht „Turnier abgesagt“ der Staffel.
+  4. Je Person **genau eine** Nachricht samt Mail (`create_user_notification`, Art `tournament_cancelled`, `meta.reason`
+     `league_season_cancelled`, `dedupe_key` `league-season-cancelled:<season>:<user>` mit `unique_dedupe`, Mail über `send_league_mail` mit
+     `never_collect`): Captain und Vertreter je Co-Team (ohne beide die Hauptteam-Leitung), in der Solo-Liga die Person (aktives Konto).
+     Dazu Zugeteilte ohne offenen Antrag (Sonderweg „Co-Team zuteilen“ bzw. „Spieler zuteilen“) - aber nur aus den Staffeln, die mit der
+     Season abgesagt werden (`told_staffeln`): Wer nur in einer vorher einzeln abgesagten Staffel stand, hat seine Absage schon. Das Blatt
+     zählt dieselbe Menge. Wer für zwei Co-Teams zuständig ist, bekommt eine Nachricht mit beiden Namen. Zeitkritisch wie jede Absage
+     (Nr. 261, 267): nie in der Sammel-Mail, der Push wartet die Ruhezeit ab. Verschickt wird erst nach dem Lösen der Sperren.
+  5. Protokoll `league.season.cancel` mit Grund, Anträgen, Staffeln, Zahl der Nachrichten und dem Stand davor.
+- **Keine Befangenheit:** Das Absagen lehnt jeden Antrag gleich ab - auch den des eigenen Teams der Leitung. Es entscheidet über keinen
+  einzelnen Antrag, darum gibt es hier keine Prüfung nach Nr. 73 (B.1) und keine Notausnahme.
+- **Idempotent:** Ein zweites Absagen - auch gleichzeitig von einer zweiten Leitung oder nach einem Abbruch mittendrin - läuft dieselben
+  Schritte noch einmal, findet nichts mehr zu tun und verschickt nichts doppelt (`already: true`, Grund und Protokoll bleiben die ersten).
+- **Gleichzeitig ein Antrag:** Das Einreichen wartet auf die Season-Sperre. Kommt es vorher an, wird der Antrag mit abgelehnt; danach
+  antwortet es 409 „Diese Season ist abgesagt.“
+- **Danach kommt nichts mehr hinein** (409 mit `SEASON_CANCELLED` bzw. dem Satz des Wegs): Einreichen (`season_problems`), Entscheiden
+  (Antrag abgelehnt), Zuteilen und Sonderweg (Staffel abgesagt), Statuswechsel der Staffel (`POST /tournaments/{id}/status`,
+  `staffel_guard.season_cancelled_problem`, auch zurück in den Entwurf), Liga N anlegen und ändern, Staffel anlegen, Los, Verlängern der
+  Nachmeldung, Startrechte einstellen, zusagen lassen und nachrücken, Kader (`CLOSED_SEASON_STATUSES`), „Vorgaben übertragen“
+  (`…/sync`), Regelwerk veröffentlichen und zustimmen (`league_rules._publish`, `_give_consent`), Folge-Season aus der abgesagten
+  Season (Vorschau nennt `NO_SUCCESSOR_CANCELLED`). Löschen einer abgesagten Season oder ihrer Liga N geht nicht; `delete-plan` trägt
+  `cancelled: true`, das Blatt bietet kein Archivieren an und der Satz nennt die Sichtbarkeit „Aus“ (`CANCELLED_DELETE_HINT`). Der „Stand“
+  lässt sich nicht mehr ändern (409, auch nicht archivieren); `cancelled`
+  selbst setzt der Stand nie (409 „Absagen geht nur über …“), unverändert mitschicken stört nicht. Andere Felder (Sichtbarkeit,
+  Gestaltung) bleiben änderbar. Der Job der Startrechte fasst abgesagte Seasons nicht an.
+- **Kein Zurücknehmen.** Für einen Neustart eine neue Season anlegen, mit Vorgänger über „Neue Season aus …“.
+- **Startrechte (#1627, F.2a):** Eine abgesagte Season verbraucht keine. Sagt die Leitung eine Folge-Season ab, gibt sie `predecessor_id`
+  frei (jetzt `cancelled_predecessor_id`, der eindeutige Index hält nur eine Folge-Season je Vorgänger); `predecessor` bleibt zur Anzeige.
+  „Neue Season aus …“ beim Vorgänger geht dann wieder und vergibt dieselben Startrechte nach demselben Endstand neu, mit neuer Frist. Eine
+  schon gegebene **Zusage** in der abgesagten Season gilt nicht weiter: Sie galt deren Terminen und Regeln, in der neuen Season sagt das
+  Team neu zu (Fabian, Nr. 307). Den Satz „Startrechte aus der Vorgänger-Season gelten für die nächste Season weiter.“ lesen nur Captain
+  und Vertreter übernommener Co-Teams (`carry_over`), nicht neu angemeldete.
+- **Anzeige:** `GET /api/leagues`, `GET /api/leagues/{liga}/{season}` und der Kopf jeder Season tragen `cancel_reason` und `cancelled_at`
+  (nie `cancelled_by`). Der Block `application` trägt `cancelled: true` und `cancelled_at`, `closes_at` ist höchstens die Absage - die
+  Seite sagt „Abgesagt am …“ statt „Vorbei seit …“. Ligaseite: auf jeder Unterseite das Zustands-Schild „Abgesagt“ (`StatusChip`, Art `cancelled`, #1306)
+  mit Datum und Grund, abgesagte Staffeln holen die Tabellen nicht nach oben; die Liga-Übersicht `/liga` sagt „Abgesagt am …“, die
+  Esports-Kachel übergeht abgesagte Seasons wie beendete; die Teilen-Karte (`seo_render_routes.league_season_meta`) heißt „… · Abgesagt“
+  mit dem Grund. Verwaltung: dasselbe Schild oben mit dem Weg zum Neustart, „Season absagen“, „Season
+  löschen“ und „Neue Season aus …“ entfallen, der Stand steht nur lesend, die Ablaufleiste endet mit „Abschluss · abgesagt“.
+- **Discord:** eine Meldung „Season abgesagt · …“ mit Grund und Link im Liga-Kanal, nur mit dem Schalter „Saisonende“ der Season und nur
+  für öffentliche Seasons (`league_discord.season_cancel_post`, Schlüssel `season_cancelled:<season>`, im Job gezählt wie das Saisonende).
+  Spieltag-Meldungen gehen für eine abgesagte Season nicht mehr hinaus.
+- **TV:** Die Staffeln sind abgesagte Turniere und erscheinen wie jedes abgesagte Turnier.
+- **App:** unverändert. Die API liefert `status` und `cancel_reason`; die App zeigt eine abgesagte Staffel wie jedes abgesagte Turnier
+  (`staffelStand` lässt `cancelled` als eigenen Turnier-Status stehen), einen unbekannten Season-Stand liest sie als nicht beendet - ohne
+  Absturz. „Abgesagt“ mit Grund kommt im App-Paket.
+
+**Warnung ohne Mindestzahl** (`league_season_cancel.entry_shortfall`): Ist die Anmeldung zu (Fenster samt Nachmeldefrist vorbei, ohne
+Fenster der Meldeschluss `registration_deadline` vorbei) und hat noch keine reguläre Staffel begonnen, zählt sie je aktiver Liga N die
+zugeteilten (`seat_stats`-Abfrage) und angenommenen ohne Zuteilung (bei ihrer `carry_over.division_id`, sonst bei der einzigen Liga N)
+gegen das, was die Staffeln brauchen: je Staffel mindestens 2, ohne Staffel 2 (Fabian, Nr. 309). Reicht die Summe und wartet in der Liga N
+niemand mehr ohne Zuteilung, prüft sie zusätzlich jede Staffel einzeln (3 und 1: „Liga 1 · Staffel B … 1 zugeteilt“). Fehlt etwas, steht in „Was fehlt noch?“ die Warnung
+`entries_short` („Liga 1: Für den Spielplan sind zu wenige dabei – 1 angenommen oder zugeteilt, nötig sind mindestens 2. …“), und der
+Job `league_season_shortfall` (alle 30 Minuten) schickt der Leitung mit `manage` einmal je Season die Meldung „Zu wenige für den
+Spielplan“ (`dedupe_key` `league-season-shortfall:<season>:<user>`, Mail). Kein Text an Teams, nie automatisch abgesagt.
+
+**Migration:** keine. Neue Felder fehlen in alten Seasons und bedeuten „nie abgesagt“; der Index auf `predecessor_id` bleibt, wie er ist.
 
 ### F.1 Saisonabschluss (#1645)
 

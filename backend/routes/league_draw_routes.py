@@ -35,9 +35,12 @@ async def _call(coroutine):
         raise HTTPException(status_code=problem.status, detail=problem.message) from None
 
 
-async def _scope(season_id: str) -> tuple[dict, dict]:
+async def _scope(season_id: str, *, write: bool = True) -> tuple[dict, dict]:
     db = get_db()
     season = await _call(leagues.get_season(db, season_id))
+    if write and season.get("status") == leagues.CANCELLED:
+        # Abgesagt (#2607): kein Los mehr - die Staffeln sind abgesagt.
+        raise HTTPException(status_code=409, detail=leagues.SEASON_CANCELLED)
     return await _call(leagues.get_league(db, season["league_id"])), season
 
 
@@ -47,7 +50,7 @@ def _body(body: LeagueDrawRequest | None) -> dict:
 
 @admin_router.get("/{season_id}/draws")
 async def draw_overview(season_id: str, me: dict = Depends(require_applications)):
-    _league, season = await _scope(season_id)
+    _league, season = await _scope(season_id, write=False)
     return await league_draw.overview(get_db(), season, me)
 
 

@@ -181,8 +181,10 @@ function StatCard({ icon: Icon, label, value }) {
  * wann sie startet - die nächste startende Season, sonst die laufende.
  */
 export function leagueTile(leagues, now = Date.now()) {
-  const seasons = (leagues || []).flatMap((league) => (league.seasons || []).map((season) => ({ ...season, league })));
-  if (!seasons.length) return null;
+  const all = (leagues || []).flatMap((league) => (league.seasons || []).map((season) => ({ ...season, league })));
+  if (!all.length) return null;
+  // Abgesagt (#2607) zählt wie beendet: Die Kachel wirbt nie mit „Start am …“ einer Season, die nicht stattfindet.
+  const seasons = all.filter((season) => season.status !== "cancelled");
   const running = seasons.find((season) => season.status === "active");
   if (running) return { badge: `Läuft: ${running.name || running.league.name || "Season"}` };
   const upcoming = seasons

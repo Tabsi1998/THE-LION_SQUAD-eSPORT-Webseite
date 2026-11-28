@@ -27,7 +27,7 @@ logger = logging.getLogger("tls.league_home")
 
 PROMOTE = "promote_on_home"
 # Diese Seasons sind vorbei - sie stehen nicht mehr auf der Startseite.
-FINISHED_STATUSES = frozenset({"completed", "archived"})
+FINISHED_STATUSES = frozenset({"completed", "archived", "cancelled"})
 RUNNING = "season_running"
 BREAK = "season_break"
 
