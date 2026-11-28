@@ -38,6 +38,8 @@ Mal senden nur Redaktion und System.
 | **Event anlegen** | Name, Typ, Zeiten, Ort, Bild, Beschreibung; startet als Entwurf | Events → Neues Event |
 | **Mehrere Tage** | Jeder Tag mit eigenem Beginn, Ende, Einlass, Titel und Ort | Formular, Kasten „Zeiten und Plätze“ |
 | **Mehrere Standorte** | Treffpunkt, Halle, Lokal – je mit Adresse, Zeiten und Karte | Formular, Kasten „Ort und Veranstalter“ |
+| **Plan A, B, C** | Ausweichorte vorab hinterlegen, mit einem Klick umschalten, auf Wunsch mit Nachricht | Formular, Kasten „Ort und Veranstalter“ |
+| **Abstimmungen** | Angemeldete stimmen ab, etwa Rodelbahn A/B/C oder Garage/Garten; Frist und Ergebnis einstellbar | Formular, Abschnitt „Abstimmungen“ |
 | **Event als Klammer** | Turniere und Fast Laps gehören zum Event und stehen in seiner Karte | Formular, Kasten „Programm und eSports-Inhalte“ |
 | **Anmeldung** | Plätze, Begleitpersonen, Warteliste, Frist, optional Kosten | Formular, Kasten „Anmeldung“ |
 | **Spielst du auch mit?** | Nach der Event-Anmeldung gleich für die Turniere des Events anmelden | von selbst, sobald das Event Turniere hat |
@@ -149,6 +151,33 @@ PLZ, Stadt, Land).
 - Die **Anmeldung gilt für das ganze Event**. „Plätze“ je Standort ist nur ein Hinweis, kein Limit.
 - Die Event-Seite zeigt „n Standorte“ und je Standort eine Karte mit Zeiten und Landkarte.
 - Weiter: **Veranstalter**, **Veranstalter-Link**, **Kontakt** und der Haken **Karte anzeigen**.
+
+**Plan A, B, C (Ausweichorte, #2613).** Hängt der Ort vom Wetter ab (Schnee, Regen), hinterlegt ihr die Alternativen vorab:
+
+- Im Kasten **Ort und Veranstalter** der Knopf **Ausweichort hinterlegen (Plan B)**. Plan A ist der Ort, der schon eingetragen ist;
+  Plan B kommt leer dazu, **+ Plan C** legt den nächsten an (zwei bis fünf Pläne). Je Plan: **Ort oder Treffpunkt (Name)**,
+  **Adresse**, **PLZ**, **Stadt**, **Land** und ein **Hinweis** (etwa „Treffpunkt Parkplatz“). Name oder Adresse muss sein.
+- Mit Plänen ersetzen sie die Ortsfelder. Pläne und **mehrere Standorte** schließen sich aus – ein Event an mehreren Orten zugleich hat
+  keinen Plan B für einen davon.
+- **Speichern**, dann steht bei jedem anderen Plan **Auf Plan B umschalten**. Ein Klick genügt. Gibt es Anmeldungen, kommt die bekannte
+  Frage **Angemeldete informieren?**: **Informieren** schickt allen (samt Warteliste) genau eine Nachricht mit dem neuen Ort und dem
+  Hinweis, **Ohne Nachricht umschalten** schaltet nur um. Bei Entwurf, Archiviert und Abgesagt geht nie eine Nachricht hinaus.
+- Danach gilt der neue Plan überall: Event-Seite (oben **Plan B aktiv** mit Ort und Hinweis, unter „Infos“ alle Pläne), Fakten-Kasten,
+  Liste, Kalender (**Plan B aktiv** beim Termin), ICS-Datei und Abo (Ort und „Plan B aktiv“ in der Beschreibung), Erinnerungen und App.
+- Unter den Plänen steht **Umgeschaltet**: wann, von welchem auf welchen Plan, wer und wie viele informiert wurden. Dasselbe steht im
+  Protokoll (`event.place_plan`).
+- Schalten zwei aus der Leitung gleichzeitig um, zählt das erste. Auf denselben Plan geht keine zweite Nachricht hinaus; auf einen anderen
+  bekommt der zweite „Inzwischen ist Plan B aktiv – bitte die Seite neu laden“.
+- Ändert ihr beim Speichern den Plan, der gerade gilt (zum Beispiel seine Adresse), fragt das Formular wie beim Verschieben, ob die
+  Angemeldeten es erfahren sollen. Ein Plan, der gerade gilt, lässt sich nicht einzeln entfernen – erst umschalten.
+- Hat jemand anderer umgeschaltet, während ihr die Maske offen hattet, speichert sie nicht über den neuen Plan drüber: Beim Ort steht
+  **Inzwischen wurde umgeschaltet – bitte neu laden**, mit **Neu laden**. Eure Änderungen am Ort sind dann nicht gespeichert.
+- **Ausweichorte entfernen** (oben im Kasten, mit Rückfrage): Danach gibt es nur noch einen Ort – den Plan, der gerade gilt. Er steht wieder
+  in den normalen Ortsfeldern; wirksam mit **Speichern**.
+- Ein entfernter Plan kommt nicht als neuer Plan mit derselben Kennung zurück. Eine Abstimmung über die Pläne kann so nie auf einen Ort
+  zeigen, über den gar nicht abgestimmt wurde.
+- Ändert jemand nur die Ortsfelder (über die Schnittstelle oder den Inhalte-Helfer), ändert sich der Plan, der gerade gilt, mit. Ort und
+  aktiver Plan stehen nie auseinander.
 
 ### 3.4 Event als Klammer: Turniere und Fast Laps
 
@@ -410,6 +439,57 @@ Name, Bild und dem Ort: Event und Turniere, bei Teams mit Teamname. Wichtig für
 - Warteliste, Storno und „nicht erschienen“ zählen nicht. Nur Turniere, die die fragende Person selbst sehen darf, erscheinen.
 - In der App gibt es dieselbe Karte. Freunde auf den **Turnier- und Fast-Lap-Seiten** sind noch nicht da (geplant, #1500).
 
+### 3.13 Abstimmungen am Event
+
+Mit einer Abstimmung entscheiden die Angemeldeten mit, etwa welche Rodelbahn oder ob Garage oder Garten (#2612). Sie läuft auf der
+Website selbst – die Abstimmungen der Generalversammlung kommen weiter aus der Mitgliederverwaltung, sehen aber gleich aus.
+
+**Anlegen:** Event bearbeiten → Abschnitt **Abstimmungen** → **Neue Abstimmung**. Was hier passiert, wirkt sofort, nicht erst mit
+**Speichern** des Formulars.
+
+- **Frage** (3 bis 200 Zeichen) und **Antworten** (2 bis 12, je bis 80 Zeichen, keine doppelt).
+- **Frist (optional):** Bis dahin wird abgestimmt; genau zur Frist ist die Abstimmung zu. Ohne Frist bleibt sie offen, bis ihr
+  **Jetzt beenden** tippt. Eine Frist in der Vergangenheit nimmt das Formular nicht – auch nicht beim Ändern einer laufenden
+  Abstimmung, denn dann fielen schon abgegebene Stimmen still heraus. Zum sofortigen Schließen gibt es **Jetzt beenden**.
+- **Ergebnis zeigen:** **Sofort** (der Stand läuft mit) oder **Erst nach der Frist bzw. dem Ende**.
+- **Mehrere Antworten erlauben** mit **bis zu** (2 bis Zahl der Antworten); sonst gilt eine Antwort.
+- **Angemeldete informieren:** Alle, die abstimmen dürfen, bekommen einmal die Nachricht „Neue Abstimmung“ – über die Nachricht zum
+  Event (Postfach, Push und Mail nach den Einstellungen der Person). Sie ist eine normale Info: Ruhezeit und Sammel-Mail gelten, anders
+  als bei einer Absage. Nicht bei Entwurf, Archiviert und Abgesagt.
+- **Über die Ort-Pläne abstimmen** (nur mit Plan A, B, C): legt je Plan eine Antwort an („Plan A: Name“, lange Namen werden auf 80
+  Zeichen gekürzt). Ist die Abstimmung entschieden, steht **Als Ort übernehmen** daneben – ein Klick schaltet auf den Gewinner um, mit
+  der Frage **Angemeldete informieren?**.
+
+**Wer abstimmt:** nur, wer angemeldet oder eingecheckt ist. Die **Warteliste**, Abgemeldete und als „nicht erschienen“ Eingetragene stimmen
+nicht ab: Die Abstimmung entscheidet über den Ablauf für die, die fix dabei sind, und eine Warteliste soll keine Stimmen sammeln. Wer
+nachrückt, stimmt ab dann mit. Sagt jemand ab, solange die Abstimmung läuft, zählt seine Stimme nicht mehr. Begleitpersonen stimmen noch
+nicht mit (folgt mit #2615).
+
+**Eine Stimme je Person:** Ändern geht bis zur Frist, danach nicht mehr. Tippt jemand zweimal oder auf zwei Geräten gleichzeitig,
+bleibt es eine Stimme. Kommt eine Stimme im selben Moment wie **Jetzt beenden**, zählt sie entweder im Ergebnis, oder die Person liest
+„Die Abstimmung ist beendet“ – nie dazwischen.
+
+**Ende und Ergebnis:** Die Abstimmung endet mit der Frist oder mit **Jetzt beenden**. Ab dann steht das Ergebnis fest: Spätere
+Abmeldungen und gelöschte Konten ändern es nicht mehr (gelöschte Konten nehmen ihre Stimme trotzdem mit – das Ergebnis enthält nur
+Zahlen). Steht das Event auf **Beendet**, **Archiviert** oder **Abgesagt**, zeigt die Seite die Abstimmung als beendet und nimmt keine
+Stimme an; das Ergebnis bleibt so sichtbar oder verdeckt wie eingestellt und wird nicht festgeschrieben. Wird eine Absage
+zurückgenommen, läuft die Abstimmung normal weiter.
+
+**Geheim:** Wer wie gestimmt hat, steht nirgends. Jede Person sieht ihre eigene Stimme, ihr seht in der Verwaltung nur Zahlen:
+„3 von 12 abgestimmt“ und je Antwort die Zahl – auch vor der Frist, wenn das Ergebnis für alle noch verdeckt ist. Das Protokoll hält
+Anlegen, Ändern, Beenden und Löschen fest, nie eine Stimme.
+
+**Ändern:** **Bearbeiten** ändert Frage, Antworten, Frist und Einstellungen. Eine Antwort, für die es schon Stimmen gibt, lässt sich
+nicht entfernen – nur ihre Beschriftung ändern. Hat schon jemand mehrere Antworten gewählt, lässt sich die Zahl der erlaubten Antworten
+nicht mehr senken. Die Frist verlängern geht, solange die Abstimmung läuft; eine beendete oder abgelaufene Abstimmung öffnet keine neue
+Frist wieder – dann lassen sich nur noch Frage und Beschriftungen berichtigen. **Löschen** nimmt die Abstimmung samt Stimmen weg
+(mit Rückfrage).
+
+**Auf der Event-Seite** steht nach „Dein Event“ der Abschnitt **Abstimmungen**: je Abstimmung Frage, Frist, Regel und das Schild
+**Offen**, **Abgestimmt** oder **Beendet**. Angemeldete wählen und tippen **Abstimmen** bzw. **Stimme ändern**; alle anderen lesen, warum
+sie nicht abstimmen können (nicht angemeldet, Warteliste, abgemeldet). Das Ergebnis steht als Balken da – oder der Satz, wann es kommt.
+In der App folgt der Abschnitt; die Daten liefert die Event-Seite schon mit (`polls`).
+
 ---
 
 ## 4. Wenn etwas nicht klappt
@@ -448,6 +528,16 @@ Name, Bild und dem Ort: Event und Turniere, bei Teams mit Teamname. Wichtig für
 | „Ein Turnier dieses Events hat noch Anmeldungen“ beim Löschen | Ein verknüpftes Turnier hat noch Anmeldungen | Das Turnier aus dem Programm lösen oder dort die Anmeldungen klären |
 | Absage wieder zurückgenommen, Anmeldungen fehlen | Die Absage hat alle Anmeldungen storniert | Gewollt; die Personen melden sich neu an |
 | Max. Teilnehmer: Fehler beim Speichern | 0 oder eine negative Zahl | Feld leeren (unbegrenzt) oder eine Zahl ab 1 eintragen |
+| **Auf Plan B umschalten** fehlt oder ist grau | Pläne noch nicht gespeichert, oder er gilt schon | Erst **Speichern**, dann umschalten |
+| „Inzwischen ist Plan B aktiv“ | Jemand anderer hat gerade umgeschaltet | Seite neu laden und prüfen, ob noch umgeschaltet werden muss |
+| **Ausweichort hinterlegen** fehlt | Das Event hat mehrere Standorte oder ist online | Standorte entfernen; online gibt es keinen Ort |
+| Person kann nicht abstimmen | Sie steht auf der Warteliste, ist abgemeldet oder nicht angemeldet | Gewollt; nach dem Nachrücken geht es |
+| „Die Frist ist vorbei – die Abstimmung ist zu“ | Die Frist ist erreicht oder die Abstimmung beendet | Gewollt; Frist unter **Bearbeiten** verlängern, solange sie noch läuft |
+| „Eine neue Frist öffnet sie nicht wieder“ | Die Abstimmung ist schon beendet oder abgelaufen | Gewollt; bei Bedarf eine neue Abstimmung anlegen |
+| „Weniger erlauben geht nicht mehr“ | Jemand hat schon mehrere Antworten gewählt | Die Zahl so lassen, oder eine neue Abstimmung anlegen |
+| „Inzwischen wurde umgeschaltet – bitte neu laden“ | Jemand anderer hat den Ort-Plan umgeschaltet, während die Maske offen war | **Neu laden**, Änderungen am Ort noch einmal eintragen |
+| Ausweichorte lassen sich nicht einzeln bis auf einen entfernen | Pläne brauchen mindestens zwei Orte | **Ausweichorte entfernen** tippen – der Plan, der gilt, bleibt als Ort |
+| Antwort lässt sich nicht entfernen | Für sie gibt es schon Stimmen | Nur die Beschriftung ändern, oder die Abstimmung löschen und neu anlegen |
 
 ---
 
@@ -482,5 +572,17 @@ Die Website speichert nur einen Fingerabdruck. Braucht jemand die Adresse noch e
 **Gibt es das Event auch auf dem Fernseher?**
 Ja, als Hallen-Tafel und Aufruf-Tafel, siehe [TV und Beamer](tv.md).
 
+**Sieht jemand, wie ich abgestimmt habe?**
+Nein. Du siehst deine eigene Stimme, die Verwaltung nur die Zahlen je Antwort (3.13).
+
+**Kann ich das Ergebnis bis zur Frist verdecken?**
+Ja: **Ergebnis zeigen → Erst nach der Frist bzw. dem Ende**. Bis dahin sehen alle nur „Das Ergebnis erscheint nach der Frist“; die
+Verwaltung sieht die Zahlen trotzdem.
+
+**Bekommen alle eine Nachricht, wenn wir auf Plan B wechseln?**
+Nur, wenn ihr bei der Frage **Angemeldete informieren?** auf **Informieren** tippt – dann jede Person (samt Warteliste) genau einmal je
+Umschaltung (3.3).
+
 **Was ist noch nicht da?**
-Freunde auf Turnier- und Fast-Lap-Seiten (#1500) sind noch in Arbeit.
+Freunde auf Turnier- und Fast-Lap-Seiten (#1500) sind noch in Arbeit. Begleitpersonen stimmen bei Abstimmungen noch nicht mit (#2615),
+und die App zeigt Abstimmungen und Ort-Pläne noch nicht eigens an (sie liest Ort und Termin wie bisher).

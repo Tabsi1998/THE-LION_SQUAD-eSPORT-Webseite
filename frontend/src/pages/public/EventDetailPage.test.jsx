@@ -54,6 +54,31 @@ test("ein Standort: wie bisher - und die Karte sucht die Adresse, nicht den Name
   expect(frame.getAttribute("src")).not.toContain(encodeURIComponent("Treffpunkt"));
 });
 
+// Plan A/B/C (#2613) und Abstimmungen (#2612): „Plan B aktiv“ oben, alle Pläne unter „Infos“, die Abstimmung nach
+// „Dein Event“ - ohne den Ablauf der Abschnitte (wie in der App) zu ändern.
+test("Ausweichort und Abstimmung: Hinweis oben, Pläne unter Infos, Abstimmung mit Frist", async () => {
+  const plans = [
+    { key: "plan-a", label: "Plan A", letter: "A", name: "Rodelbahn Hochegg", address_line: "Hocheggweg 1, 6410 Telfs", note: "", active: false },
+    { key: "plan-b", label: "Plan B", letter: "B", name: "Rodelbahn Gaisalm", address_line: "Gaisweg 5, 6410 Telfs", note: "Bei wenig Schnee", active: true },
+  ];
+  renderPage({
+    ...base, location: "Rodelbahn Gaisalm", address: "Gaisweg 5", country: "",
+    place_plan: { ...plans[1], total: 2, alternative: true }, place_plans: plans,
+    polls: [{ id: "p1", question: "Garage oder Garten?", options: [{ code: "o1", label: "Garage" }, { code: "o2", label: "Garten" }], max_choices: 1,
+      status: "open", closes_at: "2026-10-20T16:00:00Z", results_visibility: "after_close", can_vote: false, rights: [], reason: "login",
+      reason_text: "Abstimmen können nur Angemeldete – melde dich zuerst an.", result: null, result_hidden: true }],
+  });
+  const notice = await screen.findByTestId("event-place-plan-notice");
+  expect(notice).toHaveTextContent("Plan B aktiv");
+  expect(notice).toHaveTextContent("Rodelbahn Gaisalm · Gaisweg 5, 6410 Telfs");
+  expect(notice).toHaveTextContent("Bei wenig Schnee");
+  expect(screen.getByTestId("event-place-plans")).toHaveTextContent("Ort: A, B");
+  expect(screen.getByTestId("event-place-plan-plan-b")).toHaveAttribute("data-active", "1");
+  expect(screen.getByTestId("event-facts-where")).toHaveTextContent("Plan B aktiv · Bei wenig Schnee");
+  expect(screen.getByTestId("event-poll-p1-deadline")).toHaveTextContent("Abstimmen bis Di 20. Oktober · 18:00");
+  expect(screen.getByTestId("event-poll-p1-hidden")).toHaveTextContent("Das Ergebnis erscheint nach der Frist");
+});
+
 test("mehrere Standorte: Zähler im Kopf, je Standort Karte, Zeiten und Adresse", async () => {
   renderPage({ ...base, locations: [
     { key: "ort-1", name: "Treffpunkt Vereinsheim", start_date: "2026-10-31T14:00:00+00:00", door_time: "2026-10-31T13:30:00+00:00", address_line: "Bahnhofstraße 1, 6410 Telfs, Österreich", map_query: "Bahnhofstraße 1, 6410 Telfs, Österreich", max_participants: 30 },

@@ -6,6 +6,7 @@ import { api, formatApiError } from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { useModalBehavior } from "@/hooks/useModalBehavior";
+import { BallotChoice, normalizeBallotList } from "@/components/tls/ballot/BallotParts";
 
 // Abstimmung live (#844): Öffnet die Versammlungsleitung in Dolibarr eine Abstimmung, erscheint sie auf jeder Seite -
 // für angemeldete Mitglieder mit offenem Stimmrecht. Antwort wählen, „Stimme abgeben“, fertig. „Später“ macht daraus
@@ -14,46 +15,20 @@ import { useModalBehavior } from "@/hooks/useModalBehavior";
 
 const QUIET_PREFIXES = ["/admin", "/display", "/print", "/setup", "/consent"];
 
-const isObject = (value) => Boolean(value) && typeof value === "object" && !Array.isArray(value);
-
 /**
  * Die Antwort des Servers in eine sichere Form (#986): nur echte Listen, nur Abstimmungen mit Kennung, Antworten mit
- * Code und Stimmrechte als Objekte. Eine kaputte Antwort heißt „keine Abstimmung“ statt eines Absturzes.
+ * Code und Stimmrechte als Objekte. Eine kaputte Antwort heißt „keine Abstimmung“ statt eines Absturzes. Die Form einer
+ * einzelnen Abstimmung teilt das Popup mit den Abstimmungen am Event (#2612, ballot/BallotParts).
  */
 export function normalizeBallots(data) {
-  const ballots = Array.isArray(data?.ballots) ? data.ballots : [];
   return {
     poll_seconds: Number(data?.poll_seconds) || 0,
-    ballots: ballots
-      .filter((ballot) => isObject(ballot) && ballot.id != null && ballot.id !== "")
-      .map((ballot) => ({
-        ...ballot,
-        question: typeof ballot.question === "string" ? ballot.question : "",
-        options: (Array.isArray(ballot.options) ? ballot.options : []).filter((option) => isObject(option) && option.code != null && option.code !== ""),
-        rights: (Array.isArray(ballot.rights) ? ballot.rights : []).filter((right) => isObject(right) && right.right_id != null),
-      })),
+    ballots: normalizeBallotList(data?.ballots),
   };
 }
 
 export function rightLabel(right) {
   return right.for === "proxy" ? `Vollmacht für ${right.name || "ein Mitglied"}` : "Deine Stimme";
-}
-
-function Choice({ ballot, right, chosen, onChoose, disabled }) {
-  return (
-    <div className="space-y-2" data-testid={`ballot-right-${right.right_id}`}>
-      <div className="tls-type-label text-white/55">{rightLabel(right)}</div>
-      <div className="flex flex-wrap gap-2">
-        {ballot.options.map((option) => (
-          <button key={option.code} type="button" disabled={disabled} onClick={() => onChoose(option.code)}
-            data-testid={`ballot-option-${right.right_id}-${option.code}`} aria-pressed={chosen === option.code}
-            className={`min-h-11 px-4 py-2 rounded-sm border tls-type-small font-bold transition disabled:opacity-40 ${chosen === option.code ? "border-[#29B6E8] bg-[#29B6E8]/15 text-[#29B6E8]" : "border-white/15 text-white/80 hover:border-white/40"}`}>
-            {option.label}
-          </button>
-        ))}
-      </div>
-    </div>
-  );
 }
 
 export function BallotPopup({ quietPrefixes = QUIET_PREFIXES }) {
@@ -154,7 +129,7 @@ export function BallotPopup({ quietPrefixes = QUIET_PREFIXES }) {
                 ) : null}
                 <div className="space-y-4">
                   {ballot.rights.filter((right) => right.can_use).map((right) => (
-                    <Choice key={right.right_id} ballot={ballot} right={right} disabled={busy} chosen={chosen[`${ballot.id}:${right.right_id}`]}
+                    <BallotChoice key={right.right_id} ballot={ballot} right={right} label={rightLabel(right)} disabled={busy} chosen={chosen[`${ballot.id}:${right.right_id}`]}
                       onChoose={(code) => setChosen((current) => ({ ...current, [`${ballot.id}:${right.right_id}`]: code }))} />
                   ))}
                 </div>

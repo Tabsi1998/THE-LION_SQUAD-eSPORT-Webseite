@@ -18,6 +18,7 @@ from services import news_channels, partner_pages
 from services.notification_preferences import enqueue_newsletter_for_item
 from services.slug_utils import apply_slug_history, find_by_slug_or_history, slug_source_for_update, unique_slug
 from services import billing_orders, event_changes, event_days, event_facts, event_locations, event_notifications, event_play_along, event_program, event_registration, event_rewards, pricing
+from services import event_place_plans, event_polls
 from services.billing_amounts import public_payment_state
 from services.event_public import public_competition, public_event
 from services.event_registration import RegistrationError
@@ -573,6 +574,10 @@ async def admin_get_event(event_id: str, me: dict = Depends(require_admin())):
     await _decorate_event(event)
     counts = await event_changes.active_registration_counts(db, [event["id"]])
     event["active_registration_count"] = counts.get(event["id"], 0)
+    # Plan A/B/C (#2613): die Pläne mit Buchstaben und wer wann umgeschaltet hat.
+    event["place_plan"] = event_place_plans.plan_view(event)
+    event["place_plans"] = event_place_plans.plans_view(event)
+    event["place_plan_history"] = await event_place_plans.history(db, event["id"])
     return event
 
 
@@ -692,6 +697,11 @@ async def get_event(slug_or_id: str, request: Request, include_draft: bool = Fal
     # Standorte (#203): immer als Liste, auch für Events, die nur die alten Felder haben.
     event["locations"] = [event_locations.with_map(place) for place in event_locations.event_locations(event)]
     event["map_query"] = event_locations.map_query(event_locations.primary_from_event(event) or (event["locations"][0] if event["locations"] else None))
+    # Plan A/B/C (#2613): der aktive Plan mit „Plan B aktiv“ und alle Pläne; der Ort selbst steht schon in den Ortsfeldern.
+    event["place_plan"] = event_place_plans.plan_view(event)
+    event["place_plans"] = event_place_plans.plans_view(event)
+    # Abstimmungen (#2612): wie die Person sie sehen darf - eigene Stimme, Ergebnis nach Einstellung, nie fremde Stimmen.
+    event["polls"] = await event_polls.polls_for_event(db, event, user)
     # Preisangabe für die Anmeldung (#318); die Konfiguration mit Dolibarr-Nummern sieht nur Finanzen.
     offer = event.pop("billing", None)
     event["offer"] = pricing.public_offer(offer)
@@ -1049,6 +1059,20 @@ def _apply_locations(target: dict, raw: dict) -> None:
     event_locations.mirror_primary(places, target)
 
 
+def _apply_place_plans(target: dict, raw: dict, existing: dict | None) -> bool:
+    """Plan A/B/C beim Ort (#2613): prüfen, den aktiven Plan aus der Datenbank behalten und in die Ortsfelder spiegeln.
+    Standorte (#203) und Pläne schließen sich aus - auch, wenn nur die Standorte neu kommen. Gibt zurück, ob das Speichern
+    Pläne schreibt - dann gilt es nur, solange inzwischen niemand umgeschaltet hat."""
+    try:
+        writes_plans = event_place_plans.apply_on_save(target, raw, existing)
+    except event_place_plans.PlanError as exc:
+        raise HTTPException(status_code=exc.status, detail=exc.detail)
+    keeps_plans = bool(target.get("place_plans")) if "place_plans" in target else bool(event_place_plans.stored_plans(existing or {}))
+    if keeps_plans and target.get("locations"):
+        raise HTTPException(status_code=400, detail="Mehrere Standorte gibt es nur ohne Ort-Pläne – bitte zuerst die Pläne entfernen.")
+    return writes_plans
+
+
 def _apply_days(target: dict, raw: dict, existing: dict | None = None) -> None:
     """Mehrere Tage (#884): prüfen, ordnen und Beginn, Ende und Einlass des Events daraus ableiten.
 
@@ -1124,6 +1148,7 @@ async def create_event(body: EventCreate, me: dict = Depends(require_admin())):
     billing = await _billing_updates(body.model_dump(exclude_unset=True), None, me)
     doc["billing"] = billing if billing is not None else pricing.normalize_offer(None)
     _apply_locations(doc, body.model_dump(exclude_unset=True))
+    _apply_place_plans(doc, body.model_dump(exclude_unset=True), None)
     _apply_days(doc, body.model_dump(exclude_unset=True))
     doc["bring_along"], doc["highlights"] = [], []
     await _apply_facts(doc, body.model_dump(exclude_unset=True))
@@ -1186,6 +1211,7 @@ async def update_event(event_id: str, body: EventUpdate, me: dict = Depends(requ
     else:
         updates.pop("billing", None)
     _apply_locations(updates, raw)
+    writes_plans = _apply_place_plans(updates, raw, existing)
     _apply_days(updates, raw, existing)
     await _apply_facts(updates, raw, existing)
     slug_source = slug_source_for_update(raw, existing, "name", fallback="event")
@@ -1202,7 +1228,14 @@ async def update_event(event_id: str, body: EventUpdate, me: dict = Depends(requ
     cancelling = updates.get("status") == "cancelled"
     if cancelling:
         updates.pop("status")
-    await db.events.update_one({"id": event_id}, {"$set": updates})
+    # Ort-Pläne (#2613): Wer Pläne oder den Ort schreibt, schreibt den aktiven Plan mit, den er gelesen hat. Hat inzwischen
+    # jemand umgeschaltet (``place_plan_round``), gewinnt das Umschalten - sonst stünde wieder der alte Ort da, obwohl alle
+    # schon „Plan B gilt“ gelesen haben.
+    where = {"id": event_id}
+    if writes_plans:
+        where.update({"place_plan_round": existing.get("place_plan_round"), "active_place_plan": existing.get("active_place_plan")})
+    if (await db.events.update_one(where, {"$set": updates})).matched_count == 0 and writes_plans:
+        raise HTTPException(409, "Inzwischen wurde umgeschaltet – bitte neu laden. Deine Änderungen am Ort sind nicht gespeichert.")
     newly_cancelled = cancelling and (await db.events.update_one(
         {"id": event_id, "status": {"$ne": "cancelled"}},
         {"$set": {"status": "cancelled", "cancelled_at": updates["updated_at"], "updated_at": updates["updated_at"]},
@@ -1252,5 +1285,7 @@ async def delete_event(event_id: str, me: dict = Depends(require_admin())):
     if blocked:
         raise HTTPException(409, blocked)
     result = await event_changes.delete_event(db, event, me)
+    # Abstimmungen (#2612) hängen nur am Event - sie gehen mit, samt Stimmen.
+    await event_polls.forget_event(db, event["id"])
     reset_scope_cache()  # Live-Meldungen (#1801): Turnier und Event neu nachschlagen
     return result
