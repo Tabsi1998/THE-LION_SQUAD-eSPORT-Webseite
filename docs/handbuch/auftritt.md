@@ -363,16 +363,19 @@ Arten, jede mit Symbol und Wort:
 | **Check-in offen** | grün gefüllt, Haken | Check-in offen |
 | **Frei** | grüner Rahmen, Stecker | eine freie Station |
 | **Läuft** | rot, Punkt pulsiert leise | Läuft, Belegt (Station); eine laufende Saison ohne Puls |
-| **Du bist dabei** | Cyan-Rahmen, Haken | Du bist dabei, Eingecheckt, Bestätigt, Zugesagt |
-| **Wartet** | gestrichelter Rahmen, Sanduhr | Warteliste, Wartet auf Ergebnis, Pausiert, Entwurf, Ergebnis folgt |
+| **Du bist dabei** | Cyan-Rahmen, Haken; bei anderen grau | deine Anmeldung: Du bist dabei, Eingecheckt, Zugesagt; andere in der Teilnehmerliste: Bestätigt (grau) |
+| **Wartet** | gestrichelter Rahmen, Sanduhr | Warteliste, Wartet auf Ergebnis, Pausiert, Entwurf, Ergebnis folgt, Anderes Turnier (Station) |
 | **Problem** | Orange, Warnzeichen | Klärung, Defekt |
 | **Beendet** | graue Fläche, Fahne | Beendet, Ergebnisse da, Archiviert, Wertung, Gewertet |
 | **Abgesagt** | grau, durchgestrichen | Abgesagt, Abgelehnt, Nicht erschienen, Disqualifiziert |
 
 Nur die zwei grünen Schilder „Anmeldung offen“ und „Check-in offen“ sind gefüllt – sie sollen auffallen, denn dort
 kann man gerade etwas tun. Rot ist nur „Läuft“. Bei einer laufenden Saison steht der Punkt still, denn eine Saison
-läuft Monate. Ein Countdown („endet in 2 Tagen“) oder das eigene Team („mit Lions Rocket“) steht als kleiner Text
-neben dem Schild, am Handy darunter, wenn der Platz nicht reicht. Mit „Bewegung reduzieren“ steht der Punkt bei
+läuft Monate. Cyan heißt „du“: In der Teilnehmerliste stehen die Anmeldungen der anderen grau mit Haken, nur deine
+eigene Anmeldung ist Cyan. Spielt an einer geteilten Station gerade ein anderes Turnier, steht dort grau „Anderes
+Turnier“. Ein Countdown („endet in 2 Tagen“), bei mehrtägigen Events der Tag („Tag 2/3“) oder das eigene Team („mit
+Lions Rocket“) steht als kleiner Text neben dem Schild, am Handy darunter, wenn der Platz nicht reicht. Auf
+Turnierbildern liegt unter Schild und Countdown eine dunkle Fläche, damit sie auf jedem Bild lesbar bleiben. Mit „Bewegung reduzieren“ steht der Punkt bei
 „Läuft“ überall still. Einstellen muss im Admin dafür nichts werden.
 
 ---

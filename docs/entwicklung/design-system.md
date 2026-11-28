@@ -112,18 +112,28 @@ Ein Baustein für jeden Zustand: `components/tls/StatusChip.jsx`. `StatusBadge` 
   Rahmen ohne Füllung. **Rot** (`live`) ist nur „Läuft“ – der Punkt (`.tls-live-dot`) pulsiert leise, bei „Bewegung
   reduzieren“ steht er still mit ruhigem Hof. Eine laufende Saison (`active`) steht immer still: `STILL_STATES` in
   `lib/statusKinds.js` („still“ in der JSON-Datei), von Hand `pulse={false}`.
-- **Zuordnung** in `lib/statusKinds.js`: jeder bekannte Zustand → `[Art, Wort]`, dazu die Du-Form der eigenen Anmeldung
-  (`own`: „Du bist dabei“, „Wartet auf Freigabe“). Unbekanntes zeigt das Wort der Stelle oder „Unbekannt“, nie den
-  Rohwert. Ein neuer Zustand bekommt hier eine Zeile – und in `docs/status-kinds.json`, die die App liest.
+- **Zuordnung** in `lib/statusKinds.js`: jeder bekannte Zustand → `[Art, Wort]` oder `[Art, Wort, Spielart]`, dazu die
+  Du-Form der eigenen Anmeldung (`own`: „Du bist dabei“, „Wartet auf Freigabe“). Unbekanntes zeigt das Wort der Stelle
+  oder „Unbekannt“, nie den Rohwert. Ein neuer Zustand bekommt hier eine Zeile – und in `docs/status-kinds.json`, die
+  die App liest.
+- **Cyan heißt „du“** (Fabian Nr. 303): fremde Anmeldungen (`approved`, `registered`, `checked_in` ohne `own`) nehmen
+  die ruhige Spielart `quiet` von `joined` – Haken in Grau (`data-variant="quiet"`, `STATUS_VARIANTS`, „variants“ in
+  der JSON-Datei). Nur die eigene Anmeldung ist Cyan. Eine Station, an der ein anderes Turnier spielt, ist `waiting`
+  („Anderes Turnier“, ohne Puls, Fabian Nr. 304).
 - **Eigener Stand** mit Wort vom Server („Mein Kalender“, Eventliste, Event-Programm): `ownBadgeKind(state)` gibt die
   Art (Warteliste wartet, Gefahrenes ist vorbei, sonst „Du bist dabei“), das Team steht als `meta` daneben.
 - **Eigene Status-Listen** anderer Bereiche bilden ihre Werte auf die Arten ab, statt eigene Farben zu setzen: Runden
   der Rennserien `ROUND_STATE_KINDS` (lib/referenceCalendar.js), Liga-Anmeldung `APPLICATION_KINDS`
   (LeagueApplicationPanel), Stationen der Hallen-Tafel `STATION_STATES` (lib/tvStationGrid.js).
 - **Aussehen** in `styles/system.css` (`.tls-status-chip[data-kind]`): Outfit 600, 12,5 px (`--tls-chip-size`),
-  groß 14 px (`size="lg"`), Symbol 13 px, normal geschrieben, bricht nie um. Auf Bildern `onMedia` (dunkle Unterlage).
+  groß 14 px (`size="lg"`), Symbol 13 px, normal geschrieben, bricht nie um. Auf Bildern `onMedia`: Unterlage
+  `--tls-chip-underlay` (94 % des Grunds, „media“ in der JSON-Datei) unter Schild und Countdown – auch auf einem weißen
+  Bild über 4,5 : 1.
 - **Countdown** nie im Schild: `meta` setzt ihn als `tls-type-small` daneben (`.tls-status`, bricht am Handy darunter
-  um). `PhaseBadge` macht das selbst, mit `lib/countdownRule.js` (#1264) und der Tagesangabe mehrtägiger Events.
+  um). `PhaseBadge` macht das selbst, mit `lib/countdownRule.js` (#1264) und der Tagesangabe mehrtägiger Events;
+  `phaseDayInfo(phase)` gibt „Tag 2/3“ auch Stellen ohne Countdown (Kalender).
+- **Keine zweite Zustandszeile:** Was das Schild sagt, steht nicht noch einmal darunter. Die Turnierkarte zeigt zur
+  Anmeldung nur ruhigen Text mit Zusatz (Frist, „öffnet am …“), siehe `registrationLine` in TournamentCard.jsx.
 - **Andere Modi** (TV-Station „Aufgerufen“, Tage eines Events) nehmen eine Art direkt: `<StatusChip kind="soon"
   label="Aufgerufen" />`.
 - **TV:** `TvPill kind=…` bzw. `TvStatusPill status=…` (components/tv/TvParts.jsx) – dieselben Arten in Beamer-Größe
@@ -131,5 +141,6 @@ Ein Baustein für jeden Zustand: `components/tls/StatusChip.jsx`. `StatusBadge` 
 
 Wächter: `lib/statusKinds.test.js` hält JS, JSON und CSS gleich und prüft, dass jeder Zustand aus StatusBadge,
 PhaseBadge, Server (`models.py`, `public_phase.py`) und Aufrufern eine Art und ein Wort hat. `scripts/check-contrast.js`
-rechnet jede Art auf Grund und Fläche 1 bis 3 nach (mindestens 4,5 : 1). Playwright: `e2e/zustands-schilder.spec.js`
-(alle zehn Arten auf Startseite, Dashboard und den Stationen der Turnierleitung).
+rechnet jede Art und Spielart auf Grund und Fläche 1 bis 3 und auf einem weißen Bild nach (mindestens 4,5 : 1).
+Playwright: `e2e/zustands-schilder.spec.js` (alle zehn Arten auf Startseite, Dashboard, den Stationen der Turnierleitung
+und der öffentlichen Turnierseite).
