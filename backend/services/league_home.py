@@ -96,11 +96,12 @@ def _title(league: dict, season: dict) -> str:
     return " · ".join(part for part in (league.get("name"), season.get("name")) if part)
 
 
-async def _application(db, season: dict, now: datetime) -> dict | None:
+async def _application(db, season: dict, now: datetime, league: dict | None = None) -> dict | None:
     """Fenster und freie Plätze nur, solange sie etwas sagen (offen oder bald offen) - sonst nur der Stand, ohne Zählabfragen."""
     window = league_applications.window_state(season, now)
     if window in (league_applications.OPEN, league_applications.UPCOMING):
-        return await league_applications.public_block(db, season)
+        # Solo-Liga (#1629, P2): ``participant_kind`` steht dabei - der Knopf heißt dann „Als Spieler anmelden“.
+        return await league_applications.public_block(db, season, league)
     return {"state": window} if window else None
 
 
@@ -117,7 +118,7 @@ async def _row(db, league: dict, season: dict, now: datetime) -> dict | None:
         "url": path, "apply_url": f"{path}/anmelden",
         "start_date": _iso(season.get("start_date")), "end_date": leagues.season_end(season),
         "sort_at": sort_at, "public_phase": phase,
-        "application": await _application(db, season, now),
+        "application": await _application(db, season, now, league),
         "emblem_url": look["emblem_url"], "banner": look["banner"], "accent_color": look["accent_color"],
     }
 
