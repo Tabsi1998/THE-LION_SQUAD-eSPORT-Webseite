@@ -24,6 +24,11 @@ const BUILT_ALLOWED = {
   "lib/datetime.js": "die Hilfen selbst",
   "lib/matchdayPaste.js": "Fehlermeldung zur eingefügten Eingabe - nennt das Datum so, wie es getippt wurde",
   "pages/admin/AdminDashboardPage.jsx": "Achse im Diagramm: fünf Zeichen je Tag („24.11.“)",
+  "advent/doors.js": "Advent-Sonderform („5. Dezember, 6 Uhr“) - eigenes Folge-Issue #2619",
+  "pages/admin/advent/form.js": "Advent-Sonderform („13.12.2026, 20:05 Uhr“) - eigenes Folge-Issue #2619",
+  "components/tls/GermanDateField.jsx": "Eingabefeld - zeigt das Datum so, wie es eingetippt wird (bleibt laut #1307)",
+  "lib/countdownRule.js": "Countdown-Sätze (#1264) - setzt Wochentag, Tag und Monat aus formatWeekday/formatMonth zusammen",
+  "pages/public/CalendarPage.jsx": "Rasterzelle: „5. Dezember“ als Vorlesetext unter der Tageszahl",
 };
 
 // Auch als Wert weitergereicht (`exitLine(row, viennaDate)`) - Importzeilen und Kommentare zählen nicht.
@@ -34,6 +39,10 @@ const BUILT = [
   { name: "padStart-Datum mit Punkt", pattern: /get(?:UTC)?(?:Date|Month)\(\)[^;\n]*padStart\(2,\s*["']0["']\)\}?\./ },
   { name: "„Uhr“ hinter Tag und Uhrzeit", pattern: /format(?:When|DateTime)\([^()]*(?:\([^()]*\)[^()]*)*\)\}?\s*Uhr\b/ },
   { name: "Datumsmuster wie „dd.MM.“", pattern: /["'`][^"'`\n]*\bdd\.MM\b/ },
+  { name: "Tag mit Monatsnamen („${tag}. ${monatsname}“)", pattern: /\$\{[^{}]+\}\.\s?\$\{[^{}]*(?:month|Month|MONTH|monat|Monat)[^{}]*\}/ },
+  { name: "Datum aus Verkettung („getDate() + \".\"“)", pattern: /get(?:UTC)?(?:Date|Month)\(\)\s*(?:\+\s*1\s*)?\)?\s*\+\s*["']\.["']/ },
+  { name: "Intl.DateTimeFormat mit Tag oder Monat für die Anzeige", pattern: /new Intl\.DateTimeFormat\(\s*["']de[^"']*["'][^)]*\b(?:day|month)\s*:/ },
+  { name: "Tag, dann Uhrzeit mit „Uhr“", pattern: /format(?:When|Date)\([^`\n]*\$\{formatClock\([^)]*\)\}\s*Uhr\b/ },
 ];
 
 const sources = [];
@@ -59,6 +68,12 @@ describe("Gegenprobe: die Muster erkennen, was sie sollen", () => {
     expect("`${formatWhen(value)} Uhr`").toMatch(BUILT[3].pattern);
     expect("{formatDateTime(row.at)} Uhr").toMatch(BUILT[3].pattern);
     expect('format(value, "dd.MM.yyyy")').toMatch(BUILT[4].pattern);
+    // Gegenprobe aus dem Review (guard_probe.mjs): alle vorher „DURCH“.
+    expect("return `${Number(parts.day)}. ${MONTHS[Number(parts.month) - 1]}, ${Number(parts.hour)}${minute} Uhr`;").toMatch(BUILT[5].pattern);
+    expect("`${day}. ${monthName}`").toMatch(BUILT[5].pattern);
+    expect('d.getDate() + "." + (d.getMonth() + 1) + "."').toMatch(BUILT[6].pattern);
+    expect('const STAMP = new Intl.DateTimeFormat("de-AT", { timeZone: "Europe/Vienna", day: "numeric", month: "numeric", year: "numeric" });').toMatch(BUILT[7].pattern);
+    expect("`${formatWhen(x, { time: false })} ${formatClock(x)} Uhr`").toMatch(BUILT[8].pattern);
     expect("viennaDateTime(value, WHEN)").toMatch(DIRECT);
     expect("const text = exitLine(row, viennaDate);").toMatch(DIRECT);
     expect('import { viennaDate } from "@/lib/vienna";').not.toMatch(DIRECT);
@@ -73,6 +88,10 @@ describe("Gegenprobe: die Muster erkennen, was sie sollen", () => {
       "`${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, \"0\")}`",
       "`Antreten bis ${formatClock(call.report_by)} Uhr`",
       "`${base || \"qr-code\"}.${extension}`",
+      "`${row.rank}. ${nameOf(item)}`",
+      "`${index + 1}. ${value}`",
+      'new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/Vienna", year: "numeric", month: "2-digit", day: "2-digit" })',
+      'count + "." + suffix',
     ];
     for (const line of harmless) for (const { pattern } of BUILT) expect(line).not.toMatch(pattern);
     expect("formatWhen(value)").not.toMatch(DIRECT);
@@ -94,7 +113,12 @@ describe("keine eigenen Datumsformen in src/", () => {
     expect(built, "die Form kommt aus lib/datetime.js").toEqual([]);
   });
 
-  it("die Ausnahmen gibt es noch - sonst gehören sie aus der Liste", () => {
+  it("die Ausnahmen gibt es noch und sie weichen noch ab - sonst gehören sie aus der Liste", () => {
     for (const file of [...Object.keys(DIRECT_ALLOWED), ...Object.keys(BUILT_ALLOWED)]) expect(contents.has(file), file).toBe(true);
+    for (const file of Object.keys(DIRECT_ALLOWED)) expect(DIRECT.test(contents.get(file)), `${file} ruft die Wien-Helfer nicht mehr selbst`).toBe(true);
+    for (const file of Object.keys(BUILT_ALLOWED)) {
+      if (file === "lib/datetime.js") continue;
+      expect(BUILT.some(({ pattern }) => pattern.test(contents.get(file))), `${file} baut kein eigenes Datum mehr`).toBe(true);
+    }
   });
 });
