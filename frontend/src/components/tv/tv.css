@@ -326,7 +326,7 @@
 .tv-pill--gold { color: var(--tv-gold); background: var(--tv-gold-soft); }
 .tv-pill--red { color: var(--tv-red); background: var(--tv-red-soft); }
 .tv-pill--live { color: var(--tv-live); background: var(--tv-live-soft); }
-/* Zustands-Schild in Beamer-Größe (#1306): dieselben neun Arten wie auf der Website (styles/system.css,
+/* Zustands-Schild in Beamer-Größe (#1306): dieselben zehn Arten wie auf der Website (styles/system.css,
    .tls-status-chip) - normal geschrieben, mit Symbol. Gefüllt nur Anmeldung und Check-in offen, rot nur Läuft. Im
    Kontrast-Modus werden die Flächen schwarz (die --tv-*-soft-Werte), Schrift und Rahmen voll. */
 .tv-pill--status {

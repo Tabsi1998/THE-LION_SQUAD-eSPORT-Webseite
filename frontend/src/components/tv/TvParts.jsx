@@ -118,7 +118,7 @@ const TONES = {
 };
 
 /**
- * Ein Schild in der Farbe seines Zustands. Mit `kind` (#1306) ist es ein Zustands-Schild: dieselben neun Arten, Farben
+ * Ein Schild in der Farbe seines Zustands. Mit `kind` (#1306) ist es ein Zustands-Schild: dieselben zehn Arten, Farben
  * und Symbole wie auf der Website (lib/statusKinds.js), normal geschrieben, in Beamer-Größe (tv.css, .tv-pill--status).
  * Ohne `kind` bleibt es ein Hinweis-Schild (Zähler wie „3 Aufrufe“).
  */

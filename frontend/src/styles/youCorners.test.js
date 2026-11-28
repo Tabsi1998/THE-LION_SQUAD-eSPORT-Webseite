@@ -9,6 +9,16 @@ const SRC = path.resolve(__dirname, "..");
 const read = (rel) => readFileSync(path.join(SRC, rel), "utf8").replace(/\r\n/g, "\n");
 const system = read("styles/system.css");
 
+/** Nur der Abschnitt der Ecken-Klammern - bis zum nächsten Abschnitt (Schrift-Treppe), damit spätere Regeln in
+ *  system.css (etwa die Zustands-Schilder mit Puls, #1306) die Wächter hier nicht auslösen. */
+function youBlock() {
+  const start = system.indexOf("/* Ecken-Klammern (#1316)");
+  const end = system.indexOf("/* Schrift-Treppe", start);
+  expect(start).toBeGreaterThanOrEqual(0);
+  expect(end).toBeGreaterThan(start);
+  return system.slice(start, end);
+}
+
 function sourceFiles(dir) {
   return readdirSync(dir).flatMap((name) => {
     const full = path.join(dir, name);
@@ -57,7 +67,7 @@ test("TV-Seiten, Level-Rahmen und Bühne tragen keine Ecken-Klammern", () => {
 });
 
 test("„du“ ist ruhig: Winkel und Fläche ohne Bewegung und ohne Schein, das Etikett „Du“ in Cyan", () => {
-  const block = system.slice(system.indexOf("/* Ecken-Klammern (#1316)"));
+  const block = youBlock();
   expect(block).toMatch(/--tls-you-fill: inset 0 0 0 100vmax rgb\(var\(--tls-brand-rgb\) \/ 0\.08\);/);
   expect(block).toMatch(/\.tls-you \{ box-shadow: var\(--tls-you-fill\); \}/);
   expect(block).toMatch(/\.tls-you--inset \{ --tls-corner-out: 0px; \}/);
@@ -71,7 +81,7 @@ test("„du“ ist ruhig: Winkel und Fläche ohne Bewegung und ohne Schein, das 
 });
 
 test("Tabellenzeilen hängen nicht an `position: relative` auf <tr>: Fläche und Winkel liegen an den Zellen", () => {
-  const block = system.slice(system.indexOf("/* Ecken-Klammern (#1316)"));
+  const block = youBlock();
   expect(block).toMatch(/tr\.tls-you::after \{ content: none; \}/);
   expect(block).toMatch(/tr\.tls-you \{ box-shadow: none; \}/);
   const cells = (selector) => block.slice(block.indexOf(`${selector} {`), block.indexOf("}", block.indexOf(`${selector} {`)));
@@ -85,7 +95,7 @@ test("Tabellenzeilen hängen nicht an `position: relative` auf <tr>: Fläche und
 });
 
 test("Kontrast-Modus: „du“ bekommt einen Rahmen in der Systemfarbe; das Etikett ist eine Pille in gemischter Schreibung", () => {
-  const block = system.slice(system.indexOf("/* Ecken-Klammern (#1316)"));
+  const block = youBlock();
   expect(block).toMatch(/@media \(forced-colors: active\) \{\n {2}\.tls-you \{ outline: 2px solid CanvasText; outline-offset: -2px; \}/);
   const tag = block.slice(block.indexOf(".tls-you-tag {"));
   expect(tag).toMatch(/border-radius: 999px;/);

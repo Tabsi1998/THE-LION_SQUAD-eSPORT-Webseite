@@ -14,7 +14,8 @@ const STATE_CLASS = {
 };
 const STATE_LABEL = { ok: "Eingerichtet", missing: "Fehlt", optional: "Optional", unknown: "–" };
 
-export function StatusChip({ status }) {
+// Stand einer Einrichtung (Verwaltung) - nicht das Zustands-Schild StatusChip (#1306), daher der eigene Name.
+export function SetupStatusChip({ status }) {
   if (!status) return null;
   return (
     <span className={`inline-flex items-center gap-1 border rounded-sm px-2 py-0.5 tls-type-small font-bold ${STATE_CLASS[status.state] || STATE_CLASS.unknown}`} data-testid="setup-status">
@@ -39,7 +40,7 @@ export function SetupGuide({ guideKey, open = false, status = null, showWhere = 
     <details open={open} className="border border-white/10 bg-[#0F0F0F] rounded-sm" data-testid={`setup-guide-${guide.key}`}>
       <summary className="cursor-pointer select-none px-4 py-3 flex flex-wrap items-center gap-2 tls-type-small font-bold text-white/80 hover:text-white">
         <BookOpen className="w-4 h-4 text-[#29B6E8] shrink-0" /> So richtest du es ein: {guide.title}
-        <StatusChip status={status} />
+        <SetupStatusChip status={status} />
       </summary>
       <div className="px-4 pb-4 space-y-3">
         <p className="tls-type-small text-white/55">{guide.summary}</p>
