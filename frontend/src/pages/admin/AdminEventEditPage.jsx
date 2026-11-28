@@ -27,6 +27,9 @@ import { buildDirtyPayload, hasPayloadChanges } from "@/lib/dirtyPayload";
 import { EventProgramPanel, useEventProgram } from "@/pages/admin/event/EventProgramPanel";
 import { useConfirm } from "@/components/tls/ConfirmDialog";
 import { affectedRegistrations, cancelConfirmText, eventStatusOptions, outsideText, savedEventMessage, touchesScheduleOrPlace } from "@/lib/eventAdmin";
+import { formToMinimum, minimumFormError, minimumToForm } from "@/lib/eventMinimum";
+import { EventCancelSheet } from "@/pages/admin/event/EventCancelSheet";
+import { EventMinimumSection } from "@/pages/admin/event/EventMinimumSection";
 import { toast } from "sonner";
 
 import { ROLE_COLORS } from "@/lib/categoryColors";
@@ -109,6 +112,8 @@ function EventForm({ event, meta, partners = [], onDone }) {
   const { can } = useAuth();
   const canFinance = can("finance");
   const confirm = useConfirm();
+  // Absagen mit Grund (#2614): das Blatt hält, was mit der Absage gespeichert wird (aus „Speichern“ oder dem Knopf „Event absagen …“).
+  const [cancelSheet, setCancelSheet] = useState(null);
   const [billingForm, setBillingForm] = useState(() => ({
     enabled: Boolean(event?.billing?.enabled),
     positions: positionsToForm(event?.billing),
@@ -129,6 +134,10 @@ function EventForm({ event, meta, partners = [], onDone }) {
   // Highlights (#1346): eigene Liste; sie geht nur mit, wenn sie sich geändert hat.
   const [highlightsForm, setHighlightsForm] = useState(() => highlightsToForm(event?.highlights));
   const highlightsDirty = JSON.stringify(formToHighlights(highlightsForm)) !== JSON.stringify(formToHighlights(highlightsToForm(event?.highlights)));
+  // Mindestanzahl bis zu einer Frist (#2614): eigener Zustand; geht nur mit, wenn sie sich geändert hat.
+  const [minimumForm, setMinimumForm] = useState(() => minimumToForm(event?.min_registrations));
+  const minimumKey = (value) => JSON.stringify(value.enabled ? value : { enabled: false });
+  const minimumDirty = minimumKey(minimumForm) !== minimumKey(minimumToForm(event?.min_registrations));
   const slugFrom = (txt) => (txt || "")
     .normalize("NFD")
     .replace(/[̀-ͯ]/g, "")
@@ -223,6 +232,18 @@ function EventForm({ event, meta, partners = [], onDone }) {
   };
 
   const originalEventPayload = () => normalizeEventPayload(formFromEvent(event, false));
+  // Beginn des Events für die Prüfung der Frist: der erste Tag, sonst „Start“.
+  const formStart = () => (usesDays && daysForm[0]?.date && daysForm[0]?.start ? `${daysForm[0].date}T${daysForm[0].start}` : form.start_date);
+
+  // Absagen mit Grund (#2614): ein Schritt im Blatt - mit dem Grund geht, was beim Speichern sonst noch geändert war.
+  const confirmCancel = async (reason) => {
+    const { data } = await api.patch(`/events/${event.id}`, { ...(cancelSheet?.patch || {}), status: "cancelled", cancel_reason: reason });
+    toast.success(savedEventMessage(data));
+    setCancelSheet(null);
+    onDone();
+  };
+  const otherChanges = !isNew && (billingDirty || locationsDirty || daysDirty || highlightsDirty || minimumDirty || clearOwnSponsors
+    || hasPayloadChanges(buildDirtyPayload(normalizeEventPayload(form), originalEventPayload())));
 
   const submit = async (ev) => {
     ev.preventDefault();
@@ -241,6 +262,11 @@ function EventForm({ event, meta, partners = [], onDone }) {
       toast.error(daysProblem);
       return;
     }
+    const minimumProblem = minimumDirty ? minimumFormError(minimumForm, { startDate: formStart(), maxParticipants: form.max_participants }) : "";
+    if (minimumProblem) {
+      toast.error(minimumProblem);
+      return;
+    }
     // Beginnt die Beschreibung mit dem Titel (#1273), stünde er auf der Seite doppelt - die Verwaltung warnt, speichert aber.
     if (descriptionEchoesTitle(form.name, form.description)) {
       toast.warning("Die Beschreibung beginnt mit dem Titel – auf der Event-Seite steht er dann doppelt. Am besten die erste Zeile löschen.");
@@ -253,6 +279,7 @@ function EventForm({ event, meta, partners = [], onDone }) {
       if (locationsDirty) payload.locations = formToLocations(locationsForm);
       if (daysDirty) payload.days = formToDays(daysForm);
       if (isNew) {
+        if (minimumForm.enabled) payload.min_registrations = formToMinimum(minimumForm);
         await api.post("/events", payload);
       } else {
         const { highlights, ...rest } = payload;
@@ -262,6 +289,7 @@ function EventForm({ event, meta, partners = [], onDone }) {
         if (locationsDirty) patch.locations = formToLocations(locationsForm);
         if (daysDirty) patch.days = formToDays(daysForm);
         if (clearOwnSponsors) patch.sponsor_ids = [];
+        if (minimumDirty) patch.min_registrations = formToMinimum(minimumForm);
         if (!hasPayloadChanges(patch)) {
           toast.info("Keine Änderungen zum Speichern.");
           setSaving(false);
@@ -270,6 +298,13 @@ function EventForm({ event, meta, partners = [], onDone }) {
         // Absagen und Verschieben (#2118): Rückfrage mit der Zahl der Betroffenen, bevor der Server sie informiert.
         const affected = affectedRegistrations(event);
         const cancelling = patch.status === "cancelled" && event.status !== "cancelled";
+        // Mit Mindestanzahl (#2614) braucht die Absage einen Grund - er steht in der Nachricht an alle.
+        const minimumAfter = minimumDirty ? formToMinimum(minimumForm) : event.min_registrations;
+        if (cancelling && minimumAfter?.count) {
+          setCancelSheet({ patch });
+          setSaving(false);
+          return;
+        }
         if (cancelling && !await confirm({
           title: "Event absagen?",
           description: cancelConfirmText(affected),
@@ -304,6 +339,7 @@ function EventForm({ event, meta, partners = [], onDone }) {
   };
 
   return (
+    <>
     <AdminFormPage
       eyebrow="Events"
       accent={ACCENT}
@@ -428,6 +464,20 @@ function EventForm({ event, meta, partners = [], onDone }) {
             testId="event-discord-registration"
           />
         )}
+        {/* Mindestanzahl bis zu einer Frist (#2614): nur mit der Anmeldung hier - einen externen Link zählt die Website nicht. */}
+        {form.has_registration && !form.registration_url && (
+          <EventMinimumSection
+            value={minimumForm}
+            onChange={setMinimumForm}
+            minimum={isNew ? null : event.minimum}
+            notice={event?.min_registrations_notice?.deadline === event?.min_registrations?.deadline ? event.min_registrations_notice : null}
+            allowCompanions={form.allow_companions}
+            canCancel={!isNew && event.status !== "cancelled"}
+            cancelBlocked={saving || otherChanges}
+            onCancel={() => setCancelSheet({ patch: {} })}
+            accent={ACCENT}
+          />
+        )}
         {form.has_registration && !form.registration_url && (
           <EventBillingSection value={billingForm} onChange={setBillingForm} canEdit={canFinance} dolibarrConnected={Boolean(meta?.dolibarr_connected)} />
         )}
@@ -481,6 +531,12 @@ function EventForm({ event, meta, partners = [], onDone }) {
         </FormSection>
       ) : null}
     </AdminFormPage>
+    {/* Außerhalb des Formulars: das Blatt ist selbst ein Formular. */}
+    {cancelSheet && (
+      <EventCancelSheet event={event} affected={affectedRegistrations(event)} onClose={() => setCancelSheet(null)} onConfirm={confirmCancel}
+        defaultReason={event?.minimum?.state === "short" ? event.minimum.proposal || "" : ""} />
+    )}
+    </>
   );
 }
 
