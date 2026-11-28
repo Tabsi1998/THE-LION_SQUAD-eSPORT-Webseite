@@ -4,6 +4,7 @@ Eine Prüfung im Server (``tournament_rules.self_checkin_allowed``) nutzen der C
 Erinnerungen, die Mail und Discord. Online und hybrid bleibt alles wie bisher.
 """
 import pathlib
+import re
 import sys
 from datetime import datetime, timedelta, timezone
 
@@ -47,6 +48,9 @@ def test_reminder_texts_name_the_staff_on_site():
     assert checkin_reminder_text(local, "closes_10m", CHECK_IN_UNTIL)[1] == "LAN-Cup: Bitte bis Sa 14. November · 18:45 vor Ort bei der Turnierleitung melden."
     assert "vor Ort bei der Turnierleitung ab Sa 14. November · 18:00" in checkin_reminder_text(local, "opens_10m", CHECK_IN_FROM)[1]
     assert checkin_reminder_text(online, "open_now", CHECK_IN_FROM)[1] == "LAN-Cup: Check-in ist jetzt offen. Bitte bis Sa 14. November · 18:45 einchecken."
+    # Online mit Tag (#1307, Review-Befund 6): Mail und Meldung liest man auch später.
+    assert checkin_reminder_text(online, "opens_10m", CHECK_IN_FROM)[1] == "LAN-Cup: Check-in startet Sa 14. November · 18:00."
+    assert checkin_reminder_text(online, "closes_10m", CHECK_IN_UNTIL)[1] == "LAN-Cup: Check-in endet Sa 14. November · 18:45."
 
 
 def test_discord_says_on_site_without_check_in_button():
@@ -87,7 +91,7 @@ async def test_dashboard_and_reminders_on_site(flow):
     await schedule_checkin_reminders(now_utc())
     notes = {row["meta"]["tournament_id"]: row for row in await flow.db.notifications.find({"kind": "tournament_checkin"}, {"_id": 0}).to_list(10)}
     assert "vor Ort bei der Turnierleitung melden" in notes[local["id"]]["body"]
-    assert "Check-in endet um" in notes[online["id"]]["body"]
+    assert re.search(r"Check-in endet \w\w \d{1,2}\. \w+(?: \d{4})? · \d\d:\d\d\.$", notes[online["id"]]["body"]), "mit Tag (#1307)"
     mails = {job["template_key"] for job in await flow.db.mail_jobs.find({}, {"_id": 0}).to_list(10)}
     assert mails == {"checkin_closes_soon_on_site", "checkin_closes_soon"}
     on_site_mail = await flow.db.mail_jobs.find_one({"template_key": "checkin_closes_soon_on_site"}, {"_id": 0})
