@@ -28,7 +28,7 @@ import { EventProgramPanel, useEventProgram } from "@/pages/admin/event/EventPro
 import { EventPlacePlansSection, activePlanEdited, emptyPlan, formToPlans, planFromPlace, plansFormError, plansToForm } from "@/pages/admin/event/EventPlacePlansSection";
 import { EventPollsPanel } from "@/pages/admin/event/EventPollsPanel";
 import { useConfirm } from "@/components/tls/ConfirmDialog";
-import { affectedRegistrations, cancelConfirmText, eventStatusOptions, outsideText, savedEventMessage, touchesScheduleOrPlace } from "@/lib/eventAdmin";
+import { affectedRegistrations, eventStatusOptions, outsideText, savedEventMessage, touchesScheduleOrPlace } from "@/lib/eventAdmin";
 import { formToMinimum, minimumFormError, minimumToForm } from "@/lib/eventMinimum";
 import { EventCancelSheet } from "@/pages/admin/event/EventCancelSheet";
 import { EventMinimumSection } from "@/pages/admin/event/EventMinimumSection";
@@ -150,7 +150,6 @@ function EventForm({ event, meta, partners = [], onDone }) {
   // Mindestanzahl bis zu einer Frist (#2614): eigener Zustand; geht nur mit, wenn sie sich geändert hat.
   const [minimumForm, setMinimumForm] = useState(() => minimumToForm(event?.min_registrations));
   const minimumKey = (value) => JSON.stringify(value.enabled ? value : { enabled: false });
-  const minimumDirty = minimumKey(minimumForm) !== minimumKey(minimumToForm(event?.min_registrations));
   const slugFrom = (txt) => (txt || "")
     .normalize("NFD")
     .replace(/[̀-ͯ]/g, "")
@@ -206,6 +205,11 @@ function EventForm({ event, meta, partners = [], onDone }) {
     status: source.status || "draft",
   });
   const [form, setForm] = useState(() => formFromEvent(event, isNew));
+  // Mindestanzahl nur mit Anmeldung hier (#2614): Ist der Abschnitt ausgeblendet (Anmeldung aus, externer Link), gilt sie als aus und geht
+  // als null mit - sonst lehnte der Server das Speichern ab, und die Maske zeigte nicht, warum.
+  const minimumShown = Boolean(form.has_registration && !form.registration_url);
+  const minimumEffective = minimumShown ? minimumForm : { ...minimumForm, enabled: false };
+  const minimumDirty = minimumKey(minimumEffective) !== minimumKey(minimumToForm(event?.min_registrations));
   const [saving, setSaving] = useState(false);
   const eventTypes = (meta.types || []).filter((t) => !meta.primary_types || meta.primary_types.includes(t.k) || t.k === form.event_type);
 
@@ -300,7 +304,8 @@ function EventForm({ event, meta, partners = [], onDone }) {
 
   // Absagen mit Grund (#2614): ein Schritt im Blatt - mit dem Grund geht, was beim Speichern sonst noch geändert war.
   const confirmCancel = async (reason) => {
-    const { data } = await api.patch(`/events/${event.id}`, { ...(cancelSheet?.patch || {}), status: "cancelled", cancel_reason: reason });
+    // Ohne Grund (nur ohne Mindestanzahl möglich) geht die Absage wie bisher hinaus.
+    const { data } = await api.patch(`/events/${event.id}`, { ...(cancelSheet?.patch || {}), status: "cancelled", ...(reason ? { cancel_reason: reason } : {}) });
     toast.success(savedEventMessage(data));
     setCancelSheet(null);
     onDone();
@@ -330,7 +335,7 @@ function EventForm({ event, meta, partners = [], onDone }) {
       toast.error(plansProblem);
       return;
     }
-    const minimumProblem = minimumDirty ? minimumFormError(minimumForm, { startDate: formStart(), maxParticipants: form.max_participants }) : "";
+    const minimumProblem = minimumDirty ? minimumFormError(minimumEffective, { startDate: formStart(), maxParticipants: form.max_participants }) : "";
     if (minimumProblem) {
       toast.error(minimumProblem);
       return;
@@ -348,7 +353,8 @@ function EventForm({ event, meta, partners = [], onDone }) {
       if (daysDirty) payload.days = formToDays(daysForm);
       if (plansDirty) payload.place_plans = formToPlans(plansForm);
       if (isNew) {
-        if (minimumForm.enabled) payload.min_registrations = formToMinimum(minimumForm);
+        // Ausgeblendet oder aus: null - der Server legt dann keine Mindestanzahl an.
+        payload.min_registrations = formToMinimum(minimumEffective);
         await api.post("/events", payload);
       } else {
         const { highlights, ...rest } = payload;
@@ -359,7 +365,7 @@ function EventForm({ event, meta, partners = [], onDone }) {
         if (daysDirty) patch.days = formToDays(daysForm);
         if (plansDirty) patch.place_plans = formToPlans(plansForm);
         if (clearOwnSponsors) patch.sponsor_ids = [];
-        if (minimumDirty) patch.min_registrations = formToMinimum(minimumForm);
+        if (minimumDirty) patch.min_registrations = formToMinimum(minimumEffective);
         if (!hasPayloadChanges(patch)) {
           toast.info("Keine Änderungen zum Speichern.");
           setSaving(false);
@@ -368,19 +374,10 @@ function EventForm({ event, meta, partners = [], onDone }) {
         // Absagen und Verschieben (#2118): Rückfrage mit der Zahl der Betroffenen, bevor der Server sie informiert.
         const affected = affectedRegistrations(event);
         const cancelling = patch.status === "cancelled" && event.status !== "cancelled";
-        // Mit Mindestanzahl (#2614) braucht die Absage einen Grund - er steht in der Nachricht an alle.
-        const minimumAfter = minimumDirty ? formToMinimum(minimumForm) : event.min_registrations;
-        if (cancelling && minimumAfter?.count) {
-          setCancelSheet({ patch });
-          setSaving(false);
-          return;
-        }
-        if (cancelling && !await confirm({
-          title: "Event absagen?",
-          description: cancelConfirmText(affected),
-          confirmLabel: "Absagen",
-          cancelLabel: "Zurück",
-        })) {
+        // Jede Absage läuft über das Blatt mit Grund (#2614, Fabian 28.11.): Pflicht nur mit Mindestanzahl, sonst freiwillig.
+        if (cancelling) {
+          const minimumAfter = minimumDirty ? formToMinimum(minimumEffective) : event.min_registrations;
+          setCancelSheet({ patch, required: Boolean(minimumAfter?.count) });
           setSaving(false);
           return;
         }
@@ -555,7 +552,7 @@ function EventForm({ event, meta, partners = [], onDone }) {
           />
         )}
         {/* Mindestanzahl bis zu einer Frist (#2614): nur mit der Anmeldung hier - einen externen Link zählt die Website nicht. */}
-        {form.has_registration && !form.registration_url && (
+        {minimumShown && (
           <EventMinimumSection
             value={minimumForm}
             onChange={setMinimumForm}
@@ -564,7 +561,7 @@ function EventForm({ event, meta, partners = [], onDone }) {
             allowCompanions={form.allow_companions}
             canCancel={!isNew && event.status !== "cancelled"}
             cancelBlocked={saving || otherChanges}
-            onCancel={() => setCancelSheet({ patch: {} })}
+            onCancel={() => setCancelSheet({ patch: {}, required: Boolean(event?.min_registrations?.count) })}
             accent={ACCENT}
           />
         )}
@@ -633,7 +630,7 @@ function EventForm({ event, meta, partners = [], onDone }) {
     </AdminFormPage>
     {/* Außerhalb des Formulars: das Blatt ist selbst ein Formular. */}
     {cancelSheet && (
-      <EventCancelSheet event={event} affected={affectedRegistrations(event)} onClose={() => setCancelSheet(null)} onConfirm={confirmCancel}
+      <EventCancelSheet event={event} affected={affectedRegistrations(event)} required={cancelSheet.required} onClose={() => setCancelSheet(null)} onConfirm={confirmCancel}
         defaultReason={event?.minimum?.state === "short" ? event.minimum.proposal || "" : ""} />
     )}
     </>

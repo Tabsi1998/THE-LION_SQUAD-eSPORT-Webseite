@@ -3,7 +3,7 @@ import { FormGrid } from "@/components/tls/AdminForm";
 import { CheckField, TextField } from "@/components/tls/FormFields";
 import { StatusChip } from "@/components/tls/StatusChip";
 import { formatWhen } from "@/lib/datetime";
-import { minimumChip, minimumSummary } from "@/lib/eventMinimum";
+import { minimumChip, minimumExample, minimumSummary } from "@/lib/eventMinimum";
 
 // Mindestanzahl bis zu einer Frist (#2614): im Abschnitt „Anmeldung“ der Bearbeiten-Seite. Oben die Einstellung (Zahl, Frist,
 // Begleitpersonen, Event-Seite), darunter - sobald das Event gespeichert ist - der Stand vom Server und „Event absagen“ als ein
@@ -25,14 +25,14 @@ export function EventMinimumSection({ value, onChange, minimum, notice, allowCom
         <>
           <FormGrid>
             <TextField label="Mindestanzahl" type="number" min={1} max={10000} value={value.count} onChange={(next) => set("count", next)} required testId="event-minimum-count" />
-            <TextField label="Frist" type="datetime-local" value={value.deadline} onChange={(next) => set("deadline", next)} required hint="Spätestens der Beginn des Events." testId="event-minimum-deadline" />
+            <TextField label="Frist" type="datetime-local" value={value.deadline} onChange={(next) => set("deadline", next)} required hint="Mindestens 1 Stunde vor dem Beginn des Events." testId="event-minimum-deadline" />
           </FormGrid>
           {allowCompanions && (
             <CheckField label="Begleitpersonen zählen mit" checked={value.count_companions} onChange={(next) => set("count_companions", next)} accent={accent} testId="event-minimum-companions"
               hint={value.count_companions ? "Gezählt werden Personen: jede Anmeldung samt ihren Begleitpersonen." : "Gezählt werden nur die Anmeldungen, Begleitpersonen nicht."} />
           )}
           <CheckField label="Auf der Event-Seite zeigen" checked={value.public} onChange={(next) => set("public", next)} accent={accent} testId="event-minimum-public"
-            hint="„Findet ab 8 Anmeldungen statt – noch 3 bis …“ im Kasten oben. Aus: Den Stand sieht nur die Verwaltung." />
+            hint={`${minimumExample(value, { allowCompanions })} im Kasten oben. Aus: Den Stand sieht nur die Verwaltung, hier unten.`} />
         </>
       )}
       {minimum && (

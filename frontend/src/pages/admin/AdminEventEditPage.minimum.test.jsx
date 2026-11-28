@@ -28,7 +28,7 @@ const META = {
   visibilities: [{ k: "public", l: "Öffentlich" }],
 };
 const DEADLINE = "2026-12-18T17:00:00+00:00";
-const PROPOSAL = "Zu wenige Anmeldungen: Bis Fr 18.12. 18:00 waren 5 von mindestens 8 Personen dabei.";
+const PROPOSAL = "Zu wenige Anmeldungen: Bis Fr 18. Dezember · 18:00 waren 5 von mindestens 8 Personen dabei.";
 const BASE = {
   id: "ev-1", name: "Silvester im Vereinsheim", slug: "silvester", status: "scheduled", event_type: "general", visibility: "public",
   start_date: "2026-12-31T17:00:00Z", has_registration: true, allow_companions: true, max_companions_per_registration: 3, active_registration_count: 4,
@@ -120,7 +120,7 @@ test("Status „Abgesagt“ beim Speichern: mit Mindestanzahl öffnet sich das B
   expect(confirmMock).not.toHaveBeenCalled();
 });
 
-test("ohne Mindestanzahl bleibt die Absage wie bisher: Rückfrage ohne Grund", async () => {
+test("ohne Mindestanzahl: dasselbe Blatt, der Grund ist freiwillig - leer geht die Absage wie bisher hinaus", async () => {
   serve(BASE);
   apiMock.patch.mockResolvedValue({ data: { ...BASE, status: "cancelled" } });
   renderPage();
@@ -128,9 +128,72 @@ test("ohne Mindestanzahl bleibt die Absage wie bisher: Rückfrage ohne Grund", a
   expect(screen.queryByTestId("event-minimum-state")).toBeNull();
   fireEvent.change(screen.getByTestId("event-status"), { target: { value: "cancelled" } });
   fireEvent.submit(screen.getByTestId("event-form"));
+  const sheet = await screen.findByTestId("event-cancel-sheet");
+  expect(within(sheet).getByTestId("event-cancel-reason")).not.toBeRequired();
+  expect(within(sheet).getByTestId("event-cancel-reason")).toHaveValue("");
+  fireEvent.submit(sheet);
   await waitFor(() => expect(apiMock.patch).toHaveBeenCalledWith("/events/ev-1", { status: "cancelled" }));
-  expect(confirmMock).toHaveBeenCalledTimes(1);
-  expect(screen.queryByTestId("event-cancel-sheet")).toBeNull();
+  expect(confirmMock).not.toHaveBeenCalled();
+});
+
+test("ohne Mindestanzahl mit Grund: er geht mit", async () => {
+  serve(BASE);
+  apiMock.patch.mockResolvedValue({ data: { ...BASE, status: "cancelled" } });
+  renderPage();
+  fireEvent.change(await screen.findByTestId("event-status"), { target: { value: "cancelled" } });
+  fireEvent.submit(screen.getByTestId("event-form"));
+  fireEvent.change(await screen.findByTestId("event-cancel-reason"), { target: { value: "Halle nicht verfügbar" } });
+  fireEvent.submit(screen.getByTestId("event-cancel-sheet"));
+  await waitFor(() => expect(apiMock.patch).toHaveBeenCalledWith("/events/ev-1", { status: "cancelled", cancel_reason: "Halle nicht verfügbar" }));
+});
+
+test("Anmeldung aus: der Abschnitt verschwindet, die Mindestanzahl geht als null mit", async () => {
+  serve(WITH_MINIMUM);
+  apiMock.patch.mockResolvedValue({ data: BASE });
+  renderPage();
+  fireEvent.click(await screen.findByTestId("event-has-registration"));
+  expect(screen.queryByTestId("event-minimum")).toBeNull();
+  fireEvent.submit(screen.getByTestId("event-form"));
+  await waitFor(() => expect(apiMock.patch).toHaveBeenCalledTimes(1));
+  expect(apiMock.patch.mock.calls[0][1]).toEqual({ has_registration: false, min_registrations: null });
+});
+
+test("Externer Link: auch dann geht die Mindestanzahl als null mit", async () => {
+  serve(WITH_MINIMUM);
+  apiMock.patch.mockResolvedValue({ data: BASE });
+  renderPage();
+  fireEvent.change(await screen.findByLabelText("Externer Anmeldelink"), { target: { value: "https://example.test/anmeldung" } });
+  fireEvent.submit(screen.getByTestId("event-form"));
+  await waitFor(() => expect(apiMock.patch).toHaveBeenCalledTimes(1));
+  expect(apiMock.patch.mock.calls[0][1]).toMatchObject({ registration_url: "https://example.test/anmeldung", min_registrations: null });
+});
+
+test("Anlegen: eingeschaltet, dann Anmeldung wieder aus - die Mindestanzahl geht als null mit", async () => {
+  apiMock.post.mockResolvedValue({ data: { id: "ev-2" } });
+  serve(BASE);
+  render(
+    <MemoryRouter initialEntries={["/admin/events/new"]}>
+      <Routes>
+        <Route path="/admin/events" element={<div data-testid="events-list" />} />
+        <Route path="/admin/events/new" element={<AdminEventEditPage />} />
+      </Routes>
+    </MemoryRouter>,
+  );
+  fireEvent.change(await screen.findByTestId("event-name"), { target: { value: "Rodelabend" } });
+  fireEvent.click(screen.getByTestId("event-has-registration"));
+  fireEvent.click(screen.getByTestId("event-minimum-enabled"));
+  fireEvent.change(screen.getByTestId("event-minimum-count"), { target: { value: "8" } });
+  fireEvent.click(screen.getByTestId("event-has-registration"));
+  fireEvent.submit(screen.getByTestId("event-form"));
+  await waitFor(() => expect(apiMock.post).toHaveBeenCalledTimes(1));
+  expect(apiMock.post.mock.calls[0][1].min_registrations).toBeNull();
+});
+
+test("die Erklärung nennt die Zählung, wie sie ist: ohne erlaubte Begleitpersonen „Anmeldungen“", async () => {
+  serve({ ...WITH_MINIMUM, allow_companions: false });
+  renderPage();
+  expect(await screen.findByTestId("event-minimum-public")).toBeInTheDocument();
+  expect(screen.getByTestId("event-minimum").textContent).toContain("„Findet ab 8 Anmeldungen statt – noch … bis …“");
 });
 
 test("Mindestanzahl einschalten: Prüfung vor dem Speichern, dann geht die Einstellung mit", async () => {
@@ -141,7 +204,7 @@ test("Mindestanzahl einschalten: Prüfung vor dem Speichern, dann geht die Einst
   fireEvent.change(screen.getByTestId("event-minimum-count"), { target: { value: "8" } });
   fireEvent.change(screen.getByTestId("event-minimum-deadline"), { target: { value: "2027-01-02T18:00" } });
   fireEvent.submit(screen.getByTestId("event-form"));
-  await waitFor(() => expect(toast.error).toHaveBeenCalledWith("Mindestanzahl: Die Frist muss vor dem Beginn des Events liegen."));
+  await waitFor(() => expect(toast.error).toHaveBeenCalledWith("Mindestanzahl: Die Frist muss mindestens 1 Stunde vor dem Beginn des Events liegen."));
   expect(apiMock.patch).not.toHaveBeenCalled();
 
   fireEvent.change(screen.getByTestId("event-minimum-deadline"), { target: { value: "2026-12-18T18:00" } });
