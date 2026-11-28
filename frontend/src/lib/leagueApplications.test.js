@@ -5,7 +5,9 @@ import {
   applicationPayload,
   applicationToForm,
   canStartApplication,
+  canStartPersonApplication,
   effectiveCloses,
+  isSoloApplication,
   lateCapLine,
   seatsLine,
   statsLine,
@@ -154,5 +156,33 @@ describe("Nachmeldefrist (#2422, Nr. 184)", () => {
     expect(applicationToForm({ late_registration_days: 21 }).late_registration_days).toBe("21");
     expect(applicationPayload({ ...applicationToForm({ entry_policy: "all" }), late_registration_days: "" }).late_registration_days).toBeNull();
     expect(applicationPayload({ ...applicationToForm({ entry_policy: "all" }), late_registration_days: "7" }).late_registration_days).toBe(7);
+  });
+});
+
+
+describe("Solo-Liga: als Spieler anmelden (#1629, P2)", () => {
+  const player = { state: "open", can_submit: true, problems: [] };
+  const open = { kind: "solo", application: { state: "open" }, season_problems: [], player };
+
+  test("der Knopf steht nur bei offenem Fenster, ohne Gründe dagegen und ohne laufende Anmeldung", () => {
+    expect(canStartPersonApplication(open)).toBe(true);
+    expect(canStartPersonApplication({ ...open, application: { state: "closed" } })).toBe(false);
+    expect(canStartPersonApplication({ ...open, season_problems: ["Die Anmeldung ist vorbei."] })).toBe(false);
+    expect(canStartPersonApplication({ ...open, player: { ...player, can_submit: false } })).toBe(false);
+    expect(canStartPersonApplication({ ...open, player: { ...player, state: "waitlist" } })).toBe(false);
+    // Team-Liga: dieser Knopf nie - dort gilt canStartApplication.
+    expect(canStartPersonApplication({ ...open, kind: undefined })).toBe(false);
+  });
+
+  test("die Art kommt aus der eigenen Sicht oder dem öffentlichen Block, Team-Ligen ohne Feld", () => {
+    expect(isSoloApplication({ kind: "solo" }, null)).toBe(true);
+    expect(isSoloApplication(null, { participant_kind: "solo" })).toBe(true);
+    expect(isSoloApplication({ squads: [] }, { state: "open" })).toBe(false);
+  });
+
+  test("die Meldung nach dem Einreichen spricht dich an", () => {
+    expect(submittedToast("accepted", true)).toBe("Angemeldet. Du hast einen Startplatz.");
+    expect(submittedToast("waitlist", true)).toBe("Eingereicht. Du stehst auf der Warteliste.");
+    expect(submittedToast("accepted")).toBe("Angemeldet. Ihr habt einen Startplatz.");
   });
 });

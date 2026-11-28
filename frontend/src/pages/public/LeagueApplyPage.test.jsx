@@ -224,3 +224,48 @@ test("eine unsichtbare Season sagt das wie die Ligaseite", async () => {
 
   expect(await screen.findByTestId("apply-missing")).toBeInTheDocument();
 });
+
+
+// ---------------------------------------------------------------- Solo-Liga (#1629, P2): als Spieler, drei Schritte, ohne Co-Team
+
+const PLAYER = { user_id: "u1", display_name: "Duellant Eins", can_apply: true, state: "open", application: null, problems: [], warnings: ["Dein Geburtsdatum fehlt im Profil."], shortfall: null, can_submit: true };
+const SOLO_VIEW = { ...VIEW, kind: "solo", squads: [], player: PLAYER, privacy: { text: "Für die Anmeldung speichert der Verein deine Angaben als Spieler.", url: "/privacy" } };
+
+test("Solo-Liga: prüfen, selbst zustimmen, einreichen - ohne Co-Team in der Anfrage", async () => {
+  apiMock.get.mockResolvedValue({ data: SOLO_VIEW });
+  apiMock.post.mockResolvedValue({ data: { id: "a1", status: "submitted" } });
+  renderPage();
+
+  expect(await screen.findByRole("heading", { level: 1 })).toHaveTextContent("Als Spieler anmelden");
+  expect(screen.queryByTestId("apply-squad-s1")).toBeNull();
+  expect(screen.getByTestId("apply-check-ok")).toHaveTextContent("Du kannst dich anmelden.");
+  expect(screen.getByTestId("apply-warnings")).toHaveTextContent("Dein Geburtsdatum fehlt im Profil.");
+  fireEvent.click(screen.getByTestId("apply-next"));
+  expect(await screen.findByText("Ich habe die Regeln gelesen und stimme zu.")).toBeInTheDocument();
+  expect(screen.getByTestId("apply-privacy-text")).toHaveTextContent("deine Angaben als Spieler");
+  fireEvent.click(screen.getByTestId("apply-accept-rules"));
+  fireEvent.click(screen.getByTestId("apply-accept-privacy"));
+  fireEvent.click(screen.getByTestId("apply-next"));
+  expect(await screen.findByTestId("apply-summary")).toHaveTextContent("SpielerDuellant Eins");
+  expect(screen.getByTestId("apply-summary")).not.toHaveTextContent("Co-Team");
+  fireEvent.click(screen.getByTestId("apply-submit"));
+
+  await waitFor(() => expect(apiMock.post).toHaveBeenCalledWith("/leagues/probe-liga/season-1/applications", { rule_version_id: "v1", accept_rules: true, accept_privacy: true }));
+  expect(toastMock.success).toHaveBeenCalledWith("Anmeldung eingereicht. Die Liga-Leitung prüft sie jetzt.");
+});
+
+test("Solo-Liga: Was dagegen spricht, steht im Klartext, weiter geht es nicht", async () => {
+  apiMock.get.mockResolvedValue({ data: { ...SOLO_VIEW, player: { ...PLAYER, warnings: [], can_submit: false, problems: ["Du spielst in dieser Season schon in einer Staffel."] } } });
+  renderPage();
+
+  expect(await screen.findByTestId("apply-problems")).toHaveTextContent("Du spielst in dieser Season schon in einer Staffel.");
+  expect(screen.getByTestId("apply-profile-link")).toHaveAttribute("href", "/profile?tab=gaming");
+  expect(screen.getByTestId("apply-next")).toBeDisabled();
+});
+
+test("Solo-Liga: eine laufende Anmeldung verweist auf die Ligaseite", async () => {
+  apiMock.get.mockResolvedValue({ data: { ...SOLO_VIEW, player: { ...PLAYER, state: "submitted", application: { id: "a1", status: "submitted" }, can_submit: false } } });
+  renderPage();
+
+  expect(await screen.findByTestId("apply-running")).toHaveTextContent("Deine Anmeldung läuft schon.");
+});

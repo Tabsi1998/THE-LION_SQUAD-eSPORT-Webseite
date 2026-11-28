@@ -1,4 +1,5 @@
 // Ligaseite (docs/LIGA.md, B.4, #2205): Fenster und freie Plätze für alle, Status und Knopf „Mit Co-Team anmelden“ für die eigenen Co-Teams.
+// In der Solo-Liga (#1629, P2) „Als Spieler anmelden“ und der eigene Stand per Du.
 // Andere Teams und ihre Anträge stehen hier nie. Die Schritte selbst stehen auf /liga/<liga>/<season>/anmelden.
 import { useCallback, useEffect, useState } from "react";
 import { Link } from "react-router-dom";
@@ -8,7 +9,8 @@ import { api, formatApiError } from "@/lib/api";
 import { useConfirm } from "@/components/tls/ConfirmDialog";
 import { HelpLink } from "@/components/tls/HelpLink";
 import { useOptionalAuth } from "@/context/AuthContext";
-import { APPLICATION_STATES, STATE_CLASS, afterStartLine, canStartApplication, seatsLine, teamStateLabel, windowLine } from "@/lib/leagueApplications";
+import { APPLICATION_STATES, STATE_CLASS, afterStartLine, canStartApplication, canStartPersonApplication, isSoloApplication, seatsLine, teamStateLabel,
+  windowLine } from "@/lib/leagueApplications";
 import { carryLine } from "@/lib/leagueSuccessor";
 import { rightLine, teamBadge, teamBadgeTone } from "@/lib/leagueStartRights";
 import { StartRightBlock } from "./StartRightBlock";
@@ -64,6 +66,37 @@ function OwnSquadRow({ row, onWithdraw, onChanged }) {
   );
 }
 
+/** Solo-Liga (#1629, P2): die eigene Anmeldung als Spieler - dieselben Zustände wie beim Co-Team, per Du. */
+function OwnPlayerRow({ row, onWithdraw }) {
+  const application = row.application;
+  return (
+    <li className="flex flex-wrap items-start justify-between gap-x-4 gap-y-2 py-3" data-testid="league-application-player">
+      <div className="min-w-0 flex-1 basis-64">
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="min-w-0 font-semibold text-white [overflow-wrap:anywhere]">{row.display_name}</span>
+          <ApplicationStateBadge state={row.state} label={teamStateLabel(row.state, application)} testId="league-application-player-state" />
+        </div>
+        {["submitted", "in_review"].includes(row.state) ? <p className="mt-1 tls-type-small text-white/75">Die Liga-Leitung prüft deine Anmeldung und meldet sich.</p> : null}
+        {application?.staffel ? <p className="mt-1 tls-type-small text-white/75">{application.staffel_left ? `Nicht mehr in ${application.staffel}: Austritt oder Disqualifikation.` : `Du spielst in ${application.staffel}.`}</p> : null}
+        {row.state === "accepted" && !application?.staffel ? <p className="mt-1 tls-type-small text-white/75">Dein Startplatz steht. Liga und Staffel teilt die Liga-Leitung noch zu.</p> : null}
+        {row.state === "waitlist" ? <p className="mt-1 tls-type-body text-white/75">Wird ein Platz frei, entscheidet die Liga-Leitung. Es rückt niemand von selbst nach.</p> : null}
+        {application?.decision_reason ? <p className="mt-1 tls-type-small text-white/75 [overflow-wrap:anywhere]">Grund: {application.decision_reason}</p> : null}
+        {application && row.warnings?.length ? (
+          <div className="mt-2 rounded-sm border border-brand/30 bg-brand/5 p-2 tls-type-small text-white/80" data-testid="league-application-player-open">
+            <p className="font-semibold text-white/90">Deine Anmeldung zählt – fehlende Angaben halten dich nicht aus der Liga.</p>
+            <ul className="mt-1 space-y-0.5 tls-type-small text-white/70">{row.warnings.map((text) => <li key={text} className="[overflow-wrap:anywhere]">{text}</li>)}</ul>
+            <p className="mt-1 tls-type-small text-white/60">Trag es bis zum ersten Spiel im Profil nach, sonst kannst du nicht einchecken.</p>
+          </div>
+        ) : null}
+      </div>
+      {application?.can_withdraw ? (
+        <button type="button" onClick={() => onWithdraw(row)} data-testid="league-application-player-withdraw"
+          className="tls-btn tls-btn--quiet inline-flex min-h-[44px] items-center rounded-sm px-3 py-2 tls-type-label">Zurückziehen</button>
+      ) : null}
+    </li>
+  );
+}
+
 export function LeagueApplicationPanel({ leagueSlug, seasonSlug, block }) {
   const user = useOptionalAuth()?.user || null;
   const confirm = useConfirm();
@@ -83,13 +116,17 @@ export function LeagueApplicationPanel({ leagueSlug, seasonSlug, block }) {
   }, [base, signedIn]);
   useEffect(() => { load(); }, [load]);
 
+  const solo = isSoloApplication(view, block);
   const withdraw = async (row) => {
     // Eine automatische Zuteilung zieht das Team selbst zurück, solange der Spielplan nicht steht (#2348) - dann fällt auch der Platz in der Staffel weg.
     const staffel = row.application?.staffel ? ` und spielt nicht mehr in ${row.application.staffel}` : "";
     const carried = Boolean(row.application?.carry_over);
-    const sure = await confirm(carried
-      ? { title: "Von der Season abmelden?", description: `${row.display_name} spielt dann nicht in dieser Season${staffel}. Der Platz geht an die Warteliste oder neue Anmeldungen.`, confirmLabel: "Abmelden", tone: "danger" }
-      : { title: "Anmeldung zurückziehen?", description: `${row.display_name} ist dann nicht mehr angemeldet${staffel}. Solange das Fenster offen ist, kannst du neu einreichen.`, confirmLabel: "Zurückziehen" });
+    const sure = await confirm(solo
+      // Solo-Liga (#1629, P2): Die Person zieht ihre eigene Anmeldung zurück.
+      ? { title: "Anmeldung zurückziehen?", description: `Du bist dann nicht mehr angemeldet${row.application?.staffel ? ` und spielst nicht mehr in ${row.application.staffel}` : ""}. Solange das Fenster offen ist, kannst du neu einreichen.`, confirmLabel: "Zurückziehen" }
+      : carried
+        ? { title: "Von der Season abmelden?", description: `${row.display_name} spielt dann nicht in dieser Season${staffel}. Der Platz geht an die Warteliste oder neue Anmeldungen.`, confirmLabel: "Abmelden", tone: "danger" }
+        : { title: "Anmeldung zurückziehen?", description: `${row.display_name} ist dann nicht mehr angemeldet${staffel}. Solange das Fenster offen ist, kannst du neu einreichen.`, confirmLabel: "Zurückziehen" });
     if (!sure) return;
     try {
       await api.post(`${base}/applications/${row.application.id}/withdraw`, {});
@@ -106,8 +143,11 @@ export function LeagueApplicationPanel({ leagueSlug, seasonSlug, block }) {
   const afterStart = current.state && current.state !== "closed" ? afterStartLine(current.closes_at, current.season_starts_at) : "";
   // Ohne Anmeldefenster (Season aus dem Vorgänger übernommen, F.2): nur die eigenen Co-Teams mit Antrag - sonst gibt es hier nichts zu tun.
   const rows = (view?.squads || []).filter((row) => current.state || row.application);
-  if (!current.state && !rows.length) return null;
-  const problems = rows.some((row) => row.can_apply) ? view?.season_problems || [] : [];
+  // Solo-Liga (#1629, P2): statt der Co-Teams die eigene Anmeldung als Spieler - sobald es eine gibt.
+  const player = solo && view?.player && (current.state || view.player.application) ? view.player : null;
+  if (!current.state && !rows.length && !player) return null;
+  const problems = rows.some((row) => row.can_apply) || player ? view?.season_problems || [] : [];
+  const playerProblems = player && !player.application ? player.problems || [] : [];
   return (
     <section className="tls-league-application mt-10 rounded-sm border border-white/10 bg-[#121212] p-4 md:p-5" aria-labelledby="league-application-title" data-testid="league-application">
       <div className="flex flex-wrap items-start justify-between gap-3">
@@ -117,8 +157,9 @@ export function LeagueApplicationPanel({ leagueSlug, seasonSlug, block }) {
             <h2 id="league-application-title" className="inline-flex items-center gap-2 tls-type-section">
               <ClipboardCheck className="h-5 w-5 tls-league-accent" aria-hidden="true" /> Anmeldung
             </h2>
-            <HelpLink thema="liga-captains" schritt="anmeldung-starten" />
+            <HelpLink thema="liga-captains" schritt={solo ? "als-spieler-anmelden" : "anmeldung-starten"} />
           </div>
+          {solo ? <p className="mt-1 tls-type-small text-white/70" data-testid="league-application-solo">Solo-Liga: Du meldest dich selbst als Spieler an, 1 gegen 1.</p> : null}
           <p className="mt-1 tls-type-small text-white/85" data-testid="league-application-window">
             {current.state ? windowLine(current) : "Aus der Vorgänger-Season übernommen: Eure Co-Teams sind automatisch dabei."}
           </p>
@@ -127,20 +168,29 @@ export function LeagueApplicationPanel({ leagueSlug, seasonSlug, block }) {
           {current.entry_policy === "members" ? <p className="mt-0.5 tls-type-small text-white/70" data-testid="league-application-policy">Nur für Vereinsmitglieder.</p> : null}
           {current.waitlist && current.waitlist_note ? <p className="mt-0.5 tls-type-body text-white/60 [overflow-wrap:anywhere]" data-testid="league-application-waitlist-note">{current.waitlist_note}</p> : null}
         </div>
-        {canStartApplication(view) ? (
+        {!solo && canStartApplication(view) ? (
           <Link to={applyPath} data-testid="league-application-start"
             className="tls-btn tls-btn--primary inline-flex min-h-[44px] items-center rounded-sm px-4 py-2.5 tls-type-label">Mit Co-Team anmelden</Link>
+        ) : null}
+        {solo && canStartPersonApplication(view) ? (
+          <Link to={applyPath} data-testid="league-application-start-player"
+            className="tls-btn tls-btn--primary inline-flex min-h-[44px] items-center rounded-sm px-4 py-2.5 tls-type-label">Als Spieler anmelden</Link>
         ) : null}
         {!signedIn && current.state === "open" ? (
           <Link to={`/login?next=${encodeURIComponent(applyPath)}`} data-testid="league-application-login"
             className="tls-btn tls-btn--secondary inline-flex min-h-[44px] items-center gap-2 rounded-sm px-4 py-2.5 tls-type-label">
-            <LogIn className="h-4 w-4" aria-hidden="true" /> Anmelden, dann Team melden
+            <LogIn className="h-4 w-4" aria-hidden="true" /> {solo ? "Einloggen, dann mitspielen" : "Anmelden, dann Team melden"}
           </Link>
         ) : null}
       </div>
-      {problems.length ? (
+      {problems.length || playerProblems.length ? (
         <ul className="mt-3 space-y-1 tls-type-small text-warn" data-testid="league-application-season-problems">
-          {problems.map((text) => <li key={text} className="flex gap-2"><AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" /> <span>{text}</span></li>)}
+          {[...problems, ...playerProblems].map((text) => <li key={text} className="flex gap-2"><AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" /> <span className="[overflow-wrap:anywhere]">{text}</span></li>)}
+        </ul>
+      ) : null}
+      {player && player.application ? (
+        <ul className="mt-3 border-t border-white/10" aria-label="Deine Anmeldung" data-testid="league-application-own-player">
+          <OwnPlayerRow row={player} onWithdraw={withdraw} />
         </ul>
       ) : null}
       {view?.hint ? <p className="mt-3 tls-type-body text-white/70" data-testid="league-application-hint">{view.hint}</p> : null}
