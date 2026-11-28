@@ -283,10 +283,11 @@ VIENNA = ZoneInfo("Europe/Vienna")
 
 
 def _vienna_text(value) -> str:
+    """„Angemeldet am“ der Teilnehmer-CSV: amtlich „14.03.2026 18:05“ in Wiener Zeit - sortierbar, mit Jahr (#1307)."""
     moment = parse_dt(value)
-    from services.date_text import format_moment
+    from services.date_text import format_official_moment
 
-    return format_moment(moment) if moment else ""
+    return format_official_moment(moment) if moment else ""
 
 
 async def export_csv(db, event: dict, me: dict, *, filter_key: str = "all") -> str:

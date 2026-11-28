@@ -6,6 +6,7 @@ vorhandenen Weg - und „Nachricht an alle“: nur nach Bestätigung der Empfän
 mit Protokoll. Namen und Adressen sind erfunden.
 """
 import pathlib
+import re
 import sys
 from datetime import timedelta
 
@@ -186,6 +187,8 @@ async def test_csv_only_needed_fields_no_formulas_with_log(flow):
     assert len(lines) == 4
     paula = next(line for line in lines if line.startswith("Paula"))
     assert paula.startswith("Paula Brünner;Angemeldet;2;1;")
+    # Amtlich mit Jahr und Uhrzeit (#1307) - die Spalte bleibt sortierbar.
+    assert re.fullmatch(r"Paula Brünner;Angemeldet;2;1;\d{2}\.\d{2}\.\d{4} \d{2}:\d{2}", paula), paula
     assert "'=HYPERLINK(1)" in text
     for secret in ("@lionsquad-test.at", "komme später", people["paula"]["id"]):
         assert secret not in text

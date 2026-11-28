@@ -1,5 +1,4 @@
-import { formatWhen } from "@/lib/datetime";
-import { asInstant } from "@/lib/vienna";
+import { formatOfficialDate } from "@/lib/datetime";
 export function normalizeSearch(value) {
   return String(value || "")
     .toLowerCase()
@@ -28,9 +27,7 @@ export function downloadCsv(filename, header, rows) {
   URL.revokeObjectURL(url);
 }
 
+/** Datum für CSV-Spalten: amtlich „14.03.2026“ (#1307) - sortierbar, mit Jahr, nie „morgen“. Nur für Ausfuhren. */
 export function formatAdminDate(value) {
-  if (!value) return "";
-  const date = asInstant(value);
-  if (Number.isNaN(date.getTime())) return "";
-  return formatWhen(date, { time: false });
+  return value ? formatOfficialDate(value) : "";
 }

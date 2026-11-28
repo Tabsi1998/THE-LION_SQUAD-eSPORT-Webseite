@@ -15,7 +15,7 @@ vi.mock("sonner", () => ({ toast: { success: vi.fn(), error: vi.fn(), info: vi.f
 const confirmMock = vi.fn(async () => true);
 vi.mock("@/components/tls/ConfirmDialog", () => ({ useConfirm: () => confirmMock }));
 
-const { default: AdminNewsPage, exportNewsCsv } = await import("./AdminNewsPage");
+const { default: AdminNewsPage, exportNewsCsv, newsCsvRows } = await import("./AdminNewsPage");
 
 const META = { categories: [{ k: "club", l: "Verein" }], visibilities: [{ k: "public", l: "Öffentlich" }, { k: "members", l: "Nur Vereinsmitglieder" }] };
 const POSTS = [
@@ -46,7 +46,8 @@ test("CSV nennt Begriffe und die Adresse statt Rohwerten", async () => {
   globalThis.URL.revokeObjectURL = vi.fn();
   const click = vi.spyOn(window.HTMLAnchorElement.prototype, "click").mockImplementation(() => {});
   try {
-    exportNewsCsv([{ ...POSTS[0], status_label: "Veröffentlicht", date_label: "01.08.2026" }]);
+    // Echte Zeilen wie die Seite (#1307): das Datum amtlich aus published_at, nicht vorgegeben.
+    exportNewsCsv(newsCsvRows(POSTS));
   } finally {
     globalThis.Blob = OriginalBlob;
     click.mockRestore();

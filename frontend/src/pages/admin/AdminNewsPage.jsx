@@ -10,13 +10,22 @@ import { useConfirm } from "@/components/tls/ConfirmDialog";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { toast } from "sonner";
 import { Download, Globe, Plus, Pin, RotateCcw, Smartphone, Trash2, Search, Newspaper, Undo2 } from "lucide-react";
-import { formatWhen } from "@/lib/datetime";
+import { formatOfficialDate, formatWhen } from "@/lib/datetime";
 import { pinState } from "@/lib/newsPin";
 import { ShortCaps } from "@/components/tls/ShortCaps";
 
 function csvCell(value) {
   const text = String(value ?? "").replace(/\r?\n/g, " ");
   return /[",;]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text;
+}
+
+/** Zeilen für die CSV: Stand als Wort, Datum amtlich „01.08.2026“ (#1307) - sortierbar, mit Jahr, nie „gestern“. */
+export function newsCsvRows(list) {
+  return list.map((item) => ({
+    ...item,
+    status_label: newsPublicationState(item).label,
+    date_label: formatOfficialDate(item.published_at || item.created_at),
+  }));
 }
 
 export function exportNewsCsv(rows) {
@@ -169,14 +178,7 @@ export default function AdminNewsPage() {
             </select>
             <button
               type="button"
-              onClick={() => exportNewsCsv(filteredList.map((item) => {
-                const state = publicationState(item);
-                return {
-                  ...item,
-                  status_label: state.label,
-                  date_label: formatWhen(item.published_at || item.created_at, { time: false }),
-                };
-              }))}
+              onClick={() => exportNewsCsv(newsCsvRows(filteredList))}
               disabled={filteredList.length === 0}
               className="inline-flex items-center justify-center gap-2 rounded-sm border border-white/15 px-3 py-2 tls-type-label text-white/65 hover:border-[#29B6E8]/45 hover:text-white disabled:opacity-40"
             >
