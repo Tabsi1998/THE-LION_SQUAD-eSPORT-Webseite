@@ -235,7 +235,7 @@ function ApplicationRow({ row, options, busy, act, superadmin, seasonId = null, 
 }
 
 // ``version``: ändert sich mit den Einstellungen der Season. Wer das Fenster gerade gesetzt hat, sieht den Eingang gleich.
-const CLOSED_SEASONS = ["completed", "archived"];
+const CLOSED_SEASONS = ["completed", "archived", "cancelled"];
 
 // ``seasonStatus``: der Stand der Season - beendet oder archiviert, gibt es dort kein Kennzeichen „Gast“ mehr zu setzen.
 export function SeasonApplicationsPanel({ seasonId, version, seasonStatus = null }) {

@@ -621,13 +621,40 @@ async def season_end_post(db, season: dict, league: dict, settings: dict, now: d
     return 1
 
 
+def season_cancel_message(context: dict) -> dict:
+    """Die Meldung „Season abgesagt“ (#2607): Season, Grund, Link. ``context``: ``league``, ``season``, ``reason``, ``url``."""
+    league = _esc(context.get("league"))
+    intro = f"{league}: Die Season ist abgesagt." if league else "Die Season ist abgesagt."
+    reason = _esc(context.get("reason"))
+    description = "\n".join(part for part in (intro, f"Grund: {reason}" if reason else "") if part)
+    return {"title": f"Season abgesagt · {context.get('season') or 'Season'}", "description": description[:DESCRIPTION_MAX],
+            "fields": [], "url": context.get("url"), "color": COLOR,
+            "buttons": [{"label": "Zur Season", "url": context["url"]}] if context.get("url") else []}
+
+
+async def season_cancel_post(db, season: dict, league: dict, settings: dict, now: datetime) -> int:
+    """Abgesagt (#2607): einmal die Meldung im Liga-Kanal - mit demselben Schalter wie das Saisonende, nie doppelt."""
+    if season.get("status") != "cancelled":
+        return 0
+    key = f"season_cancelled:{season['id']}"
+    if await blocked(db, key, now):
+        return 0
+    message = season_cancel_message({"league": league.get("name"), "season": season.get("name"), "reason": season.get("cancel_reason"),
+                                     "url": season_url(league, season)})
+    if not await claim(db, key, {"kind": "season_cancelled", "season_id": season["id"]}, now):
+        return 0
+    await _send(db, key, settings["channel_id"], message, now)
+    return 1
+
+
 async def sweep(db, *, now: datetime | None = None) -> dict:
     """Der Job (Scheduler „league_discord“, alle 15 Minuten auf genau einem Server): je Season mit Einstellung melden, was fertig ist."""
     from services.profile_visibility import public_season
 
     current = now or now_utc()
     counts = {"matchday": 0, "season_end": 0}
-    query = {"$or": [{f"{FIELD}.matchday": True}, {f"{FIELD}.season_end": True}], "status": {"$in": ["active", "completed"]},
+    # Abgesagt (#2607): eine Meldung mit dem Schalter „Saisonende“ - gezählt wie das Saisonende.
+    query = {"$or": [{f"{FIELD}.matchday": True}, {f"{FIELD}.season_end": True}], "status": {"$in": ["active", "completed", "cancelled"]},
              "visibility": "public"}
     seasons = await db.league_seasons.find(query, {"_id": 0}).to_list(SEASON_LIMIT)
     if not seasons or not await _discord_ready(db):
@@ -639,10 +666,11 @@ async def sweep(db, *, now: datetime | None = None) -> dict:
             continue
         league = await db.leagues.find_one({"id": season.get("league_id")}, {"_id": 0, "id": 1, "name": 1, "slug": 1}) or {}
         try:
-            if settings["matchday"]:
+            if settings["matchday"] and season.get("status") != "cancelled":
                 counts["matchday"] += await matchday_posts(db, season, league, settings, current, MAX_POSTS_PER_RUN - counts["matchday"])
             if settings["season_end"]:
                 counts["season_end"] += await season_end_post(db, season, league, settings, current)
+                counts["season_end"] += await season_cancel_post(db, season, league, settings, current)
         except Exception:  # noqa: BLE001 - eine Season hält die anderen nicht auf
             logger.warning("[league_discord] Season %s nicht gemeldet", log_safe(season.get("id")), exc_info=True)
     return counts

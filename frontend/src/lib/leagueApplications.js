@@ -69,6 +69,8 @@ function when(value) {
 export function windowLine(block) {
   if (block?.state === "open") return `Offen bis ${when(block.closes_at)}`;
   if (block?.state === "upcoming") return `Öffnet am ${when(block.opens_at)}`;
+  // Abgesagt (#2607): Die Anmeldung endete mit der Absage - der Satz nennt sie, nie „vorbei seit“ einem späteren Fensterende.
+  if (block?.state === "closed" && block.cancelled) return `Abgesagt am ${when(block.cancelled_at || block.closes_at)}`;
   if (block?.state === "closed") return `Vorbei seit ${when(block.closes_at)}`;
   return "";
 }

@@ -58,3 +58,12 @@ test("leagueTile: läuft vor Starttermin, sonst „Startet bald“", () => {
   expect(leagueTile([{ name: "L", seasons: [{ ...SEASON, start_date: null }] }], now).badge).toBe("Startet bald");
   expect(leagueTile([{ name: "L", seasons: [{ ...SEASON, status: "completed" }] }], now).badge).toBe("");
 });
+
+
+test("leagueTile: abgesagte Seasons zählen wie beendete nicht mit (#2607)", () => {
+  const now = Date.parse("2026-10-28T12:00:00Z");
+  const cancelled = { ...SEASON, status: "cancelled" };
+  expect(leagueTile([{ name: "L", seasons: [cancelled] }], now).badge).toBe("");
+  expect(leagueTile([{ name: "L", seasons: [{ ...cancelled, start_date: null }] }], now).badge).toBe("");
+  expect(leagueTile([{ name: "L", seasons: [cancelled, { ...SEASON, id: "s2", start_date: "2026-12-01" }] }], now).badge).toBe("Start am Di 1. Dezember");
+});

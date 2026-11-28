@@ -488,6 +488,30 @@ async def _follow_veto(db, season_id: str, doc: dict, me: dict, warnings: list[s
     return followed
 
 
+@admin_router.get("/seasons/{season_id}/cancel-plan")
+async def admin_season_cancel_plan(season_id: str, _me: dict = Depends(require_league("manage", via="season_id"))):
+    """Season absagen (#2607): was das Absagen täte - Anträge, Staffeln, wer eine Nachricht bekommt - oder warum es nicht geht."""
+    from services import league_season_cancel
+
+    db = get_db()
+    season = await _call(leagues.get_season(db, season_id))
+    league = await _call(leagues.get_league(db, season["league_id"]))
+    return await league_season_cancel.plan(db, league, season)
+
+
+@admin_router.post("/seasons/{season_id}/cancel")
+async def admin_cancel_season(season_id: str, body: LeagueDelete, me: dict = Depends(require_league("manage", via="season_id"))):
+    """Season absagen (#2607, Nr. 302): mit Grund, in einem Schritt, unter Sperre. Ein zweites Absagen antwortet mit ``already``."""
+    from services import league_season_cancel
+
+    db = get_db()
+    season = await _call(leagues.get_season(db, season_id))
+    league = await _call(leagues.get_league(db, season["league_id"]))
+    result = await _call(league_season_cancel.cancel(db, league, season, body.reason, me))
+    return {"ok": True, "already": result["already"], "season": result["season"], "rejected": len(result["application_ids"]),
+            "staffeln": len(result["staffel_ids"]), "notified": result["notified"]}
+
+
 @admin_router.get("/seasons/{season_id}/delete-plan")
 async def admin_season_delete_plan(season_id: str, _me: dict = Depends(require_league("manage", via="season_id"))):
     return await _delete_plan("season", season_id)
@@ -696,6 +720,9 @@ async def admin_sync_season(season_id: str, me: dict = Depends(require_league("s
 
     db = get_db()
     season = await _call(leagues.get_season(db, season_id))
+    # Abgesagt (#2607): Die Staffeln sind abgesagt - nichts mehr zu übertragen.
+    if season.get("status") == leagues.CANCELLED:
+        raise HTTPException(status_code=409, detail=leagues.SEASON_CANCELLED)
     league = await _call(leagues.get_league(db, season["league_id"]))
     divisions = {row["id"]: row for row in await db.league_divisions.find({"season_id": season_id},
                                                                           {"_id": 0}).to_list(50)}

@@ -26,7 +26,7 @@ from services.log_safe import log_safe
 from services.match_pause import settle_pause
 from services.league_scope import is_league_staffel
 from services.league_service import season_follows_first_staffel
-from services.staffel_guard import staffel_status_problem
+from services.staffel_guard import season_cancelled_problem, staffel_status_problem
 from services.station_runtime import free_stations_of_deleted_matches
 from services.change_events import reset_scope_cache
 from services.public_phase import parse_dt
@@ -555,6 +555,10 @@ async def set_status(tid: str, body: dict, me: dict = Depends(get_current_user),
     staffel_problem = staffel_status_problem(t, status) if status != prev else None
     if staffel_problem:
         raise HTTPException(status_code=400, detail=staffel_problem)
+    # Season abgesagt (#2607): Ihre Staffeln bleiben abgesagt - auch über diesen Weg kommt nichts zurück.
+    cancelled = await season_cancelled_problem(db, t) if status != prev else None
+    if cancelled:
+        raise HTTPException(status_code=409, detail=cancelled)
     pause_set, pause_unset = _pause_change(t, prev, status, body)
     auto_generated_bracket = None
     planning = None

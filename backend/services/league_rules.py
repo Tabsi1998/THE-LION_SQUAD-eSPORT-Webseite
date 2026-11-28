@@ -500,7 +500,7 @@ async def admin_view(db, scope: str, scope_id: str) -> dict:
         # Seasons aus einem Vorgänger (F.2, #1627), die dieses Liga-Regelwerk erben: Ändert es sich, stimmen ihre übernommenen Teams neu zu -
         # die Verwaltung belegt „neu zustimmen“ dann vor wie beim Entwurf einer eigenen Fassung.
         "successor_seasons": ([{"id": row["id"], "name": row.get("name")} for row in await _inheriting_seasons(db, league)
-                               if row.get("predecessor_id") and row.get("status") not in ("completed", "archived")] if not season else []),
+                               if row.get("predecessor_id") and row.get("status") not in ("completed", "archived", "cancelled")] if not season else []),
         "public_url": page_path(league, season),
         "today": _today(),
     }
@@ -743,6 +743,8 @@ async def _publish(db, scope: str, scope_id: str, body: dict, user: dict, *, fro
     nicht mehr (409); dieselbe Nummer verhindert der eindeutige Index. ``frozen``: ein schon geprüfter Schnappschuss (Freigabe des
     Vorschlags) - dann wird genau er veröffentlicht, auch die Namen, nichts neu gelesen."""
     league, season = await resolve_scope(db, scope, scope_id)
+    # Abgesagt (#2607): keine neue Fassung mehr für eine Season, die nicht stattfindet.
+    leagues.cancelled_problem(season)
     draft = await draft_of(db, scope, scope_id)
     if not draft or draft.get("revision") != body.get("revision"):
         raise LeagueProblem(CHANGED_MEANWHILE, 409)
@@ -929,6 +931,8 @@ async def _give_consent(db, version_id: str, season_id: str, squad_id: str, user
     league = await db.leagues.find_one({"id": (season or {}).get("league_id"), "status": "active"}, {"_id": 0}) if season else None
     if not league or season.get("status") == "archived" or not await leagues.can_see_season(user, season):
         raise LeagueProblem("Season nicht gefunden.", 404)
+    # Abgesagt (#2607): Zugestimmt wird nur, wo noch gespielt wird.
+    leagues.cancelled_problem(season)
     chain = await _chain(db, league, season)
     version = _find(chain["rows"], version_id)
     if not chain["current"] or chain["current"]["id"] != version["id"]:
@@ -1020,7 +1024,7 @@ async def own_consent_tasks(db, user: dict, registrations: list[dict]) -> list[d
                  for row in squad_rows if row["tournament_id"] in tournaments}
     if not season_of:
         return []
-    seasons = await _by_id(db.league_seasons, {value for value in season_of.values() if value}, {"status": {"$nin": ["archived", "completed"]}})
+    seasons = await _by_id(db.league_seasons, {value for value in season_of.values() if value}, {"status": {"$nin": ["archived", "completed", "cancelled"]}})
     # Was jemand sehen darf, hängt an Sichtbarkeit und Liga (Rechte je Liga, #2203) - je Paar einmal fragen.
     allowed: dict[tuple, bool] = {}
     for season in seasons.values():

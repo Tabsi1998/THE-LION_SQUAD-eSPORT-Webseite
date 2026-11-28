@@ -14,6 +14,10 @@ export const VISIBILITY_OPTIONS = [
 ];
 export const VISIBILITY_SHORT = { off: "Aus", admins: "Nur Liga-Leitung", members: "Nur Mitglieder", public: "Öffentlich" };
 export const SEASON_STATUS_OPTIONS = [["draft", "Entwurf"], ["active", "Läuft"], ["completed", "Beendet"], ["archived", "Archiviert"]];
+// „Abgesagt“ (#2607) steht nicht zur Wahl: Das setzt nur „Season absagen“ mit Grund und Nachricht an alle, zurück geht es nicht.
+export const SEASON_STATUS_TEXT = { ...Object.fromEntries(SEASON_STATUS_OPTIONS), cancelled: "Abgesagt" };
+/** Ist die Season abgesagt (#2607)? Dann wirkt sie überall wie geschlossen, bleibt aber sichtbar. */
+export const isCancelledSeason = (season) => season?.status === "cancelled";
 export const WEEKDAY_OPTIONS = [["0", "Montag"], ["1", "Dienstag"], ["2", "Mittwoch"], ["3", "Donnerstag"], ["4", "Freitag"], ["5", "Samstag"], ["6", "Sonntag"]];
 export const BEST_OF_OPTIONS = [["1", "Best of 1"], ["3", "Best of 3"], ["5", "Best of 5"], ["7", "Best of 7"]];
 export const LEGS_OPTIONS = [["1", "Nur Hinrunde"], ["2", "Hin- und Rückrunde"]];

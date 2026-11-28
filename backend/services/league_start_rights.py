@@ -710,7 +710,8 @@ async def sweep(db, *, now: datetime | None = None) -> dict:
         except Exception:  # noqa: BLE001 - die nächste Season kommt trotzdem dran
             logger.warning("[liga] Startrechte: Nachricht der Season %s nicht verschickt", log_safe(season.get("id")), exc_info=True)
     seasons = await db.league_seasons.find({FIELD: {"$type": "object"}, "predecessor_id": {"$nin": [None, ""]},
-                                            "status": {"$nin": ["completed", "archived"]}}, {"_id": 0, "id": 1}).to_list(500)
+                                            # Abgesagt (#2607): Dort verfällt nichts und rückt niemand nach.
+                                            "status": {"$nin": ["completed", "archived", "cancelled"]}}, {"_id": 0, "id": 1}).to_list(500)
     for season in seasons:
         try:
             async with _Lock(db, season["id"], wait_seconds=2.0):

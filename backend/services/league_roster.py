@@ -45,7 +45,8 @@ FORMAT, TAKEN = "format", "taken"
 TAKEN_REASON = ("Diese Spiel-ID ist in dieser Season schon vergeben. Bitte prüfe sie im Profil. Stimmt sie, hilft die "
                 "Liga-Leitung weiter.")
 TAKEN_ANOTHER = "Diese Spiel-ID ist in dieser Season schon bei einer anderen Person festgehalten."
-CLOSED_SEASON_STATUSES = {"completed", "archived"}
+# Wie ``league_service.CLOSED_SEASON_STATUSES``, mit „abgesagt“ (#2607): Danach hält der Kader nichts mehr fest.
+CLOSED_SEASON_STATUSES = {"completed", "archived", "cancelled"}
 FINISHED_TOURNAMENT_STATUSES = {"completed", "results_published", "archived", "cancelled"}
 ACTIVE_REGISTRATION_STATUSES = ("pending", "approved", "checked_in", "waitlist")
 REASON_MIN_LENGTH = 5

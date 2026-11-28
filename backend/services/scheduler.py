@@ -828,6 +828,18 @@ async def _safe_league_start_rights():
         _log_task_failure("league_start_rights", exc)
 
 
+async def _safe_league_season_shortfall():
+    """Zu wenige für den Spielplan (#2607, Nr. 302): Ist die Anmeldung zu, hört die Leitung es einmal je Season - nie automatisch abgesagt."""
+    try:
+        from database import get_db
+        from services.league_season_cancel import shortfall_sweep
+        result = await shortfall_sweep(get_db())
+        if result.get("told"):
+            logger.info(f"[scheduler] league_season_shortfall told={result['told']}")
+    except Exception as exc:
+        _log_task_failure("league_season_shortfall", exc)
+
+
 async def _safe_league_moments():
     """Saisonende-Moment (#1639): ein ausgelassener Abgleich (Sperre belegt, Abbruch) holt hier nach - Marke an der Season."""
     try:
@@ -1413,6 +1425,9 @@ def start_scheduler() -> AsyncIOScheduler:
     # Startrechte der Liga (#1627, F.2a): Fristen und Nachrücken - alle 15 Minuten, jede Season unter ihrer eigenen Sperre.
     sched.add_job(_single_replica("league_start_rights", _safe_league_start_rights, lease_seconds=300.0), IntervalTrigger(minutes=15),
                   id="league_start_rights", max_instances=1, coalesce=True)
+    # Zu wenige für den Spielplan (#2607, Nr. 302): nach Anmeldeschluss einmal je Season an die Leitung - alle 30 Minuten.
+    sched.add_job(_single_replica("league_season_shortfall", _safe_league_season_shortfall, lease_seconds=300.0), IntervalTrigger(minutes=30),
+                  id="league_season_shortfall", max_instances=1, coalesce=True)
     # Saisonende-Moment (#1639): ausgelassene Abgleiche nachholen - alle 5 Minuten, nie doppelt (Sperre und Marke je Season).
     sched.add_job(_single_replica("league_moments", _safe_league_moments, lease_seconds=300.0), IntervalTrigger(minutes=5),
                   id="league_moments", max_instances=1, coalesce=True)

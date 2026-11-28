@@ -12,7 +12,7 @@
 // gelten für bestehende Staffeln erst nach „Vorgaben auf Staffeln übertragen“.
 import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
 import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
-import { ArrowLeft, CopyPlus, RefreshCw, Trash2, X } from "lucide-react";
+import { ArrowLeft, Ban, CopyPlus, RefreshCw, Trash2, X } from "lucide-react";
 import { api, formatApiError } from "@/lib/api";
 import { AdminLayout } from "@/components/tls/AdminLayout";
 import { AdminTabBar } from "@/components/tls/AdminTabBar";
@@ -25,8 +25,9 @@ import { selectableModes } from "@/lib/gameMatchData";
 import { LeagueEmblem } from "@/components/tls/league/public/LeagueLook";
 import { formatWhen } from "@/lib/datetime";
 import {
-  VISIBILITY_SHORT, longestSeries, modeOrderProblem, orderLengthNote, sameOrder, seasonToForm, settingsLine,
+  VISIBILITY_SHORT, isCancelledSeason, longestSeries, modeOrderProblem, orderLengthNote, sameOrder, seasonToForm, settingsLine,
 } from "@/lib/league";
+import { SeasonCancelledNotice } from "@/components/tls/league/public/SeasonCancelledNotice";
 import { SEASON_TABS, TAB_FIELDS, dirtyTabs, rebaseForm, rulesNotice as noticeOf, seasonTarget, tabPayload } from "@/lib/seasonTabs";
 import { LeagueDeleteSheet } from "./LeagueDeleteSheet";
 import { SeasonDatesTab } from "./SeasonDatesTab";
@@ -42,6 +43,7 @@ import { SeasonSanctionsTab } from "./SeasonSanctionsTab";
 import { SeasonCloseTab } from "./SeasonCloseTab";
 import { SeasonRewardsTab } from "./SeasonRewardsTab";
 import { SeasonSuccessorSheet } from "./SeasonSuccessorSheet";
+import { SeasonCancelSheet } from "./SeasonCancelSheet";
 import { SeasonRecomputeSheet } from "./SeasonRecomputeSheet";
 import { SeasonTableLinks } from "./SeasonTablePanel";
 import { SeasonPointsFields, SeasonTableRules } from "./SeasonTableRules";
@@ -116,6 +118,7 @@ export default function AdminLeagueSeasonPage() {
   const [divisionSheet, setDivisionSheet] = useState(null);
   const [deleting, setDeleting] = useState(null);
   const [successorOpen, setSuccessorOpen] = useState(false);
+  const [cancelOpen, setCancelOpen] = useState(false);
   const [recomputeOpen, setRecomputeOpen] = useState(false);
   const [overrideReason, setOverrideReason] = useState("");
   const [seasonModes, setSeasonModes] = useState(null);
@@ -155,6 +158,8 @@ export default function AdminLeagueSeasonPage() {
   const season = data?.season;
   // Solo-Liga (#1629, P1): 1 gegen 1, Spieler statt Co-Teams - die Reiter blenden aus, was es für Spieler (noch) nicht gibt.
   const solo = isSoloLeague(data?.league);
+  // Abgesagt (#2607): oben Schild, Grund und der Weg zum Neustart; Absagen, Löschen und „Neue Season aus …“ entfallen.
+  const cancelled = isCancelledSeason(season);
   const saved = useMemo(() => (season ? seasonToForm(season) : null), [season]);
   const staffelCount = (data?.divisions || []).reduce((sum, division) => sum + division.staffeln.length, 0);
   const readinessVersion = data ? `${season.updated_at}-${data.map_pool?.version ?? 0}-${data.divisions.length}-${staffelCount}` : "";
@@ -433,26 +438,51 @@ export default function AdminLeagueSeasonPage() {
             {can("manage") ? (
               <div className="flex flex-wrap items-center gap-2">
                 {/* Aus dem Vorgänger übernommen (F.2, Nr. 162): Wurde dessen Endstand korrigiert, rechnet der Knopf die Übernahme neu - nur vor dem Start. */}
-                {season.predecessor_id ? (
+                {cancelled ? null : season.predecessor_id ? (
                   <button type="button" onClick={() => setRecomputeOpen(true)} data-testid="season-recompute"
                     className="tls-btn tls-btn--quiet px-3 py-1.5 rounded-sm tls-type-label inline-flex items-center gap-1.5">
                     <RefreshCw className="w-3.5 h-3.5" aria-hidden="true" /> Übernahme neu berechnen
                   </button>
                 ) : null}
-                {/* Solo-Liga (#1629): Folge-Season und Startrechte je Person folgen (P4) - der Knopf steht da, gesperrt mit Satz darunter. */}
-                <button type="button" onClick={() => setSuccessorOpen(true)} data-testid="season-successor" disabled={solo}
-                  aria-describedby={solo ? "season-successor-follows" : undefined}
-                  className="tls-btn tls-btn--secondary px-3 py-1.5 rounded-sm tls-type-label inline-flex items-center gap-1.5 disabled:opacity-50">
-                  <CopyPlus className="w-3.5 h-3.5" aria-hidden="true" /> Neue Season aus {season.name}
-                </button>
-                <button type="button" onClick={() => setDeleting({ kind: "season", target: season, name: season.name })} data-testid="season-delete"
-                  className="tls-btn tls-btn--danger px-3 py-1.5 rounded-sm tls-type-label inline-flex items-center gap-1.5">
-                  <Trash2 className="w-3.5 h-3.5" aria-hidden="true" /> Season löschen
-                </button>
+                {/* Solo-Liga (#1629): Folge-Season und Startrechte je Person folgen (P4) - der Knopf steht da, gesperrt mit Satz darunter.
+                    Abgesagt (#2607): Aus einer abgesagten Season gibt es keine neue - der Hinweis oben zeigt den Weg über den Vorgänger. */}
+                {cancelled ? null : (
+                  <button type="button" onClick={() => setSuccessorOpen(true)} data-testid="season-successor" disabled={solo}
+                    aria-describedby={solo ? "season-successor-follows" : undefined}
+                    className="tls-btn tls-btn--secondary px-3 py-1.5 rounded-sm tls-type-label inline-flex items-center gap-1.5 disabled:opacity-50">
+                    <CopyPlus className="w-3.5 h-3.5" aria-hidden="true" /> Neue Season aus {season.name}
+                  </button>
+                )}
+                {/* Season absagen (#2607, Nr. 302): ein Knopf mit Grund und Nachricht an alle - nur bis zum Start. */}
+                {cancelled || ["completed", "archived"].includes(season.status) ? null : (
+                  <button type="button" onClick={() => setCancelOpen(true)} data-testid="season-cancel"
+                    className="tls-btn tls-btn--secondary px-3 py-1.5 rounded-sm tls-type-label inline-flex items-center gap-1.5">
+                    <Ban className="w-3.5 h-3.5" aria-hidden="true" /> Season absagen
+                  </button>
+                )}
+                {cancelled ? null : (
+                  <button type="button" onClick={() => setDeleting({ kind: "season", target: season, name: season.name })} data-testid="season-delete"
+                    className="tls-btn tls-btn--danger px-3 py-1.5 rounded-sm tls-type-label inline-flex items-center gap-1.5">
+                    <Trash2 className="w-3.5 h-3.5" aria-hidden="true" /> Season löschen
+                  </button>
+                )}
               </div>
             ) : null}
           </div>
-          {solo && can("manage") ? (
+          {cancelled ? (
+            <SeasonCancelledNotice season={season} className="mb-5" testId="season-admin-cancelled">
+              <p className="mt-2 tls-type-small text-white/70" data-testid="season-admin-cancelled-next">
+                Zurücknehmen geht nicht. Für einen Neustart legst du eine neue Season an
+                {season.predecessor?.id ? (
+                  <> – mit <Link to={`/admin/leagues/seasons/${season.predecessor.id}`} className="font-semibold text-brand underline-offset-2 hover:underline"
+                    data-testid="season-admin-cancelled-predecessor">„Neue Season aus {season.predecessor.name}“</Link> gelten dessen Startrechte weiter.</>
+                ) : (
+                  <> in der <Link to="/admin/leagues" className="font-semibold text-brand underline-offset-2 hover:underline">Liga-Übersicht</Link>.</>
+                )}
+              </p>
+            </SeasonCancelledNotice>
+          ) : null}
+          {solo && can("manage") && !cancelled ? (
             <p id="season-successor-follows" className="-mt-2 mb-5 tls-type-small text-white/70" data-testid="season-successor-follows">{SOLO_SUCCESSOR_FOLLOWS}</p>
           ) : null}
 
@@ -491,6 +521,9 @@ export default function AdminLeagueSeasonPage() {
           ) : null}
           {recomputeOpen ? (
             <SeasonRecomputeSheet season={season} onClose={() => setRecomputeOpen(false)} onDone={() => { setRecomputeOpen(false); reload(); }} />
+          ) : null}
+          {cancelOpen ? (
+            <SeasonCancelSheet season={season} onClose={() => setCancelOpen(false)} onDone={() => { setCancelOpen(false); reload(); }} />
           ) : null}
           {successorOpen ? (
             <SeasonSuccessorSheet season={season} onClose={() => setSuccessorOpen(false)}

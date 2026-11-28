@@ -216,7 +216,8 @@ export function seasonPhases({ season = {}, calendar = null, divisions = [], now
   const lastDay = weeks.at(-1)?.end_day || "";
   const staffeln = (divisions || []).filter((row) => (row.status || "active") === "active").flatMap((row) => row.staffeln || []);
   const started = staffeln.some((row) => STARTED.has(row.status)) || (season.status === "active" && start != null && time >= start);
-  const finished = ["completed", "archived"].includes(season.status)
+  // Abgesagt (#2607) schließt die Leiste ab wie „Beendet“ - auch vor dem Start.
+  const finished = ["completed", "archived", "cancelled"].includes(season.status)
     || (started && staffeln.length > 0 && staffeln.every((row) => FINISHED.has(row.status)));
   const published = ["members", "public"].includes(season.visibility);
   const hasWindow = opens != null && closes != null;
@@ -242,10 +243,16 @@ export function seasonPhases({ season = {}, calendar = null, divisions = [], now
     { key: "einteilung", label: "Einteilung", when: startText ? `bis ${startText}` : "", note: "Staffeln anlegen, Co-Teams zuteilen, Staffel starten" },
     { key: "spielbetrieb", label: "Spielbetrieb", when: startText ? (lastDay ? formatRange(season.start_date, lastDay) : startText) : "",
       note: weekNote || "Termine, Check-in je Spiel, Ergebnisse" },
-    { key: "abschluss", label: "Abschluss", when: season.status === "archived" ? "archiviert" : season.status === "completed" ? "beendet" : "",
-      note: "Endstand je Staffel im Reiter „Abschluss“ festhalten" },
+    { key: "abschluss", label: "Abschluss", when: season.status === "archived" ? "archiviert" : season.status === "completed" ? "beendet"
+      : season.status === "cancelled" ? "abgesagt" : "",
+    note: season.status === "cancelled" ? "Abgesagt – ohne Endstand, die Staffeln sind abgesagt" : "Endstand je Staffel im Reiter „Abschluss“ festhalten" },
   ];
+  // Abgesagt (#2607): Was bis zur Absage erreicht war, ist erledigt - alles danach bis zum Abschluss entfällt (kein Haken für einen
+  // Spielbetrieb, den es nie gab).
+  const cancelledAt = season.status === "cancelled" ? (at(season.cancelled_at) ?? time) : null;
+  const reached = cancelledAt == null ? null : started ? 3 : hasWindow ? (cancelledAt < opens ? 0 : cancelledAt < closes ? 1 : 2) : 0;
   return steps.map((step, index) => {
+    if (reached != null && index > reached && index < current) return { ...step, state: "skipped" };
     if (step.key === "anmeldung" && !hasWindow) return { ...step, state: index < current ? "skipped" : current === index ? "current" : "skipped" };
     return { ...step, state: index < current ? "done" : index === current ? "current" : "upcoming" };
   });
@@ -258,7 +265,7 @@ export function seasonPhases({ season = {}, calendar = null, divisions = [], now
 // „Archiviert“ sind eigene Entscheidungen der Leitung und bleiben als Status stehen.
 const OWN_STAFFEL_STATUS = new Set(["cancelled", "archived"]);
 const BEFORE_START = new Set(["draft", "scheduled", "registration_open", "registration_closed", "check_in"]);
-const CLOSED_SEASON = new Set(["completed", "archived"]);
+const CLOSED_SEASON = new Set(["completed", "archived", "cancelled"]);
 const PUBLISHED_VISIBILITY = new Set(["members", "public"]);
 const STEP_NOTE_WAITING = "Die Season läuft schon - diese Staffel ist noch nicht gestartet.";
 const STAND_LABEL = {
@@ -339,6 +346,7 @@ export const STATUS_EFFECT = {
   active: "Im Spielbetrieb. Diesen Stand setzt der Start der ersten Staffel von selbst.",
   completed: "Abgeschlossen: keine Anmeldungen und keine Kaderänderungen mehr. Ligaseite und Tabellen bleiben sichtbar.",
   archived: "Ausgeblendet: Die Season verschwindet aus Ligaseite und Übersicht, alle Daten bleiben erhalten.",
+  cancelled: "Abgesagt: keine Anmeldungen, keine Staffeln, kein Spielbetrieb. Die Season bleibt mit Grund und Datum sichtbar. Zurücknehmen geht nicht.",
 };
 
 // ---------------------------------------------------------------- Hinweise

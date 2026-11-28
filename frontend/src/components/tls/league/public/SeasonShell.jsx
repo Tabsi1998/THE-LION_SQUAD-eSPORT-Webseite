@@ -14,6 +14,7 @@ import { SEASON_SECTIONS, sectionPath } from "@/lib/leagueSeasonPage";
 import "./league.css";
 import "./season.css";
 import { ShortCaps } from "@/components/tls/ShortCaps";
+import { SeasonCancelledNotice } from "./SeasonCancelledNotice";
 
 /** Die Season laden - `missing`, wenn die API sie der Person nicht zeigt (404); `failed` bei Netz- oder Serverfehlern (#2268) - dann
  *  ist die Season nicht „nicht gefunden“, sondern gerade nicht erreichbar. */
@@ -156,6 +157,8 @@ export function SeasonShell({ section = "", head, children }) {
             {head ? head(data) : null}
           </LeagueHead>
         )}
+        {/* Abgesagt (#2607): auf jeder Unterseite Schild, Datum und Grund - die Season bleibt sichtbar. */}
+        <SeasonCancelledNotice season={season} className="mt-6" />
         <SeasonNav leagueSlug={league.slug} seasonSlug={season.slug} hasRules={Boolean(data.rules)} hasOverall={Boolean(data.overall)} className="mt-8" />
         {children(data)}
       </div>
