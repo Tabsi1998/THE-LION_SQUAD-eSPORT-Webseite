@@ -3849,12 +3849,11 @@ Logik in `services/league_season_cancel.py`, Routen in `routes/league_routes.py`
   und Vertreter übernommener Co-Teams (`carry_over`), nicht neu angemeldete.
 - **Anzeige:** `GET /api/leagues`, `GET /api/leagues/{liga}/{season}` und der Kopf jeder Season tragen `cancel_reason` und `cancelled_at`
   (nie `cancelled_by`). Der Block `application` trägt `cancelled: true` und `cancelled_at`, `closes_at` ist höchstens die Absage - die
-  Seite sagt „Abgesagt am …“ statt „Vorbei seit …“. Ligaseite: auf jeder Unterseite das Schild „Abgesagt“ (`PhaseBadge`, Rolle `quiet`)
+  Seite sagt „Abgesagt am …“ statt „Vorbei seit …“. Ligaseite: auf jeder Unterseite das Zustands-Schild „Abgesagt“ (`StatusChip`, Art `cancelled`, #1306)
   mit Datum und Grund, abgesagte Staffeln holen die Tabellen nicht nach oben; die Liga-Übersicht `/liga` sagt „Abgesagt am …“, die
   Esports-Kachel übergeht abgesagte Seasons wie beendete; die Teilen-Karte (`seo_render_routes.league_season_meta`) heißt „… · Abgesagt“
   mit dem Grund. Verwaltung: dasselbe Schild oben mit dem Weg zum Neustart, „Season absagen“, „Season
-  löschen“ und „Neue Season aus …“ entfallen, der Stand steht nur lesend, die Ablaufleiste endet mit „Abschluss · abgesagt“. Die
-  Zustands-Schilder aus #2609 übernehmen die Art „Abgesagt“, sobald sie da sind.
+  löschen“ und „Neue Season aus …“ entfallen, der Stand steht nur lesend, die Ablaufleiste endet mit „Abschluss · abgesagt“.
 - **Discord:** eine Meldung „Season abgesagt · …“ mit Grund und Link im Liga-Kanal, nur mit dem Schalter „Saisonende“ der Season und nur
   für öffentliche Seasons (`league_discord.season_cancel_post`, Schlüssel `season_cancelled:<season>`, im Job gezählt wie das Saisonende).
   Spieltag-Meldungen gehen für eine abgesagte Season nicht mehr hinaus.

@@ -127,8 +127,8 @@ for (const kind of ["team", "solo"]) {
 
         const notice = page.getByTestId("season-admin-cancelled");
         await expect(notice).toBeVisible();
-        await expect(notice).toContainText("Abgesagt");
-        await expect(notice.getByTestId("season-admin-cancelled-date")).toHaveText("am 28.11.2026");
+        await expect(notice.locator("[data-kind=cancelled]")).toContainText("Abgesagt");
+        await expect(notice.getByTestId("season-admin-cancelled-date")).toContainText("am 28.11.2026");
         await expect(notice.getByTestId("season-admin-cancelled-reason")).toContainText(REASON);
         if (kind === "team") {
           await expect(notice.getByTestId("season-admin-cancelled-predecessor")).toHaveAttribute("href", "/admin/leagues/seasons/s1");
@@ -154,8 +154,8 @@ for (const kind of ["team", "solo"]) {
         await page.goto(`/liga/${w.league.slug}/season-2`);
         const notice = page.getByTestId("season-cancelled");
         await expect(notice).toBeVisible();
-        await expect(notice).toContainText("Abgesagt");
-        await expect(notice.getByTestId("season-cancelled-date")).toHaveText("am 28.11.2026");
+        await expect(notice.locator("[data-kind=cancelled]")).toContainText("Abgesagt");
+        await expect(notice.getByTestId("season-cancelled-date")).toContainText("am 28.11.2026");
         await expect(notice.getByTestId("season-cancelled-reason")).toHaveText(`Grund: ${REASON}`);
         // Die Anmeldung endete mit der Absage - nie „Vorbei seit <Fensterende>“.
         await expect(page.getByText("Abgesagt am 28.11.2026, 11:30 Uhr")).toBeVisible();
