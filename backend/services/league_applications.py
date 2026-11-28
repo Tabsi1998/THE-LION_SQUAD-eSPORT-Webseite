@@ -74,6 +74,7 @@ ACCEPT_BOTH = "Bitte stimme den Regeln und dem Hinweis zum Datenschutz ausdrück
 NOT_RESPONSIBLE = "Anmelden und zurückziehen dürfen nur Captain und Vertreter des Co-Teams."
 ALREADY_OPEN = "Für dieses Co-Team läuft schon eine Anmeldung."
 FINISHED = "Diese Season ist beendet."
+CANCELLED_SEASON = "Diese Season ist abgesagt."
 NO_SEATS = "Alle Startplätze sind vergeben."
 NO_SEATS_NO_WAITLIST = "Alle Startplätze sind vergeben, und die Warteliste ist voll oder gibt es nicht."
 SEATS_TAKEN = "Alle Startplätze sind vergeben. Setz das Co-Team auf die Warteliste oder gib erst einen Platz frei."
@@ -182,6 +183,9 @@ def window_state(season: dict, now: datetime | None = None) -> str | None:
     opens, closes = _moment(season.get("application_opens_at")), league_late.effective_closes(season)
     if not opens or not closes:
         return None
+    if season.get("status") == league_service.CANCELLED:
+        # Abgesagt (#2607): Die Anmeldung ist zu - das Fenster bleibt gespeichert, als Nachweis.
+        return CLOSED
     moment = now or now_utc()
     if moment < opens:
         return UPCOMING
@@ -275,6 +279,9 @@ async def season_problems(db, league: dict, season: dict, stats: dict | None = N
     if not state:
         return [NO_WINDOW]
     problems: list[str] = []
+    if season.get("status") == league_service.CANCELLED:
+        # Abgesagt (#2607): der Grund vor allem anderen - „Die Anmeldung ist vorbei“ allein sagte nicht, warum.
+        return [CANCELLED_SEASON]
     if (season.get("status") or "draft") in ("completed", "archived"):
         problems.append(FINISHED)
     if state == UPCOMING:

@@ -532,7 +532,25 @@ SYNC_GROUP_LABELS = {
 TABLE_POINTS_KEYS = ("match_points_mode", "table_tiebreakers", "forfeit_score")
 FINISHED_STAFFEL_STATUSES = frozenset({"completed", "results_published", "archived", "cancelled"})
 # Eine abgeschlossene oder archivierte Season bekommt keine neue Punkteart mehr - ihr Endstand bleibt.
-CLOSED_SEASON_STATUSES = frozenset({"completed", "archived"})
+# Abgesagt (#2607, Nr. 302): Die Season wirkt wie geschlossen, bleibt aber sichtbar. Gesetzt nur über „Season absagen“
+# (``services/league_season_cancel.py``), nie über den „Stand“ - und von dort führt kein Weg zurück.
+CANCELLED = "cancelled"
+CLOSED_SEASON_STATUSES = frozenset({"completed", "archived", CANCELLED})
+SEASON_CANCELLED = ("Diese Season ist abgesagt. Zurücknehmen geht nicht – für einen Neustart legst du eine neue Season an, "
+                    "zum Beispiel über „Neue Season aus …“ bei der Vorgänger-Season.")
+CANCEL_ONLY_BY_BUTTON = "Absagen geht nur über „Season absagen“ – mit Grund und Nachricht an alle Angemeldeten."
+
+
+def cancelled_problem(season: dict | None) -> None:
+    """Wirft 409, wenn die Season abgesagt ist (#2607): Danach kommt auf keinem Weg mehr etwas in sie hinein."""
+    if (season or {}).get("status") == CANCELLED:
+        raise LeagueProblem(SEASON_CANCELLED, 409)
+
+
+async def require_not_cancelled(db, season_id: str | None) -> None:
+    """Wie ``cancelled_problem``, mit frisch gelesenem Stand - für Wege, die unter einer Sperre noch einmal nachsehen."""
+    if season_id:
+        cancelled_problem(await db.league_seasons.find_one({"id": season_id}, {"_id": 0, "status": 1}))
 
 
 def table_points_update(tournament: dict, wanted: dict) -> dict | None:
@@ -819,6 +837,8 @@ async def _platform_season(db, season: dict, body: dict) -> dict:
 
 
 async def create_season(db, league: dict, body: dict, user: dict, *, before_write=None) -> dict:
+    if body.get("status") == CANCELLED:
+        raise LeagueProblem(CANCEL_ONLY_BY_BUTTON, 409)
     game = await _game(db, league.get("game_id"))
     if isinstance(body.get("scoring_rules"), dict):
         # Tabelle (E.1, #1625): was eine neue Season nicht selbst setzt, kommt aus den Vorgaben neuer Liga-Seasons.
@@ -894,6 +914,12 @@ async def update_season(db, season: dict, body: dict, *, before_write=None,
                         warnings: list | None = None) -> tuple[dict, list[str]]:
     """Eine Season ändern. ``before_write(neuer Stand)`` läuft nach allen Prüfungen und vor dem Schreiben (Prüfung vor der
     Veröffentlichung, #2207); ``warnings`` sammelt Hinweise, die das Speichern nicht aufhalten."""
+    if season.get("status") == CANCELLED and body.get("status") not in (None, CANCELLED):
+        # Abgesagt (#2607): kein Weg zurück und kein Archiv, das die Absage ausblendet.
+        raise LeagueProblem(SEASON_CANCELLED, 409)
+    if body.get("status") == CANCELLED and season.get("status") != CANCELLED:
+        # Abgesagt wird nur mit Grund und mit allen Folgen (Anträge, Staffeln, Nachrichten) - über „Season absagen“.
+        raise LeagueProblem(CANCEL_ONLY_BY_BUTTON, 409)
     league = await get_league(db, season["league_id"])
     game = await _game(db, league.get("game_id"))
     # Solo-Liga (#1629): vor den übrigen Prüfungen, damit der Satz sagt, warum - nicht nur, dass der Kader nicht passt.
@@ -931,10 +957,14 @@ async def update_season(db, season: dict, body: dict, *, before_write=None,
         await before_write({**season, **fields})
     if changed or stamp:
         fields["updated_at"] = _now()
+        # Wurde die Season inzwischen abgesagt (#2607), setzt ein Speichern mit altem Stand sie nicht zurück.
+        guard = {"status": {"$ne": CANCELLED}} if "status" in fields and season.get("status") != CANCELLED else {}
         try:
-            await db.league_seasons.update_one({"id": season["id"]}, {"$set": fields})
+            written = await db.league_seasons.update_one({"id": season["id"], **guard}, {"$set": fields})
         except DuplicateKeyError:
             raise LeagueProblem("Diese Season gibt es schon.", 409) from None
+        if guard and not written.matched_count:
+            raise LeagueProblem(SEASON_CANCELLED, 409)
     doc = {**season, **fields}
     if league_look.BANNER in changed:
         await apply_banner(db, league, doc)
@@ -1019,6 +1049,7 @@ async def create_division(db, season: dict, body: dict, user: dict, *, warnings:
     """Legt eine Liga N an - unter der Season-Sperre (Nr. 232) und nur, solange keine Staffel der Season abgeschlossen ist (Nr. 231)."""
     try:
         async with _season_lock(db, season["id"]):
+            await require_not_cancelled(db, season["id"])
             if await divisions_locked(db, season["id"]):
                 raise LeagueProblem(DIVISIONS_LOCKED, 422)
             return await _create_division(db, season, body, user, warnings=warnings)
@@ -1069,6 +1100,7 @@ async def update_division(db, division: dict, body: dict, *, warnings: list | No
 
 async def _update_division(db, division: dict, body: dict, *, warnings: list | None = None, before_write=None) -> tuple[dict, list[str]]:
     season = await get_season(db, division["season_id"])
+    cancelled_problem(season)
     # Archivieren oder zurückholen verändert die Stufen der Season (Nr. 231): nicht mehr, sobald eine Staffel abgeschlossen ist.
     if body.get("status") and body["status"] != (division.get("status") or "active") and await divisions_locked(db, division["season_id"]):
         raise LeagueProblem(DIVISIONS_LOCKED, 422)
@@ -1102,7 +1134,7 @@ async def _update_division(db, division: dict, body: dict, *, warnings: list | N
 
 DELETE_REASON_MISSING = "Bitte einen Grund angeben (mindestens 5 Zeichen) – er steht im Protokoll."
 STAFFEL_BUSY = "Eine Staffel wird gerade bearbeitet – bitte gleich noch einmal."
-SEASON_STATUS_TEXT = {"draft": "Entwurf", "active": "läuft", "completed": "beendet", "archived": "archiviert"}
+SEASON_STATUS_TEXT = {"draft": "Entwurf", "active": "läuft", "completed": "beendet", "archived": "archiviert", CANCELLED: "abgesagt"}
 DELETE_KINDS = ("league", "season", "division")
 
 
@@ -1307,6 +1339,7 @@ async def create_staffel(db, division: dict, staffel: str | None, user: dict, *,
 
 async def _create_staffel(db, division: dict, staffel: str | None, user: dict, *, postseason: dict | None = None) -> dict:
     season = await get_season(db, division["season_id"])
+    cancelled_problem(season)
     league = await get_league(db, division["league_id"])
     game = await _game(db, league.get("game_id"))
     if not game:
@@ -1638,10 +1671,11 @@ PUBLIC_SEASON_FIELDS = ("id", "number", "name", "slug", "status", "start_date", 
                         "matchday_days", "default_match_weekday", "default_match_time", "round_robin_legs",
                         "max_staffel_size", "best_of", "team_size", "min_squad_size", "game_mode_order",
                         "map_repeat", "result_confirm_hours", "lineup_amend_hours", RESPONSE_HOURS, "rules_text",
-                        "registration_deadline")
+                        "registration_deadline", "cancel_reason", "cancelled_at")
 
 
-PUBLIC_SEASON_HEAD = ("id", "number", "name", "slug", "status", "start_date")
+# Abgesagt (#2607): Grund und Zeit stehen öffentlich da - wer abgesagt hat, nicht.
+PUBLIC_SEASON_HEAD = ("id", "number", "name", "slug", "status", "start_date", "cancel_reason", "cancelled_at")
 
 
 def public_season(season: dict) -> dict:
