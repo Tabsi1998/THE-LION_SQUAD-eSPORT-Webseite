@@ -3009,10 +3009,11 @@ class LeagueDelete(BaseModel):
 
 
 class LeagueApplicationSubmit(BaseModel):
-    """Selbstanmeldung einreichen (#2205): das Co-Team, die gezeigte Fassung und beide ausdrücklichen Zustimmungen."""
+    """Selbstanmeldung einreichen (#2205): das Co-Team, die gezeigte Fassung und beide ausdrücklichen Zustimmungen. In der Solo-Liga
+    (#1629, P2) meldet sich die Person selbst an - dann ohne ``squad_id``; der Dienst sagt mit Satz, was fehlt bzw. zu viel ist."""
     model_config = ConfigDict(extra="forbid")
 
-    squad_id: str = Field(min_length=1, max_length=64)
+    squad_id: Optional[str] = Field(default=None, min_length=1, max_length=64)
     rule_version_id: Optional[str] = Field(default=None, max_length=64)
     accept_rules: bool = False
     accept_privacy: bool = False

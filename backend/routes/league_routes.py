@@ -872,7 +872,8 @@ async def public_season(league_slug: str, season_slug: str, user: dict | None = 
     return {**view, "rules": await rules_summary(db, view["league"]["id"], view["season"]["id"], user),
             # Gesamtwertung (F.5, #2215): der Zeitraum dieser Season - nur dann zeigt die Navigation „Gesamtwertung“.
             "overall": await overall_block(league_doc, season),
-            "application": await league_applications.public_block(db, season),
+            # Solo-Liga (#1629, P2): ``view["league"]`` trägt die Teilnehmerart - dann sagt der Block „als Spieler“.
+            "application": await league_applications.public_block(db, season, view["league"]),
             # Plattform je Season (#2270): erlaubte Plattformen, Crossplay, Eingabegerät, je Liga N; ``None`` ohne jede Angabe.
             "platform": await league_platform.season_block(db, season)}
 

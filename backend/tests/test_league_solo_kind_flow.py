@@ -134,18 +134,20 @@ async def test_the_solo_defaults_stay_adjustable_but_the_team_size_stays_one(flo
 
 
 @pytest.mark.asyncio
-async def test_a_solo_season_has_no_self_registration_yet(flow):
+async def test_a_solo_season_takes_a_window_like_a_team_season(flow):
+    # Seit P2 (#1629) melden sich Spieler selbst an - das Fenster geht beim Anlegen und später (test_league_solo_application_flow).
     flow.act_as(await flow.add_staff())
     game = await make_game(flow)
     solo = await make_league(flow, game, "solo", "Duell Liga")
     window = {"application_opens_at": "2026-11-01T10:00:00Z", "application_closes_at": "2026-11-08T10:00:00Z"}
 
-    refused = await flow.post(f"{ADMIN}/{solo['id']}/seasons", json={**SEASON, **window})
+    created = await flow.post(f"{ADMIN}/{solo['id']}/seasons", json={**SEASON, **window})
     season = (await flow.post(f"{ADMIN}/{solo['id']}/seasons", json=SEASON)).json()
     later = await flow.patch(f"{ADMIN}/seasons/{season['id']}", json=window)
 
-    assert refused.status_code == 422 and refused.json()["detail"] == league_participants.APPLICATIONS_FOLLOW
-    assert later.status_code == 422 and later.json()["detail"] == league_participants.APPLICATIONS_FOLLOW
+    assert created.status_code == 200, created.text
+    assert later.status_code == 200, later.text
+    assert created.json()["team_size"] == 1
 
 
 @pytest.mark.asyncio

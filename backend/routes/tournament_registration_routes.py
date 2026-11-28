@@ -1393,7 +1393,8 @@ async def _delete_registration_locked(db, tid: str, reg_id: str, me: dict) -> di
         return None
     await tournament_fees.close_price(db, reg, "Abmeldung")
     await db.tournament_registrations.delete_one({"id": reg_id})
-    if reg.get("squad_id"):
+    # Zuteilung aus dem Antrag (Co-Team; in der Solo-Staffel die Person, #1629 P2): Der Antrag bleibt angenommen und belegt seinen Platz.
+    if reg.get("squad_id") or league_participants.is_solo_staffel(tournament):
         await league_applications.clear_assignment(db, reg_id, me.get("id"))
     await _move_up_from_waitlist(db, tid, me.get("id"))
     await _audit_tournament_action(
@@ -1590,7 +1591,11 @@ async def _assign_person(db, tournament: dict, user_id: str, me: dict, conflict_
     season_resource = squad_registration.season_lock_resource(tournament)
     try:
         async with (mutation_lock(db, season_resource) if season_resource else contextlib.nullcontext()):
+            # Sonderweg (#1629, P2, wie #2205): Liegt ein offener Antrag der Person vor, gilt er damit als angenommen - über die eigene
+            # Anmeldung entscheidet eine andere Person (#2245). Unter der Season-Sperre, wie beim Co-Team.
+            linked = await league_applications.admin_assignment_conflict(db, tournament, None, me, conflict_reason, user_id=user_id)
             reg = await _insert_person_registration(db, tournament, user_id, me)
+            await league_applications.link_admin_assignment(db, tournament, reg, me, linked or override)
     except MutationLockBusy:
         raise HTTPException(status_code=409, detail=TOURNAMENT_BUSY_DETAIL)
     reg.pop("_id", None)

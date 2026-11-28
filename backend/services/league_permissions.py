@@ -387,8 +387,9 @@ async def side_conflict(db, user: dict | None, side: dict) -> dict | None:
 
 
 async def require_no_side_conflict(db, user: dict, side: dict, *, conflict_reason: str | None = None,
-                                   superadmin_detail: str = SIDE_CONFLICT_SUPERADMIN_DETAIL) -> str | None:
+                                   superadmin_detail: str = SIDE_CONFLICT_SUPERADMIN_DETAIL, detail: str = SIDE_CONFLICT_DETAIL) -> str | None:
     """403, wenn die Person zur Seite gehört; der Superadmin nur mit Grund. Gibt den Grund der Notausnahme zurück, das Protokoll
-    schreibt der Aufrufer, wenn die Entscheidung gelungen ist (``record_override``)."""
+    schreibt der Aufrufer, wenn die Entscheidung gelungen ist (``record_override``). ``detail``: der Satz bei der eigenen Anmeldung als
+    Spieler (Solo-Liga, #1629) statt „eigenes Team“."""
     return override_reason(await side_conflict(db, user, side), conflict_reason,
-                           detail=SIDE_CONFLICT_DETAIL, superadmin_detail=superadmin_detail)
+                           detail=detail, superadmin_detail=superadmin_detail)

@@ -26,7 +26,7 @@ import secrets
 
 from models import REGISTRATION_LIMIT, new_id, now_utc
 from services import league_applications as applications
-from services import league_roster, league_service, league_start_right_rules, squad_registration
+from services import league_participants, league_roster, league_service, league_start_right_rules, squad_registration
 from services import league_staffel_plan as plan
 from services.league_permissions import belongs_to_side, override_reason, record_override, side_of
 from services.league_scope import ONLY_LEAGUE
@@ -73,9 +73,17 @@ def _now() -> str:
 
 # ---------------------------------------------------------------- Stand lesen
 
+async def _solo(db, season: dict) -> bool:
+    """Solo-Liga (#1629, P2): Das Los rechnet mit Co-Teams und Hauptteams - für Spieler folgt es, die Leitung teilt im Eingang zu."""
+    league = await db.leagues.find_one({"id": season.get("league_id")}, {"_id": 0, "participant_kind": 1})
+    return league_participants.is_solo(league)
+
+
 async def _load(db, season: dict) -> dict:
     """Alles, was Übersicht und Los brauchen, mit einer Abfrage je Sammlung: aktive Liga N, Staffeln, ihre Anmeldungen, feste Spielpläne
-    und die angenommenen Anträge der Season."""
+    und die angenommenen Anträge der Season. In der Solo-Liga 409 mit Satz - auf jedem Weg des Loses (#1629, P2)."""
+    if await _solo(db, season):
+        raise LeagueProblem(league_participants.DRAW_FOLLOWS, 409)
     divisions = await db.league_divisions.find({"season_id": season["id"], "status": "active"}, {"_id": 0}).sort("level", 1).to_list(50)
     # Playoff- und Relegations-Staffeln (#2404) tragen ``league_context.kind`` - ins Los kommen nur reguläre Staffeln.
     tournaments = [row for row in await db.tournaments.find(
@@ -251,7 +259,10 @@ async def _division_view(db, ctx: dict, division: dict, user: dict, names: dict[
 
 
 async def overview(db, season: dict, user: dict) -> dict:
-    """Je aktiver Liga N: wer auf eine Staffel wartet, welche Staffeln es gibt, ob sie reichen (Vorschlag der Staffelzahl) und das Los."""
+    """Je aktiver Liga N: wer auf eine Staffel wartet, welche Staffeln es gibt, ob sie reichen (Vorschlag der Staffelzahl) und das Los.
+    Solo-Liga (#1629, P2): keine Liga N, dafür der Satz ``solo_follows``."""
+    if await _solo(db, season):
+        return {"superadmin": is_superadmin(user), "siblings_allowed": False, "divisions": [], "solo_follows": league_participants.DRAW_FOLLOWS}
     ctx = await _load(db, season)
     people = {step.get("by") for division in ctx["divisions"] for key in ("log", "swaps") for step in (division.get("draw") or {}).get(key) or []}
     names = await applications._names(db, people)
