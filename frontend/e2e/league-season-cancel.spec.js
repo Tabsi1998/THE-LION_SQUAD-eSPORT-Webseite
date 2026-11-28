@@ -54,7 +54,8 @@ function world(kind) {
       default_match_weekday: 6, default_match_time: "20:00", best_of: 3, team_size: row.team_size, match_points: { win: 3, draw: 0, loss: 0 }, blocked_periods: [],
       cancel_reason: row.cancel_reason || null, cancelled_at: row.cancelled_at || null },
     map_pool: null, divisions: [{ id: "d1", level: 1, label: "Liga 1", staffeln: [{ tournament_id: "t1", slug: "probe-1a", staffel: "A", status: row.status === "cancelled" ? "cancelled" : "draft" }] }],
-    application: { state: "closed", opens_at: row.application_opens_at, closes_at: row.application_closes_at, slots: null, slots_free: null, waitlist: false, waitlist_full: false },
+    application: { state: "closed", opens_at: row.application_opens_at, closes_at: row.cancelled_at || row.application_closes_at,
+      ...(row.status === "cancelled" ? { cancelled: true, cancelled_at: row.cancelled_at } : {}), slots: null, slots_free: null, waitlist: false, waitlist_full: false },
   });
   return { league, season, page, plan, cancelled, publicSeason };
 }
@@ -156,6 +157,9 @@ for (const kind of ["team", "solo"]) {
         await expect(notice).toContainText("Abgesagt");
         await expect(notice.getByTestId("season-cancelled-date")).toHaveText("am 28.11.2026");
         await expect(notice.getByTestId("season-cancelled-reason")).toHaveText(`Grund: ${REASON}`);
+        // Die Anmeldung endete mit der Absage - nie „Vorbei seit <Fensterende>“.
+        await expect(page.getByText("Abgesagt am 28.11.2026, 11:30 Uhr")).toBeVisible();
+        await expect(page.getByText(/Vorbei seit/)).toHaveCount(0);
         await noSideScroll(page);
         await shot(page, `season-absagen-ligaseite-${kind}-${width}`);
 

@@ -192,3 +192,8 @@ test("Zulassung in der Solo-Season: „Alle Konten“ ohne Teams", async () => {
   expect(ENTRY_POLICY_OPTIONS_SOLO).toEqual([["all", "Alle Konten"], ["members", "Nur Vereinsmitglieder"]]);
   expect(ENTRY_POLICY_OPTIONS[0][1]).toBe("Alle Konten, auch externe Teams");
 });
+
+test("windowLine: eine abgesagte Season sagt die Absage, nie „vorbei seit“ (#2607)", () => {
+  expect(windowLine({ state: "closed", cancelled: true, cancelled_at: "2026-11-28T10:30:00Z", closes_at: "2026-11-28T10:30:00Z" }))
+    .toBe("Abgesagt am 28.11.2026, 11:30 Uhr");
+});
