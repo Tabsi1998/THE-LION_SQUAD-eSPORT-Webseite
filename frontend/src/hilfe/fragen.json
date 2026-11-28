@@ -72,8 +72,8 @@
   {
     "id": "liga-season-abgesagt",
     "frage": "Was passiert, wenn eine Season abgesagt wird?",
-    "antwort": "Die Liga-Leitung kann eine Season vor dem Start absagen, etwa wenn sich zu wenige anmelden. Deine Anmeldung ist dann beendet, Captain und Vertreter bzw. du als Spieler bekommen genau eine Nachricht mit dem Grund. Die Ligaseite zeigt „Abgesagt“ mit Grund und Datum. Startrechte aus der Season davor gelten für die nächste Season weiter.",
-    "bereich": "liga", "rollen": ["spieler", "captain"], "sichtbar_fuer": "alle"
+    "antwort": "Die Liga-Leitung kann sie vor dem Start absagen, etwa bei zu wenigen Anmeldungen. Deine Anmeldung endet, und du bekommst eine Nachricht mit dem Grund. Startrechte aus der Season davor gelten für die nächste Season weiter.",
+    "bereich": "liga", "rollen": ["captain"], "sichtbar_fuer": "alle"
   },
   {
     "id": "ergebnis-melden",
