@@ -840,6 +840,19 @@ async def _safe_league_season_shortfall():
         _log_task_failure("league_season_shortfall", exc)
 
 
+async def _safe_event_minimum_shortfall():
+    """Mindestanzahl bis zu einer Frist (#2614): Frist vorbei und zu wenige - die Turnierleitung hört es einmal je Event und Frist,
+    mit dem Vorschlag abzusagen. Nie automatisch abgesagt."""
+    try:
+        from database import get_db
+        from services.event_minimum import shortfall_sweep
+        result = await shortfall_sweep(get_db())
+        if result.get("told"):
+            logger.info(f"[scheduler] event_minimum_shortfall told={result['told']}")
+    except Exception as exc:
+        _log_task_failure("event_minimum_shortfall", exc)
+
+
 async def _safe_league_moments():
     """Saisonende-Moment (#1639): ein ausgelassener Abgleich (Sperre belegt, Abbruch) holt hier nach - Marke an der Season."""
     try:
@@ -1428,6 +1441,9 @@ def start_scheduler() -> AsyncIOScheduler:
     # Zu wenige für den Spielplan (#2607, Nr. 302): nach Anmeldeschluss einmal je Season an die Leitung - alle 30 Minuten.
     sched.add_job(_single_replica("league_season_shortfall", _safe_league_season_shortfall, lease_seconds=300.0), IntervalTrigger(minutes=30),
                   id="league_season_shortfall", max_instances=1, coalesce=True)
+    # Mindestanzahl bei Events (#2614): nach der Frist einmal je Event und Frist an die Turnierleitung - alle 15 Minuten.
+    sched.add_job(_single_replica("event_minimum_shortfall", _safe_event_minimum_shortfall, lease_seconds=300.0), IntervalTrigger(minutes=15),
+                  id="event_minimum_shortfall", max_instances=1, coalesce=True)
     # Saisonende-Moment (#1639): ausgelassene Abgleiche nachholen - alle 5 Minuten, nie doppelt (Sperre und Marke je Season).
     sched.add_job(_single_replica("league_moments", _safe_league_moments, lease_seconds=300.0), IntervalTrigger(minutes=5),
                   id="league_moments", max_instances=1, coalesce=True)

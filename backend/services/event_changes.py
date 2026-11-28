@@ -4,7 +4,8 @@
   (``cancelled_with_event``), offene Rechnungsaufträge werden storniert, ein schon angelegter Beleg wird zum Prüffall
   (``billing_orders.cancel_orders_for``). Alle Betroffenen bekommen eine Benachrichtigung (Postfach, Push, Discord nach
   Einstellung) und die Mail „Event abgesagt“ (``event_cancelled``, #2119), wenn sie Mails zu Turnier-Updates
-  zulassen. Protokoll ``event.cancel``.
+  zulassen. Mit Grund (``cancel_reason``, #2614) steht er in beiden; bei einem Event mit Mindestzahl ist er Pflicht
+  (services/event_minimum). Protokoll ``event.cancel``.
 - **Verschieben**: neuer Termin oder Ort. Ob die Angemeldeten es erfahren, entscheidet die Verwaltung beim Speichern
   (``notify_registrants``); dieselben Wege, Protokoll ``event.change_notice``.
 - **Löschen**: nur, wenn nichts mehr daran hängt - keine aktive Anmeldung (sonst zuerst absagen), kein Beleg (dann
@@ -98,7 +99,7 @@ def change_starts_at(before: dict, after: dict, now) -> str | None:
 
 
 async def _inform(db, event: dict, users: list[dict], *, title: str, message: str, dedupe: str,
-                  template: str = MESSAGE_TEMPLATE, starts_at: str | None = None) -> dict:
+                  template: str = MESSAGE_TEMPLATE, starts_at: str | None = None, extra: dict | None = None) -> dict:
     """Benachrichtigung und Mail über die vorhandenen Wege; ein Fehler bei einer Person hält die anderen nicht auf.
     Die Absage hat ihre eigene Mail ``event_cancelled`` (#2119), die Terminänderung bleibt bei ``event_message``."""
     from services.notification_preferences import send_user_template
@@ -125,6 +126,7 @@ async def _inform(db, event: dict, users: list[dict], *, title: str, message: st
             values = {"display_name": user.get("display_name") or user.get("username") or "", "event_name": name, "url": url}
             if template == MESSAGE_TEMPLATE:
                 values["message"] = message
+            values.update(extra or {})
             result = await send_user_template(
                 user, template, MESSAGE_CATEGORY, never_collect=True, dedupe_key=f"{dedupe}:{user['id']}", **values,
             )
@@ -186,17 +188,21 @@ async def cancel_event(db, event: dict, me: dict) -> dict:
         registrations += [registration for registration in later if registration["id"] not in known]
         orders += more_orders
     users = await _recipients(db, [registration.get("user_id") for registration in registrations])
-    message = ("Das Event wurde abgesagt. Deine Anmeldung ist damit storniert – ein offener Kostenbeitrag wird nicht "
+    # Grund (#2614): steht, wenn die Verwaltung einen angegeben hat - bei einer Mindestzahl ist er Pflicht.
+    reason = event.get("cancel_reason") or ""
+    message = ("Das Event wurde abgesagt." + (f" Grund: {reason}" if reason else "")
+               + " Deine Anmeldung ist damit storniert – ein offener Kostenbeitrag wird nicht "
                "verrechnet; wurde schon eine Rechnung gestellt, meldet sich der Verein bei dir.")
     # Je Absage-Durchgang und Person genau einmal (``cancel_round`` zählt nur der bedingte Statuswechsel weiter): ein
     # doppelter Klick schickt nichts doppelt, wer sich nach dem Zurücknehmen neu anmeldet, erfährt die zweite Absage.
     round_no = int(event.get("cancel_round") or 1)
     sent = await _inform(db, event, users, title="abgesagt", message=message,
-                         dedupe=f"event-cancelled:{event['id']}:{round_no}", template="event_cancelled")
+                         dedupe=f"event-cancelled:{event['id']}:{round_no}", template="event_cancelled",
+                         extra={"reason": reason} if reason else None)
     result = {"registrations": len(registrations), "notified": sent["notified"], "orders": orders}
     await db.audit_logs.insert_one({
         "id": new_id(), "action": "event.cancel", "actor_id": me["id"], "target_id": event["id"],
-        "data": {**result, "mails": sent["mails"]}, "created_at": now,
+        "data": {**result, "mails": sent["mails"], **({"reason": reason} if reason else {})}, "created_at": now,
     })
     return result
 

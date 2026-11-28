@@ -15,6 +15,8 @@ INTERNAL_EVENT_FIELDS = frozenset({
     "discord_scheduled_event", "discord_scheduled_guilds", "discord_scheduled_days", "discord_scheduled_day_guilds",
     "members_notified_at", "members_notified_count",
     "slug_history", "cancel_round",
+    # Mindestanzahl (#2614): wann die Turnierleitung den Hinweis „zu wenige“ bekam.
+    "min_registrations_notice",
 })
 
 
@@ -22,6 +24,10 @@ def public_event(event: dict, *, keep_internal: bool = False, finance: bool = Fa
     """Eine neue Fassung des Events für die Antwort; das übergebene Dokument bleibt, wie es ist."""
     source = event or {}
     out = dict(source) if keep_internal else {key: value for key, value in source.items() if key not in INTERNAL_EVENT_FIELDS}
+    if not keep_internal and isinstance(out.get("min_registrations"), dict) and out["min_registrations"].get("public") is False:
+        # Mindestanzahl nur für die Verwaltung (#2614): weder Einstellung noch Stand.
+        out.pop("min_registrations", None)
+        out.pop("minimum", None)
     if "billing" in out:
         out.setdefault("offer", pricing.public_offer(out.get("billing")))
         if not finance:

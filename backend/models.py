@@ -813,6 +813,18 @@ class EventHighlight(BaseModel):
     text: str = Field(default="", max_length=120)
 
 
+class EventMinimum(BaseModel):
+    """Mindestanzahl bis zu einer Frist (#2614): findet nur statt, wenn bis ``deadline`` mindestens ``count`` dabei sind.
+    Geprüft in services/event_minimum; nie automatisch abgesagt."""
+    model_config = ConfigDict(extra="forbid")
+    count: int = Field(ge=1, le=10000)
+    deadline: datetime
+    # Begleitpersonen zählen mit (Vorgabe) - sonst nur die Anmeldungen selbst.
+    count_companions: bool = True
+    # Die Event-Seite zeigt „Findet ab 8 Anmeldungen statt – noch 3 bis …“ (Vorgabe); aus: nur die Verwaltung sieht den Stand.
+    public: bool = True
+
+
 EventBannerStyle = Literal["auto", "photo", "logo"]
 
 
@@ -873,6 +885,8 @@ class EventCreate(BaseModel):
     banner_style: Optional[EventBannerStyle] = None
     banner_focus_x: Optional[int] = Field(default=None, ge=0, le=100)
     banner_focus_y: Optional[int] = Field(default=None, ge=0, le=100)
+    # Mindestanzahl bis zu einer Frist (#2614); leer = findet in jedem Fall statt (wie bisher).
+    min_registrations: Optional[EventMinimum] = None
 
 
 class EventUpdate(BaseModel):
@@ -929,6 +943,11 @@ class EventUpdate(BaseModel):
     banner_focus_y: Optional[int] = Field(default=None, ge=0, le=100)
     # Neuer Termin oder Ort (#2118): die Angemeldeten und die Warteliste informieren - wird nicht gespeichert.
     notify_registrants: Optional[bool] = None
+    # Mindestanzahl bis zu einer Frist (#2614); null leert sie - dann findet das Event in jedem Fall statt.
+    min_registrations: Optional[EventMinimum] = None
+    # Grund der Absage (#2614): nur zusammen mit dem Status „Abgesagt“; steht in der Nachricht an alle und auf der Event-Seite.
+    # Pflicht, wenn das Event eine Mindestzahl hat.
+    cancel_reason: Optional[str] = Field(default=None, max_length=500)
 
 
 EventRegistrationStatus =Literal["registered", "waitlist", "checked_in", "cancelled", "no_show"]

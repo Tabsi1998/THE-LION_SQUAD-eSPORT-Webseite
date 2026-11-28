@@ -503,11 +503,13 @@ def tpl_event_registration(display_name: str, event_name: str, headline: str, de
 
 # Absage (#2119): eigene Mails statt „Nachricht der Turnierleitung“ (Event, #2118) bzw. nur Glocke und Push (Turnier, #2120).
 @mail_template
-def tpl_event_cancelled(display_name: str, event_name: str, url: str = "") -> tuple[str, str]:
+def tpl_event_cancelled(display_name: str, event_name: str, reason: str = "", url: str = "") -> tuple[str, str]:
+    # Grund (#2614): wenn die Verwaltung einen angegeben hat - bei einer Mindestzahl immer.
     body = (
         f"<p>Hallo {display_name or 'Löwe'},</p>"
         f"<p><strong>{event_name}</strong> ist abgesagt. Deine Anmeldung ist damit storniert, auch ein Platz auf der Warteliste.</p>"
-        "<p>Einen offenen Kostenbeitrag verrechnen wir nicht. Hast du schon eine Rechnung bekommen, meldet sich der Verein bei dir.</p>"
+        + (f"<p><strong>Grund:</strong> {reason}</p>" if reason else "")
+        + "<p>Einen offenen Kostenbeitrag verrechnen wir nicht. Hast du schon eine Rechnung bekommen, meldet sich der Verein bei dir.</p>"
     )
     return f"Abgesagt: {event_name}", _wrap("Event abgesagt", body, "Zum Event" if url else None, url or None)
 

@@ -17,7 +17,7 @@ from services.sponsor_utils import dedupe_public_sponsors
 from services import news_channels, partner_pages
 from services.notification_preferences import enqueue_newsletter_for_item
 from services.slug_utils import apply_slug_history, find_by_slug_or_history, slug_source_for_update, unique_slug
-from services import billing_orders, event_changes, event_days, event_facts, event_locations, event_notifications, event_play_along, event_program, event_registration, event_rewards, pricing
+from services import billing_orders, event_changes, event_days, event_facts, event_locations, event_minimum, event_notifications, event_play_along, event_program, event_registration, event_rewards, pricing
 from services.billing_amounts import public_payment_state
 from services.event_public import public_competition, public_event
 from services.event_registration import RegistrationError
@@ -468,6 +468,10 @@ async def _decorate_event(event: dict, include_sponsors: bool = False) -> dict:
             "spots_left": event.get("max_participants"),
             "max_participants": event.get("max_participants"),
         }
+    # Mindestanzahl bis zu einer Frist (#2614): der Stand aus derselben Rechnung wie die Plätze - nur, wenn eingestellt.
+    minimum = event_minimum.view(event, event["registration_summary"])
+    if minimum is not None:
+        event["minimum"] = minimum
     if include_sponsors:
         await _attach_event_sponsors(event)
         # Partner II (#469): Partnervereine beim Event, Kurzform mit Link auf die Partnerseite.
@@ -573,6 +577,9 @@ async def admin_get_event(event_id: str, me: dict = Depends(require_admin())):
     await _decorate_event(event)
     counts = await event_changes.active_registration_counts(db, [event["id"]])
     event["active_registration_count"] = counts.get(event["id"], 0)
+    if event.get("minimum"):
+        # Mindestanzahl (#2614): der vorgeschlagene Grund für „Absagen“ - die Verwaltung kann ihn ändern.
+        event["minimum"]["proposal"] = event_minimum.proposal(event["minimum"])
     return event
 
 
@@ -1108,6 +1115,17 @@ async def _billing_updates(raw: dict, existing: dict | None, me: dict) -> dict |
     return pricing.bump_version((existing or {}).get("billing"), offer)
 
 
+MINIMUM_CONTEXT_FIELDS = ("min_registrations", "has_registration", "registration_url", "start_date", "days", "max_participants")
+
+
+def _check_minimum(merged: dict) -> None:
+    """Mindestanzahl (#2614): passt sie zum Event, so wie es nach dem Speichern aussieht? Sonst 400 mit dem Satz dazu."""
+    try:
+        event_minimum.validate(merged)
+    except event_minimum.MinimumError as exc:
+        raise HTTPException(status_code=exc.status, detail=exc.detail)
+
+
 def _refuse_event_sponsor_choice(values: dict) -> None:
     """Event-Sponsoren (#1371): welche Sponsoren bei welchem Event erscheinen, legt die Redaktion beim Sponsor fest.
     Das Event nimmt keine eigene Auswahl mehr an - nur noch das Aufheben einer alten (leere Liste)."""
@@ -1135,6 +1153,10 @@ async def create_event(body: EventCreate, me: dict = Depends(require_admin())):
     for k in ("start_date", "end_date", "door_time", "registration_opens_at", "registration_closes_at"):
         if doc.get(k) and hasattr(doc[k], "isoformat"):
             doc[k] = doc[k].isoformat()
+    minimum = event_minimum.normalize(doc.pop("min_registrations", None))
+    if minimum:
+        doc["min_registrations"] = minimum
+        _check_minimum(doc)
     doc["created_at"] = now_utc().isoformat()
     doc["updated_at"] = now_utc().isoformat()
     doc["created_by"] = me["id"]
@@ -1172,10 +1194,14 @@ async def update_event(event_id: str, body: EventUpdate, me: dict = Depends(requ
         "contact", "program", "stream_platform",
         # Leer heißt unbegrenzt (#2118) - vorher kam „Gespeichert.“, aber der alte Wert blieb.
         "max_participants",
+        # Leer heißt: keine Mindestzahl (#2614) - das Event findet in jedem Fall statt.
+        "min_registrations",
     }
     raw = body.model_dump(exclude_unset=True)
     # Neuer Termin oder Ort (#2118): nur eine Frage an diesen Aufruf, kein Feld des Events.
     notify_registrants = bool(raw.pop("notify_registrants", None))
+    # Grund der Absage (#2614): gilt nur zusammen mit dem Wechsel auf „Abgesagt“.
+    cancel_reason = raw.pop("cancel_reason", None)
     _refuse_event_sponsor_choice(raw)
     updates = {k: v for k, v in raw.items() if v is not None or k in nullable_fields}
     if "partner_ids" in updates:
@@ -1200,12 +1226,27 @@ async def update_event(event_id: str, body: EventUpdate, me: dict = Depends(requ
     # löst nur eine die Folgen aus. Nur sie zählt den Absage-Durchgang (``cancel_round``) weiter - daraus entsteht der
     # Schlüssel, unter dem jede Person je Absage genau eine Nachricht bekommt.
     cancelling = updates.get("status") == "cancelled"
+    if "min_registrations" in updates:
+        updates["min_registrations"] = event_minimum.normalize(updates["min_registrations"])
+    merged = {**existing, **updates}
+    reason = None
+    if cancelling and existing.get("status") != "cancelled":
+        # Mindestanzahl (#2614): mit ihr ist der Grund Pflicht - geprüft, bevor irgendetwas gespeichert ist.
+        try:
+            reason = event_minimum.clean_reason(cancel_reason, required=event_minimum.settings(merged) is not None)
+        except event_minimum.MinimumError as exc:
+            raise HTTPException(status_code=exc.status, detail=exc.detail)
+    elif not cancelling and any(field in raw for field in MINIMUM_CONTEXT_FIELDS):
+        _check_minimum(merged)
+    if existing.get("status") == "cancelled" and updates.get("status") not in (None, "cancelled"):
+        updates["cancel_reason"] = None  # Absage zurückgenommen: ihr Grund gilt nicht mehr.
     if cancelling:
         updates.pop("status")
     await db.events.update_one({"id": event_id}, {"$set": updates})
     newly_cancelled = cancelling and (await db.events.update_one(
         {"id": event_id, "status": {"$ne": "cancelled"}},
-        {"$set": {"status": "cancelled", "cancelled_at": updates["updated_at"], "updated_at": updates["updated_at"]},
+        {"$set": {"status": "cancelled", "cancelled_at": updates["updated_at"], "updated_at": updates["updated_at"],
+                  **({"cancel_reason": reason} if reason else {})},
          "$inc": {"cancel_round": 1}},
     )).modified_count == 1
     reset_scope_cache()  # Live-Meldungen (#1801): Turnier und Event neu nachschlagen
