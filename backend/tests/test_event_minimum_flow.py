@@ -115,7 +115,7 @@ async def test_minimum_is_saved_shown_and_cleared(flow):
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize("change, detail", [
-    ({"min_registrations": minimum(deadline=START + timedelta(minutes=1))}, event_minimum.DEADLINE_AFTER_START),
+    ({"min_registrations": minimum(deadline=START - timedelta(minutes=59))}, event_minimum.DEADLINE_TOO_LATE),
     ({"min_registrations": minimum(11), "max_participants": 10}, "größer als die Plätze"),
     ({"min_registrations": minimum(), "registration_url": "https://anmeldung.example.test"}, "externem Anmeldelink"),
     ({"min_registrations": minimum(), "has_registration": False}, "Anmeldung über die Website"),
@@ -128,12 +128,36 @@ async def test_minimum_must_fit_the_event(flow, change, detail):
 
 
 @pytest.mark.asyncio
-async def test_deadline_on_the_start_is_allowed_and_moving_the_start_before_it_is_not(flow):
-    lead, event = await setup(flow, min_registrations=minimum(deadline=START))
-    assert event["min_registrations"]["deadline"] == START.isoformat()
+async def test_deadline_one_hour_before_the_start_is_allowed_and_moving_the_start_closer_is_not(flow):
+    """Mindestens eine Stunde Abstand: Sonst läge der Hinweis nach dem Beginn - der Job meldet dann nichts mehr."""
+    lead, event = await setup(flow, min_registrations=minimum(deadline=START - timedelta(hours=1)))
+    assert event["min_registrations"]["deadline"] == (START - timedelta(hours=1)).isoformat()
     flow.act_as(lead)
-    earlier = await flow.patch(f"/api/events/{event['id']}", json={"start_date": (START - timedelta(hours=1)).isoformat()})
-    assert earlier.status_code == 400 and earlier.json()["detail"] == event_minimum.DEADLINE_AFTER_START
+    earlier = await flow.patch(f"/api/events/{event['id']}", json={"start_date": (START - timedelta(minutes=1)).isoformat()})
+    assert earlier.status_code == 400 and earlier.json()["detail"] == event_minimum.DEADLINE_TOO_LATE
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("change", [{"has_registration": False}, {"registration_url": "https://anmeldung.example.test"}])
+async def test_switching_off_the_registration_names_the_way_out(flow, change):
+    lead, event = await setup(flow, min_registrations=minimum())
+    flow.act_as(lead)
+    blocked = await flow.patch(f"/api/events/{event['id']}", json=change)
+    assert blocked.status_code == 400 and "zuerst die Mindestanzahl ausschalten" in blocked.json()["detail"]
+    # Mit der Mindestanzahl zusammen ausgeschaltet geht es (so schickt es die Maske).
+    together = await flow.patch(f"/api/events/{event['id']}", json={**change, "min_registrations": None})
+    assert together.status_code == 200, together.text
+
+
+@pytest.mark.asyncio
+async def test_cancelling_still_checks_a_minimum_sent_along(flow):
+    lead, event = await setup(flow, min_registrations=minimum(4))
+    flow.act_as(lead)
+    bad = minimum(4, deadline=START + timedelta(days=2))
+    response = await flow.patch(f"/api/events/{event['id']}", json={"status": "cancelled", "cancel_reason": REASON, "min_registrations": bad})
+    assert response.status_code == 400 and response.json()["detail"] == event_minimum.DEADLINE_TOO_LATE
+    stored = await flow.db.events.find_one({"id": event["id"]}, {"_id": 0})
+    assert stored["status"] == "registration_open" and stored["min_registrations"]["deadline"] == DEADLINE.isoformat()
 
 
 @pytest.mark.asyncio
@@ -238,6 +262,58 @@ async def test_notice_only_once_when_two_runs_meet(flow):
     assert sorted(result["told"] for result in results) == [0, 1]
     assert len(await notices(flow)) == 1
     assert await flow.db.audit_logs.count_documents({"action": "event.minimum_short"}) == 1
+
+
+@pytest.mark.asyncio
+async def test_a_lead_missed_in_one_run_gets_the_notice_in_the_next(flow, monkeypatch):
+    """Erst benachrichtigen, dann die Marke: Fällt eine Leitung aus, holt der nächste Lauf sie nach - die andere nicht doppelt."""
+    from services import user_notifications
+
+    await setup(flow, min_registrations=minimum(4))
+    await person(flow, "zweite", role="tournament_admin")
+    real = user_notifications.create_user_notification
+    calls = {"n": 0}
+
+    async def flaky(user_id, *args, **kwargs):
+        calls["n"] += 1
+        if calls["n"] == 2:
+            raise RuntimeError("Datenbank kurz weg")
+        return await real(user_id, *args, **kwargs)
+
+    monkeypatch.setattr(user_notifications, "create_user_notification", flaky)
+    first = await shortfall_sweep(flow.db, now=DEADLINE)
+    assert first["told"] == 1 and len(await notices(flow)) == 1
+    monkeypatch.setattr(user_notifications, "create_user_notification", real)
+    second = await shortfall_sweep(flow.db, now=DEADLINE + timedelta(minutes=15))
+    assert second["told"] == 1
+    assert len({row["user_id"] for row in await notices(flow)}) == len(await notices(flow)) == 2
+    assert (await shortfall_sweep(flow.db, now=DEADLINE + timedelta(minutes=30)))["told"] == 0
+    assert await flow.db.audit_logs.count_documents({"action": "event.minimum_short"}) == 1
+
+
+@pytest.mark.asyncio
+async def test_a_lead_without_the_active_field_is_told_too(flow):
+    lead, _event = await setup(flow, min_registrations=minimum(4))
+    await flow.db.users.update_one({"id": lead["id"]}, {"$unset": {"is_active": ""}})
+    assert (await shortfall_sweep(flow.db, now=DEADLINE))["told"] == 1
+
+
+@pytest.mark.asyncio
+async def test_without_companions_allowed_it_says_registrations(flow):
+    lead, event = await setup(flow, allow_companions=False, max_companions_per_registration=0, min_registrations=minimum(4))
+    view = (await admin_view(flow, lead, event))["minimum"]
+    assert view["count_companions"] is False
+    await shortfall_sweep(flow.db, now=DEADLINE)
+    assert "0 von mindestens 4 Anmeldungen" in (await notices(flow))[0]["body"]
+
+
+@pytest.mark.asyncio
+async def test_a_hidden_minimum_keeps_its_numbers_out_of_the_proposal(flow):
+    lead, event = await setup(flow, min_registrations=minimum(8, public=False))
+    flow.clock["now"] = DEADLINE + timedelta(minutes=1)
+    proposal = (await admin_view(flow, lead, event))["minimum"]["proposal"]
+    assert proposal == event_minimum.PROPOSAL_HIDDEN
+    assert not any(char.isdigit() for char in proposal)
 
 
 @pytest.mark.asyncio

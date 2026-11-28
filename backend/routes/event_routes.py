@@ -1262,7 +1262,8 @@ async def update_event(event_id: str, body: EventUpdate, me: dict = Depends(requ
             reason = event_minimum.clean_reason(cancel_reason, required=event_minimum.settings(merged) is not None)
         except event_minimum.MinimumError as exc:
             raise HTTPException(status_code=exc.status, detail=exc.detail)
-    elif not cancelling and any(field in raw for field in MINIMUM_CONTEXT_FIELDS):
+    # Die Einstellung muss passen - auch beim Absagen, wenn sie mitkommt (sonst stünde nach dem Zurücknehmen ein ungültiger Wert da).
+    if any(field in raw for field in MINIMUM_CONTEXT_FIELDS) and (not cancelling or "min_registrations" in raw):
         _check_minimum(merged)
     if existing.get("status") == "cancelled" and updates.get("status") not in (None, "cancelled"):
         updates["cancel_reason"] = None  # Absage zurückgenommen: ihr Grund gilt nicht mehr.
