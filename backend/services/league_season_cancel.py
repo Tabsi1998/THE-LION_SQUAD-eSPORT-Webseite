@@ -63,7 +63,14 @@ def _staffel_name(row: dict) -> str:
 async def _staffeln(db, season_id: str) -> list[dict]:
     """Alle Staffeln der Season - auch Playoffs und Relegation."""
     return await db.tournaments.find({"league_context.season_id": season_id, **ONLY_LEAGUE},
-                                     {"_id": 0, "id": 1, "title": 1, "status": 1, "league_context": 1, "final_table": 1}).to_list(500)
+                                     {"_id": 0, "id": 1, "title": 1, "status": 1, "league_context": 1, "final_table": 1,
+                                      "cancelled_with_season": 1}).to_list(500)
+
+
+def told_staffeln(staffeln: list[dict]) -> list[str]:
+    """Die Staffeln, deren Teilnehmer die Absage der Season hören: die noch offenen (Vorschau) bzw. die mit der Season abgesagten.
+    Wer nur in einer vorher einzeln abgesagten oder archivierten Staffel stand, hat seine Absage schon - Blatt und Nachricht zählen gleich."""
+    return [row["id"] for row in staffeln if row.get("status") not in SETTLED_STAFFEL or row.get("cancelled_with_season")]
 
 
 async def problems(db, season: dict, staffeln: list[dict] | None = None) -> list[str]:
@@ -98,10 +105,11 @@ async def _registrations(db, staffel_ids: list[str]) -> list[dict]:
          "application_id": 1}).to_list(5000)
 
 
-async def audience(db, applications: list[dict], registrations: list[dict]) -> dict[str, list[str]]:
+async def audience(db, applications: list[dict], registrations: list[dict], carried: set[str] | None = None) -> dict[str, list[str]]:
     """Je Person die Namen, für die sie die Nachricht bekommt: Captain und Vertreter (ohne beide die Hauptteam-Leitung) je Antrag bzw.
     Co-Team, in der Solo-Liga die Person selbst. Zugeteilte ohne offenen Antrag (Sonderweg „Co-Team zuteilen“) zählen mit - jede
-    Person steht nur einmal da, auch mit zwei Co-Teams."""
+    Person steht nur einmal da, auch mit zwei Co-Teams. ``carried`` sammelt, wer für einen aus dem Vorgänger übernommenen Antrag
+    (``carry_over``) zuständig ist - nur diese Personen lesen den Satz zu den Startrechten."""
     out: dict[str, list[str]] = {}
 
     def add(user_ids, name: str) -> None:
@@ -111,7 +119,10 @@ async def audience(db, applications: list[dict], registrations: list[dict]) -> d
 
     covered: set[str] = set()
     for application in applications:
-        add(await league_applications._audience(db, application), application.get("display_name") or "Anmeldung")
+        people = await league_applications._audience(db, application)
+        add(people, application.get("display_name") or "Anmeldung")
+        if carried is not None and application.get("carry_over"):
+            carried.update(people)
         covered.add(application["id"])
         if application.get("squad_id"):
             covered.add(f"squad:{application['squad_id']}")
@@ -153,7 +164,7 @@ async def plan(db, league: dict, season: dict) -> dict:
     staffeln = await _staffeln(db, season["id"])
     found = await problems(db, season, staffeln)
     applications = await _open_applications(db, season["id"])
-    open_ids = [row["id"] for row in staffeln if row.get("status") not in SETTLED_STAFFEL]
+    open_ids = told_staffeln(staffeln)
     registrations = await _registrations(db, open_ids)
     people = await audience(db, applications, registrations)
     by_status = {status: 0 for status in league_applications.OPEN_STATUSES}
@@ -185,12 +196,14 @@ async def cancel(db, league: dict, season: dict, reason, actor: dict) -> dict:
                 await stack.enter_async_context(mutation_lock(db, tournament_write_resource(tid), wait_seconds=LOCK_WAIT_SECONDS))
             await stack.enter_async_context(mutation_lock(db, league_season_resource(season["id"]), wait_seconds=LOCK_WAIT_SECONDS))
             await stack.enter_async_context(mutation_lock(db, league_season_pool_resource(season["id"]), wait_seconds=LOCK_WAIT_SECONDS))
-            result = await _cancel_locked(db, league, season["id"], text, actor)
+            result = await _cancel_locked(db, league, season["id"], text, actor, staffel_ids)
     except MutationLockBusy:
         raise LeagueProblem(BUSY, 409) from None
     from services.change_events import reset_scope_cache
 
     reset_scope_cache()
+    # Nachrichten erst nach den Sperren: Sie halten nichts auf, doppelt verhindert der ``dedupe_key`` (auch beim Wiederholen).
+    result["notified"] = await _tell(db, league, result["season"], await _staffeln(db, season["id"]))
     if not result["already"]:
         await db.audit_logs.insert_one({
             "id": new_id(), "action": "league.season.cancel", "actor_id": actor.get("id"), "target_id": season["id"],
@@ -200,10 +213,13 @@ async def cancel(db, league: dict, season: dict, reason, actor: dict) -> dict:
     return result
 
 
-async def _cancel_locked(db, league: dict, season_id: str, text: str, actor: dict) -> dict:
+async def _cancel_locked(db, league: dict, season_id: str, text: str, actor: dict, locked_ids: list[str]) -> dict:
     fresh = await league_service.get_season(db, season_id)
     already = fresh.get("status") == CANCELLED
     staffeln = await _staffeln(db, season_id)
+    if sorted(row["id"] for row in staffeln) != locked_ids:
+        # Inzwischen kam eine Staffel dazu oder ging weg - sie hielte keine Sperre. Neu laden und noch einmal.
+        raise LeagueProblem(league_service.CHANGED_MEANWHILE, 409)
     if not already:
         found = await problems(db, fresh, staffeln)
         if found:
@@ -226,9 +242,8 @@ async def _cancel_locked(db, league: dict, season_id: str, text: str, actor: dic
     reason = fresh.get("cancel_reason") or text
     application_ids = await _reject_all(db, fresh, reason, actor)
     staffel_ids = await _cancel_staffeln(db, staffeln, actor)
-    notified = await _tell(db, league, fresh, staffeln)
     return {"already": already, "season": fresh, "application_ids": application_ids, "staffel_ids": staffel_ids,
-            "notified": notified, "from": fresh.get("status_before_cancel")}
+            "notified": 0, "from": fresh.get("status_before_cancel")}
 
 
 async def _reject_all(db, season: dict, reason: str, actor: dict) -> list[str]:
@@ -270,15 +285,15 @@ async def _cancel_staffeln(db, staffeln: list[dict], actor: dict) -> list[str]:
     return done
 
 
-def texts(league: dict, season: dict, names: list[str]) -> tuple[str, str]:
-    """Die Nachricht an eine Person: Season, Grund, für wen. Kein Hinweis auf Zurücknehmen - das gibt es nicht."""
+def texts(league: dict, season: dict, names: list[str], *, carried: bool = False) -> tuple[str, str]:
+    """Die Nachricht an eine Person: Season, Grund, für wen. Kein Hinweis auf Zurücknehmen - das gibt es nicht. ``carried``: Die Person ist
+    für ein aus dem Vorgänger übernommenes Co-Team zuständig - nur dann der Satz zu den Startrechten."""
     title = league_applications._season_title(league, season)
     reason = season.get("cancel_reason") or ""
     if league_participants.is_solo(league):
         return "Season abgesagt", f"Die Liga-Leitung hat {title} abgesagt. Grund: {reason} Deine Anmeldung ist damit beendet."
     who = ", ".join(names)
-    rights = (" Startrechte aus der Vorgänger-Season gelten für die nächste Season weiter."
-              if season.get("cancelled_predecessor_id") else "")
+    rights = " Startrechte aus der Vorgänger-Season gelten für die nächste Season weiter." if carried else ""
     return "Season abgesagt", f"Die Liga-Leitung hat {title} abgesagt. Grund: {reason} Betroffen: {who}. Die Anmeldung ist damit beendet.{rights}"
 
 
@@ -288,12 +303,13 @@ async def _tell(db, league: dict, season: dict, staffeln: list[dict]) -> int:
 
     try:
         applications = await _cancelled_applications(db, season["id"])
-        registrations = await _registrations(db, [row["id"] for row in staffeln])
-        people = await audience(db, applications, registrations)
+        registrations = await _registrations(db, told_staffeln(staffeln))
+        carried: set[str] = set()
+        people = await audience(db, applications, registrations, carried)
         page = f"/liga/{league.get('slug')}/{season.get('slug')}"
         sent = 0
         for user_id in sorted(people):
-            headline, text = texts(league, season, people[user_id])
+            headline, text = texts(league, season, people[user_id], carried=user_id in carried)
             key = f"league-season-cancelled:{season['id']}:{user_id}"
             if await create_user_notification(user_id, headline, text, url=page, kind=NOTE_KIND,
                                               meta={"category": "tournament_updates", "reason": "league_season_cancelled", "season_id": season["id"],
@@ -326,30 +342,50 @@ async def entry_shortfall(db, season: dict) -> list[dict]:
                    for division in divisions}
     rows = await league_applications._staffeln(db, season["id"])
     counts = {division["id"]: 0 for division in divisions}
+    per_staffel: dict[str, int] = {}
     if rows:
         seated = await db.tournament_registrations.find(league_applications._seated_query(rows), {"_id": 0, "tournament_id": 1}).to_list(5000)
         where = {row["id"]: (row.get("league_context") or {}).get("division_id") for row in rows}
         for row in seated:
+            per_staffel[row["tournament_id"]] = per_staffel.get(row["tournament_id"], 0) + 1
             if where.get(row["tournament_id"]) in counts:
                 counts[where[row["tournament_id"]]] += 1
+    # Angenommene ohne Zuteilung: Sie zählen bei ihrer Liga N - und solange sie warten, kann die Leitung jede Staffel noch auffüllen.
+    waiting = {division["id"]: 0 for division in divisions}
     async for row in db.league_applications.find({"season_id": season["id"], "status": league_applications.ACCEPTED,
                                                   "assignment": {"$exists": False}}, {"_id": 0, "carry_over": 1}):
         target = (row.get("carry_over") or {}).get("division_id")
         if target in counts:
             counts[target] += 1
+            waiting[target] += 1
         elif len(divisions) == 1:
             counts[divisions[0]["id"]] += 1
+            waiting[divisions[0]["id"]] += 1
+        else:
+            waiting = {key: value + 1 for key, value in waiting.items()}  # ohne Ziel: wartet für jede Liga N
     out = []
     for division in divisions:
-        needed = 2 * max(1, len(staffeln_of[division["id"]]))
+        label = league_service.division_label(division)
+        own = staffeln_of[division["id"]]
+        needed = 2 * max(1, len(own))
         have = counts[division["id"]]
         if have < needed:
-            label = league_service.division_label(division)
-            many = len(staffeln_of[division["id"]]) > 1
+            many = len(own) > 1
             out.append({"division_id": division["id"], "label": label, "have": have, "needed": needed,
                         "text": (f"{label}: Für den Spielplan sind zu wenige dabei – {have} angenommen oder zugeteilt, nötig sind mindestens "
                                  f"{needed}{' (2 je Staffel)' if many else ''}. Entscheide, ob die Season so startet, ob du Staffeln "
                                  "zusammenlegst oder ob du sie absagst.")})
+            continue
+        if waiting[division["id"]]:
+            continue
+        # Genug in der Liga N, aber ungleich verteilt (etwa 3 und 1): 2 je Staffel gilt für jede einzelne, sobald niemand mehr wartet.
+        for row in sorted(own, key=lambda item: str((item.get("league_context") or {}).get("staffel") or "")):
+            seated_here = per_staffel.get(row["id"], 0)
+            if seated_here < 2:
+                name = f"{label} · {_staffel_name(row)}"
+                out.append({"division_id": division["id"], "tournament_id": row["id"], "label": name, "have": seated_here, "needed": 2,
+                            "text": (f"{name}: Für den Spielplan sind zu wenige dabei – {seated_here} zugeteilt, nötig sind mindestens 2. "
+                                     "Entscheide, ob du Teams verschiebst, Staffeln zusammenlegst oder die Season absagst.")})
     return out
 
 
