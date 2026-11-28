@@ -356,7 +356,7 @@ async def _reschedule(db, me, season, staffeln) -> list[dict]:
 async def _rules(db, me, season, staffeln) -> list[dict]:
     from services import league_rules
 
-    if season.get("status") in ("completed", "archived"):
+    if season.get("status") in ("completed", "archived", "cancelled"):
         return []
     league = await db.leagues.find_one({"id": season.get("league_id")}, {"_id": 0})
     if not league:

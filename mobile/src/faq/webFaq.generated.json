@@ -294,6 +294,16 @@
       }
     },
     {
+      "id": "liga-season-abgesagt",
+      "frage": "Was passiert, wenn eine Season abgesagt wird?",
+      "antwort": "Die Liga-Leitung kann sie vor dem Start absagen, etwa bei zu wenigen Anmeldungen. Deine Anmeldung endet, und du bekommst eine Nachricht mit dem Grund. Startrechte aus der Season davor gelten für die nächste Season weiter.",
+      "bereich": "liga",
+      "rollen": [
+        "captain"
+      ],
+      "sichtbar_fuer": "alle"
+    },
+    {
       "id": "ergebnis-melden",
       "frage": "Wo melde ich ein Ergebnis?",
       "antwort": "Auf der Matchseite deines Spiels. Meldet die Gegenseite dasselbe, steht das Ergebnis fest. Weicht es ab, entscheidet die Leitung.",

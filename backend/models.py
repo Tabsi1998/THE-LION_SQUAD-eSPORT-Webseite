@@ -2745,7 +2745,8 @@ class AreasUpdate(BaseModel):
 # Liga (je Spiel) → Season → Liga N → Staffel A/B (ein Turnier mit ``league_context``). Logik und Prüfungen in
 # ``services/league_service.py``; hier nur Form und Grenzen der Eingaben.
 LeagueVisibility = Literal["off", "admins", "members", "public"]
-LeagueSeasonStatus = Literal["draft", "active", "completed", "archived"]
+# „cancelled“ (#2607) nimmt die Verwaltung nur an, um ihn unverändert stehen zu lassen - setzen geht nur über „Season absagen“.
+LeagueSeasonStatus = Literal["draft", "active", "completed", "archived", "cancelled"]
 LeagueStatus = Literal["active", "archived"]
 _CALENDAR_DAY = r"^\d{4}-\d{2}-\d{2}$"
 _CLOCK_TIME = r"^([01]\d|2[0-3]):[0-5]\d$"

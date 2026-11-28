@@ -4,13 +4,13 @@ import { Link } from "react-router-dom";
 import { AlertTriangle, ArrowRight, Check, Minus } from "lucide-react";
 import { FormGrid, FormSection } from "@/components/tls/AdminForm";
 import { SelectField, TextField } from "@/components/tls/FormFields";
-import { SEASON_STATUS_OPTIONS, VISIBILITY_OPTIONS, VISIBILITY_SHORT } from "@/lib/league";
+import { SEASON_STATUS_OPTIONS, SEASON_STATUS_TEXT, VISIBILITY_OPTIONS, VISIBILITY_SHORT, isCancelledSeason } from "@/lib/league";
 import { STATUS_EFFECT, VISIBILITY_EFFECT, seasonPhases, seasonWithEnd } from "@/lib/seasonTabs";
 import { BannerField, EmblemField, PrizeEditor } from "./LeagueLookFields";
 import { SeasonReadinessPanel } from "./SeasonReadinessPanel";
 import { SeasonTabForm } from "./SeasonTabForm";
 
-const STATUS_TEXT = Object.fromEntries(SEASON_STATUS_OPTIONS);
+const STATUS_TEXT = SEASON_STATUS_TEXT;
 
 function PhaseDot({ state }) {
   if (state === "done") {
@@ -112,7 +112,12 @@ export function SeasonOverviewTab({ data, form, set, setForm, saved, canSeason, 
               {blocked ? (
                 <p className="tls-type-small text-warn" data-testid="season-visibility-blocked">Die Prüfung links meldet noch Probleme – so lässt sich die Season noch nicht veröffentlichen.</p>
               ) : null}
-              <SelectField label="Stand" value={form.status} onChange={(value) => set("status", value)} options={SEASON_STATUS_OPTIONS} testId="season-form-status" />
+              {/* Abgesagt (#2607): kein Stand zur Wahl - zurück geht es nicht, und archivieren würde die Absage ausblenden. */}
+              {isCancelledSeason(season) ? (
+                <p className="tls-type-small text-white/80" data-testid="season-form-status-cancelled"><strong className="text-white">Stand:</strong> {STATUS_TEXT.cancelled}</p>
+              ) : (
+                <SelectField label="Stand" value={form.status} onChange={(value) => set("status", value)} options={SEASON_STATUS_OPTIONS} testId="season-form-status" />
+              )}
               <Effect testId="season-status-effect">{STATUS_EFFECT[form.status]}</Effect>
               {/* Startseite (#2324): Vorgabe an. Wer die Season sieht, sagt weiter die Sichtbarkeit. */}
               <label className="flex min-h-[44px] items-start gap-2 tls-type-small text-white/80">

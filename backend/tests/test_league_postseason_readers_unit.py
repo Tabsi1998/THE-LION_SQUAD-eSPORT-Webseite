@@ -45,6 +45,8 @@ READERS = {
     "services/league_rules.py": (2, ALL, "Regelwerk an jeder Staffel"),
     "services/league_sanctions.py": (2, ALL, "Strafen: jede Staffel"),
     "services/league_schedule.py": (2, ALL, "Termine: jede Staffel"),
+    # Season absagen (#2607): Absagen prüft und sagt jede Staffel ab, die Warnung „zu wenige“ zählt nur reguläre.
+    "services/league_season_cancel.py": (1, MIXED, "Absagen: jede Staffel; Warnung nur reguläre Staffeln"),
     "services/league_service.py": (12, MIXED, "Verwaltung; die Ligaseite trennt Staffeln und ``postseason``; ob die Season läuft (Nr. 254), sagen nur reguläre Staffeln"),
     # Startrechte (#1627, F.2a): Seit wann der Endstand des Vorgängers nicht mehr steht - auch eine wieder geöffnete Playoff- oder
     # Relegations-Staffel hält die Fristen an.

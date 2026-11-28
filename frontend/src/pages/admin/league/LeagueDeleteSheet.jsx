@@ -82,7 +82,7 @@ export function LeagueDeleteSheet({ kind, target, name, onClose, onDeleted, onAr
     <AdminSheet title={title} eyebrow="Löschen" accent={blocked ? "#29B6E8" : "var(--tls-live)"} onClose={onClose}
       onSubmit={plan?.deletable ? submit : undefined} saving={saving} savingLabel="Lösche …" submitLabel="Endgültig löschen"
       submitDisabled={!reasonOk} submitTestId="league-delete-confirm" testId="league-delete-sheet" noValidate
-      footer={blocked && onArchive ? (
+      footer={blocked && onArchive && !plan.cancelled ? (
         <button type="button" onClick={archive} disabled={saving || plan.archived} data-testid="league-delete-archive"
           className="tls-btn tls-btn--primary ml-auto px-4 py-2.5 rounded-sm tls-type-label inline-flex items-center gap-2 disabled:opacity-50">
           <Archive className="w-3.5 h-3.5" aria-hidden="true" /> {plan.archived ? "Schon archiviert" : "Archivieren"}
@@ -94,14 +94,17 @@ export function LeagueDeleteSheet({ kind, target, name, onClose, onDeleted, onAr
       {blocked ? (
         <div className="space-y-3" data-testid="league-delete-blocked">
           <div className="rounded-sm border border-warn/30 bg-warn/5 px-4 py-3">
-            <h3 className="tls-type-label text-warn">Archivieren statt löschen</h3>
+            <h3 className="tls-type-label text-warn">{plan.cancelled ? "Abgesagt – bleibt erhalten" : "Archivieren statt löschen"}</h3>
             <p className="mt-1 tls-type-small text-white/80">Löschen geht nicht, weil schon gespielt oder zugeteilt wurde:</p>
             <ul className="mt-2 list-disc space-y-1 pl-5 tls-type-small text-white/80">
               {plan.blockers.map((text) => <li key={text} className="break-words">{text}</li>)}
             </ul>
           </div>
-          <p className="tls-type-small text-white/60">
-            {plan.archived
+          <p className="tls-type-small text-white/60" data-testid="league-delete-hint">
+            {/* Abgesagt (#2607): Archivieren ist dort gesperrt - ausblenden geht über die Sichtbarkeit. */}
+            {plan.cancelled
+              ? "Die Season ist abgesagt und bleibt mit Grund sichtbar. Archivieren geht dort nicht – ausblenden kannst du sie über die Sichtbarkeit „Aus“."
+              : plan.archived
               ? "Ist schon archiviert – ausgeblendet, aber mit allen Spielen und Ergebnissen erhalten."
               : "Archivieren blendet es auf der Ligaseite aus; Spiele, Ergebnisse und Protokoll bleiben erhalten. Zurückholen geht über den Stand „Aktiv“."}
           </p>

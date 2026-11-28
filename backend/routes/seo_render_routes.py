@@ -633,6 +633,11 @@ async def league_season_meta(db, league_slug: str, season_slug: str, base: dict,
         details=[*signup, format_date_label(season.get("start_date")), format_date_label(season_end(season))],
     )
     shown_title = f"{title} · Anmeldung offen" if signup else title
+    if season.get("status") == "cancelled":
+        # Abgesagt (#2607): Die Teilen-Karte wirbt nicht mehr - sie sagt die Absage mit Grund.
+        shown_title = f"{title} · Abgesagt"
+        description = seo_description(f"Abgesagt: {season.get('cancel_reason') or 'ohne Angabe'}", prefix="Liga",
+                                      details=[format_date_label(season.get("cancelled_at"))])
     if page:
         shown_title = f"{page[0]} · {title}"
     meta = {**base, "title": f"{shown_title} · {base['site_name']}", "description": description, "url": canonical,

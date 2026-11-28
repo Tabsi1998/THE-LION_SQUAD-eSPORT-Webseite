@@ -50,6 +50,8 @@ async def admin_extend_late_registration(season_id: str, body: ExtensionBody,
         async with mutation_lock(db, league_season_resource(season_id)):
             try:
                 season = await leagues.get_season(db, season_id)
+                # Abgesagt (#2607): Die Anmeldung bleibt zu.
+                leagues.cancelled_problem(season)
             except LeagueProblem as problem:
                 raise HTTPException(status_code=problem.status, detail=problem.message) from None
             before = season.get(league_late.EXTENSION)
