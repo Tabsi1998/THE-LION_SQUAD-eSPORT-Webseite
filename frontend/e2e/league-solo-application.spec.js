@@ -149,6 +149,8 @@ for (const [width, height] of WIDTHS) {
       await noSideScroll(page);
       await page.screenshot({ path: shotPath(testInfo, `solo-anmelden-einreichen-${width}.png`), fullPage: true, animations: "disabled" });
       // Am Handy liegen sonner-Hinweise über Knöpfen - per Tastatur auslösen.
+      // Der Schrittwechsel setzt den Fokus erst auf die Überschrift (requestAnimationFrame) - danach den Knopf fokussieren, sonst geht Enter ins Leere.
+      await expect(page.locator("#apply-step-title")).toBeFocused();
       await page.getByTestId("apply-submit").focus();
       await page.keyboard.press("Enter");
       await expect(page).toHaveURL(/season-1$/);
@@ -253,6 +255,8 @@ for (const [width, height] of WIDTHS) {
       await page.getByTestId("apply-accept-rules").check();
       await page.getByTestId("apply-accept-privacy").check();
       await page.getByTestId("apply-next").click();
+      // Der Schrittwechsel setzt den Fokus erst auf die Überschrift (requestAnimationFrame) - danach den Knopf fokussieren, sonst geht Enter ins Leere.
+      await expect(page.locator("#apply-step-title")).toBeFocused();
       await page.getByTestId("apply-submit").focus();
       await page.keyboard.press("Enter");
       await expect(page).toHaveURL(/season-1$/);
