@@ -144,3 +144,28 @@ PhaseBadge, Server (`models.py`, `public_phase.py`) und Aufrufern eine Art und e
 rechnet jede Art und Spielart auf Grund und Fläche 1 bis 3 und auf einem weißen Bild nach (mindestens 4,5 : 1).
 Playwright: `e2e/zustands-schilder.spec.js` (alle zehn Arten auf Startseite, Dashboard, den Stationen der Turnierleitung
 und der öffentlichen Turnierseite).
+
+## Datum (#1307)
+
+Ein Datum steht überall in einer Form: **„Sa 23. Mai · 18:00“** – Wochentag kurz, Monat ausgeschrieben („Jänner“), das
+Jahr nur bei einem anderen Jahr, Nahes als „heute 18:00“ / „morgen 18:00“. Gerechnet wird in Wiener Zeit.
+
+- **Website** (`frontend/src/lib/datetime.js`): `formatWhen` (mit `time: false` nur der Tag, mit `relative: false` ohne
+  heute/morgen), `formatRange` für Zeiträume („Fr 19. – Sa 20. Juni“, „Mo 30. November – Mi 2. Dezember“), `formatAgo`
+  für Vergangenes in Listen („vor 12 Min.“), `formatClock` („18:00“), `formatMonth` („Februar 2026“), `formatWeekday`
+  („Sa“), `formatOfficialDate` („23.05.2026“). `formatDateTime`/`formatDate` rufen `formatWhen`.
+- **Server** (`backend/services/date_text.py`): dieselben Hilfen; Mails, Discord, Teilen-Bilder, Kalender-Abo und
+  gespeicherte Meldungen nehmen `format_moment` – die feste Form ohne heute/morgen, weil man sie später liest.
+- **Ohne heute/morgen** (`relative: false`): Sätze mit „am“/„vom“, Gedrucktes, Geteiltes. „· 18:00 Uhr“ gibt es nicht;
+  nach der Uhrzeit allein bleibt „Uhr“ („Antreten bis 18:00 Uhr“).
+- **Amtlich „23.05.2026“** bleibt für Rechnungen, Urkunden, PDF-Listen, CSV-Ausfuhr, Mitgliedsausweis, Rechtstexte,
+  Statuten und das Regelwerk.
+- **Barrierefreiheit:** `components/tls/When.jsx` schreibt einen Termin als `<time dateTime>`; der Mittelpunkt steht
+  `aria-hidden` da und wird nicht vorgelesen.
+- **Eingabefelder** (`GermanDateField`, `datetime-local`) bleiben, wie sie sind.
+
+Dieselben Fälle für Web, Server und App: `docs/date-cases.json` (Sommerzeit, Mitternacht in Wien, Jahreswechsel,
+Zeiträume über Monats- und Jahresgrenzen). Wächter: `lib/dateForms.test.js` (keine eigenen Datumsformen in `src/`,
+Ausnahmen mit Grund) und `backend/tests/test_date_text_inventory_unit.py` (kein `%d.%m` außerhalb der amtlichen
+Stellen). Tests mit Datums-Texten laufen mit fester Uhr: `runAtTestClock()` aus `src/testClock.js`, in Playwright
+`page.clock.install`.
