@@ -1186,10 +1186,14 @@ async def deletion_plan(db, kind: str, target: dict) -> dict:
         season_names = {target["season_id"]: None}
     divisions.sort(key=lambda row: (str(season_names.get(row.get("season_id")) or ""), int(row.get("level") or 0)))
     name = division_label(target) if kind == "division" else target.get("name")
+    # Abgesagt (#2607): Archivieren ist dort gesperrt - das Blatt bietet es nicht an, der Satz sagt, was stattdessen geht.
+    cancelled = (target.get("status") == CANCELLED if kind == "season" else
+                 kind == "division" and await db.league_seasons.find_one({"id": target.get("season_id"), "status": CANCELLED}, {"_id": 1}) is not None)
     return {
         "kind": kind, "id": target["id"], "name": name,
         "deletable": not blockers, "blockers": blockers,
         "archived": target.get("status") == "archived",
+        **({"cancelled": True} if cancelled else {}),
         "seasons": [{"id": season["id"], "name": season.get("name")} for season in seasons] if kind == "league" else [],
         "divisions": [{"id": row["id"], "label": " · ".join(filter(None, [
             season_names.get(row.get("season_id")) if kind == "league" else None, division_label(row)]))}
@@ -1200,7 +1204,13 @@ async def deletion_plan(db, kind: str, target: dict) -> dict:
     }
 
 
+CANCELLED_DELETE_HINT = ("Die Season ist abgesagt und bleibt mit Grund erhalten – Archivieren geht dort nicht. Ausblenden geht über die "
+                         "Sichtbarkeit „Aus“.")
+
+
 def blocked_message(plan: dict) -> str:
+    if plan.get("cancelled"):
+        return f"Löschen geht nicht: {plan['blockers'][0]}. {CANCELLED_DELETE_HINT}"
     return f"Löschen geht nicht: {plan['blockers'][0]}. Archivieren statt löschen – dann bleibt alles erhalten."
 
 

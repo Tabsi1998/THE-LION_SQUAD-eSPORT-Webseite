@@ -743,6 +743,8 @@ async def _publish(db, scope: str, scope_id: str, body: dict, user: dict, *, fro
     nicht mehr (409); dieselbe Nummer verhindert der eindeutige Index. ``frozen``: ein schon geprüfter Schnappschuss (Freigabe des
     Vorschlags) - dann wird genau er veröffentlicht, auch die Namen, nichts neu gelesen."""
     league, season = await resolve_scope(db, scope, scope_id)
+    # Abgesagt (#2607): keine neue Fassung mehr für eine Season, die nicht stattfindet.
+    leagues.cancelled_problem(season)
     draft = await draft_of(db, scope, scope_id)
     if not draft or draft.get("revision") != body.get("revision"):
         raise LeagueProblem(CHANGED_MEANWHILE, 409)
@@ -929,6 +931,8 @@ async def _give_consent(db, version_id: str, season_id: str, squad_id: str, user
     league = await db.leagues.find_one({"id": (season or {}).get("league_id"), "status": "active"}, {"_id": 0}) if season else None
     if not league or season.get("status") == "archived" or not await leagues.can_see_season(user, season):
         raise LeagueProblem("Season nicht gefunden.", 404)
+    # Abgesagt (#2607): Zugestimmt wird nur, wo noch gespielt wird.
+    leagues.cancelled_problem(season)
     chain = await _chain(db, league, season)
     version = _find(chain["rows"], version_id)
     if not chain["current"] or chain["current"]["id"] != version["id"]:

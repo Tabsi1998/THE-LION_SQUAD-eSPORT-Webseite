@@ -720,6 +720,9 @@ async def admin_sync_season(season_id: str, me: dict = Depends(require_league("s
 
     db = get_db()
     season = await _call(leagues.get_season(db, season_id))
+    # Abgesagt (#2607): Die Staffeln sind abgesagt - nichts mehr zu übertragen.
+    if season.get("status") == leagues.CANCELLED:
+        raise HTTPException(status_code=409, detail=leagues.SEASON_CANCELLED)
     league = await _call(leagues.get_league(db, season["league_id"]))
     divisions = {row["id"]: row for row in await db.league_divisions.find({"season_id": season_id},
                                                                           {"_id": 0}).to_list(50)}
