@@ -1,5 +1,5 @@
-import { formatClock, formatMonth, formatWeekday } from "@/lib/datetime";
-import { dayNoon, viennaDay } from "./vienna";
+import { formatClock, formatMonth, formatRange, formatWhen } from "@/lib/datetime";
+import { asInstant, dayNoon, viennaDay } from "./vienna";
 
 // Countdown nur, wenn es bald so weit ist (#1264) - eine Regel für alle Termin-Angaben der Website (Startseite,
 // Zustands-Schild, Zeitleiste der Turnierseite):
@@ -24,10 +24,11 @@ export function countdownDays(value) {
   return value != null && value !== "" && Number.isInteger(days) && days >= 1 && days <= DATE_DAYS ? days : COUNTDOWN_DAYS_DEFAULT;
 }
 
+// Ein Text ohne Zone („2026-11-14T18:00:00“) ist Wiener Uhr, wie überall auf der Seite - nicht die Uhr des Geräts.
 function toMs(value) {
   if (value == null || value === "") return NaN;
   if (typeof value === "number") return value;
-  const ms = new Date(value).getTime();
+  const ms = asInstant(value).getTime();
   return Number.isFinite(ms) ? ms : NaN;
 }
 
@@ -37,17 +38,16 @@ export function calendarDaysBetween(fromMs, toMs_) {
 }
 
 const clock = (ms) => formatClock(ms);
-const weekday = (ms) => formatWeekday(ms);
-const dayNumber = (ms) => Number(viennaDay(ms).slice(8, 10));
 const monthName = (ms) => formatMonth(ms, { year: false });
 const yearOf = (ms) => viennaDay(ms).slice(0, 4);
 
-/** „Sa 14. November“ bzw. mehrtägig „Do 11. – So 14. März“ / „Fr 30. Oktober – So 1. November“. */
-function dateText(startMs, endMs) {
-  const start = `${weekday(startMs)} ${dayNumber(startMs)}.`;
-  if (!Number.isFinite(endMs) || endMs <= startMs || viennaDay(endMs) === viennaDay(startMs)) return `${start} ${monthName(startMs)}`;
-  const end = `${weekday(endMs)} ${dayNumber(endMs)}. ${monthName(endMs)}`;
-  return monthName(startMs) === monthName(endMs) && yearOf(startMs) === yearOf(endMs) ? `${start} – ${end}` : `${start} ${monthName(startMs)} – ${end}`;
+/**
+ * „Sa 14. November“ bzw. mehrtägig „Do 11. – So 14. März“ / „Fr 30. Oktober – So 1. November“ - die eine Form aus
+ * lib/datetime.js (#1307), mit dem Jahr, wenn es nicht das laufende ist („Sa 9. Jänner 2027“ im Dezember).
+ */
+function dateText(startMs, endMs, now) {
+  if (!Number.isFinite(endMs) || endMs <= startMs) return formatWhen(startMs, { now, time: false, relative: false });
+  return formatRange(startMs, endMs, { now });
 }
 
 function minutesText(diff) {
@@ -70,7 +70,7 @@ export function whenText(target, { now = Date.now(), end = null, days = COUNTDOW
   if (calendarDays <= 0) return diff < HOUR_MS ? { mode: "minutes", text: minutesText(diff) } : { mode: "today", text: `heute ${clock(targetMs)}` };
   if (calendarDays === 1) return { mode: "tomorrow", text: `morgen ${clock(targetMs)}` };
   if (calendarDays <= countdownDays(days)) return { mode: "days", text: `in ${calendarDays} Tagen` };
-  if (calendarDays <= DATE_DAYS) return { mode: "date", text: dateText(targetMs, toMs(end)) };
+  if (calendarDays <= DATE_DAYS) return { mode: "date", text: dateText(targetMs, toMs(end), now) };
   const year = calendarDays > YEAR_AFTER_DAYS ? ` ${yearOf(targetMs)}` : "";
   return { mode: "month", text: `im ${monthName(targetMs)}${year}` };
 }

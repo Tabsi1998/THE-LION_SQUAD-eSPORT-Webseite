@@ -27,7 +27,6 @@ const BUILT_ALLOWED = {
   "advent/doors.js": "Advent-Sonderform („5. Dezember, 6 Uhr“) - eigenes Folge-Issue #2619",
   "pages/admin/advent/form.js": "Advent-Sonderform („13.12.2026, 20:05 Uhr“) - eigenes Folge-Issue #2619",
   "components/tls/GermanDateField.jsx": "Eingabefeld - zeigt das Datum so, wie es eingetippt wird (bleibt laut #1307)",
-  "lib/countdownRule.js": "Countdown-Sätze (#1264) - setzt Wochentag, Tag und Monat aus formatWeekday/formatMonth zusammen",
   "pages/public/CalendarPage.jsx": "Rasterzelle: „5. Dezember“ als Vorlesetext unter der Tageszahl",
 };
 
