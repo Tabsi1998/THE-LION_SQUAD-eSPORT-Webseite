@@ -203,6 +203,11 @@ async def season_readiness(db, league: dict, season: dict, user: dict | None = N
             if division["id"] not in with_staffel:
                 items.append(("problem", _item("staffel_missing", f"Liga {division.get('level')} hat noch keine Staffel.")))
     items += _application_items(season)
+    # Zu wenige für den Spielplan (#2607, Nr. 302): nur eine Warnung, sobald die Anmeldung zu ist - keine Mindestzahl, nie automatisch abgesagt.
+    from services import league_season_cancel
+
+    if season.get("id"):
+        items += [("warning", _item("entries_short", row["text"])) for row in await league_season_cancel.entry_shortfall(db, season)]
     map_ids = sorted({item.get("map_id") for group in (pool or {}).get("modes") or [] for item in group.get("maps") or []})
     maps = {row["id"]: row for row in await db.game_maps.find({"id": {"$in": map_ids}}, {"_id": 0, "id": 1, "status": 1}).to_list(None)}
     items += _pool_state_items(pool, game, order, maps)
