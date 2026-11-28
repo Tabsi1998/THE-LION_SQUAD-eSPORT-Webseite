@@ -4,8 +4,10 @@ Mails, Discord-Texte, Teilen-Bilder, Vorschauen, Kalender-Abo und Meldungen nehm
 „23.05.2026“ bleibt den Dokumenten: Rechnungen, Urkunden, PDF-Listen, CSV-Ausfuhren und dem Regelwerk. Wer sonst ein
 Datum selbst baut (``%d.%m``, ``%d. %B``, ``%02d.%02d.``, ``{tag}.{monat}``, ``{x.day}. {MONATE[...]}``), steht hier
 mit Grund in ``OFFICIAL`` - oder nimmt die Hilfe. CSV-Ausfuhren, die das amtliche Datum über ``format_official_*``
-schreiben, stehen in ``CSV_OFFICIAL``: dort muss es amtlich bleiben, nie die Anzeigeform.
+schreiben, stehen mit ihrer Ausfuhr-Funktion in ``CSV_OFFICIAL``: Diese Funktion ruft - auch über Hilfen derselben Datei -
+nie die Anzeigeform. Eine neue CSV-Ausfuhr kommt hierher und bekommt einen Verhaltenstest in ``test_csv_dates_unit.py``.
 """
+import ast
 import pathlib
 import re
 
@@ -27,15 +29,20 @@ OFFICIAL = {
     "services/advent_calendar.py": "Advent-Sonderform („am 12. Dezember um 6 Uhr“) - eigenes Folge-Issue #2619",
 }
 
-# CSV-Ausfuhren mit amtlichem Datum über die Hilfe (kein eigenes Muster, darum nicht in OFFICIAL).
+# CSV-Ausfuhren mit amtlichem Datum über die Hilfe (kein eigenes Muster, darum nicht in OFFICIAL):
+# Datei -> (Ausfuhr-Funktion, Grund). Geprüft wird, was die Funktion aufruft - nicht nur, ob die Datei die Hilfe kennt.
 CSV_OFFICIAL = {
-    "services/event_lead.py": "Teilnehmerliste eines Events („Angemeldet am“)",
-    "services/moderation_standing.py": "Personen-CSV der Moderation („Chat gesperrt bis“, „Letzter Vorfall“)",
+    "services/event_lead.py": ("export_csv", "Teilnehmerliste eines Events („Angemeldet am“)"),
+    "services/moderation_standing.py": ("export_csv", "Personen-CSV der Moderation („Chat gesperrt bis“, „Letzter Vorfall“)"),
 }
+# Die Anzeigeform - in einer CSV-Ausfuhr nie.
+DISPLAY_FORMS = {"format_moment", "format_when", "format_date", "format_range", "format_ago", "format_clock"}
 
 MONTH_WORDS = r"(?:Jänner|Januar|Februar|März|April|Mai|Juni|Juli|August|September|Oktober|November|Dezember)"
 PATTERNS = {
-    "strftime mit Tag und Monat": re.compile(r"%-?d[./]\s?%[mbB]|%-?d\.?\s%[bB]"),
+    "strftime mit Tag und Monat": re.compile(r"%-?d[./]\s?%-?[mbB]|%-?d\.?\s%-?[bB]"),
+    "str.format mit Tag und Monat": re.compile(
+        r"""["']\{[^{}]*\}\.\{[^{}]*\}\.(?:\{[^{}]*\})?["']\s*\.format\([^)]*\b(?:day|month|tag|monat)\b"""),
     "%-Format „%02d.%02d.“": re.compile(r"%0?2?d\.%0?2?d\."),
     "Tag und Monat aus Platzhaltern": re.compile(
         r"\{[^{}]*:02d\}\.\{[^{}]*:02d\}\.|\{[^{}]*\}\.\s?\{[^{}]*\b(?:month|monat|MONTHS?\w*|MONATE?\w*)\b[^{}]*\}"),
@@ -64,12 +71,16 @@ def test_gegenprobe_die_muster_treffen_und_lassen_anderes_in_ruhe():
         'f"{moment.day}.{moment.month}.{moment.year}"', 'f"{int(day)}.{int(month)}."', 'f"{tag}.{monat}.{jahr}"',
         'return f"{local.day}. {MONTHS_DE[local.month - 1]} {local.year}"', 'f"am {when.day}. Dezember um {when.hour} Uhr"',
         '"-".join(reversed(day.isoformat().split("-")))',
+        # Nachprüfung: ohne führende Null und über str.format.
+        'x.strftime("%-d.%-m.%Y")', 'x.strftime("%-d. %-B")', '"{}.{}.{}".format(d.day, d.month, d.year)',
+        "'{}.{}.'.format(moment.day, moment.month)",
     ]
     for text in caught:
         assert own_form(text), text
     left_alone = [
         'x.strftime("%Y-%m-%d")', 'x.strftime("%H:%M")', 'f"{m}:{s:02d}.{mil:03d}"', 'f"{minutes}:{seconds:02d}.{millis:03d}"',
         'f"{ref.collection}.{ref.field}"', 'f"{rank}. Platz"', 'f"{count}. Spieltag"', 'f"{index}. Mai-Cup"',
+        '"{}.{}.{}".format(major, minor, patch)', '"{}.{}".format(collection, field)',
     ]
     for text in left_alone:
         assert not own_form(text), text
@@ -88,7 +99,57 @@ def test_jede_ausnahme_wird_noch_gebraucht():
         assert any(own_form(line) for line in texts[rel].splitlines()), f"{rel} schreibt kein eigenes Datum mehr - aus OFFICIAL nehmen"
 
 
+def csv_calls(source: str, function: str) -> set[str]:
+    """Alles, was ``function`` aufruft - auch über Hilfen derselben Datei (``export_csv`` -> ``_fmt`` -> ``format_moment``)
+    und über Import-Namen (``format_moment as fm``)."""
+    tree = ast.parse(source)
+    aliases = {alias.asname or alias.name: alias.name for node in ast.walk(tree) if isinstance(node, ast.ImportFrom)
+               for alias in node.names}
+    functions = {node.name: node for node in ast.walk(tree) if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef))}
+    calls: set[str] = set()
+    seen: set[str] = set()
+    todo = [function]
+    while todo:
+        name = todo.pop()
+        if name in seen or name not in functions:
+            continue
+        seen.add(name)
+        for node in ast.walk(functions[name]):
+            if isinstance(node, ast.Call):
+                func = node.func
+                called = func.id if isinstance(func, ast.Name) else func.attr if isinstance(func, ast.Attribute) else None
+                if called:
+                    calls.add(aliases.get(called, called))
+                    todo.append(called)
+    return calls
+
+
+def csv_display_forms(source: str, function: str) -> set[str]:
+    return csv_calls(source, function) & DISPLAY_FORMS
+
+
+def test_gegenprobe_csv_ausfuhr():
+    over_helper = (
+        "from services.date_text import format_moment\n"
+        "def _fmt(value):\n    return format_moment(value)\n"
+        "def export_csv(rows):\n    return [_fmt(row['at']) for row in rows]\n"
+        "def _csv_moment(value):\n    from services.date_text import format_official_moment\n    return format_official_moment(value)\n"
+    )
+    assert csv_display_forms(over_helper, "export_csv") == {"format_moment"}
+    aliased = "from services.date_text import format_when as fw\nasync def export_csv(rows):\n    return fw(rows[0])\n"
+    assert csv_display_forms(aliased, "export_csv") == {"format_when"}
+    official = over_helper.replace("[_fmt(row['at'])", "[_csv_moment(row['at'])")
+    assert csv_display_forms(official, "export_csv") == set()
+    assert "format_official_moment" in csv_calls(official, "export_csv")
+
+
 def test_csv_ausfuhren_bleiben_amtlich():
+    """Die Ausfuhr-Funktion selbst (und was sie in der Datei aufruft) schreibt amtlich - eine Meldung daneben darf die
+    Anzeigeform nehmen. Das Verhalten prüft ``test_csv_dates_unit.py``; eine neue CSV-Ausfuhr kommt hierher und dorthin."""
     texts = dict(sources())
-    for rel, reason in CSV_OFFICIAL.items():
-        assert "format_official_" in texts[rel], f"{rel}: {reason} - amtlich über format_official_date/_moment"
+    for rel, (function, reason) in CSV_OFFICIAL.items():
+        defined = {node.name for node in ast.walk(ast.parse(texts[rel])) if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef))}
+        assert function in defined, f"{rel}: {function} gibt es nicht mehr - CSV_OFFICIAL anpassen"
+        calls = csv_calls(texts[rel], function)
+        assert not calls & DISPLAY_FORMS, f"{rel}: {reason} - {function} nimmt die Anzeigeform {sorted(calls & DISPLAY_FORMS)}"
+        assert any(name.startswith("format_official_") for name in calls), f"{rel}: {reason} - amtlich über format_official_*"
