@@ -41,6 +41,7 @@ from pymongo.errors import DuplicateKeyError
 from models import new_id, now_utc
 from services import ballot_views
 from services.log_safe import log_safe
+from services.mutation_lock import MutationLockBusy, mutation_lock
 
 logger = logging.getLogger("tls.events.polls")
 
@@ -51,8 +52,12 @@ LABEL_MAX = 80
 RESULTS = ("live", "after_close")
 VOTERS = ("registered",)
 ELIGIBLE_STATUSES = ("registered", "checked_in")
+# Ist das Event vorbei, archiviert oder abgesagt, ist jede Abstimmung daran beendet (Review #2612-12).
+FINISHED_EVENT_STATUSES = ("completed", "archived", "cancelled")
 CODE = re.compile(r"^[a-z0-9][a-z0-9-]{0,39}$")
 VOTER_USER = "user"
+# So lange wartet eine Stimme bzw. das Beenden auf die Sperre der Abstimmung.
+POLL_LOCK_WAIT = 3.0
 
 STATUS_LABELS = {"open": "offen", "closed": "beendet"}
 OUTCOME_LABELS = {"winner": "Mehrheit", "tie": "Gleichstand", "none": "Noch keine Stimmen"}
@@ -61,6 +66,7 @@ REASON_TEXTS = {
     "not_registered": "Abstimmen können nur Angemeldete dieses Events.",
     "waitlist": "Du stehst auf der Warteliste – abstimmen kannst du, sobald du nachrückst.",
     "cancelled": "Du hast dich abgemeldet – abstimmen können nur Angemeldete.",
+    "no_show": "Du bist als nicht erschienen eingetragen – abstimmen können nur Angemeldete.",
 }
 
 
@@ -86,16 +92,27 @@ def _dt(value) -> datetime | None:
     return moment if moment.tzinfo else moment.replace(tzinfo=timezone.utc)
 
 
-def is_closed(poll: dict, now: datetime) -> bool:
-    """Zu, wenn die Verwaltung sie beendet hat oder die Frist erreicht ist - genau zur Frist ist sie schon zu."""
-    if poll.get("closed_at"):
+def _event_over(event: dict | None) -> bool:
+    return (event or {}).get("status") in FINISHED_EVENT_STATUSES
+
+
+def is_closed(poll: dict, now: datetime, event: dict | None = None) -> bool:
+    """Zu, wenn die Verwaltung sie beendet hat, die Frist erreicht ist (genau zur Frist ist sie schon zu) oder das Event
+    beendet, archiviert oder abgesagt ist."""
+    if poll.get("closed_at") or poll.get("final_result") or _event_over(event):
         return True
     closes = _dt(poll.get("closes_at"))
     return bool(closes and now >= closes)
 
 
-def results_visible(poll: dict, now: datetime) -> bool:
-    return poll.get("results_visibility") == "live" or is_closed(poll, now)
+def end_of(poll: dict, now: datetime) -> datetime:
+    """Wann die Abstimmung zu war: beendet, Frist - der frühere Zeitpunkt; sonst jetzt (Event beendet)."""
+    ends = [moment for moment in (_dt(poll.get("closed_at")), _dt(poll.get("closes_at"))) if moment]
+    return min(ends) if ends else now
+
+
+def results_visible(poll: dict, now: datetime, event: dict | None = None) -> bool:
+    return poll.get("results_visibility") == "live" or is_closed(poll, now, event)
 
 
 # ---------------------------------------------------------------- Prüfen
@@ -191,10 +208,8 @@ async def eligibility(db, event: dict, user: dict | None) -> tuple[bool, str | N
     status = (registration or {}).get("status")
     if status in ELIGIBLE_STATUSES:
         return True, None
-    if status == "waitlist":
-        return False, "waitlist"
-    if status in ("cancelled", "no_show"):
-        return False, "cancelled"
+    if status in ("waitlist", "cancelled", "no_show"):
+        return False, status
     return False, "not_registered"
 
 
@@ -202,24 +217,65 @@ def voter_key(kind: str, ref: str) -> str:
     return f"{kind}:{ref}"
 
 
-async def _counted(db, poll: dict, active: set[str]) -> list[dict]:
-    """Die Stimmen, die zählen: die der Wähler, deren Konto gerade angemeldet ist."""
-    rows = await db.event_poll_votes.find({"poll_id": poll["id"]}, {"_id": 0, "user_id": 1, "choices": 1}).to_list(5000)
-    return [row for row in rows if row.get("user_id") in active]
+async def _counted(db, poll: dict, active: set[str], before: datetime | None = None) -> list[dict]:
+    """Die Stimmen, die zählen: die der Wähler, deren Konto gerade angemeldet ist - mit ``before`` nur die, die bis zum
+    Ende angenommen wurden (die Sperre lässt danach keine mehr zu; gleich lautende Zeitstempel zählen, die Uhr ist grob)."""
+    rows = await db.event_poll_votes.find({"poll_id": poll["id"]}, {"_id": 0, "user_id": 1, "choices": 1, "voted_at": 1,
+                                                                    "updated_at": 1}).to_list(5000)
+    rows = [row for row in rows if row.get("user_id") in active]
+    if before is not None:
+        rows = [row for row in rows if (_dt(row.get("voted_at") or row.get("updated_at")) or datetime.min.replace(tzinfo=timezone.utc)) <= before]
+    return rows
 
 
-def _result(poll: dict, counted: list[dict]) -> dict:
+def _tally(poll: dict, counted: list[dict]) -> dict:
+    return ballot_views.tally([row.get("choices") or [] for row in counted], ballot_views.options_view(poll.get("options")))
+
+
+def _result(poll: dict, counted: list[dict] | None = None) -> dict:
+    """Das Ergebnis - nach dem Ende das eingefrorene (``final_result``), sonst der Stand der gezählten Stimmen."""
     options = ballot_views.options_view(poll.get("options"))
-    tallied = ballot_views.tally([row.get("choices") or [] for row in counted], options)
+    tallied = poll.get("final_result") or _tally(poll, counted or [])
     return ballot_views.result_view(
-        counts=tallied["counts"], options=options, outcome=tallied["outcome"],
-        outcome_label=OUTCOME_LABELS[tallied["outcome"]], valid=tallied["valid"], winner=tallied["winner"],
+        counts=tallied.get("counts") or {}, options=options, outcome=tallied.get("outcome") or "none",
+        outcome_label=OUTCOME_LABELS.get(tallied.get("outcome") or "none", ""), valid=tallied.get("valid"),
+        winner=tallied.get("winner") or "",
     )
 
 
-def _base(poll: dict, now: datetime) -> dict:
+def _lock(db, poll_id: str):
+    """Abstimmen und Beenden laufen je Abstimmung nacheinander: Eine Stimme rutscht nie nach dem Ende durch, und das
+    eingefrorene Ergebnis enthält jede Stimme, die vorher angenommen wurde (Review #2612-11)."""
+    return mutation_lock(db, f"event_poll:{poll_id}", wait_seconds=POLL_LOCK_WAIT)
+
+
+async def _freeze_locked(db, event: dict, poll: dict, now: datetime) -> dict:
+    """Das Ergebnis festschreiben (nur einmal, nur Zahlen): die Stimmen der Angemeldeten, die vor dem Ende ankamen.
+    Spätere Abmeldungen und Kontolöschungen ändern es danach nicht mehr. Der Aufrufer hält die Sperre."""
+    fresh = await db.event_polls.find_one({"id": poll["id"]}, {"_id": 0}) or poll
+    if fresh.get("final_result") or not is_closed(fresh, now, event):
+        return fresh
+    counted = await _counted(db, fresh, await _active_user_ids(db, event["id"]), before=end_of(fresh, now))
+    final = {**_tally(fresh, counted), "frozen_at": now.isoformat()}
+    await db.event_polls.update_one({"id": fresh["id"], "final_result": None}, {"$set": {"final_result": final}})
+    return await db.event_polls.find_one({"id": fresh["id"]}, {"_id": 0}) or fresh
+
+
+async def _frozen(db, event: dict, poll: dict, now: datetime) -> dict:
+    """Ist die Abstimmung zu, aber noch nicht eingefroren, jetzt einfrieren (beim ersten Lesen nach der Frist)."""
+    if poll.get("final_result") or not is_closed(poll, now, event):
+        return poll
+    try:
+        async with _lock(db, poll["id"]):
+            return await _freeze_locked(db, event, poll, now)
+    except MutationLockBusy:
+        # Gerade stimmt jemand ab oder beendet - dieses Lesen zeigt den Stand, das nächste das eingefrorene Ergebnis.
+        return poll
+
+
+def _base(poll: dict, now: datetime, event: dict | None = None) -> dict:
     options = ballot_views.options_view(poll.get("options"))
-    status = "closed" if is_closed(poll, now) else "open"
+    status = "closed" if is_closed(poll, now, event) else "open"
     max_choices = int(poll.get("max_choices") or 1)
     return {
         "id": poll["id"], "event_id": poll.get("event_id"), "question": poll.get("question") or "",
@@ -231,9 +287,11 @@ def _base(poll: dict, now: datetime) -> dict:
 
 
 async def poll_view(db, poll: dict, user: dict | None, *, now: datetime, eligible: tuple[bool, str | None],
-                    active: set[str]) -> dict:
+                    active: set[str], event: dict | None = None) -> dict:
     """Eine Abstimmung, wie die Event-Seite und die App sie der Person zeigen."""
-    view = _base(poll, now)
+    if event is not None:
+        poll = await _frozen(db, event, poll, now)
+    view = _base(poll, now, event)
     ok, reason = eligible
     rights = []
     if ok:
@@ -247,11 +305,11 @@ async def poll_view(db, poll: dict, user: dict | None, *, now: datetime, eligibl
             "option": choices[0] if choices else "", "option_label": labels.get(choices[0], "") if choices else "",
             "can_use": view["status"] == "open",
         })
-    visible = results_visible(poll, now)
+    visible = results_visible(poll, now, event)
     view.update({
         "rights": rights, "can_vote": bool(rights) and view["status"] == "open",
         "reason": None if ok else reason, "reason_text": "" if ok else REASON_TEXTS.get(reason or "", ""),
-        "result": _result(poll, await _counted(db, poll, active)) if visible else None,
+        "result": (_result(poll) if poll.get("final_result") else _result(poll, await _counted(db, poll, active))) if visible else None,
         "result_hidden": not visible,
     })
     return view
@@ -264,11 +322,14 @@ async def admin_view(db, event: dict, poll: dict, *, now: datetime, active: set[
 
     if active is None:
         active = await _active_user_ids(db, event["id"])
+    poll = await _frozen(db, event, poll, now)
     counted = await _counted(db, poll, active)
-    view = _base(poll, now)
+    view = _base(poll, now, event)
     plan_keys = {plan["key"] for plan in stored_plans(event)}
     codes = [option["code"] for option in view["options"]]
-    view.update({"result": _result(poll, counted), "voters_count": len(counted), "eligible_count": len(active),
+    final = poll.get("final_result")
+    view.update({"result": _result(poll, counted), "voters_count": int(final["valid"]) if final else len(counted),
+                 "eligible_count": len(active),
                  "place_plan_poll": bool(plan_keys and codes) and all(code in plan_keys for code in codes),
                  "created_at": poll.get("created_at"), "updated_at": poll.get("updated_at")})
     return view
@@ -285,7 +346,7 @@ async def polls_for_event(db, event: dict, user: dict | None) -> list[dict]:
         return []
     eligible = await eligibility(db, event, user)
     active = await _active_user_ids(db, event["id"])
-    return [await poll_view(db, poll, user, now=now, eligible=eligible, active=active) for poll in polls]
+    return [await poll_view(db, poll, user, now=now, eligible=eligible, active=active, event=event) for poll in polls]
 
 
 async def admin_polls(db, event: dict) -> list[dict]:
@@ -318,8 +379,9 @@ async def _notice(db, event: dict, poll: dict) -> dict | None:
     message = f"Stimm ab: {poll['question']}"
     if poll.get("closes_at"):
         message += f" Abstimmen bis {vienna(poll['closes_at'])}."
+    # Eine normale Info (Review #2612-12): nicht zeitkritisch wie eine Absage - Ruhezeit und Sammel-Mail gelten.
     return await inform_registrants(db, event, title="Neue Abstimmung", message=message, dedupe=f"event-poll:{poll['id']}",
-                                    statuses=ELIGIBLE_STATUSES)
+                                    statuses=ELIGIBLE_STATUSES, urgent=False)
 
 
 async def create_poll(db, event: dict, raw: dict, me: dict, *, notify: bool = False) -> dict:
@@ -346,24 +408,37 @@ async def update_poll(db, event: dict, poll_id: str, raw: dict, me: dict) -> dic
     """Ändern: Frage, Antworten, Frist und Einstellungen. Eine Antwort mit Stimmen bleibt - nur ihre Beschriftung ändert sich."""
     now = now_utc()
     poll = await _poll(db, event, poll_id)
+    closed = is_closed(poll, now, event)
     updates: dict = {}
     if "question" in raw:
         updates["question"] = _question(raw.get("question"))
     options = poll.get("options") or []
+    voted: set[str] = set()
+    most = 0
+    async for row in db.event_poll_votes.find({"poll_id": poll["id"]}, {"_id": 0, "choices": 1}):
+        voted.update(row.get("choices") or [])
+        most = max(most, len(row.get("choices") or []))
     if "options" in raw:
         options = _options(raw.get("options"), existing=poll.get("options"))
         kept = {option["code"] for option in options}
-        voted = set()
-        async for row in db.event_poll_votes.find({"poll_id": poll["id"]}, {"_id": 0, "choices": 1}):
-            voted.update(row.get("choices") or [])
         gone = [option["label"] for option in poll.get("options") or [] if option["code"] in voted and option["code"] not in kept]
         if gone:
             raise PollError(409, f"Für „{gone[0]}“ gibt es schon Stimmen – die Antwort bleibt; ändern lässt sich nur ihre Beschriftung.")
+        if closed and kept != {option["code"] for option in poll.get("options") or []}:
+            raise PollError(409, "Die Abstimmung ist beendet – Antworten lassen sich nur noch umbenennen.")
         updates["options"] = options
     if "max_choices" in raw or "options" in raw:
         updates["max_choices"] = _max_choices(raw.get("max_choices", poll.get("max_choices")), options)
+        # Wer schon mehr Antworten gewählt hat, behielte sonst mehrere Stimmen (Review #2612-6).
+        if updates["max_choices"] < most:
+            raise PollError(409, f"Es wurde schon mit bis zu {most} Antworten abgestimmt – weniger erlauben geht nicht mehr.")
+        if closed and updates["max_choices"] != int(poll.get("max_choices") or 1):
+            raise PollError(409, "Die Abstimmung ist beendet – die Zahl der Antworten bleibt.")
     if "closes_at" in raw:
         updates["closes_at"] = _closes(raw.get("closes_at"), now, must_be_future=False)
+        # Verlängern geht nur, solange sie läuft - eine neue Frist öffnet eine beendete nicht wieder (Review #2612-8).
+        if closed and updates["closes_at"] != poll.get("closes_at"):
+            raise PollError(409, "Die Abstimmung ist beendet – eine neue Frist öffnet sie nicht wieder.")
     if "results_visibility" in raw:
         updates["results_visibility"] = _results(raw.get("results_visibility"))
     if updates:
@@ -375,13 +450,20 @@ async def update_poll(db, event: dict, poll_id: str, raw: dict, me: dict) -> dic
 
 
 async def close_poll(db, event: dict, poll_id: str, me: dict) -> dict:
-    now = now_utc()
+    """Früher beenden: unter derselben Sperre wie das Abstimmen - danach steht das Ergebnis fest (``final_result``)."""
     poll = await _poll(db, event, poll_id)
-    if not poll.get("closed_at"):
-        await db.event_polls.update_one({"id": poll["id"], "closed_at": None},
-                                        {"$set": {"closed_at": now.isoformat(), "updated_at": now.isoformat()}})
-        await _audit(db, "event.poll.close", me, event, {"poll_id": poll["id"]})
-        poll["closed_at"] = now.isoformat()
+    try:
+        async with _lock(db, poll["id"]):
+            now = now_utc()
+            fresh = await db.event_polls.find_one({"id": poll["id"]}, {"_id": 0}) or poll
+            if not is_closed(fresh, now, event):
+                ended = await db.event_polls.update_one({"id": poll["id"], "closed_at": None},
+                                                        {"$set": {"closed_at": now.isoformat(), "updated_at": now.isoformat()}})
+                if ended.modified_count:
+                    await _audit(db, "event.poll.close", me, event, {"poll_id": poll["id"]})
+            poll = await _freeze_locked(db, event, fresh, now)
+    except MutationLockBusy as exc:
+        raise PollError(409, "Gerade wird abgestimmt – bitte gleich noch einmal beenden.") from exc
     return await admin_view(db, event, poll, now=now)
 
 
@@ -412,22 +494,11 @@ def _choices(raw, poll: dict) -> list[str]:
     return [code for code in codes if code in chosen]
 
 
-async def cast(db, event: dict, poll_id: str, user: dict, raw_choices) -> dict:
-    """Eine Stimme abgeben oder ändern - je Wähler genau eine, bis zur Frist."""
-    poll = await _poll(db, event, poll_id)
-    if event.get("status") == "cancelled":
-        raise PollError(409, "Das Event ist abgesagt – abgestimmt wird nicht mehr.")
-    ok, reason = await eligibility(db, event, user)
-    if not ok:
-        raise PollError(403, REASON_TEXTS.get(reason or "", REASON_TEXTS["not_registered"]))
-    choices = _choices(raw_choices, poll)
-    now = now_utc()
-    if is_closed(poll, now):
-        raise PollError(409, "Die Frist ist vorbei – die Abstimmung ist zu." if poll.get("closes_at") and not poll.get("closed_at")
-                        else "Die Abstimmung ist beendet.")
+async def _write_vote(db, event: dict, poll: dict, user: dict, choices: list[str], now: datetime) -> None:
     key = voter_key(VOTER_USER, user["id"])
     stamp = now.isoformat()
-    fields = {"choices": choices, "updated_at": stamp, "user_id": user["id"], "event_id": event["id"], "voter_kind": VOTER_USER}
+    fields = {"choices": choices, "updated_at": stamp, "voted_at": stamp, "user_id": user["id"], "event_id": event["id"],
+              "voter_kind": VOTER_USER}
     where = {"poll_id": poll["id"], "voter_key": key}
     try:
         # Eine Zeile je Wähler: zwei gleichzeitige Stimmen derselben Person treffen dieselbe Zeile, die spätere gilt.
@@ -437,6 +508,31 @@ async def cast(db, event: dict, poll_id: str, user: dict, raw_choices) -> dict:
         # Auf echtem MongoDB legen zwei gleichzeitige Upserts nicht beide an - der zweite trifft den eindeutigen Index.
         logger.info("Event %s: Stimme gleichzeitig abgegeben, zweite als Änderung", log_safe(event["id"]))
         await db.event_poll_votes.update_one(where, {"$set": fields})
+
+
+async def cast(db, event: dict, poll_id: str, user: dict, raw_choices) -> dict:
+    """Eine Stimme abgeben oder ändern - je Wähler genau eine, bis zur Frist."""
+    poll = await _poll(db, event, poll_id)
+    if event.get("status") == "cancelled":
+        raise PollError(409, "Das Event ist abgesagt – abgestimmt wird nicht mehr.")
+    if _event_over(event):
+        raise PollError(409, "Das Event ist vorbei – die Abstimmung ist beendet.")
+    ok, reason = await eligibility(db, event, user)
+    if not ok:
+        raise PollError(403, REASON_TEXTS.get(reason or "", REASON_TEXTS["not_registered"]))
+    choices = _choices(raw_choices, poll)
+    try:
+        # Prüfen und Schreiben unter der Sperre der Abstimmung: Beenden und Einfrieren warten, bis die Stimme steht - und
+        # eine Stimme, die nach dem Ende kommt, sieht hier das Ende (Review #2612-11).
+        async with _lock(db, poll["id"]):
+            poll = await db.event_polls.find_one({"id": poll["id"]}, {"_id": 0}) or poll
+            now = now_utc()
+            if is_closed(poll, now, event):
+                raise PollError(409, "Die Frist ist vorbei – die Abstimmung ist zu."
+                                if poll.get("closes_at") and not poll.get("closed_at") else "Die Abstimmung ist beendet.")
+            await _write_vote(db, event, poll, user, choices, now)
+    except MutationLockBusy as exc:
+        raise PollError(409, "Gerade ist viel los bei dieser Abstimmung – bitte gleich noch einmal abstimmen.") from exc
     active = await _active_user_ids(db, event["id"])
     return await poll_view(db, poll, user, now=now, eligible=(True, None), active=active)
 

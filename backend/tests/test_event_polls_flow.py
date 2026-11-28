@@ -425,3 +425,155 @@ async def test_the_poll_list_reads_without_an_account_and_for_the_app(flow):
     assert len(polls) == 1 and polls[0]["options"] and polls[0]["closes_at"] is None
     hidden = await flow.get("/api/events/gibt-es-nicht/polls")
     assert hidden.status_code == 404
+
+
+# --------------------------------------------------------------------------- Review-Runde (Befunde 6, 7, 8, 11, 12)
+async def admin_polls(flow, leitung, event):
+    flow.act_as(leitung)
+    return (await flow.get(f"/api/admin/events/{event['id']}/polls")).json()
+
+
+@pytest.mark.asyncio
+async def test_lowering_max_choices_below_cast_votes_is_refused(flow):
+    """Befund 6: Wer schon zwei Antworten gewählt hat, behält zwei Stimmen - also nicht auf eine Antwort senken."""
+    leitung, event, people = await setup_event(flow)
+    poll = await create_poll(flow, leitung, event, max_choices=2)
+    codes = [option["code"] for option in poll["options"]]
+    assert (await vote(flow, people["paula"], event, poll, codes[:2])).status_code == 200
+    flow.act_as(leitung)
+    url = f"/api/admin/events/{event['id']}/polls/{poll['id']}"
+    lowered = await flow.patch(url, json={"max_choices": 1})
+    assert lowered.status_code == 409 and "schon" in lowered.json()["detail"]
+    assert (await flow.db.event_polls.find_one({"id": poll["id"]}))["max_choices"] == 2
+    # Mehr erlauben geht weiter.
+    assert (await flow.patch(url, json={"max_choices": 3})).status_code == 200
+
+
+@pytest.mark.asyncio
+async def test_the_result_is_frozen_when_the_poll_ends(flow):
+    """Befund 7: Beim Beenden steht das Ergebnis fest - spätere Abmeldungen und Kontolöschungen ändern es nicht."""
+    leitung, event, people = await setup_event(flow)
+    poll = await create_poll(flow, leitung, event, results_visibility="after_close")
+    code = poll["options"][0]["code"]
+    for name in ("paula", "max"):
+        assert (await vote(flow, people[name], event, poll, [code])).status_code == 200
+    flow.act_as(leitung)
+    closed = (await flow.post(f"/api/admin/events/{event['id']}/polls/{poll['id']}/close")).json()
+    assert closed["result"]["counts"][0]["count"] == 2
+    stored_poll = await flow.db.event_polls.find_one({"id": poll["id"]})
+    assert stored_poll["final_result"]["counts"] == {poll["options"][0]["code"]: 2, poll["options"][1]["code"]: 0, poll["options"][2]["code"]: 0}
+    assert "user" not in str(stored_poll["final_result"]) and people["max"]["id"] not in str(stored_poll["final_result"])
+
+    flow.act_as(people["max"])
+    left = await flow.delete(f"/api/events/{event['id']}/registrations/me")
+    assert left.status_code == 200
+    # Wie bei einer Kontolöschung: die Stimme der Person ist weg, das Ergebnis bleibt.
+    removed = await flow.db.event_poll_votes.delete_many({"user_id": people["paula"]["id"]})
+    assert removed.deleted_count == 1
+    assert (await admin_polls(flow, leitung, event))[0]["result"]["counts"][0]["count"] == 2
+    assert (await public_polls(flow, None, event))[0]["result"]["counts"][0]["count"] == 2
+
+
+@pytest.mark.asyncio
+async def test_the_result_is_frozen_on_the_first_read_after_the_deadline(flow, monkeypatch):
+    leitung, event, people = await setup_event(flow)
+    closes = (now_utc() + timedelta(days=1)).replace(microsecond=0)
+    poll = await create_poll(flow, leitung, event, closes_at=closes.isoformat())
+    code = poll["options"][1]["code"]
+    assert (await vote(flow, people["paula"], event, poll, [code])).status_code == 200
+    at(monkeypatch, closes + timedelta(minutes=5))
+    assert (await public_polls(flow, None, event))[0]["result"]["counts"][1]["count"] == 1
+    assert (await flow.db.event_polls.find_one({"id": poll["id"]}))["final_result"]["valid"] == 1
+    flow.act_as(people["paula"])
+    left = await flow.delete(f"/api/events/{event['id']}/registrations/me")
+    assert left.status_code == 200
+    assert (await public_polls(flow, None, event))[0]["result"]["counts"][1]["count"] == 1
+
+
+@pytest.mark.asyncio
+async def test_an_ended_poll_cannot_be_reopened_with_a_new_deadline(flow, monkeypatch):
+    """Befund 8: Verlängern geht, solange sie läuft - eine beendete oder abgelaufene Abstimmung bleibt zu."""
+    leitung, event, _people = await setup_event(flow)
+    closes = (now_utc() + timedelta(hours=1)).replace(microsecond=0)
+    poll = await create_poll(flow, leitung, event, closes_at=closes.isoformat(), results_visibility="after_close")
+    url = f"/api/admin/events/{event['id']}/polls/{poll['id']}"
+    flow.act_as(leitung)
+    longer = await flow.patch(url, json={"closes_at": (closes + timedelta(days=1)).isoformat()})
+    assert longer.status_code == 200, longer.text
+    at(monkeypatch, closes + timedelta(days=2))
+    flow.act_as(leitung)
+    reopened = await flow.patch(url, json={"closes_at": (closes + timedelta(days=5)).isoformat()})
+    assert reopened.status_code == 409 and "beendet" in reopened.json()["detail"]
+    assert (await public_polls(flow, None, event))[0]["status"] == "closed"
+    # Die Frage lässt sich noch berichtigen.
+    flow.act_as(leitung)
+    assert (await flow.patch(url, json={"question": "Welche Rodelbahn am 31.?"})).status_code == 200
+
+
+@pytest.mark.asyncio
+async def test_a_vote_racing_the_close_never_slips_through(flow, monkeypatch):
+    """Befund 11: Stimme und Beenden gleichzeitig - entweder zählt die Stimme im eingefrorenen Ergebnis, oder sie wird abgelehnt."""
+    from routes import event_poll_routes
+
+    leitung, event, people = await setup_event(flow)
+    poll = await create_poll(flow, leitung, event)
+    code = poll["options"][0]["code"]
+    gate = InterleavedReads(flow.db, "event_polls", before=("find_one",))
+    monkeypatch.setattr(event_poll_routes, "get_db", lambda: gate)
+    flow.act_as(people["paula"])
+    voted, closed = await asyncio.gather(
+        flow.put(f"/api/events/{event['id']}/polls/{poll['id']}/vote", json={"choices": [code]}),
+        _close_as(flow, leitung, event, poll),
+    )
+    assert closed.status_code == 200 and voted.status_code in (200, 409)
+    final = (await flow.db.event_polls.find_one({"id": poll["id"]}))["final_result"]
+    assert final["counts"][code] == (1 if voted.status_code == 200 else 0)
+
+
+async def _close_as(flow, leitung, event, poll):
+    """Beenden mit eigenem Konto, ohne den Wechsel des angemeldeten Kontos im anderen Lauf zu stören."""
+    from auth import get_current_user
+    from fastapi import Request
+    from flow_harness import load_application
+
+    server = load_application()[1]
+    original = server.app.dependency_overrides[get_current_user]
+
+    async def pick(request: Request):
+        return leitung if request.url.path.endswith("/close") else await original()
+
+    server.app.dependency_overrides[get_current_user] = pick
+    try:
+        return await flow.post(f"/api/admin/events/{event['id']}/polls/{poll['id']}/close")
+    finally:
+        server.app.dependency_overrides[get_current_user] = original
+
+
+@pytest.mark.asyncio
+async def test_no_show_gets_its_own_reason(flow):
+    leitung, event, people = await setup_event(flow)
+    poll = await create_poll(flow, leitung, event)
+    await flow.db.event_registrations.update_one({"event_id": event["id"], "user_id": people["max"]["id"]}, {"$set": {"status": "no_show"}})
+    response = await vote(flow, people["max"], event, poll, [poll["options"][0]["code"]])
+    assert response.status_code == 403 and "nicht erschienen" in response.json()["detail"]
+    assert "abgemeldet" not in response.json()["detail"]
+
+
+@pytest.mark.asyncio
+async def test_a_new_poll_message_is_a_normal_info(flow):
+    leitung, event, _people = await setup_event(flow)
+    await create_poll(flow, leitung, event, notify=True)
+    notes = await flow.db.notifications.find({"kind": "event_message"}, {"_id": 0}).to_list(10)
+    assert notes and all(note["meta"].get("timely") is not True and note["meta"].get("importance") == "normal" for note in notes)
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("status", ["completed", "archived"])
+async def test_a_finished_event_takes_no_more_votes(flow, status):
+    leitung, event, people = await setup_event(flow)
+    poll = await create_poll(flow, leitung, event)
+    await flow.db.events.update_one({"id": event["id"]}, {"$set": {"status": status}})
+    response = await vote(flow, people["paula"], event, poll, [poll["options"][0]["code"]])
+    assert response.status_code == 409
+    view = (await public_polls(flow, people["paula"], event))[0]
+    assert view["status"] == "closed" and view["can_vote"] is False
