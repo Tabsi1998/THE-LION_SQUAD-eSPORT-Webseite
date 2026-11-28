@@ -1,8 +1,8 @@
 const path = require("path");
 const { test, expect } = require("@playwright/test");
 
-// Zustands-Schilder (#1306) auf Startseite, Dashboard und den Stationen der Turnierleitung bei 390, 768, 1440 und 2560 px -
-// zusammen alle zehn Arten.
+// Zustands-Schilder (#1306) auf Startseite, Dashboard, den Stationen der Turnierleitung und der öffentlichen Turnierseite
+// bei 390, 768, 1440 und 2560 px - zusammen alle zehn Arten und die ruhige Spielart „Bestätigt“.
 // Geprüft wird: kein Schild bricht um oder wird abgeschnitten, keins ist kleiner als 12 px oder GROSS, der Countdown steht
 // neben dem Schild und nie darin, axe-Kontrast an Schild und Countdown. Server nachgestellt, nur erfundene Namen, feste
 // Uhr. Mit SHOTS_DIR legt der Test Bilder für die Abnahme ab (kein Bildvergleich mit festen Goldwerten).
@@ -73,8 +73,23 @@ const QUEUE = {
     { id: "st-2", name: "PC 2", station_text: "PC 2 · PC", status: "busy", waiting: 0, running: queued("m-2", "B", { state: "running", position: 0, started_at: at(-10 * 60000) }), next: null, after: null },
     { id: "st-3", name: "PC 3", station_text: "PC 3 · PC", status: "broken", waiting: 0, running: null, next: null, after: null },
     { id: "st-4", name: "PC 4", station_text: "PC 4 · PC", status: "reserved", waiting: 0, running: null, next: queued("m-4", "D", { state: "called", called_at: at(-60000), report_by: at(60000) }), after: null },
+    // Geteilte Station, an der ein anderes Turnier spielt (Fabian Nr. 304): grau, ohne Puls.
+    { id: "st-5", name: "Halle 1", station_text: "Halle 1 · Switch 2", status: "reserved", waiting: 0, running: null, next: null, after: null, hold_issue: { kind: "other", tournament_title: "Abend-Probe" } },
   ],
 };
+
+// Öffentliche Turnierseite: Kopf „Check-in offen“ mit Countdown daneben, Teilnehmerliste mit fremden Anmeldungen in
+// ruhigem Grau (Fabian Nr. 303) und der Warteliste.
+const DETAIL = {
+  id: "t-detail", slug: "probe-turnier", title: "Probe-Turnier", status: "check_in", start_date: at(4 * HOUR), max_participants: 16,
+  participant_count: 3, registration_enabled: true, format: "single_elimination", game: { display_name: "Mario Kart World" },
+  public_phase: { state: "check_in", label: "Check-in offen", target_at: at(3 * HOUR), countdown_kind: "check_in_closes" },
+};
+const REGS = [
+  { id: "r1", display_name: "Probe Eins", status: "checked_in", seed: 1 },
+  { id: "r2", display_name: "Probe Zwei mit einem langen Namen", status: "approved", seed: 2 },
+  { id: "r3", display_name: "Probe Drei", status: "waitlist", seed: null },
+];
 
 async function mock(page, { user = null } = {}) {
   await page.addInitScript(CONSENT);
@@ -91,6 +106,8 @@ async function mock(page, { user = null } = {}) {
       return json({ tournament: { id: "t-probe", slug: "probe-cup", title: "Probe-Cup", status: "live", event_mode: "local" }, now: NOW.toISOString(), matches: [], attention: [], recent: [], stations: [], counts: { open: 0 } });
     }
     if (pathname === "/tournaments/probe-cup/live-queue") return json(QUEUE);
+    if (pathname === "/tournaments/probe-turnier") return json(DETAIL);
+    if (pathname === "/tournaments/t-detail/registrations") return json(REGS);
     const objects = ["/settings/public", "/home/about", "/chats/unread", "/seasonal/active", "/friends"];
     return json(objects.includes(pathname) ? {} : []);
   });
@@ -195,8 +212,26 @@ for (const [width, height] of WIDTHS) {
       await expect(page.getByTestId("live-chip-st-1")).toHaveText("Frei");
       await expect(page.getByTestId("live-chip-st-1")).toHaveAttribute("data-kind", "free");
       await expect(page.getByTestId("live-chip-st-2")).toHaveAttribute("data-kind", "live");
+      // Ein anderes Turnier an der geteilten Station: grau, ohne Punkt (Fabian Nr. 304).
+      await expect(page.getByTestId("live-chip-st-5")).toHaveAttribute("data-kind", "waiting");
+      await expect(page.getByTestId("live-chip-st-5").locator(".tls-live-dot")).toHaveCount(0);
       await check(page, width, STATION_KINDS);
       await shot(page, "stationen", width, page.locator("main"));
+    });
+
+    test("Turnierseite: Kopf mit Countdown daneben, fremde Anmeldungen ruhig grau", async ({ page }) => {
+      await mock(page);
+      await page.goto("/tournaments/probe-turnier");
+      const head = page.getByTestId("phase-chip").first();
+      await expect(head).toHaveText("Check-in offen");
+      await expect(page.getByTestId("phase-meta").first()).toContainText("Check-in endet");
+      await page.getByTestId("tournament-participants").scrollIntoViewIfNeeded();
+      const approved = page.getByTestId("status-approved");
+      await expect(approved).toHaveText("Bestätigt");
+      await expect(approved).toHaveAttribute("data-variant", "quiet");
+      await expect(page.getByTestId("status-checked_in")).toHaveAttribute("data-variant", "quiet");
+      await check(page, width, ["checkin", "joined", "waiting"]);
+      await shot(page, "turnierseite", width, page.locator("main"));
     });
   });
 }
