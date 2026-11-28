@@ -21,6 +21,8 @@ informieren?“) geht an Angemeldete samt Warteliste - wie beim Verschieben (``e
 """
 from __future__ import annotations
 
+import re
+
 from models import new_id, now_utc
 from services.event_locations import address_line, map_query
 
@@ -28,6 +30,9 @@ MAX_PLANS = 5
 MIN_PLANS = 2
 TEXT_FIELDS = {"name": 120, "address": 120, "postal_code": 20, "city": 120, "country": 120, "note": 300}
 MIRRORED = ("address", "postal_code", "city", "country")
+# Ortsfeld des Events → Feld des Plans (Befund #2613-5: wer die Ortsfelder ändert, ändert den aktiven Plan mit).
+PLACE_TO_PLAN = {"location": "name", **{field: field for field in MIRRORED}}
+KEY = re.compile(r"^[a-z0-9][a-z0-9-]{0,39}$")
 QUIET_STATUSES = ("draft", "archived", "cancelled")
 
 
@@ -46,8 +51,23 @@ def plan_label(index: int) -> str:
     return f"Plan {letter(index)}"
 
 
-def normalize_plans(raw_list) -> list[dict]:
-    """Die Pläne aus der Maske prüfen: Reihenfolge = A, B, C; leer heißt „keine Pläne“."""
+def key_for(number: int) -> str:
+    """Der n-te Schlüssel (ab 0): plan-a … plan-z, danach plan-27, plan-28 … - nie zweimal vergeben."""
+    return f"plan-{chr(ord('a') + number)}" if number < 26 else f"plan-{number + 1}"
+
+
+def used_keys(event: dict | None) -> set[str]:
+    """Alle Schlüssel, die das Event je vergeben hat - auch die von entfernten Plänen (Befund #2613-1/2)."""
+    event = event or {}
+    return set(event.get("place_plan_used_keys") or []) | {plan["key"] for plan in stored_plans(event)}
+
+
+def normalize_plans(raw_list, *, current: set[str] | None = None, used: set[str] | None = None) -> list[dict]:
+    """Die Pläne aus der Maske prüfen: Reihenfolge = A, B, C; leer heißt „keine Pläne“.
+
+    Schlüssel werden nie wiederverwendet: Ein neuer Plan bekommt den nächsten, den das Event noch nie vergeben hat. Sonst
+    zeigte eine Abstimmung über den entfernten Plan C plötzlich auf einen neuen, ganz anderen Plan C. ``current`` sind die
+    Schlüssel der gespeicherten Pläne, ``used`` alle je vergebenen."""
     if raw_list in (None, []):
         return []
     if not isinstance(raw_list, list):
@@ -56,18 +76,33 @@ def normalize_plans(raw_list) -> list[dict]:
         raise PlanError(400, f"Höchstens {MAX_PLANS} Ort-Pläne je Event (A bis {letter(MAX_PLANS - 1)}).")
     if len(raw_list) < MIN_PLANS:
         raise PlanError(400, "Ort-Pläne brauchen mindestens zwei Orte (Plan A und B) – sonst reicht der Ort allein.")
+    current, used = set(current or ()), set(used or ())
     plans = []
     for index, raw in enumerate(raw_list):
         raw = raw if isinstance(raw, dict) else {}
-        plan = {"key": str(raw.get("key") or "").strip().lower()[:40] or f"plan-{letter(index).lower()}"}
+        key = str(raw.get("key") or "").strip()
+        if key and not KEY.match(key):
+            raise PlanError(400, f"{plan_label(index)}: Schlüssel nur aus Kleinbuchstaben, Ziffern und Bindestrich (höchstens 40).")
+        if key and key not in current and key in used:
+            raise PlanError(400, f"{plan_label(index)}: Der Schlüssel {key} war schon vergeben – ein neuer Plan bekommt einen neuen.")
+        plan = {"key": key}
         for field, limit in TEXT_FIELDS.items():
             plan[field] = " ".join(str(raw.get(field) or "").split())[:limit]
         if not (plan["name"] or address_line(plan)):
             raise PlanError(400, f"{plan_label(index)}: Name oder Adresse fehlt.")
         plans.append(plan)
-    keys = [plan["key"] for plan in plans]
+    keys = [plan["key"] for plan in plans if plan["key"]]
     if len(set(keys)) != len(keys):
-        raise PlanError(400, "Die Ort-Pläne brauchen eindeutige Schlüssel.")
+        raise PlanError(400, "Die Ort-Pläne brauchen eindeutige Schlüssel – zwei haben denselben. Bitte die Seite neu laden.")
+    taken = used | set(keys)
+    number = 0
+    for plan in plans:
+        if plan["key"]:
+            continue
+        while key_for(number) in taken:
+            number += 1
+        plan["key"] = key_for(number)
+        taken.add(plan["key"])
     return plans
 
 
@@ -93,17 +128,35 @@ def mirror(plan: dict, target: dict) -> dict:
     return target
 
 
-def apply_on_save(target: dict, raw: dict, existing: dict | None) -> None:
+def apply_on_save(target: dict, raw: dict, existing: dict | None) -> bool:
     """Beim Speichern des Events: Pläne prüfen, den aktiven aus der Datenbank behalten und ihn in die Ortsfelder spiegeln.
-    Die Maske setzt den aktiven Plan nie - das tut nur das Umschalten."""
+    Die Maske setzt den aktiven Plan nie - das tut nur das Umschalten.
+
+    Kommen nur Ortsfelder (API, Inhalte-Helfer) und das Event hat Pläne, ändert sich der aktive Plan mit - Ort und Plan
+    laufen nie auseinander. Gibt zurück, ob das Speichern Pläne schreibt: dann gilt es nur, solange niemand umgeschaltet
+    hat (``place_plan_round``), sonst schriebe es den alten Plan zurück."""
     if "place_plans" not in raw:
         target.pop("place_plans", None)
-        return
-    plans = normalize_plans(raw.get("place_plans"))
+        stored = stored_plans(existing or {})
+        touched = [field for field in PLACE_TO_PLAN if field in raw]
+        if not stored or not touched:
+            return False
+        index = active_index(existing)
+        plans = [dict(plan) for plan in stored]
+        for field in touched:
+            plans[index][PLACE_TO_PLAN[field]] = " ".join(str(target.get(field) or "").split())[:TEXT_FIELDS[PLACE_TO_PLAN[field]]]
+        if not (plans[index]["name"] or address_line(plans[index])):
+            raise PlanError(400, f"{plan_label(index)}: Name oder Adresse fehlt.")
+        target["place_plans"] = plans
+        mirror(plans[index], target)
+        return True
+    plans = normalize_plans(raw.get("place_plans"), current={plan["key"] for plan in stored_plans(existing or {})},
+                           used=used_keys(existing))
     target["place_plans"] = plans
+    target["place_plan_used_keys"] = sorted(used_keys(existing) | {plan["key"] for plan in plans})
     if not plans:
         target["active_place_plan"] = None
-        return
+        return True
     places = target.get("locations") if "locations" in target else (existing or {}).get("locations")
     if places:
         raise PlanError(400, "Ort-Pläne gibt es nur bei einem Ort – bitte zuerst die Liste der Standorte leeren.")
@@ -112,6 +165,7 @@ def apply_on_save(target: dict, raw: dict, existing: dict | None) -> None:
     active = current if current in keys else keys[0]
     target["active_place_plan"] = active
     mirror(plans[keys.index(active)], target)
+    return True
 
 
 def _plan_entry(plan: dict, index: int, active: int | None) -> dict:

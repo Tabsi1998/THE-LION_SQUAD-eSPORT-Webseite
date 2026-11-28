@@ -1059,16 +1059,18 @@ def _apply_locations(target: dict, raw: dict) -> None:
     event_locations.mirror_primary(places, target)
 
 
-def _apply_place_plans(target: dict, raw: dict, existing: dict | None) -> None:
+def _apply_place_plans(target: dict, raw: dict, existing: dict | None) -> bool:
     """Plan A/B/C beim Ort (#2613): prüfen, den aktiven Plan aus der Datenbank behalten und in die Ortsfelder spiegeln.
-    Standorte (#203) und Pläne schließen sich aus - auch, wenn nur die Standorte neu kommen."""
+    Standorte (#203) und Pläne schließen sich aus - auch, wenn nur die Standorte neu kommen. Gibt zurück, ob das Speichern
+    Pläne schreibt - dann gilt es nur, solange inzwischen niemand umgeschaltet hat."""
     try:
-        event_place_plans.apply_on_save(target, raw, existing)
+        writes_plans = event_place_plans.apply_on_save(target, raw, existing)
     except event_place_plans.PlanError as exc:
         raise HTTPException(status_code=exc.status, detail=exc.detail)
     keeps_plans = bool(target.get("place_plans")) if "place_plans" in target else bool(event_place_plans.stored_plans(existing or {}))
     if keeps_plans and target.get("locations"):
         raise HTTPException(status_code=400, detail="Mehrere Standorte gibt es nur ohne Ort-Pläne – bitte zuerst die Pläne entfernen.")
+    return writes_plans
 
 
 def _apply_days(target: dict, raw: dict, existing: dict | None = None) -> None:
@@ -1209,7 +1211,7 @@ async def update_event(event_id: str, body: EventUpdate, me: dict = Depends(requ
     else:
         updates.pop("billing", None)
     _apply_locations(updates, raw)
-    _apply_place_plans(updates, raw, existing)
+    writes_plans = _apply_place_plans(updates, raw, existing)
     _apply_days(updates, raw, existing)
     await _apply_facts(updates, raw, existing)
     slug_source = slug_source_for_update(raw, existing, "name", fallback="event")
@@ -1226,7 +1228,14 @@ async def update_event(event_id: str, body: EventUpdate, me: dict = Depends(requ
     cancelling = updates.get("status") == "cancelled"
     if cancelling:
         updates.pop("status")
-    await db.events.update_one({"id": event_id}, {"$set": updates})
+    # Ort-Pläne (#2613): Wer Pläne oder den Ort schreibt, schreibt den aktiven Plan mit, den er gelesen hat. Hat inzwischen
+    # jemand umgeschaltet (``place_plan_round``), gewinnt das Umschalten - sonst stünde wieder der alte Ort da, obwohl alle
+    # schon „Plan B gilt“ gelesen haben.
+    where = {"id": event_id}
+    if writes_plans:
+        where.update({"place_plan_round": existing.get("place_plan_round"), "active_place_plan": existing.get("active_place_plan")})
+    if (await db.events.update_one(where, {"$set": updates})).matched_count == 0 and writes_plans:
+        raise HTTPException(409, "Inzwischen wurde umgeschaltet – bitte neu laden. Deine Änderungen am Ort sind nicht gespeichert.")
     newly_cancelled = cancelling and (await db.events.update_one(
         {"id": event_id, "status": {"$ne": "cancelled"}},
         {"$set": {"status": "cancelled", "cancelled_at": updates["updated_at"], "updated_at": updates["updated_at"]},

@@ -272,3 +272,88 @@ async def test_a_poll_over_the_plans_can_take_over_its_result(flow):
     winner = (await flow.get(f"/api/admin/events/{event['id']}/polls")).json()[0]["result"]["winner"]
     assert winner == "plan-b"
     assert (await switch(flow, leitung, event, winner, expected="plan-a")).json()["changed"] is True
+
+
+# --------------------------------------------------------------------------- Review-Runde (Befunde 1, 2, 3, 5)
+@pytest.mark.asyncio
+async def test_removing_a_middle_plan_and_adding_a_new_one_never_reuses_a_key(flow):
+    """Befund 1: B entfernen und einen neuen Plan anlegen - der neue bekommt den nächsten nie benutzten Schlüssel."""
+    leitung, event, _people = await setup_event(flow)
+    a, _b, c = (await stored(flow, event))["place_plans"]
+    flow.act_as(leitung)
+    response = await flow.patch(f"/api/events/{event['id']}", json={"place_plans": [a, c, {"key": "", "name": "Neue Bahn", "city": "Telfs"}]})
+    assert response.status_code == 200, response.text
+    assert [plan["key"] for plan in (await stored(flow, event))["place_plans"]] == ["plan-a", "plan-c", "plan-d"]
+    doc = await stored(flow, event)
+    again = await flow.patch(f"/api/events/{event['id']}", json={"place_plans": [*doc["place_plans"], {"key": "plan-b", "name": "Alte Bahn"}]})
+    assert again.status_code == 400 and "schon vergeben" in again.json()["detail"]
+
+
+@pytest.mark.asyncio
+async def test_a_poll_over_a_removed_plan_does_not_point_to_a_new_place(flow):
+    """Befund 2: Ein entfernter Plan C kommt nie als neuer Plan C zurück - die Abstimmung über C lenkt nicht auf einen fremden Ort."""
+    leitung, event, people = await setup_event(flow)
+    doc = await stored(flow, event)
+    flow.act_as(leitung)
+    options = [{"code": plan["key"], "label": plan["name"]} for plan in doc["place_plans"]]
+    poll = (await flow.post(f"/api/admin/events/{event['id']}/polls", json={"question": "Welcher Ort?", "options": options})).json()
+    flow.act_as(people["paula"])
+    assert (await flow.put(f"/api/events/{event['id']}/polls/{poll['id']}/vote", json={"choices": ["plan-c"]})).status_code == 200
+    a, b, _c = doc["place_plans"]
+    flow.act_as(leitung)
+    assert (await flow.patch(f"/api/events/{event['id']}", json={"place_plans": [a, b]})).status_code == 200
+    added = await flow.patch(f"/api/events/{event['id']}", json={"place_plans": [a, b, {"key": "", "name": "Pizzeria", "city": "Zirl"}]})
+    assert added.status_code == 200
+    assert (await stored(flow, event))["place_plans"][2]["key"] == "plan-d"
+    admin = (await flow.get(f"/api/admin/events/{event['id']}/polls")).json()[0]
+    assert admin["place_plan_poll"] is False
+
+
+@pytest.mark.asyncio
+async def test_plan_keys_from_the_api_must_be_clean(flow):
+    leitung = await person(flow, "leitung", role="tournament_admin")
+    flow.act_as(leitung)
+    response = await flow.post("/api/events", json={"name": "Silvester", "place_plans": [{**PLANS[0], "key": "Plan B!"}, PLANS[1]]})
+    assert response.status_code == 400 and "Schlüssel" in response.json()["detail"]
+
+
+@pytest.mark.asyncio
+async def test_saving_the_form_while_someone_switches_is_refused(flow, monkeypatch):
+    """Befund 3: Schaltet jemand um, während die Maske speichert, gewinnt das Umschalten - das Speichern bekommt 409."""
+    from routes import event_routes
+    from services import event_place_plans
+
+    leitung, event, _people = await setup_event(flow)
+    original = event_routes._apply_facts
+    fired = {}
+
+    async def racing(updates, raw, existing=None):
+        if not fired:
+            fired["switch"] = await event_place_plans.switch(flow.db, await stored(flow, event), "plan-b", leitung, notify=True)
+        return await original(updates, raw, existing)
+
+    monkeypatch.setattr(event_routes, "_apply_facts", racing)
+    plans = (await stored(flow, event))["place_plans"]
+    plans[2] = {**plans[2], "note": "neu"}
+    flow.act_as(leitung)
+    response = await flow.patch(f"/api/events/{event['id']}", json={"place_plans": plans})
+    assert response.status_code == 409 and "Inzwischen wurde umgeschaltet" in response.json()["detail"]
+    after = await stored(flow, event)
+    assert fired["switch"]["changed"] is True
+    assert (after["active_place_plan"], after["location"]) == ("plan-b", "Rodelbahn Gaisalm")
+    assert after["place_plans"][2]["note"] == PLANS[2]["note"]
+
+
+@pytest.mark.asyncio
+async def test_place_fields_without_plans_change_the_active_plan_along(flow):
+    """Befund 5: Ortsfelder über API oder Inhalte-Helfer ändern - der aktive Plan ändert sich mit, nie auseinander."""
+    leitung, event, _people = await setup_event(flow)
+    flow.act_as(leitung)
+    response = await flow.patch(f"/api/events/{event['id']}", json={"location": "Ganz woanders", "city": "Innsbruck"})
+    assert response.status_code == 200, response.text
+    flow.act_as(None)
+    page = (await flow.get(f"/api/events/{event['slug']}")).json()
+    assert page["location"] == "Ganz woanders" == page["place_plan"]["name"]
+    assert page["place_plan"]["city"] == "Innsbruck" and page["place_plan"]["address"] == "Hocheggweg 1"
+    doc = await stored(flow, event)
+    assert doc["place_plans"][0]["name"] == "Ganz woanders" and doc["place_plans"][1]["name"] == "Rodelbahn Gaisalm"

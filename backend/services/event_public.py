@@ -16,7 +16,7 @@ INTERNAL_EVENT_FIELDS = frozenset({
     "members_notified_at", "members_notified_count",
     "slug_history", "cancel_round",
     # Plan A/B/C (#2613): der Zähler der Umschaltungen dient nur dem Server (Nachricht je Umschaltung, Gleichzeitigkeit).
-    "place_plan_round",
+    "place_plan_round", "place_plan_used_keys",
 })
 
 
