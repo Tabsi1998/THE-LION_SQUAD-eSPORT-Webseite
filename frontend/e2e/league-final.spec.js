@@ -1,6 +1,11 @@
 const path = require("node:path");
 const { test, expect } = require("@playwright/test");
 
+// Feste Uhr (#1307): die Datums-Texte lassen das laufende Jahr weg und sagen „heute“/„morgen“ - Samstag, 28.11.2026.
+test.beforeEach(async ({ page }) => {
+  await page.clock.install({ time: new Date("2026-11-28T10:00:00Z") });
+});
+
 // Saisonabschluss (F.1, #1645, docs/LIGA.md „F.1 Saisonabschluss“) im echten Browser, Server nachgestellt: das Cockpit im Reiter
 // „Abschluss“ mit Checkliste und Link, Vorschau, Gleichstand auf Platz 1, Abschließen mit Bestätigung, Verlauf und Wieder öffnen -
 // und der Endstand auf der Ligaseite. Bei 390 und 1440 px ohne seitliches Scrollen. Mit E2E_SCREENS_DIR legt der Test die Bilder ab
@@ -133,7 +138,7 @@ test.describe("Liga: Saisonabschluss", () => {
       const blocked = panel.getByTestId("close-staffel-tA");
       await expect(blocked.getByTestId("close-state-tA")).toHaveText("4 offen");
       await expect(blocked.getByRole("link", { name: `Spieltag 3: ${TEAMS[2]} – ${TEAMS[3]}` })).toHaveAttribute("href", "/matches/m9");
-      await expect(blocked.getByTestId("close-blocker-tA-deadlines")).toContainText("bis 14.01.2027, 20:00");
+      await expect(blocked.getByTestId("close-blocker-tA-deadlines")).toContainText("bis Do 14. Jänner 2027 · 20:00");
       await expect(blocked.getByTestId("close-decide-tA")).toBeVisible();
       await expect(blocked.getByTestId("close-button-tA")).toBeDisabled();
 
@@ -142,7 +147,7 @@ test.describe("Liga: Saisonabschluss", () => {
       await expect(ready.getByRole("table", { name: "Vorschau Liga 1 · Staffel B" })).toBeVisible();
 
       const closed = panel.getByTestId("close-staffel-tC");
-      await expect(closed.getByTestId("close-final-tC")).toContainText("Abgeschlossen am 12.01.2027, 20:30 von Zweite Leitung · Fassung 2");
+      await expect(closed.getByTestId("close-final-tC")).toContainText("Abgeschlossen am Di 12. Jänner 2027 · 20:30 von Zweite Leitung · Fassung 2");
       await expect(closed.getByTestId("close-final-tC")).toContainText(`Meister: ${TEAMS[0]}`);
       await expect(closed.getByTestId("close-final-tC")).toContainText("Entscheidungsspiel: Am 10.01. mit 2:1 gewonnen");
       await expect(closed.getByTestId("standing-notes-r1")).toContainText("Platz durch Entscheidungsspiel");
@@ -205,7 +210,7 @@ test.describe("Liga: Saisonabschluss", () => {
       await mockServer(page);
       await page.goto("/liga/probe-liga/season-1");
       const staffel = page.getByTestId("league-staffel-A");
-      await expect(staffel.getByTestId("league-final-A")).toHaveText("Endstand · abgeschlossen am 12.01.2027");
+      await expect(staffel.getByTestId("league-final-A")).toHaveText("Endstand · abgeschlossen am Di 12. Jänner 2027");
       await expect(staffel.getByTestId("league-champion-A")).toContainText(`Meister ${TEAMS[0]}`);
       await expect(staffel.getByTestId("standing-notes-r1")).toContainText("Platz durch Entscheidungsspiel: Am 10.01. mit 2:1 gewonnen");
       await noSideScroll(page);

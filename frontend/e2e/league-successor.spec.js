@@ -1,6 +1,11 @@
 const path = require("node:path");
 const { test, expect } = require("@playwright/test");
 
+// Feste Uhr (#1307): die Datums-Texte lassen das laufende Jahr weg und sagen „heute“/„morgen“ - Samstag, 28.11.2026.
+test.beforeEach(async ({ page }) => {
+  await page.clock.install({ time: new Date("2026-11-28T10:00:00Z") });
+});
+
 // Neue Season aus der Vorgänger-Season (F.2, #1627, docs/LIGA.md „F.2 Neue Season aus dem Vorgänger“) im echten Browser, Server
 // nachgestellt: die Vorschau „Neue Season aus …“ mit Teams je Liga und Anlegen, die Zonen in der Tabelle der Ligaseite und „Abmelden“
 // unter Teams. Bei 390 und 1440 px ohne seitliches Scrollen. Mit E2E_SCREENS_DIR legt der Test die Bilder ab (f2-neue-season-…,
@@ -164,7 +169,7 @@ test.describe("Liga: neue Season aus dem Vorgänger", () => {
       await page.goto("/teams");
       const row = page.getByTestId("squad-application-a5");
       await expect(row.getByTestId("squad-application-carry-a5")).toHaveText(
-        "Übernommen aus Season 1: Liga 1 (Aufstieg aus Liga 2). Abmelden bis zum Start am 02.02.2027, 00:00 Uhr.");
+        "Übernommen aus Season 1: Liga 1 (Aufstieg aus Liga 2). Abmelden bis zum Start am Di 2. Februar 2027 · 00:00.");
       await expect(row.getByRole("link")).toHaveCount(0);
       await noSideScroll(page);
       if (width === 390) await shot(row.locator("xpath=ancestor::div[contains(@class,'rounded-sm')][1]"), "f2-abmelden-390");

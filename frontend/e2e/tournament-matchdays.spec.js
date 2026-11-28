@@ -1,5 +1,10 @@
 const { test, expect } = require("@playwright/test");
 
+// Feste Uhr (#1307): die Datums-Texte lassen das laufende Jahr weg und sagen „heute“/„morgen“ - Samstag, 28.11.2026.
+test.beforeEach(async ({ page }) => {
+  await page.clock.install({ time: new Date("2026-11-28T10:00:00Z") });
+});
+
 // Ein Spieltag ist eine Woche. Bisher standen alle Spieltage untereinander auf
 // einer Seite; jetzt blättert man mit Pfeilen durch, und die Kopfzeile nennt
 // den Zeitraum. Dazu steht an jeder Partie, warum dieser Termin gilt.
@@ -89,7 +94,7 @@ test.describe("Spielplan als Spielwochen", () => {
     await expect(page.getByTestId("matchday-pager")).toBeVisible();
     // Die laufende Woche steht offen, nicht Spieltag 1.
     await expect(page.getByTestId("matchday-title")).toHaveText("Spieltag 2");
-    await expect(page.getByTestId("matchday-range")).toHaveText("15.09. – 22.09.2026");
+    await expect(page.getByTestId("matchday-range")).toHaveText("Di 15. – Di 22. September");
     await expect(page.getByTestId("matchday-matches").getByRole("link")).toHaveCount(1);
   });
 
@@ -100,7 +105,7 @@ test.describe("Spielplan als Spielwochen", () => {
 
     await page.getByTestId("matchday-prev").click();
     await expect(page.getByTestId("matchday-title")).toHaveText("Spieltag 1");
-    await expect(page.getByTestId("matchday-range")).toHaveText("08.09. – 15.09.2026");
+    await expect(page.getByTestId("matchday-range")).toHaveText("Di 8. – Di 15. September");
     await expect(page.getByTestId("matchday-matches").getByRole("link")).toHaveCount(2);
     await expect(page.getByTestId("matchday-prev")).toBeDisabled();
 
