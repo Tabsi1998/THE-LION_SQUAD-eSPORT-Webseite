@@ -65,10 +65,15 @@ class StartRightAnswerBody(BaseModel):
     action: Literal["accept", "decline"]
 
 
-async def _season(db, season_id: str) -> dict:
+async def _season(db, season_id: str, *, write: bool = False) -> dict:
     season = await db.league_seasons.find_one({"id": season_id}, {"_id": 0})
     if not season:
         raise HTTPException(status_code=404, detail="Season nicht gefunden.")
+    if write and season.get("status") == "cancelled":
+        # Abgesagt (#2607): keine Startrechte mehr in dieser Season - sie gelten beim Vorgänger weiter.
+        from services.league_service import SEASON_CANCELLED
+
+        raise HTTPException(status_code=409, detail=SEASON_CANCELLED)
     return season
 
 
@@ -88,7 +93,7 @@ async def get_start_rights(season_id: str, me: dict = Depends(require_any_capabi
 @admin_router.put("/seasons/{season_id}/start-rights")
 async def put_start_rights(season_id: str, body: StartRightsBody, me: dict = Depends(require_season)):
     db = get_db()
-    await _call(start_rights.save_settings(db, await _season(db, season_id), body.model_dump(), me))
+    await _call(start_rights.save_settings(db, await _season(db, season_id, write=True), body.model_dump(), me))
     await publish_api_change("PUT", f"/api/admin/leagues/seasons/{season_id}", 200)
     return await start_rights.overview(db, await _season(db, season_id), me)
 
@@ -96,7 +101,7 @@ async def put_start_rights(season_id: str, body: StartRightsBody, me: dict = Dep
 @admin_router.post("/seasons/{season_id}/start-rights/{application_id}/accept")
 async def accept_start_right(season_id: str, application_id: str, body: StartRightAcceptBody, me: dict = Depends(require_applications)):
     db = get_db()
-    season = await _season(db, season_id)
+    season = await _season(db, season_id, write=True)
     await _call(start_rights.accept_for(db, season, application_id, me, body.reason, body.conflict_reason))
     await publish_api_change("POST", f"/api/admin/leagues/seasons/{season_id}", 200)
     return await _call(start_rights.row_of(db, season, application_id, me))
@@ -105,7 +110,7 @@ async def accept_start_right(season_id: str, application_id: str, body: StartRig
 @admin_router.post("/seasons/{season_id}/start-rights/{application_id}/fill")
 async def fill_start_right(season_id: str, application_id: str, body: StartRightFillBody, me: dict = Depends(require_applications)):
     db = get_db()
-    season = await _season(db, season_id)
+    season = await _season(db, season_id, write=True)
     await _call(start_rights.fill(db, season, application_id, body.candidate_id, me, body.reason, body.conflict_reason))
     await publish_api_change("POST", f"/api/admin/leagues/seasons/{season_id}", 200)
     return await _call(start_rights.row_of(db, season, body.candidate_id, me))

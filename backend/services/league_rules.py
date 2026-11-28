@@ -500,7 +500,7 @@ async def admin_view(db, scope: str, scope_id: str) -> dict:
         # Seasons aus einem Vorgänger (F.2, #1627), die dieses Liga-Regelwerk erben: Ändert es sich, stimmen ihre übernommenen Teams neu zu -
         # die Verwaltung belegt „neu zustimmen“ dann vor wie beim Entwurf einer eigenen Fassung.
         "successor_seasons": ([{"id": row["id"], "name": row.get("name")} for row in await _inheriting_seasons(db, league)
-                               if row.get("predecessor_id") and row.get("status") not in ("completed", "archived")] if not season else []),
+                               if row.get("predecessor_id") and row.get("status") not in ("completed", "archived", "cancelled")] if not season else []),
         "public_url": page_path(league, season),
         "today": _today(),
     }
@@ -1020,7 +1020,7 @@ async def own_consent_tasks(db, user: dict, registrations: list[dict]) -> list[d
                  for row in squad_rows if row["tournament_id"] in tournaments}
     if not season_of:
         return []
-    seasons = await _by_id(db.league_seasons, {value for value in season_of.values() if value}, {"status": {"$nin": ["archived", "completed"]}})
+    seasons = await _by_id(db.league_seasons, {value for value in season_of.values() if value}, {"status": {"$nin": ["archived", "completed", "cancelled"]}})
     # Was jemand sehen darf, hängt an Sichtbarkeit und Liga (Rechte je Liga, #2203) - je Paar einmal fragen.
     allowed: dict[tuple, bool] = {}
     for season in seasons.values():

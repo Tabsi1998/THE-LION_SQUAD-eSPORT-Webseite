@@ -176,6 +176,19 @@ def staffel_status_problem(tournament: dict, status: str | None) -> str | None:
     return STAFFEL_STATUS_REFUSED
 
 
+SEASON_CANCELLED_REFUSED = ("Die Season ist abgesagt – ihre Staffeln bleiben „Abgesagt“. Für einen Neustart legst du eine neue Season "
+                            "an, zum Beispiel über „Neue Season aus …“.")
+
+
+async def season_cancelled_problem(db, tournament: dict) -> str | None:
+    """Ein Statuswechsel einer Staffel, deren Season abgesagt ist (#2607): keiner - weder starten noch zurück in den Entwurf."""
+    if not is_league_staffel(tournament):
+        return None
+    season_id = (tournament.get("league_context") or {}).get("season_id")
+    season = await db.league_seasons.find_one({"id": season_id}, {"_id": 0, "status": 1}) if season_id else None
+    return SEASON_CANCELLED_REFUSED if (season or {}).get("status") == "cancelled" else None
+
+
 async def _staffel_started(db, tournament: dict) -> bool:
     """Hat die Staffel begonnen - Status nach dem Start oder schon ein fester (nicht Vorschau-)Spielplan?"""
     if tournament.get("status") not in PRE_START_STATUSES:
