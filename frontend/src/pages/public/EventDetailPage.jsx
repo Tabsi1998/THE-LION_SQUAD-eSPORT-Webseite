@@ -355,7 +355,7 @@ function EventFactsBox({ e, user, over, onRegister }) {
     detail: eventKindLabel(e.event_type), url: typeof window !== "undefined" && e.slug ? `${window.location.origin}/events/${e.slug}` : null,
   };
   return (
-    <FactsBox rows={eventFacts(e)} testId="event-facts">
+    <FactsBox rows={eventFacts(e, { over })} testId="event-facts">
       {e.has_registration && e.registration_url && !over ? (
         <a href={e.registration_url} target="_blank" rel="noreferrer" className="tls-btn tls-btn--primary inline-flex items-center justify-center gap-2 px-4 py-2.5 tls-type-label rounded-sm" data-testid="event-facts-register">
           Anmelden <ExternalLink className="w-3.5 h-3.5" />

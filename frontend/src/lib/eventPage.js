@@ -1,5 +1,6 @@
 import { formatWhen } from "@/lib/datetime";
 import { gameLabel } from "@/lib/gameLabels";
+import { minimumFact } from "@/lib/eventMinimum";
 import { offerSummary } from "@/lib/pricing";
 import { formatTournamentDisplay } from "@/lib/tournamentLabels";
 import { viennaDay, viennaTime } from "@/lib/vienna";
@@ -60,7 +61,7 @@ function endClock(start, end) {
  * Was im Fakten-Kasten steht (#1346): Wann (Zeitraum, je Tag die Uhrzeit), Wo (Ort, Adresse, Route), Eintritt (aus den
  * Preisen, sonst „frei“) und Mitbringen. Ohne Angabe fällt eine Zeile weg - nie „unbekannt“.
  */
-export function eventFacts(event, { now = new Date() } = {}) {
+export function eventFacts(event, { now = new Date(), over = false } = {}) {
   if (!event) return [];
   const rows = [];
   const schedule = event.schedule;
@@ -92,6 +93,9 @@ export function eventFacts(event, { now = new Date() } = {}) {
   }
   const paid = Boolean(event.offer?.enabled);
   rows.push({ key: "entry", label: "Eintritt", title: paid ? offerSummary(event.offer, 1) : "frei", free: !paid, lines: [] });
+  // Mindestanzahl bis zu einer Frist (#2614): nur, wenn eingestellt und sichtbar geschaltet.
+  const minimum = minimumFact(event, { now, over });
+  if (minimum) rows.push(minimum);
   const bring = (event.bring_along || []).filter(Boolean);
   if (bring.length) rows.push({ key: "bring", label: "Mitbringen", title: bring[0], lines: bring.slice(1) });
   return rows;
@@ -171,13 +175,16 @@ function plain(text) {
  * mit dem Hinweis zum Kostenbeitrag. ``null``, solange das Event nicht abgesagt ist. */
 export function cancelledNotice(event) {
   if (event?.status !== "cancelled") return null;
+  // Grund der Absage (#2614): steht vorne, wenn die Verwaltung einen angegeben hat.
+  const reason = String(event.cancel_reason || "").trim();
+  const why = reason ? `Grund: ${reason} ` : "";
   const own = event.own_registration;
   if (own?.cancelled_with_event) {
-    return own.price
+    return why + (own.price
       ? "Deine Anmeldung wurde mit der Absage storniert. Ein offener Kostenbeitrag wird nicht verrechnet; wurde schon eine Rechnung gestellt, meldet sich der Verein bei dir."
-      : "Deine Anmeldung wurde mit der Absage storniert.";
+      : "Deine Anmeldung wurde mit der Absage storniert.");
   }
-  return "Dieses Event findet nicht statt.";
+  return `${why}Dieses Event findet nicht statt.`;
 }
 
 /** Warnung in der Verwaltung (#1273): die Beschreibung beginnt mit dem Titel (oft als Überschrift mit Emoji). */

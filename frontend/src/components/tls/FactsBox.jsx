@@ -1,11 +1,12 @@
-import { Backpack, CalendarDays, Info, MapPin, Navigation, Ticket } from "lucide-react";
+import { Backpack, CalendarDays, Info, MapPin, Navigation, Ticket, Users } from "lucide-react";
 
 // Fakten-Kasten (#1346): Wann, Wo, Eintritt, Mitbringen - je eine Zeile mit Symbol, darunter die Knöpfe („Anmelden“
 // bzw. der eigene Stand und „In den Kalender“). Eine ruhige Fläche ohne Kästen darin. Wo er steht, regelt die Seite:
 // am Handy direkt unter dem Titel, am PC rechts und beim Scrollen stehend. Derselbe Baustein ist für die Turnierseite
 // („Vor Ort“) und Versammlungen gedacht - die Zeilen kommen fertig vom Aufrufer (lib/eventPage.js → eventFacts).
 
-const ICONS = { when: CalendarDays, where: MapPin, entry: Ticket, bring: Backpack };
+// „Mindestzahl“ (#2614): findet ab X statt - die Zeile steht nur, wenn die Verwaltung sie eingestellt hat.
+const ICONS = { when: CalendarDays, where: MapPin, entry: Ticket, bring: Backpack, minimum: Users };
 
 export function FactsBox({ rows = [], children = null, className = "", testId = "facts-box" }) {
   if (!rows.length && !children) return null;
