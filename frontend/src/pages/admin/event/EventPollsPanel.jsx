@@ -13,6 +13,14 @@ import { pollChip, pollDeadlineText, pollRuleText } from "@/lib/eventPolls";
 // Ergebnis mit einem Klick als Ort übernehmen. Eigene Knöpfe statt Speichern der Maske: alles hier wirkt sofort.
 
 export const OPTION_MAX = 12;
+// So lang darf eine Antwort sein - dieselbe Grenze wie am Server (event_polls.LABEL_MAX).
+export const LABEL_MAX = 80;
+
+/** Zu lange Texte (etwa „Plan A: “ plus ein langer Ortsname) auf die Grenze kürzen, mit … am Ende. */
+export function clip(text, max = LABEL_MAX) {
+  const value = String(text || "");
+  return value.length > max ? `${value.slice(0, max - 1)}…` : value;
+}
 
 export function emptyPollForm() {
   return { question: "", options: [{ code: "", label: "" }, { code: "", label: "" }], multiple: false, max_choices: 2, closes_at: "",
@@ -22,7 +30,7 @@ export function emptyPollForm() {
 /** Eine Abstimmung über die Ort-Pläne: je Plan eine Antwort, der Code ist der Schlüssel des Plans. */
 export function pollFormFromPlans(plans) {
   return { ...emptyPollForm(), question: "Welcher Ort?",
-    options: (plans || []).map((plan) => ({ code: plan.key, label: [plan.label, plan.name].filter(Boolean).join(": ") })) };
+    options: (plans || []).map((plan) => ({ code: plan.key, label: clip([plan.label, plan.name].filter(Boolean).join(": ")) })) };
 }
 
 export function pollFormFromPoll(poll) {
@@ -36,6 +44,8 @@ export function pollFormError(form) {
   const labels = form.options.map((option) => option.label.trim()).filter(Boolean);
   if (labels.length < 2) return "Mindestens zwei Antworten.";
   if (labels.length !== form.options.length) return "Eine Antwort ist leer – ausfüllen oder entfernen.";
+  const long = labels.findIndex((label) => label.length > LABEL_MAX);
+  if (long >= 0) return `Antwort ${long + 1}: höchstens ${LABEL_MAX} Zeichen.`;
   if (new Set(labels.map((label) => label.toLowerCase())).size !== labels.length) return "Eine Antwort steht doppelt da.";
   if (form.multiple && !(Number(form.max_choices) >= 2 && Number(form.max_choices) <= form.options.length)) return `Mehrere Antworten: 2 bis ${form.options.length}.`;
   return "";
@@ -54,7 +64,7 @@ export function formToPoll(form, { create = false } = {}) {
   return payload;
 }
 
-function PollForm({ initial, onCancel, onSubmit, busy, create, canNotify }) {
+function PollForm({ initial, onCancel, onSubmit, busy, create, canNotify, closed = false }) {
   const [form, setForm] = useState(initial);
   const set = (patch) => setForm((current) => ({ ...current, ...patch }));
   const setOption = (index, label) => set({ options: form.options.map((option, i) => (i === index ? { ...option, label } : option)) });
@@ -86,11 +96,11 @@ function PollForm({ initial, onCancel, onSubmit, busy, create, canNotify }) {
       </div>
       <div className="grid gap-3 md:grid-cols-2">
         <label className="block tls-type-small"><span className={label}>Frist (optional)</span>
-          <input type="datetime-local" value={form.closes_at} onKeyDown={blockEnter} onChange={(ev) => set({ closes_at: ev.target.value })} className={input} data-testid="event-poll-closes" />
-          <span className="mt-1 block tls-type-small text-quiet">Genau zur Frist ist die Abstimmung zu. Ohne Frist beendest du sie selbst.</span>
+          <input type="datetime-local" value={form.closes_at} onKeyDown={blockEnter} onChange={(ev) => set({ closes_at: ev.target.value })} disabled={closed} className={`${input} disabled:opacity-40`} data-testid="event-poll-closes" />
+          <span className="mt-1 block tls-type-small text-quiet" data-testid="event-poll-closes-hint">{closed ? "Die Abstimmung ist beendet – eine neue Frist öffnet sie nicht wieder." : "Genau zur Frist ist die Abstimmung zu. Ohne Frist beendest du sie selbst. Verlängern geht, solange sie läuft."}</span>
         </label>
         <label className="block tls-type-small"><span className={label}>Ergebnis zeigen</span>
-          <select value={form.results_visibility} onChange={(ev) => set({ results_visibility: ev.target.value })} className={input} data-testid="event-poll-results">
+          <select value={form.results_visibility} onChange={(ev) => set({ results_visibility: ev.target.value })} disabled={closed} className={`${input} disabled:opacity-40`} data-testid="event-poll-results">
             <option value="live">Sofort (Stand läuft mit)</option>
             <option value="after_close">Erst nach der Frist bzw. dem Ende</option>
           </select>
@@ -98,11 +108,11 @@ function PollForm({ initial, onCancel, onSubmit, busy, create, canNotify }) {
       </div>
       <div className="flex flex-wrap items-center gap-x-6 gap-y-2">
         <label className="inline-flex min-h-11 items-center gap-2 tls-type-small">
-          <input type="checkbox" checked={form.multiple} onChange={(ev) => set({ multiple: ev.target.checked })} data-testid="event-poll-multiple" /> Mehrere Antworten erlauben
+          <input type="checkbox" checked={form.multiple} disabled={closed} onChange={(ev) => set({ multiple: ev.target.checked })} data-testid="event-poll-multiple" /> Mehrere Antworten erlauben
         </label>
         {form.multiple ? (
           <label className="inline-flex items-center gap-2 tls-type-small">bis zu
-            <input type="number" min={2} max={form.options.length} value={form.max_choices} onKeyDown={blockEnter} onChange={(ev) => set({ max_choices: ev.target.value })}
+            <input type="number" min={2} max={form.options.length} value={form.max_choices} onKeyDown={blockEnter} onChange={(ev) => set({ max_choices: ev.target.value })} disabled={closed}
               className="w-20 bg-surface-0 border border-white/10 px-2 py-2 rounded-sm tls-type-small" data-testid="event-poll-max" />
           </label>
         ) : null}
@@ -191,7 +201,7 @@ export function EventPollsPanel({ eventId, plans = [], activePlan, onTakeOver, c
       <ul className="space-y-3">
         {(polls || []).map((poll) => {
           if (editing === poll.id) {
-            return <li key={poll.id}><PollForm initial={pollFormFromPoll(poll)} onCancel={() => setEditing(null)} onSubmit={save} busy={busy === "save"} /></li>;
+            return <li key={poll.id}><PollForm initial={pollFormFromPoll(poll)} onCancel={() => setEditing(null)} onSubmit={save} busy={busy === "save"} closed={poll.status === "closed"} /></li>;
           }
           const chip = pollChip({ ...poll, rights: [] });
           const winner = poll.result?.winner;

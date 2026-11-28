@@ -1,4 +1,4 @@
-import { ArrowDown, ArrowUp, Plus, Shuffle, Signpost, Trash2 } from "lucide-react";
+import { ArrowDown, ArrowUp, Plus, Shuffle, Signpost, Trash2, X } from "lucide-react";
 import { StatusChip } from "@/components/tls/StatusChip";
 import { formatWhen } from "@/lib/datetime";
 
@@ -35,7 +35,7 @@ export function formToPlans(form) {
 export function plansFormError(form) {
   const plans = form || [];
   if (!plans.length) return "";
-  if (plans.length < 2) return "Ort-Pläne brauchen mindestens zwei Orte (Plan A und B) – oder den Plan entfernen.";
+  if (plans.length < 2) return "Ort-Pläne brauchen mindestens zwei Orte (Plan A und B) – oder „Ausweichorte entfernen“ tippen.";
   if (plans.length > MAX_PLANS) return `Höchstens ${MAX_PLANS} Ort-Pläne.`;
   for (const [index, plan] of plans.entries()) {
     if (!plan.name?.trim() && !plan.address?.trim() && !plan.city?.trim()) return `Plan ${planLetter(index)}: Name oder Adresse fehlt.`;
@@ -54,7 +54,8 @@ export function activePlanEdited(before, after, activeKey) {
   return ["name", "address", "postal_code", "city", "country"].some((field) => String(old[field] || "").trim() !== String(now[field] || "").trim());
 }
 
-export function EventPlacePlansSection({ value, onChange, saved = [], activeKey, onSwitch, switching = "", dirty = false, history = [], canSwitch = true }) {
+export function EventPlacePlansSection({ value, onChange, saved = [], activeKey, onSwitch, switching = "", dirty = false, history = [], canSwitch = true,
+  onRemoveAll = null, conflict = "", onReload = () => window.location.reload() }) {
   const plans = value || [];
   const savedKeys = new Set((saved || []).map((plan) => plan.key));
   const setPlan = (index, patch) => onChange(plans.map((plan, i) => (i === index ? { ...plan, ...patch } : plan)));
@@ -74,11 +75,25 @@ export function EventPlacePlansSection({ value, onChange, saved = [], activeKey,
     <section className="border border-event/30 rounded-sm p-4 space-y-3" data-testid="event-place-plans-admin">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <h3 className="tls-type-card inline-flex items-center gap-2"><Signpost className="w-4 h-4 text-event" aria-hidden="true" /> Ort-Pläne A, B, C</h3>
-        <button type="button" onClick={() => onChange([...plans, emptyPlan()])} disabled={plans.length >= MAX_PLANS}
-          className="tls-btn tls-btn--quiet inline-flex min-h-11 items-center gap-2 px-3 py-2 rounded-sm tls-type-label disabled:opacity-40" data-testid="event-place-plans-add">
-          <Plus className="w-3.5 h-3.5" aria-hidden="true" /> Plan {planLetter(plans.length)}
-        </button>
+        <span className="flex flex-wrap gap-2">
+          <button type="button" onClick={() => onChange([...plans, emptyPlan()])} disabled={plans.length >= MAX_PLANS}
+            className="tls-btn tls-btn--quiet inline-flex min-h-11 items-center gap-2 px-3 py-2 rounded-sm tls-type-label disabled:opacity-40" data-testid="event-place-plans-add">
+            <Plus className="w-3.5 h-3.5" aria-hidden="true" /> Plan {planLetter(plans.length)}
+          </button>
+          {onRemoveAll ? (
+            <button type="button" onClick={onRemoveAll} disabled={Boolean(switching)}
+              className="tls-btn tls-btn--quiet inline-flex min-h-11 items-center gap-2 px-3 py-2 rounded-sm tls-type-label disabled:opacity-40" data-testid="event-place-plans-remove-all">
+              <X className="w-3.5 h-3.5" aria-hidden="true" /> Ausweichorte entfernen
+            </button>
+          ) : null}
+        </span>
       </div>
+      {conflict ? (
+        <div role="alert" className="border border-warn/40 bg-warn/10 rounded-sm px-3 py-2 flex flex-wrap items-center justify-between gap-2" data-testid="event-place-plans-conflict">
+          <span className="tls-type-small text-warn min-w-0 break-words">{conflict}</span>
+          <button type="button" onClick={onReload} className="tls-btn tls-btn--secondary inline-flex min-h-11 items-center px-3 py-2 rounded-sm tls-type-label">Neu laden</button>
+        </div>
+      ) : null}
       <p className="tls-type-small text-white/60">
         Plan A ist der Ort, mit dem du rechnest. Gilt ein anderer, schaltest du hier mit einem Klick um – Event-Seite, Kalender, ICS-Datei und App zeigen dann diesen Ort.
       </p>

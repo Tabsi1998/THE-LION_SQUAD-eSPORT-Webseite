@@ -131,6 +131,8 @@ function EventForm({ event, meta, partners = [], onDone }) {
     saved: plansToForm(event?.place_plans), active: event?.place_plan?.key || event?.active_place_plan || null, history: event?.place_plan_history || [],
   }));
   const [switching, setSwitching] = useState("");
+  // Hat inzwischen jemand umgeschaltet, lehnt der Server das Speichern ab (409) - der Hinweis steht dann beim Ort.
+  const [placeConflict, setPlaceConflict] = useState("");
   const plansDirty = JSON.stringify(plansForm) !== JSON.stringify(placeState.saved);
   const usesPlans = plansForm.length > 0;
   // Mehrtägig (#884): die Tage ersetzen Start, Ende und Einlass; die Liste geht nur mit, wenn sie sich geändert hat.
@@ -228,6 +230,22 @@ function EventForm({ event, meta, partners = [], onDone }) {
       setPlaceState({ saved: plansToForm(data?.place_plans), active: data?.place_plan?.key || data?.active_place_plan || null, history: data?.place_plan_history || [] });
     } catch {
       // still: die Seite zeigt weiter den letzten Stand
+    }
+  };
+  // Ausweichorte entfernen (Review #2613-4): der Plan, der gerade gilt, bleibt als normaler Ort - wirksam mit „Speichern“.
+  const removeAllPlans = async () => {
+    const active = placeState.saved.find((plan) => plan.key === placeState.active) || plansForm[0];
+    const ok = await confirm({
+      title: "Ausweichorte entfernen?",
+      description: `Danach gibt es nur noch einen Ort: ${active?.name || active?.address || "der Plan, der gerade gilt"}. Die anderen Pläne sind weg. Wirksam wird es mit „Speichern“.`,
+      confirmLabel: "Entfernen",
+      cancelLabel: "Zurück",
+    });
+    if (!ok) return;
+    setPlansForm([]);
+    if (active) {
+      setForm((f) => ({ ...f, location: active.name || "", address: active.address || "", postal_code: active.postal_code || "",
+        city: active.city || "", country: active.country || f.country }));
     }
   };
   const switchPlan = async (key, label) => {
@@ -352,7 +370,10 @@ function EventForm({ event, meta, partners = [], onDone }) {
       toast.success("Gespeichert.");
       onDone();
     } catch (err) {
-      toast.error(formatRequestError(err, "Event konnte nicht gespeichert werden.", { slug: form.slug, name: form.name }));
+      const message = formatRequestError(err, "Event konnte nicht gespeichert werden.", { slug: form.slug, name: form.name });
+      const detail = err?.response?.data?.detail;
+      if (err?.response?.status === 409 && typeof detail === "string" && /umgeschaltet/i.test(detail)) setPlaceConflict(detail);
+      toast.error(message);
     }
     setSaving(false);
   };
@@ -433,7 +454,8 @@ function EventForm({ event, meta, partners = [], onDone }) {
         {/* Plan A/B/C (#2613): beim Ort, nicht unten angehängt. Mit Plänen ersetzen sie die Ortsfelder. */}
         {eventMode !== "online" && usesPlans && (
           <EventPlacePlansSection value={plansForm} onChange={setPlansForm} saved={placeState.saved} activeKey={placeState.active}
-            onSwitch={switchPlan} switching={switching} dirty={plansDirty} history={placeState.history} canSwitch={!isNew} />
+            onSwitch={switchPlan} switching={switching} dirty={plansDirty} history={placeState.history} canSwitch={!isNew}
+            onRemoveAll={removeAllPlans} conflict={placeConflict} />
         )}
         {eventMode !== "online" && !usesPlans && !usesLocationList && (
           <div className="flex flex-wrap items-center gap-3">

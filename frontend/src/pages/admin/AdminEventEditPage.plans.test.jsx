@@ -116,6 +116,39 @@ test("ein Ausweichort beginnt mit dem eingetragenen Ort als Plan A", async () =>
   expect(patch).not.toHaveProperty("notify_registrants");
 });
 
+// Review-Befund 4: Einmal gespeicherte Pläne lassen sich wieder entfernen - der Plan, der gerade gilt, bleibt als Ort.
+test("Ausweichorte entfernen: Rückfrage, dann gilt der aktive Plan als Ort", async () => {
+  current = { ...EVENT, active_place_plan: "plan-b", place_plan: { ...PLANS[1], total: 2, alternative: true },
+    location: "Rodelbahn Gaisalm", address: "Gaisweg 5" };
+  apiMock.patch.mockResolvedValue({ data: current });
+  renderAt();
+  const section = await screen.findByTestId("event-place-plans-admin");
+  confirmMock.mockResolvedValueOnce(false);
+  fireEvent.click(within(section).getByTestId("event-place-plans-remove-all"));
+  await waitFor(() => expect(confirmMock).toHaveBeenCalledWith(expect.objectContaining({ title: "Ausweichorte entfernen?" })));
+  expect(screen.getByTestId("event-place-plans-admin")).toBeInTheDocument();
+  fireEvent.click(within(section).getByTestId("event-place-plans-remove-all"));
+  await waitFor(() => expect(screen.queryByTestId("event-place-plans-admin")).toBeNull());
+  expect(screen.getByTestId("event-location-name")).toHaveValue("Rodelbahn Gaisalm");
+  fireEvent.submit(screen.getByTestId("event-form"));
+  await waitFor(() => expect(apiMock.patch).toHaveBeenCalledTimes(1));
+  const [, patch] = apiMock.patch.mock.calls[0];
+  expect(patch.place_plans).toEqual([]);
+  expect(patch).not.toHaveProperty("notify_registrants");
+});
+
+// Review-Befund 3: Hat inzwischen jemand umgeschaltet, sagt die Maske das in Klartext beim Ort - mit „Neu laden“.
+test("Speichern nach fremdem Umschalten: Hinweis beim Ort statt stiller Fehler", async () => {
+  apiMock.patch.mockRejectedValue({ response: { status: 409, data: { detail: "Inzwischen wurde umgeschaltet – bitte neu laden. Deine Änderungen am Ort sind nicht gespeichert." } } });
+  renderAt();
+  const section = await screen.findByTestId("event-place-plans-admin");
+  fireEvent.change(within(section).getByTestId("event-place-plan-note-1"), { target: { value: "Neu: Talstation" } });
+  fireEvent.submit(screen.getByTestId("event-form"));
+  const conflict = await screen.findByTestId("event-place-plans-conflict");
+  expect(conflict).toHaveTextContent("Inzwischen wurde umgeschaltet");
+  expect(within(conflict).getByRole("button", { name: "Neu laden" })).toBeInTheDocument();
+});
+
 test("Abstimmungen: Zahlen statt Namen, Ergebnis als Ort übernehmen", async () => {
   apiMock.post.mockResolvedValue({ data: { changed: true, notice: null } });
   confirmMock.mockResolvedValueOnce(false);
