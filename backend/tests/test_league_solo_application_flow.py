@@ -560,3 +560,71 @@ async def test_a_team_league_applies_as_before_next_to_a_solo_league(flow):
     assert "participant_kind" not in ok(await flow.get(base_url(team)))["application"]
     assert ok(await flow.get(base_url(solo)))["application"]["participant_kind"] == "solo"
     assert (await flow.db.league_applications.find_one({"id": person["id"]}))["status"] == "submitted"
+
+
+# ---------------------------------------------------------------- Nachträge aus der Prüfung (M1, g08, g10, g13)
+
+def test_the_staffel_refusal_points_solo_players_to_the_league_page():
+    from services import staffel_guard
+
+    text = staffel_guard.registration_refused({"league_context": {"season_id": "s"}, "team_mode": "solo"})
+    assert "folgt" not in text
+    assert "auf der Ligaseite als Spieler an" in text and "Spieler zuteilen" in text
+
+
+@pytest.mark.asyncio
+async def test_erasure_of_an_assigned_person_keeps_no_id_in_the_application(flow):
+    w = await solo_application_world(flow)
+    player = w["players"][0]
+    application = await submitted_person(flow, w, player)
+    ok(await decide(flow, w, application, "accept", tournament_id=w["tid"]))
+
+    await league_applications.scrub_person(flow.db, player["id"])
+
+    stored = await flow.db.league_applications.find_one({"id": application["id"]}, {"_id": 0})
+    assert stored["user_id"] is None and stored["status"] == "accepted"
+    assert not {key: value for key, value in stored.items() if player["id"] in str(value)}
+    assert stored["active_key"] == f"{w['season']['id']}:user:erased:{application['id']}"
+
+
+@pytest.mark.asyncio
+async def test_team_seat_count_ignores_single_registrations_in_a_team_staffel(flow):
+    team = await application_world(flow, teams=2, application_slots=2)
+    flow.act_as(team["lead"])
+    before = ok(await flow.get(inbox_url(team)))["stats"]
+    await flow.db.tournament_registrations.insert_one({"id": "alt-1", "tournament_id": team["tid"], "user_id": "u-alt", "team_id": None,
+                                                       "status": "approved", "registration_type": "solo"})
+
+    after = ok(await flow.get(inbox_url(team)))["stats"]
+
+    assert after["taken"] == before["taken"], (before, after)
+
+
+@pytest.mark.asyncio
+async def test_the_solo_view_has_a_hint_for_old_app_clients(flow):
+    w = await solo_application_world(flow)
+    flow.act_as(w["players"][0])
+
+    view = ok(await flow.get(f"{base_url(w)}/application"))
+
+    assert view["squads"] == [] and view["hint"] == league_applications.PERSON_APP_HINT
+
+
+@pytest.mark.asyncio
+async def test_the_lead_reads_person_sentences_for_reasons_and_divisions(flow):
+    w = await solo_application_world(flow)
+    flow.act_as(w["lead"])
+    lower = ok(await flow.post(f"{season_url(w)}/divisions", json={}))
+    ok(await flow.post(f"{ADMIN_LEAGUES}/divisions/{lower['id']}/staffeln", json={}))
+    application = await submitted_person(flow, w, w["players"][0])
+
+    higher = await decide(flow, w, application, "accept", tournament_id=w["tid"])
+    no_reason = await decide(flow, w, application, "reject", reason="kurz")
+    ok(await decide(flow, w, application, "accept"))
+    demote = await decide(flow, w, application, "waitlist")
+
+    assert higher.status_code == 422 and higher.json()["detail"].startswith("Neue Spieler starten in der untersten Liga")
+    assert no_reason.status_code == 422 and no_reason.json()["detail"].endswith("Der Spieler liest ihn.")
+    assert demote.status_code == 422 and "der Spieler liest ihn" in demote.json()["detail"]
+    for answer in (higher, no_reason, demote):
+        assert "Co-Team" not in answer.json()["detail"] and "Team liest" not in answer.json()["detail"]

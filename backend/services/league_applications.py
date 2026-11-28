@@ -113,6 +113,12 @@ NEW_LOWEST = "new_squads_lowest_division"
 NEW_OTHER_DIVISION = ("Neue Co-Teams starten in der untersten Liga ({label}). Eine Staffel einer höheren Liga geht nur mit Grund "
                       f"(mindestens {REASON_MIN} Zeichen).")
 DEMOTE_REASON = f"Bitte einen Grund angeben (mindestens {REASON_MIN} Zeichen). Die Anmeldung war angenommen, das Team liest ihn."
+REJECT_REASON = f"Bitte einen Grund angeben (mindestens {REASON_MIN} Zeichen). Das Team liest ihn."
+# Dieselben Sätze für Anträge von Spielern (Solo-Liga, #1629, P2).
+NEW_OTHER_DIVISION_PERSON = ("Neue Spieler starten in der untersten Liga ({label}). Eine Staffel einer höheren Liga geht nur mit Grund "
+                             f"(mindestens {REASON_MIN} Zeichen).")
+DEMOTE_REASON_PERSON = f"Bitte einen Grund angeben (mindestens {REASON_MIN} Zeichen). Die Anmeldung war angenommen, der Spieler liest ihn."
+REJECT_REASON_PERSON = f"Bitte einen Grund angeben (mindestens {REASON_MIN} Zeichen). Der Spieler liest ihn."
 # Anmeldung als Person (Solo-Liga, #1629, P2, S7): derselbe Antrag, dieselben Zustände - die Sätze sprechen von „Spieler“ bzw. „du“.
 SQUAD_NEEDED = "Bitte ein Co-Team wählen."
 PERSON_NO_SQUAD = "In dieser Liga meldest du dich selbst als Spieler an – ohne Co-Team."
@@ -136,6 +142,8 @@ PERSON_ADMIN_WAY_OVERRIDE = ("Über deine eigene Anmeldung entscheidet eine ande
                              "als Notausnahme mit Grund, im Eingang der Season unter „Anmeldungen“.")
 # Kontolöschung (#1629, P2): Der Antrag einer Person bleibt als Nachweis, ohne Kennung und Namen.
 GONE_PERSON = "Gelöschter User"
+# Für App-Fassungen ohne Solo-Anmeldung (A9 folgt): Sie zeigen den Satz statt „Anmelden dürfen Captain und Vertreter …“.
+PERSON_APP_HINT = "Als Spieler meldest du dich bis zum App-Ausbau auf der Website an."
 ERASED_REASON = "Konto gelöscht"
 PERSON_FIELDS = {"_id": 0, "id": 1, "username": 1, "display_name": 1, "role": 1, "areas": 1, "is_club_member": 1, "is_banned": 1, "is_active": 1}
 
@@ -180,19 +188,28 @@ def window_state(season: dict, now: datetime | None = None) -> str | None:
     return OPEN if moment < closes else CLOSED
 
 
-async def _staffel_ids(db, season_id: str) -> list[str]:
+async def _staffeln(db, season_id: str) -> list[dict]:
     # Nur reguläre Staffeln (#2404, F.6): Zugeteilt wird nie in die Playoffs oder die Relegation.
-    return [row["id"] for row in await db.tournaments.find({"league_context.season_id": season_id, "league_context.kind": None, **ONLY_LEAGUE},
-                                                           {"_id": 0, "id": 1}).to_list(200)]
+    return await db.tournaments.find({"league_context.season_id": season_id, "league_context.kind": None, **ONLY_LEAGUE},
+                                     {"_id": 0, "id": 1, "team_mode": 1, "league_context": 1}).to_list(200)
+
+
+def _seated_query(staffeln: list[dict]) -> dict:
+    """Welche Anmeldungen einen Startplatz belegen: aktive Co-Team-Anmeldungen - und nur in Solo-Staffeln (#1629, P2) die Einzel-Anmeldungen
+    der Personen. In Team-Staffeln bleibt die Abfrage genau die von vorher; eine Einzel-Anmeldung aus dem Altbestand zählt dort nicht."""
+    query: dict = {"tournament_id": {"$in": [row["id"] for row in staffeln]}, "status": {"$in": list(SEAT_STATUSES)}}
+    solo_ids = [row["id"] for row in staffeln if league_participants.is_solo_staffel(row)]
+    if not solo_ids:
+        return {**query, "squad_id": {"$exists": True}}
+    return {**query, "$or": [{"squad_id": {"$exists": True}},
+                             {"tournament_id": {"$in": solo_ids}, "registration_type": "solo", "user_id": {"$type": "string"}}]}
 
 
 async def seat_stats(db, season: dict) -> dict:
-    """Belegt sind aktive Co-Team-Anmeldungen der Staffeln und angenommene Anträge ohne Zuteilung. Die Warteliste belegt nichts. In der
-    Solo-Liga (#1629, P2) belegen die Einzel-Anmeldungen der Personen (``registration_type`` ``solo``) - Team-Staffeln haben keine."""
-    ids = await _staffel_ids(db, season["id"])
-    seated = await db.tournament_registrations.count_documents(
-        {"tournament_id": {"$in": ids}, "status": {"$in": list(SEAT_STATUSES)},
-         "$or": [{"squad_id": {"$exists": True}}, {"registration_type": "solo", "user_id": {"$type": "string"}}]}) if ids else 0
+    """Belegt sind aktive Co-Team-Anmeldungen der Staffeln und angenommene Anträge ohne Zuteilung. Die Warteliste belegt nichts. In
+    Solo-Staffeln (#1629, P2) belegen die Einzel-Anmeldungen der Personen (``_seated_query``)."""
+    staffeln = await _staffeln(db, season["id"])
+    seated = await db.tournament_registrations.count_documents(_seated_query(staffeln)) if staffeln else 0
     counts = dict.fromkeys(OPEN_STATUSES, 0)
     unassigned = 0
     async for row in db.league_applications.find({"season_id": season["id"], "status": {"$in": list(OPEN_STATUSES)}}, {"_id": 0, "status": 1, "assignment": 1}):
@@ -699,7 +716,8 @@ async def reject(db, league: dict, season: dict, application_id: str, reason: st
     override = await _no_conflict(db, season, application_id, actor, conflict_reason)
     text = (reason or "").strip()
     if len(text) < REASON_MIN:
-        raise LeagueProblem(f"Bitte einen Grund angeben (mindestens {REASON_MIN} Zeichen). Das Team liest ihn.")
+        person = league_participants.is_person_application(await _load(db, season["id"], application_id))
+        raise LeagueProblem(REJECT_REASON_PERSON if person else REJECT_REASON)
     locked_id = await _auto_seat_to_lock(db, season["id"], application_id)
     async with _staffel_lock(db, locked_id):
         async with _season_lock(db, season["id"]):
@@ -742,7 +760,7 @@ async def waitlist(db, league: dict, season: dict, application_id: str, reason: 
             if not _waitlist_has_room(fresh, await seat_stats(db, fresh)):
                 raise LeagueProblem(WAITLIST_FULL, 409)
             if application["status"] == ACCEPTED and len(text or "") < REASON_MIN:
-                raise LeagueProblem(DEMOTE_REASON)
+                raise LeagueProblem(DEMOTE_REASON_PERSON if league_participants.is_person_application(application) else DEMOTE_REASON)
             now = now_utc().isoformat()
             done = await _move(db, application, WAITLIST, actor["id"], reason=text, override=override, drop_assignment=bool(seat),
                                fields={"decided_by": actor["id"], "decided_at": now, "decision_reason": text})
@@ -945,7 +963,8 @@ async def division_deviation(db, season: dict, application: dict, tournament: di
         return None
     text = " ".join(str(reason or "").split())
     if len(text) < REASON_MIN:
-        raise LeagueProblem(NEW_OTHER_DIVISION.format(label=league_service.division_label(divisions[-1])), 422)
+        sentence = NEW_OTHER_DIVISION_PERSON if league_participants.is_person_application(application) else NEW_OTHER_DIVISION
+        raise LeagueProblem(sentence.format(label=league_service.division_label(divisions[-1])), 422)
     return text[:500]
 
 
@@ -1454,7 +1473,8 @@ async def _my_person_view(db, league: dict, season: dict, user: dict) -> dict:
         "season_problems": blocked if state else [],
         "squads": [],
         "player": player,
-        "hint": None,
+        # Ältere App-Fassungen lesen nur ``squads`` und ``hint`` - ohne Satz zeigten sie den für Captains.
+        "hint": PERSON_APP_HINT,
     }
 
 
@@ -1681,7 +1701,8 @@ async def scrub_person(db, user_id: str) -> int:
 
 
 async def _withdraw_erased_person(db, user_id: str) -> None:
-    """Die eigenen Anträge einer gelöschten Person (#1629, P2): ohne Kennung und Namen; offene ohne Zuteilung gelten als zurückgezogen."""
+    """Die eigenen Anträge einer gelöschten Person (#1629, P2): ohne Kennung und Namen; offene ohne Zuteilung gelten als zurückgezogen.
+    Ein zugeteilter Antrag bleibt angenommen, sein ``active_key`` wird ``<season>:user:erased:<antrag>`` - eindeutig, ohne Kennung."""
     now = now_utc().isoformat()
     async for row in db.league_applications.find({"user_id": user_id, "squad_id": None}, {"_id": 0}):
         update: dict = {"$set": {"user_id": None, "display_name": GONE_PERSON, "updated_at": now}}
@@ -1689,6 +1710,9 @@ async def _withdraw_erased_person(db, user_id: str) -> None:
             update["$set"].update(status=WITHDRAWN, withdrawn_at=now)
             update["$unset"] = {"active_key": ""}
             update["$push"] = {"history": {"status": WITHDRAWN, "by": None, "at": now, "reason": ERASED_REASON}}
+        elif row.get("active_key"):
+            # Zugeteilt: Der Antrag bleibt angenommen und hält seinen Schlüssel, aber ohne die Kennung der Person.
+            update["$set"]["active_key"] = f"{row['season_id']}:user:erased:{row['id']}"
         await db.league_applications.update_one({"id": row["id"]}, update)
 
 
