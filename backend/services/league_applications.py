@@ -248,8 +248,14 @@ async def public_block(db, season: dict, league: dict | None = None) -> dict | N
     if not state:
         return None
     stats = await seat_stats(db, season)
+    closes_at = league_late.effective_closes_iso(season)
+    cancelled = season.get("status") == league_service.CANCELLED
+    if cancelled and season.get("cancelled_at") and (not closes_at or _moment(season["cancelled_at"]) < _moment(closes_at)):
+        # Abgesagt (#2607): Die Anmeldung endete mit der Absage - nie „vorbei seit“ einem Zeitpunkt in der Zukunft.
+        closes_at = season["cancelled_at"]
     return {**({"participant_kind": league_participants.SOLO} if league_participants.is_solo(league) else {}),
-            "state": state, "opens_at": season.get("application_opens_at"), "closes_at": league_late.effective_closes_iso(season),
+            **({"cancelled": True, "cancelled_at": season.get("cancelled_at")} if cancelled else {}),
+            "state": state, "opens_at": season.get("application_opens_at"), "closes_at": closes_at,
             "slots": stats["slots"], "slots_free": _free_for_newcomers(season, stats), "waitlist": bool(season.get("application_waitlist")),
             "waitlist_full": bool(season.get("application_waitlist")) and not _waitlist_has_room(season, stats),
             "waitlist_note": season.get("application_waitlist_note"), "entry_policy": season.get("entry_policy") or "all",

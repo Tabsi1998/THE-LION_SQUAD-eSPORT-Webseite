@@ -485,3 +485,153 @@ async def test_two_staffeln_need_two_each_and_enough_entries_warn_nothing(flow):
     assert len(short) == 1 and short[0]["have"] == 3 and short[0]["needed"] == 4 and "2 je Staffel" in short[0]["text"]
     ok(await decide(flow, w, rows[3], "accept", tournament_id=w["tids"][1]))
     assert await shortfall() == []
+
+
+# ---------------------------------------------------------------- Korrekturrunde (Prüfung #2607)
+
+@pytest.mark.asyncio
+async def test_cancel_during_open_window_shows_the_cancel_not_a_future_end(flow):
+    """Abgesagt bei offenem Fenster: Die Ligaseite sagt „abgesagt am …“, nie „vorbei seit <Zukunft>“."""
+    from models import now_utc
+
+    w = await application_world(flow, teams=1)  # Fenster offen, schließt in 48 h
+    ok(await cancel(flow, w))
+    flow.act_as(None)
+
+    block = ok(await flow.get(base_url(w)))["application"]
+
+    assert block["state"] == "closed" and block["cancelled"] is True and block["cancelled_at"]
+    assert block["closes_at"] <= now_utc().isoformat(), "das Ende der Anmeldung ist die Absage"
+
+
+@pytest.mark.asyncio
+async def test_the_share_card_says_cancelled(flow):
+    from routes.seo_render_routes import league_season_meta
+
+    w = await application_world(flow, teams=1)
+    ok(await cancel(flow, w))
+    base = {"site_name": "Probe", "image": "/logo.png", "title": "Probe", "description": ""}
+
+    meta = await league_season_meta(flow.db, w["league"]["slug"], w["season"]["slug"], base, "https://example.test")
+
+    assert "Abgesagt" in meta["title"] and "Anmeldung offen" not in meta["title"]
+    assert REASON in meta["description"]
+
+
+@pytest.mark.asyncio
+async def test_deleting_a_cancelled_season_or_division_does_not_offer_archiving(flow):
+    w = await application_world(flow, teams=1)
+    first = await submitted(flow, w, w["teams"][0])
+    ok(await decide(flow, w, first, "accept", tournament_id=w["tid"]))
+    ok(await cancel(flow, w))
+    flow.act_as(w["lead"])
+
+    for url in (season_url(w), f"{ADMIN_LEAGUES}/divisions/{w['division']['id']}"):
+        plan = ok(await flow.get(f"{url}/delete-plan"))
+        assert plan["deletable"] is False and plan["cancelled"] is True, url
+        refused = await flow.client.request("DELETE", url, json={"reason": "Probe löschen"})
+        assert refused.status_code == 409 and "Archivieren statt löschen" not in refused.json()["detail"], refused.text
+        assert "abgesagt" in refused.json()["detail"]
+
+
+@pytest.mark.asyncio
+async def test_cancel_refuses_when_the_staffeln_changed_meanwhile(flow, monkeypatch):
+    """Die Staffeln werden unter der Sperre neu gelesen: Kam inzwischen eine dazu, antwortet das Absagen 409."""
+    w = await application_world(flow, teams=1)
+    league = await flow.db.leagues.find_one({"id": w["league"]["id"]}, {"_id": 0})
+    season = await flow.db.league_seasons.find_one({"id": w["season"]["id"]}, {"_id": 0})
+    original = league_season_cancel._staffeln
+    calls = {"n": 0}
+
+    async def staffeln_then_new(db, season_id):
+        calls["n"] += 1
+        rows = await original(db, season_id)
+        if calls["n"] == 1:
+            return rows
+        return [*rows, {"id": "neu", "status": "draft", "league_context": {"season_id": season_id, "staffel": "B"}}]
+
+    monkeypatch.setattr(league_season_cancel, "_staffeln", staffeln_then_new)
+    with pytest.raises(LeagueProblem) as changed:
+        await league_season_cancel.cancel(flow.db, league, season, REASON, w["lead"])
+
+    assert changed.value.status == 409
+    assert (await flow.db.league_seasons.find_one({"id": w["season"]["id"]}, {"_id": 0}))["status"] != "cancelled"
+
+
+@pytest.mark.asyncio
+async def test_a_staffel_cancelled_before_sends_no_second_cancel_and_the_plan_agrees(flow):
+    """Wer nur in einer vorher einzeln abgesagten Staffel stand, hat die Absage schon - keine zweite Nachricht, und das Blatt zählt ihn nicht."""
+    w = await application_world(flow, teams=2, staffeln=2)
+    flow.act_as(w["lead"])
+    side = w["teams"][0]
+    ok(await flow.post(f"/api/tournaments/{w['tids'][1]}/squad-registrations", json={"team_id": side["team"]["id"], "squad_id": side["squad"]["id"]}))
+    await flow.db.tournaments.update_one({"id": w["tids"][1]}, {"$set": {"status": "cancelled"}})
+    other = await submitted(flow, w, w["teams"][1])
+    assert other
+
+    flow.act_as(w["lead"])
+    plan = ok(await flow.get(f"{season_url(w)}/cancel-plan"))
+    ok(await cancel(flow, w))
+
+    assert await notes(flow, side["captain"]) == []
+    assert len(await notes(flow, w["teams"][1]["captain"])) == 1
+    assert plan["teams"] == 1 and plan["people"] == 2
+
+
+@pytest.mark.asyncio
+async def test_the_start_rights_sentence_only_goes_to_carried_teams(flow):
+    from test_league_start_rights_flow import person
+
+    world, second, rows = await rights_world(flow)
+    squad = next(iter(rows))
+    # Ein neu angemeldetes Team derselben Season: ohne Startrecht.
+    new = await flow.add_user(name="Neu Kapitän")
+    application = {"id": new_id(), "season_id": second["id"], "league_id": second["league_id"], "user_id": None, "team_id": None,
+                   "squad_id": "neu-squad", "display_name": "Neu · Eins", "status": "submitted", "active_key": f"{second['id']}:neu-squad",
+                   "history": []}
+    await flow.db.team_squads.insert_one({"id": "neu-squad", "team_id": "neu-team", "name": "Eins", "captain_id": new["id"], "member_ids": [new["id"]]})
+    await flow.db.teams.insert_one({"id": "neu-team", "name": "Neu", "leader_id": new["id"], "member_ids": [new["id"]]})
+    await flow.db.league_applications.insert_one(dict(application))
+
+    ok(await cancel_season(flow, world, second))
+
+    carried_note = await notes(flow, await person(flow, squad))
+    new_note = await notes(flow, new)
+    assert len(carried_note) == 1 and "Startrechte" in carried_note[0]["body"]
+    assert len(new_note) == 1 and "Startrechte" not in new_note[0]["body"]
+
+
+@pytest.mark.asyncio
+async def test_sync_and_rules_are_refused_after_the_cancel(flow):
+    w = await application_world(flow, teams=1)
+    ok(await cancel(flow, w))
+    flow.act_as(w["lead"])
+
+    synced = await flow.post(f"{season_url(w)}/sync")
+    assert synced.status_code == 409 and synced.json()["detail"] == SEASON_CANCELLED
+
+    from league_rules_world import publish
+
+    with pytest.raises(AssertionError) as published:
+        await publish(flow, w, reason="Neue Fassung nach der Absage")
+    assert "409" in str(published.value) or SEASON_CANCELLED[:30] in str(published.value)
+
+    from services import league_rules
+
+    with pytest.raises(LeagueProblem) as consent:
+        await league_rules._give_consent(flow.db, w["rule"]["id"], w["season"]["id"], w["teams"][0]["squad"]["id"], w["teams"][0]["captain"])
+    assert consent.value.status in (404, 409)
+
+
+@pytest.mark.asyncio
+async def test_shortfall_checks_each_staffel_once_nobody_waits_for_a_staffel(flow):
+    """3 in Staffel A, 1 in Staffel B: zusammen genug, aber Staffel B hat zu wenige - sobald niemand mehr ohne Zuteilung wartet."""
+    w = await application_world(flow, teams=4, staffeln=2)
+    rows = [await submitted(flow, w, side) for side in w["teams"]]
+    for row, tid in zip(rows, [w["tids"][0], w["tids"][0], w["tids"][0], w["tids"][1]]):
+        ok(await decide(flow, w, row, "accept", tournament_id=tid))
+    season = await flow.db.league_seasons.find_one({"id": w["season"]["id"]}, {"_id": 0})
+
+    short = await league_season_cancel.entry_shortfall(flow.db, {**season, **closed_window()})
+
+    assert len(short) == 1 and "Staffel B" in short[0]["text"] and "1 zugeteilt" in short[0]["text"]
