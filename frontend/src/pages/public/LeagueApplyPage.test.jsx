@@ -240,6 +240,7 @@ test("Solo-Liga: prüfen, selbst zustimmen, einreichen - ohne Co-Team in der Anf
   expect(screen.queryByTestId("apply-squad-s1")).toBeNull();
   expect(screen.getByTestId("apply-check-ok")).toHaveTextContent("Du kannst dich anmelden.");
   expect(screen.getByTestId("apply-warnings")).toHaveTextContent("Dein Geburtsdatum fehlt im Profil.");
+  expect(screen.getByTestId("apply-profile-link")).toHaveAttribute("href", "/profile");
   fireEvent.click(screen.getByTestId("apply-next"));
   expect(await screen.findByText("Ich habe die Regeln gelesen und stimme zu.")).toBeInTheDocument();
   expect(screen.getByTestId("apply-privacy-text")).toHaveTextContent("deine Angaben als Spieler");
@@ -259,7 +260,8 @@ test("Solo-Liga: Was dagegen spricht, steht im Klartext, weiter geht es nicht", 
   renderPage();
 
   expect(await screen.findByTestId("apply-problems")).toHaveTextContent("Du spielst in dieser Season schon in einer Staffel.");
-  expect(screen.getByTestId("apply-profile-link")).toHaveAttribute("href", "/profile?tab=gaming");
+  // Diese Gründe behebt niemand im Profil - kein Link dorthin.
+  expect(screen.queryByTestId("apply-profile-link")).toBeNull();
   expect(screen.getByTestId("apply-next")).toBeDisabled();
 });
 

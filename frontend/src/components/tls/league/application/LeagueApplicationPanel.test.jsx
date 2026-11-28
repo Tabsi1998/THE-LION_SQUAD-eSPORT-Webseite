@@ -294,3 +294,15 @@ test("Solo-Liga: zugeteilt - „Du spielst in …“, Zurückziehen nur über di
   expect(screen.getByTestId("league-application-player")).toHaveTextContent("Du spielst in Liga 1 · Staffel A.");
   expect(screen.queryByTestId("league-application-player-withdraw")).toBeNull();
 });
+
+test("Solo-Liga ohne Fenster: eigener Satz statt „Eure Co-Teams sind automatisch dabei“, kein Satz für die App", async () => {
+  const application = { id: "a1", status: "accepted", can_withdraw: false, staffel: "Liga 1 · Staffel A" };
+  apiMock.get.mockResolvedValue({ data: soloView({ ...PLAYER, state: "accepted", application, can_submit: false }, { application: null,
+    hint: "Als Spieler meldest du dich bis zum App-Ausbau auf der Website an." }) });
+  renderPanel(null);
+
+  expect(await screen.findByTestId("league-application-player")).toHaveTextContent("Du spielst in Liga 1 · Staffel A.");
+  expect(screen.getByTestId("league-application-window")).toHaveTextContent("Gerade kein Anmeldefenster");
+  expect(screen.getByTestId("league-application-window")).not.toHaveTextContent("Co-Teams");
+  expect(screen.queryByTestId("league-application-hint")).toBeNull();
+});

@@ -161,7 +161,7 @@ export function LeagueApplicationPanel({ leagueSlug, seasonSlug, block }) {
           </div>
           {solo ? <p className="mt-1 tls-type-small text-white/70" data-testid="league-application-solo">Solo-Liga: Du meldest dich selbst als Spieler an, 1 gegen 1.</p> : null}
           <p className="mt-1 tls-type-small text-white/85" data-testid="league-application-window">
-            {current.state ? windowLine(current) : "Aus der Vorgänger-Season übernommen: Eure Co-Teams sind automatisch dabei."}
+            {current.state ? windowLine(current) : solo ? "Gerade kein Anmeldefenster – hier steht der Stand deiner Anmeldung." : "Aus der Vorgänger-Season übernommen: Eure Co-Teams sind automatisch dabei."}
           </p>
           {afterStart ? <p className="mt-0.5 tls-type-small text-white/70" data-testid="league-application-after-start">{afterStart}</p> : null}
           {seats ? <p className="mt-0.5 tls-type-small text-white/70" data-testid="league-application-seats">{seats}</p> : null}
@@ -193,7 +193,8 @@ export function LeagueApplicationPanel({ leagueSlug, seasonSlug, block }) {
           <OwnPlayerRow row={player} onWithdraw={withdraw} />
         </ul>
       ) : null}
-      {view?.hint ? <p className="mt-3 tls-type-body text-white/70" data-testid="league-application-hint">{view.hint}</p> : null}
+      {/* Solo-Liga: ``hint`` ist der Satz für ältere App-Fassungen, die Website zeigt ihn nicht. */}
+      {!solo && view?.hint ? <p className="mt-3 tls-type-body text-white/70" data-testid="league-application-hint">{view.hint}</p> : null}
       {rows.length ? (
         <ul className="mt-3" aria-label="Deine Co-Teams" data-testid="league-application-squads">
           {rows.map((row) => <OwnSquadRow key={row.squad_id} row={row} onWithdraw={withdraw} onChanged={load} />)}

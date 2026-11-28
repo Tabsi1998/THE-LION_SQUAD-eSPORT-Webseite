@@ -1,6 +1,6 @@
 import { FormGrid, FormSection } from "@/components/tls/AdminForm";
 import { SelectField, TextAreaField, TextField } from "@/components/tls/FormFields";
-import { ENTRY_POLICY_OPTIONS, LATE_DAYS_DEFAULT, afterStartLine, effectiveCloses, lateCapLine, waitingLine } from "@/lib/leagueApplications";
+import { ENTRY_POLICY_OPTIONS, ENTRY_POLICY_OPTIONS_SOLO, LATE_DAYS_DEFAULT, afterStartLine, effectiveCloses, lateCapLine, waitingLine } from "@/lib/leagueApplications";
 import { fromViennaInput } from "@/lib/vienna";
 import { SeasonLateExtension } from "./SeasonLateExtension";
 import { SeasonPrivacyRelease } from "./SeasonPrivacyRelease";
@@ -55,7 +55,7 @@ export function SeasonApplicationSection({ form, set, id, deadlineField = null, 
       <FormGrid cols={3}>
         <TextField label="Startplätze" type="number" min={1} max={500} value={form.application_slots} onChange={(value) => set("application_slots", value)} hint="leer: keine Grenze außer der Staffelgröße" testId="season-form-application-slots" />
         <TextField label="Warteliste höchstens" type="number" min={1} max={500} value={form.application_waitlist_limit} onChange={(value) => set("application_waitlist_limit", value)} hint="leer: keine Grenze" testId="season-form-application-waitlist-limit" />
-        <SelectField label="Wer darf sich anmelden" value={form.entry_policy} onChange={(value) => set("entry_policy", value)} options={ENTRY_POLICY_OPTIONS}
+        <SelectField label="Wer darf sich anmelden" value={form.entry_policy} onChange={(value) => set("entry_policy", value)} options={solo ? ENTRY_POLICY_OPTIONS_SOLO : ENTRY_POLICY_OPTIONS}
           hint={solo ? "Bei „Nur Vereinsmitglieder“ muss der Spieler Mitglied sein." : "Bei „Nur Vereinsmitglieder“ gilt das für den ganzen Kader."} testId="season-form-entry-policy" />
       </FormGrid>
       {form.entry_policy === "all" && form.visibility === "members" ? (

@@ -106,6 +106,9 @@ function OpenPoints({ row, solo }) {
       {warnings.length ? (
         <ul className="mt-2 space-y-1 tls-type-small text-white/75">{warnings.map((text) => <li key={text} className="[overflow-wrap:anywhere]">{text}</li>)}</ul>
       ) : null}
+      {solo && warnings.length ? (
+        <Link to="/profile" data-testid="apply-profile-link" className="mt-2 inline-flex min-h-[44px] items-center gap-1 tls-type-small font-semibold text-brand hover:underline">Im Profil nachtragen</Link>
+      ) : null}
       <p className="mt-2 tls-type-small text-white/60">
         {solo
           ? "Fehlt dir dann noch etwas, kannst du nicht einchecken. Du trägst es im eigenen Profil nach. Wir erinnern dich jetzt und noch einmal vor dem ersten Spiel."
@@ -130,9 +133,8 @@ function CheckStep({ row, seasonProblems, platform, solo }) {
           <ul className="mt-2 space-y-2 tls-type-small text-white/85">
             {problems.map((text) => <li key={text} className="flex gap-2 [overflow-wrap:anywhere]"><AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-warn" aria-hidden="true" /> <span>{text}</span></li>)}
           </ul>
-          {solo ? (
-            <Link to="/profile?tab=gaming" data-testid="apply-profile-link" className="mt-3 inline-flex items-center gap-1 tls-type-small font-semibold text-brand hover:underline">Profil öffnen</Link>
-          ) : (
+          {/* Solo-Liga: Diese Gründe (Antrag, Staffel, Sperre, Mitgliedschaft) behebt niemand im Profil - kein Link. Was im Profil fehlt, steht unten. */}
+          {solo ? null : (
             <Link to={`/teams?team=${encodeURIComponent(row.team_id)}`} data-testid="apply-team-link" className="mt-3 inline-flex items-center gap-1 tls-type-small font-semibold text-[#29B6E8] hover:underline">Kader und Rollen ändern</Link>
           )}
         </div>

@@ -186,3 +186,9 @@ describe("Solo-Liga: als Spieler anmelden (#1629, P2)", () => {
     expect(submittedToast("accepted")).toBe("Angemeldet. Ihr habt einen Startplatz.");
   });
 });
+
+test("Zulassung in der Solo-Season: „Alle Konten“ ohne Teams", async () => {
+  const { ENTRY_POLICY_OPTIONS_SOLO, ENTRY_POLICY_OPTIONS } = await import("./leagueApplications");
+  expect(ENTRY_POLICY_OPTIONS_SOLO).toEqual([["all", "Alle Konten"], ["members", "Nur Vereinsmitglieder"]]);
+  expect(ENTRY_POLICY_OPTIONS[0][1]).toBe("Alle Konten, auch externe Teams");
+});

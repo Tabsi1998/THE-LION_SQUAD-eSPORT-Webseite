@@ -57,6 +57,8 @@ export function waitingLine(count) {
 }
 
 export const ENTRY_POLICY_OPTIONS = [["all", "Alle Konten, auch externe Teams"], ["members", "Nur Vereinsmitglieder"]];
+// Solo-Liga (#1629, P2): Es melden sich Personen an, keine Teams.
+export const ENTRY_POLICY_OPTIONS_SOLO = [["all", "Alle Konten"], ["members", "Nur Vereinsmitglieder"]];
 
 function when(value) {
   return `${viennaDateTime(value, LONG)} Uhr`;
