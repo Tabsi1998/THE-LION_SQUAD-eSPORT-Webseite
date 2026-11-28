@@ -84,10 +84,11 @@ export function eventFacts(event, { now = new Date() } = {}) {
     const address = place?.address_line || addressLine(event);
     const query = place?.map_query || event.map_query || address || name;
     if (name || address) {
-      rows.push({
-        key: "where", label: "Wo", title: name || address, lines: name && address && address !== name ? [address] : [],
-        route: routeUrl(query), hybrid: Boolean(event.is_hybrid),
-      });
+      const lines = name && address && address !== name ? [address] : [];
+      // Plan A/B/C (#2613): welcher Plan gerade gilt, mit seinem Hinweis.
+      const plan = event.place_plan;
+      if (plan?.label && Number(plan.total) > 1) lines.push(`${plan.label} aktiv${plan.note ? ` · ${plan.note}` : ""}`);
+      rows.push({ key: "where", label: "Wo", title: name || address, lines, route: routeUrl(query), hybrid: Boolean(event.is_hybrid) });
     }
   }
   const paid = Boolean(event.offer?.enabled);

@@ -51,6 +51,18 @@ test("Fakten mehrtägig mit Preis, ohne Ort und ohne Mitbringen", () => {
   expect(eventFacts({ locations: [{ name: "Halle A" }, { name: "Halle B" }] }).find((row) => row.key === "where")).toMatchObject({ title: "2 Standorte", lines: ["Halle A", "Halle B"] });
 });
 
+// Plan A/B/C (#2613): Der Ort ist der aktive Plan; der Kasten sagt, welcher Plan gilt, samt Hinweis.
+test("Fakten mit Ort-Plänen: Wo nennt den aktiven Plan und seinen Hinweis", () => {
+  const where = eventFacts({
+    location: "Rodelbahn Gaisalm", address: "Gaisweg 5", postal_code: "6410", city: "Telfs",
+    place_plan: { label: "Plan B", total: 3, alternative: true, note: "Bei wenig Schnee" },
+  }, { now: NOW }).find((row) => row.key === "where");
+  expect(where.title).toBe("Rodelbahn Gaisalm");
+  expect(where.lines).toEqual(["Gaisweg 5, 6410 Telfs", "Plan B aktiv · Bei wenig Schnee"]);
+  const planA = eventFacts({ location: "Hochegg", place_plan: { label: "Plan A", total: 2, alternative: false, note: "" } }).find((row) => row.key === "where");
+  expect(planA.lines).toEqual(["Plan A aktiv"]);
+});
+
 test("Was läuft: eintägig nur Uhrzeit; eigener Stand, Team und „Anmelden“ nur offen und ohne Stand", () => {
   const rows = whatsOnRows({
     tournaments: [
