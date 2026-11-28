@@ -98,9 +98,10 @@ def change_starts_at(before: dict, after: dict, now) -> str | None:
 
 
 async def _inform(db, event: dict, users: list[dict], *, title: str, message: str, dedupe: str,
-                  template: str = MESSAGE_TEMPLATE, starts_at: str | None = None) -> dict:
+                  template: str = MESSAGE_TEMPLATE, starts_at: str | None = None, urgent: bool = True) -> dict:
     """Benachrichtigung und Mail über die vorhandenen Wege; ein Fehler bei einer Person hält die anderen nicht auf.
-    Die Absage hat ihre eigene Mail ``event_cancelled`` (#2119), die Terminänderung bleibt bei ``event_message``."""
+    Die Absage hat ihre eigene Mail ``event_cancelled`` (#2119), die Terminänderung bleibt bei ``event_message``. Ohne ``urgent``
+    (neue Abstimmung, #2612) ist es eine normale Info: Ruhezeit und Sammel-Mail gelten."""
     from services.notification_preferences import send_user_template
     from services.user_notifications import build_public_url, create_user_notification
 
@@ -115,7 +116,8 @@ async def _inform(db, event: dict, users: list[dict], *, title: str, message: st
                 # Absage und neuer Termin sind zeitkritisch (Fabian 26.11., A/E): nie gesammelt; der Push wartet in der Ruhezeit,
                 # außer das Event beginnt bis 2 Stunden nach dem Ende der Ruhezeit (services/quiet_hours.py).
                 meta={"category": MESSAGE_CATEGORY, "event_id": event["id"], "dedupe_key": f"{dedupe}:{user['id']}",
-                      "timely": True, "starts_at": starts_at or event.get("start_date"), "importance": "important"},
+                      **({"timely": True, "starts_at": starts_at or event.get("start_date"), "importance": "important"}
+                         if urgent else {"importance": "normal"})},
             )
             notified += 1 if doc else 0
         except Exception:
@@ -126,13 +128,27 @@ async def _inform(db, event: dict, users: list[dict], *, title: str, message: st
             if template == MESSAGE_TEMPLATE:
                 values["message"] = message
             result = await send_user_template(
-                user, template, MESSAGE_CATEGORY, never_collect=True, dedupe_key=f"{dedupe}:{user['id']}", **values,
+                user, template, MESSAGE_CATEGORY, never_collect=urgent, dedupe_key=f"{dedupe}:{user['id']}", **values,
             )
             mails += 1 if result.get("ok") and not result.get("skipped") else 0
         except Exception:
             logger.warning("Event %s: Mail an %s nicht eingereiht", log_safe(event["id"]), log_safe(user["id"]),
                            exc_info=True)
     return {"notified": notified, "mails": mails}
+
+
+async def inform_registrants(db, event: dict, *, title: str, message: str, dedupe: str,
+                             statuses: tuple[str, ...] = AFFECTED_STATUSES, starts_at: str | None = None,
+                             urgent: bool = True) -> dict:
+    """Eine Nachricht zum Event an alle mit einer Anmeldung in ``statuses`` - je Person genau eine je ``dedupe``.
+    Für neue Abstimmungen (#2612, nur wer abstimmen darf) und den Wechsel auf einen anderen Ort-Plan (#2613, samt
+    Warteliste wie beim Verschieben). Dieselben Wege wie beim Verschieben: Postfach, Push, Mail „Nachricht zum Event“."""
+    registrations = await db.event_registrations.find(
+        {"event_id": event["id"], "status": {"$in": list(statuses)}}, {"_id": 0, "user_id": 1},
+    ).to_list(5000)
+    users = await _recipients(db, [registration.get("user_id") for registration in registrations])
+    sent = await _inform(db, event, users, title=title, message=message, dedupe=dedupe, starts_at=starts_at, urgent=urgent)
+    return {"recipients": len(users), "notified": sent["notified"], "mails": sent["mails"]}
 
 
 def _when_and_where(event: dict) -> str:

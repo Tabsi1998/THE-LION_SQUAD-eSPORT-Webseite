@@ -68,7 +68,7 @@ class FakeDb:
         self.teams = FakeCollection()
         self.email_logs = FakeCollection([{"id": "mail-1", "to": "lion@example.at"}])
         for name in (
-            "consent_records", "memberships", "user_socials", "event_registrations", "team_members",
+            "consent_records", "memberships", "user_socials", "event_registrations", "event_poll_votes", "team_members",
             "team_invites", "user_achievements", "season_points", "prize_pickups", "notifications", "mail_digest_items",
             "direct_messages", "friendships", "user_blocks", "user_reports", "mobile_push_tokens", "web_push_subscriptions", "discord_guild_active",
             "mobile_client_logs", "audit_logs", "event_messages", "platform_links", "user_signals", "news_reads", "stream_watches",

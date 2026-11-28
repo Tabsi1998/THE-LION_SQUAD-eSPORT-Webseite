@@ -224,6 +224,13 @@ async def init_indexes():
     await db.event_registrations.create_index("id", unique=True)
     await db.event_registrations.create_index([("event_id", 1), ("user_id", 1)], unique=True)
     await db.event_registrations.create_index([("event_id", 1), ("status", 1)])
+    # Abstimmung im Event (#2612): eine Stimme je Wähler und Abstimmung - zwei gleichzeitige Stimmen derselben Person
+    # treffen dieselbe Zeile. Je Konto für Kontolöschung und Auskunft, je Event fürs Löschen des Events.
+    await db.event_polls.create_index("id", unique=True)
+    await db.event_polls.create_index("event_id")
+    await db.event_poll_votes.create_index([("poll_id", 1), ("voter_key", 1)], unique=True)
+    await db.event_poll_votes.create_index("user_id")
+    await db.event_poll_votes.create_index("event_id")
     # Nachricht an alle Angemeldeten (#1372): das Protokoll je Event, neueste zuerst.
     await db.event_messages.create_index([("event_id", 1), ("created_at", -1)])
     # Hinweis der Turnierleitung (#1166): je Turnier bzw. Event die neuesten zuerst. Die Sperre gegen Doppelversand ist

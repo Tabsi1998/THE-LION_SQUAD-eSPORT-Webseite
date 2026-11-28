@@ -410,6 +410,8 @@ function ItemRow({ item, withDate = false }) {
       <span className="min-w-0 flex-1">
         <span className="block tls-type-label text-quiet">
           {kindLabel(item)}{when ? ` · ${when}` : ""}{item.location ? ` · ${item.location}` : ""}
+          {/* Plan A/B/C (#2613): welcher Ort-Plan gerade gilt. */}
+          {item.place_plan ? <span className="text-event" data-testid={`calendar-place-plan-${item.id}`}>{` · ${item.place_plan} aktiv`}</span> : null}
         </span>
         <span className="tls-wrap block tls-type-small font-bold">{item.title}</span>
         {badge ? (

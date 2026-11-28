@@ -15,7 +15,7 @@ import re
 from datetime import datetime, timedelta, timezone
 from zoneinfo import ZoneInfo
 
-from services import event_days, event_facts
+from services import event_days, event_facts, event_place_plans
 from services.league_scope import is_league_staffel
 from services.public_phase import derive_public_phase
 from services.visibility import lead_can_see
@@ -30,7 +30,8 @@ ALARM_MINUTES = 60
 VIENNA = ZoneInfo("Europe/Vienna")
 
 _EVENT_FIELDS = {"_id": 0, "id": 1, "slug": 1, "name": 1, "start_date": 1, "end_date": 1, "status": 1,
-                 "visibility": 1, "location": 1, "city": 1, "event_type": 1, "days": 1, "locations": 1}
+                 "visibility": 1, "location": 1, "city": 1, "event_type": 1, "days": 1, "locations": 1,
+                 "place_plans": 1, "active_place_plan": 1}
 _TOURNAMENT_FIELDS = {"_id": 0, "id": 1, "slug": 1, "title": 1, "start_date": 1, "end_date": 1, "status": 1,
                       "visibility": 1, "is_public": 1, "registration_open_until": 1, "game_name": 1,
                       "league_context": 1}
@@ -87,7 +88,16 @@ def event_item(doc: dict, *, mine: bool = False) -> dict | None:
 
 def event_items(doc: dict, *, mine: bool = False) -> list[dict]:
     """Ein Event als Termine: eintägig einer, mehrtägig (#884) je Tag einer - „Name – Tag 2/3“, damit Kalender die
-    Nächte frei zeigen. Der Weg führt immer auf die eine Event-Seite."""
+    Nächte frei zeigen. Der Weg führt immer auf die eine Event-Seite. Mit Ort-Plänen (#2613) trägt jeder Termin den
+    aktiven Plan („Plan B“); der Ort selbst steht schon in den Ortsfeldern."""
+    plan = event_place_plans.active_label(doc)
+    items = _event_items(doc, mine=mine)
+    for item in items if plan else []:
+        item["place_plan"] = plan
+    return items
+
+
+def _event_items(doc: dict, *, mine: bool = False) -> list[dict]:
     days = event_days.stored_days(doc)
     if not days:
         item = event_item(doc, mine=mine)
@@ -262,6 +272,8 @@ def _vevent(item: dict, *, origin: str, now: datetime, alarm_minutes: int | None
     detail = [KIND_LABELS.get(item["kind"], item["kind"])]
     if item.get("phase", {}) and item["phase"].get("label"):
         detail.append(item["phase"]["label"])
+    if item.get("place_plan"):
+        detail.append(f"{item['place_plan']} aktiv")
     if extra_detail:
         detail.append(extra_detail)
     lines = [

@@ -223,6 +223,8 @@ async def _user_data_sections(db, user_id: str) -> list[tuple[str, tuple]]:
         ("league_rule_consents", _rows(db.league_rule_consents, me)),
         ("competition_matches", _value(matches)),
         ("event_registrations", _rows(db.event_registrations, me)),
+        # Abstimmung im Event (#2612): die eigenen Stimmen - welche Antworten die Person gewählt hat.
+        ("event_poll_votes", _rows(db.event_poll_votes, me)),
         ("f1_lap_times", _rows(db.f1_lap_times, me)),
         ("teams", _rows(db.teams, {"$or": [{"member_ids": user_id}, {"leader_id": user_id}]}, lambda row: _clean(row, "join_code"))),
         # Aufgelöste Teams (#2128, TM8), solange sie wiederherstellbar sind: das Team und die eigene Rolle darin - keine

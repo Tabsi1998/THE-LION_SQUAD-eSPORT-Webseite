@@ -21,7 +21,7 @@ import hashlib
 import json
 from datetime import date
 
-from services import dolibarr_identity, dolibarr_policy, member_activity
+from services import ballot_views, dolibarr_identity, dolibarr_policy, member_activity
 from services.dolibarr_client import DolibarrClient, DolibarrError, load_settings
 
 KIND_LABELS = {"board": "Vorstandssitzung", "general": "Generalversammlung", "extraordinary": "Außerordentliche Generalversammlung"}
@@ -158,21 +158,21 @@ def _right_view(row: dict, labels: dict, secret: bool = False) -> dict:
 
 
 def _result_view(result: dict | None, options: list[dict], labels: dict) -> dict | None:
+    """Das Ergebnis aus der Akte in der gemeinsamen Form (``ballot_views``, #2612) - gezählt hat das Vereinsmodul."""
     if not isinstance(result, dict):
         return None
     counts = result.get("counts") if isinstance(result.get("counts"), dict) else {}
     outcome, winner = str(result.get("outcome") or ""), str(result.get("winner") or "")
-    return {
-        "revision": int(result.get("revision") or 0), "outcome": outcome, "outcome_label": OUTCOME_LABELS.get(outcome, outcome),
-        "passed": bool(result.get("passed")), "valid": int(result.get("valid") or 0), "abstain": int(result.get("abstain") or 0),
-        "counts": [{"code": option["code"], "label": option["label"], "count": int(counts.get(option["code"]) or 0)} for option in options],
-        "winner": winner, "winner_label": labels.get(winner, winner),
-    }
+    return ballot_views.result_view(
+        counts=counts, options=options, outcome=outcome, outcome_label=OUTCOME_LABELS.get(outcome, outcome),
+        valid=result.get("valid"), winner=winner, passed=result.get("passed"), abstain=result.get("abstain"),
+        revision=result.get("revision"),
+    )
 
 
 def ballot_view(row: dict) -> dict:
-    options = [{"code": str(o.get("code") or ""), "label": str(o.get("label") or "")} for o in (row.get("options") or []) if isinstance(o, dict)]
-    labels = {o["code"]: o["label"] for o in options}
+    options = ballot_views.options_view(row.get("options") or [])
+    labels = ballot_views.labels_of(options)
     secret = bool(row.get("secret"))
     rights = [_right_view(r, labels, secret) for r in (row.get("rights") or []) if isinstance(r, dict)]
     kind, status = str(row.get("kind") or ""), str(row.get("status") or "")

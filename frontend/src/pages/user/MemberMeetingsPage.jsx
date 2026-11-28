@@ -6,6 +6,7 @@ import { useConfirm } from "@/components/tls/ConfirmDialog";
 import { useApiInvalidation } from "@/hooks/useApiInvalidation";
 import { AddToCalendar } from "@/components/tls/AddToCalendar";
 import { calendarAskDue, meetingCalendarItem, rememberCalendarAsked } from "@/lib/clubCalendar";
+import { BallotResult } from "@/components/tls/ballot/BallotParts";
 import { Calendar, CheckCircle2, FileText, MapPin, Send, Vote, Video } from "lucide-react";
 import { formatWhen } from "@/lib/datetime";
 
@@ -200,12 +201,7 @@ function BallotCard({ ballot, busy, onVote }) {
       </div>
 
       {ballot.result ? (
-        <div className="mt-4 border-t border-white/10 pt-3 tls-type-small" data-testid={`ballot-${id}-result`}>
-          <div className="font-bold text-white">Ergebnis: {ballot.result.outcome_label}{ballot.result.winner_label ? ` – ${ballot.result.winner_label}` : ""}</div>
-          <div className="mt-1 text-white/70">
-            {ballot.result.counts.map((row) => `${row.label} ${row.count}`).join(" · ")} · gültig {ballot.result.valid}
-          </div>
-        </div>
+        <BallotResult result={ballot.result} testId={`ballot-${id}-result`} />
       ) : ballot.status === "closed" || ballot.status === "evaluated" ? (
         <p className="mt-3 tls-type-small text-white/45">Das Ergebnis erscheint, sobald die Versammlungsleitung es bestätigt hat.</p>
       ) : null}
